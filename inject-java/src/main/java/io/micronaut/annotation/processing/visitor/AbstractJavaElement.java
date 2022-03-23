@@ -117,12 +117,16 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
     public <T extends Annotation> io.micronaut.inject.ast.Element removeAnnotationIf(@NonNull Predicate<AnnotationValue<T>> predicate) {
         //noinspection ConstantConditions
         if (predicate != null) {
-            AnnotationUtils annotationUtils = visitorContext
-                    .getAnnotationUtils();
-            this.annotationMetadata = annotationUtils
-                    .newAnnotationBuilder()
-                    .removeAnnotationIf(annotationMetadata, predicate);
-            return this;
+            try {
+                AnnotationUtils annotationUtils = visitorContext
+                        .getAnnotationUtils();
+                this.annotationMetadata = annotationUtils
+                        .newAnnotationBuilder()
+                        .removeAnnotationIf(annotationMetadata, predicate);
+                return this;
+            } finally {
+                updateMetadataCaches();
+            }
         }
         return this;
     }
@@ -403,6 +407,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
                 upperBounds = Stream.of(extendsBound);
             }
             return new JavaWildcardElement(
+                    wt,
                     upperBounds
                             .map(tm -> (JavaClassElement) mirrorToClassElement(tm, visitorContext, finalGenericsInfo, includeTypeAnnotations))
                             .collect(Collectors.toList()),

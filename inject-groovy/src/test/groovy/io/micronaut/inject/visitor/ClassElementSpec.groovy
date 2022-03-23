@@ -132,6 +132,24 @@ class PckElementTest {
 
         expect:
         pe.name == 'pkgeltest'
+        pe.simpleName == 'pkgeltest'
+        pe.getClass().name.contains("GroovyPackageElement")
+    }
+
+    void "test get full package element"() {
+        given:
+        def element = buildClassElement('''
+package abc.my.pkgeltest;
+
+class PckElementTest {
+
+}
+''')
+        PackageElement pe = element.getPackage()
+
+        expect:
+        pe.name == 'abc.my.pkgeltest'
+        pe.simpleName == 'pkgeltest'
         pe.getClass().name.contains("GroovyPackageElement")
     }
 
@@ -618,6 +636,15 @@ enum Test {
                 'name',
                 'ordinal',
         ]
+
+        then:
+        for (String name : allFields*.name) {
+            assert expected.contains(name)
+        }
+        allFields.size() == expected.size()
+
+        when:
+        allFields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS.includeEnumConstants())
 
         then:
         for (String name : allFields*.name) {
