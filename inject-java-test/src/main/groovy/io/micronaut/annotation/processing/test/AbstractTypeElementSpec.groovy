@@ -192,6 +192,17 @@ class Test {
         context.getBean(context.classLoader.loadClass(className), qualifier)
     }
 
+
+    /**
+     * Gets a bean definition from the context for the given class name
+     * @param context The context
+     * @param className The class name
+     * @return The bean instance
+     */
+    BeanDefinition<?> getBeanDefinition(ApplicationContext context, String className, Qualifier qualifier = null) {
+        context.getBeanDefinition(context.classLoader.loadClass(className), qualifier)
+    }
+
     /**
      * Builds a {@link ApplicationContext} containing only the classes produced by the given source.
      *
