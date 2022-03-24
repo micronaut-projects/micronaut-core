@@ -42,10 +42,7 @@ micronautBom {
         // https://github.com/micronaut-projects/micronaut-data/issues/1403
         dependencies.add("io.micronaut.data:micronaut-data-tck:3.3.0")
         dependencies.add("io.micronaut.data:micronaut-data-document-tck:3.3.0")
-
-        // https://github.com/micronaut-projects/micronaut-servlet/issues/292
-        dependencies.add("io.micronaut.servlet:micronaut-test-kotlin-jetty:3.2.1")
-
+        
         // The R2DBC bom that we include mentions dependencies which do not belong to io.r2dbc group
         bomAuthorizedGroupIds.put("io.r2dbc:r2dbc-bom", ["com.google.cloud", "com.oracle.database.r2dbc", "org.mariadb", "dev.miku"] as Set)
     }
