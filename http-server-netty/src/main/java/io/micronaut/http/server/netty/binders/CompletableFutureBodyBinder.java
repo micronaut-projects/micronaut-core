@@ -29,6 +29,7 @@ import io.micronaut.http.server.netty.HttpContentProcessor;
 import io.micronaut.http.server.netty.HttpContentProcessorResolver;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.netty.buffer.ByteBufHolder;
+import io.netty.util.ReferenceCountUtil;
 import org.reactivestreams.Subscription;
 
 import java.util.Arrays;
@@ -97,6 +98,9 @@ public class CompletableFutureBodyBinder extends DefaultBodyAnnotationBinder<Com
                         } else {
                             nettyHttpRequest.setBody(message);
                         }
+                        // upstream producer gave us control of the message. release it now, if we still need it,
+                        // nettyHttpRequest will have retained it
+                        ReferenceCountUtil.release(message);
                         subscription.request(1);
                     }
 

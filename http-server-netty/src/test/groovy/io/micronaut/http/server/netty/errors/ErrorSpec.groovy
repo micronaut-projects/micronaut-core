@@ -262,6 +262,9 @@ X-Long-Header: $longString\r
 
         then:
         response.status().code() == 413
+
+        cleanup:
+        response.release()
     }
 
     @Controller('/errors')

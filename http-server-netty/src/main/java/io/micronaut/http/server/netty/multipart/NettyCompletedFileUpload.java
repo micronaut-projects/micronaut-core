@@ -23,6 +23,9 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.handler.codec.http.multipart.FileUpload;
+import io.netty.util.ResourceLeakDetector;
+import io.netty.util.ResourceLeakDetectorFactory;
+import io.netty.util.ResourceLeakTracker;
 
 import java.io.File;
 import java.io.IOException;
@@ -38,9 +41,13 @@ import java.util.Optional;
  */
 @Internal
 public class NettyCompletedFileUpload implements CompletedFileUpload {
+    private static final ResourceLeakDetector<NettyCompletedFileUpload> RESOURCE_LEAK_DETECTOR =
+            ResourceLeakDetectorFactory.instance().newResourceLeakDetector(NettyCompletedFileUpload.class);
 
     private final FileUpload fileUpload;
     private final boolean controlRelease;
+
+    private final ResourceLeakTracker<NettyCompletedFileUpload> tracker;
 
     /**
      * @param fileUpload The file upload
@@ -58,6 +65,9 @@ public class NettyCompletedFileUpload implements CompletedFileUpload {
         this.controlRelease = controlRelease;
         if (controlRelease) {
             fileUpload.retain();
+            tracker = RESOURCE_LEAK_DETECTOR.track(this);
+        } else {
+            tracker = null;
         }
     }
 
@@ -105,9 +115,7 @@ public class NettyCompletedFileUpload implements CompletedFileUpload {
         try {
             return ByteBufUtil.getBytes(byteBuf);
         } finally {
-            if (controlRelease) {
-                fileUpload.release();
-            }
+            discard();
         }
     }
 
@@ -129,9 +137,7 @@ public class NettyCompletedFileUpload implements CompletedFileUpload {
         try {
             return byteBuf.nioBuffer();
         } finally {
-            if (controlRelease) {
-                fileUpload.release();
-            }
+            discard();
         }
     }
 
@@ -166,7 +172,12 @@ public class NettyCompletedFileUpload implements CompletedFileUpload {
     }
 
     @Override
-    public void discard() {
-        fileUpload.release();
+    public final void discard() {
+        if (controlRelease) {
+            fileUpload.release();
+        }
+        if (tracker != null) {
+            tracker.close(this);
+        }
     }
 }
