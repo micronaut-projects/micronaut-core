@@ -1,3 +1,13 @@
+plugins {
+    id "io.micronaut.build.internal.convention-library"
+}
+
+micronautBuild {
+    core {
+        usesMicronautTest()
+    }
+}
+
 dependencies {
     api project(":inject")
     api project(':aop')
@@ -39,11 +49,7 @@ dependencies {
         exclude module: 'micronaut-inject'
         exclude module: 'micronaut-runtime'
     }
-    testImplementation(libs.managed.micronaut.test.core) {
-        exclude module:'micronaut-runtime'
-        exclude module:'micronaut-bom'
-        exclude module:'micronaut-inject'
-    }
+
     testRuntimeOnly libs.javax.el.impl
     testRuntimeOnly libs.javax.el
 }

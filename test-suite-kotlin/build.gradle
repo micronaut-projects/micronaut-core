@@ -1,6 +1,15 @@
 plugins {
+    id "io.micronaut.build.internal.convention-test-library"
     id "org.jetbrains.kotlin.jvm"
     id "org.jetbrains.kotlin.kapt"
+}
+
+micronautBuild {
+    core {
+        usesMicronautTestJunit()
+        usesMicronautTestSpock()
+        usesMicronautTestKotest()
+    }
 }
 
 dependencies {
@@ -32,14 +41,7 @@ dependencies {
     testImplementation project(":http-client")
     testImplementation project(":session")
     testImplementation libs.managed.groovy.templates
-    testImplementation(libs.managed.micronaut.test.junit5) {
-        exclude module:'micronaut-runtime'
-        exclude module:'micronaut-inject'
-    }
-    testImplementation(libs.managed.micronaut.test.kotest) {
-        exclude module:'micronaut-runtime'
-        exclude module:'micronaut-inject'
-    }
+
     testImplementation project(":function-client")
     testImplementation project(":function-web")
     testImplementation libs.kotlin.kotest.junit5
