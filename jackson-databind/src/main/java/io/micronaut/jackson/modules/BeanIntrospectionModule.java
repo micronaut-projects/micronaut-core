@@ -249,12 +249,9 @@ public class BeanIntrospectionModule extends SimpleModule {
     }
 
     private String getName(MapperConfig<?> mapperConfig, @Nullable PropertyNamingStrategy namingStrategy, AnnotatedElement property) {
-        AnnotationValue<JsonProperty> explicitAnnotation = property.getAnnotation(JsonProperty.class);
-        if (explicitAnnotation != null) {
-            String explicitName = explicitAnnotation.stringValue().orElse(JsonProperty.USE_DEFAULT_NAME);
-            if (!explicitName.equals(JsonProperty.USE_DEFAULT_NAME)) {
-                return explicitName;
-            }
+        String explicitName = property.getAnnotationMetadata().stringValue(JsonProperty.class).orElse(JsonProperty.USE_DEFAULT_NAME);
+        if (!explicitName.equals(JsonProperty.USE_DEFAULT_NAME)) {
+            return explicitName;
         }
         String implicitName = property.getName();
         if (namingStrategy != null) {
