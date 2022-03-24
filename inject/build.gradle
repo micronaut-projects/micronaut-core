@@ -1,6 +1,15 @@
-ext {
-    shadowJarEnabled = true
+plugins {
+    id "io.micronaut.build.internal.convention-core-library"
 }
+
+micronautBuild {
+    core {
+        documented = false
+        usesMicronautTestJunit()
+    }
+
+}
+
 dependencies {
     api libs.managed.javax.annotation.api
     compileOnly libs.javax.inject
@@ -20,10 +29,6 @@ dependencies {
     testImplementation project(":inject-test-utils")
     testImplementation libs.systemlambda
 
-    testImplementation(libs.managed.micronaut.test.junit5) {
-        exclude module:'micronaut-runtime'
-        exclude module:'micronaut-inject'
-    }
     testRuntimeOnly libs.junit.jupiter.engine
 
 }

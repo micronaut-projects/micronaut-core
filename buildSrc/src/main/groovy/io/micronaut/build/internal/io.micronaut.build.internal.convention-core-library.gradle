@@ -1,0 +1,7 @@
+plugins {
+    id "io.micronaut.build.internal.convention-library"
+}
+
+ext {
+    shadowJarEnabled = true
+}
