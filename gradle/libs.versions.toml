@@ -91,7 +91,7 @@ managed-micronaut-ignite = "1.0.0.RC1"
 managed-micronaut-jaxrs = "3.2.0"
 managed-micronaut-jms = "2.0.0-M1"
 managed-micronaut-jmx = "3.0.0"
-managed-micronaut-kafka = "4.2.0"
+managed-micronaut-kafka = "4.3.0"
 managed-micronaut-kotlin = "3.2.2"
 managed-micronaut-kubernetes = "3.4.0"
 managed-micronaut-micrometer = "4.2.0"
@@ -157,6 +157,7 @@ boms-micronaut-email = { module = "io.micronaut.email:micronaut-email-bom", vers
 boms-micronaut-data = { module = "io.micronaut.data:micronaut-data-bom", version.ref = "managed-micronaut-data" }
 boms-micronaut-gcp = { module = "io.micronaut.gcp:micronaut-gcp-bom", version.ref = "managed-micronaut-gcp" }
 boms-micronaut-groovy = { module = "io.micronaut.groovy:micronaut-groovy-bom", version.ref = "managed-micronaut-groovy" }
+boms-micronaut-kafka = { module = "io.micronaut.kafka:micronaut-kafka-bom", version.ref = "managed-micronaut-kafka" }
 boms-micronaut-kotlin = { module = "io.micronaut.kotlin:micronaut-kotlin-bom", version.ref = "managed-micronaut-kotlin" }
 boms-micronaut-kubernetes = { module = "io.micronaut.kubernetes:micronaut-kubernetes-bom", version.ref = "managed-micronaut-kubernetes" }
 boms-micronaut-micrometer = { module = "io.micronaut.micrometer:micronaut-micrometer-bom", version.ref = "managed-micronaut-micrometer" }
@@ -255,9 +256,7 @@ managed-jna = { module = "net.java.dev.jna:jna", version.ref = "managed-jna" }
 
 managed-jsr305 = { module = "com.google.code.findbugs:jsr305", version.ref = "managed-jsr305" }
 
-managed-kafka = { module = "org.apache.kafka:kafka-clients", version.ref = "managed-kafka" }
 managed-kafka212 = { module = "org.apache.kafka:kafka_2.12", version.ref = "managed-kafka" }
-managed-kafka-streams = { module = "org.apache.kafka:kafka-streams", version.ref = "managed-kafka" }
 
 managed-liquibase = { module = "org.liquibase:liquibase-core", version.ref = "managed-liquibase" }
 
@@ -301,8 +300,6 @@ managed-micronaut-jms-activemq-classic = { module = "io.micronaut.jms:micronaut-
 managed-micronaut-jms-activemq-artemis = { module = "io.micronaut.jms:micronaut-jms-activemq-artemis", version.ref = "managed-micronaut-jms" }
 managed-micronaut-jms-sqs = { module = "io.micronaut.jms:micronaut-jms-sqs", version.ref = "managed-micronaut-jms" }
 managed-micronaut-jmx = { module = "io.micronaut.jmx:micronaut-jmx", version.ref = "managed-micronaut-jmx" }
-managed-micronaut-kafka = { module = "io.micronaut.kafka:micronaut-kafka", version.ref = "managed-micronaut-kafka" }
-managed-micronaut-kafka-streams = { module = "io.micronaut.kafka:micronaut-kafka-streams", version.ref = "managed-micronaut-kafka" }
 managed-micronaut-liquibase = { module = "io.micronaut.liquibase:micronaut-liquibase", version.ref = "managed-micronaut-liquibase" }
 managed-micronaut-multitenancy = { module = "io.micronaut.multitenancy:micronaut-multitenancy", version.ref = "managed-micronaut-multitenancy" }
 managed-micronaut-nats = { module = "io.micronaut.nats:micronaut-nats", version.ref = "managed-micronaut-nats" }
