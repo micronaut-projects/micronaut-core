@@ -31,7 +31,6 @@ import io.netty.util.ResourceLeakTracker;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.util.Optional;
 import java.util.function.Supplier;
