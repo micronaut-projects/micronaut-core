@@ -10,6 +10,7 @@ dependencies {
 
     api project(":jackson-core")
 
+    compileOnly libs.managed.graal
     api libs.managed.jackson.databind
     api libs.managed.jackson.datatype.jdk8
     api libs.managed.jackson.datatype.jsr310
