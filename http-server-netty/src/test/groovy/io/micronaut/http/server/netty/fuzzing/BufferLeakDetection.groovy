@@ -18,16 +18,18 @@ class BufferLeakDetection<T> extends ResourceLeakDetector<T> {
 
     private static volatile String canaryString = null
 
+    private static volatile String currentTest = null
     private static volatile boolean leakDetected = false
     private static volatile boolean canaryDetected = false
 
     @SuppressWarnings("unused")
     private static volatile int sink
 
-    static void startTracking() {
+    static void startTracking(String testName) {
         triggerGc()
 
         leakDetected = false
+        currentTest = testName
 
         LOG.debug("Starting resource leak tracking")
         if (level != Level.PARANOID) {
@@ -108,5 +110,10 @@ class BufferLeakDetection<T> extends ResourceLeakDetector<T> {
     protected void reportUntracedLeak(String resourceType) {
         leakDetected = true
         super.reportUntracedLeak(resourceType)
+    }
+
+    //@Override only available for override in netty 4.1.75+
+    protected Object getInitialHint(String resourceType) {
+        return currentTest
     }
 }
