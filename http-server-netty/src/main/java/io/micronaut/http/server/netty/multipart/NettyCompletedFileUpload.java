@@ -17,6 +17,7 @@ package io.micronaut.http.server.netty.multipart;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
+import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.multipart.CompletedFileUpload;
 import io.netty.buffer.ByteBuf;
@@ -32,6 +33,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 /**
  * A Netty implementation of {@link CompletedFileUpload}.
@@ -41,8 +43,9 @@ import java.util.Optional;
  */
 @Internal
 public class NettyCompletedFileUpload implements CompletedFileUpload {
-    private static final ResourceLeakDetector<NettyCompletedFileUpload> RESOURCE_LEAK_DETECTOR =
-            ResourceLeakDetectorFactory.instance().newResourceLeakDetector(NettyCompletedFileUpload.class);
+    //to avoid initializing Netty at build time
+    private static final Supplier<ResourceLeakDetector<NettyCompletedFileUpload>> RESOURCE_LEAK_DETECTOR = SupplierUtil.memoized(() ->
+            ResourceLeakDetectorFactory.instance().newResourceLeakDetector(NettyCompletedFileUpload.class));
 
     private final FileUpload fileUpload;
     private final boolean controlRelease;
@@ -65,7 +68,7 @@ public class NettyCompletedFileUpload implements CompletedFileUpload {
         this.controlRelease = controlRelease;
         if (controlRelease) {
             fileUpload.retain();
-            tracker = RESOURCE_LEAK_DETECTOR.track(this);
+            tracker = RESOURCE_LEAK_DETECTOR.get().track(this);
         } else {
             tracker = null;
         }
