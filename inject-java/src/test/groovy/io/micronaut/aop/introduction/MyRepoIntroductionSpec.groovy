@@ -116,6 +116,18 @@ class MyRepoIntroductionSpec extends Specification {
             MyRepoIntroducer.EXECUTED_METHODS.clear()
     }
 
+    void "test return type annotations are method annotations"() {
+        when:
+            def beanDef = applicationContext.getBeanDefinition(CustomCrudRepo2)
+            def custom1Method = beanDef.getExecutableMethods().find(m -> m.getName() == "custom1")
+            def custom2Method = beanDef.getExecutableMethods().find(m -> m.getName() == "custom2")
+        then:
+            !custom1Method.hasAnnotation(Marker)
+            custom2Method.hasAnnotation(Marker)
+            !custom1Method.getReturnType().annotationMetadata.hasAnnotation(Marker)
+            custom2Method.getReturnType().annotationMetadata.hasAnnotation(Marker)
+    }
+
     void "test overridden void methods"() {
         when:
             def bean = applicationContext.getBean(MyRepo2)

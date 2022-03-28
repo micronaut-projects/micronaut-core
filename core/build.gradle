@@ -1,5 +1,11 @@
-ext {
-    shadowJarEnabled = true
+plugins {
+    id "io.micronaut.build.internal.convention-core-library"
+}
+
+micronautBuild {
+    core {
+        documented = false
+    }
 }
 
 tasks.named("shadowJar") {
@@ -7,11 +13,11 @@ tasks.named("shadowJar") {
 }
 
 dependencies {
-    api libs.managed.slf4j
     compileOnly libs.managed.jsr305
     compileOnly libs.managed.graal
     compileOnly libs.kotlin.stdlib
     compileOnly libs.asm.tree
+
     shadowCompile libs.bundles.asm
     shadowCompile libs.asm.tree
     shadowCompile(libs.caffeine) {

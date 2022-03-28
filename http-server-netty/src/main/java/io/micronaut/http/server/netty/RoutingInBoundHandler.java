@@ -56,6 +56,7 @@ import io.micronaut.http.server.exceptions.InternalServerException;
 import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
+import io.micronaut.http.server.netty.multipart.NettyCompletedFileUpload;
 import io.micronaut.http.server.netty.multipart.NettyPartData;
 import io.micronaut.http.server.netty.multipart.NettyStreamingFileUpload;
 import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandler;
@@ -96,6 +97,7 @@ import io.netty.handler.codec.http2.Http2Error;
 import io.netty.handler.codec.http2.Http2Exception;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
+import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 import org.reactivestreams.Publisher;
@@ -149,7 +151,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
      * Also present in {@link RouteExecutor}.
      */
     private static final Pattern IGNORABLE_ERROR_MESSAGE = Pattern.compile(
-            "^.*(?:connection.*(?:reset|closed|abort|broken)|broken.*pipe).*$", Pattern.CASE_INSENSITIVE);
+            "^.*(?:connection (?:reset|closed|abort|broken)|broken pipe).*$", Pattern.CASE_INSENSITIVE);
     private static final Argument ARGUMENT_PART_DATA = Argument.of(PartData.class);
     private final Router router;
     private final StaticResourceResolver staticResourceResolver;
@@ -665,6 +667,20 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
                 @Override
                 protected void doOnNext(Object message) {
+                    try {
+                        doOnNext0(message);
+                    } finally {
+                        // the upstream processor gives us ownership of the message, so we need to release it.
+                        ReferenceCountUtil.release(message);
+                    }
+                }
+
+                private void doOnNext0(Object message) {
+                    if (request.destroyed) {
+                        // we don't want this message anymore
+                        return;
+                    }
+
                     boolean executed = this.executed.get();
                     if (message instanceof ByteBufHolder) {
                         if (message instanceof HttpData) {
@@ -823,7 +839,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                     }
                                 }
 
-                                if (alwaysAddContent) {
+                                if (alwaysAddContent && !request.destroyed) {
                                     request.addContent(data);
                                 }
 
@@ -848,6 +864,18 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 @Override
                 protected void doOnError(Throwable t) {
                     s.cancel();
+                    // discard parameters that have already been bound
+                    for (Object toDiscard : routeMatch.getVariableValues().values()) {
+                        if (toDiscard instanceof ReferenceCounted) {
+                            ((ReferenceCounted) toDiscard).release();
+                        }
+                        if (toDiscard instanceof io.netty.util.ReferenceCounted) {
+                            ((io.netty.util.ReferenceCounted) toDiscard).release();
+                        }
+                        if (toDiscard instanceof NettyCompletedFileUpload) {
+                            ((NettyCompletedFileUpload) toDiscard).discard();
+                        }
+                    }
                     for (Sinks.Many<Object> subject : downstreamSubscribers) {
                         subject.tryEmitError(t);
                     }
@@ -896,6 +924,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         ((NettyHttpRequest) request).setBody(message);
                         s.request(1);
                     }
+                    ReferenceCountUtil.release(message);
                 }
 
                 @Override

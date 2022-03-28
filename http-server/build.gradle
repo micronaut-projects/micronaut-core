@@ -1,7 +1,9 @@
-
+plugins {
+    id "io.micronaut.build.internal.convention-library"
+}
 
 internalSanityChecks {
-    expectedServiceCount.put('io.micronaut.inject.BeanDefinitionReference', 30)
+    expectedServiceCount.put('io.micronaut.inject.BeanDefinitionReference', 32)
     expectedServiceCount.put('io.micronaut.inject.BeanConfiguration', 1)
 }           
 

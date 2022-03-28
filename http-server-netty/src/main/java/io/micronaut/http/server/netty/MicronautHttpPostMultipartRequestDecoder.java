@@ -39,12 +39,6 @@ class MicronautHttpPostMultipartRequestDecoder extends HttpPostMultipartRequestD
 
     @Override
     public void destroy() {
-        /*
-            Prevent them from being released as they will
-            be released after they are read or when the request
-            terminates
-         */
-        getBodyHttpDatas().clear();
         super.destroy();
         // release any data partially uploaded but not completed
         final InterfaceHttpData data = currentPartialHttpData();

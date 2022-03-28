@@ -110,6 +110,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
     private final List<InvocationInstrumenterFactory> invocationInstrumenterFactories;
     private final EventLoopGroupFactory eventLoopGroupFactory;
     private final HttpClientFilterResolver<ClientFilterResolutionContext> clientFilterResolver;
+    private final JsonMapper jsonMapper;
     private final Collection<ChannelPipelineListener> pipelineListeners = new CopyOnWriteArrayList<>();
 
     /**
@@ -125,6 +126,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
      * @param eventLoopGroupFactory           The event loop group factory
      * @param beanContext                     The bean context
      * @param invocationInstrumenterFactories The invocation instrumenter factories
+     * @param jsonMapper                      JSON Mapper
      */
     public DefaultNettyHttpClientRegistry(
             HttpClientConfiguration defaultHttpClientConfiguration,
@@ -136,8 +138,8 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
             EventLoopGroupRegistry eventLoopGroupRegistry,
             EventLoopGroupFactory eventLoopGroupFactory,
             BeanContext beanContext,
-            List<InvocationInstrumenterFactory> invocationInstrumenterFactories
-    ) {
+            List<InvocationInstrumenterFactory> invocationInstrumenterFactories,
+            JsonMapper jsonMapper) {
         this.clientFilterResolver = httpClientFilterResolver;
         this.defaultHttpClientConfiguration = defaultHttpClientConfiguration;
         this.loadBalancerResolver = loadBalancerResolver;
@@ -148,6 +150,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
         this.eventLoopGroupFactory = eventLoopGroupFactory;
         this.eventLoopGroupRegistry = eventLoopGroupRegistry;
         this.invocationInstrumenterFactories = invocationInstrumenterFactories;
+        this.jsonMapper = jsonMapper;
     }
 
     @NonNull
@@ -473,7 +476,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
                 .getAnnotationNamesByStereotype(FilterMatcher.class);
         final Class configurationClass =
                 metadata.classValue(Client.class, "configuration").orElse(null);
-        JsonFeatures jsonFeatures = beanContext.getBean(JsonMapper.class).detectFeatures(metadata).orElse(null);
+        JsonFeatures jsonFeatures = jsonMapper.detectFeatures(metadata).orElse(null);
 
         return new ClientKey(httpVersion, clientId, filterAnnotation, path, configurationClass, jsonFeatures);
     }

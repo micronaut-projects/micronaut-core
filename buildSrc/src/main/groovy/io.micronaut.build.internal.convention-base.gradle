@@ -1,0 +1,97 @@
+import io.micronaut.build.internal.ext.MicronautCoreExtension
+import io.micronaut.build.internal.ext.DefaultMicronautCoreExtension
+
+plugins {
+    id "io.micronaut.build.internal.common"
+}
+
+micronautBuild {
+    enableBom = false
+    enableProcessing = false
+}
+
+group = projectGroupId
+
+def micronautBuild = (ExtensionAware) project.extensions.getByName("micronautBuild")
+def micronautCore = micronautBuild.extensions.create(MicronautCoreExtension, "core", DefaultMicronautCoreExtension, extensions.findByType(VersionCatalogsExtension))
+micronautCore.documented.convention(true)
+
+tasks.withType(Test).configureEach {
+    useJUnitPlatform()
+    jvmArgs '-Xmx2048m'
+    systemProperty "micronaut.cloud.platform", "OTHER"
+    if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_15)) {
+        jvmArgs "--enable-preview"
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.fork = true
+    options.compilerArgs.add("-Amicronaut.processing.group=$project.group")
+    options.compilerArgs.add("-Amicronaut.processing.module=micronaut-$project.name")
+    options.compilerArgs.add("-Amicronaut.processing.omit.confprop.injectpoints=true")
+    options.forkOptions.memoryMaximumSize = "2g"
+}
+
+tasks.withType(GroovyCompile).configureEach {
+    options.fork = true
+    options.compilerArgs.add("-Amicronaut.processing.group=$project.group")
+    options.compilerArgs.add("-Amicronaut.processing.module=micronaut-$project.name")
+    groovyOptions.forkOptions.memoryMaximumSize = "2g"
+}
+
+// This is for reproducible builds
+tasks.withType(Jar).configureEach {
+    reproducibleFileOrder = true
+    preserveFileTimestamps = false
+}
+
+dependencies {
+    annotationProcessor libs.bundles.asm
+    annotationProcessor(libs.micronaut.docs.map {
+        if (micronautCore.documented.get()) {
+            it
+        } else {
+            null
+        }
+    }) {
+        transitive = false
+    }
+
+    api libs.managed.slf4j
+    compileOnly libs.caffeine
+    compileOnly libs.bundles.asm
+
+    testAnnotationProcessor project(":http-validation")
+    testAnnotationProcessor libs.bundles.asm
+
+    testImplementation libs.caffeine
+    testImplementation libs.managed.groovy
+    testImplementation(libs.managed.spock) {
+        exclude module: 'groovy-all'
+    }
+
+    testImplementation libs.groovy.test.junit5
+    testImplementation libs.bundles.asm
+}
+
+spotless {
+    java {
+        targetExclude '**/io/micronaut/core/io/scan/AnnotationClassReader.java'
+        targetExclude '**/io/micronaut/core/io/scan/Attribute.java'
+        targetExclude '**/io/micronaut/core/io/scan/Context.java'
+        targetExclude '**/io/micronaut/core/util/clhm/**'
+        targetExclude '**/io/micronaut/core/util/AntPathMatcher.java'
+        targetExclude '**/io/micronaut/discovery/eureka/client/v2/AmazonInfo.java'
+        targetExclude '**/io/micronaut/discovery/eureka/client/v2/DataCenterInfo.java'
+        targetExclude '**/io/micronaut/discovery/eureka/client/v2/LeaseInfo.java'
+        targetExclude '**/io/micronaut/support/InMemoryJavaFileManager.java'
+        targetExclude '**/io/micronaut/scheduling/cron/CronExpression.java'
+        targetExclude '**/org/atinject/tck/auto/Tck.kt'
+        targetExclude '**/io/micronaut/http/uri/QueryStringDecoder.java'
+    }
+    format 'javaMisc', {
+        targetExclude '**/io/micronaut/core/util/clhm/**'
+        targetExclude '**/io/micronaut/http/netty/stream/package-info.java'
+    }
+}

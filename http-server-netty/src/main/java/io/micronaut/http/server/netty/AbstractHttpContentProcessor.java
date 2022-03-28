@@ -70,6 +70,7 @@ public abstract class AbstractHttpContentProcessor<T> extends SingleSubscriberPr
     protected final void doOnNext(ByteBufHolder message) {
         long receivedLength = this.receivedLength.addAndGet(message.content().readableBytes());
 
+        ReferenceCountUtil.touch(message);
         if (advertisedLength > requestMaxSize) {
             fireExceedsLength(advertisedLength, requestMaxSize, message);
         } else if (receivedLength > requestMaxSize) {

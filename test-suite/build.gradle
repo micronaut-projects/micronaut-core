@@ -10,10 +10,18 @@ buildscript {
 }
 
 plugins {
+    id "io.micronaut.build.internal.convention-test-library"
     id 'io.micronaut.build.internal.functional-test'
+    id 'java-test-fixtures'
 }
 
-apply plugin: 'java-test-fixtures'
+micronautBuild {
+    core {
+        usesMicronautTestJunit()
+        usesMicronautTestSpock()
+    }
+}
+
 apply from: "${rootProject.projectDir}/gradle/geb.gradle"
 apply from: "${rootProject.projectDir}/gradle/webdriverbinaries.gradle"
 
@@ -35,17 +43,9 @@ dependencies {
     testImplementation project(":function-client")
     testImplementation project(":function-web")
     testImplementation project(":session")
-    testImplementation(libs.managed.micronaut.test.junit5) {
-        exclude module:'micronaut-runtime'
-        exclude module:'micronaut-inject'
-    }
+
     // Adding these for now since micronaut-test isnt resolving correctly ... probably need to upgrade gradle there too
     testImplementation libs.junit.jupiter.api
-
-    testImplementation(libs.managed.micronaut.test.spock) {
-        exclude module:'micronaut-runtime'
-        exclude module:'micronaut-inject'
-    }
 
     testImplementation libs.managed.jcache
     testImplementation(libs.micronaut.tracing.jaeger) {

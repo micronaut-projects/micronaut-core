@@ -38,6 +38,7 @@ import io.netty.buffer.EmptyByteBuf;
 import io.netty.handler.codec.http.multipart.Attribute;
 import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.handler.codec.http.multipart.HttpData;
+import io.netty.util.ReferenceCountUtil;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -129,13 +130,10 @@ public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinde
                                 } else if (data instanceof Attribute) {
                                     subscriber.onNext(new NettyCompletedAttribute((Attribute) data, false));
                                 }
-
-                                //If the user didn't release the data, we should
-                                if (data.refCnt() > 0) {
-                                    data.release();
-                                }
                             }
                         }
+
+                        ReferenceCountUtil.release(message);
 
                         if (partsRequested.get() > 0) {
                             s.request(1);

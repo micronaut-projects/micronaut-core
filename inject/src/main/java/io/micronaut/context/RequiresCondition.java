@@ -78,6 +78,8 @@ public class RequiresCondition implements Condition {
     public static final String MEMBER_MISSING_BEANS = "missingBeans";
     public static final String MEMBER_OS = "os";
     public static final String MEMBER_NOT_OS = "notOs";
+    public static final String MEMBER_BEAN = "bean";
+    public static final String MEMBER_BEAN_PROPERTY = "beanProperty";
 
     private final AnnotationMetadata annotationMetadata;
 
@@ -201,7 +203,7 @@ public class RequiresCondition implements Condition {
     }
 
     /**
-     * This method will run conditions that require all beans to be loaded. These conditions included "beans", "missingBeans" and custom conditions.
+     * This method will run conditions that require all beans to be loaded. These conditions included "beans", "bean", "missingBeans" and custom conditions.
      */
     private void processPostStartRequirements(ConditionContext context, AnnotationValue<Requires> requirements) {
         processPreStartRequirements(context, requirements);
@@ -560,8 +562,14 @@ public class RequiresCondition implements Condition {
     }
 
     private boolean matchesPresenceOfBeans(ConditionContext context, AnnotationValue<Requires> requirements) {
-        if (requirements.contains(MEMBER_BEANS)) {
+        if (requirements.contains(MEMBER_BEANS) || requirements.contains(MEMBER_BEAN)) {
             Class[] beans = requirements.classValues(MEMBER_BEANS);
+            if (requirements.contains(MEMBER_BEAN)) {
+                Class<?> memberBean = requirements.classValue(MEMBER_BEAN).orElse(null);
+                if (memberBean != null) {
+                    beans = ArrayUtils.concat(beans, memberBean);
+                }
+            }
             if (ArrayUtils.isNotEmpty(beans)) {
                 BeanContext beanContext = context.getBeanContext();
                 for (Class type : beans) {

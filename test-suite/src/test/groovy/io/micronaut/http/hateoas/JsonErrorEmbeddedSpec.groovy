@@ -15,7 +15,6 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import spock.lang.Issue
-import spock.lang.PendingFeature
 import spock.lang.Specification
 
 import javax.validation.constraints.Pattern
@@ -29,7 +28,6 @@ class JsonErrorEmbeddedSpec extends Specification {
     @Client("/")
     HttpClient httpClient
 
-    @PendingFeature
     void "JsonError returns embedded"() {
         when:
         HttpResponse<String> response = httpClient.toBlocking().exchange('/say/hello/sergio', String, JsonError)
