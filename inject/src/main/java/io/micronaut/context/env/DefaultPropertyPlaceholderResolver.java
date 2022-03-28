@@ -16,13 +16,15 @@
 package io.micronaut.context.env;
 
 import io.micronaut.context.exceptions.ConfigurationException;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.PropertyResolver;
 
-import io.micronaut.core.annotation.Nullable;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -35,7 +37,7 @@ import java.util.regex.Pattern;
  * @author graemerocher
  * @since 1.0
  */
-public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderResolver {
+public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderResolver, AutoCloseable {
 
     /**
      * Prefix for placeholder in properties.
@@ -53,6 +55,7 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
     private final PropertyResolver environment;
     private final ConversionService<?> conversionService;
     private final String prefix;
+    private Collection<PropertyExpressionResolver> expressionResolvers;
 
     /**
      * @param environment The property resolver for the environment
@@ -62,6 +65,23 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
         this.environment = environment;
         this.conversionService = conversionService;
         this.prefix = PREFIX;
+    }
+
+    private Collection<PropertyExpressionResolver> getExpressionResolvers() {
+        Collection<PropertyExpressionResolver> expressionResolvers = this.expressionResolvers;
+        if (expressionResolvers == null) {
+            synchronized (this) { // double check
+                expressionResolvers = this.expressionResolvers;
+                if (expressionResolvers == null) {
+                    this.expressionResolvers = new ArrayList<>();
+                    expressionResolvers = new ArrayList<>();
+                    ClassLoader classLoader = (environment instanceof Environment) ? ((Environment) environment).getClassLoader() : environment.getClass().getClassLoader();
+                    SoftServiceLoader.load(PropertyExpressionResolver.class, classLoader).collectAll(expressionResolvers);
+                    this.expressionResolvers = expressionResolvers;
+                }
+            }
+        }
+        return expressionResolvers;
     }
 
     @Override
@@ -145,6 +165,12 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
      */
     @Nullable
     protected <T> T resolveExpression(String context, String expression, Class<T> type) {
+        for (PropertyExpressionResolver expressionResolver : getExpressionResolvers()) {
+            Optional<T> value = expressionResolver.resolve(environment, conversionService, expression, type);
+            if (value.isPresent()) {
+                return value.get();
+            }
+        }
         if (environment.containsProperty(expression)) {
             return environment.getProperty(expression, type)
                     .orElseThrow(() ->
@@ -159,6 +185,15 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
             }
         }
         return null;
+    }
+
+    @Override
+    public void close() throws Exception {
+        for (PropertyExpressionResolver expressionResolver : getExpressionResolvers()) {
+            if (expressionResolver instanceof AutoCloseable) {
+                ((AutoCloseable) expressionResolver).close();
+            }
+        }
     }
 
     /**
