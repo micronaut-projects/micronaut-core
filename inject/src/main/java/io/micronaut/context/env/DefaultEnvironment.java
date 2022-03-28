@@ -997,6 +997,15 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         return "digitalocean".equalsIgnoreCase(readFile(DO_SYS_VENDOR_FILE));
     }
 
+    @Override
+    public void close() {
+        try {
+            super.close();
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to close!", e);
+        }
+        stop();
+    }
 
     /**
      * Helper class for handling environments and package.

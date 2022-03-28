@@ -64,7 +64,7 @@ import java.util.stream.Collectors;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class PropertySourcePropertyResolver implements PropertyResolver {
+public class PropertySourcePropertyResolver implements PropertyResolver, AutoCloseable {
 
     private static final Logger LOG = ClassUtils.getLogger(PropertySourcePropertyResolver.class);
 
@@ -894,6 +894,13 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
             return lowerBound + (float) (Math.random() * (upperBound - lowerBound));
         } catch (NumberFormatException ex) {
             throw new ValueException("Invalid range: `" + range + "` found for type Float while parsing property: " + property, ex);
+        }
+    }
+
+    @Override
+    public void close() throws Exception {
+        if (propertyPlaceholderResolver instanceof AutoCloseable) {
+            ((AutoCloseable) propertyPlaceholderResolver).close();
         }
     }
 
