@@ -58,6 +58,7 @@ managed-h2 = "1.4.200"
 managed-hystrix = "1.5.18"
 managed-jakarta-annotation-api = "2.0.0"
 managed-jackson = "2.13.2"
+managed-jackson-databind = "2.13.2.2"
 managed-javax-annotation-api = "1.3.2"
 managed-jcache = "1.1.1"
 managed-jna = "5.7.0"
@@ -240,7 +241,7 @@ managed-jakarta-annotation-api = { module = "jakarta.annotation:jakarta.annotati
 
 managed-jackson-annotations = { module = "com.fasterxml.jackson.core:jackson-annotations", version.ref = "managed-jackson" }
 managed-jackson-core = { module = "com.fasterxml.jackson.core:jackson-core", version.ref = "managed-jackson" }
-managed-jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "managed-jackson" }
+managed-jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "managed-jackson-databind" }
 managed-jackson-datatype-jdk8 = { module = "com.fasterxml.jackson.datatype:jackson-datatype-jdk8", version.ref = "managed-jackson" }
 managed-jackson-datatype-jsr310 = { module = "com.fasterxml.jackson.datatype:jackson-datatype-jsr310", version.ref = "managed-jackson" }
 managed-jackson-module-afterburner = { module = "com.fasterxml.jackson.module:jackson-module-afterburner", version.ref = "managed-jackson" }
