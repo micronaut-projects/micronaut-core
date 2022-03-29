@@ -41,7 +41,6 @@ wiremock = "2.27.2"
 managed-commons-dbcp = "2.9.0"
 managed-dekorate = "1.0.3"
 managed-elasticsearch = "7.16.3"
-managed-grpc = "1.39.0"
 managed-ignite = "2.8.1"
 managed-junit5 = "5.7.2"
 managed-kotlin = "1.6.10"
@@ -85,7 +84,7 @@ managed-micronaut-flyway = "5.2.0"
 managed-micronaut-gcp = "4.1.1"
 managed-micronaut-graphql = "3.0.0"
 managed-micronaut-groovy = "3.1.0"
-managed-micronaut-grpc = "3.1.3"
+managed-micronaut-grpc = "3.2.0"
 managed-micronaut-hibernate-validator = "3.0.0"
 managed-micronaut-ignite = "1.0.0.RC1"
 managed-micronaut-jaxrs = "3.2.0"
@@ -156,6 +155,7 @@ boms-micronaut-coherence = { module = "io.micronaut.coherence:micronaut-coherenc
 boms-micronaut-email = { module = "io.micronaut.email:micronaut-email-bom", version.ref = "managed-micronaut-email" }
 boms-micronaut-data = { module = "io.micronaut.data:micronaut-data-bom", version.ref = "managed-micronaut-data" }
 boms-micronaut-gcp = { module = "io.micronaut.gcp:micronaut-gcp-bom", version.ref = "managed-micronaut-gcp" }
+boms-micronaut-grpc = { module = "io.micronaut.grpc:micronaut-grpc-bom", version.ref = "managed-micronaut-grpc" }
 boms-micronaut-groovy = { module = "io.micronaut.groovy:micronaut-groovy-bom", version.ref = "managed-micronaut-groovy" }
 boms-micronaut-kafka = { module = "io.micronaut.kafka:micronaut-kafka-bom", version.ref = "managed-micronaut-kafka" }
 boms-micronaut-kotlin = { module = "io.micronaut.kotlin:micronaut-kotlin-bom", version.ref = "managed-micronaut-kotlin" }
@@ -180,7 +180,6 @@ boms-micronaut-r2dbc = { module = "io.micronaut.r2dbc:micronaut-r2dbc-bom", vers
 boms-micronaut-flyway = { module = "io.micronaut.flyway:micronaut-flyway-bom", version.ref = "managed-micronaut-flyway" }
 
 boms-groovy = { module = "org.codehaus.groovy:groovy-bom", version.ref = "managed-groovy" }
-boms-grpc = { module = "io.grpc:grpc-bom", version.ref = "managed-grpc" }
 boms-jackson = { module = "com.fasterxml.jackson:jackson-bom", version.ref = "managed-jackson" }
 boms-junit5 = { module = "org.junit:junit-bom", version.ref = "managed-junit5" }
 boms-kotlin = { module = "org.jetbrains.kotlin:kotlin-bom", version.ref = "managed-kotlin" }
@@ -284,11 +283,6 @@ managed-micronaut-cassandra = { module = "io.micronaut.cassandra:micronaut-cassa
 managed-micronaut-discovery = { module = "io.micronaut.discovery:micronaut-discovery-client", version.ref = "managed-micronaut-discovery" }
 managed-micronaut-elasticsearch = { module = "io.micronaut.elasticsearch:micronaut-elasticsearch", version.ref = "managed-micronaut-elasticsearch" }
 managed-micronaut-graphql = { module = "io.micronaut.graphql:micronaut-graphql", version.ref = "managed-micronaut-graphql" }
-managed-micronaut-grpc = { module = "io.micronaut.grpc:micronaut-grpc-runtime", version.ref = "managed-micronaut-grpc" }
-managed-micronaut-grpc-annotation = { module = "io.micronaut.grpc:micronaut-grpc-annotation", version.ref = "managed-micronaut-grpc" }
-managed-micronaut-grpc-client-runtime = { module = "io.micronaut.grpc:micronaut-grpc-client-runtime", version.ref = "managed-micronaut-grpc" }
-managed-micronaut-grpc-server-runtime = { module = "io.micronaut.grpc:micronaut-grpc-server-runtime", version.ref = "managed-micronaut-grpc" }
-managed-micronaut-grpc-protobuf-support = { module = "io.micronaut.grpc:micronaut-protobuff-support", version.ref = "managed-micronaut-grpc" }
 managed-micronaut-hibernate-validator = { module = "io.micronaut.beanvalidation:micronaut-hibernate-validator", version.ref = "managed-micronaut-hibernate-validator" }
 managed-micronaut-ignite-core = { module = "io.micronaut.ignite:micronaut-ignite-core", version.ref = "managed-micronaut-ignite" }
 managed-micronaut-ignite-cache = { module = "io.micronaut.ignite:micronaut-ignite-cache", version.ref = "managed-micronaut-ignite" }
