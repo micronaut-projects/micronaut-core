@@ -680,7 +680,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             // this is to ensure that if the post construct method does anything funky to
             // cause recreation of this bean then we don't have a circular problem
             key = new DefaultBeanContext.BeanKey(this, resolutionContext.getCurrentQualifier());
-            resolutionContext.addInFlightBean(key, bean);
+            resolutionContext.addInFlightBean(key, new BeanRegistration(key, this, bean));
         }
 
         final Set<Map.Entry<Class, List<BeanInitializedEventListener>>> beanInitializedEventListeners

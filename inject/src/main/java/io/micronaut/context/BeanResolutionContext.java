@@ -17,17 +17,22 @@ package io.micronaut.context;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.value.ValueResolver;
-import io.micronaut.inject.*;
+import io.micronaut.inject.BeanDefinition;
+import io.micronaut.inject.BeanIdentifier;
+import io.micronaut.inject.FieldInjectionPoint;
+import io.micronaut.inject.InjectionPoint;
+import io.micronaut.inject.MethodInjectionPoint;
 
-import io.micronaut.core.annotation.Nullable;
-
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 /**
  * Represents the resolution context for a current resolve of a given bean.
@@ -41,6 +46,90 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     @Override
     default void close() {
         // no-op
+    }
+
+    /**
+     * Get a bean of the given type and qualifier.
+     *
+     * @param beanType          The bean type
+     * @param qualifier         The qualifier
+     * @param <T>               The bean type parameter
+     * @return The found bean
+     * @since 3.5.0
+     */
+    @NonNull
+    default <T> T getBean(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+        return ((DefaultBeanContext) getContext()).getBean(this, beanType, qualifier);
+    }
+
+    /**
+     * Get all beans of the given type and qualifier.
+     *
+     * @param beanType          The bean type
+     * @param qualifier         The qualifier
+     * @param <T>               The bean type parameter
+     * @return The found beans
+     * @since 3.5.0
+     */
+    @NonNull
+    default <T> Collection<T> getBeansOfType(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+        return ((DefaultBeanContext) getContext()).getBeansOfType(this, beanType, qualifier);
+    }
+
+    /**
+     * Obtains a stream of beans of the given type and qualifier.
+     *
+     * @param beanType          The bean type
+     * @param qualifier         The qualifier
+     * @param <T>               The bean concrete type
+     * @return A stream
+     * @since 3.5.0
+     */
+    @NonNull
+    default <T> Stream<T> streamOfType(@NonNull  Argument<T> beanType, @Nullable  Qualifier<T> qualifier) {
+        return ((DefaultBeanContext) getContext()).streamOfType(this, beanType, qualifier);
+    }
+
+    /**
+     * Find an optional bean of the given type and qualifier.
+     *
+     * @param beanType          The bean type
+     * @param qualifier         The qualifier
+     * @param <T>               The bean type parameter
+     * @return The found bean wrapped as an {@link Optional}
+     * @since 3.5.0
+     */
+    @NonNull
+    default <T> Optional<T> findBean(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+        return ((DefaultBeanContext) getContext()).findBean(this, beanType, qualifier);
+    }
+
+    /**
+     * Injects a bean.
+     *
+     * @param beanDefinition The requesting bean definition
+     * @param instance       The instance
+     * @param <T>            The instance type
+     * @return The instance
+     * @since 3.5.0
+     */
+    @NonNull
+    default <T> T inject(@Nullable BeanDefinition<?> beanDefinition, @NonNull T instance) {
+        return ((DefaultBeanContext) getContext()).inject(this, beanDefinition, instance);
+    }
+
+    /**
+     * Obtains the bean registrations for the given type and qualifier.
+     *
+     * @param beanType          The bean type
+     * @param qualifier         The qualifier
+     * @param <T>               The generic type
+     * @return A collection of {@link BeanRegistration}
+     * @since 3.5.0
+     */
+    @NonNull
+    default <T> Collection<BeanRegistration<T>> getBeanRegistrations(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+        return ((DefaultBeanContext) getContext()).getBeanRegistrations(this, beanType, qualifier);
     }
 
     /**
@@ -99,10 +188,10 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     /**
      * Adds a bean that is created as part of the resolution. This is used to store references to instances passed to {@link BeanContext#inject(Object)}
      * @param beanIdentifier The bean identifier
-     * @param instance The instance
-     * @param <T> THe instance type
+     * @param beanRegistration The bean registration
+     * @param <T> The instance type
      */
-    <T> void addInFlightBean(BeanIdentifier beanIdentifier, T instance);
+    <T> void addInFlightBean(BeanIdentifier beanIdentifier, BeanRegistration<T> beanRegistration);
 
     /**
      * Removes a bean that is in the process of being created. This is used to store references to instances passed to {@link BeanContext#inject(Object)}
@@ -119,7 +208,7 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * @param <T> The bean type
      * @return The bean
      */
-    @Nullable <T> T getInFlightBean(BeanIdentifier beanIdentifier);
+    @Nullable <T> BeanRegistration<T> getInFlightBean(BeanIdentifier beanIdentifier);
 
     /**
      * @return The current bean identifier
