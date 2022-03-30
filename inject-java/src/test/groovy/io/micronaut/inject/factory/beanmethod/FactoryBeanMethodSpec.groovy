@@ -138,7 +138,7 @@ class Bar6 {
             bar2BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).size() == 1
             bar2BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).iterator().next() == AnnotationUtil.SINGLETON
         and:
-            bar3BeanDefinition.getScope().isEmpty()
+            !bar3BeanDefinition.getScope().isPresent()
             bar3BeanDefinition.declaredQualifier.toString() == "@Named('test.Xyz')"
             bar3BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).size() == 0
         and:
