@@ -58,9 +58,7 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * @since 3.5.0
      */
     @NonNull
-    default <T> T getBean(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
-        return ((DefaultBeanContext) getContext()).getBean(this, beanType, qualifier);
-    }
+    <T> T getBean(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier);
 
     /**
      * Get all beans of the given type and qualifier.
@@ -72,9 +70,7 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * @since 3.5.0
      */
     @NonNull
-    default <T> Collection<T> getBeansOfType(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
-        return ((DefaultBeanContext) getContext()).getBeansOfType(this, beanType, qualifier);
-    }
+    <T> Collection<T> getBeansOfType(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier);
 
     /**
      * Obtains a stream of beans of the given type and qualifier.
@@ -86,9 +82,7 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * @since 3.5.0
      */
     @NonNull
-    default <T> Stream<T> streamOfType(@NonNull  Argument<T> beanType, @Nullable  Qualifier<T> qualifier) {
-        return ((DefaultBeanContext) getContext()).streamOfType(this, beanType, qualifier);
-    }
+    <T> Stream<T> streamOfType(@NonNull  Argument<T> beanType, @Nullable  Qualifier<T> qualifier);
 
     /**
      * Find an optional bean of the given type and qualifier.
@@ -100,9 +94,7 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * @since 3.5.0
      */
     @NonNull
-    default <T> Optional<T> findBean(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
-        return ((DefaultBeanContext) getContext()).findBean(this, beanType, qualifier);
-    }
+    <T> Optional<T> findBean(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier);
 
     /**
      * Injects a bean.
@@ -114,9 +106,7 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * @since 3.5.0
      */
     @NonNull
-    default <T> T inject(@Nullable BeanDefinition<?> beanDefinition, @NonNull T instance) {
-        return ((DefaultBeanContext) getContext()).inject(this, beanDefinition, instance);
-    }
+    <T> T inject(@Nullable BeanDefinition<?> beanDefinition, @NonNull T instance);
 
     /**
      * Obtains the bean registrations for the given type and qualifier.
@@ -128,9 +118,7 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * @since 3.5.0
      */
     @NonNull
-    default <T> Collection<BeanRegistration<T>> getBeanRegistrations(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
-        return ((DefaultBeanContext) getContext()).getBeanRegistrations(this, beanType, qualifier);
-    }
+    <T> Collection<BeanRegistration<T>> getBeanRegistrations(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier);
 
     /**
      * Call back to destroy any {@link io.micronaut.context.annotation.InjectScope} beans.
