@@ -240,6 +240,7 @@ public class BeanIntrospectionModule extends SimpleModule {
                     Constructor<?> emptyConstructor = clazz.get().getConstructor();
                     return (PropertyNamingStrategy) emptyConstructor.newInstance();
                 } catch (NoSuchMethodException ignored) {
+                    return mapperConfig.getPropertyNamingStrategy();
                 } catch (ReflectiveOperationException e) {
                     throw new RuntimeException("Failed to construct configured PropertyNamingStrategy", e);
                 }
