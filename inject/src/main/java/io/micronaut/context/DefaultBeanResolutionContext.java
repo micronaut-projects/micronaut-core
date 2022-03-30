@@ -31,26 +31,14 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Internal
 public final class DefaultBeanResolutionContext extends AbstractBeanResolutionContext {
-    private final Map<BeanIdentifier, BeanRegistration> beansInCreation = new ConcurrentHashMap<>(5);
+    private final Map<BeanIdentifier, BeanRegistration<?>> beansInCreation = new ConcurrentHashMap<>(5);
 
     /**
      * @param context        The bean context
      * @param rootDefinition The bean root definition
      */
-    public DefaultBeanResolutionContext(BeanContext context, BeanDefinition rootDefinition) {
-        super(context, rootDefinition);
-    }
-
-    /**
-     * @param context        The bean context
-     * @param rootDefinition The bean root definition
-     * @param beansInCreation the beans in creation
-     */
-    public DefaultBeanResolutionContext(BeanContext context, BeanDefinition rootDefinition, Map<BeanIdentifier, BeanRegistration> beansInCreation) {
-        super(context, rootDefinition);
-        if (beansInCreation != null) {
-            this.beansInCreation.putAll(beansInCreation);
-        }
+    public DefaultBeanResolutionContext(BeanContext context, BeanDefinition<?> rootDefinition) {
+        super((DefaultBeanContext) context, rootDefinition);
     }
 
     @Override
