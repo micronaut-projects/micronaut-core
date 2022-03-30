@@ -29,6 +29,7 @@ import com.fasterxml.jackson.core.SerializableString;
 import com.fasterxml.jackson.core.io.SerializedString;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.cfg.MapperConfig;
 import com.fasterxml.jackson.databind.deser.BeanDeserializerBuilder;
@@ -56,6 +57,7 @@ import com.fasterxml.jackson.databind.ser.impl.PropertySerializerMap;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 import com.fasterxml.jackson.databind.util.SimpleBeanPropertyDefinition;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.AnnotatedElement;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Experimental;
@@ -69,7 +71,6 @@ import io.micronaut.core.reflect.exception.InstantiationException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.http.hateoas.Resource;
 import io.micronaut.jackson.JacksonConfiguration;
 import jakarta.inject.Singleton;
 import org.slf4j.Logger;
@@ -77,6 +78,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Constructor;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -228,6 +230,38 @@ public class BeanIntrospectionModule extends SimpleModule {
         );
     }
 
+    @Nullable
+    private PropertyNamingStrategy findNamingStrategy(MapperConfig<?> mapperConfig, BeanIntrospection<?> introspection) {
+        AnnotationValue<JsonNaming> namingAnnotation = introspection.getAnnotation(JsonNaming.class);
+        if (namingAnnotation != null) {
+            Optional<Class<?>> clazz = namingAnnotation.classValue();
+            if (clazz.isPresent()) {
+                try {
+                    Constructor<?> emptyConstructor = clazz.get().getConstructor();
+                    return (PropertyNamingStrategy) emptyConstructor.newInstance();
+                } catch (NoSuchMethodException ignored) {
+                    return mapperConfig.getPropertyNamingStrategy();
+                } catch (ReflectiveOperationException e) {
+                    throw new RuntimeException("Failed to construct configured PropertyNamingStrategy", e);
+                }
+            }
+        }
+        return mapperConfig.getPropertyNamingStrategy();
+    }
+
+    private String getName(MapperConfig<?> mapperConfig, @Nullable PropertyNamingStrategy namingStrategy, AnnotatedElement property) {
+        String explicitName = property.getAnnotationMetadata().stringValue(JsonProperty.class).orElse(JsonProperty.USE_DEFAULT_NAME);
+        if (!explicitName.equals(JsonProperty.USE_DEFAULT_NAME)) {
+            return explicitName;
+        }
+        String implicitName = property.getName();
+        if (namingStrategy != null) {
+            return namingStrategy.nameForGetterMethod(mapperConfig, null, implicitName);
+        } else {
+            return implicitName;
+        }
+    }
+
     /**
      * Modifies bean serialization.
      */
@@ -235,13 +269,14 @@ public class BeanIntrospectionModule extends SimpleModule {
         @Override
         public BeanSerializerBuilder updateBuilder(SerializationConfig config, BeanDescription beanDesc, BeanSerializerBuilder builder) {
             final Class<?> beanClass = beanDesc.getBeanClass();
-            final boolean isResource = Resource.class.isAssignableFrom(beanDesc.getBeanClass());
             final BeanIntrospection<Object> introspection =
                     findIntrospection(beanClass);
 
             if (introspection == null) {
                 return super.updateBuilder(config, beanDesc, builder);
             } else {
+                PropertyNamingStrategy namingStrategy = findNamingStrategy(config, introspection);
+
                 final BeanSerializerBuilder newBuilder = new BeanSerializerBuilder(beanDesc) {
                     @Override
                     public JsonSerializer<?> build() {
@@ -270,19 +305,7 @@ public class BeanIntrospectionModule extends SimpleModule {
                         if (beanProperty.hasAnnotation(JsonIgnore.class)) {
                             continue;
                         }
-                        final String propertyName;
-                        if (isResource) {
-                            final String n = beanProperty.getName();
-                            if ("embedded".equals(n)) {
-                                propertyName = Resource.EMBEDDED;
-                            } else if ("links".equals(n)) {
-                                propertyName = Resource.LINKS;
-                            } else {
-                                propertyName = beanProperty.stringValue(JsonProperty.class).orElse(beanProperty.getName());
-                            }
-                        } else {
-                            propertyName = beanProperty.stringValue(JsonProperty.class).orElse(beanProperty.getName());
-                        }
+                        final String propertyName = getName(config, namingStrategy, beanProperty);
                         BeanPropertyWriter writer = new BeanIntrospectionPropertyWriter(
                                 createVirtualMember(
                                         typeResolutionContext,
@@ -310,50 +333,18 @@ public class BeanIntrospectionModule extends SimpleModule {
                     }
 
                     final List<BeanPropertyWriter> newProperties = new ArrayList<>(properties);
-                    Map<String, BeanProperty> named = new LinkedHashMap<>(properties.size());
+                    Map<String, BeanProperty<Object, Object>> named = new LinkedHashMap<>();
                     for (BeanProperty<Object, Object> beanProperty : beanProperties) {
-                        final Optional<String> n = beanProperty.stringValue(JsonProperty.class);
-                        n.ifPresent(s -> named.put(s, beanProperty));
+                        named.put(getName(config, namingStrategy, beanProperty), beanProperty);
                     }
                     for (int i = 0; i < properties.size(); i++) {
                         final BeanPropertyWriter existing = properties.get(i);
 
-                        final Optional<BeanProperty<Object, Object>> property;
-                        final String existingName = existing.getName();
-                        if (named.containsKey(existingName)) {
-                            property = Optional.of(named.get(existingName));
-                        } else {
-                            property = introspection.getProperty(existingName);
-                        }
+                        final Optional<BeanProperty<Object, Object>> property = Optional.ofNullable(named.get(existing.getName()));
                         // ignore properties that are @JsonIgnore, so that we don't replace other properties of the
                         // same name
                         if (property.isPresent() && !property.get().isAnnotationPresent(JsonIgnore.class)) {
                             final BeanProperty<Object, Object> beanProperty = property.get();
-                            if (isResource) {
-                                if ("embedded".equals(beanProperty.getName())) {
-                                    newProperties.set(i, new BeanIntrospectionPropertyWriter(
-                                                    new SerializedString(Resource.EMBEDDED),
-                                                    existing,
-                                                    beanProperty,
-                                                    existing.getSerializer(),
-                                                    config.getTypeFactory(),
-                                                    existing.getViews()
-                                            )
-                                    );
-                                    continue;
-                                } else if ("links".equals(beanProperty.getName())) {
-                                    newProperties.set(i, new BeanIntrospectionPropertyWriter(
-                                                    new SerializedString(Resource.LINKS),
-                                                    existing,
-                                                    beanProperty,
-                                                    existing.getSerializer(),
-                                                    config.getTypeFactory(),
-                                                    existing.getViews()
-                                            )
-                                    );
-                                    continue;
-                                }
-                            }
                             newProperties.set(i, new BeanIntrospectionPropertyWriter(
                                         existing,
                                         beanProperty,
@@ -394,6 +385,8 @@ public class BeanIntrospectionModule extends SimpleModule {
             if (introspection == null) {
                 return builder;
             } else {
+                PropertyNamingStrategy propertyNamingStrategy = findNamingStrategy(config, introspection);
+
                 final Iterator<SettableBeanProperty> properties = builder.getProperties();
                 if ((ignoreReflectiveProperties || !properties.hasNext()) && introspection.getPropertyNames().length > 0) {
                     // mismatch, probably GraalVM reflection not enabled for bean. Try recreate
@@ -403,6 +396,7 @@ public class BeanIntrospectionModule extends SimpleModule {
                                             beanDesc.getClassInfo(),
                                             config.getTypeFactory(),
                                             beanProperty,
+                                            getName(config, propertyNamingStrategy, beanProperty),
                                             findSerializerFromAnnotation(beanProperty, JsonDeserialize.class)),
                                     true);
                         }
@@ -416,7 +410,7 @@ public class BeanIntrospectionModule extends SimpleModule {
                             continue;
                         }
 
-                        remainingProperties.put(beanProperty.getName(), beanProperty);
+                        remainingProperties.put(getName(config, propertyNamingStrategy, beanProperty), beanProperty);
                     }
                     while (properties.hasNext()) {
                         final SettableBeanProperty settableBeanProperty = properties.next();
@@ -444,6 +438,7 @@ public class BeanIntrospectionModule extends SimpleModule {
                                                 beanDesc.getClassInfo(),
                                                 config.getTypeFactory(),
                                                 entry.getValue(),
+                                                entry.getKey(),
                                                 findSerializerFromAnnotation(entry.getValue(), JsonDeserialize.class)),
                                         true);
                             }
@@ -468,7 +463,7 @@ public class BeanIntrospectionModule extends SimpleModule {
                                 final JavaType javaType = existingProperty != null ? existingProperty.getType() : newType(argument, typeFactory);
                                 final AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
                                 PropertyMetadata propertyMetadata = newPropertyMetadata(argument, annotationMetadata);
-                                final String simpleName = existingProperty != null ? existingProperty.getName() : annotationMetadata.stringValue(JsonProperty.class).orElse(argument.getName());
+                                final String simpleName = existingProperty != null ? existingProperty.getName() : getName(config, propertyNamingStrategy, argument);
                                 TypeDeserializer typeDeserializer;
                                 try {
                                     typeDeserializer = config.findTypeDeserializer(javaType);
@@ -673,9 +668,9 @@ public class BeanIntrospectionModule extends SimpleModule {
         final BeanProperty beanProperty;
         final TypeResolutionContext typeResolutionContext;
 
-        VirtualSetter(TypeResolutionContext typeResolutionContext, TypeFactory typeFactory, BeanProperty beanProperty, JsonDeserializer<Object> valueDeser) {
+        VirtualSetter(TypeResolutionContext typeResolutionContext, TypeFactory typeFactory, BeanProperty<?,?> beanProperty, String propertyName, JsonDeserializer<Object> valueDeser) {
             super(
-                    new PropertyName(beanProperty.getName()),
+                    new PropertyName(propertyName),
                     newType(beanProperty.asArgument(), typeFactory),
                     newPropertyMetadata(beanProperty.asArgument(), beanProperty.getAnnotationMetadata()), valueDeser);
             this.beanProperty = beanProperty;

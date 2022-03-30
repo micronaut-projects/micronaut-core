@@ -27,12 +27,12 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.Creator
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.http.hateoas.JsonError
-import io.micronaut.http.hateoas.Link
 import io.micronaut.jackson.JacksonConfiguration
 import io.micronaut.jackson.modules.testcase.EmailTemplate
 import io.micronaut.jackson.modules.testcase.Notification
 import io.micronaut.jackson.modules.wrappers.*
 import spock.lang.Issue
+import spock.lang.Unroll
 import spock.lang.Specification
 
 import java.beans.ConstructorProperties
@@ -916,7 +916,8 @@ class BeanIntrospectionModuleSpec extends Specification {
         }
     }
 
-    void "JsonIgnore on one accessor"() {
+    @Unroll("JsonIgnore is supported with ignoreReflectiveProperties: #ignoreReflectiveProperties")
+    void "JsonIgnore on one accessor"(boolean ignoreReflectiveProperties) {
         given:
         ApplicationContext ctx = ApplicationContext.run()
         ctx.getBean(BeanIntrospectionModule).ignoreReflectiveProperties = ignoreReflectiveProperties
@@ -961,6 +962,105 @@ class BeanIntrospectionModuleSpec extends Specification {
         @JsonIgnore
         public void setBar(String s) {
             this.bar = s
+        }
+    }
+
+    @Unroll("JsonProperty annotation is supported with ignoreReflectiveProperties: #ignoreReflectiveProperties")
+    void "JsonProperty support"(boolean ignoreReflectiveProperties) {
+        given:
+        ApplicationContext ctx = ApplicationContext.run()
+        ctx.getBean(BeanIntrospectionModule).ignoreReflectiveProperties = ignoreReflectiveProperties
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        expect:
+        objectMapper.writeValueAsString(new JsonPropertyBean(foo: 'x')) == '{"bar":"x"}'
+        objectMapper.readValue('{"bar":"x"}', JsonPropertyBean).foo == 'x'
+
+        cleanup:
+        ctx.close()
+
+        where:
+        // without reflection we only see JsonIgnore on the whole property
+        ignoreReflectiveProperties << [true, false]
+    }
+
+    @Introspected
+    static class JsonPropertyBean {
+
+        private String foo
+
+        @JsonProperty('bar')
+        public String getFoo() {
+            return foo
+        }
+
+        public void setFoo(String s) {
+            this.foo = s
+        }
+    }
+
+    void "JsonNaming support"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run()
+        ctx.getBean(BeanIntrospectionModule).ignoreReflectiveProperties = ignoreReflectiveProperties
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        expect:
+        objectMapper.writeValueAsString(new JsonNamingBean(fooBar: 'x')) == '{"foo_bar":"x"}'
+        objectMapper.readValue('{"foo_bar":"x"}', JsonNamingBean).fooBar == 'x'
+
+        cleanup:
+        ctx.close()
+
+        where:
+        // without reflection we only see JsonIgnore on the whole property
+        ignoreReflectiveProperties << [true, false]
+    }
+
+    @Introspected
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy)
+    static class JsonNamingBean {
+
+        private String fooBar
+
+        public String getFooBar() {
+            return fooBar
+        }
+
+        public void setFooBar(String s) {
+            this.fooBar = s
+        }
+    }
+
+    void "JsonNaming support in config"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run(["jackson.property-naming-strategy": "SNAKE_CASE"])
+        ctx.getBean(BeanIntrospectionModule).ignoreReflectiveProperties = ignoreReflectiveProperties
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        expect:
+        objectMapper.writeValueAsString(new JsonNamingBeanConfig(fooBar: 'x')) == '{"foo_bar":"x"}'
+        objectMapper.readValue('{"foo_bar":"x"}', JsonNamingBeanConfig).fooBar == 'x'
+
+        cleanup:
+        ctx.close()
+
+        where:
+        // without reflection we only see JsonIgnore on the whole property
+        ignoreReflectiveProperties << [true, false]
+    }
+
+    @Introspected
+    static class JsonNamingBeanConfig {
+
+        private String fooBar
+
+        public String getFooBar() {
+            return fooBar
+        }
+
+        public void setFooBar(String s) {
+            this.fooBar = s
         }
     }
 }
