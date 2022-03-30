@@ -32,6 +32,7 @@ import io.micronaut.jackson.modules.testcase.EmailTemplate
 import io.micronaut.jackson.modules.testcase.Notification
 import io.micronaut.jackson.modules.wrappers.*
 import spock.lang.Issue
+import spock.lang.Unroll
 import spock.lang.Specification
 
 import java.beans.ConstructorProperties
@@ -915,7 +916,8 @@ class BeanIntrospectionModuleSpec extends Specification {
         }
     }
 
-    void "JsonIgnore on one accessor"() {
+    @Unroll("JsonIgnore is supported with ignoreReflectiveProperties: #ignoreReflectiveProperties")
+    void "JsonIgnore on one accessor"(boolean ignoreReflectiveProperties) {
         given:
         ApplicationContext ctx = ApplicationContext.run()
         ctx.getBean(BeanIntrospectionModule).ignoreReflectiveProperties = ignoreReflectiveProperties
@@ -963,7 +965,8 @@ class BeanIntrospectionModuleSpec extends Specification {
         }
     }
 
-    void "JsonProperty support"() {
+    @Unroll("JsonProperty annotation is supported with ignoreReflectiveProperties: #ignoreReflectiveProperties")
+    void "JsonProperty support"(boolean ignoreReflectiveProperties) {
         given:
         ApplicationContext ctx = ApplicationContext.run()
         ctx.getBean(BeanIntrospectionModule).ignoreReflectiveProperties = ignoreReflectiveProperties
