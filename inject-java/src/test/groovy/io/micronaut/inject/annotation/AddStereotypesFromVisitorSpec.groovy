@@ -27,6 +27,7 @@ import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.inject.annotation.MyQualifier;
 import io.micronaut.inject.annotation.MyScope;
 import io.micronaut.inject.annotation.MyAdvice;
+import io.micronaut.inject.annotation.MyAnnotation;
 import io.micronaut.aop.InterceptorBean;
 import java.util.Locale;
 
@@ -37,6 +38,9 @@ class TestBean {
 
 @MyQualifier
 class Other {}
+
+@MyAnnotation
+class StereotypeTest {}
 
 @MyScope
 class AdvisedBean {
@@ -56,8 +60,12 @@ class MyInterceptor implements MethodInterceptor<Object, Object> {
 }
 ''')
         expect:
+        getBean(context, 'addstereotype.StereotypeTest') != null
         getBean(context, 'addstereotype.TestBean').other != null
-        context.getBeanDefinition(context.classLoader.loadClass('addstereotype.TestBean'))
+        getBeanDefinition(context, 'addstereotype.StereotypeTest')
+            .getAnnotationNameByStereotype(AnnotationUtil.SCOPE)
+            .get() == MyScope.name
+        getBeanDefinition(context, 'addstereotype.TestBean')
                 .injectedFields.first().annotationMetadata.hasDeclaredStereotype(AnnotationUtil.QUALIFIER)
         getBean(context, 'addstereotype.AdvisedBean') instanceof Intercepted
         getBean(context, 'addstereotype.AdvisedBean').test("foo") == "FOO"
@@ -87,6 +95,9 @@ class MyInterceptor implements MethodInterceptor<Object, Object> {
             visitorContext.getClassElement(MyScope).ifPresent({ ClassElement ce ->
                 ce.annotate(Scope)
             })
+            visitorContext.getClassElement(MyAnnotation).ifPresent({ ClassElement ce ->
+                ce.annotate(MyScope)
+            })
         }
     }
 
@@ -109,3 +120,6 @@ class MyInterceptor implements MethodInterceptor<Object, Object> {
 
 @Retention(RetentionPolicy.RUNTIME)
 @interface MyAdvice {}
+
+@Retention(RetentionPolicy.RUNTIME)
+@interface MyAnnotation {}

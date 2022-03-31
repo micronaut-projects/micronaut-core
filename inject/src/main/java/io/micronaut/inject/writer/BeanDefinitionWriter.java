@@ -869,7 +869,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         } else {
             constructor = factoryField;
 
-            autoApplyNamed(factoryField);
+            autoApplyNamedIfPresent(factoryField, factoryField.getAnnotationMetadata());
             // now prepare the implementation of the build method. See BeanFactory interface
             visitBuildFactoryMethodDefinition(factoryClass, factoryField);
             // now override the injectBean method
