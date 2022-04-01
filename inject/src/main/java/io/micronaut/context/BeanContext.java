@@ -261,6 +261,21 @@ public interface BeanContext extends
     <T> Optional<T> refreshBean(@Nullable BeanIdentifier identifier);
 
     /**
+     * <p>Refresh the state of the given registered bean applying dependency injection and configuration wiring again.</p>
+     * <p>
+     * <p>Note that if the bean was produced by a {@link io.micronaut.context.annotation.Factory} then this method will
+     * refresh the factory too</p>
+     * <p>
+     * This methods skips an additional resolution of the {@link BeanRegistration}.
+     *
+     * @param beanRegistration The {@link BeanRegistration}
+     * @param <T>              The concrete class
+     * @since 3.5.0
+     */
+    @NonNull
+    <T> void refreshBean(@NonNull BeanRegistration<T> beanRegistration);
+
+    /**
      * @return The class loader used by this context
      */
     @NonNull

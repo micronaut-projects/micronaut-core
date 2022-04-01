@@ -12,8 +12,8 @@ import org.atinject.tck.auto.Car;
 public class BeanImportTck {
 
     public static Test suite() {
-        try (BeanContext beanContext = BeanContext.run()) {
-            return Tck.testsFor(beanContext.getBean(Car.class), false, true);
-        }
+        BeanContext beanContext = BeanContext.run();
+        // Tests are running after this method, keep the bean context open
+        return Tck.testsFor(beanContext.getBean(Car.class), false, true);
     }
 }

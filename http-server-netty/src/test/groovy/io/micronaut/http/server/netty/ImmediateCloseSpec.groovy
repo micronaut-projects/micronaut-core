@@ -32,6 +32,7 @@ class ImmediateCloseSpec extends Specification {
         embeddedServer.start()
 
         when:
+        def holder = ctx.getBean(Holder) // Get holder before the close is called and instance is destroyed
         HttpGet get = new HttpGet(embeddedServer.URI.toString() + '/empty')
         CloseableHttpClient httpClient = HttpClients.createDefault()
         def response = httpClient.execute(get)
@@ -40,7 +41,7 @@ class ImmediateCloseSpec extends Specification {
 
         then:
         response.getStatusLine().statusCode == 401
-        ctx.getBean(Holder).handleCount == 1
+        holder.handleCount == 1
         // can't check for log messages :(
 
         cleanup:
