@@ -1751,7 +1751,8 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
      */
     @Internal
     @UsedByGeneratedCode
-    protected final <K, R extends Collection<K>> R getBeansOfTypeForField(BeanResolutionContext resolutionContext, BeanContext context, int fieldIndex, Argument<K> genericType, Qualifier<K> qualifier) {
+    protected final <K, R extends Collection<K>> Object getBeansOfTypeForField(BeanResolutionContext resolutionContext, BeanContext context, int fieldIndex, Argument<K> genericType, Qualifier<K> qualifier) {
+        // Keep Object type for backwards compatibility
         final FieldReference fieldRef = fieldInjection[fieldIndex];
         final Argument<R> argument = resolveEnvironmentArgument(context, fieldRef.argument);
         try (BeanResolutionContext.Path ignored = resolutionContext.getPath().pushFieldResolve(this, argument, fieldRef.requiresReflection)) {
