@@ -1019,14 +1019,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
         );
         if (candidate.isPresent()) {
             try (BeanResolutionContext resolutionContext = newResolutionContext(candidate.get(), null)) {
-                T createdBean = doCreateBean(
-                        resolutionContext,
-                        candidate.get(),
-                        qualifier,
-                        beanArg,
-                        false,
-                        argumentValues
-                );
+                T createdBean = doCreateBean(resolutionContext, candidate.get(), qualifier, argumentValues);
                 if (createdBean == null) {
                     throw new NoSuchBeanException(beanType);
                 }
@@ -1081,7 +1074,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
         if (LOG.isTraceEnabled()) {
             LOG.trace("Computed bean argument values: {}", argumentValues);
         }
-        T createdBean = doCreateBean(resolutionContext, definition, qualifier, beanType, false, argumentValues);
+        T createdBean = doCreateBean(resolutionContext, definition, qualifier, argumentValues);
         if (createdBean == null) {
             throw new NoSuchBeanException(beanType);
         }
@@ -1286,27 +1279,19 @@ public class DefaultBeanContext implements InitializableBeanContext {
     <T> T createBean(@Nullable BeanResolutionContext resolutionContext, @NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier) {
         ArgumentUtils.requireNonNull("beanType", beanType);
 
-        final Argument<T> beanArgument = Argument.of(beanType);
         Optional<BeanDefinition<T>> concreteCandidate = findConcreteCandidate(
                 resolutionContext,
-                beanArgument,
+                Argument.of(beanType),
                 qualifier,
                 true
         );
         if (concreteCandidate.isPresent()) {
             BeanDefinition<T> candidate = concreteCandidate.get();
             try (BeanResolutionContext context = newResolutionContext(candidate, resolutionContext)) {
-                T createBean = doCreateBean(
-                        context,
-                        candidate,
-                        qualifier,
-                        beanArgument,
-                        false, null
-                );
-                if (createBean == null) {
-                    throw new NoSuchBeanException(beanType);
+                T createBean = doCreateBean(context, candidate, qualifier);
+                if (createBean != null) {
+                    return createBean;
                 }
-                return createBean;
             }
         }
         throw new NoSuchBeanException(beanType);
@@ -1858,7 +1843,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                     listener = (BeanCreatedEventListener) createAndRegisterSingleton(
                             context,
                             beanCreatedDefinition,
-                            beanCreatedDefinition.getBeanType(),
+                            Argument.of(beanCreatedDefinition.getBeanType()),
                             qualifier
                     ).bean;
                 } else {
@@ -2257,11 +2242,47 @@ public class DefaultBeanContext implements InitializableBeanContext {
      * @param resolutionContext The {@link BeanResolutionContext}
      * @param beanDefinition    The {@link BeanDefinition}
      * @param qualifier         The {@link Qualifier}
+     * @param argumentValues    Any argument values passed to create the bean
+     * @param <T>               The bean generic type
+     * @return The created bean
+     */
+    @Nullable
+    private <T> T doCreateBean(@NonNull BeanResolutionContext resolutionContext,
+                               @NonNull BeanDefinition<T> beanDefinition,
+                               @Nullable Qualifier<T> qualifier,
+                               @Nullable Map<String, Object> argumentValues) {
+        return doCreateBean(resolutionContext, beanDefinition, qualifier, Argument.of(beanDefinition.getBeanType()), false, argumentValues);
+    }
+
+    /**
+     * Execution the creation of a bean. The returned value can be null if a
+     * factory method returned null.
+     *
+     * @param resolutionContext The {@link BeanResolutionContext}
+     * @param beanDefinition    The {@link BeanDefinition}
+     * @param qualifier         The {@link Qualifier}
+     * @param <T>               The bean generic type
+     * @return The created bean
+     */
+    @Nullable
+    private <T> T doCreateBean(@NonNull BeanResolutionContext resolutionContext,
+                               @NonNull BeanDefinition<T> beanDefinition,
+                               @Nullable Qualifier<T> qualifier) {
+        return doCreateBean(resolutionContext, beanDefinition, qualifier, Argument.of(beanDefinition.getBeanType()), false, null);
+    }
+
+    /**
+     * Execution the creation of a bean. The returned value can be null if a
+     * factory method returned null.
+     *
+     * @param resolutionContext The {@link BeanResolutionContext}
+     * @param beanDefinition    The {@link BeanDefinition}
+     * @param qualifier         The {@link Qualifier}
      * @param isSingleton       Whether the bean is a singleton
      * @param argumentValues    Any argument values passed to create the bean
      * @param <T>               The bean generic type
      * @return The created bean
-     * @deprecated Use {@link #doCreateBean(BeanResolutionContext, BeanDefinition, Qualifier, Argument, boolean, Map)} instead.
+     * @deprecated Use {@link #doCreateBean(BeanResolutionContext, BeanDefinition, Qualifier, Map)} instead.
      */
     @Nullable
     @Deprecated
@@ -2277,6 +2298,8 @@ public class DefaultBeanContext implements InitializableBeanContext {
      * Execution the creation of a bean. The returned value can be null if a
      * factory method returned null.
      *
+     * Method is deprecated since it doesn't do anything related to the singleton.
+     *
      * @param resolutionContext The {@link BeanResolutionContext}
      * @param beanDefinition    The {@link BeanDefinition}
      * @param qualifier         The {@link Qualifier}
@@ -2285,32 +2308,19 @@ public class DefaultBeanContext implements InitializableBeanContext {
      * @param argumentValues    Any argument values passed to create the bean
      * @param <T>               The bean generic type
      * @return The created bean
+     * @deprecated Use {@link #doCreateBean(BeanResolutionContext, BeanDefinition, Qualifier, Map)} instead.
      */
     @Nullable
+    @Deprecated
     protected <T> T doCreateBean(@NonNull BeanResolutionContext resolutionContext,
                                  @NonNull BeanDefinition<T> beanDefinition,
                                  @Nullable Qualifier<T> qualifier,
                                  @Nullable Argument<T> qualifierBeanType,
                                  boolean isSingleton,
                                  @Nullable Map<String, Object> argumentValues) {
-        if (isSingleton) {
-            BeanRegistration<T> beanRegistration = singletonObjects.get(new BeanKey<>(beanDefinition, beanDefinition.getDeclaredQualifier()));
-            final Class<T> beanClass = qualifierBeanType.getType();
-            if (beanRegistration != null) {
-                if (qualifier == null || qualifier.reduce(beanClass, Stream.of(beanRegistration.beanDefinition)).findFirst().isPresent()) {
-                    return beanRegistration.bean;
-                }
-            } else if (qualifier != null) {
-                beanRegistration = singletonObjects.get(new BeanKey<>(beanDefinition, null));
-                if (beanRegistration != null && qualifier.reduce(beanClass, Stream.of(beanRegistration.beanDefinition)).findFirst().isPresent()) {
-                    return beanRegistration.bean;
-                }
-            }
-        }
-
         T bean;
         if (beanDefinition instanceof BeanFactory) {
-            bean = resolveByBeanFactory(resolutionContext, beanDefinition, qualifier, argumentValues == null ? Collections.emptyMap() : argumentValues);
+            bean = resolveByBeanFactory(resolutionContext, beanDefinition, qualifier, argumentValues);
         } else {
             bean = resolveByBeanDefinition(resolutionContext, beanDefinition);
         }
@@ -2345,6 +2355,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
     private <T> T resolveByBeanFactory(BeanResolutionContext resolutionContext,
                                        BeanDefinition<T> beanDefinition,
                                        Qualifier<T> qualifier,
+                                       @Nullable
                                        Map<String, Object> argumentValues) {
         T bean;
         BeanFactory<T> beanFactory = (BeanFactory<T>) beanDefinition;
@@ -2429,18 +2440,25 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
     private <T> T resolveByParametrizedBeanFactory(BeanResolutionContext resolutionContext,
                                                    BeanDefinition<T> beanDefinition,
-                                                   Map<String, Object> argumentValues,
+                                                   @Nullable Map<String, Object> argumentValues,
                                                    ParametrizedBeanFactory<T> parametrizedBeanFactory) {
         Argument<?>[] requiredArguments = parametrizedBeanFactory.getRequiredArguments();
-        Map<String, Object> convertedValues = new LinkedHashMap<>(argumentValues);
+        Map<String, Object> convertedValues;
+        if (argumentValues == null) {
+            convertedValues = Collections.emptyMap();
+            argumentValues = Collections.emptyMap();
+        } else {
+            convertedValues = new LinkedHashMap<>();
+        }
         for (Argument<?> requiredArgument : requiredArguments) {
             String argumentName = requiredArgument.getName();
             Object val = argumentValues.get(argumentName);
-            if (val == null && !requiredArgument.isDeclaredNullable()) {
-                throw new BeanInstantiationException(resolutionContext, "Missing bean argument [" + requiredArgument + "] for type: " + beanDefinition.getBeanType().getName() + ". Required arguments: " + ArrayUtils.toString(requiredArguments));
-            }
-            Object convertedValue = null;
-            if (val != null) {
+            if (val == null) {
+                if (!requiredArgument.isDeclaredNullable()) {
+                    throw new BeanInstantiationException(resolutionContext, "Missing bean argument [" + requiredArgument + "] for type: " + beanDefinition.getBeanType().getName() + ". Required arguments: " + ArrayUtils.toString(requiredArguments));
+                }
+            } else {
+                Object convertedValue;
                 if (requiredArgument.getType().isInstance(val)) {
                     convertedValue = val;
                 } else {
@@ -2448,16 +2466,10 @@ public class DefaultBeanContext implements InitializableBeanContext {
                             new BeanInstantiationException(resolutionContext, "Invalid bean argument [" + requiredArgument + "]. Cannot convert object [" + val + "] to required type: " + requiredArgument.getType())
                     );
                 }
+                convertedValues.put(argumentName, convertedValue);
             }
-            convertedValues.put(argumentName, convertedValue);
         }
-
-        return parametrizedBeanFactory.build(
-                resolutionContext,
-                this,
-                beanDefinition,
-                convertedValues
-        );
+        return parametrizedBeanFactory.build(resolutionContext, this, beanDefinition, convertedValues);
     }
 
     /**
@@ -2712,7 +2724,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
         } else {
             try (BeanResolutionContext resolutionContext = newResolutionContext(beanDefinition, null)) {
-                createAndRegisterSingletonInternal(resolutionContext, beanDefinition, beanDefinition.asArgument(), null);
+                createAndRegisterSingleton(resolutionContext, beanDefinition, beanDefinition.asArgument(), null);
             }
         }
     }
@@ -2721,7 +2733,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
     private <T> BeanRegistration<T> getBeanInternal(
             @Nullable BeanResolutionContext resolutionContext,
             @NonNull Argument<T> beanType,
-            Qualifier<T> qualifier,
+            @Nullable Qualifier<T> qualifier,
             boolean throwNonUnique,
             boolean throwNoSuchBean) {
         // allow injection the bean context
@@ -2942,14 +2954,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                                                         boolean throwNoSuchBean,
                                                         BeanDefinition<T> definition) {
         BeanKey<T> beanKey = new BeanKey<>(beanType, qualifier);
-        T bean = doCreateBean(
-                resolutionContext,
-                definition,
-                qualifier,
-                beanType,
-                false,
-                null
-        );
+        T bean = doCreateBean(resolutionContext, definition, qualifier);
         if (bean == null && throwNoSuchBean) {
             throw new NoSuchBeanException(definition.getBeanType(), qualifier);
         } else if (definition instanceof DisposableBeanDefinition) {
@@ -2972,14 +2977,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
             q = definition.getDeclaredQualifier();
         }
 
-        T bean = doCreateBean(
-                resolutionContext,
-                definition,
-                q,
-                beanType,
-                false,
-                null
-        );
+        T bean = doCreateBean(resolutionContext, definition, q);
         if (bean instanceof Qualified) {
             ((Qualified<T>) bean).$withBeanQualifier(q);
         }
@@ -3283,26 +3281,29 @@ public class DefaultBeanContext implements InitializableBeanContext {
         }
     }
 
-    private <T> BeanRegistration<T> createAndRegisterSingleton(
-            BeanResolutionContext resolutionContext,
-            BeanDefinition<T> definition,
-            Class<T> beanType,
-            Qualifier<T> qualifier) {
-        synchronized (singletonObjects) {
-            return createAndRegisterSingletonInternal(resolutionContext, definition, Argument.of(beanType), qualifier);
-        }
+    private <T> BeanRegistration<T> createAndRegisterSingleton(BeanResolutionContext resolutionContext,
+                                                               BeanDefinition<T> definition,
+                                                               Qualifier<T> qualifier) {
+        return createAndRegisterSingleton(resolutionContext, definition, Argument.of(definition.getBeanType()), qualifier);
     }
 
-    private <T> BeanRegistration<T> createAndRegisterSingletonInternal(BeanResolutionContext resolutionContext, BeanDefinition<T> definition, Argument<T> beanType, Qualifier<T> qualifier) {
-        if (definition instanceof NoInjectionBeanDefinition) {
-            NoInjectionBeanDefinition<T> manuallyRegistered = (NoInjectionBeanDefinition) definition;
-            BeanRegistration<T> reg = singletonObjects.get(new BeanKey(manuallyRegistered.getBeanType(), manuallyRegistered.getQualifier()));
-            if (reg == null) {
-                throw new IllegalStateException("Manually registered singleton no longer present in bean context");
+    private <T> BeanRegistration<T> createAndRegisterSingleton(BeanResolutionContext resolutionContext,
+                                                               BeanDefinition<T> definition,
+                                                               Class<T> beanType,
+                                                               Qualifier<T> qualifier) {
+        return createAndRegisterSingleton(resolutionContext, definition, Argument.of(beanType), qualifier);
+    }
+
+    private <T> BeanRegistration<T> createAndRegisterSingleton(BeanResolutionContext resolutionContext,
+                                                               BeanDefinition<T> definition,
+                                                               Argument<T> beanType,
+                                                               Qualifier<T> qualifier) {
+        synchronized (singletonObjects) {
+            BeanRegistration<T> singletonRegistration = findSingletonRegistration(definition, qualifier, beanType);
+            if (singletonRegistration != null) {
+                return singletonRegistration;
             }
-            return registerSingletonBean(definition, beanType, reg.bean, qualifier, true, Collections.emptyList());
-        } else {
-            T createdBean = doCreateBean(resolutionContext, definition, qualifier, beanType, true, null);
+            T createdBean = doCreateBean(resolutionContext, definition, qualifier);
             return registerSingletonBean(
                     definition,
                     beanType,
@@ -3688,54 +3689,32 @@ public class DefaultBeanContext implements InitializableBeanContext {
             Collection<BeanRegistration<T>> beansOfTypeList,
             Qualifier<T> qualifier,
             boolean singleCandidate) {
-        T bean = null;
-        final boolean isContainerType = candidate.isContainerType();
+        BeanRegistration<T> beanRegistration = null;
         try {
             try (BeanResolutionContext context = newResolutionContext(candidate, resolutionContext)) {
                 if (candidate.isSingleton()) {
                     synchronized (singletonObjects) {
-                        if (candidate instanceof NoInjectionBeanDefinition) {
-                            NoInjectionBeanDefinition noibd = (NoInjectionBeanDefinition) candidate;
-                            final BeanKey key = new BeanKey(noibd.singletonClass, noibd.qualifier);
-                            final BeanRegistration beanRegistration = singletonObjects.get(key);
-                            if (beanRegistration != null) {
-                                bean = (T) beanRegistration.bean;
-                            } else {
-                                throw new IllegalStateException("Singleton not present for key: " + key);
-                            }
+                        BeanRegistration<T> singletonRegistration = findSingletonRegistration(candidate, qualifier, beanType);
+                        if (singletonRegistration != null) {
+                            beanRegistration = singletonRegistration;
                         } else {
-                            bean = doCreateBean(
-                                    context,
-                                    candidate,
-                                    qualifier,
-                                    beanType,
-                                    true,
-                                    null
-                            );
+                            T bean = doCreateBean(context, candidate, qualifier);
 
-                            if (candidate.getBeanType() != beanType.getType() && isContainerType) {
-                                registerSingletonBean(
-                                        candidate,
-                                        candidate.asArgument(),
-                                        bean,
-                                        qualifier,
-                                        singleCandidate,
-                                        context.getAndResetDependentBeans()
-                                );
-                            } else {
-                                registerSingletonBean(
-                                        candidate,
-                                        beanType,
-                                        bean,
-                                        qualifier,
-                                        singleCandidate,
-                                        context.getAndResetDependentBeans()
-                                );
-                            }
+                            Argument<T> registerBeanType = candidate.getBeanType() != beanType.getType() && candidate.isContainerType() ?
+                                    candidate.asArgument() : beanType;
+
+                            beanRegistration = registerSingletonBean(
+                                    candidate,
+                                    registerBeanType,
+                                    bean,
+                                    qualifier,
+                                    singleCandidate,
+                                    context.getAndResetDependentBeans()
+                            );
                         }
                     }
                 } else {
-                    bean = getNotSingletonBeanForDefinition(context, candidate.asArgument(), qualifier, true, candidate).bean;
+                    beanRegistration = getNotSingletonBeanForDefinition(context, candidate.asArgument(), qualifier, true, candidate);
                 }
             }
         } catch (DisabledBeanException e) {
@@ -3744,9 +3723,9 @@ public class DefaultBeanContext implements InitializableBeanContext {
             }
         }
 
-        if (bean != null) {
-            if (isContainerType && bean instanceof Iterable) {
-                Iterable<Object> iterable = (Iterable<Object>) bean;
+        if (beanRegistration != null) {
+            if (candidate.isContainerType() && beanRegistration.bean instanceof Iterable) {
+                Iterable<Object> iterable = (Iterable<Object>) beanRegistration.bean;
                 int i = 0;
                 for (Object o : iterable) {
                     if (o == null || !beanType.isInstance(o)) {
@@ -3759,9 +3738,35 @@ public class DefaultBeanContext implements InitializableBeanContext {
                     ));
                 }
             } else {
-                beansOfTypeList.add(new BeanRegistration(new BeanKey(beanType, candidate.getDeclaredQualifier()), candidate, bean));
+                beansOfTypeList.add(beanRegistration);
             }
         }
+    }
+
+    @Nullable
+    private <T> BeanRegistration<T> findSingletonRegistration(@NonNull BeanDefinition<T> beanDefinition,
+                                                              @Nullable Qualifier<T> qualifier,
+                                                              @Nullable Argument<T> qualifierBeanType) {
+        if (beanDefinition instanceof NoInjectionBeanDefinition) {
+            NoInjectionBeanDefinition<T> manuallyRegistered = (NoInjectionBeanDefinition) beanDefinition;
+            BeanRegistration<T> reg = singletonObjects.get(new BeanKey(manuallyRegistered.getBeanType(), manuallyRegistered.getQualifier()));
+            if (reg == null) {
+                throw new IllegalStateException("Manually registered singleton no longer present in bean context");
+            }
+            return reg;
+        }
+        BeanRegistration<T> beanRegistration = singletonObjects.get(new BeanKey<>(beanDefinition, beanDefinition.getDeclaredQualifier()));
+        if (beanRegistration != null) {
+            if (qualifier == null || qualifier.reduce(qualifierBeanType.getType(), Stream.of(beanRegistration.beanDefinition)).findFirst().isPresent()) {
+                return beanRegistration;
+            }
+        } else if (qualifier != null) {
+            beanRegistration = singletonObjects.get(new BeanKey<>(beanDefinition, null));
+            if (beanRegistration != null && qualifier.reduce(qualifierBeanType.getType(), Stream.of(beanRegistration.beanDefinition)).findFirst().isPresent()) {
+                return beanRegistration;
+            }
+        }
+        return null;
     }
 
     private <T> boolean isCandidatePresent(Argument<T> beanType, Qualifier<T> qualifier) {
