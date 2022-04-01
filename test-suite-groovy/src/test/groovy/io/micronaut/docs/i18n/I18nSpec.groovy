@@ -15,22 +15,40 @@
  */
 package io.micronaut.docs.i18n
 
+import io.micronaut.context.MessageSource
 import io.micronaut.context.MessageSource.MessageContext
-import io.micronaut.context.i18n.ResourceBundleMessageSource
+import io.micronaut.test.extensions.spock.annotation.MicronautTest
+import jakarta.inject.Inject
 import spock.lang.Specification
 
+@MicronautTest(startApplication = false)
 class I18nSpec extends Specification {
+
+    @Inject
+    MessageSource messageSource
 
     void "it is possible to create a MessageSource from resource bundle"() {
         //tag::test[]
-        given:
-        def ms = new ResourceBundleMessageSource("io.micronaut.docs.i18n.messages")
-
         expect:
-        ms.getMessage("hello", MessageContext.of(new Locale("es"))).get() == 'Hola'
+        messageSource.getMessage("hello", MessageContext.of(new Locale("es"))).get() == 'Hola'
 
         and:
-        ms.getMessage("hello", MessageContext.of(Locale.ENGLISH)).get() == 'Hello'
+        messageSource.getMessage("hello", MessageContext.of(Locale.ENGLISH)).get() == 'Hello'
         //end::test[]
+
+        messageSource.getMessage("hello", new Locale("es")).isPresent()
+        "Hola" == messageSource.getMessage("hello", new Locale("es")).get()
+        "Hello" == messageSource.getMessage("hello", Locale.ENGLISH).get()
+        messageSource.getMessage("hello", Locale.ENGLISH).isPresent()
+
+        messageSource.getMessage("hello.name", new Locale("es"), "Sergio").isPresent()
+        "Hola Sergio" == messageSource.getMessage("hello.name", new Locale("es"), "Sergio").get()
+        messageSource.getMessage("hello.name", Locale.ENGLISH, "Sergio").isPresent()
+        "Hello Sergio" == messageSource.getMessage("hello.name", Locale.ENGLISH, "Sergio").get()
+
+        messageSource.getMessage("hello.name", new Locale("es"), ["0": "Sergio"]).isPresent()
+        "Hola Sergio" == messageSource.getMessage("hello.name", new Locale("es"), ["0": "Sergio"]).get()
+        messageSource.getMessage("hello.name", Locale.ENGLISH, ["0": "Sergio"]).isPresent()
+        "Hello Sergio" == messageSource.getMessage("hello.name", Locale.ENGLISH, ["0": "Sergio"]).get()
     }
 }

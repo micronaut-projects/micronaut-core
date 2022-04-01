@@ -129,6 +129,15 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
 
     }
 
+    private AnnotationMetadata metadataForError(RuntimeException e) {
+        if ("org.eclipse.jdt.internal.compiler.problem.AbortCompilation".equals(e.getClass().getName())) {
+            // workaround for a bug in the Eclipse APT implementation. See bug 541466 on their Bugzilla.
+            return AnnotationMetadata.EMPTY_METADATA;
+        } else {
+            throw e;
+        }
+    }
+
     /**
      * Build only metadata for declared annotations.
      *
@@ -145,12 +154,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             }
             return metadata;
         } catch (RuntimeException e) {
-            if ("org.eclipse.jdt.internal.compiler.problem.AbortCompilation".equals(e.getClass().getName())) {
-                // workaround for a bug in the Eclipse APT implementation. See bug 541466 on their Bugzilla.
-                return AnnotationMetadata.EMPTY_METADATA;
-            } else {
-                throw e;
-            }
+            return metadataForError(e);
         }
     }
 
@@ -179,12 +183,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             }
             return annotationMetadata;
         } catch (RuntimeException e) {
-            if ("org.eclipse.jdt.internal.compiler.problem.AbortCompilation".equals(e.getClass().getName())) {
-                // workaround for a bug in the Eclipse APT implementation. See bug 541466 on their Bugzilla.
-                return AnnotationMetadata.EMPTY_METADATA;
-            } else {
-                throw e;
-            }
+            return metadataForError(e);
         }
     }
 
@@ -209,12 +208,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 }
                 return metadata;
             } catch (RuntimeException e) {
-                if ("org.eclipse.jdt.internal.compiler.problem.AbortCompilation".equals(e.getClass().getName())) {
-                    // workaround for a bug in the Eclipse APT implementation. See bug 541466 on their Bugzilla.
-                    return AnnotationMetadata.EMPTY_METADATA;
-                } else {
-                    throw e;
-                }
+                return metadataForError(e);
             }
         }
     }
@@ -252,12 +246,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 }
                 return metadata;
             } catch (RuntimeException e) {
-                if ("org.eclipse.jdt.internal.compiler.problem.AbortCompilation".equals(e.getClass().getName())) {
-                    // workaround for a bug in the Eclipse APT implementation. See bug 541466 on their Bugzilla.
-                    return AnnotationMetadata.EMPTY_METADATA;
-                } else {
-                    throw e;
-                }
+                return metadataForError(e);
             }
         }
     }
@@ -350,12 +339,20 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         if (existing instanceof DefaultAnnotationMetadata) {
             // ugly, but will have to do
             annotationMetadata = ((DefaultAnnotationMetadata) existing).clone();
+            if (parents.isEmpty()) {
+                // Don't need to do anything with existing
+                return annotationMetadata;
+            }
         } else if (existing instanceof AnnotationMetadataHierarchy) {
             final AnnotationMetadata declaredMetadata = ((AnnotationMetadataHierarchy) existing).getDeclaredMetadata();
             if (declaredMetadata instanceof DefaultAnnotationMetadata) {
                 annotationMetadata = ((DefaultAnnotationMetadata) declaredMetadata).clone();
             } else {
                 annotationMetadata = new MutableAnnotationMetadata();
+            }
+            if (parents.isEmpty()) {
+                // Don't need to do anything with existing
+                return annotationMetadata;
             }
         } else {
             annotationMetadata = new MutableAnnotationMetadata();

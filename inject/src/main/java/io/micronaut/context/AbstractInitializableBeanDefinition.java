@@ -124,6 +124,8 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
     @Nullable
     private final Map<String, Argument<?>[]> typeArgumentsMap;
     @Nullable
+    private AnnotationReference[] annotationInjection;
+    @Nullable
     private Environment environment;
     @Nullable
     private Optional<Argument<?>> containerElement;
@@ -188,6 +190,45 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
         this.isConfigurationProperties = isConfigurationProperties;
         this.isContainerType = isContainerType;
         this.requiresMethodProcessing = requiresMethodProcessing;
+    }
+
+    @SuppressWarnings("ParameterNumber")
+    @Internal
+    @UsedByGeneratedCode
+    protected AbstractInitializableBeanDefinition(
+            Class<T> beanType,
+            @Nullable MethodOrFieldReference constructor,
+            @Nullable AnnotationMetadata annotationMetadata,
+            @Nullable MethodReference[] methodInjection,
+            @Nullable FieldReference[] fieldInjection,
+            @Nullable AnnotationReference[] annotationInjection,
+            @Nullable ExecutableMethodsDefinition<T> executableMethodsDefinition,
+            @Nullable Map<String, Argument<?>[]> typeArgumentsMap,
+            Optional<String> scope,
+            boolean isAbstract,
+            boolean isProvided,
+            boolean isIterable,
+            boolean isSingleton,
+            boolean isPrimary,
+            boolean isConfigurationProperties,
+            boolean isContainerType,
+            boolean requiresMethodProcessing) {
+        this(beanType,
+            constructor,
+            annotationMetadata,
+            methodInjection,
+            fieldInjection,
+            executableMethodsDefinition,
+            typeArgumentsMap,
+            scope, isAbstract,
+            isProvided,
+            isIterable,
+            isSingleton,
+            isPrimary,
+            isConfigurationProperties,
+            isContainerType,
+            requiresMethodProcessing);
+        this.annotationInjection = annotationInjection;
     }
 
     @Override
@@ -424,6 +465,13 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
             for (FieldReference fieldReference : fieldInjection) {
                 if (annotationMetadata != null && annotationMetadata.hasDeclaredAnnotation(AnnotationUtil.INJECT)) {
                     argumentConsumer.accept(fieldReference.argument);
+                }
+            }
+        }
+        if (annotationInjection != null) {
+            for (AnnotationReference annotationReference: annotationInjection) {
+                if (annotationReference.argument != null) {
+                    argumentConsumer.accept(annotationReference.argument);
                 }
             }
         }
@@ -817,6 +865,50 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
     @UsedByGeneratedCode
     protected boolean isInnerConfiguration(Class<?> clazz) {
         return false;
+    }
+
+
+    /**
+     * Checks whether the bean should be loaded.
+     * @param resolutionContext - the resolution context
+     * @param context - the bean context
+     */
+    @Internal
+    @UsedByGeneratedCode
+    protected void checkIfShouldLoad(BeanResolutionContext resolutionContext, BeanContext context) {
+    }
+
+    /**
+     * Check the value of the injected bean property to decide whether the
+     * bean should be loaded.
+     *
+     * @param injectedBeanPropertyName the name of the injected bean property
+     * @param beanPropertyValue the value of injected bean property
+     * @param requiredValue the value which is required for the bean to be loaded
+     * @param notEqualsValue the value which bean property should not be equal to for the bean to be loaded
+     */
+    @Internal
+    @UsedByGeneratedCode
+    protected final void checkInjectedBeanPropertyValue(String injectedBeanPropertyName,
+                                                        @Nullable Object beanPropertyValue,
+                                                        @Nullable String requiredValue,
+                                                        @Nullable String notEqualsValue) {
+        if (beanPropertyValue instanceof Optional) {
+            beanPropertyValue = ((Optional<?>) beanPropertyValue).orElse(null);
+        }
+
+        String convertedValue = ConversionService.SHARED.convert(beanPropertyValue, String.class).orElse(null);
+        if (convertedValue == null && notEqualsValue == null) {
+            throw new DisabledBeanException("Bean [" + getBeanType() + "] is disabled since required bean property [" + injectedBeanPropertyName + "] id not set");
+        } else if (convertedValue != null) {
+            if (requiredValue != null && !convertedValue.equals(requiredValue)) {
+                throw new DisabledBeanException("Bean [" + getBeanType() + "] is disabled since bean property [" + injectedBeanPropertyName + "] " +
+                                                        "value is not equal to [" + requiredValue + "]");
+            } else if (requiredValue == null && convertedValue.equals(notEqualsValue)) {
+                throw new DisabledBeanException("Bean [" + getBeanType() + "] is disabled since bean property [" + injectedBeanPropertyName + "] " +
+                                                    "value is equal to [" + notEqualsValue + "]");
+            }
+        }
     }
 
     /**
@@ -1485,6 +1577,16 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
         try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
                 .pushFieldResolve(this, argument, fieldInjection[fieldIndex].requiresReflection)) {
             return resolveBean(resolutionContext, context, argument, qualifier, true);
+        }
+    }
+
+    @Internal
+    @UsedByGeneratedCode
+    protected final Object getBeanForAnnotation(BeanResolutionContext resolutionContext, BeanContext context, int annotationBeanIndex, Qualifier qualifier) {
+        final Argument argument = resolveEnvironmentArgument(context, annotationInjection[annotationBeanIndex].argument);
+        try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
+                .pushAnnotationResolve(this, argument)) {
+            return resolveBean(resolutionContext, context, argument, qualifier);
         }
     }
 
@@ -2229,6 +2331,20 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
         public MethodOrFieldReference(Class declaringType, boolean requiresReflection) {
             this.declaringType = declaringType;
             this.requiresReflection = requiresReflection;
+        }
+
+    }
+
+    /**
+     * The data class containing annotation injection information.
+     */
+    @Internal
+    @SuppressWarnings("VisibilityModifier")
+    public static final class AnnotationReference {
+        public final Argument argument;
+
+        public AnnotationReference(Argument argument) {
+            this.argument = argument;
         }
 
     }

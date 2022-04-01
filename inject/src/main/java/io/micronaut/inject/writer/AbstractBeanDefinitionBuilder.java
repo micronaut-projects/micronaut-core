@@ -16,6 +16,7 @@
 package io.micronaut.inject.writer;
 
 import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.AnnotationClassValue;
@@ -356,9 +357,14 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
             @NonNull Consumer<BeanMethodElement> beanMethods) {
         //noinspection ConstantConditions
         if (methods != null && beanMethods != null) {
-            this.beanType.getEnclosedElements(methods.onlyInstance().onlyAccessible(originatingType))
-                    .forEach((methodElement) ->
-                            beanMethods.accept(new InternalBeanElementMethod(methodElement, false))
+            final ElementQuery<MethodElement> baseQuery = methods.onlyInstance();
+            this.beanType.getEnclosedElements(baseQuery.modifiers(m -> m.contains(ElementModifier.PUBLIC)))
+                    .forEach(methodElement ->
+                        beanMethods.accept(new InternalBeanElementMethod(methodElement, false))
+                    );
+            this.beanType.getEnclosedElements(baseQuery.modifiers(m -> !m.contains(ElementModifier.PUBLIC)))
+                    .forEach(methodElement ->
+                         beanMethods.accept(new InternalBeanElementMethod(methodElement, true))
                     );
         }
         return this;
@@ -567,7 +573,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
                          beanDefinitionWriter.visitMethodInjectionPoint(
                                  ibm.getDeclaringType(),
                                  ibm,
-                                 ibm.isRequiresReflection(),
+                                 ibm.isReflectionRequired(),
                                  visitorContext
                          )
                     );
@@ -583,6 +589,9 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
                     executableMethod,
                     visitorContext
             );
+            if (executableMethod.getAnnotationMetadata().isTrue(Executable.class, "processOnStartup")) {
+                beanDefinitionWriter.setRequiresMethodProcessing(true);
+            }
         }
 
         for (BeanMethodElement postConstructMethod : postConstructMethods) {
@@ -590,7 +599,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
                 beanDefinitionWriter.visitPostConstructMethod(
                         beanType,
                         postConstructMethod,
-                        ((InternalBeanElementMethod) postConstructMethod).isRequiresReflection(),
+                        ((InternalBeanElementMethod) postConstructMethod).isReflectionRequired(),
                         visitorContext
                 );
             }
@@ -601,7 +610,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
                 beanDefinitionWriter.visitPreDestroyMethod(
                         beanType,
                         preDestroyMethod,
-                        ((InternalBeanElementMethod) preDestroyMethod).isRequiresReflection(),
+                        ((InternalBeanElementMethod) preDestroyMethod).isReflectionRequired(),
                         visitorContext
                 );
             }
@@ -632,14 +641,14 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
             beanDefinitionWriter.visitFieldValue(
                     injectedField.getDeclaringType(),
                     injectedField,
-                    ibf.isRequiresReflection(),
-                    injectedField.isNullable()
+                    ibf.isReflectionRequired(),
+                    ibf.isDeclaredNullable()
             );
         } else {
             beanDefinitionWriter.visitFieldInjectionPoint(
                     injectedField.getDeclaringType(),
-                    injectedField,
-                    ibf.isRequiresReflection()
+                    ibf,
+                    ibf.isReflectionRequired()
             );
         }
     }
@@ -792,7 +801,8 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
             this.beanParameters = beanParameters;
         }
 
-        public boolean isRequiresReflection() {
+        @Override
+        public boolean isReflectionRequired() {
             return requiresReflection;
         }
 
@@ -848,6 +858,14 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
                 AbstractBeanDefinitionBuilder.this.executableMethods.add(this);
             }
             return BeanMethodElement.super.executable();
+        }
+
+        @Override
+        public BeanMethodElement executable(boolean processOnStartup) {
+            if (!AbstractBeanDefinitionBuilder.this.executableMethods.contains(this)) {
+                AbstractBeanDefinitionBuilder.this.executableMethods.add(this);
+            }
+            return BeanMethodElement.super.executable(processOnStartup);
         }
 
         @NonNull
