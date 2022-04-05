@@ -3,6 +3,7 @@ package io.micronaut.http.server.netty.filters
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
 import io.micronaut.http.MutableHttpResponse
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Filter
@@ -17,15 +18,15 @@ import spock.lang.Specification
 class FilterReplaceRequestSpec extends Specification {
     def 'test replaced http request is handled by next filter'() {
         given:
-        def ctx = ApplicationContext.run(['spec.name': 'FilterReplaceRequestSpec'])
-        def server = ctx.getBean(EmbeddedServer)
+        ApplicationContext ctx = ApplicationContext.run(['spec.name': 'FilterReplaceRequestSpec'])
+        EmbeddedServer server = ctx.getBean(EmbeddedServer)
         server.start()
-        def client = ctx.createBean(HttpClient, server.URI)
-        def filter1 = ctx.getBean(Filter1)
-        def filter2 = ctx.getBean(Filter2)
+        HttpClient client = ctx.createBean(HttpClient, server.URI)
+        Filter1 filter1 = ctx.getBean(Filter1)
+        Filter2 filter2 = ctx.getBean(Filter2)
 
         when:
-        def resp = client.toBlocking().exchange("/initial", String)
+        HttpResponse<String> resp = client.toBlocking().exchange("/initial", String)
         then:
         resp.body() == "initial"
         filter1.filteredRequest.path == "/initial"
@@ -75,12 +76,12 @@ class FilterReplaceRequestSpec extends Specification {
     @Requires(property = 'spec.name', value = 'FilterReplaceRequestSpec')
     static class Ctrl {
         @Get("/filter2")
-        def filter2() {
+        String filter2() {
             return "filter2"
         }
 
         @Get("/initial")
-        def initial() {
+        String initial() {
             return "initial"
         }
     }
