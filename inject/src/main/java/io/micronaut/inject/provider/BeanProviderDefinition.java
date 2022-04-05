@@ -23,6 +23,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.qualifiers.AnyQualifier;
+import io.micronaut.inject.qualifiers.Qualifiers;
 
 import java.util.Iterator;
 import java.util.Optional;
@@ -70,7 +71,16 @@ public final class BeanProviderDefinition extends AbstractProviderDefinition<Bea
 
             @Override
             public Optional<Object> find(Qualifier<Object> qualifier) {
-                return ((DefaultBeanContext) context).findBean(resolutionContext, argument, finalQualifier);
+                Qualifier<Object> actualQualifier;
+                if (finalQualifier == null) {
+                    actualQualifier = qualifier;
+                } else if (qualifier == null) {
+                    actualQualifier = finalQualifier;
+                } else {
+                    actualQualifier = Qualifiers.byQualifiers(finalQualifier, qualifier);
+                }
+
+                return ((DefaultBeanContext) context).findBean(resolutionContext, argument, actualQualifier);
             }
 
             @Override

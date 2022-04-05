@@ -320,11 +320,12 @@ class MaxRequestSizeSpec extends Specification {
         }
 
         cleanup:
+        responses.forEach(r -> r.release())
         channel.close()
         embeddedServer.close()
     }
 
-    @PendingFeature
+    @Ignore
     void 'large request should not affect other http2 connections'() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
@@ -426,6 +427,7 @@ class MaxRequestSizeSpec extends Specification {
         responses[1].status() == HttpResponseStatus.OK
 
         cleanup:
+        responses.forEach(r -> r.release())
         channel.close()
         embeddedServer.close()
     }
@@ -449,6 +451,11 @@ class MaxRequestSizeSpec extends Specification {
                          CompletedFileUpload c,
                          CompletedFileUpload d,
                          CompletedFileUpload e) {
+            a.discard()
+            b.discard()
+            c.discard()
+            d.discard()
+            e.discard()
             "OK"
         }
 

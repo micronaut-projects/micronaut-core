@@ -1,3 +1,7 @@
+plugins {
+    id "io.micronaut.build.internal.convention-library"
+}
+
 import java.time.Duration
 
 
