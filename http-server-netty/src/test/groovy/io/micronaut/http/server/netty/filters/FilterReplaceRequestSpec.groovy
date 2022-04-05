@@ -13,26 +13,30 @@ import io.micronaut.http.filter.HttpServerFilter
 import io.micronaut.http.filter.ServerFilterChain
 import io.micronaut.runtime.server.EmbeddedServer
 import org.reactivestreams.Publisher
+import spock.lang.AutoCleanup
+import spock.lang.Shared
 import spock.lang.Specification
 
 class FilterReplaceRequestSpec extends Specification {
+
+    @Shared
+    @AutoCleanup
+    EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': 'FilterReplaceRequestSpec'])
+
+    @Shared
+    @AutoCleanup
+    HttpClient client = server.applicationContext.createBean(HttpClient, server.URI)
+    
     def 'test replaced http request is handled by next filter'() {
-        given:
-        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': 'FilterReplaceRequestSpec'])
-        HttpClient client = server.applicationContext.createBean(HttpClient, server.URI)
+        when:
+        HttpResponse<String> resp = client.toBlocking().exchange("/initial", String)
         Filter1 filter1 = server.applicationContext.getBean(Filter1)
         Filter2 filter2 = server.applicationContext.getBean(Filter2)
 
-        when:
-        HttpResponse<String> resp = client.toBlocking().exchange("/initial", String)
         then:
         resp.body() == "initial"
         filter1.filteredRequest.path == "/initial"
         filter2.filteredRequest.path == "/filter1"
-
-        cleanup:
-        server.stop()
-        client.stop()
     }
     
     @Filter(Filter.MATCH_ALL_PATTERN)
