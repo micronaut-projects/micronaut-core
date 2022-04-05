@@ -18,12 +18,10 @@ import spock.lang.Specification
 class FilterReplaceRequestSpec extends Specification {
     def 'test replaced http request is handled by next filter'() {
         given:
-        ApplicationContext ctx = ApplicationContext.run(['spec.name': 'FilterReplaceRequestSpec'])
-        EmbeddedServer server = ctx.getBean(EmbeddedServer)
-        server.start()
-        HttpClient client = ctx.createBean(HttpClient, server.URI)
-        Filter1 filter1 = ctx.getBean(Filter1)
-        Filter2 filter2 = ctx.getBean(Filter2)
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': 'FilterReplaceRequestSpec'])
+        HttpClient client = server.applicationContext.createBean(HttpClient, server.URI)
+        Filter1 filter1 = server.applicationContext.getBean(Filter1)
+        Filter2 filter2 = server.applicationContext.getBean(Filter2)
 
         when:
         HttpResponse<String> resp = client.toBlocking().exchange("/initial", String)
