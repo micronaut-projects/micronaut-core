@@ -393,9 +393,9 @@ public final class RouteExecutor {
                 }
                 HttpFilter httpFilter = filters.get(pos);
 
-                HttpRequest<?> requestForFilter = requestReference.getAndSet(request);
+                requestReference.set(request);
                 try {
-                    return Flux.from((Publisher<MutableHttpResponse<?>>) httpFilter.doFilter(requestForFilter, this))
+                    return Flux.from((Publisher<MutableHttpResponse<?>>) httpFilter.doFilter(request, this))
                             .flatMap(handleStatusException)
                             .onErrorResume(onError);
                 } catch (Throwable t) {
