@@ -34,8 +34,7 @@ class FilterReplaceRequestSpec extends Specification {
         server.stop()
         client.stop()
     }
-
-
+    
     @Filter(Filter.MATCH_ALL_PATTERN)
     @Requires(property = 'spec.name', value = 'FilterReplaceRequestSpec')
     static class Filter1 implements HttpServerFilter {
