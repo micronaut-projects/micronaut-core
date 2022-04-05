@@ -21,6 +21,8 @@ import com.fasterxml.jackson.databind.SerializerProvider
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize
 import com.fasterxml.jackson.databind.annotation.JsonNaming
 import com.fasterxml.jackson.databind.annotation.JsonSerialize
+import com.fasterxml.jackson.dataformat.xml.XmlMapper
+import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper
 import groovy.transform.EqualsAndHashCode
 import groovy.transform.PackageScope
 import io.micronaut.context.ApplicationContext
@@ -962,6 +964,31 @@ class BeanIntrospectionModuleSpec extends Specification {
         @JsonIgnore
         public void setBar(String s) {
             this.bar = s
+        }
+    }
+
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/5907')
+    void "xml modifier"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run()
+        XmlMapper objectMapper = new XmlMapper()
+        objectMapper.registerModule(ctx.getBean(BeanIntrospectionModule))
+
+        expect:
+        objectMapper.writeValueAsString(new UsesXmlElementWrapper()) ==
+                '<UsesXmlElementWrapper><nestedItems><strings>foo</strings><strings>bar</strings></nestedItems></UsesXmlElementWrapper>'
+
+        cleanup:
+        ctx.close()
+    }
+
+    @Introspected
+    static class UsesXmlElementWrapper {
+        private List<String> strings = ["foo", "bar"];
+
+        @JacksonXmlElementWrapper(/*useWrapping = false, */localName = "nestedItems")
+        public List<String> getStrings() {
+            return strings
         }
     }
 
