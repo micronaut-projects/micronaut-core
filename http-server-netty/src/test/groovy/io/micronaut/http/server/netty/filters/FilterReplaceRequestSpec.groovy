@@ -51,7 +51,7 @@ class FilterReplaceRequestSpec extends Specification {
         @Override
         Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
             filteredRequest = request
-            return chain.proceed(HttpRequest.GET("/filter1"))
+            chain.proceed(HttpRequest.GET("/filter1"))
         }
     }
 
@@ -68,7 +68,7 @@ class FilterReplaceRequestSpec extends Specification {
         @Override
         Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
             filteredRequest = request
-            return chain.proceed(HttpRequest.GET("/filter2"))
+            chain.proceed(HttpRequest.GET("/filter2"))
         }
     }
 
@@ -77,12 +77,12 @@ class FilterReplaceRequestSpec extends Specification {
     static class Ctrl {
         @Get("/filter2")
         String filter2() {
-            return "filter2"
+            "filter2"
         }
 
         @Get("/initial")
         String initial() {
-            return "initial"
+            "initial"
         }
     }
 }
