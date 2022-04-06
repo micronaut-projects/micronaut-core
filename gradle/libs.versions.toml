@@ -182,7 +182,6 @@ boms-micronaut-r2dbc = { module = "io.micronaut.r2dbc:micronaut-r2dbc-bom", vers
 boms-micronaut-flyway = { module = "io.micronaut.flyway:micronaut-flyway-bom", version.ref = "managed-micronaut-flyway" }
 
 boms-groovy = { module = "org.codehaus.groovy:groovy-bom", version.ref = "managed-groovy" }
-boms-grpc = { module = "io.grpc:grpc-bom", version.ref = "managed-grpc" }
 boms-jackson = { module = "com.fasterxml.jackson:jackson-bom", version.ref = "managed-jackson" }
 boms-junit5 = { module = "org.junit:junit-bom", version.ref = "managed-junit5" }
 boms-kotlin = { module = "org.jetbrains.kotlin:kotlin-bom", version.ref = "managed-kotlin" }
