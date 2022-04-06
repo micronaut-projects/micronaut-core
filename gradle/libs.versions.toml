@@ -41,6 +41,7 @@ wiremock = "2.27.2"
 managed-commons-dbcp = "2.9.0"
 managed-dekorate = "1.0.3"
 managed-elasticsearch = "7.16.3"
+managed-grpc = "1.45.0"
 managed-ignite = "2.8.1"
 managed-junit5 = "5.7.2"
 managed-kotlin = "1.6.10"
@@ -129,7 +130,7 @@ managed-neo4j = "3.5.29"
 managed-neo4j-java-driver = "4.2.7"
 managed-netty = "4.1.73.Final"
 managed-picocli = "4.6.1"
-managed-protobuf = "3.17.2"
+managed-protobuf = "3.19.4"
 managed-reactive-pg-client = "0.11.4"
 managed-reactive-streams = "1.0.3"
 # This should be kept aligned with https://github.com/micronaut-projects/micronaut-reactor/blob/master/gradle.properties from the BOM
@@ -181,6 +182,7 @@ boms-micronaut-r2dbc = { module = "io.micronaut.r2dbc:micronaut-r2dbc-bom", vers
 boms-micronaut-flyway = { module = "io.micronaut.flyway:micronaut-flyway-bom", version.ref = "managed-micronaut-flyway" }
 
 boms-groovy = { module = "org.codehaus.groovy:groovy-bom", version.ref = "managed-groovy" }
+boms-grpc = { module = "io.grpc:grpc-bom", version.ref = "managed-grpc" }
 boms-jackson = { module = "com.fasterxml.jackson:jackson-bom", version.ref = "managed-jackson" }
 boms-junit5 = { module = "org.junit:junit-bom", version.ref = "managed-junit5" }
 boms-kotlin = { module = "org.jetbrains.kotlin:kotlin-bom", version.ref = "managed-kotlin" }
