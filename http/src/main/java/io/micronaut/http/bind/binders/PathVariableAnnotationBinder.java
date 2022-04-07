@@ -77,28 +77,30 @@ public class PathVariableAnnotationBinder<T> extends AbstractAnnotatedArgumentBi
         // if the annotation is present or the HTTP method doesn't allow a request body
         // attempt to bind from request parameters. This avoids allowing the request URI to
         // be manipulated to override POST or JSON variables
-        if (hasAnnotation && matchInfo.isPresent()) {
-            final ConvertibleValues<Object> variableValues = ConvertibleValues.of(matchInfo.get().getVariableValues());
-            if (bindAll) {
-                Object value;
-                // Only maps and POJOs will "bindAll", lists work like normal
-                if (Iterable.class.isAssignableFrom(argument.getType())) {
-                    value = doResolve(context, variableValues, parameterName);
-                    if (value == null) {
-                        value = Collections.emptyList();
-                    }
-                } else {
-                    value = parameters.asMap();
-                }
-                result = doConvert(value, context);
-            } else {
-                result = doBind(context, variableValues, parameterName);
+        
+        if(!hasAnnotation || !matchInfo.isPresent()){
+            result = BindingResult.EMPTY;
+            return result;
+        }
+        
+        final ConvertibleValues<Object> variableValues = ConvertibleValues.of(matchInfo.get().getVariableValues());
+        if(!bindAll){
+            result = doBind(context, variableValues, parameterName);
+            return result;
+        }
+        
+        Object value;
+        // Only maps and POJOs will "bindAll", lists work like normal
+        if (Iterable.class.isAssignableFrom(argument.getType())) {
+            value = doResolve(context, variableValues, parameterName);
+            if (value == null) {
+                value = Collections.emptyList();
             }
         } else {
-            //noinspection unchecked
-            result = BindingResult.EMPTY;
+            value = parameters.asMap();
         }
-
+            
+        result = doConvert(value, context);
         return result;
     }
 }
