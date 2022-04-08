@@ -1,6 +1,6 @@
 The Micronaut HTTP server can be considered a Micronaut Module - that is a component of Micronaut that builds on the fundamental building blocks including <<iocArch, Dependency Injection>> and the lifecycle of the <<containerArch, ApplicationContext>>.
 
-The HTTP server includes a set of abstract interfaces and common code contained with the `micronaut-http` and `micronaut-http-server` modules respectively (the former includes HTTP primitives shared aross the client and the server).
+The HTTP server includes a set of abstract interfaces and common code contained with the `micronaut-http` and `micronaut-http-server` modules respectively (the former includes HTTP primitives shared across the client and the server).
 
 A default implementation of these interfaces is provided based on the https://netty.io/[Netty I/O toolkit] the architecture of which is described in the image below:
 
@@ -8,7 +8,7 @@ image::https://netty.io/images/components.png[]
 
 The Netty API is in general a very low-level I/O networking API designed for integrators to use to build clients and servers that present a higher abstraction layer. The Micronaut HTTP server is one such abstraction layer.
 
-An architecture diagram of the Micronaut HTTP server and the components used in it's implementation is described below:
+An architecture diagram of the Micronaut HTTP server and the components used in its implementation is described below:
 
 image::arch/httpserver.png[]
 
@@ -42,7 +42,7 @@ The api:http.server.netty.NettyHttpServer[] reads the <<serverConfiguration, Ser
 
 === Server Configuration Security Considerations
 
-Netty's https://netty.io/4.1/api/io/netty/handler/ssl/SslContext.html[SslContext] provides an abstraction which allows using either the JDK-provided `javax.net.ssl.SSLContext` or an https://netty.io/4.1/api/io/netty/handler/ssl/OpenSslEngine.html[OpenSslEngine] that requires the the developer to additionally add https://netty.io/wiki/forked-tomcat-native.html[netty-tcnative] as a dependency (`netty-tcnative` is a fork of of https://tomcat.apache.org/native-doc/[Tomcat's OpenSSL binding]).
+Netty's https://netty.io/4.1/api/io/netty/handler/ssl/SslContext.html[SslContext] provides an abstraction which allows using either the JDK-provided `javax.net.ssl.SSLContext` or an https://netty.io/4.1/api/io/netty/handler/ssl/OpenSslEngine.html[OpenSslEngine] that requires the developer to additionally add https://netty.io/wiki/forked-tomcat-native.html[netty-tcnative] as a dependency (`netty-tcnative` is a fork of https://tomcat.apache.org/native-doc/[Tomcat's OpenSSL binding]).
 
 The api:http.ssl.ServerSslConfiguration[] allows configuring the application to a secure, readable location on disk where valid certificates exist to correctly configure the `javax.net.ssl.TrustManagerFactory` and `javax.net.ssl.KeyManagerFactory` by loading the configurtion from disk.
 
@@ -52,7 +52,7 @@ When the api:http.server.netty.NettyHttpServer[] executes the `start()` sequence
 
 1. Read the api:http.netty.channel.EventLoopGroupConfiguration[] and create the parent and worker https://netty.io/4.1/api/io/netty/channel/EventLoopGroup.html[EventLoopGroup] instances required to start a Netty server.
 2. Compute a platform specific https://netty.io/4.1/api/io/netty/channel/socket/ServerSocketChannel.html[ServerSocketChannel] to use (depending on Operating System this could either be Epoll or KQueue, falling back to Java NIO if no native binding is possible)
-3. Creates the instance of https://netty.io/4.1/api/io/netty/bootstrap/ServerBootstrap.html[ServerBootstrap] used to initialze the the https://netty.io/4.1/api/io/netty/channel/socket/SocketChannel.html[SocketChannel] (the connection between client and server).
+3. Creates the instance of https://netty.io/4.1/api/io/netty/bootstrap/ServerBootstrap.html[ServerBootstrap] used to initialze the https://netty.io/4.1/api/io/netty/channel/socket/SocketChannel.html[SocketChannel] (the connection between client and server).
 4. The `SocketChannel` is initialized by a Netty https://netty.io/4.1/api/io/netty/channel/ChannelInitializer.html[ChannelInitializer] that creates the customized Netty https://netty.io/4.1/api/io/netty/channel/ChannelPipeline.html[ChannelPipeline] used to Micronaut to server HTTP/1.1 or HTTP/2 requests depending on configuration.
 5. The Netty https://netty.io/4.1/api/io/netty/bootstrap/ServerBootstrap.html[ServerBootstrap] is bound to one or more configured ports, effectively making the server available to receive requests.
 6. Two <<events, Bean Events>> are fired, first api:runtime.server.event.ServerStartupEvent[] to indicate the server has started, then finally once all these events are processed a api:discovery.event.ServiceReadyEvent[] only if the property `micronaut.application.name` is set.
@@ -94,7 +94,7 @@ image::arch/http-server-requestflow.png[]
 
 The `RouteExecutor` will construct a api:http.filter.FilterChain[] to execute one or many api:http.filter.HttpServerFilter[] prior executing the target method of an annotated ann:http.annotation.Controller[] type.
 
-Once all of the api:http.filter.HttpServerFilter[] instances have been executed the api:http.server.RouteExecutor[] will attempt to satisify the requirements of the target method's parameters, including any <<binding, Request binding annotations>>. If the parameters cannot be satisfied then a `HTTP 400 - Bad Request` api:http.HttpStatus[] response is returned to the calling client.
+Once all of the api:http.filter.HttpServerFilter[] instances have been executed the api:http.server.RouteExecutor[] will attempt to satisfy the requirements of the target method's parameters, including any <<binding, Request binding annotations>>. If the parameters cannot be satisfied then a `HTTP 400 - Bad Request` api:http.HttpStatus[] response is returned to the calling client.
 
 === Netty Server Routing Security Considerations
 

@@ -30,6 +30,7 @@ import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
+import spock.lang.Issue
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 import java.time.LocalDate
@@ -389,6 +390,47 @@ class HttpHeadSpec extends Specification {
         !body.isPresent()
     }
 
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/3685')
+    void "test that content-type header is present in head request"() {
+        when:
+        HttpResponse response = Flux.from(client.exchange(
+                HttpRequest.HEAD("/head/content-type"), String
+        )).blockFirst()
+
+        then:
+        response.status == HttpStatus.OK
+        !response.body.present
+        response.contentType.present
+        response.contentType.get() == MediaType.IMAGE_PNG_TYPE
+        response.contentLength == 10
+    }
+
+    void "test that content-type header is not present for head request when error results"() {
+        when:
+        Flux.from(client.exchange(
+                HttpRequest.HEAD("/head/empty"), String
+        )).blockFirst()
+
+        then:
+        def ex = thrown(HttpClientResponseException)
+        def response = ex.response
+        !response.body.present
+        !response.contentType.present
+    }
+
+    void "test that content-type header is not present for head request when error route throws"() {
+        when:
+        Flux.from(client.exchange(
+                HttpRequest.HEAD("/head/thrownError"), String
+        )).blockFirst()
+
+        then:
+        def ex = thrown(HttpClientResponseException)
+        def response = ex.response
+        !response.body.present
+        !response.contentType.present
+    }
+
     @Requires(property = 'spec.name', value = 'HttpHeadSpec')
     @Controller("/get")
     static class GetController {
@@ -491,7 +533,26 @@ class HttpHeadSpec extends Specification {
         @Head("/no-content")
         @Status(HttpStatus.NO_CONTENT)
         void noContent() {}
+
+        @Head("/content-type")
+        HttpResponse<String> contentType() {
+            return HttpResponse.ok("ok")
+                    .contentType(MediaType.IMAGE_PNG_TYPE)
+                    .contentLength(10)
+        }
+
+        @Get("/thrownError")
+        HttpResponse<String> thrownError() {
+            throw new CustomErrorException();
+        }
+
+        @io.micronaut.http.annotation.Error
+        HttpResponse thrownErrorHandler(HttpRequest request, CustomErrorException ignored) {
+            throw new RuntimeException('error thrown: CustomErrorException')
+        }
     }
+
+    static class CustomErrorException extends RuntimeException { }
 
     static class Book {
         String title

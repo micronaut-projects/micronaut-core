@@ -126,7 +126,7 @@ public class MultiValuesConverterFactory {
     ) {
         List<String> paramValues = parameters.getAll(name);
 
-        if (paramValues.size() == 0 && defaultValue != null) {
+        if (paramValues.isEmpty() && defaultValue != null) {
             paramValues.add(defaultValue);
         }
 
@@ -147,12 +147,11 @@ public class MultiValuesConverterFactory {
      *
      * @return All the values in a Map
      */
-    private static Map<String, String> getMultiMapParameters(ConvertibleMultiValues<String> parameters, String name) {
+    private static Map<String, String> getMultiMapParameters(ConvertibleMultiValues<String> parameters) {
         // Convert to map of strings - if multiple values are present, the first one is taken
-        Map values = parameters.asMap().entrySet().stream()
+        return parameters.asMap().entrySet().stream()
                 .filter(v -> !v.getValue().isEmpty())
-                .collect(Collectors.toMap(v -> v.getKey(), v -> v.getValue().get(0)));
-        return values;
+                .collect(Collectors.toMap(Map.Entry::getKey, v -> v.getValue().get(0)));
     }
 
     /**
@@ -170,7 +169,7 @@ public class MultiValuesConverterFactory {
             String key = param.getKey();
             if (key.startsWith(name) && key.length() > name.length() &&
                     key.charAt(name.length()) == '[' && key.charAt(key.length() - 1) == ']' &&
-                    param.getValue().size() > 0
+                    !param.getValue().isEmpty()
             ) {
                 String mapKey = key.substring(name.length() + 1, key.length() - 1);
                 values.put(mapKey, param.getValue().get(0));
@@ -344,7 +343,7 @@ public class MultiValuesConverterFactory {
             String name, ConvertibleMultiValues<String> parameters, String defaultValue, Character delimiter
         ) {
             List<String> values = parameters.getAll(name);
-            if (values.size() == 0 && defaultValue != null) {
+            if (values.isEmpty() && defaultValue != null) {
                 values.add(defaultValue);
             }
 
@@ -426,7 +425,7 @@ public class MultiValuesConverterFactory {
                                                    String name,
                                                    ConvertibleMultiValues<String> parameters
         ) {
-            Map<String, String> values = getMultiMapParameters(parameters, name);
+            Map<String, String> values = getMultiMapParameters(parameters);
             return convertValues(conversionContext, values);
         }
 
@@ -500,7 +499,7 @@ public class MultiValuesConverterFactory {
                                                       String name,
                                                       ConvertibleMultiValues<String> parameters
         ) {
-            Map<String, String> values = getMultiMapParameters(parameters, name);
+            Map<String, String> values = getMultiMapParameters(parameters);
             return convertValues(conversionContext, values);
         }
 

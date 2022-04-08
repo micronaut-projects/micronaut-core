@@ -1,5 +1,5 @@
 plugins {
-    id 'java'
+    id "io.micronaut.build.internal.convention-library"
     id "org.jetbrains.kotlin.jvm"
 }
 

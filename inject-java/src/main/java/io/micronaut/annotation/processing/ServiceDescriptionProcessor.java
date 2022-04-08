@@ -55,15 +55,17 @@ import java.util.Set;
         AbstractInjectAnnotationProcessor.MICRONAUT_PROCESSING_ANNOTATIONS
 })
 public class ServiceDescriptionProcessor extends AbstractInjectAnnotationProcessor {
-    private static final Set<String> SUPPORTED_ANNOTATIONS = Collections.unmodifiableSet(
-            new HashSet<String>() {{
-                add(Generated.class.getName());
-                add(ContextConfigurer.class.getName());
-            }}
-    );
+    private static final Set<String> SUPPORTED_ANNOTATIONS;
     private static final Set<String> SUPPORTED_SERVICE_TYPES = Collections.singleton(
             ApplicationContextConfigurer.class.getName()
     );
+
+    static {
+        Set<String> annotations = new HashSet<>(2);
+        annotations.add(Generated.class.getName());
+        annotations.add(ContextConfigurer.class.getName());
+        SUPPORTED_ANNOTATIONS = Collections.unmodifiableSet(annotations);
+    }
 
     private final Map<String, Set<String>> serviceDescriptors = new HashMap<>();
 

@@ -41,21 +41,21 @@ There are sometimes where we are not sure whether we want or can solve an issue.
 There are also a bunch of `relates-to` labels that can be used to further categorise issues. This is helpful in projects
 with a lot of issues, or projects where different people work on different parts or modules.
 
-The majority of the issues are defined in the 
+The majority of the issues are defined in the
 [management](https://github.com/micronaut-projects/management/blob/master/labels.tf) repo, and propagated via Terraform.
 If you want new labels:
 
 * If they can be beneficial to several repos, send a pull request to the management repo.
 * If they are repo-specific, just go ahead and create them with the GitHub UI.
 
-Finally, issues (especially bugs) should be prioritised with either `priority: high`, `priority: medium` or 
+Finally, issues (especially bugs) should be prioritised with either `priority: high`, `priority: medium` or
 `priority: low`. Checkout the
 [Issue Priority Labels](https://github.com/micronaut-projects/micronaut-core/wiki/Issue-Priority-Labels) document for
 guidelines about when to use each of them.
 
 ## Review pull requests
 
-Pull requests, regardless of whether they are created by internal or external contributors, should meet the following 
+Pull requests, regardless of whether they are created by internal or external contributors, should meet the following
 criteria:
 
 * All the GitHub checks are passing (CLA signed and builds passing).
@@ -63,13 +63,13 @@ criteria:
   type of things you would review in every other software project.
 * Contains tests.
 * Includes documentation.
-* If it closes any issues, 
+* If it closes any issues,
   [they should be linked](https://docs.github.com/en/free-pro-team@latest/github/managing-your-work-on-github/linking-a-pull-request-to-an-issue)
   either using closing keywords, or manually.
 
-Regarding the target branch, backwards-compatible bug fixes and improvements typically target the default branch, 
+Regarding the target branch, backwards-compatible bug fixes and improvements typically target the default branch,
 backwards-compatible enhancements target the next minor version branch, and breaking changes target the next major version
-branch. Check the 
+branch. Check the
 [Micronaut Module Versioning](https://github.com/micronaut-projects/micronaut-core/wiki/Micronaut-Module-Versioning)
 document for more information.
 
@@ -78,7 +78,7 @@ patch/minor release we don't leak breaking changes. Check the
 [Micronaut Module Branch Naming](https://github.com/micronaut-projects/micronaut-core/wiki/Micronaut-Module-Branch-Naming)
 document for more information.
 
-Note that 
+Note that
 [Micronaut Core and Starter](https://github.com/micronaut-projects/micronaut-core/wiki/Micronaut-Core-and-Starter-Branching-Strategy)
 follow a slightly different strategy.
 
@@ -93,17 +93,17 @@ All Micronaut repos have 2 dependency upgrade checking mechanism:
    those defined in `gradle.properties`. It will also send different PRs for the same version upgrade if the artifact ID
    is different. For example, if you have `com.example:client:1.0` and `com.example:server:1.0`, and a new 1.1 version
    arrives for both, it will send 2 PRs, where they should both be upgraded at the same time.
-   
+
 2. To overcome those disadvantages, we have our own dependency upgrade solution based on the
    [Gradle Use Latest Versions Plugin](https://github.com/patrikerdes/gradle-use-latest-versions-plugin). It runs daily
    during weekdays.
-   
+
 The consequence of having both approaches in place is that we get multiple dependency upgrade PRs: one created by
 `micronaut-build` via our automation, and one or many (one per dependency) created by Dependabot. When merging those, it
-is better to prefer the `micronaut-build` ones, if possible, for 2 reasons: a) they attempt to upgrade multiple dependencies 
+is better to prefer the `micronaut-build` ones, if possible, for 2 reasons: a) they attempt to upgrade multiple dependencies
 in a single PR, which creates less noise in the Git history; b) Once you merge that, Dependabot will react and automatically
 close its own PRs if the dependecy is up-to-date.
-   
+
 When an upgrade to a new version arrives, we need to be careful when merging, so that we don't introduce an
 unnecessary upgrade burden on our users. Read the
 [Module Upgrade Strategy](https://github.com/micronaut-projects/micronaut-core/wiki/Module-Upgrade-Strategy) for more
@@ -157,7 +157,7 @@ Note that it is perfectly possible to have new workflows that aren't part of the
 The release process is highly automated and normally involves just publishing a GitHub release. But before you get there,
 there are some parts you need to understand first.
 
-First of all, all the repos have an automatic changelog generation mechanism: when a change is made to the repo 
+First of all, all the repos have an automatic changelog generation mechanism: when a change is made to the repo
 (a push event), it creates (or updates if there is already one) a draft release, calculating the next patch version. The
 release notes will contain pull requests merged and issues closed since the last release.
 
@@ -168,21 +168,21 @@ If you are publishing a milestone or release candidate, check the pre-release ch
 
 Note that the release tags must be preceded with `v`, e.g.: `v1.2.3`.
 
-Once you publish the GitHub release, the 
+Once you publish the GitHub release, the
 [Release GitHub Action workflow](https://github.com/micronaut-projects/micronaut-project-template/blob/master/.github/workflows/release.yml)
 will kick off, performing the following steps:
 
-* Pre-release: sets the `projectVersion` property in `gradle.properties` to the release version, and commit and pushes 
+* Pre-release: sets the `projectVersion` property in `gradle.properties` to the release version, and commit and pushes
   the result.
 * Generates documentation guide and publishes it to the `gh-pages` branch.
 * Sends a pull request to Core to update the BOM.
-* Post-release: 
+* Post-release:
   * Determines the next patch version, and sets it as a `SNAPSHOT` version.
   * Closes the milestone that matches the release version, and creates a new one for the next patch.
 
 If everything goes well, you now need to manually trigger the Maven Central publishing workflow via the GitHub UI.
 
-If there is an issue with the release, it's important not to trigger the Maven Central publishing workflow because once 
+If there is an issue with the release, it's important not to trigger the Maven Central publishing workflow because once
 we publish a version to Maven Central we cannot change or remove it anymore.
 
 There are some properties in `gradle.properties` that affect the release process:
@@ -192,19 +192,19 @@ There are some properties in `gradle.properties` that affect the release process
 * `bomProperty`: in Micronaut Core's `gradle.properties`, the property that represents this module's version.
 * `bomProperties`: if needed, additional properties for the BOM pull request.
 
-For example, assuming a module has the release `1.0.0` as the latest version published, which was included in the 
+For example, assuming a module has the release `1.0.0` as the latest version published, which was included in the
 Micronaut `2.2.0` BOM. If the next version you want to publish is:
 
 * A new patch release (`1.0.1`): simply publish the existing draft release.
-* A new minor release (`1.1.0`): 
+* A new minor release (`1.1.0`):
   * Before the release, push a `1.0.x` branch off `master`.
   * Bump the version in master to `1.1.0-SNAPSHOT`.
   * Set the `githubCoreBranch` property to `2.3.x` (or `3.0.x` if it will be the next one).
   * Edit the draft release setting the version to `1.1.0` in the release title, body, tag, etc.
   * Publish the release.
-* A new major release (`2.0.0`): 
+* A new major release (`2.0.0`):
   * Before the release, push a `1.0.x` branch off `master`.
   * Bump the version in master to `2.0.0-SNAPSHOT`.
   * Set the `githubCoreBranch` property to `3.0.x` (or `2.3.x` if this new major version doesn't introduce breaking changes).
   * Edit the draft release setting the version to `2.0.0` in the release title, body, tag, etc.
-  * Publish the release.  
+  * Publish the release.

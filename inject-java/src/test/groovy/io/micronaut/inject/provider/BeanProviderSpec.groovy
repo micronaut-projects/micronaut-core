@@ -17,13 +17,12 @@ package io.micronaut.inject.provider
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.BeanContext
-import io.micronaut.context.BeanContextConfiguration
-import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.exceptions.NoSuchBeanException
+import io.micronaut.context.exceptions.NonUniqueBeanException
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanDefinitionReference
-import io.micronaut.inject.annotation.TestCachePuts
+import io.micronaut.inject.annotation.MutableAnnotationMetadata
+import io.micronaut.inject.qualifiers.Qualifiers
 
 class BeanProviderSpec extends AbstractTypeElementSpec {
 
@@ -199,5 +198,63 @@ class Bar {}
 
         cleanup:
         context.close()
+    }
+
+    void "test BeanProvider's find method" () {
+        given:
+        ApplicationContext context = buildContext('''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.context.annotation.*;
+import io.micronaut.context.BeanProvider;
+
+@jakarta.inject.Qualifier
+@java.lang.annotation.Documented
+@java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.RUNTIME)
+@interface OneQualifier { }
+
+@jakarta.inject.Qualifier
+@java.lang.annotation.Documented
+@java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.RUNTIME)
+@interface TwoQualifier { }
+
+interface BeanNumber { }
+
+@OneQualifier
+class BeanOne implements BeanNumber { }
+
+@OneQualifier
+@TwoQualifier
+class BeanOneTwo implements BeanNumber { }
+
+@jakarta.inject.Singleton
+class Test {
+    public BeanProvider<BeanNumber> provider;
+    Test(@OneQualifier BeanProvider<BeanNumber> provider) {
+        this.provider = provider;
+    }
+}
+''')
+        when:
+        def bean = getBean(context, 'test.Test')
+
+        then:
+        bean.provider.isPresent()
+
+        when:
+        bean.provider.find(null)
+
+        then:
+        thrown(NonUniqueBeanException)
+
+        when:
+        def metadata = new MutableAnnotationMetadata()
+        metadata.addDeclaredAnnotation('test.TwoQualifier', Collections.emptyMap())
+        def foundBean = bean.provider.find(Qualifiers.byAnnotation(metadata, 'test.TwoQualifier'))
+
+        then:
+        foundBean.isPresent()
+        foundBean.get().class.name == 'test.BeanOneTwo'
     }
 }

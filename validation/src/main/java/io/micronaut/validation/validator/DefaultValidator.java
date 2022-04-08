@@ -1062,6 +1062,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                 .findConstraintValidator(pojoConstraint, parameterType).orElse(null);
 
         if (constraintValidator != null) {
+            final String currentMessageTemplate = context.getMessageTemplate().orElse(null);
             if (!constraintValidator.isValid(parameterValue, constraintAnnotation, context)) {
                 BeanIntrospection<Object> beanIntrospection = getBeanIntrospection(parameterValue);
                 if (beanIntrospection == null) {
@@ -1084,6 +1085,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                         new DefaultConstraintDescriptor(beanAnnotationMetadata, pojoConstraint, annotationValue),
                         argumentValues));
             }
+            context.messageTemplate(currentMessageTemplate);
         }
     }
 

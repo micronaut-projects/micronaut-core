@@ -28,6 +28,9 @@ import java.lang.annotation.Annotation;
 import java.util.Collections;
 import java.util.List;
 
+/**
+ * A {@link TypedAnnotationMapper} for the {@link InterceptorBean} annotation.
+ */
 @Internal
 public class InterceptorBeanMapper implements TypedAnnotationMapper<InterceptorBean> {
 

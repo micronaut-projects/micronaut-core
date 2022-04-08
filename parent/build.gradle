@@ -24,10 +24,10 @@ ext.extraPomInfo = {
 
         'azure-functions-maven-plugin.version'('1.5.0')
         'exec-maven-plugin.version'('1.6.0')
-        'function-maven-plugin.version'('0.9.4')
+        'function-maven-plugin.version'('0.9.8')
         'jib-maven-plugin.version'('3.1.4')
-        'maven-compiler-plugin.version'('3.8.1') // Override actual Maven compiler version (3.1) because some bugs cause annotation processors doesn't work well
-        'maven-failsafe-plugin.version'('2.22.2') // Override actual Maven surefire and failsafe version (2.12) to get native support for executing tests on the JUnit Platform (JUnit 5)
+        'maven-compiler-plugin.version'('3.10.1') // Override actual Maven compiler version (3.1) because some bugs cause annotation processors doesn't work well
+        'maven-failsafe-plugin.version'('2.22.3') // Override actual Maven surefire and failsafe version (2.12) to get native support for executing tests on the JUnit Platform (JUnit 5)
         'maven-resources-plugin.version'('3.2.0')
         'maven-shade-plugin.version'('3.2.4')
         'maven-surefire-plugin.version'('2.22.2') // Override actual Maven surefire and failsafe version (2.12) to get native support for executing tests on the JUnit Platform (JUnit 5)
@@ -217,7 +217,6 @@ ext.extraPomInfo = {
                         mainClass '${exec.mainClass}'
                         buildArgs {
                             buildArg '--no-fallback'
-                            buildArg '-cp ${project.build.directory}/${project.artifactId}-${project.version}.jar'
                         }
                     }
                 }

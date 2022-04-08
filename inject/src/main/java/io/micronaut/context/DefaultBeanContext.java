@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2022 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -3739,7 +3739,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                     ));
                 }
             } else {
-                beansOfTypeList.add(new BeanRegistration(null, candidate, bean));
+                beansOfTypeList.add(new BeanRegistration(new BeanKey(beanType, candidate.getDeclaredQualifier()), candidate, bean));
             }
         }
     }

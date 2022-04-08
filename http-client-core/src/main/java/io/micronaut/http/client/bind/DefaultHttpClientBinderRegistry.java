@@ -46,6 +46,8 @@ import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
 import jakarta.inject.Singleton;
 import kotlin.coroutines.Continuation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.lang.annotation.Annotation;
 import java.util.LinkedHashMap;
@@ -67,6 +69,8 @@ import static io.micronaut.core.util.KotlinUtils.KOTLIN_COROUTINES_SUPPORTED;
 @Internal
 public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry {
 
+    private static final Logger LOG = LoggerFactory.getLogger(HttpClientBinderRegistry.class);
+
     private final Map<Class<? extends Annotation>, ClientArgumentRequestBinder<?>> byAnnotation = new LinkedHashMap<>();
     private final Map<Integer, ClientArgumentRequestBinder<?>> byType = new LinkedHashMap<>();
     private final Map<Class<? extends Annotation>, AnnotatedClientRequestBinder<?>> methodByAnnotation = new LinkedHashMap<>();
@@ -79,21 +83,11 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
     protected DefaultHttpClientBinderRegistry(ConversionService<?> conversionService,
                                               List<ClientRequestBinder> binders,
                                               BeanContext beanContext) {
-        byType.put(Argument.of(HttpHeaders.class).typeHashCode(), (ClientArgumentRequestBinder<HttpHeaders>) (context, uriContext, value, request) -> {
-            value.forEachValue(request::header);
-        });
-        byType.put(Argument.of(Cookies.class).typeHashCode(), (ClientArgumentRequestBinder<Cookies>) (context, uriContext, value, request) -> {
-            request.cookies(value.getAll());
-        });
-        byType.put(Argument.of(Cookie.class).typeHashCode(), (ClientArgumentRequestBinder<Cookie>) (context, uriContext, value, request) -> {
-            request.cookie(value);
-        });
-        byType.put(Argument.of(BasicAuth.class).typeHashCode(), (ClientArgumentRequestBinder<BasicAuth>) (context, uriContext, value, request) -> {
-            request.basicAuth(value.getUsername(), value.getPassword());
-        });
-        byType.put(Argument.of(Locale.class).typeHashCode(), (ClientArgumentRequestBinder<Locale>) (context, uriContext, value, request) -> {
-            request.header(HttpHeaders.ACCEPT_LANGUAGE, value.toLanguageTag());
-        });
+        byType.put(Argument.of(HttpHeaders.class).typeHashCode(), (ClientArgumentRequestBinder<HttpHeaders>) (context, uriContext, value, request) -> value.forEachValue(request::header));
+        byType.put(Argument.of(Cookies.class).typeHashCode(), (ClientArgumentRequestBinder<Cookies>) (context, uriContext, value, request) -> request.cookies(value.getAll()));
+        byType.put(Argument.of(Cookie.class).typeHashCode(), (ClientArgumentRequestBinder<Cookie>) (context, uriContext, value, request) -> request.cookie(value));
+        byType.put(Argument.of(BasicAuth.class).typeHashCode(), (ClientArgumentRequestBinder<BasicAuth>) (context, uriContext, value, request) -> request.basicAuth(value.getUsername(), value.getPassword()));
+        byType.put(Argument.of(Locale.class).typeHashCode(), (ClientArgumentRequestBinder<Locale>) (context, uriContext, value, request) -> request.header(HttpHeaders.ACCEPT_LANGUAGE, value.toLanguageTag()));
         byAnnotation.put(QueryValue.class, new QueryValueClientArgumentRequestBinder(conversionService));
         byAnnotation.put(PathVariable.class, (context, uriContext, value, request) -> {
             String parameterName = context.getAnnotationMetadata().stringValue(PathVariable.class)
@@ -139,9 +133,7 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
                         }
                     });
         });
-        byAnnotation.put(Body.class, (context, uriContext, value, request) -> {
-            request.body(value);
-        });
+        byAnnotation.put(Body.class, (context, uriContext, value, request) -> request.body(value));
         byAnnotation.put(RequestBean.class, (context, uriContext, value, request) -> {
             BeanIntrospection<Object> introspection = BeanIntrospection.getIntrospection(context.getArgument().getType());
             for (BeanProperty<Object, Object> beanProperty : introspection.getBeanProperties()) {
@@ -217,6 +209,10 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
                 for (Class<?> superType : superTypes) {
                     byType.put(Argument.of(superType).typeHashCode(), typedRequestArgumentBinder);
                 }
+            }
+        } else {
+            if (LOG.isErrorEnabled()) {
+                LOG.error("The client request binder {} was rejected because it does not implement {}, {}, or {}", binder.getClass().getName(), TypedClientArgumentRequestBinder.class.getName(), AnnotatedClientArgumentRequestBinder.class.getName(), AnnotatedClientRequestBinder.class.getName());
             }
         }
     }

@@ -121,8 +121,24 @@ Some parameters are recognized by their type instead of their annotation. The fo
 |Type |Description |Example
 
 |api:http.BasicAuth[]
-|Binds Basic Authorization credentials
+|Sets the `Authorization` header
 |`BasicAuth basicAuth`
+
+|api:http.HttpHeaders[]
+|Adds multiple headers to the request
+|`HttpHeaders headers`
+
+|api:http.Cookies[]
+|Adds multiple cookies to the request
+|`Cookies cookies`
+
+|api:http.Cookie[]
+|Adds a cookie to the request
+|`Cookie cookie`
+
+|link:{jdkapi}/java/util/Locale.html[Locale]
+|Sets the `Accept-Language` header. Annotate with ann:http.annotation.QueryValue[] or ann:http.annotation.PathVariable[] to populate a URI variable.
+|`Locale locale`
 
 |===
 

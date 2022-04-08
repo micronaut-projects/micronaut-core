@@ -542,7 +542,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
     /**
      * Used to accumulate property elements for abstract types.
      */
-    private class AbstractPropertyElement implements PropertyElement {
+    private static class AbstractPropertyElement implements PropertyElement {
 
         private final ClassElement declaringType;
         private final ClassElement type;
@@ -594,11 +594,10 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             return true;
         }
 
-        @SuppressWarnings("ConstantConditions")
         @NonNull
         @Override
         public Object getNativeType() {
-            throw null;
+            return this;
         }
     }
 

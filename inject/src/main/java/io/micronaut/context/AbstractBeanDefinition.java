@@ -2149,10 +2149,18 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         final Collection<BeanRegistration<Object>> beanRegistrations = resolveBeanRegistrationsWithGenericsFromArgument(resolutionContext, argument, path,
                 (beanType, qualifier) -> context.getBeanRegistrations(resolutionContext, beanType, qualifier)
         );
-        if (argument.isArray()) {
-            return beanRegistrations.toArray(new BeanRegistration[beanRegistrations.size()]);
+        if (CollectionUtils.isNotEmpty(beanRegistrations)) {
+            if (argument.isArray()) {
+                return beanRegistrations.toArray(new BeanRegistration[beanRegistrations.size()]);
+            } else {
+                return coerceCollectionToCorrectType(argument.getType(), beanRegistrations);
+            }
         } else {
-            return coerceCollectionToCorrectType(argument.getType(), beanRegistrations);
+            if (argument.isArray()) {
+                return Array.newInstance(argument.getType(), 0);
+            } else {
+                return coerceCollectionToCorrectType(argument.getType(), Collections.emptySet());
+            }
         }
     }
 

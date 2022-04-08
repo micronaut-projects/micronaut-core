@@ -4,7 +4,7 @@ introduction:
   upgrading: Upgrading to Micronaut 3.x
 quickStart:
   title: Quick Start
-  buildCLI: Build/Install the CLI
+  buildCLI: Install the CLI
   creatingServer: Creating a Server Application
   ideSetup:
     title: Setting up an IDE

@@ -223,6 +223,8 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
          */
         Path pushFieldResolve(BeanDefinition declaringType, Argument fieldAsArgument, boolean requiresReflection);
 
+        Path pushAnnotationResolve(BeanDefinition beanDefinition, Argument annotationMemberBeanAsArgument);
+
         /**
          * Converts the path to a circular string.
          *

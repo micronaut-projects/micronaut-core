@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty.types.files;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
@@ -33,6 +34,7 @@ import io.netty.channel.DefaultFileRegion;
 import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.HttpChunkedInput;
 import io.netty.handler.codec.http.LastHttpContent;
+import io.netty.handler.codec.http2.Http2StreamChannel;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.stream.ChunkedFile;
 import io.netty.util.ResourceLeakDetector;
@@ -47,6 +49,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 /**
  * Writes a {@link File} to the Netty context.
@@ -117,7 +120,9 @@ public class NettySystemFileCustomizableResponseType extends SystemFile implemen
             FileHolder file = new FileHolder(getFile());
 
             // Write the content.
-            if (context.pipeline().get(SslHandler.class) == null && context.pipeline().get(SmartHttpContentCompressor.class).shouldSkip(finalResponse)) {
+            if (context.pipeline().get(SslHandler.class) == null &&
+                    context.pipeline().get(SmartHttpContentCompressor.class).shouldSkip(finalResponse) &&
+                    !(context.channel() instanceof Http2StreamChannel)) {
                 // SSL not enabled - can use zero-copy file transfer.
                 context.write(new DefaultFileRegion(file.raf.getChannel(), 0, getLength()), context.newProgressivePromise())
                         .addListener(file);
@@ -143,8 +148,9 @@ public class NettySystemFileCustomizableResponseType extends SystemFile implemen
      * {@link ChannelFutureListener} that closes the file when called.
      */
     private static final class FileHolder implements ChannelFutureListener {
-        private static final ResourceLeakDetector<RandomAccessFile> LEAK_DETECTOR =
-                ResourceLeakDetectorFactory.instance().newResourceLeakDetector(RandomAccessFile.class);
+        //to avoid initializing Netty at build time
+        private static final Supplier<ResourceLeakDetector<RandomAccessFile>> LEAK_DETECTOR = SupplierUtil.memoized(() ->
+                ResourceLeakDetectorFactory.instance().newResourceLeakDetector(RandomAccessFile.class));
 
         final RandomAccessFile raf;
         final long length;
@@ -160,7 +166,7 @@ public class NettySystemFileCustomizableResponseType extends SystemFile implemen
             } catch (FileNotFoundException e) {
                 throw new CustomizableResponseTypeException("Could not find file", e);
             }
-            this.tracker = LEAK_DETECTOR.track(raf);
+            this.tracker = LEAK_DETECTOR.get().track(raf);
             try {
                 this.length = raf.length();
             } catch (IOException e) {

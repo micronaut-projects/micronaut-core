@@ -27,6 +27,10 @@ import reactor.util.context.Context;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
+/**
+ * A Reactor subscriber used to handle JSON content. It delegates to an upstream subscriber, wrapping them with opening/closing brackets
+ * where necessary.
+ */
 @Internal
 public final class JsonSubscriber implements CoreSubscriber<HttpContent> {
 

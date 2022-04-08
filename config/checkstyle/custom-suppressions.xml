@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+
+<!DOCTYPE suppressions PUBLIC
+  "-//Checkstyle//DTD SuppressionFilter Configuration 1.2//EN"
+  "https://checkstyle.org/dtds/suppressions_1_2.dtd">
+
+<suppressions>
+
+    <suppress checks="FileLength"
+      files="DefaultBeanContext.java|BeanDefinitionWriter.java|DefaultHttpClient.java|BeanDefinitionInjectProcessor.java|AbstractBeanDefinition.java|AbstractInitializableBeanDefinition.java|DefaultValidator.java|RoutingInBoundHandler.java|DefaultAnnotationMetadata.java|AbstractAnnotationMetadataBuilder.java"/>
+
+    <suppress checks="DeclarationOrder" files="UriTemplate.java"/>
+
+    <suppress checks="Header"
+      files="AnnotationClassReader.java|Attribute.java|Context.java|io[\\/]micronaut[\\/]core[\\/]util[\\/]clhm|AmazonInfo.java|DataCenterInfo.java|LeaseInfo.java|QueryStringDecoder.java|CronExpression.java|AntPathMatcher.java|MicronautAstBuilder.java|io[\\/]micronaut[\\/]http[\\/]netty[\\/]stream[\\/]package-info.java" />
+
+    <suppress checks=".*" files="FlowControlHandler.java" />
+
+    <suppress checks="ParameterNumber" files="DefaultHttpClient.java" />
+
+    <suppress checks="IllegalImport" files="JavaxProviderBeanDefinition.java" />
+
+    <suppress checks=".*" files=".*test-suite.*|.*benchmarks.*" />
+
+</suppressions>

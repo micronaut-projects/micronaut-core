@@ -29,10 +29,6 @@ import spock.lang.Specification
 
 @Retry
 class HttpToHttpsRedirectSpec extends Specification {
-
-    @Shared
-    int port = SocketUtils.findAvailableTcpPort()
-
     @Shared
     @AutoCleanup
     EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
@@ -40,7 +36,7 @@ class HttpToHttpsRedirectSpec extends Specification {
             'micronaut.server.dual-protocol'         : true,
             'micronaut.server.http-to-https-redirect': true,
             'micronaut.ssl.enabled'                  : true,
-            'micronaut.server.ssl.port'                     : -1,
+            'micronaut.server.ssl.port'              : -1,
             'micronaut.server.ssl.build-self-signed' : true,
             'micronaut.http.client.follow-redirects' : false
     ])

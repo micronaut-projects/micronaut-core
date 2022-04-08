@@ -15,12 +15,15 @@
  */
 package io.micronaut.annotation.processing.visitor;
 
+import io.micronaut.core.annotation.AccessorsStyle;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
@@ -166,7 +169,8 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
                     this.continuationParameter = newParameterElement(variableElement, AnnotationMetadata.EMPTY_METADATA);
                     continue;
                 }
-                AnnotationMetadata annotationMetadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(variableElement);
+                AnnotationMetadata annotationMetadata = visitorContext.getAnnotationUtils()
+                        .getAnnotationMetadata(getFieldElementForWriter(), variableElement);
                 JavaParameterElement javaParameterElement = newParameterElement(variableElement, annotationMetadata);
                 if (annotationMetadata.hasDeclaredAnnotation("org.jetbrains.annotations.Nullable")) {
                     javaParameterElement.annotate("javax.annotation.Nullable").getAnnotationMetadata();
@@ -270,4 +274,27 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
         return false;
     }
 
+    private Element getFieldElementForWriter() {
+        String[] writerPrefixes = getAnnotationMetadata()
+                .getValue(AccessorsStyle.class, "writePrefixes", String[].class)
+                .orElse(new String[]{AccessorsStyle.DEFAULT_WRITE_PREFIX});
+
+        final String methodName = getName();
+        if (!NameUtils.isWriterName(methodName, writerPrefixes) || executableElement.getParameters().size() != 1) {
+            return null;    // not a writer
+        }
+
+        Element classElement = executableElement.getEnclosingElement();
+        if (!(classElement instanceof TypeElement)) {
+            return null;    // not within a class
+        }
+
+        final String fieldName = NameUtils.getPropertyNameForSetter(methodName, writerPrefixes);
+
+        // Return the field corresponding to this writer.
+        return (Element) getDeclaringType()
+                .getEnclosedElement(ElementQuery.ALL_FIELDS.named(fieldName::equals))
+                .map(io.micronaut.inject.ast.Element::getNativeType)
+                .orElse(null);
+    }
 }

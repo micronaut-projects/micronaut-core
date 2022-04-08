@@ -87,6 +87,7 @@ public abstract class SingleThreadedBufferingProcessor<R, T> extends SingleThrea
             case BUFFERING:
             case FLOWING:
                 provideDownstreamSubscription(downstreamSubscriber);
+                break;
             default:
                 // no-op
         }

@@ -34,6 +34,8 @@ import io.netty.handler.ssl.SslProvider;
 import io.netty.handler.ssl.SupportedCipherSuiteFilter;
 import io.netty.handler.ssl.util.SelfSignedCertificate;
 import jakarta.inject.Singleton;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.net.ssl.SSLException;
 import java.security.cert.CertificateException;
@@ -48,7 +50,7 @@ import java.util.Optional;
 @Singleton
 @Internal
 public class SelfSignedSslBuilder extends SslBuilder<SslContext> implements ServerSslBuilder {
-
+    private static final Logger LOG = LoggerFactory.getLogger(SelfSignedSslBuilder.class);
     private final ServerSslConfiguration ssl;
     private final HttpServerConfiguration serverConfiguration;
 
@@ -86,6 +88,9 @@ public class SelfSignedSslBuilder extends SslBuilder<SslContext> implements Serv
     @Override
     public Optional<SslContext> build(SslConfiguration ssl, HttpVersion httpVersion) {
         try {
+            if (LOG.isWarnEnabled()) {
+                LOG.warn("HTTP Server is configured to use a self-signed certificate ('build-self-signed' is set to true). This configuration should not be used in a production environment as self-signed certificates are inherently insecure.");
+            }
             SelfSignedCertificate ssc = new SelfSignedCertificate();
             final SslContextBuilder sslBuilder = SslContextBuilder.forServer(ssc.certificate(), ssc.privateKey());
             final boolean isHttp2 = httpVersion == HttpVersion.HTTP_2_0;

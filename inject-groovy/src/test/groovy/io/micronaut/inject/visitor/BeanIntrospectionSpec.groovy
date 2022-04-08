@@ -2170,4 +2170,22 @@ class AImpl implements A {
         property.isReadWrite()
     }
 
+    def "property name with a number is not duplicated"() {
+        when:
+        def introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+class Test {
+    UUID id
+    String s3Name
+}
+''')
+
+        then:
+            introspection.beanProperties.size() == 2
+    }
+
 }

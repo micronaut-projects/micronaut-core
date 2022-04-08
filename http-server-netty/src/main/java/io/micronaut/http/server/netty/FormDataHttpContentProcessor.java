@@ -46,8 +46,21 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
 
     private final InterfaceHttpPostRequestDecoder decoder;
     private final boolean enabled;
-    private AtomicLong extraMessages = new AtomicLong(0);
+    private final AtomicLong extraMessages = new AtomicLong(0);
     private final long partMaxSize;
+
+    /**
+     * Set to true to request a destroy by any thread.
+     */
+    private volatile boolean pleaseDestroy = false;
+    /**
+     * {@code true} during {@link #doOnNext}, can't destroy while that's running.
+     */
+    private volatile boolean inFlight = false;
+    /**
+     * {@code true} if the decoder has been destroyed or will be destroyed in the near future.
+     */
+    private boolean destroyed = false;
 
     /**
      * @param nettyHttpRequest The {@link NettyHttpRequest}
@@ -102,12 +115,28 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
             @Override
             public void cancel() {
                 subscription.cancel();
+                pleaseDestroy = true;
+                destroyIfRequested();
             }
         });
     }
 
     @Override
     protected void onData(ByteBufHolder message) {
+        boolean skip;
+        synchronized (this) {
+            if (destroyed) {
+                skip = true;
+            } else {
+                skip = false;
+                inFlight = true;
+            }
+        }
+        if (skip) {
+            message.release();
+            return;
+        }
+
         Subscriber<? super HttpData> subscriber = getSubscriber();
 
         if (message instanceof HttpContent) {
@@ -120,16 +149,19 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
 
                 while (postRequestDecoder.hasNext()) {
                     InterfaceHttpData data = postRequestDecoder.next();
+                    data.touch();
                     switch (data.getHttpDataType()) {
                         case Attribute:
                             Attribute attribute = (Attribute) data;
-                            messages.add(attribute);
+                            // bodyListHttpData keeps a copy and releases it later
+                            messages.add(attribute.retain());
                             postRequestDecoder.removeHttpDataFromClean(attribute);
                             break;
                         case FileUpload:
                             FileUpload fileUpload = (FileUpload) data;
                             if (fileUpload.isCompleted()) {
-                                messages.add(fileUpload);
+                                // bodyListHttpData keeps a copy and releases it later
+                                messages.add(fileUpload.retain());
                                 postRequestDecoder.removeHttpDataFromClean(fileUpload);
                             }
                             break;
@@ -140,7 +172,8 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
 
                 InterfaceHttpData currentPartialHttpData = postRequestDecoder.currentPartialHttpData();
                 if (currentPartialHttpData instanceof HttpData) {
-                    messages.add(currentPartialHttpData);
+                    // can't give away ownership of this data yet, so retain it
+                    messages.add(currentPartialHttpData.retain());
                 }
 
             } catch (HttpPostRequestDecoder.EndOfDataDecoderException e) {
@@ -172,16 +205,35 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
         } else {
             message.release();
         }
+        inFlight = false;
+        destroyIfRequested();
     }
 
     @Override
     protected void doAfterOnError(Throwable throwable) {
-        decoder.destroy();
+        pleaseDestroy = true;
+        destroyIfRequested();
     }
 
     @Override
     protected void doAfterComplete() {
-        decoder.destroy();
+        pleaseDestroy = true;
+        destroyIfRequested();
+    }
+
+    private void destroyIfRequested() {
+        boolean destroy;
+        synchronized (this) {
+            if (pleaseDestroy && !destroyed && !inFlight) {
+                destroy = true;
+                destroyed = true;
+            } else {
+                destroy = false;
+            }
+        }
+        if (destroy) {
+            decoder.destroy();
+        }
     }
 
 }
