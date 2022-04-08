@@ -1109,24 +1109,6 @@ public class DefaultHttpClient implements
         };
     }
 
-
-    /**
-     * @param parentRequest The parent request
-     * @param request       The request
-     * @param requestURI    The request URI
-     * @param <I>           The input type
-     * @return A {@link Flux}
-     * @deprecated Use {@link #buildStreamExchange(io.micronaut.http.HttpRequest, io.micronaut.http.HttpRequest, URI, Argument)} instead.
-     */
-    @Deprecated
-    @SuppressWarnings("MagicNumber")
-    protected <I> Publisher<io.micronaut.http.HttpResponse<Object>> buildStreamExchange(
-            @Nullable io.micronaut.http.HttpRequest<?> parentRequest,
-            io.micronaut.http.HttpRequest<I> request,
-            URI requestURI) {
-        return buildStreamExchange(parentRequest, request, requestURI, null);
-    }
-
     /**
      * @param parentRequest The parent request
      * @param request       The request
@@ -1136,7 +1118,7 @@ public class DefaultHttpClient implements
      * @return A {@link Flux}
      */
     @SuppressWarnings("MagicNumber")
-    protected <I> Publisher<io.micronaut.http.HttpResponse<Object>> buildStreamExchange(
+    protected <I> Publisher<MutableHttpResponse<Object>> buildStreamExchange(
             @Nullable io.micronaut.http.HttpRequest<?> parentRequest,
             @NonNull io.micronaut.http.HttpRequest<I> request,
             @NonNull URI requestURI,
@@ -1144,7 +1126,7 @@ public class DefaultHttpClient implements
         SslContext sslContext = buildSslContext(requestURI);
 
         AtomicReference<io.micronaut.http.HttpRequest> requestWrapper = new AtomicReference<>(request);
-        Flux<io.micronaut.http.HttpResponse<Object>> streamResponsePublisher = Flux.create(emitter -> {
+        Flux<MutableHttpResponse<Object>> streamResponsePublisher = Flux.create(emitter -> {
 
             ChannelFuture channelFuture;
             try {
@@ -1154,7 +1136,7 @@ public class DefaultHttpClient implements
                         try {
                             final Channel channel = channelHandlerContext.channel();
                             request.setAttribute(NettyClientHttpRequest.CHANNEL, channel);
-                            this.<io.micronaut.http.HttpResponse<Object>>streamRequestThroughChannel(
+                            this.streamRequestThroughChannel(
                                     parentRequest,
                                     requestWrapper,
                                     channel,
@@ -1170,7 +1152,7 @@ public class DefaultHttpClient implements
                                 if (f.isSuccess()) {
                                     Channel channel = f.channel();
                                     request.setAttribute(NettyClientHttpRequest.CHANNEL, channel);
-                                    this.<io.micronaut.http.HttpResponse<Object>>streamRequestThroughChannel(
+                                    this.streamRequestThroughChannel(
                                             parentRequest,
                                             requestWrapper,
                                             channel,
@@ -1294,12 +1276,7 @@ public class DefaultHttpClient implements
                     requestWrapper,
                     responsePublisher
             );
-            Flux<io.micronaut.http.HttpResponse<O>> finalReactiveSequence;
-            if (finalPublisher instanceof Flux) {
-                finalReactiveSequence = (Flux<io.micronaut.http.HttpResponse<O>>) finalPublisher;
-            } else {
-                finalReactiveSequence = Flux.from(finalPublisher);
-            }
+            Flux<io.micronaut.http.HttpResponse<O>> finalReactiveSequence = Flux.from(finalPublisher);
             // apply timeout to flowable too in case a filter applied another policy
             Optional<Duration> readTimeout = configuration.getReadTimeout();
             if (readTimeout.isPresent()) {
@@ -1643,12 +1620,12 @@ public class DefaultHttpClient implements
      * @param <O>               The output type
      * @return The {@link Publisher} for the response
      */
-    protected <I, O> Publisher<io.micronaut.http.HttpResponse<O>> applyFilterToResponsePublisher(
+    protected <I, O, R extends io.micronaut.http.HttpResponse<O>> Publisher<R> applyFilterToResponsePublisher(
             io.micronaut.http.HttpRequest<?> parentRequest,
             io.micronaut.http.HttpRequest<I> request,
             URI requestURI,
             AtomicReference<io.micronaut.http.HttpRequest> requestWrapper,
-            Publisher<io.micronaut.http.HttpResponse<O>> responsePublisher) {
+            Publisher<R> responsePublisher) {
 
         if (request instanceof MutableHttpRequest) {
             ((MutableHttpRequest<I>) request).uri(requestURI);
@@ -1660,14 +1637,14 @@ public class DefaultHttpClient implements
             }
 
             OrderUtil.reverseSort(filters);
-            Publisher<io.micronaut.http.HttpResponse<O>> finalResponsePublisher = responsePublisher;
+            Publisher<R> finalResponsePublisher = responsePublisher;
             filters.add((req, chain) -> finalResponsePublisher);
 
             ClientFilterChain filterChain = buildChain(requestWrapper, filters);
             if (parentRequest != null) {
-                responsePublisher = ServerRequestContext.with(parentRequest, (Supplier<Publisher<io.micronaut.http.HttpResponse<O>>>) () -> {
+                responsePublisher = ServerRequestContext.with(parentRequest, (Supplier<Publisher<R>>) () -> {
                     try {
-                        return Flux.from((Publisher<io.micronaut.http.HttpResponse<O>>) filters.get(0).doFilter(request, filterChain))
+                        return Flux.from((Publisher<R>) filters.get(0).doFilter(request, filterChain))
                                 .contextWrite(ctx -> ctx.put(ServerRequestContext.KEY, parentRequest));
                     } catch (Throwable t) {
                         return Flux.error(t);
@@ -1675,7 +1652,7 @@ public class DefaultHttpClient implements
                 });
             } else {
                 try {
-                    responsePublisher = (Publisher<io.micronaut.http.HttpResponse<O>>) filters.get(0).doFilter(request, filterChain);
+                    responsePublisher = (Publisher<R>) filters.get(0).doFilter(request, filterChain);
                 } catch (Throwable t) {
                     responsePublisher = Flux.error(t);
                 }
@@ -1972,7 +1949,7 @@ public class DefaultHttpClient implements
 
     }
 
-    private Flux<io.micronaut.http.HttpResponse<Object>> readBodyOnError(@NonNull Argument<?> errorType, @NonNull Flux<io.micronaut.http.HttpResponse<Object>> publisher) {
+    private Flux<MutableHttpResponse<Object>> readBodyOnError(@NonNull Argument<?> errorType, @NonNull Flux<MutableHttpResponse<Object>> publisher) {
         if (errorType != null && errorType != HttpClient.DEFAULT_ERROR_TYPE) {
             return publisher.onErrorResume(clientException -> {
                 if (clientException instanceof HttpClientResponseException) {
@@ -2053,7 +2030,7 @@ public class DefaultHttpClient implements
             AtomicReference<io.micronaut.http.HttpRequest> requestWrapper,
             Argument<O> bodyType,
             Argument<E> errorType,
-            FluxSink<io.micronaut.http.HttpResponse<O>> emitter,
+            FluxSink<? super io.micronaut.http.HttpResponse<O>> emitter,
             Channel channel,
             boolean secure,
             ChannelPool channelPool) throws HttpPostRequestEncoder.ErrorDataEncoderException {
@@ -2109,7 +2086,7 @@ public class DefaultHttpClient implements
         requestWriter.writeAndClose(channel, channelPool, emitter);
     }
 
-    private <R> Flux<R> streamRequestThroughChannel(
+    private Flux<MutableHttpResponse<Object>> streamRequestThroughChannel(
             io.micronaut.http.HttpRequest<?> parentRequest,
             AtomicReference<io.micronaut.http.HttpRequest> requestWrapper,
             Channel channel,
@@ -2395,7 +2372,7 @@ public class DefaultHttpClient implements
             Channel channel,
             boolean secure,
             ChannelPool channelPool,
-            FluxSink<io.micronaut.http.HttpResponse<O>> emitter,
+            FluxSink<? super io.micronaut.http.HttpResponse<O>> emitter,
             Argument<O> bodyType, Argument<E> errorType) {
         ChannelPipeline pipeline = channel.pipeline();
         final SimpleChannelInboundHandler<FullHttpResponse> newHandler = new SimpleChannelInboundHandlerInstrumented<FullHttpResponse>(combineFactories(), false) {
@@ -3029,7 +3006,7 @@ public class DefaultHttpClient implements
                                     try {
                                         final Channel channel = channelHandlerContext.channel();
                                         request.setAttribute(NettyClientHttpRequest.CHANNEL, channel);
-                                        this.<MutableHttpResponse<Object>>streamRequestThroughChannel(
+                                        this.streamRequestThroughChannel(
                                                 request,
                                                 requestWrapper,
                                                 channel,
@@ -3046,7 +3023,7 @@ public class DefaultHttpClient implements
                                             if (f.isSuccess()) {
                                                 Channel channel = f.channel();
                                                 request.setAttribute(NettyClientHttpRequest.CHANNEL, channel);
-                                                this.<MutableHttpResponse<Object>>streamRequestThroughChannel(
+                                                this.streamRequestThroughChannel(
                                                         request,
                                                         requestWrapper,
                                                         channel,
