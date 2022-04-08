@@ -2091,13 +2091,49 @@ public class DefaultHttpClient implements
             AtomicReference<io.micronaut.http.HttpRequest> requestWrapper,
             Channel channel,
             boolean failOnError) {
-        return Flux.create(sink -> {
+        return Flux.<MutableHttpResponse<Object>>create(sink -> {
             try {
                 streamRequestThroughChannel0(parentRequest, requestWrapper, sink, channel, failOnError);
             } catch (HttpPostRequestEncoder.ErrorDataEncoderException e) {
                 sink.error(e);
             }
-        });
+        }).flatMap(resp -> handleStreamHttpError(parentRequest, requestWrapper.get(), resp, failOnError));
+    }
+
+    private Flux<MutableHttpResponse<Object>> handleStreamHttpError(
+            io.micronaut.http.HttpRequest<?> parentRequest,
+            io.micronaut.http.HttpRequest<?> finalRequest,
+            MutableHttpResponse<Object> response,
+            boolean failOnError
+    ) {
+        int statusCode = response.code();
+        io.micronaut.http.HttpHeaders headers = response.getHeaders();
+
+        if (statusCode > 300 && statusCode < 400 && configuration.isFollowRedirects() && headers.contains(io.micronaut.http.HttpHeaders.LOCATION)) {
+            String location = headers.get(io.micronaut.http.HttpHeaders.LOCATION);
+            try {
+                MutableHttpRequest<Object> redirectRequest;
+                if (statusCode == 307) {
+                    redirectRequest = io.micronaut.http.HttpRequest.create(finalRequest.getMethod(), location);
+                    finalRequest.getBody().ifPresent(redirectRequest::body);
+                } else {
+                    redirectRequest = io.micronaut.http.HttpRequest.GET(location);
+                }
+
+                setRedirectHeaders(finalRequest, redirectRequest);
+                return Flux.from(resolveRedirectURI(parentRequest, redirectRequest))
+                        .flatMap(uri -> buildStreamExchange(parentRequest, redirectRequest, uri, null));
+            } catch (Exception e) {
+                return Flux.error(e);
+            }
+        } else {
+            boolean errorStatus = statusCode >= 400;
+            if (errorStatus && failOnError) {
+                return Flux.error(new HttpClientResponseException(response.getStatus().getReason(), response));
+            } else {
+                return Flux.just(response);
+            }
+        }
     }
 
     private void streamRequestThroughChannel0(
@@ -2169,13 +2205,8 @@ public class DefaultHttpClient implements
                         log.trace("HTTP Client Streaming Response Received ({}) for Request: {} {}", msg.status(), nettyRequest.method().name(), nettyRequest.uri());
                         traceHeaders(headers);
                     }
-                    boolean errorStatus = statusCode >= 400;
-                    if (errorStatus && failOnError) {
-                        emitter.error(new HttpClientResponseException(response.getStatus().getReason(), response));
-                    } else {
-                        emitter.next(response);
-                        emitter.complete();
-                    }
+                    emitter.next(response);
+                    emitter.complete();
                 }
             }
         });
@@ -2215,60 +2246,8 @@ public class DefaultHttpClient implements
                         traceHeaders(headers);
                     }
 
-                    if (statusCode > 300 && statusCode < 400 && configuration.isFollowRedirects() && headers.contains(HttpHeaderNames.LOCATION)) {
-                        String location = headers.get(HttpHeaderNames.LOCATION);
-                        Flux<io.micronaut.http.HttpResponse<Object>> redirectedExchange;
-                        try {
-                            MutableHttpRequest<Object> redirectRequest;
-                            if (statusCode == 307) {
-                                redirectRequest = io.micronaut.http.HttpRequest.create(finalRequest.getMethod(), location);
-                                finalRequest.getBody().ifPresent(redirectRequest::body);
-                            } else {
-                                redirectRequest = io.micronaut.http.HttpRequest.GET(location);
-                            }
-
-
-                            setRedirectHeaders(nettyRequest, redirectRequest);
-                            redirectedExchange = Flux.from(resolveRedirectURI(parentRequest, redirectRequest))
-                                    .flatMap(uri -> buildStreamExchange(parentRequest, redirectRequest, uri, null));
-
-                            //noinspection SubscriberImplementation
-                            redirectedExchange.subscribe(new Subscriber<io.micronaut.http.HttpResponse<Object>>() {
-                                Subscription sub;
-
-                                @Override
-                                public void onSubscribe(Subscription s) {
-                                    s.request(1);
-                                    this.sub = s;
-                                }
-
-                                @Override
-                                public void onNext(io.micronaut.http.HttpResponse<Object> objectHttpResponse) {
-                                    emitter.next(objectHttpResponse);
-                                }
-
-                                @Override
-                                public void onError(Throwable t) {
-                                    emitter.error(t);
-                                }
-
-                                @Override
-                                public void onComplete() {
-                                    emitter.complete();
-                                }
-                            });
-                        } catch (Exception e) {
-                            emitter.error(e);
-                        }
-                    } else {
-                        boolean errorStatus = statusCode >= 400;
-                        if (errorStatus && failOnError) {
-                            emitter.error(new HttpClientResponseException(response.getStatus().getReason(), response));
-                        } else {
-                            emitter.next(response);
-                            emitter.complete();
-                        }
-                    }
+                    emitter.next(response);
+                    emitter.complete();
                 }
             }
         });
