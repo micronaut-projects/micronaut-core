@@ -2652,34 +2652,18 @@ public class DefaultHttpClient implements
     }
 
     private void removeReadTimeoutHandler(ChannelPipeline pipeline) {
-        if (readTimeoutMillis != null) {
-            if (pipeline.context(ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT) != null) {
-                pipeline.remove(ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT);
-            }
-        }
-    }
-
-    private void setRedirectHeaders(@Nullable HttpRequest request, MutableHttpRequest<Object> redirectRequest) {
-        if (request != null) {
-            request.headers().forEach(header -> {
-                if (!REDIRECT_HEADER_BLOCKLIST.contains(header.getKey())) {
-                    redirectRequest.header(header.getKey(), header.getValue());
-                }
-            });
+        if (readTimeoutMillis != null && pipeline.context(ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT) != null) {
+            pipeline.remove(ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT);
         }
     }
 
     private void setRedirectHeaders(@Nullable io.micronaut.http.HttpRequest<?> request, MutableHttpRequest<Object> redirectRequest) {
         if (request != null) {
-            final Iterator<Map.Entry<String, List<String>>> headerIterator = request.getHeaders().iterator();
-            while (headerIterator.hasNext()) {
-                final Map.Entry<String, List<String>> originalHeader = headerIterator.next();
+            for (Map.Entry<String, List<String>> originalHeader : request.getHeaders()) {
                 if (!REDIRECT_HEADER_BLOCKLIST.contains(originalHeader.getKey())) {
                     final List<String> originalHeaderValue = originalHeader.getValue();
                     if (originalHeaderValue != null && !originalHeaderValue.isEmpty()) {
-                        final Iterator<String> headerValueIterator = originalHeaderValue.iterator();
-                        while (headerValueIterator.hasNext()) {
-                            final String value = headerValueIterator.next();
+                        for (String value : originalHeaderValue) {
                             if (value != null) {
                                 redirectRequest.header(originalHeader.getKey(), value);
                             }
