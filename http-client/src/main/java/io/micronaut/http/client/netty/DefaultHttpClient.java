@@ -2092,7 +2092,7 @@ public class DefaultHttpClient implements
             boolean failOnError) {
         return Flux.<MutableHttpResponse<Object>>create(sink -> {
             try {
-                streamRequestThroughChannel0(parentRequest, requestWrapper, sink, channel, failOnError);
+                streamRequestThroughChannel0(parentRequest, requestWrapper, sink, channel);
             } catch (HttpPostRequestEncoder.ErrorDataEncoderException e) {
                 sink.error(e);
             }
@@ -2140,8 +2140,7 @@ public class DefaultHttpClient implements
             io.micronaut.http.HttpRequest<?> parentRequest,
             AtomicReference<io.micronaut.http.HttpRequest> requestWrapper,
             FluxSink emitter,
-            Channel channel,
-            boolean failOnError) throws HttpPostRequestEncoder.ErrorDataEncoderException {
+            Channel channel) throws HttpPostRequestEncoder.ErrorDataEncoderException {
         io.micronaut.http.HttpRequest<?> finalRequest = requestWrapper.get();
         URI requestURI = finalRequest.getUri();
         NettyRequestWriter requestWriter = prepareRequest(
@@ -2163,15 +2162,7 @@ public class DefaultHttpClient implements
             @Override
             public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
                 if (received.compareAndSet(false, true)) {
-                    emitter.error(cause);
-                }
-            }
-
-            @Override
-            public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
-                if (evt instanceof IdleStateEvent && received.compareAndSet(false, true)) {
-                    // closed to idle ste
-                    emitter.error(ReadTimeoutException.TIMEOUT_EXCEPTION);
+                    emitter.error(mapException(finalRequest, cause));
                 }
             }
 
@@ -2217,6 +2208,18 @@ public class DefaultHttpClient implements
                     emitter.complete();
                 }
             }
+
+            @Override
+            public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
+                super.handlerAdded(ctx);
+                addReadTimeoutHandler(pipeline);
+            }
+
+            @Override
+            public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
+                super.handlerRemoved(ctx);
+                removeReadTimeoutHandler(pipeline);
+            }
         });
         pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE_STREAM, new SimpleChannelInboundHandlerInstrumented<StreamedHttpResponse>(combineFactories()) {
 
@@ -2230,7 +2233,7 @@ public class DefaultHttpClient implements
             @Override
             public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
                 if (received.compareAndSet(false, true)) {
-                    emitter.error(cause);
+                    emitter.error(mapException(finalRequest, cause));
                 }
             }
 
@@ -2587,28 +2590,9 @@ public class DefaultHttpClient implements
             public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
                 try {
                     if (complete.compareAndSet(false, true)) {
-
-                        String message = cause.getMessage();
-                        if (message == null) {
-                            message = cause.getClass().getSimpleName();
-                        }
-                        if (log.isTraceEnabled()) {
-                            log.trace("HTTP Client exception ({}) occurred for request : {} {}",
-                                    message, request.getMethodName(), request.getUri());
-                        }
-
-                        if (cause instanceof TooLongFrameException) {
-                            if (!emitter.isCancelled()) {
-                                emitter.error(new ContentLengthExceededException(configuration.getMaxContentLength()));
-                            }
-                        } else if (cause instanceof io.netty.handler.timeout.ReadTimeoutException) {
-                            if (!emitter.isCancelled()) {
-                                emitter.error(ReadTimeoutException.TIMEOUT_EXCEPTION);
-                            }
-                        } else {
-                            if (!emitter.isCancelled()) {
-                                emitter.error(new HttpClientException("Error occurred reading HTTP response: " + message, cause));
-                            }
+                        HttpClientException mapped = mapException(request, cause);
+                        if (!emitter.isCancelled()) {
+                            emitter.error(mapped);
                         }
                     }
                 } finally {
@@ -2618,6 +2602,25 @@ public class DefaultHttpClient implements
             }
         };
         pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_FULL_HTTP_RESPONSE, newHandler);
+    }
+
+    private HttpClientException mapException(io.micronaut.http.HttpRequest<?> request, Throwable cause) {
+        String message = cause.getMessage();
+        if (message == null) {
+            message = cause.getClass().getSimpleName();
+        }
+        if (log.isTraceEnabled()) {
+            log.trace("HTTP Client exception ({}) occurred for request : {} {}",
+                    message, request.getMethodName(), request.getUri());
+        }
+
+        if (cause instanceof TooLongFrameException) {
+            return (new ContentLengthExceededException(configuration.getMaxContentLength()));
+        } else if (cause instanceof io.netty.handler.timeout.ReadTimeoutException) {
+            return ReadTimeoutException.TIMEOUT_EXCEPTION;
+        } else {
+            return new HttpClientException("Error occurred reading HTTP response: " + message, cause);
+        }
     }
 
     private void addReadTimeoutHandler(ChannelPipeline pipeline) {
