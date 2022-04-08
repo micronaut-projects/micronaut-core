@@ -17,6 +17,7 @@ package io.micronaut.scheduling
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
+import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.scheduling.annotation.Scheduled
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
@@ -79,8 +80,11 @@ class ScheduledFixedRateSpec extends Specification {
         MyOtherTask myTask = beanContext.getBean(MyOtherTask)
 
         then:
+        // Cron tasks run once every (30/31/32) seconds, starting with the application startup.
+        // A timeout of 20 seconds ensures that each task triggers once.
         conditions.eventually {
-            myTask.cronEvents.get() == 3
+            print("${myTask.cronEvents.get()}\n")
+            myTask.cronEvents.get() >= 3
         }
 
         cleanup:
@@ -131,14 +135,15 @@ class ScheduledFixedRateSpec extends Specification {
     }
 
     @Singleton
+    @Requires(property = 'spec.name', value = 'ScheduledFixedRateSpecMyOtherTask')
     @Requires(property = 'scheduled-test.task.enabled', value = 'true')
     static class MyOtherTask {
 
         AtomicInteger cronEvents = new AtomicInteger(0)
 
-        @Scheduled(cron = '1/3 0/1 * 1/1 * ?')
-        @Scheduled(cron = '1/4 0/1 * 1/1 * ?')
-        @Scheduled(cron = '1/5 0/1 * 1/1 * ?', zoneId = "America/Chicago")
+        @Scheduled(cron = '1/30 0/1 * 1/1 * ?')
+        @Scheduled(cron = '1/31 0/1 * 1/1 * ?')
+        @Scheduled(cron = '1/32 0/1 * 1/1 * ?', zoneId = "America/Chicago")
         void runCron() {
             cronEvents.incrementAndGet()
         }
