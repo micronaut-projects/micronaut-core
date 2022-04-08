@@ -2452,25 +2452,7 @@ public class DefaultHttpClient implements
                                 emitter.complete();
                             } else { // error flow
                                 try {
-                                    HttpClientResponseException clientError;
-                                    if (errorType != null && errorType != HttpClient.DEFAULT_ERROR_TYPE) {
-                                        clientError = new HttpClientResponseException(
-                                                status.reasonPhrase(),
-                                                null,
-                                                response,
-                                                new HttpClientErrorDecoder() {
-                                                    @Override
-                                                    public Argument<?> getErrorType(MediaType mediaType) {
-                                                        return errorType;
-                                                    }
-                                                }
-                                        );
-                                    } else {
-                                        clientError = new HttpClientResponseException(
-                                                status.reasonPhrase(),
-                                                response
-                                        );
-                                    }
+                                    HttpClientResponseException clientError = makeErrorFromRequestBody(status, response, errorType);
                                     try {
                                         if (!emitter.isCancelled()) {
                                             emitter.error(clientError);
@@ -2478,67 +2460,34 @@ public class DefaultHttpClient implements
                                     } finally {
                                         response.onComplete();
                                     }
-                                } catch (Throwable t) {
-                                    if (t instanceof HttpClientResponseException) {
-                                        try {
-                                            if (!emitter.isCancelled()) {
-                                                emitter.error(t);
-                                            }
-                                        } finally {
-                                            response.onComplete();
-                                        }
-                                    } else {
-                                        response.onComplete();
-                                        FullNettyClientHttpResponse<Object> errorResponse = new FullNettyClientHttpResponse<>(
-                                                fullResponse,
-                                                httpStatus,
-                                                mediaTypeCodecRegistry,
-                                                byteBufferFactory,
-                                                null,
-                                                false
-                                        );
-                                        errorResponse.onComplete();
-                                        HttpClientResponseException clientResponseError = new HttpClientResponseException(
-                                                "Error decoding HTTP error response body: " + t.getMessage(),
-                                                t,
-                                                errorResponse,
-                                                null
-                                        );
+                                } catch (HttpClientResponseException t) {
+                                    try {
                                         if (!emitter.isCancelled()) {
-                                            emitter.error(clientResponseError);
+                                            emitter.error(t);
                                         }
+                                    } finally {
+                                        response.onComplete();
+                                    }
+                                } catch (Exception t) {
+                                    response.onComplete();
+                                    HttpClientResponseException clientResponseError = makeErrorBodyParseError(fullResponse, httpStatus, t);
+                                    if (!emitter.isCancelled()) {
+                                        emitter.error(clientResponseError);
                                     }
                                 }
                             }
                         }
+                    } catch (HttpClientResponseException t) {
+                        if (!emitter.isCancelled()) {
+                            emitter.error(t);
+                        }
                     } catch (Throwable t) {
                         if (complete.compareAndSet(false, true)) {
-                            if (t instanceof HttpClientResponseException) {
+                            makeNormalBodyParseError(fullResponse, httpStatus, errorType, t, e -> {
                                 if (!emitter.isCancelled()) {
-                                    emitter.error(t);
+                                    emitter.error(e);
                                 }
-                            } else {
-                                FullNettyClientHttpResponse<Object> response = new FullNettyClientHttpResponse<>(fullResponse, httpStatus, mediaTypeCodecRegistry, byteBufferFactory, null, false);
-                                HttpClientResponseException clientResponseError = new HttpClientResponseException(
-                                        "Error decoding HTTP response body: " + t.getMessage(),
-                                        t,
-                                        response,
-                                        new HttpClientErrorDecoder() {
-                                            @Override
-                                            public Argument<?> getErrorType(MediaType mediaType) {
-                                                return errorType;
-                                            }
-                                        }
-                                );
-                                try {
-                                    if (!emitter.isCancelled()) {
-                                        emitter.error(clientResponseError);
-                                    }
-
-                                } finally {
-                                    response.onComplete();
-                                }
-                            }
+                            });
                         } else {
                             if (log.isWarnEnabled()) {
                                 log.warn("Exception fired after handler completed: " + t.getMessage(), t);
@@ -2549,7 +2498,7 @@ public class DefaultHttpClient implements
                     if (fullResponse.refCnt() > 0) {
                         try {
                             ReferenceCountUtil.release(fullResponse);
-                        } catch (Throwable e) {
+                        } catch (Exception e) {
                             if (log.isDebugEnabled()) {
                                 log.debug("Failed to release response: {}", fullResponse);
                             }
@@ -2602,6 +2551,76 @@ public class DefaultHttpClient implements
             }
         };
         pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_FULL_HTTP_RESPONSE, newHandler);
+    }
+
+    /**
+     * Create a {@link HttpClientResponseException} from a response with a failed HTTP status.
+     */
+    private HttpClientResponseException makeErrorFromRequestBody(HttpResponseStatus status, FullNettyClientHttpResponse<?> response, Argument<?> errorType) {
+        if (errorType != null && errorType != HttpClient.DEFAULT_ERROR_TYPE) {
+            return new HttpClientResponseException(
+                    status.reasonPhrase(),
+                    null,
+                    response,
+                    new HttpClientErrorDecoder() {
+                        @Override
+                        public Argument<?> getErrorType(MediaType mediaType) {
+                            return errorType;
+                        }
+                    }
+            );
+        } else {
+            return new HttpClientResponseException(status.reasonPhrase(), response);
+        }
+    }
+
+    /**
+     * Create a {@link HttpClientResponseException} if parsing of the HTTP error body failed.
+     */
+    private HttpClientResponseException makeErrorBodyParseError(FullHttpResponse fullResponse, HttpStatus httpStatus, Throwable t) {
+        FullNettyClientHttpResponse<Object> errorResponse = new FullNettyClientHttpResponse<>(
+                fullResponse,
+                httpStatus,
+                mediaTypeCodecRegistry,
+                byteBufferFactory,
+                null,
+                false
+        );
+        // this onComplete call disables further parsing by HttpClientResponseException
+        errorResponse.onComplete();
+        return new HttpClientResponseException(
+                "Error decoding HTTP error response body: " + t.getMessage(),
+                t,
+                errorResponse,
+                null
+        );
+    }
+
+    private void makeNormalBodyParseError(FullHttpResponse fullResponse, HttpStatus httpStatus, Argument<?> errorType, Throwable t, Consumer<HttpClientResponseException> forward) {
+        FullNettyClientHttpResponse<Object> response = new FullNettyClientHttpResponse<>(
+                fullResponse,
+                httpStatus,
+                mediaTypeCodecRegistry,
+                byteBufferFactory,
+                null,
+                false
+        );
+        HttpClientResponseException clientResponseError = new HttpClientResponseException(
+                "Error decoding HTTP response body: " + t.getMessage(),
+                t,
+                response,
+                new HttpClientErrorDecoder() {
+                    @Override
+                    public Argument<?> getErrorType(MediaType mediaType) {
+                        return errorType;
+                    }
+                }
+        );
+        try {
+            forward.accept(clientResponseError);
+        } finally {
+            response.onComplete();
+        }
     }
 
     private HttpClientException mapException(io.micronaut.http.HttpRequest<?> request, Throwable cause) {
