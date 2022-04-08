@@ -2079,10 +2079,9 @@ public class DefaultHttpClient implements
                 channel,
                 secure,
                 channelPool,
-                emitter,
                 bodyType,
                 errorType
-        );
+        ).subscribe(new ForwardingSubscriber<>(emitter));
         requestWriter.writeAndClose(channel, channelPool, emitter);
     }
 
@@ -2097,42 +2096,43 @@ public class DefaultHttpClient implements
             } catch (HttpPostRequestEncoder.ErrorDataEncoderException e) {
                 sink.error(e);
             }
-        }).flatMap(resp -> handleStreamHttpError(parentRequest, requestWrapper.get(), resp, failOnError));
+        }).flatMap(resp -> handleStreamHttpError(resp, failOnError));
     }
 
-    private Flux<MutableHttpResponse<Object>> handleStreamHttpError(
-            io.micronaut.http.HttpRequest<?> parentRequest,
-            io.micronaut.http.HttpRequest<?> finalRequest,
-            MutableHttpResponse<Object> response,
+    private <R extends HttpResponse<?>> Flux<R> handleStreamHttpError(
+            R response,
             boolean failOnError
     ) {
-        int statusCode = response.code();
-        io.micronaut.http.HttpHeaders headers = response.getHeaders();
-
-        if (statusCode > 300 && statusCode < 400 && configuration.isFollowRedirects() && headers.contains(io.micronaut.http.HttpHeaders.LOCATION)) {
-            String location = headers.get(io.micronaut.http.HttpHeaders.LOCATION);
-            try {
-                MutableHttpRequest<Object> redirectRequest;
-                if (statusCode == 307) {
-                    redirectRequest = io.micronaut.http.HttpRequest.create(finalRequest.getMethod(), location);
-                    finalRequest.getBody().ifPresent(redirectRequest::body);
-                } else {
-                    redirectRequest = io.micronaut.http.HttpRequest.GET(location);
-                }
-
-                setRedirectHeaders(finalRequest, redirectRequest);
-                return Flux.from(resolveRedirectURI(parentRequest, redirectRequest))
-                        .flatMap(uri -> buildStreamExchange(parentRequest, redirectRequest, uri, null));
-            } catch (Exception e) {
-                return Flux.error(e);
-            }
+        boolean errorStatus = response.code() >= 400;
+        if (errorStatus && failOnError) {
+            return Flux.error(new HttpClientResponseException(response.getStatus().getReason(), response));
         } else {
-            boolean errorStatus = statusCode >= 400;
-            if (errorStatus && failOnError) {
-                return Flux.error(new HttpClientResponseException(response.getStatus().getReason(), response));
+            return Flux.just(response);
+        }
+    }
+
+    @Nullable
+    private MutableHttpRequest<Object> handleRedirect(
+            io.micronaut.http.HttpRequest<?> finalRequest,
+            io.netty.handler.codec.http.HttpResponse nettyResponse
+    ) {
+        int statusCode = nettyResponse.status().code();
+        HttpHeaders headers = nettyResponse.headers();
+        if (statusCode > 300 && statusCode < 400 && configuration.isFollowRedirects() && headers.contains(HttpHeaderNames.LOCATION)) {
+            String location = headers.get(HttpHeaderNames.LOCATION);
+
+            MutableHttpRequest<Object> redirectRequest;
+            if (statusCode == 307) {
+                redirectRequest = io.micronaut.http.HttpRequest.create(finalRequest.getMethod(), location);
+                finalRequest.getBody().ifPresent(redirectRequest::body);
             } else {
-                return Flux.just(response);
+                redirectRequest = io.micronaut.http.HttpRequest.GET(location);
             }
+
+            setRedirectHeaders(finalRequest, redirectRequest);
+            return redirectRequest;
+        } else {
+            return null;
         }
     }
 
@@ -2178,6 +2178,14 @@ public class DefaultHttpClient implements
             @Override
             protected void channelReadInstrumented(ChannelHandlerContext ctx, FullHttpResponse msg) {
                 if (received.compareAndSet(false, true)) {
+                    MutableHttpRequest<Object> redirectRequest = handleRedirect(finalRequest, msg);
+                    if (redirectRequest != null) {
+                        Flux.from(resolveRedirectURI(parentRequest, redirectRequest))
+                                .flatMap(uri -> buildStreamExchange(parentRequest, redirectRequest, uri, null))
+                                .subscribe(new ForwardingSubscriber<>(emitter));
+                        return;
+                    }
+
                     HttpResponseStatus status = msg.status();
                     int statusCode = status.code();
                     HttpStatus httpStatus;
@@ -2229,6 +2237,14 @@ public class DefaultHttpClient implements
             @Override
             protected void channelReadInstrumented(ChannelHandlerContext ctx, StreamedHttpResponse msg) {
                 if (received.compareAndSet(false, true)) {
+                    MutableHttpRequest<Object> redirectRequest = handleRedirect(finalRequest, msg);
+                    if (redirectRequest != null) {
+                        Flux.from(resolveRedirectURI(parentRequest, redirectRequest))
+                                .flatMap(uri -> buildStreamExchange(parentRequest, redirectRequest, uri, null))
+                                .subscribe(new ForwardingSubscriber<>(emitter));
+                        return;
+                    }
+
                     HttpResponseStatus status = msg.status();
                     int statusCode = status.code();
                     HttpStatus httpStatus;
@@ -2346,7 +2362,17 @@ public class DefaultHttpClient implements
     }
 
     @SuppressWarnings("MagicNumber")
-    private <O, E> void addFullHttpResponseHandler(
+    private <O, E> Flux<HttpResponse<O>> addFullHttpResponseHandler(
+            io.micronaut.http.HttpRequest<?> request,
+            Channel channel,
+            boolean secure,
+            ChannelPool channelPool,
+            Argument<O> bodyType, Argument<E> errorType) {
+        return Flux.create(sink -> addFullHttpResponseHandler0(request, channel, secure, channelPool, sink, bodyType, errorType));
+    }
+
+    @SuppressWarnings("MagicNumber")
+    private <O, E> void addFullHttpResponseHandler0(
             io.micronaut.http.HttpRequest<?> request,
             Channel channel,
             boolean secure,
@@ -2396,34 +2422,14 @@ public class DefaultHttpClient implements
                             traceBody("Response", fullResponse.content());
                         }
 
-                        // it is a redirect
-                        if (statusCode > 300 && statusCode < 400 && configuration.isFollowRedirects() && headers.contains(HttpHeaderNames.LOCATION)) {
-                            String location = headers.get(HttpHeaderNames.LOCATION);
-                            final MutableHttpRequest<Object> redirectRequest;
-                            if (statusCode == 307) {
-                                redirectRequest = io.micronaut.http.HttpRequest.create(request.getMethod(), location);
-                                request.getBody().ifPresent(redirectRequest::body);
-                            } else {
-                                redirectRequest = io.micronaut.http.HttpRequest.GET(location);
-                            }
-
-                            setRedirectHeaders(request, redirectRequest);
-                            Flux<io.micronaut.http.HttpResponse<O>> redirectExchange = Flux.from(resolveRedirectURI(request, redirectRequest))
-                                    .switchMap(buildExchangePublisher(request, redirectRequest, bodyType, errorType));
-                            redirectExchange
-                                    .defaultIfEmpty(io.micronaut.http.HttpResponse.notFound())
-                                    .subscribe(oHttpResponse -> {
-                                        if (bodyType == null || !bodyType.isVoid()) {
-                                            emitter.next(oHttpResponse);
-                                        }
-                                        emitter.complete();
-                                    }, throwable -> {
-                                        if (!emitter.isCancelled()) {
-                                            emitter.error(throwable);
-                                        }
-                                    });
+                        MutableHttpRequest<Object> redirectRequest = handleRedirect(request, fullResponse);
+                        if (redirectRequest != null) {
+                            Flux.from(resolveRedirectURI(request, redirectRequest))
+                                    .switchMap(buildExchangePublisher(request, redirectRequest, bodyType, errorType))
+                                    .subscribe(new ForwardingSubscriber<>(emitter));
                             return;
                         }
+
                         if (statusCode == HttpStatus.NO_CONTENT.getCode()) {
                             // normalize the NO_CONTENT header, since http content aggregator adds it even if not present in the response
                             headers.remove(HttpHeaderNames.CONTENT_LENGTH);
