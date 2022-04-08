@@ -2127,7 +2127,7 @@ public class DefaultHttpClient implements
         );
         HttpRequest nettyRequest = requestWriter.getNettyRequest();
         ChannelPipeline pipeline = channel.pipeline();
-        pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE_FULL, new SimpleChannelInboundHandlerInstrumented<FullHttpResponse>() {
+        pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE_FULL, new SimpleChannelInboundHandlerInstrumented<FullHttpResponse>(combineFactories()) {
             final AtomicBoolean received = new AtomicBoolean(false);
 
             @Override
@@ -2190,7 +2190,7 @@ public class DefaultHttpClient implements
                 }
             }
         });
-        pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE_STREAM, new SimpleChannelInboundHandlerInstrumented<StreamedHttpResponse>() {
+        pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE_STREAM, new SimpleChannelInboundHandlerInstrumented<StreamedHttpResponse>(combineFactories()) {
 
             final AtomicBoolean received = new AtomicBoolean(false);
 
@@ -2386,7 +2386,7 @@ public class DefaultHttpClient implements
             FluxSink<io.micronaut.http.HttpResponse<O>> emitter,
             Argument<O> bodyType, Argument<E> errorType) {
         ChannelPipeline pipeline = channel.pipeline();
-        final SimpleChannelInboundHandler<FullHttpResponse> newHandler = new SimpleChannelInboundHandlerInstrumented<FullHttpResponse>(false) {
+        final SimpleChannelInboundHandler<FullHttpResponse> newHandler = new SimpleChannelInboundHandlerInstrumented<FullHttpResponse>(combineFactories(), false) {
 
             AtomicBoolean complete = new AtomicBoolean(false);
             boolean keepAlive = true;
@@ -3087,7 +3087,7 @@ public class DefaultHttpClient implements
     private <V, C extends Future<V>> Future<V> addInstrumentedListener(
             Future<V> channelFuture, GenericFutureListener<C> listener
     ) {
-        InvocationInstrumenter instrumenter = combineFactories(invocationInstrumenterFactories);
+        InvocationInstrumenter instrumenter = combineFactories();
 
         return channelFuture.addListener(f -> {
             try (Instrumentation ignored = instrumenter.newInstrumentation()) {
@@ -3096,11 +3096,11 @@ public class DefaultHttpClient implements
         });
     }
 
-    private static @NonNull InvocationInstrumenter combineFactories(Collection<InvocationInstrumenterFactory> factories) {
-        if (CollectionUtils.isEmpty(factories)) {
+    private @NonNull InvocationInstrumenter combineFactories() {
+        if (CollectionUtils.isEmpty(invocationInstrumenterFactories)) {
             return NOOP;
         }
-        return InvocationInstrumenter.combine(factories.stream()
+        return InvocationInstrumenter.combine(invocationInstrumenterFactories.stream()
                 .map(InvocationInstrumenterFactory::newInvocationInstrumenter)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList()));
@@ -3115,38 +3115,6 @@ public class DefaultHttpClient implements
     interface ThrowingBiConsumer<T1, T2> {
         void accept(T1 t1, T2 t2) throws Exception;
     }
-
-
-    /**
-     * An extension of Netty {@link SimpleChannelInboundHandler} that instruments the channel read handler
-     * by using collection of available {@link InvocationInstrumenterFactory} (such as
-     * {@link ServerRequestContext#with(io.micronaut.http.HttpRequest, java.util.concurrent.Callable)}) if present during
-     * the constructor call of the http client.
-     * Thanks to that the {@link ServerRequestContext#currentRequest()} returns parent request.
-     *
-     * @param <I> the type of the inbound message
-     */
-    abstract class SimpleChannelInboundHandlerInstrumented<I> extends SimpleChannelInboundHandler<I> {
-
-        private final InvocationInstrumenter instrumenter = combineFactories(invocationInstrumenterFactories);
-
-        SimpleChannelInboundHandlerInstrumented() {
-        }
-
-        SimpleChannelInboundHandlerInstrumented(boolean autoRelease) {
-            super(autoRelease);
-        }
-
-        protected abstract void channelReadInstrumented(ChannelHandlerContext ctx, I msg) throws Exception;
-
-        @Override
-        protected final void channelRead0(ChannelHandlerContext ctx, I msg) throws Exception {
-            try (Instrumentation ignored = instrumenter.newInstrumentation()) {
-                channelReadInstrumented(ctx, msg);
-            }
-        }
-    }
-
 
     /**
      * Initializes the HTTP client channel.
@@ -3324,7 +3292,7 @@ public class DefaultHttpClient implements
                     }
                 });
 
-                p.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_SSE_CONTENT, new SimpleChannelInboundHandlerInstrumented<ByteBuf>(false) {
+                p.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_SSE_CONTENT, new SimpleChannelInboundHandlerInstrumented<ByteBuf>(combineFactories(), false) {
 
                     @Override
                     public boolean acceptInboundMessage(Object msg) {
@@ -3394,6 +3362,7 @@ public class DefaultHttpClient implements
          * @param promise Promise object used to notify when first settings are received
          */
         Http2SettingsHandler(ChannelPromise promise) {
+            super(combineFactories());
             this.promise = promise;
         }
 
