@@ -2563,9 +2563,7 @@ public class DefaultHttpClient implements
             @Override
             public void handlerRemoved(ChannelHandlerContext ctx) {
                 if (channelPool != null) {
-                    if (readTimeoutMillis != null) {
-                        ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT);
-                    }
+                    removeReadTimeoutHandler(ctx.pipeline());
                     final Channel ch = ctx.channel();
                     if (!keepAlive) {
                         ch.closeFuture().addListener((future ->
@@ -2582,35 +2580,7 @@ public class DefaultHttpClient implements
 
             @Override
             public void handlerAdded(ChannelHandlerContext ctx) {
-                if (readTimeoutMillis != null) {
-
-                    if (httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0) {
-                        Http2SettingsHandler settingsHandler = (Http2SettingsHandler) ctx.pipeline().get(HANDLER_HTTP2_SETTINGS);
-                        if (settingsHandler != null) {
-                            addInstrumentedListener(settingsHandler.promise, future -> {
-                                if (future.isSuccess()) {
-                                    pipeline.addBefore(
-                                            ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION,
-                                            ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT,
-                                            new ReadTimeoutHandler(readTimeoutMillis, TimeUnit.MILLISECONDS)
-                                    );
-                                }
-
-                            });
-                        } else {
-                            pipeline.addBefore(
-                                    ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION,
-                                    ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT,
-                                    new ReadTimeoutHandler(readTimeoutMillis, TimeUnit.MILLISECONDS)
-                            );
-                        }
-                    } else {
-                        pipeline.addBefore(
-                                ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC,
-                                ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT,
-                                new ReadTimeoutHandler(readTimeoutMillis, TimeUnit.MILLISECONDS));
-                    }
-                }
+                addReadTimeoutHandler(pipeline);
             }
 
             @Override
@@ -2648,6 +2618,45 @@ public class DefaultHttpClient implements
             }
         };
         pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_FULL_HTTP_RESPONSE, newHandler);
+    }
+
+    private void addReadTimeoutHandler(ChannelPipeline pipeline) {
+        if (readTimeoutMillis != null) {
+            if (httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0) {
+                Http2SettingsHandler settingsHandler = (Http2SettingsHandler) pipeline.get(HANDLER_HTTP2_SETTINGS);
+                if (settingsHandler != null) {
+                    addInstrumentedListener(settingsHandler.promise, future -> {
+                        if (future.isSuccess()) {
+                            pipeline.addBefore(
+                                    ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION,
+                                    ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT,
+                                    new ReadTimeoutHandler(readTimeoutMillis, TimeUnit.MILLISECONDS)
+                            );
+                        }
+
+                    });
+                } else {
+                    pipeline.addBefore(
+                            ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION,
+                            ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT,
+                            new ReadTimeoutHandler(readTimeoutMillis, TimeUnit.MILLISECONDS)
+                    );
+                }
+            } else {
+                pipeline.addBefore(
+                        ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC,
+                        ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT,
+                        new ReadTimeoutHandler(readTimeoutMillis, TimeUnit.MILLISECONDS));
+            }
+        }
+    }
+
+    private void removeReadTimeoutHandler(ChannelPipeline pipeline) {
+        if (readTimeoutMillis != null) {
+            if (pipeline.context(ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT) != null) {
+                pipeline.remove(ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT);
+            }
+        }
     }
 
     private void setRedirectHeaders(@Nullable HttpRequest request, MutableHttpRequest<Object> redirectRequest) {
@@ -2948,11 +2957,7 @@ public class DefaultHttpClient implements
                     }
                 }
 
-                if (readTimeoutMillis != null) {
-                    if (pipeline.context(ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT) != null) {
-                        pipeline.remove(ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT);
-                    }
-                }
+                removeReadTimeoutHandler(pipeline);
             }
 
             @Override
