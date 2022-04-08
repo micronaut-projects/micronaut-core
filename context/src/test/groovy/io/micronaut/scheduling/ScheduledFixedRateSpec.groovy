@@ -83,7 +83,6 @@ class ScheduledFixedRateSpec extends Specification {
         // Cron tasks run once every (30/31/32) seconds, starting with the application startup.
         // A timeout of 20 seconds ensures that each task triggers once.
         conditions.eventually {
-            print("${myTask.cronEvents.get()}\n")
             myTask.cronEvents.get() >= 3
         }
 
