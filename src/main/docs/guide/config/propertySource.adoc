@@ -72,11 +72,11 @@ datasources:
 
 To securely externalize configuration consider using a secrets manager system supported by Micronaut such as:
 
-* [AWS Secrets Manager](https://micronaut-projects.github.io/micronaut-aws/latest/guide/#secretsmanager) 
-* [Google Cloud Secrets Manager](https://micronaut-projects.github.io/micronaut-gcp/latest/guide/#secretManager)
-* [HashiCorp Vault](https://docs.micronaut.io/latest/guide/#distributedConfigurationVault)
-* [Kubernetes Secrets](https://micronaut-projects.github.io/micronaut-kubernetes/latest/guide/index.html#config-client)
-* [Oracle Cloud Vault](https://micronaut-projects.github.io/micronaut-oracle-cloud/latest/guide/#vault)
+* https://micronaut-projects.github.io/micronaut-aws/latest/guide/#secretsmanager[AWS Secrets Manager].
+* https://micronaut-projects.github.io/micronaut-gcp/latest/guide/#secretManager[Google Cloud Secrets Manager].
+* https://docs.micronaut.io/latest/guide/#distributedConfigurationVault[HashiCorp Vault].
+* https://micronaut-projects.github.io/micronaut-kubernetes/latest/guide/index.html#config-client[Kubernetes Secrets].
+* https://micronaut-projects.github.io/micronaut-oracle-cloud/latest/guide/#vault[Oracle Cloud Vault].
 
 === Property Value Placeholders
 
