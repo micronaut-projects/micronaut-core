@@ -1,0 +1,124 @@
+/*
+ * Copyright 2017-2022 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.micronaut.core.graal;
+
+import java.io.IOException;
+import java.net.URI;
+import java.net.URL;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+
+import com.oracle.svm.core.annotate.AutomaticFeature;
+import com.oracle.svm.core.annotate.Substitute;
+import com.oracle.svm.core.annotate.TargetClass;
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.io.IOUtils;
+import io.micronaut.core.io.service.SoftServiceLoader;
+import org.graalvm.nativeimage.ImageSingletons;
+import org.graalvm.nativeimage.hosted.Feature;
+import org.graalvm.nativeimage.hosted.RuntimeReflection;
+
+/**
+ * Integrates {@link io.micronaut.core.io.service.SoftServiceLoader} with GraalVM Native Image.
+ *
+ * @author graemerocher
+ * @since 3.5.0
+ */
+@SuppressWarnings("unused")
+@AutomaticFeature
+final class ServiceLoaderFeature implements Feature {
+
+    @Override
+    public void beforeAnalysis(BeforeAnalysisAccess access) {
+        final String path = "META-INF/micronaut/";
+        StaticServiceDefinitions staticServiceDefinitions = new StaticServiceDefinitions();
+        try {
+            final Enumeration<URL> micronautResources = ServiceLoaderFeature.class.getClassLoader().getResources(path);
+            while (micronautResources.hasMoreElements()) {
+                Set<String> servicePaths = new HashSet<>();
+                URL url = micronautResources.nextElement();
+                IOUtils.eachDirectory(
+                        url,
+                        path,
+                        servicePath -> {
+                            final String serviceName = servicePath.toString();
+                            servicePaths.add(serviceName);
+                        }
+                );
+
+                for (String servicePath : servicePaths) {
+                    IOUtils.eachDirectory(
+                            url,
+                            servicePath,
+                            serviceTypePath -> {
+                                final Set<String> serviceTypeNames = staticServiceDefinitions.serviceTypeMap
+                                        .computeIfAbsent(servicePath,
+                                                         key -> new HashSet<>());
+                                final String serviceTypeName = serviceTypePath.getFileName().toString();
+                                serviceTypeNames.add(serviceTypeName);
+
+                            }
+                    );
+                }
+            }
+
+        } catch (IOException e) {
+            // ignore
+        }
+        final Collection<Set<String>> allTypeNames = staticServiceDefinitions.serviceTypeMap.values();
+        for (Set<String> typeNameSet : allTypeNames) {
+            for (String typeName : typeNameSet) {
+                try {
+                    final Class<?> c = access.findClassByName(typeName);
+                    if (c != null) {
+                        RuntimeReflection.registerForReflectiveInstantiation(c);
+                        RuntimeReflection.register(c);
+                    }
+                } catch (NoClassDefFoundError e) {
+                    // missing dependencies ignore and let it fail at runtime
+                }
+            }
+        }
+        ImageSingletons.add(StaticServiceDefinitions.class, staticServiceDefinitions);
+    }
+}
+
+@Internal
+final class StaticServiceDefinitions {
+    final Map<String, Set<String>> serviceTypeMap = new HashMap<>();
+}
+
+@SuppressWarnings("unused")
+@TargetClass(SoftServiceLoader.class)
+@Internal
+final class ServiceLoaderInitialization {
+    private ServiceLoaderInitialization() {
+    }
+
+    @Substitute
+    private static Set<String> computeServiceTypeNames(URI uri, String path) {
+        final StaticServiceDefinitions ssd = ImageSingletons.lookup(StaticServiceDefinitions.class);
+        return ssd.serviceTypeMap.getOrDefault(
+                path,
+                Collections.emptySet()
+        );
+    }
+}

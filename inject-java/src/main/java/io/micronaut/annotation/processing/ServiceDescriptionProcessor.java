@@ -62,7 +62,6 @@ public class ServiceDescriptionProcessor extends AbstractInjectAnnotationProcess
 
     static {
         Set<String> annotations = new HashSet<>(2);
-        annotations.add(Generated.class.getName());
         annotations.add(ContextConfigurer.class.getName());
         SUPPORTED_ANNOTATIONS = Collections.unmodifiableSet(annotations);
     }

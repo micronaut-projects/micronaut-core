@@ -50,7 +50,7 @@ public class ContextConfigurerVisitor implements TypeElementVisitor<ContextConfi
                 .stream()
                 .map(Element::getName)
                 .filter(SUPPORTED_SERVICE_TYPES::contains)
-                .forEach(serviceType -> context.visitServiceDescriptor(serviceType, element.getName()));
+                .forEach(serviceType -> context.visitServiceDescriptor(serviceType, element.getName(), element));
     }
 
     /**
