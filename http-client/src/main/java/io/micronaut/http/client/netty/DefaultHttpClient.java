@@ -1154,13 +1154,12 @@ public class DefaultHttpClient implements
                         try {
                             final Channel channel = channelHandlerContext.channel();
                             request.setAttribute(NettyClientHttpRequest.CHANNEL, channel);
-                            streamRequestThroughChannel(
+                            this.<io.micronaut.http.HttpResponse<Object>>streamRequestThroughChannel(
                                     parentRequest,
                                     requestWrapper,
-                                    emitter,
                                     channel,
                                     true
-                            );
+                            ).subscribe(new ForwardingSubscriber<>(emitter));
                         } catch (Throwable e) {
                             emitter.error(e);
                         }
@@ -1171,13 +1170,12 @@ public class DefaultHttpClient implements
                                 if (f.isSuccess()) {
                                     Channel channel = f.channel();
                                     request.setAttribute(NettyClientHttpRequest.CHANNEL, channel);
-                                    streamRequestThroughChannel(
+                                    this.<io.micronaut.http.HttpResponse<Object>>streamRequestThroughChannel(
                                             parentRequest,
                                             requestWrapper,
-                                            emitter,
                                             channel,
                                             true
-                                    );
+                                    ).subscribe(new ForwardingSubscriber<>(emitter));
                                 } else {
                                     Throwable cause = f.cause();
                                     emitter.error(
@@ -2111,7 +2109,21 @@ public class DefaultHttpClient implements
         requestWriter.writeAndClose(channel, channelPool, emitter);
     }
 
-    private void streamRequestThroughChannel(
+    private <R> Flux<R> streamRequestThroughChannel(
+            io.micronaut.http.HttpRequest<?> parentRequest,
+            AtomicReference<io.micronaut.http.HttpRequest> requestWrapper,
+            Channel channel,
+            boolean failOnError) {
+        return Flux.create(sink -> {
+            try {
+                streamRequestThroughChannel0(parentRequest, requestWrapper, sink, channel, failOnError);
+            } catch (HttpPostRequestEncoder.ErrorDataEncoderException e) {
+                sink.error(e);
+            }
+        });
+    }
+
+    private void streamRequestThroughChannel0(
             io.micronaut.http.HttpRequest<?> parentRequest,
             AtomicReference<io.micronaut.http.HttpRequest> requestWrapper,
             FluxSink emitter,
@@ -3017,13 +3029,12 @@ public class DefaultHttpClient implements
                                     try {
                                         final Channel channel = channelHandlerContext.channel();
                                         request.setAttribute(NettyClientHttpRequest.CHANNEL, channel);
-                                        streamRequestThroughChannel(
+                                        this.<MutableHttpResponse<Object>>streamRequestThroughChannel(
                                                 request,
                                                 requestWrapper,
-                                                emitter,
                                                 channel,
                                                 false
-                                        );
+                                        ).subscribe(new ForwardingSubscriber<>(emitter));
                                     } catch (Throwable e) {
                                         emitter.error(e);
                                     }
@@ -3035,13 +3046,12 @@ public class DefaultHttpClient implements
                                             if (f.isSuccess()) {
                                                 Channel channel = f.channel();
                                                 request.setAttribute(NettyClientHttpRequest.CHANNEL, channel);
-                                                streamRequestThroughChannel(
+                                                this.<MutableHttpResponse<Object>>streamRequestThroughChannel(
                                                         request,
                                                         requestWrapper,
-                                                        emitter,
                                                         channel,
                                                         false
-                                                );
+                                                ).subscribe(new ForwardingSubscriber<>(emitter));
                                             } else {
                                                 Throwable cause = f.cause();
                                                 emitter.error(
@@ -3109,7 +3119,6 @@ public class DefaultHttpClient implements
     private static boolean isSecureScheme(String scheme) {
         return io.micronaut.http.HttpRequest.SCHEME_HTTPS.equalsIgnoreCase(scheme) || SCHEME_WSS.equalsIgnoreCase(scheme);
     }
-
 
     @FunctionalInterface
     interface ThrowingBiConsumer<T1, T2> {
