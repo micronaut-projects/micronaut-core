@@ -74,7 +74,7 @@ class ScheduledFixedRateSpec extends Specification {
                 'spec.name': 'ScheduledFixedRateSpecMyOtherTask',
         )
 
-        PollingConditions conditions = new PollingConditions(timeout: 20)
+        PollingConditions conditions = new PollingConditions(timeout: 30)
 
         when:
         MyOtherTask myTask = beanContext.getBean(MyOtherTask)
@@ -140,9 +140,9 @@ class ScheduledFixedRateSpec extends Specification {
 
         AtomicInteger cronEvents = new AtomicInteger(0)
 
-        @Scheduled(cron = '1/30 0/1 * 1/1 * ?')
         @Scheduled(cron = '1/31 0/1 * 1/1 * ?')
-        @Scheduled(cron = '1/32 0/1 * 1/1 * ?', zoneId = "America/Chicago")
+        @Scheduled(cron = '1/32 0/1 * 1/1 * ?')
+        @Scheduled(cron = '1/33 0/1 * 1/1 * ?', zoneId = "America/Chicago")
         void runCron() {
             cronEvents.incrementAndGet()
         }

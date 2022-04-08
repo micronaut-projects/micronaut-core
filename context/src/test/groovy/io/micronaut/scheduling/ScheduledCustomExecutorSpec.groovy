@@ -19,7 +19,7 @@ class ScheduledCustomExecutorSpec extends Specification {
 
         when:
         ScheduledBean bean = ctx.getBean(ScheduledBean)
-        PollingConditions conditions = new PollingConditions(timeout: 20)
+        PollingConditions conditions = new PollingConditions(timeout: 30)
 
         then:
         conditions.eventually {
@@ -40,9 +40,9 @@ class ScheduledCustomExecutorSpec extends Specification {
             ran = true
         }
 
-        @Scheduled(cron = '1/30 0/1 * 1/1 * ?', scheduler = "dispatcher")
         @Scheduled(cron = '1/31 0/1 * 1/1 * ?', scheduler = "dispatcher")
-        @Scheduled(cron = '1/32 0/1 * 1/1 * ?', zoneId = "America/Chicago", scheduler = "dispatcher")
+        @Scheduled(cron = '1/32 0/1 * 1/1 * ?', scheduler = "dispatcher")
+        @Scheduled(cron = '1/33 0/1 * 1/1 * ?', zoneId = "America/Chicago", scheduler = "dispatcher")
         void runCron() {
             cronEvents.incrementAndGet()
         }
