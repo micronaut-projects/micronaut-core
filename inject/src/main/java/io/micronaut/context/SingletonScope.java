@@ -86,21 +86,21 @@ final class SingletonScope {
             // In some cases you can register an instance of non-singleton bean and expect it act as a singleton
             // Current test `RegisterSingletonSpec "test register singleton method"` does it because of the present @Inject annotation
             // This might be something to remove in 4.0
-            DefaultBeanContext.BeanKey<T> beanKey = new DefaultBeanContext.BeanKey(beanDefinition, qualifier);
+            DefaultBeanContext.BeanKey<T> beanKey = new DefaultBeanContext.BeanKey<>(beanDefinition, qualifier);
             singletonByArgumentAndQualifier.put(beanKey, registration);
         }
         if (beanDefinition instanceof BeanDefinitionDelegate || beanDefinition instanceof NoInjectionBeanDefinition) {
             // Special cases when custom bean definitions need to be indexed:
             // BeanDefinitionDelegate - doesn't really exist with a custom qualifier
             // NoInjectionBeanDefinition - cannot be properly selected from 'beanDefinitionsClasses' when is used with a custom qualifier
-            DefaultBeanContext.BeanKey<T> beanKey = new DefaultBeanContext.BeanKey(beanDefinition, beanDefinition.getDeclaredQualifier());
+            DefaultBeanContext.BeanKey<T> beanKey = new DefaultBeanContext.BeanKey<>(beanDefinition, beanDefinition.getDeclaredQualifier());
             singletonByArgumentAndQualifier.put(beanKey, registration);
         }
         if (createdBean != null && createdBean.getClass() != beanDefinition.getBeanType()) {
             // If the actual type differs, allow to inject the actual implementation for cases like:
             // `MyInterface factoryBean() { new Impl.. }`
             // This might be something to remove in 4.0
-            DefaultBeanContext.BeanKey<T> concrete = new DefaultBeanContext.BeanKey(createdBean.getClass(), qualifier);
+            DefaultBeanContext.BeanKey<T> concrete = new DefaultBeanContext.BeanKey<>((Class<T>) createdBean.getClass(), qualifier);
             singletonByArgumentAndQualifier.put(concrete, registration);
         }
         return registration;
@@ -313,10 +313,10 @@ final class SingletonScope {
 
         static BeanDefinitionIdentity of(BeanDefinition<?> beanDefinition) {
             if (beanDefinition instanceof BeanDefinitionDelegate) {
-                return new BeanDefinitionDelegatedIdentity((BeanDefinitionDelegate) beanDefinition);
+                return new BeanDefinitionDelegatedIdentity((BeanDefinitionDelegate<?>) beanDefinition);
             }
             if (beanDefinition instanceof NoInjectionBeanDefinition) {
-                return new NoInjectionBeanDefinitionIdentity((NoInjectionBeanDefinition) beanDefinition);
+                return new NoInjectionBeanDefinitionIdentity((NoInjectionBeanDefinition<?>) beanDefinition);
             }
             return new SimpleBeanDefinitionIdentity(beanDefinition);
         }
@@ -330,9 +330,9 @@ final class SingletonScope {
      */
     static final class BeanDefinitionDelegatedIdentity implements BeanDefinitionIdentity {
 
-        private final BeanDefinitionDelegate beanDefinitionDelegate;
+        private final BeanDefinitionDelegate<?> beanDefinitionDelegate;
 
-        BeanDefinitionDelegatedIdentity(BeanDefinitionDelegate beanDefinitionDelegate) {
+        BeanDefinitionDelegatedIdentity(BeanDefinitionDelegate<?> beanDefinitionDelegate) {
             this.beanDefinitionDelegate = beanDefinitionDelegate;
         }
 
@@ -364,9 +364,9 @@ final class SingletonScope {
      */
     static final class NoInjectionBeanDefinitionIdentity implements BeanDefinitionIdentity {
 
-        private final NoInjectionBeanDefinition beanDefinition;
+        private final NoInjectionBeanDefinition<?> beanDefinition;
 
-        NoInjectionBeanDefinitionIdentity(NoInjectionBeanDefinition beanDefinition) {
+        NoInjectionBeanDefinitionIdentity(NoInjectionBeanDefinition<?> beanDefinition) {
             this.beanDefinition = beanDefinition;
         }
 
@@ -382,8 +382,8 @@ final class SingletonScope {
             if (beanDefinition.getBeanType() != that.beanDefinition.getBeanType()) {
                 return false;
             }
-            Qualifier qualifier = beanDefinition.getQualifier();
-            Qualifier thatQualifier = that.beanDefinition.getQualifier();
+            Qualifier<?> qualifier = beanDefinition.getQualifier();
+            Qualifier<?> thatQualifier = that.beanDefinition.getQualifier();
             if (qualifier == thatQualifier) {
                 return true;
             }

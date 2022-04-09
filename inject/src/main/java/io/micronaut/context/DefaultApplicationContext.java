@@ -262,7 +262,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         if (!candidates.isEmpty()) {
 
             List<BeanDefinition<T>> transformedCandidates = new ArrayList<>();
-            for (BeanDefinition candidate : candidates) {
+            for (BeanDefinition<T> candidate : candidates) {
                 if (candidate.isIterable()) {
                     if (candidate.hasDeclaredStereotype(EachProperty.class)) {
                         transformEachPropertyBeanDefinition(resolutionContext, candidate, transformedCandidates);
@@ -286,7 +286,9 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         return candidates;
     }
 
-    private <T> void transformConfigurationReaderBeanDefinition(BeanResolutionContext resolutionContext, BeanDefinition candidate, List<BeanDefinition<T>> transformedCandidates) {
+    private <T> void transformConfigurationReaderBeanDefinition(BeanResolutionContext resolutionContext,
+                                                                BeanDefinition<T> candidate,
+                                                                List<BeanDefinition<T>> transformedCandidates) {
         final String prefix = candidate.stringValue(ConfigurationReader.class, "prefix").orElse(null);
         if (prefix != null) {
             int mapIndex = prefix.indexOf("*");
@@ -316,14 +318,14 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     }
 
     private <T> void transformConfigurationReaderMap(BeanResolutionContext resolutionContext,
-                                                     BeanDefinition candidate,
+                                                     BeanDefinition<T> candidate,
                                                      String prefix,
                                                      String eachProperty,
                                                      List<BeanDefinition<T>> transformedCandidates) {
         Map entries = getProperty(eachProperty, Map.class, Collections.emptyMap());
         if (!entries.isEmpty()) {
             for (Object key : entries.keySet()) {
-                BeanDefinitionDelegate delegate = BeanDefinitionDelegate.create(candidate);
+                BeanDefinitionDelegate<T> delegate = BeanDefinitionDelegate.create(candidate);
                 delegate.put(EachProperty.class.getName(), delegate.getBeanType());
                 delegate.put(Named.class.getName(), key.toString());
 
@@ -336,7 +338,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     }
 
     private <T> void transformConfigurationReaderList(BeanResolutionContext resolutionContext,
-                                                      BeanDefinition candidate,
+                                                      BeanDefinition<T> candidate,
                                                       String prefix,
                                                       String eachProperty,
                                                       List<BeanDefinition<T>> transformedCandidates) {
@@ -344,7 +346,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         if (!entries.isEmpty()) {
             for (int i = 0; i < entries.size(); i++) {
                 if (entries.get(i) != null) {
-                    BeanDefinitionDelegate delegate = BeanDefinitionDelegate.create(candidate);
+                    BeanDefinitionDelegate<T> delegate = BeanDefinitionDelegate.create(candidate);
                     String index = String.valueOf(i);
                     delegate.put("Array", index);
                     delegate.put(Named.class.getName(), index);
@@ -359,7 +361,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     }
 
     private <T> void transformEachBeanBeanDefinition(BeanResolutionContext resolutionContext,
-                                                     BeanDefinition candidate,
+                                                     BeanDefinition<T> candidate,
                                                      List<BeanDefinition<T>> transformedCandidates,
                                                      boolean filterProxied) {
         Class dependentType = candidate.classValue(EachBean.class).orElse(null);
@@ -412,7 +414,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     }
 
     private <T> void transformEachPropertyBeanDefinition(BeanResolutionContext resolutionContext,
-                                                         BeanDefinition candidate,
+                                                         BeanDefinition<T> candidate,
                                                          List<BeanDefinition<T>> transformedCandidates) {
         boolean isList = candidate.booleanValue(EachProperty.class, "list").orElse(false);
         String property = candidate.stringValue(ConfigurationReader.class, "prefix")
@@ -432,12 +434,12 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     }
 
     private <T> void transformEachPropertyOfMap(BeanResolutionContext resolutionContext,
-                                                BeanDefinition candidate,
+                                                BeanDefinition<T> candidate,
                                                 String primaryPrefix,
                                                 String property,
                                                 List<BeanDefinition<T>> transformedCandidates) {
         for (String key : getEnvironment().getPropertyEntries(property)) {
-            BeanDefinitionDelegate delegate = BeanDefinitionDelegate.create(candidate);
+            BeanDefinitionDelegate<T> delegate = BeanDefinitionDelegate.create(candidate);
             if (primaryPrefix != null && primaryPrefix.equals(key)) {
                 delegate.put(BeanDefinitionDelegate.PRIMARY_ATTRIBUTE, true);
             }
@@ -451,7 +453,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     }
 
     private <T> void transformEachPropertyOfList(BeanResolutionContext resolutionContext,
-                                                 BeanDefinition candidate,
+                                                 BeanDefinition<T> candidate,
                                                  String primaryPrefix,
                                                  String property,
                                                  List<BeanDefinition<T>> transformedCandidates) {
@@ -459,7 +461,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         int i = 0;
         for (Object entry : entries) {
             if (entry != null) {
-                BeanDefinitionDelegate delegate = BeanDefinitionDelegate.create(candidate);
+                BeanDefinitionDelegate<T> delegate = BeanDefinitionDelegate.create(candidate);
                 String index = String.valueOf(i);
                 if (primaryPrefix != null && primaryPrefix.equals(index)) {
                     delegate.put(BeanDefinitionDelegate.PRIMARY_ATTRIBUTE, true);

@@ -55,7 +55,7 @@ final class NoInjectionBeanDefinition<T> implements BeanDefinition<T>, BeanDefin
      * @param singletonClass The singleton class
      * @param qualifier      The qualifier
      */
-    NoInjectionBeanDefinition(Class singletonClass, Qualifier<T> qualifier) {
+    NoInjectionBeanDefinition(Class<?> singletonClass, Qualifier<T> qualifier) {
         this.singletonClass = singletonClass;
         this.qualifier = qualifier;
     }
@@ -203,7 +203,7 @@ final class NoInjectionBeanDefinition<T> implements BeanDefinition<T>, BeanDefin
             return false;
         }
 
-        NoInjectionBeanDefinition that = (NoInjectionBeanDefinition) o;
+        NoInjectionBeanDefinition<?> that = (NoInjectionBeanDefinition) o;
         return singletonClass.equals(that.singletonClass);
     }
 
