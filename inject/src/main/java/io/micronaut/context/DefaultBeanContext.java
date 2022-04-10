@@ -3000,48 +3000,43 @@ public class DefaultBeanContext implements InitializableBeanContext {
         }
         if (candidates.size() == 1) {
             return candidates.iterator().next();
-        } else {
-            BeanDefinition<T> definition = null;
-            candidates = candidates.stream().filter(candidate -> !candidate.hasDeclaredStereotype(Secondary.class)).collect(Collectors.toList());
-            if (candidates.size() == 1) {
-                return candidates.iterator().next();
-            } else {
-                if (candidates.stream().anyMatch(candidate -> candidate.hasAnnotation(Order.class))) {
-                    // pick the bean with the highest priority
-                    final Iterator<BeanDefinition<T>> i = candidates.stream()
-                            .sorted((bean1, bean2) -> {
-                                int order1 = OrderUtil.getOrder(bean1.getAnnotationMetadata());
-                                int order2 = OrderUtil.getOrder(bean2.getAnnotationMetadata());
-                                return Integer.compare(order1, order2);
-                            })
-                            .iterator();
-                    if (i.hasNext()) {
-                        final BeanDefinition<T> bean = i.next();
-                        if (i.hasNext()) {
-                            // check there are not 2 beans with the same order
-                            final BeanDefinition<T> next = i.next();
-                            if (OrderUtil.getOrder(bean.getAnnotationMetadata()) == OrderUtil.getOrder(next.getAnnotationMetadata())) {
-                                throw new NonUniqueBeanException(beanType.getType(), candidates.iterator());
-                            }
-                        }
-
-                        LOG.debug("Picked bean {} with the highest precedence for type {} and qualifier {}", bean, beanType, qualifier);
-                        return bean;
-                    } else {
+        }
+        BeanDefinition<T> definition = null;
+        candidates = candidates.stream().filter(candidate -> !candidate.hasDeclaredStereotype(Secondary.class)).collect(Collectors.toList());
+        if (candidates.size() == 1) {
+            return candidates.iterator().next();
+        } else if (candidates.stream().anyMatch(candidate -> candidate.hasAnnotation(Order.class))) {
+            // pick the bean with the highest priority
+            final Iterator<BeanDefinition<T>> i = candidates.stream()
+                    .sorted((bean1, bean2) -> {
+                        int order1 = OrderUtil.getOrder(bean1.getAnnotationMetadata());
+                        int order2 = OrderUtil.getOrder(bean2.getAnnotationMetadata());
+                        return Integer.compare(order1, order2);
+                    })
+                    .iterator();
+            if (i.hasNext()) {
+                final BeanDefinition<T> bean = i.next();
+                if (i.hasNext()) {
+                    // check there are not 2 beans with the same order
+                    final BeanDefinition<T> next = i.next();
+                    if (OrderUtil.getOrder(bean.getAnnotationMetadata()) == OrderUtil.getOrder(next.getAnnotationMetadata())) {
                         throw new NonUniqueBeanException(beanType.getType(), candidates.iterator());
                     }
-                } else {
-
-                    Collection<BeanDefinition<T>> exactMatches = filterExactMatch(beanClass, candidates);
-                    if (exactMatches.size() == 1) {
-                        definition = exactMatches.iterator().next();
-                    } else if (throwNonUnique) {
-                        definition = findConcreteCandidate(beanClass, qualifier, candidates);
-                    }
-                    return definition;
                 }
+
+                LOG.debug("Picked bean {} with the highest precedence for type {} and qualifier {}", bean, beanType, qualifier);
+                return bean;
             }
+            throw new NonUniqueBeanException(beanType.getType(), candidates.iterator());
         }
+
+        Collection<BeanDefinition<T>> exactMatches = filterExactMatch(beanClass, candidates);
+        if (exactMatches.size() == 1) {
+            definition = exactMatches.iterator().next();
+        } else if (throwNonUnique) {
+            definition = findConcreteCandidate(beanClass, qualifier, candidates);
+        }
+        return definition;
     }
 
     private void readAllBeanConfigurations() {
