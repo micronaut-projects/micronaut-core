@@ -89,6 +89,7 @@ class RequestLineSpec extends Specification {
         uri << [
                 '/foo', // origin-form
                 'http://example.com/foo', // absolute-form
+                'http:///foo', // weird form
         ]
     }
 
