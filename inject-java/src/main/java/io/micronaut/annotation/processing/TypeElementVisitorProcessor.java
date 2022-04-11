@@ -273,9 +273,9 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                                  Set<? extends Element> annotatedElements, TypeMirror groovyObjectType) {
         annotatedElements
                 .stream()
+                .filter(element -> JavaModelUtils.isClassOrInterface(element) || JavaModelUtils.isEnum(element) || JavaModelUtils.isRecord(element))
                 .map(modelUtils::classElementFor)
                 .filter(Objects::nonNull)
-                .filter(element -> JavaModelUtils.isClassOrInterface(element) || JavaModelUtils.isEnum(element) || JavaModelUtils.isRecord(element))
                 .filter(element -> element.getAnnotation(Generated.class) == null)
                 .filter(typeElement -> groovyObjectType == null || !typeUtils.isAssignable(typeElement.asType(),
                                                                                            groovyObjectType))
