@@ -15,6 +15,7 @@
  */
 package io.micronaut.context;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.type.Argument;
@@ -35,6 +36,7 @@ import java.util.stream.Stream;
  * @author Denis Stepanov
  * @since 3.5.0
  */
+@Internal
 final class SingletonScope {
 
     private final DefaultBeanContext beanContext;

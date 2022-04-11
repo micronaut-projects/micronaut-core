@@ -16,6 +16,7 @@
 package io.micronaut.context;
 
 import io.micronaut.context.exceptions.BeanDestructionException;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.DisposableBeanDefinition;
 
@@ -26,8 +27,10 @@ import java.util.ListIterator;
  * The disposing bean registration.
  *
  * @param <BT> The bean type
+ * @author Denis Stepanov
  * @since 3.5.0
  */
+@Internal
 final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> {
     private final BeanContext beanContext;
     private final List<BeanRegistration<?>> dependents;
