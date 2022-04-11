@@ -14,3 +14,17 @@ tasks.named("updateVersionCatalogs") {
     // workaround Gradle variant selection problem
     ignoredModules.add("com.github.ben-manes.caffeine:caffeine")
 }
+
+if (System.getenv("SONAR_TOKEN") != null) {
+    def coverageExcludes = [
+        "**/ServiceDescriptionProcessor.java",
+        "**/graal/ServiceLoaderInitialization.java",
+        "**/DirectoryClassWriterOutputVisitor.java",
+        "**/GroovyClassWriterOutputVisitor.java"
+    ]
+    sonarqube {
+        properties {
+            property "sonar.exclusions", coverageExcludes.join(",")
+        }
+    }
+}
