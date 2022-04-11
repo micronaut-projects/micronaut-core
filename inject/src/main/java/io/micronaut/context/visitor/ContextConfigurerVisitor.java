@@ -39,6 +39,11 @@ public class ContextConfigurerVisitor implements TypeElementVisitor<ContextConfi
     );
 
     @Override
+    public VisitorKind getVisitorKind() {
+        return VisitorKind.ISOLATING;
+    }
+
+    @Override
     public String getElementType() {
         return ContextConfigurer.class.getName();
     }
