@@ -13,5 +13,15 @@
         "type": "io.micronaut.core.annotation.AnnotationMetadata",
         "member": "Class io.micronaut.core.annotation.AnnotationMetadata",
         "reason": "AnnotationMetadata is an internally implemented data structure and not designed to be implemented by consumers of the framework."
+    },
+    {
+        "type": "io.micronaut.inject.writer.ClassWriterOutputVisitor",
+        "member": "Class io.micronaut.inject.writer.ClassWriterOutputVisitor",
+        "reason": "Classes in the io.micronaut.inject.writer package are considered non-public implementation detail"
+    },
+    {
+        "type": "io.micronaut.inject.writer.ClassWriterOutputVisitor",
+        "member": "Method io.micronaut.inject.writer.ClassWriterOutputVisitor.visitServiceDescriptor(java.lang.Class,java.lang.String,io.micronaut.inject.ast.Element)",
+        "reason": "Classes in the io.micronaut.inject.writer package are considered non-public implementation detail"
     }
 ]
