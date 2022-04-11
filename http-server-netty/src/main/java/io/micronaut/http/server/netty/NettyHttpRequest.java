@@ -665,7 +665,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
                 synchronized (this) { // double check
                     httpParameters = this.httpParameters;
                     if (httpParameters == null) {
-                        QueryStringDecoder queryStringDecoder = createDecoder(uri.toString());
+                        QueryStringDecoder queryStringDecoder = createDecoder(uri);
                         httpParameters = new NettyHttpParameters(queryStringDecoder.parameters(), conversionService, null);
                         this.httpParameters = httpParameters;
                     }
