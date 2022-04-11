@@ -1,3 +1,18 @@
+/*
+ * Copyright 2017-2022 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.kotlin.processing.beans
 
 import io.micronaut.aop.Adapter
@@ -51,7 +66,7 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
         if (isConfigurationProperties) {
             this.configurationMetadata = configurationMetadataBuilder.visitProperties(
                 classElement,
-                null
+                classElement.documentation.orElse(null)
             )
         }
         this.isFactoryClass = classElement.hasStereotype(Factory::class.java)
@@ -80,7 +95,7 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
     companion object {
         private const val ANN_CONSTRAINT = "javax.validation.Constraint"
         private const val ANN_VALID = "javax.validation.Valid"
-        private val IS_CONSTRAINT: (AnnotationMetadata) -> Boolean = { am: AnnotationMetadata ->
+        val IS_CONSTRAINT: (AnnotationMetadata) -> Boolean = { am: AnnotationMetadata ->
             am.hasStereotype(ANN_CONSTRAINT) || am.hasStereotype(ANN_VALID)
         }
         const val ANN_VALIDATED = "io.micronaut.validation.Validated"
@@ -222,7 +237,7 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
                 false,
                 visitorContext
             )
-        } else if (methodElement.hasStereotype(AnnotationUtil.INJECT)) {
+        } else if (methodElement.hasStereotype(AnnotationUtil.INJECT) || methodElement.hasDeclaredStereotype(ConfigurationInject::class.java)) {
             beanWriter!!.visitMethodInjectionPoint(
                 methodElement.declaringType,
                 methodElement,
@@ -268,7 +283,7 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
                 val declaredAround =
                     hasAround && !classElement.isAbstract && !classElement.isAssignable(Interceptor::class.java)
                 val inheritedAround =
-                    isAopProxyType && (methodElement.isPublic || methodElement.isPackagePrivate) && !declaredAround
+                    isAopProxyType && methodElement.isVisibleInPackage(classElement.packageName) && !methodElement.isProtected && !declaredAround
 
                 if (inheritedAround || declaredAround) {
                     visitAroundMethod(methodElement, inheritedAround)
@@ -348,10 +363,11 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
         if (shouldExclude(configurationMetadata!!, name)) {
             return
         }
+        val declaringType = methodElement.declaringType
         val parameterElement = methodElement.parameters[0]
         val propertyMetadata = configurationMetadataBuilder.visitProperty(
             classElement,
-            methodElement.declaringType,
+            declaringType,
             parameterElement.type.name,
             name,
             null,
@@ -362,10 +378,12 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
             builder.member("name", propertyMetadata.path)
         }
 
+        val requiresReflection = !methodElement.isVisibleInPackage(classElement.packageName)
+
         beanWriter!!.visitSetterValue(
-            methodElement.declaringType,
+            declaringType,
             methodElement,
-            false,
+            requiresReflection,
             true
         )
     }
@@ -825,10 +843,10 @@ class BeanDefinitionProcessorVisitor(private val classElement: KotlinClassElemen
         aopProxyWriter.visitTypeArguments(classElement.allTypeArguments)
 
         if (classElement.isAbstract) {
-            KotlinIntroductionInterfaceVisitor(classElement, classElement, aopProxyWriter, visitorContext).visit()
+            KotlinIntroductionInterfaceVisitor(classElement, classElement, aopProxyWriter, visitorContext, configurationMetadataBuilder).visit()
         }
         for (interfaceType in interfaceTypes) {
-            KotlinIntroductionInterfaceVisitor(interfaceType, classElement, aopProxyWriter, visitorContext).visit()
+            KotlinIntroductionInterfaceVisitor(interfaceType, classElement, aopProxyWriter, visitorContext, configurationMetadataBuilder).visit()
         }
 
         return aopProxyWriter

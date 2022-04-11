@@ -1,3 +1,18 @@
+/*
+ * Copyright 2017-2022 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.kotlin.processing.beans
 
 import io.micronaut.context.annotation.ConfigurationReader
@@ -19,13 +34,14 @@ class KotlinConfigurationMetadataBuilder: ConfigurationMetadataBuilder<ClassElem
         declaringType: ClassElement,
         propertyName: String
     ): String {
-        val prefix =  if (declaringType.hasStereotype(ConfigurationReader::class.java)) {
-             declaringType.stringValue(ConfigurationReader::class.java, "prefix")
-                .filter(String::isNotEmpty)
-                .orElseGet { buildTypePath(owningType, declaringType) }
+        val type =  if (declaringType.hasStereotype(ConfigurationReader::class.java)) {
+             declaringType
         } else {
-            owningType.stringValue(ConfigurationReader::class.java, "prefix").get()
+            owningType
         }
+        val prefix = type.stringValue(ConfigurationReader::class.java, "prefix")
+            .filter(String::isNotEmpty)
+            .orElseGet { buildTypePath(owningType, declaringType) }
         return "$prefix.$propertyName"
     }
 
@@ -77,6 +93,10 @@ class KotlinConfigurationMetadataBuilder: ConfigurationMetadataBuilder<ClassElem
                 path.insert(0, parentConfig.get() + '.')
                 superType = getSuperClass(superType)
             } else {
+                val parentPrefix = superType.stringValue(ConfigurationReader::class.java, "prefix")
+                if (parentPrefix.isPresent) {
+                    path.insert(0, parentPrefix.get() + '.')
+                }
                 break
             }
         }
