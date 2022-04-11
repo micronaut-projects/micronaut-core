@@ -4,10 +4,6 @@ plugins {
 
 import org.apache.tools.ant.taskdefs.condition.Os
 
-internalSanityChecks {
-    expectedServiceCount.put('io.micronaut.inject.BeanDefinitionReference', 24)
-}
-
 micronautBuild {
     core {
         usesMicronautTestJunit()

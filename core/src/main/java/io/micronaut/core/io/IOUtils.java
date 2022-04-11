@@ -43,9 +43,9 @@ import java.util.stream.Stream;
  * @author Graeme Rocher
  * @since 1.0
  */
+@SuppressWarnings("java:S1118")
 public class IOUtils {
 
-    private static final Logger LOG = LoggerFactory.getLogger(IOUtils.class);
     private static final int BUFFER_MAX = 8192;
 
     /**
@@ -147,12 +147,15 @@ public class IOUtils {
                     reader.close();
                 }
             } catch (IOException e) {
-                if (LOG.isWarnEnabled()) {
-                    LOG.warn("Failed to close reader: " + e.getMessage(), e);
+                if (IOLogging.LOG.isWarnEnabled()) {
+                    IOLogging.LOG.warn("Failed to close reader: " + e.getMessage(), e);
                 }
             }
         }
         return answer.toString();
     }
 
+    private static final class IOLogging {
+        private static final Logger LOG = LoggerFactory.getLogger(IOLogging.class);
+    }
 }
