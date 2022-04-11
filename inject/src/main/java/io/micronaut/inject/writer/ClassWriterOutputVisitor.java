@@ -149,6 +149,7 @@ public interface ClassWriterOutputVisitor {
      * @deprecated Use {@link #visitServiceDescriptor(String, String, io.micronaut.inject.ast.Element)}
      */
     @Deprecated
+    @SuppressWarnings("java:S1133")
     default void visitServiceDescriptor(Class<?> type, String classname) {
         visitServiceDescriptor(type.getName(), classname);
     }

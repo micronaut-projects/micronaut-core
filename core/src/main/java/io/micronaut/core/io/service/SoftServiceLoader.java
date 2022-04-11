@@ -148,10 +148,10 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
             return Optional.of(i.next());
         }
 
-        Optional<Class> alternativeClass = ClassUtils.forName(alternative, classLoader)
-                                                ;
-        if (alternativeClass.isPresent()) {
-            return Optional.of(newService(alternative, alternativeClass));
+        @SuppressWarnings("unchecked") Class<S> alternativeClass = ClassUtils.forName(alternative, classLoader)
+                .orElse(null);
+        if (alternativeClass != null) {
+            return Optional.of(createService(alternative, alternativeClass));
         }
         return Optional.empty();
     }
@@ -169,19 +169,19 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
         if (serviceLoader != null) {
             collectStaticServices(values, predicate, (StaticServiceLoader<S>) serviceLoader);
         } else {
-            collectDynamicServices(values, predicate, serviceType, name);
+            collectDynamicServices(values, predicate, name);
         }
     }
 
     private void collectDynamicServices(
             Collection<S> values,
             Predicate<S> predicate,
-            Class<S> serviceType,
             String name) {
         ServiceCollector<S> collector = newCollector(name, condition, classLoader, className -> {
             try {
-                final Class<?> loadedClass = Class.forName(className, false, classLoader);
-                S result = (S) loadedClass.getDeclaredConstructor().newInstance();
+                @SuppressWarnings("unchecked") final Class<S> loadedClass =
+                        (Class<S>) Class.forName(className, false, classLoader);
+                S result = loadedClass.getDeclaredConstructor().newInstance();
                 if (predicate != null && !predicate.test(result)) {
                     return null;
                 }
@@ -213,9 +213,10 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
      * @return The iterator
      */
     @Override
+    @NonNull
     public Iterator<ServiceDefinition<S>> iterator() {
         return new Iterator<ServiceDefinition<S>>() {
-            Iterator<ServiceDefinition<S>> loaded = loadedServices.values().iterator();
+            final Iterator<ServiceDefinition<S>> loaded = loadedServices.values().iterator();
 
             @Override
             public boolean hasNext() {
@@ -240,7 +241,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
                     return nextService;
                 }
                 // should not happen
-                throw new Error("Bug in iterator");
+                throw new ServiceConfigurationError("Bug in iterator");
             }
         };
     }
@@ -249,10 +250,22 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
      * @param name The name
      * @param loadedClass The loaded class
      * @return The service definition
+     * @deprecated No longer used
      */
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({"unchecked", "ProtectedMemberInFinalClass", "OptionalUsedAsFieldOrParameterType", "java:S3740",
+            "java:S1133", "rawtypes"})
+    @Deprecated
     protected ServiceDefinition<S> newService(String name, Optional<Class> loadedClass) {
-        return new DefaultServiceDefinition(name, loadedClass);
+        return new DefaultServiceDefinition<>(name, loadedClass.orElse(null));
+    }
+
+    /**
+     * @param name The name
+     * @param loadedClass The loaded class
+     * @return The service definition
+     */
+    private ServiceDefinition<S> createService(String name, Class<S> loadedClass) {
+        return new DefaultServiceDefinition<>(name, loadedClass);
     }
 
     public static <S> ServiceCollector<S> newCollector(String serviceName,
@@ -261,18 +274,6 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
                                                        Function<String, S> transformer) {
         return new DefaultServiceCollector<>(serviceName, lineCondition, classLoader, transformer);
     }
-
-    private static Set<String> computeServiceTypeNames(URI uri, String path) {
-        Set<String> typeNames = new HashSet<>();
-        IOUtils.eachDirectory(
-                uri, path, currentPath -> {
-                    final String typeName = currentPath.getFileName().toString();
-                    typeNames.add(typeName);
-                }
-        );
-        return typeNames;
-    }
-
 
     /**
      * A {@link ServiceDefinition} implementation that uses a {@link MethodHandles.Lookup} object to find a public constructor.
@@ -361,6 +362,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
         private Iterator<String> unprocessed = null;
 
         @Override
+        @SuppressWarnings({"java:S3776", "java:S135"})
         public boolean hasNext() {
 
             if (serviceConfigs == null) {
@@ -413,10 +415,11 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
 
             String nextName = unprocessed.next();
             try {
-                final Class<?> loadedClass = Class.forName(nextName, false, classLoader);
-                return newService(nextName, Optional.of(loadedClass));
+                @SuppressWarnings("unchecked")
+                final Class<S> loadedClass = (Class<S>) Class.forName(nextName, false, classLoader);
+                return createService(nextName, loadedClass);
             } catch (NoClassDefFoundError | ClassNotFoundException e) {
-                return newService(nextName, Optional.empty());
+                return createService(nextName, null);
             }
         }
     }
@@ -445,6 +448,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
      *
      * @param <S> The type
      */
+    @SuppressWarnings("java:S1948")
     private static class DefaultServiceCollector<S> extends RecursiveActionValuesCollector<S> implements ServiceCollector<S> {
 
         private final String serviceName;
@@ -528,6 +532,17 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
                 task.fork();
             }
         }
+
+        private static Set<String> computeServiceTypeNames(URI uri, String path) {
+            Set<String> typeNames = new HashSet<>();
+            IOUtils.eachDirectory(
+                    uri, path, currentPath -> {
+                        final String typeName = currentPath.getFileName().toString();
+                        typeNames.add(typeName);
+                    }
+            );
+            return typeNames;
+        }
     }
 
     /**
@@ -535,6 +550,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
      *
      * @param <S> The type
      */
+    @SuppressWarnings("java:S1948")
     private static final class UrlServicesLoader<S> extends RecursiveActionValuesCollector<S> {
 
         private final URL url;
@@ -549,6 +565,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
         }
 
         @Override
+        @SuppressWarnings({"java:S3776", "java:S135"})
         protected void compute() {
             try {
                 try (BufferedReader reader = new BufferedReader(new InputStreamReader(url.openStream()))) {
@@ -591,7 +608,8 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
      *
      * @param <S> The type
      */
-    private static class ServiceInstanceLoader<S> extends RecursiveActionValuesCollector<S> {
+    @SuppressWarnings("java:S1948")
+    private static final class ServiceInstanceLoader<S> extends RecursiveActionValuesCollector<S> {
 
         private final String className;
         private final Function<String, S> transformer;

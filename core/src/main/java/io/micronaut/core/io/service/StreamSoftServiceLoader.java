@@ -25,7 +25,6 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
-import java.util.Optional;
 import java.util.ServiceConfigurationError;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -44,7 +43,7 @@ public class StreamSoftServiceLoader {
      * @param <T>         The type
      * @return A stream
      */
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({"unchecked", "java:S2112"})
     public static <T> Stream<ServiceDefinition<T>> loadParallel(Class<T> serviceType, ClassLoader classLoader) {
         Enumeration<URL> serviceConfigs;
         String name = serviceType.getName();
@@ -78,8 +77,9 @@ public class StreamSoftServiceLoader {
                     return lines.stream();
                 }
             ).map(serviceName -> {
-                Optional<Class> loadedClass = ClassUtils.forName(serviceName, classLoader);
-                return new DefaultServiceDefinition(name, loadedClass);
+                Class<T> loadedClass = ClassUtils.forName(serviceName, classLoader)
+                        .orElse(null);
+                return new DefaultServiceDefinition<>(name, loadedClass);
             });
     }
 
@@ -89,7 +89,6 @@ public class StreamSoftServiceLoader {
      * @param <T>         The type
      * @return A stream with services loaded
      */
-    @SuppressWarnings("unchecked")
     public static <T> Stream<T> loadPresentParallel(Class<T> serviceType, ClassLoader classLoader) {
         return loadParallel(serviceType, classLoader)
             .filter(ServiceDefinition::isPresent)
