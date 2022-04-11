@@ -92,7 +92,6 @@ class ConfigurationPropertiesSpec extends Specification {
         config.innerVals[1].expireUnsignedSeconds == 600
         config.port == 8080
         config.maxSize == 1048576
-        config.anotherSize == 1048576
         config.anotherPort == 9090
         config.intList == [1,2,3]
         config.flags == [one:1, two:2]
@@ -104,7 +103,6 @@ class ConfigurationPropertiesSpec extends Specification {
         !config.anotherUrl.isPresent()
         config.defaultPort == 9999
         config.defaultValue == 9999
-        config.primitiveDefaultValue == 9999
     }
 
     void "test configuration inner class properties binding"() {

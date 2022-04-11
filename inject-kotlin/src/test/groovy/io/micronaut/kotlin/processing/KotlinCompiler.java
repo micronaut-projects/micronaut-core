@@ -18,7 +18,6 @@ import io.micronaut.inject.writer.BeanDefinitionWriter;
 import io.micronaut.kotlin.processing.beans.BeanDefinitionProcessorProvider;
 import io.micronaut.kotlin.processing.visitor.TypeElementSymbolProcessorProvider;
 import org.intellij.lang.annotations.Language;
-import org.jetbrains.kotlin.config.JvmDefaultMode;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
