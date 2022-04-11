@@ -1106,7 +1106,8 @@ public class DefaultBeanContext implements InitializableBeanContext {
     }
 
     @Nullable
-    private <T> void destroyBean(@NonNull BeanRegistration<T> registration) {
+    @Override
+    public <T> void destroyBean(@NonNull BeanRegistration<T> registration) {
         if (LOG_LIFECYCLE.isDebugEnabled()) {
             LOG_LIFECYCLE.debug("Destroying bean [{}] with identifier [{}]", registration.bean, registration.identifier);
         }

@@ -248,6 +248,16 @@ public interface BeanContext extends
     <T> T destroyBean(@NonNull T bean);
 
     /**
+     * Destroys the given bean.
+     *
+     * @param beanRegistration The bean registration
+     * @param <T>  The bean type
+     * @since 3.5.0
+     */
+    @NonNull
+    <T> void destroyBean(@NonNull BeanRegistration<T> beanRegistration);
+
+    /**
      * <p>Refresh the state of the given registered bean applying dependency injection and configuration wiring again.</p>
      * <p>
      * <p>Note that if the bean was produced by a {@link io.micronaut.context.annotation.Factory} then this method will
