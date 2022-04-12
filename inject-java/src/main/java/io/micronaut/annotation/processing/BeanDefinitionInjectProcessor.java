@@ -2253,28 +2253,28 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             return shouldExclude(configurationMetadata.getIncludes(), configurationMetadata.getExcludes(), propertyName);
         }
 
-    }
 
-    private void cleanupScopeAndQualifierAnnotations(MutableAnnotationMetadata producedAnnotationMetadata,
-                                                     AnnotationMetadata producedTypeAnnotationMetadata,
-                                                     AnnotationMetadata producingElementAnnotationMetadata) {
-        // If the producing element defines a scope don't inherit it from the type
-        if (producingElementAnnotationMetadata.hasStereotype(AnnotationUtil.SCOPE) || producingElementAnnotationMetadata.hasStereotype(AnnotationUtil.QUALIFIER)) {
-            // The producing element is declaring the scope then we should remove the scope defined by the type
-            for (String scope : producedTypeAnnotationMetadata.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE)) {
-                if (!producingElementAnnotationMetadata.hasStereotype(scope)) {
-                    producedAnnotationMetadata.removeAnnotation(scope);
+        private void cleanupScopeAndQualifierAnnotations(MutableAnnotationMetadata producedAnnotationMetadata,
+                                                         AnnotationMetadata producedTypeAnnotationMetadata,
+                                                         AnnotationMetadata producingElementAnnotationMetadata) {
+            // If the producing element defines a scope don't inherit it from the type
+            if (producingElementAnnotationMetadata.hasStereotype(AnnotationUtil.SCOPE) || producingElementAnnotationMetadata.hasStereotype(AnnotationUtil.QUALIFIER)) {
+                // The producing element is declaring the scope then we should remove the scope defined by the type
+                for (String scope : producedTypeAnnotationMetadata.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE)) {
+                    if (!producingElementAnnotationMetadata.hasStereotype(scope)) {
+                        producedAnnotationMetadata.removeAnnotation(scope);
+                    }
                 }
-            }
-            // Remove any qualifier coming from the type
-            for (String qualifier : producedTypeAnnotationMetadata.getAnnotationNamesByStereotype(AnnotationUtil.QUALIFIER)) {
-                if (!producingElementAnnotationMetadata.hasStereotype(qualifier)) {
-                    producedAnnotationMetadata.removeAnnotation(qualifier);
+                // Remove any qualifier coming from the type
+                for (String qualifier : producedTypeAnnotationMetadata.getAnnotationNamesByStereotype(AnnotationUtil.QUALIFIER)) {
+                    if (!producingElementAnnotationMetadata.hasStereotype(qualifier)) {
+                        producedAnnotationMetadata.removeAnnotation(qualifier);
+                    }
                 }
             }
         }
     }
-
+    
     /**
      * A dynamic name.
      */
