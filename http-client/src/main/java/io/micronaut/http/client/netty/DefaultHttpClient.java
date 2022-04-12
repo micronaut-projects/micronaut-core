@@ -157,6 +157,7 @@ import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
+import io.netty.util.concurrent.Promise;
 import org.reactivestreams.Processor;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
@@ -2370,187 +2371,20 @@ public class DefaultHttpClient implements
             Channel channel,
             boolean secure,
             ChannelPool channelPool,
-            Argument<O> bodyType, Argument<E> errorType) {
-        return Flux.create(sink -> addFullHttpResponseHandler0(request, channel, secure, channelPool, sink, bodyType, errorType));
-    }
-
-    @SuppressWarnings("MagicNumber")
-    private <O, E> void addFullHttpResponseHandler0(
-            io.micronaut.http.HttpRequest<?> request,
-            Channel channel,
-            boolean secure,
-            ChannelPool channelPool,
-            FluxSink<? super io.micronaut.http.HttpResponse<O>> emitter,
-            Argument<O> bodyType, Argument<E> errorType) {
-        ChannelPipeline pipeline = channel.pipeline();
-        final SimpleChannelInboundHandler<FullHttpResponse> newHandler = new SimpleChannelInboundHandlerInstrumented<FullHttpResponse>(combineFactories(), false) {
-
-            AtomicBoolean complete = new AtomicBoolean(false);
-            boolean keepAlive = true;
-
-            @Override
-            public boolean acceptInboundMessage(Object msg) {
-                return msg instanceof FullHttpResponse && (secure || !discardH2cStream((HttpMessage) msg));
-            }
-
-            @Override
-            protected void channelReadInstrumented(ChannelHandlerContext channelHandlerContext, FullHttpResponse fullResponse) {
-                try {
-
-                    HttpResponseStatus status = fullResponse.status();
-                    int statusCode = status.code();
-                    HttpStatus httpStatus;
-                    try {
-                        httpStatus = HttpStatus.valueOf(statusCode);
-                    } catch (IllegalArgumentException e) {
-                        if (complete.compareAndSet(false, true)) {
-                            if (!emitter.isCancelled()) {
-                                emitter.error(e);
-                            }
-                        } else if (log.isWarnEnabled()) {
-                            log.warn("Unsupported http status after handler completed: " + e.getMessage(), e);
-                        }
-                        return;
-                    }
-
-                    try {
-                        HttpHeaders headers = fullResponse.headers();
-
-                        if (log.isDebugEnabled()) {
-                            log.debug("Received response {} from {}", status.code(), request.getUri());
-                        }
-
-                        if (log.isTraceEnabled()) {
-                            traceHeaders(headers);
-                            traceBody("Response", fullResponse.content());
-                        }
-
-                        MutableHttpRequest<Object> redirectRequest = handleRedirect(request, fullResponse);
-                        if (redirectRequest != null) {
-                            Flux.from(resolveRedirectURI(request, redirectRequest))
-                                    .switchMap(buildExchangePublisher(request, redirectRequest, bodyType, errorType))
-                                    .subscribe(new ForwardingSubscriber<>(emitter));
-                            return;
-                        }
-
-                        if (statusCode == HttpStatus.NO_CONTENT.getCode()) {
-                            // normalize the NO_CONTENT header, since http content aggregator adds it even if not present in the response
-                            headers.remove(HttpHeaderNames.CONTENT_LENGTH);
-                        }
-
-                        boolean convertBodyWithBodyType = statusCode < 400 ||
-                                (!DefaultHttpClient.this.configuration.isExceptionOnErrorStatus() && bodyType.equalsType(errorType));
-                        FullNettyClientHttpResponse<O> response
-                                = new FullNettyClientHttpResponse<>(fullResponse, httpStatus, mediaTypeCodecRegistry, byteBufferFactory, bodyType, convertBodyWithBodyType);
-
-                        if (complete.compareAndSet(false, true)) {
-                            if (convertBodyWithBodyType) {
-                                if (bodyType == null || !bodyType.isVoid()) {
-                                    emitter.next(response);
-                                }
-                                response.onComplete();
-                                emitter.complete();
-                            } else { // error flow
-                                try {
-                                    HttpClientResponseException clientError = makeErrorFromRequestBody(status, response, errorType);
-                                    try {
-                                        if (!emitter.isCancelled()) {
-                                            emitter.error(clientError);
-                                        }
-                                    } finally {
-                                        response.onComplete();
-                                    }
-                                } catch (HttpClientResponseException t) {
-                                    try {
-                                        if (!emitter.isCancelled()) {
-                                            emitter.error(t);
-                                        }
-                                    } finally {
-                                        response.onComplete();
-                                    }
-                                } catch (Exception t) {
-                                    response.onComplete();
-                                    HttpClientResponseException clientResponseError = makeErrorBodyParseError(fullResponse, httpStatus, t);
-                                    if (!emitter.isCancelled()) {
-                                        emitter.error(clientResponseError);
-                                    }
-                                }
-                            }
-                        }
-                    } catch (HttpClientResponseException t) {
-                        if (!emitter.isCancelled()) {
-                            emitter.error(t);
-                        }
-                    } catch (Throwable t) {
-                        if (complete.compareAndSet(false, true)) {
-                            makeNormalBodyParseError(fullResponse, httpStatus, errorType, t, e -> {
-                                if (!emitter.isCancelled()) {
-                                    emitter.error(e);
-                                }
-                            });
-                        } else {
-                            if (log.isWarnEnabled()) {
-                                log.warn("Exception fired after handler completed: " + t.getMessage(), t);
-                            }
-                        }
-                    }
-                } finally {
-                    if (fullResponse.refCnt() > 0) {
-                        try {
-                            ReferenceCountUtil.release(fullResponse);
-                        } catch (Exception e) {
-                            if (log.isDebugEnabled()) {
-                                log.debug("Failed to release response: {}", fullResponse);
-                            }
-                        }
-                    }
-                    if (!HttpUtil.isKeepAlive(fullResponse)) {
-                        keepAlive = false;
-                    }
-                    pipeline.remove(this);
-
+            Argument<O> bodyType,
+            Argument<E> errorType) {
+        FullHttpResponseHandler<O> handler = new FullHttpResponseHandler<>(channel, channelPool, secure, request, bodyType, errorType);
+        channel.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_FULL_HTTP_RESPONSE, handler);
+        return Flux.from(s -> handler.responsePromise.addListener(future -> {
+            if (handler.responsePromise.isSuccess()) {
+                if (bodyType == null || !bodyType.isVoid()) {
+                    s.onNext(handler.responsePromise.getNow());
                 }
+                s.onComplete();
+            } else {
+                s.onError(handler.responsePromise.cause());
             }
-
-            @Override
-            public void handlerRemoved(ChannelHandlerContext ctx) {
-                if (channelPool != null) {
-                    removeReadTimeoutHandler(ctx.pipeline());
-                    final Channel ch = ctx.channel();
-                    if (!keepAlive) {
-                        ch.closeFuture().addListener((future ->
-                                channelPool.release(ch)
-                        ));
-                    } else {
-                        channelPool.release(ch);
-                    }
-                } else {
-                    // just close it to prevent any future reads without a handler registered
-                    ctx.close();
-                }
-            }
-
-            @Override
-            public void handlerAdded(ChannelHandlerContext ctx) {
-                addReadTimeoutHandler(pipeline);
-            }
-
-            @Override
-            public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-                try {
-                    if (complete.compareAndSet(false, true)) {
-                        HttpClientException mapped = mapException(request, cause);
-                        if (!emitter.isCancelled()) {
-                            emitter.error(mapped);
-                        }
-                    }
-                } finally {
-                    keepAlive = false;
-                    pipeline.remove(this);
-                }
-            }
-        };
-        pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_FULL_HTTP_RESPONSE, newHandler);
+        }));
     }
 
     /**
@@ -3611,4 +3445,170 @@ public class DefaultHttpClient implements
         Duration retry;
     }
 
+    private class FullHttpResponseHandler<O> extends SimpleChannelInboundHandlerInstrumented<FullHttpResponse> {
+        final Promise<HttpResponse<O>> responsePromise;
+
+        private final boolean secure;
+        private final io.micronaut.http.HttpRequest<?> request;
+        private final Argument<O> bodyType;
+        private final Argument<?> errorType;
+        private final ChannelPool channelPool;
+
+        private boolean keepAlive = true;
+
+        public FullHttpResponseHandler(
+                Channel channel,
+                ChannelPool channelPool, boolean secure, io.micronaut.http.HttpRequest<?> request, Argument<O> bodyType, Argument<?> errorType) {
+            super(combineFactories(), false);
+            this.responsePromise = channel.eventLoop().newPromise();
+            this.secure = secure;
+            this.request = request;
+            this.bodyType = bodyType;
+            this.errorType = errorType;
+            this.channelPool = channelPool;
+        }
+
+        @Override
+        public boolean acceptInboundMessage(Object msg) {
+            return msg instanceof FullHttpResponse && (secure || !discardH2cStream((HttpMessage) msg));
+        }
+
+        @Override
+        protected void channelReadInstrumented(ChannelHandlerContext channelHandlerContext, FullHttpResponse fullResponse) {
+            try {
+                HttpResponseStatus status = fullResponse.status();
+                int statusCode = status.code();
+                HttpStatus httpStatus;
+                try {
+                    httpStatus = HttpStatus.valueOf(statusCode);
+                } catch (IllegalArgumentException e) {
+                    if (!responsePromise.tryFailure(e) && log.isWarnEnabled()) {
+                        log.warn("Unsupported http status after handler completed: " + e.getMessage(), e);
+                    }
+                    return;
+                }
+
+                try {
+                    HttpHeaders headers = fullResponse.headers();
+
+                    if (log.isDebugEnabled()) {
+                        log.debug("Received response {} from {}", status.code(), request.getUri());
+                    }
+
+                    if (log.isTraceEnabled()) {
+                        traceHeaders(headers);
+                        traceBody("Response", fullResponse.content());
+                    }
+
+                    MutableHttpRequest<Object> redirectRequest = handleRedirect(request, fullResponse);
+                    if (redirectRequest != null) {
+                        Flux.from(resolveRedirectURI(request, redirectRequest))
+                                .switchMap(buildExchangePublisher(request, redirectRequest, bodyType, errorType))
+                                .subscribe(new Subscriber<HttpResponse<O>>() {
+                                    HttpResponse<O> response;
+
+                                    @Override
+                                    public void onSubscribe(Subscription s) {
+                                        s.request(1);
+                                    }
+
+                                    @Override
+                                    public void onNext(HttpResponse<O> oHttpResponse) {
+                                        this.response = oHttpResponse;
+                                    }
+
+                                    @Override
+                                    public void onError(Throwable t) {
+                                        responsePromise.tryFailure(t);
+                                    }
+
+                                    @Override
+                                    public void onComplete() {
+                                        responsePromise.trySuccess(response);
+                                    }
+                                });
+                        return;
+                    }
+
+                    if (statusCode == HttpStatus.NO_CONTENT.getCode()) {
+                        // normalize the NO_CONTENT header, since http content aggregator adds it even if not present in the response
+                        headers.remove(HttpHeaderNames.CONTENT_LENGTH);
+                    }
+
+                    boolean convertBodyWithBodyType = statusCode < 400 ||
+                            (!DefaultHttpClient.this.configuration.isExceptionOnErrorStatus() && bodyType.equalsType(errorType));
+                    FullNettyClientHttpResponse<O> response
+                            = new FullNettyClientHttpResponse<>(fullResponse, httpStatus, mediaTypeCodecRegistry, byteBufferFactory, bodyType, convertBodyWithBodyType);
+
+                    if (convertBodyWithBodyType) {
+                        responsePromise.trySuccess(response);
+                        response.onComplete();
+                    } else { // error flow
+                        try {
+                            responsePromise.tryFailure(makeErrorFromRequestBody(status, response, errorType));
+                            response.onComplete();
+                        } catch (HttpClientResponseException t) {
+                            responsePromise.tryFailure(t);
+                            response.onComplete();
+                        } catch (Exception t) {
+                            response.onComplete();
+                            responsePromise.tryFailure(makeErrorBodyParseError(fullResponse, httpStatus, t));
+                        }
+                    }
+                } catch (HttpClientResponseException t) {
+                    responsePromise.tryFailure(t);
+                } catch (Throwable t) {
+                    makeNormalBodyParseError(fullResponse, httpStatus, errorType, t, cause -> {
+                        if (!responsePromise.tryFailure(cause) && log.isWarnEnabled()) {
+                            log.warn("Exception fired after handler completed: " + t.getMessage(), t);
+                        }
+                    });
+                }
+            } finally {
+                if (fullResponse.refCnt() > 0) {
+                    try {
+                        ReferenceCountUtil.release(fullResponse);
+                    } catch (Exception e) {
+                        if (log.isDebugEnabled()) {
+                            log.debug("Failed to release response: {}", fullResponse);
+                        }
+                    }
+                }
+                if (!HttpUtil.isKeepAlive(fullResponse)) {
+                    keepAlive = false;
+                }
+                channelHandlerContext.pipeline().remove(this);
+            }
+        }
+
+        @Override
+        public void handlerRemoved(ChannelHandlerContext ctx) {
+            if (channelPool != null) {
+                removeReadTimeoutHandler(ctx.pipeline());
+                final Channel ch = ctx.channel();
+                if (!keepAlive) {
+                    ch.closeFuture().addListener((future ->
+                            channelPool.release(ch)
+                    ));
+                } else {
+                    channelPool.release(ch);
+                }
+            } else {
+                // just close it to prevent any future reads without a handler registered
+                ctx.close();
+            }
+        }
+
+        @Override
+        public void handlerAdded(ChannelHandlerContext ctx) {
+            addReadTimeoutHandler(ctx.pipeline());
+        }
+
+        @Override
+        public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+            responsePromise.tryFailure(mapException(request, cause));
+            keepAlive = false;
+            ctx.pipeline().remove(this);
+        }
+    }
 }
