@@ -343,7 +343,10 @@ public class BeanIntrospectionModule extends SimpleModule {
                         final Optional<BeanProperty<Object, Object>> property = Optional.ofNullable(named.get(existing.getName()));
                         // ignore properties that are @JsonIgnore, so that we don't replace other properties of the
                         // same name
-                        if (property.isPresent() && !property.get().isAnnotationPresent(JsonIgnore.class)) {
+                        if (property.isPresent() &&
+                                !property.get().isAnnotationPresent(JsonIgnore.class) &&
+                                // we can't support XmlBeanPropertyWriter easily https://github.com/micronaut-projects/micronaut-core/issues/5907
+                                !existing.getClass().getName().equals("com.fasterxml.jackson.dataformat.xml.ser.XmlBeanPropertyWriter")) { // NOSONAR
                             final BeanProperty<Object, Object> beanProperty = property.get();
                             newProperties.set(i, new BeanIntrospectionPropertyWriter(
                                         existing,
