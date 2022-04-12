@@ -3327,7 +3327,7 @@ public class DefaultHttpClient implements
         public FullHttpResponseHandler(
                 Channel channel,
                 ChannelPool channelPool, boolean secure, io.micronaut.http.HttpRequest<?> request, Argument<O> bodyType, Argument<?> errorType) {
-            super(combineFactories(), false);
+            super(combineFactories());
             this.responsePromise = channel.eventLoop().newPromise();
             this.secure = secure;
             this.request = request;
@@ -3411,15 +3411,6 @@ public class DefaultHttpClient implements
                     });
                 }
             } finally {
-                if (fullResponse.refCnt() > 0) {
-                    try {
-                        ReferenceCountUtil.release(fullResponse);
-                    } catch (Exception e) {
-                        if (log.isDebugEnabled()) {
-                            log.debug("Failed to release response: {}", fullResponse);
-                        }
-                    }
-                }
                 if (!HttpUtil.isKeepAlive(fullResponse)) {
                     keepAlive = false;
                 }
