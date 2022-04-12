@@ -154,6 +154,19 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
     }
 
     /**
+     * Does this process have any visitors.
+     * @return True if visitors are present.
+     */
+    protected boolean hasVisitors() {
+        for (TypeElementVisitor<?, ?> typeElementVisitor : typeElementVisitors) {
+            if (typeElementVisitor.getVisitorKind() == getVisitorKind()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * @return The loaded visitors.
      */
     protected List<LoadedVisitor> getLoadedVisitors() {
