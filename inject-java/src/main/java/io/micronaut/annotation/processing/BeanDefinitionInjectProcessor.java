@@ -1192,10 +1192,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     }
 
                 }
-                OptionalValues<Boolean> aopSettings = producedAnnotationMetadata.getValues(AROUND_TYPE, Boolean.class);
+                OptionalValues<Boolean> aroundSettings = producedAnnotationMetadata.getValues(AROUND_TYPE, Boolean.class);
                 Map<CharSequence, Boolean> finalSettings = new LinkedHashMap<>();
-                for (CharSequence setting : aopSettings) {
-                    Optional<Boolean> entry = aopSettings.get(setting);
+                for (CharSequence setting : aroundSettings) {
+                    Optional<Boolean> entry = aroundSettings.get(setting);
                     entry.ifPresent(val ->
                             finalSettings.put(setting, val)
                     );
