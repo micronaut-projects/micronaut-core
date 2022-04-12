@@ -2075,14 +2075,19 @@ public class DefaultHttpClient implements
             traceRequest(finalRequest, nettyRequest);
         }
 
-        addFullHttpResponseHandler(
-                finalRequest,
-                channel,
-                secure,
-                channelPool,
-                bodyType,
-                errorType
-        ).subscribe(new ForwardingSubscriber<>(emitter));
+        FullHttpResponseHandler<O> handler = new FullHttpResponseHandler<>(channel, channelPool, secure, finalRequest, bodyType, errorType);
+        channel.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_FULL_HTTP_RESPONSE, handler);
+        handler.responsePromise.addListener(future -> {
+            if (handler.responsePromise.isSuccess()) {
+                if (bodyType == null || !bodyType.isVoid()) {
+                    emitter.next(handler.responsePromise.getNow());
+                }
+                emitter.complete();
+            } else {
+                emitter.error(handler.responsePromise.cause());
+            }
+        });
+
         requestWriter.writeAndClose(channel, channelPool, emitter);
     }
 
@@ -2363,28 +2368,6 @@ public class DefaultHttpClient implements
         } else {
             return false;
         }
-    }
-
-    @SuppressWarnings("MagicNumber")
-    private <O, E> Flux<HttpResponse<O>> addFullHttpResponseHandler(
-            io.micronaut.http.HttpRequest<?> request,
-            Channel channel,
-            boolean secure,
-            ChannelPool channelPool,
-            Argument<O> bodyType,
-            Argument<E> errorType) {
-        FullHttpResponseHandler<O> handler = new FullHttpResponseHandler<>(channel, channelPool, secure, request, bodyType, errorType);
-        channel.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_FULL_HTTP_RESPONSE, handler);
-        return Flux.from(s -> handler.responsePromise.addListener(future -> {
-            if (handler.responsePromise.isSuccess()) {
-                if (bodyType == null || !bodyType.isVoid()) {
-                    s.onNext(handler.responsePromise.getNow());
-                }
-                s.onComplete();
-            } else {
-                s.onError(handler.responsePromise.cause());
-            }
-        }));
     }
 
     /**
