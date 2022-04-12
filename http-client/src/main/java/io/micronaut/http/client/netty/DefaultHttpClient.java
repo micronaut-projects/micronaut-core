@@ -1126,7 +1126,7 @@ public class DefaultHttpClient implements
             @NonNull Argument<?> errorType) {
         SslContext sslContext = buildSslContext(requestURI);
 
-        AtomicReference<io.micronaut.http.HttpRequest> requestWrapper = new AtomicReference<>(request);
+        AtomicReference<io.micronaut.http.HttpRequest<?>> requestWrapper = new AtomicReference<>(request);
         Flux<MutableHttpResponse<Object>> streamResponsePublisher = Flux.create(emitter -> {
 
             ChannelFuture channelFuture;
@@ -1139,7 +1139,7 @@ public class DefaultHttpClient implements
                             request.setAttribute(NettyClientHttpRequest.CHANNEL, channel);
                             this.streamRequestThroughChannel(
                                     parentRequest,
-                                    requestWrapper,
+                                    requestWrapper.get(),
                                     channel,
                                     true
                             ).subscribe(new ForwardingSubscriber<>(emitter));
@@ -1155,7 +1155,7 @@ public class DefaultHttpClient implements
                                     request.setAttribute(NettyClientHttpRequest.CHANNEL, channel);
                                     this.streamRequestThroughChannel(
                                             parentRequest,
-                                            requestWrapper,
+                                            requestWrapper.get(),
                                             channel,
                                             true
                                     ).subscribe(new ForwardingSubscriber<>(emitter));
@@ -1202,7 +1202,7 @@ public class DefaultHttpClient implements
             io.micronaut.http.HttpRequest<I> request,
             @NonNull Argument<O> bodyType,
             @NonNull Argument<E> errorType) {
-        AtomicReference<io.micronaut.http.HttpRequest> requestWrapper = new AtomicReference<>(request);
+        AtomicReference<io.micronaut.http.HttpRequest<?>> requestWrapper = new AtomicReference<>(request);
         return requestURI -> {
             Flux<io.micronaut.http.HttpResponse<O>> responsePublisher = Flux.create(emitter -> {
 
@@ -1217,7 +1217,7 @@ public class DefaultHttpClient implements
                                 Channel channel = future.get();
                                 try {
                                     sendRequestThroughChannel(
-                                            requestWrapper,
+                                            requestWrapper.get(),
                                             bodyType,
                                             errorType,
                                             emitter,
@@ -1254,14 +1254,14 @@ public class DefaultHttpClient implements
                         } else {
                             try {
                                 sendRequestThroughChannel(
-                                        requestWrapper,
+                                        requestWrapper.get(),
                                         bodyType,
                                         errorType,
                                         emitter,
                                         connectionFuture.channel(),
                                         sslContext != null,
                                         null);
-                            } catch (Throwable e) {
+                            } catch (Exception e) {
                                 emitter.error(e);
                             }
                         }
@@ -1625,7 +1625,7 @@ public class DefaultHttpClient implements
             io.micronaut.http.HttpRequest<?> parentRequest,
             io.micronaut.http.HttpRequest<I> request,
             URI requestURI,
-            AtomicReference<io.micronaut.http.HttpRequest> requestWrapper,
+            AtomicReference<io.micronaut.http.HttpRequest<?>> requestWrapper,
             Publisher<R> responsePublisher) {
 
         if (request instanceof MutableHttpRequest) {
@@ -2028,14 +2028,13 @@ public class DefaultHttpClient implements
     }
 
     private <I, O, E> void sendRequestThroughChannel(
-            AtomicReference<io.micronaut.http.HttpRequest> requestWrapper,
+            io.micronaut.http.HttpRequest<I> finalRequest,
             Argument<O> bodyType,
             Argument<E> errorType,
-            FluxSink<? super io.micronaut.http.HttpResponse<O>> emitter,
+            FluxSink<? super HttpResponse<O>> emitter,
             Channel channel,
             boolean secure,
             ChannelPool channelPool) throws HttpPostRequestEncoder.ErrorDataEncoderException {
-        io.micronaut.http.HttpRequest<I> finalRequest = requestWrapper.get();
         URI requestURI = finalRequest.getUri();
         MediaType requestContentType = finalRequest
                 .getContentType()
@@ -2093,12 +2092,12 @@ public class DefaultHttpClient implements
 
     private Flux<MutableHttpResponse<Object>> streamRequestThroughChannel(
             io.micronaut.http.HttpRequest<?> parentRequest,
-            AtomicReference<io.micronaut.http.HttpRequest> requestWrapper,
+            io.micronaut.http.HttpRequest<?> request,
             Channel channel,
             boolean failOnError) {
         return Flux.<MutableHttpResponse<Object>>create(sink -> {
             try {
-                streamRequestThroughChannel0(parentRequest, requestWrapper, sink, channel);
+                streamRequestThroughChannel0(parentRequest, request, sink, channel);
             } catch (HttpPostRequestEncoder.ErrorDataEncoderException e) {
                 sink.error(e);
             }
@@ -2144,10 +2143,9 @@ public class DefaultHttpClient implements
 
     private void streamRequestThroughChannel0(
             io.micronaut.http.HttpRequest<?> parentRequest,
-            AtomicReference<io.micronaut.http.HttpRequest> requestWrapper,
+            final io.micronaut.http.HttpRequest<?> finalRequest,
             FluxSink emitter,
             Channel channel) throws HttpPostRequestEncoder.ErrorDataEncoderException {
-        io.micronaut.http.HttpRequest<?> finalRequest = requestWrapper.get();
         URI requestURI = finalRequest.getUri();
         NettyRequestWriter requestWriter = prepareRequest(
                 finalRequest,
@@ -2282,7 +2280,7 @@ public class DefaultHttpClient implements
         }
 
         if (log.isTraceEnabled()) {
-            traceRequest(requestWrapper.get(), nettyRequest);
+            traceRequest(finalRequest, nettyRequest);
         }
 
         requestWriter.writeAndClose(channel, null, emitter);
@@ -2513,7 +2511,7 @@ public class DefaultHttpClient implements
         }
     }
 
-    private ClientFilterChain buildChain(AtomicReference<io.micronaut.http.HttpRequest> requestWrapper, List<HttpClientFilter> filters) {
+    private ClientFilterChain buildChain(AtomicReference<io.micronaut.http.HttpRequest<?>> requestWrapper, List<HttpClientFilter> filters) {
         AtomicInteger integer = new AtomicInteger();
         int len = filters.size();
         return new ClientFilterChain() {
@@ -2808,7 +2806,7 @@ public class DefaultHttpClient implements
                             : request.mutate();
                     httpRequest.headers(headers -> headers.remove(HttpHeaderNames.HOST));
 
-                    AtomicReference<io.micronaut.http.HttpRequest> requestWrapper = new AtomicReference<>(httpRequest);
+                    AtomicReference<io.micronaut.http.HttpRequest<?>> requestWrapper = new AtomicReference<>(httpRequest);
                     Flux<MutableHttpResponse<Object>> proxyResponsePublisher = Flux.create(emitter -> {
                         SslContext sslContext = buildSslContext(requestURI);
                         ChannelFuture channelFuture;
@@ -2821,7 +2819,7 @@ public class DefaultHttpClient implements
                                         request.setAttribute(NettyClientHttpRequest.CHANNEL, channel);
                                         this.streamRequestThroughChannel(
                                                 request,
-                                                requestWrapper,
+                                                requestWrapper.get(),
                                                 channel,
                                                 false
                                         ).subscribe(new ForwardingSubscriber<>(emitter));
@@ -2838,7 +2836,7 @@ public class DefaultHttpClient implements
                                                 request.setAttribute(NettyClientHttpRequest.CHANNEL, channel);
                                                 this.streamRequestThroughChannel(
                                                         request,
-                                                        requestWrapper,
+                                                        requestWrapper.get(),
                                                         channel,
                                                         false
                                                 ).subscribe(new ForwardingSubscriber<>(emitter));
