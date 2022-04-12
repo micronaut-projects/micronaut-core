@@ -15,35 +15,42 @@
  */
 package io.micronaut.graal.reflect;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.ObjectWriter;
+import java.io.IOException;
+import java.lang.annotation.RetentionPolicy;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Import;
 import io.micronaut.context.visitor.BeanImportVisitor;
-import io.micronaut.core.annotation.Creator;
+import io.micronaut.core.annotation.AnnotationClassValue;
+import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.ReflectionConfig;
 import io.micronaut.core.annotation.ReflectiveAccess;
 import io.micronaut.core.annotation.TypeHint;
-import io.micronaut.core.annotation.AnnotationUtil;
-import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.inject.ast.*;
+import io.micronaut.inject.annotation.MutableAnnotationMetadata;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ElementModifier;
+import io.micronaut.inject.ast.ElementQuery;
+import io.micronaut.inject.ast.FieldElement;
+import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
-import io.micronaut.inject.writer.GeneratedFile;
+import io.micronaut.inject.writer.ClassGenerationException;
 import jakarta.inject.Inject;
-
-import java.io.File;
-import java.io.IOException;
-import java.io.Writer;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.*;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /**
  * Generates the GraalVM reflect.json file at compilation time.
@@ -60,17 +67,26 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
 
     /**
      * Beans are those requiring full reflective access to all public members.
+     * @deprecated will be removed in a future release
      */
+    @Deprecated
+    @SuppressWarnings("java:S1133")
     protected static Set<String> packages = new HashSet<>();
 
     /**
      * Classes only require classloading access.
+     * @deprecated will be removed in a future release
      */
+    @Deprecated
+    @SuppressWarnings("java:S1133")
     protected static Map<String, Map<String, Object>> classes = new HashMap<>();
 
     /**
      * Arrays requiring reflective instantiation.
+     * @deprecated will be removed in a future release
      */
+    @Deprecated
+    @SuppressWarnings("java:S1133")
     protected static Set<String> arrays = new HashSet<>();
 
     /**
@@ -79,23 +95,8 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
     protected static Set<ClassElement> originatingElements = new HashSet<>();
 
     private static final TypeHint.AccessType[] DEFAULT_ACCESS_TYPE = {TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS};
-    private static final String REFLECTION_CONFIG_JSON = "reflect-config.json";
-
-    private static final String BASE_REFLECT_JSON = "src/main/graal/reflect.json";
-
-    private static final String ALL_PUBLIC_METHODS = "allPublicMethods";
-
-    private static final String ALL_DECLARED_FIELDS = "allDeclaredFields";
-
-    private static final String NAME = "name";
-
-    private static final String ALL_DECLARED_CONSTRUCTORS = "allDeclaredConstructors";
-
-    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private boolean isSubclass = getClass() != GraalTypeElementVisitor.class;
-
-    private boolean executed = false;
 
     @Override
     public int getOrder() {
@@ -118,23 +119,34 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
     @NonNull
     @Override
     public VisitorKind getVisitorKind() {
-        return VisitorKind.AGGREGATING;
+        return VisitorKind.ISOLATING;
+    }
+
+    @Override
+    public void finish(VisitorContext visitorContext) {
+        originatingElements.clear();
     }
 
     @Override
     public void visitClass(ClassElement element, VisitorContext context) {
         if (!isSubclass && !element.hasStereotype(Deprecated.class)) {
+            if (originatingElements.contains(element)) {
+                return;
+            }
+            Map<String, ReflectionConfigData> reflectiveClasses = new LinkedHashMap<>();
             if (element.hasAnnotation(ReflectiveAccess.class)) {
-                originatingElements.add(element);
-                packages.add(element.getPackageName());
                 final String beanName = element.getName();
-                addBean(beanName);
-                resolveClassData(beanName + "[]");
+                addBean(beanName, reflectiveClasses);
+                element.getDefaultConstructor().ifPresent(constructor -> processMethodElement(constructor, reflectiveClasses));
+                resolveClassData(beanName + "[]", reflectiveClasses);
             }
 
+            element.getEnclosedElements(ElementQuery.ALL_METHODS.annotated(ann -> ann.hasAnnotation(ReflectiveAccess.class)))
+                    .forEach(m -> processMethodElement(m, reflectiveClasses));
+            element.getEnclosedElements(ElementQuery.ALL_FIELDS.annotated(ann -> ann.hasAnnotation(ReflectiveAccess.class)))
+                    .forEach(m -> processFieldElement(m, reflectiveClasses));
+
             if (element.hasAnnotation(TypeHint.class)) {
-                originatingElements.add(element);
-                packages.add(element.getPackageName());
                 final String[] introspectedClasses = element.stringValues(TypeHint.class);
                 final TypeHint typeHint = element.synthesize(TypeHint.class);
                 TypeHint.AccessType[] accessTypes = DEFAULT_ACCESS_TYPE;
@@ -142,260 +154,218 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                 if (typeHint != null) {
                     accessTypes = typeHint.accessType();
                 }
-                processClasses(accessTypes, introspectedClasses);
-                processClasses(accessTypes, element.getValue(
-                        TypeHint.class,
-                        "typeNames",
-                        String[].class).orElse(StringUtils.EMPTY_STRING_ARRAY
-                        )
+                processClasses(accessTypes, reflectiveClasses, introspectedClasses);
+                processClasses(accessTypes, reflectiveClasses, element.getValue(
+                                       TypeHint.class,
+                                       "typeNames",
+                                       String[].class).orElse(StringUtils.EMPTY_STRING_ARRAY
+                               )
                 );
             }
 
             if (element.hasAnnotation(Import.class)) {
                 final List<ClassElement> beanElements = BeanImportVisitor.collectInjectableElements(element, context);
                 for (ClassElement beanElement : beanElements) {
-                    final MethodElement constructor = beanElement.getPrimaryConstructor().orElse(null);
-                    if (constructor != null && !constructor.isPublic()) {
-                        processMethodElement(constructor);
-                    }
-
-                    final ElementQuery<MethodElement> reflectiveMethodQuery = ElementQuery.ALL_METHODS
-                            .onlyInstance()
-                            .onlyConcrete()
-                            .onlyInjected()
-                            .modifiers((elementModifiers -> !elementModifiers.contains(ElementModifier.PUBLIC)));
-                    final List<MethodElement> reflectiveMethods = beanElement.getEnclosedElements(reflectiveMethodQuery);
-                    reflectiveMethods.forEach(this::processMethodElement);
-                    final ElementQuery<FieldElement> reflectiveFieldQuery = ElementQuery.ALL_FIELDS
-                            .onlyInstance()
-                            .onlyInjected()
-                            .modifiers((elementModifiers -> !elementModifiers.contains(ElementModifier.PUBLIC)));
-                    final List<FieldElement> reflectiveFields = beanElement.getEnclosedElements(reflectiveFieldQuery);
-                    reflectiveFields.forEach(this::processFieldElement);
+                    processBeanElement(reflectiveClasses, beanElement, true);
                 }
-            } else if (element.hasStereotype(Bean.class) || element.hasStereotype(AnnotationUtil.SCOPE) || element.hasStereotype(AnnotationUtil.QUALIFIER)) {
+            } else if (element.hasStereotype(Bean.class) || element.hasStereotype(AnnotationUtil.SCOPE) || element.hasStereotype(
+                    AnnotationUtil.QUALIFIER)) {
+                processBeanElement(
+                        reflectiveClasses,
+                        element,
+                        false
+                );
                 MethodElement me = element.getPrimaryConstructor().orElse(null);
                 if (me != null && me.isPrivate() && !me.hasAnnotation(ReflectiveAccess.class)) {
-                    processMethodElement(me);
+                    processMethodElement(me, reflectiveClasses);
                 }
             }
 
             if (element.isInner()) {
                 ClassElement enclosingType = element.getEnclosingType().orElse(null);
                 if (enclosingType != null && enclosingType.hasAnnotation(ReflectiveAccess.class)) {
-                    originatingElements.add(enclosingType);
-                    packages.add(enclosingType.getPackageName());
                     final String beanName = element.getName();
-                    addBean(beanName);
-                    resolveClassData(beanName + "[]");
+                    addBean(beanName, reflectiveClasses);
+                    resolveClassData(beanName + "[]", reflectiveClasses);
+                }
+            }
+
+            if (!reflectiveClasses.isEmpty()) {
+                originatingElements.add(element);
+                @SuppressWarnings("unchecked") final AnnotationValue<ReflectionConfig>[] annotationValues =
+                        reflectiveClasses.values().stream()
+                        .map(ReflectionConfigData::build)
+                        .toArray(AnnotationValue[]::new);
+                MutableAnnotationMetadata annotationMetadata = new MutableAnnotationMetadata();
+
+                final AnnotationValue<ReflectionConfig.ReflectionConfigList> av =
+                        AnnotationValue.builder(ReflectionConfig.ReflectionConfigList.class)
+                        .values(annotationValues)
+                        .build();
+                annotationMetadata.addAnnotation(
+                        av.getAnnotationName(),
+                        av.getValues(),
+                        RetentionPolicy.RUNTIME
+                );
+                GraalReflectionMetadataWriter writer = new GraalReflectionMetadataWriter(
+                        element,
+                        annotationMetadata
+                );
+                try {
+                    writer.accept(context);
+                } catch (IOException e) {
+                    throw new ClassGenerationException("I/O error occurred during class generation: " + e.getMessage(), e);
                 }
             }
         }
     }
 
-    private void addBean(String beanName) {
-        resolveClassData(beanName).putAll(CollectionUtils.mapOf(
-                ALL_PUBLIC_METHODS, true,
-                ALL_DECLARED_CONSTRUCTORS, true,
-                ALL_DECLARED_FIELDS, true
-        ));
-    }
-
-    @Override
-    public void visitField(FieldElement element, VisitorContext context) {
-        if (element.hasStereotype(ReflectiveAccess.class)) {
-            processFieldElement(element);
-        } else if (element.hasDeclaredAnnotation(AnnotationUtil.INJECT) && element.isPrivate()) {
-            processFieldElement(element);
-        }
-    }
-
-    private void processFieldElement(FieldElement element) {
-        final ClassElement dt = element.getDeclaringType();
-        originatingElements.add(dt);
-        packages.add(dt.getPackageName());
-        final Map<String, Object> json = resolveClassData(resolveName(dt));
-        final List<Map<String, Object>> fields = (List<Map<String, Object>>)
-                json.computeIfAbsent("fields", (Function<String, List<Map<String, Object>>>) s -> new ArrayList<>());
-
-        fields.add(Collections.singletonMap(
-                "name", element.getName()
-        ));
-    }
-
-    private String resolveName(ClassElement classElement) {
-        if (classElement.isArray()) {
-            return classElement.getName() + "[]";
-        }
-        return classElement.getName();
-    }
-
-    @SuppressWarnings("unchecked")
-    @Override
-    public void visitMethod(MethodElement element, VisitorContext context) {
-        if (!isSubclass && element.hasDeclaredStereotype(ReflectiveAccess.class)) {
-            processMethodElement(element);
-        } else if (element.hasDeclaredAnnotation(AnnotationUtil.INJECT) && element.isPrivate()) {
-            processMethodElement(element);
-        }
-    }
-
-    @Override
-    public void visitConstructor(ConstructorElement element, VisitorContext context) {
-        if (!isSubclass) {
-            if (element.hasAnnotation(Creator.class) && element.isPrivate()) {
-                final ClassElement declaringType = element.getDeclaringType();
-                originatingElements.add(declaringType);
-                packages.add(declaringType.getPackageName());
-                addBean(declaringType.getName());
-            } else if (element.hasAnnotation(ReflectiveAccess.class) && !element.getDeclaringType().isEnum()) {
-                processMethodElement(element);
+    private void processBeanElement(
+            Map<String, ReflectionConfigData> reflectiveClasses,
+            ClassElement beanElement,
+            boolean isImport) {
+        final MethodElement constructor = beanElement.getPrimaryConstructor().orElse(null);
+        if (constructor != null) {
+            if (constructor.hasAnnotation(ReflectiveAccess.class)) {
+                processMethodElement(constructor, reflectiveClasses);
+            } else {
+                if (isImport) {
+                    if (!constructor.isPublic()) {
+                        processMethodElement(constructor, reflectiveClasses);
+                    }
+                } else {
+                    if (constructor.isPrivate()) {
+                        processMethodElement(constructor, reflectiveClasses);
+                    }
+                }
             }
         }
+
+        ElementQuery<MethodElement> injectedMethodsThatNeedReflection = ElementQuery.ALL_METHODS
+                .onlyInstance()
+                .onlyInjected();
+
+        if (isImport) {
+            // methods that are injected but not public and are imported need reflection
+            beanElement
+                    .getEnclosedElements(injectedMethodsThatNeedReflection
+                             .modifiers((elementModifiers ->
+                                 !elementModifiers.contains(ElementModifier.PUBLIC))))
+                    .forEach(m -> processMethodElement(m, reflectiveClasses));
+        } else {
+            beanElement
+                    .getEnclosedElements(injectedMethodsThatNeedReflection
+                                                 .modifiers((elementModifiers ->
+                                                                     elementModifiers.contains(ElementModifier.PRIVATE))))
+                    .forEach(m -> processMethodElement(m, reflectiveClasses));
+        }
+        // methods with explicit reflective access
+        beanElement.getEnclosedElements(
+                ElementQuery.ALL_METHODS.annotated(ann -> ann.hasAnnotation(ReflectiveAccess.class))
+        ).forEach(m -> processMethodElement(m, reflectiveClasses));
+
+
+        final ElementQuery<FieldElement> reflectiveFieldQuery = ElementQuery.ALL_FIELDS
+                .onlyInstance()
+                .onlyInjected();
+
+        if (isImport) {
+            // fields that are injected but not public and are imported need reflection
+            beanElement
+                    .getEnclosedElements(reflectiveFieldQuery.modifiers((elementModifiers -> !elementModifiers.contains(ElementModifier.PUBLIC))))
+                    .forEach(e -> processFieldElement(e, reflectiveClasses));
+        } else {
+            // fields that are injected and private need reflection
+            beanElement
+                    .getEnclosedElements(reflectiveFieldQuery.modifiers((elementModifiers -> elementModifiers.contains(ElementModifier.PRIVATE))))
+                    .forEach(e -> processFieldElement(e, reflectiveClasses));
+
+        }
+
     }
 
-    private void processMethodElement(MethodElement element) {
+    private void addBean(String beanName, Map<String, ReflectionConfigData> reflectiveClasses) {
+        resolveClassData(beanName, reflectiveClasses)
+                .accessTypes.addAll(
+                    Arrays.asList(
+                        TypeHint.AccessType.ALL_PUBLIC_METHODS,
+                        TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS,
+                        TypeHint.AccessType.ALL_DECLARED_FIELDS
+                    )
+                );
+    }
+
+    private void processFieldElement(FieldElement element,
+                                     Map<String, ReflectionConfigData> classes) {
+        final ClassElement dt = element.getDeclaringType();
+        final ReflectionConfigData data = resolveClassData(resolveName(dt).getName(), classes);
+        data.fields.add(AnnotationValue.builder(ReflectionConfig.ReflectiveFieldConfig.class)
+                                .member("name", element.getName())
+                                .build()
+        );
+    }
+
+    private AnnotationClassValue<?> resolveName(ClassElement classElement) {
+        return new AnnotationClassValue<>(classElement.getCanonicalName());
+    }
+
+    private void processMethodElement(MethodElement element, Map<String, ReflectionConfigData> classes) {
         final String methodName = element.getName();
         final ClassElement declaringType = element.getDeclaringType();
-        originatingElements.add(declaringType);
-        packages.add(declaringType.getPackageName());
-        final Map<String, Object> json = resolveClassData(declaringType.getName());
-        final List<Map<String, Object>> methods = (List<Map<String, Object>>)
-                json.computeIfAbsent("methods", (Function<String, List<Map<String, Object>>>) s -> new ArrayList<>());
-        final List<String> params = Arrays.stream(element.getParameters())
+        final ReflectionConfigData data = resolveClassData(declaringType.getName(), classes);
+        final List<AnnotationClassValue<?>> params = Arrays.stream(element.getParameters())
                 .map(ParameterElement::getType)
-                .filter(Objects::nonNull)
                 .map(this::resolveName).collect(Collectors.toList());
-        Map newMap = CollectionUtils.mapOf(
-                "name", methodName,
-                "parameterTypes", params
+        data.methods.add(
+                AnnotationValue.builder(ReflectionConfig.ReflectiveMethodConfig.class)
+                        .member("name", methodName)
+                        .member("parameterTypes", params.toArray(AnnotationClassValue.EMPTY_ARRAY))
+                        .build()
         );
-        if (!methods.contains(newMap)) {
-            methods.add(newMap);
-        }
     }
 
-    private void processClasses(TypeHint.AccessType[] accessType, String... introspectedClasses) {
-        for (String introspectedClass : introspectedClasses) {
-
-            for (TypeHint.AccessType type : accessType) {
-                if (type == TypeHint.AccessType.ALL_PUBLIC) {
-                    for (String aClass : introspectedClasses) {
-                        addBean(aClass);
-                    }
-                    return;
+    private void processClasses(TypeHint.AccessType[] accessType, Map<String, ReflectionConfigData> reflectiveClasses, String... introspectedClasses) {
+        for (TypeHint.AccessType type : accessType) {
+            if (type == TypeHint.AccessType.ALL_PUBLIC) {
+                for (String aClass : introspectedClasses) {
+                    addBean(aClass, reflectiveClasses);
                 }
-                Map<String, Object> json = resolveClassData(introspectedClass);
-                json.put(NameUtils.camelCase(type.name().toLowerCase()), true);
-            }
-        }
-    }
-
-    @Override
-    public final void finish(VisitorContext visitorContext) {
-
-        // Execute only once and never for subclasses
-        if (!executed && !isSubclass) {
-            executed = true;
-            generateNativeImageProperties(visitorContext);
-        }
-    }
-
-    private void generateNativeImageProperties(VisitorContext visitorContext) {
-        List<Map> json;
-
-        Optional<Path> projectDir = visitorContext.getProjectDir();
-
-        File userReflectJsonFile = projectDir
-                .map(projectPath -> Paths.get(projectPath.toString(), BASE_REFLECT_JSON).toFile())
-                .orElse(null);
-
-        if (userReflectJsonFile != null && userReflectJsonFile.exists()) {
-            try {
-                json = MAPPER.readValue(userReflectJsonFile, new TypeReference<List<Map>>() {
-                });
-            } catch (Throwable e) {
-                visitorContext.fail("Error parsing base reflect.json: " + BASE_REFLECT_JSON, null);
                 return;
             }
-        } else {
-            json = new ArrayList<>();
         }
-
-        if (CollectionUtils.isEmpty(classes) && CollectionUtils.isEmpty(arrays) && CollectionUtils.isEmpty(json)) {
-            return;
-        }
-
-        try {
-            String path = buildNativeImagePath(visitorContext);
-            String reflectFile = path + REFLECTION_CONFIG_JSON;
-            final Optional<GeneratedFile> generatedFile = visitorContext.visitMetaInfFile(
-                    reflectFile,
-                    originatingElements.toArray(Element.EMPTY_ELEMENT_ARRAY)
-            );
-            generatedFile.ifPresent(gf -> {
-                for (Map<String, Object> value : classes.values()) {
-                    json.add(value);
-                }
-
-                for (String array : arrays) {
-                    json.add(CollectionUtils.mapOf(
-                            NAME, "[L" + array.substring(0, array.length() - 2) + ";",
-                            ALL_DECLARED_CONSTRUCTORS, true
-                    ));
-                }
-
-                ObjectWriter writer = MAPPER.writer(new DefaultPrettyPrinter());
-                try (Writer w = gf.openWriter()) {
-                    visitorContext.info("Writing " + REFLECTION_CONFIG_JSON + " file to destination: " + gf.getName());
-
-                    writer.writeValue(w, json);
-                } catch (IOException e) {
-                    visitorContext.fail("Error writing " + REFLECTION_CONFIG_JSON + ": " + e.getMessage(), null);
-                }
-            });
-        } finally {
-            packages.clear();
-            classes.clear();
-            arrays.clear();
-            originatingElements.clear();
+        for (String introspectedClass : introspectedClasses) {
+            resolveClassData(introspectedClass, reflectiveClasses)
+                    .accessTypes.addAll(Arrays.asList(accessType));
         }
     }
 
-    private String buildNativeImagePath(VisitorContext visitorContext) {
+    private ReflectionConfigData resolveClassData(String introspectedClass, Map<String, ReflectionConfigData> classes) {
+        return classes.computeIfAbsent(introspectedClass, s -> new ReflectionConfigData(introspectedClass));
+    }
 
-        String group = visitorContext.getOptions().get(VisitorContext.MICRONAUT_PROCESSING_GROUP);
-        String module = visitorContext.getOptions().get(VisitorContext.MICRONAUT_PROCESSING_MODULE);
 
-        if (group != null && module != null) {
-            return "native-image/" + group + "/" + module + "/";
+    private static final class ReflectionConfigData {
+        private final AnnotationClassValue<?> type;
+        private final List<TypeHint.AccessType> accessTypes = new ArrayList<>(5);
+        private final List<AnnotationValue<ReflectionConfig.ReflectiveMethodConfig>> methods = new ArrayList<>(30);
+        private final List<AnnotationValue<ReflectionConfig.ReflectiveFieldConfig>> fields = new ArrayList<>(30);
+
+        ReflectionConfigData(String type) {
+            this.type = new AnnotationClassValue<>(type);
         }
 
-        String basePackage = packages.stream()
-                .distinct()
-                .min(Comparator.comparingInt(String::length)).orElse("io.micronaut");
-
-        if (basePackage.startsWith("io.micronaut.")) {
-            module = basePackage.substring("io.micronaut.".length()).replace('.', '-');
-            basePackage = "io.micronaut";
-        } else {
-            if (basePackage.contains(".")) {
-                final int i = basePackage.lastIndexOf('.');
-                module = basePackage.substring(i + 1);
-                basePackage = basePackage.substring(0, i);
-            } else {
-                module = basePackage;
+        AnnotationValue<ReflectionConfig> build() {
+            final AnnotationValueBuilder<ReflectionConfig> builder = AnnotationValue.builder(ReflectionConfig.class)
+                    .member("type", type)
+                    .member("accessType", accessTypes.toArray(new TypeHint.AccessType[0]));
+            if (!methods.isEmpty()) {
+                builder.member("methods", methods.toArray(new AnnotationValue<?>[0]));
             }
+            if (!fields.isEmpty()) {
+                builder.member("fields", fields.toArray(new AnnotationValue<?>[0]));
+            }
+            return builder
+                    .build();
         }
-
-        return "native-image/" + basePackage + "/" + module + "/";
-    }
-
-    private Map<String, Object> resolveClassData(String introspectedClass) {
-        return classes.computeIfAbsent(introspectedClass, s -> {
-            final HashMap<String, Object> map = new HashMap<>(5);
-            map.put(NAME, s);
-            return map;
-        });
     }
 }

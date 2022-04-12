@@ -29,6 +29,7 @@ import io.micronaut.core.annotation.NonNull
 import io.micronaut.core.annotation.Nullable
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap
+import io.micronaut.core.graal.GraalReflectionConfigurer
 import io.micronaut.core.naming.NameUtils
 import io.micronaut.inject.BeanConfiguration
 import io.micronaut.inject.BeanDefinition
@@ -146,6 +147,20 @@ abstract class AbstractTypeElementSpec extends Specification {
 
         ClassLoader classLoader = buildClassLoader(className, cls)
         return (BeanIntrospection)classLoader.loadClass(beanFullName).newInstance()
+    }
+
+    /**
+     * Build and return a {@link GraalReflectionConfigurer} for the given class name and class data.
+     *
+     * @return the GraalReflectionConfigurer if it is correct
+     **/
+    protected GraalReflectionConfigurer buildReflectionConfigurer(String className, @Language("java") String cls) {
+        def beanDefName= (className.startsWith('$') ? '' : '$') + NameUtils.getSimpleName(className) + GraalReflectionConfigurer.CLASS_SUFFIX
+        def packageName = NameUtils.getPackageName(className)
+        String beanFullName = "${packageName}.${beanDefName}"
+
+        ClassLoader classLoader = buildClassLoader(className, cls)
+        return (GraalReflectionConfigurer)classLoader.loadClass(beanFullName).newInstance()
     }
 
     /**

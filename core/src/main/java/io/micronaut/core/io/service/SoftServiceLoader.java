@@ -30,6 +30,7 @@ import java.lang.invoke.MethodType;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -266,6 +267,20 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
      */
     private ServiceDefinition<S> createService(String name, Class<S> loadedClass) {
         return new DefaultServiceDefinition<>(name, loadedClass);
+    }
+
+    @SuppressWarnings("java:S3398")
+    private static Set<String> computeServiceTypeNames(URI uri, String path) {
+        Set<String> typeNames = new HashSet<>();
+        IOUtils.eachFile(
+                uri, path, currentPath -> {
+                    if (Files.isRegularFile(currentPath)) {
+                        final String typeName = currentPath.getFileName().toString();
+                        typeNames.add(typeName);
+                    }
+                }
+        );
+        return typeNames;
     }
 
     public static <S> ServiceCollector<S> newCollector(String serviceName,
@@ -531,17 +546,6 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
                 tasks.add(task);
                 task.fork();
             }
-        }
-
-        private static Set<String> computeServiceTypeNames(URI uri, String path) {
-            Set<String> typeNames = new HashSet<>();
-            IOUtils.eachDirectory(
-                    uri, path, currentPath -> {
-                        final String typeName = currentPath.getFileName().toString();
-                        typeNames.add(typeName);
-                    }
-            );
-            return typeNames;
         }
     }
 

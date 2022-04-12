@@ -18,6 +18,8 @@ package io.micronaut.core.graal;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URL;
+import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Enumeration;
@@ -48,33 +50,46 @@ final class ServiceLoaderFeature implements Feature {
 
     @Override
     public void beforeAnalysis(BeforeAnalysisAccess access) {
+        Collection<GraalReflectionConfigurer> configurers = new ArrayList<>();
+        SoftServiceLoader.load(GraalReflectionConfigurer.class, access.getApplicationClassLoader())
+                .collectAll(configurers);
+
+        for (GraalReflectionConfigurer configurer : configurers) {
+            configurer.configure(access);
+        }
+
         final String path = "META-INF/micronaut/";
         StaticServiceDefinitions staticServiceDefinitions = new StaticServiceDefinitions();
         try {
-            final Enumeration<URL> micronautResources = ServiceLoaderFeature.class.getClassLoader().getResources(path);
+            final Enumeration<URL> micronautResources = access.getApplicationClassLoader().getResources(path);
             while (micronautResources.hasMoreElements()) {
                 Set<String> servicePaths = new HashSet<>();
                 URL url = micronautResources.nextElement();
-                IOUtils.eachDirectory(
+                IOUtils.eachFile(
                         url,
                         path,
                         servicePath -> {
-                            final String serviceName = servicePath.toString();
-                            servicePaths.add(serviceName);
+                            if (Files.isDirectory(servicePath)) {
+                                final String serviceName = servicePath.toString();
+                                if (serviceName.startsWith(path)) {
+                                    servicePaths.add(serviceName);
+                                }
+                            }
                         }
                 );
 
                 for (String servicePath : servicePaths) {
-                    IOUtils.eachDirectory(
+                    IOUtils.eachFile(
                             url,
                             servicePath,
                             serviceTypePath -> {
-                                final Set<String> serviceTypeNames = staticServiceDefinitions.serviceTypeMap
-                                        .computeIfAbsent(servicePath,
-                                                         key -> new HashSet<>());
-                                final String serviceTypeName = serviceTypePath.getFileName().toString();
-                                serviceTypeNames.add(serviceTypeName);
-
+                                if (Files.isRegularFile(serviceTypePath)) {
+                                    final Set<String> serviceTypeNames = staticServiceDefinitions.serviceTypeMap
+                                            .computeIfAbsent(servicePath,
+                                                             key -> new HashSet<>());
+                                    final String serviceTypeName = serviceTypePath.getFileName().toString();
+                                    serviceTypeNames.add(serviceTypeName);
+                                }
                             }
                     );
                 }

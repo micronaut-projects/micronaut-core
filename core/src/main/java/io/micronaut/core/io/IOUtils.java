@@ -57,9 +57,9 @@ public class IOUtils {
      */
     @Blocking
     @SuppressWarnings({"java:S2095", "S1141"})
-    public static void eachDirectory(@NonNull URL url, String path, @NonNull Consumer<Path> consumer) {
+    public static void eachFile(@NonNull URL url, String path, @NonNull Consumer<Path> consumer) {
         try {
-            eachDirectory(url.toURI(), path, consumer);
+            eachFile(url.toURI(), path, consumer);
         } catch (URISyntaxException e) {
             // ignore and proceed
         }
@@ -74,7 +74,7 @@ public class IOUtils {
      */
     @Blocking
     @SuppressWarnings({"java:S2095", "java:S1141"})
-    public static void eachDirectory(@NonNull URI uri, String path, @NonNull Consumer<Path> consumer) {
+    public static void eachFile(@NonNull URI uri, String path, @NonNull Consumer<Path> consumer) {
         Path myPath;
         try {
             FileSystem fileSystem = null;
@@ -98,7 +98,7 @@ public class IOUtils {
                 try (Stream<Path> walk = Files.walk(myPath, 1)) {
                     for (Iterator<Path> it = walk.iterator(); it.hasNext();) {
                         final Path currentPath = it.next();
-                        if (currentPath.equals(myPath)) {
+                        if (currentPath.equals(myPath) || Files.isHidden(currentPath) || currentPath.getFileName().startsWith(".")) {
                             continue;
                         }
                         consumer.accept(currentPath);
