@@ -89,7 +89,9 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                 "javax.persistence.Entity",
                 "jakarta.persistence.Entity",
                 AnnotationUtil.INJECT,
-                Inject.class.getName()
+                Inject.class.getName(),
+                ReflectionConfig.class.getName(),
+                ReflectionConfig.ReflectionConfigList.class.getName()
         );
     }
 
@@ -112,6 +114,22 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                 return;
             }
             Map<String, ReflectionConfigData> reflectiveClasses = new LinkedHashMap<>();
+            final List<AnnotationValue<ReflectionConfig>> values = element.getAnnotationValuesByType(
+                    ReflectionConfig.class);
+            for (AnnotationValue<ReflectionConfig> value : values) {
+                value.stringValue("type").ifPresent(n -> {
+                    final ReflectionConfigData data = resolveClassData(n, reflectiveClasses);
+                    data.accessTypes.addAll(
+                        Arrays.asList(value.enumValues("accessType", TypeHint.AccessType.class))
+                    );
+                    data.methods.addAll(
+                            value.getAnnotations("methods")
+                    );
+                    data.fields.addAll(
+                            value.getAnnotations("fields")
+                    );
+                });
+            }
             if (element.hasAnnotation(ReflectiveAccess.class)) {
                 final String beanName = element.getName();
                 addBean(beanName, reflectiveClasses);

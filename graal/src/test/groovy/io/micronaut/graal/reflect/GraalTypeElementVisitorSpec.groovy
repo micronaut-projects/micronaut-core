@@ -55,6 +55,39 @@ class Bar {}
         config.enumValues("accessType", TypeHint.AccessType) == [TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS] as TypeHint.AccessType[]
     }
 
+    void "test write reflect.json for @ReflectionConfig with classes"() {
+
+        given:
+        GraalReflectionConfigurer configurer = buildReflectionConfigurer('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.*;
+
+@ReflectionConfig(
+    type = Bar.class,
+    accessType = TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS,
+    methods = @ReflectionConfig.ReflectiveMethodConfig(
+            name = "foo"
+    )
+)
+class Test {
+    
+}
+
+class Bar {}
+
+''')
+
+        when:
+        AnnotationValue<ReflectionConfig> config = configurer.getAnnotationMetadata().getAnnotationValuesByType(ReflectionConfig).first()
+
+        then:
+        config
+        config.stringValue("type").get() == 'test.Bar'
+        config.enumValues("accessType", TypeHint.AccessType) == [TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS] as TypeHint.AccessType[]
+        config.getAnnotations("methods").size() == 1
+    }
+
     void "test write reflect.json for @TypeHint with classes and type names"() {
 
         given:
