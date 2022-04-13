@@ -16,6 +16,9 @@
 package io.micronaut.core.graal;
 
 import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.net.URI;
 import java.net.URL;
 import java.nio.file.Files;
@@ -32,6 +35,7 @@ import com.oracle.svm.core.annotate.AutomaticFeature;
 import com.oracle.svm.core.annotate.Substitute;
 import com.oracle.svm.core.annotate.TargetClass;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.io.IOUtils;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import org.graalvm.nativeimage.ImageSingletons;
@@ -54,8 +58,34 @@ final class ServiceLoaderFeature implements Feature {
         SoftServiceLoader.load(GraalReflectionConfigurer.class, access.getApplicationClassLoader())
                 .collectAll(configurers);
 
+        final GraalReflectionConfigurer.ReflectionConfigurationContext context = new GraalReflectionConfigurer.ReflectionConfigurationContext() {
+            @Override
+            public Class<?> findClassByName(@NonNull String name) {
+                return access.findClassByName(name);
+            }
+
+            @Override
+            public void register(Class<?>... types) {
+                RuntimeReflection.register(types);
+            }
+
+            @Override
+            public void register(Method... methods) {
+                RuntimeReflection.register(methods);
+            }
+
+            @Override
+            public void register(Field... fields) {
+                RuntimeReflection.register(fields);
+            }
+
+            @Override
+            public void register(Constructor<?>... constructors) {
+                RuntimeReflection.register(constructors);
+            }
+        };
         for (GraalReflectionConfigurer configurer : configurers) {
-            configurer.configure(access);
+            configurer.configure(context);
         }
 
         final String path = "META-INF/micronaut/";
