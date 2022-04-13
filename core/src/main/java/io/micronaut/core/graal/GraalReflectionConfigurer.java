@@ -50,7 +50,7 @@ public interface GraalReflectionConfigurer extends AnnotationMetadataProvider {
      * Configure reflection for this type.
      * @param access The feature access
      */
-    @SuppressWarnings("unused")
+    @SuppressWarnings({"unused", "java:S3776"})
     default void configure(Feature.FeatureAccess access) {
         final AnnotationMetadata annotationMetadata = getAnnotationMetadata();
         final List<AnnotationValue<ReflectionConfig>> values = annotationMetadata.getAnnotationValuesByType(

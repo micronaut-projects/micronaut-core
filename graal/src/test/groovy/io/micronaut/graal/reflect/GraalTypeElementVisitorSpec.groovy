@@ -87,7 +87,47 @@ class Bar {}
         config.enumValues("accessType", TypeHint.AccessType) == [TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS] as TypeHint.AccessType[]
 
         when:
-        config = configs.find {it.stringValue("type").get() == 'java.lang.String' }
+        config = configs.find {it.classValue("type").get() == String }
+
+        then:
+        config
+        config.enumValues("accessType", TypeHint.AccessType) == [TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS] as TypeHint.AccessType[]
+
+    }
+
+    void "test write reflect.json for @TypeHint with classes and arrays"() {
+
+        given:
+        GraalReflectionConfigurer configurer = buildReflectionConfigurer('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.*;
+
+@TypeHint(value = {Bar.class, String[].class})
+class Test {
+    
+}
+
+class Bar {}
+
+''')
+
+        when:
+        def configs = configurer.getAnnotationMetadata().getAnnotationValuesByType(ReflectionConfig)
+
+        then:
+        configs.size() == 2
+
+        when:
+        def config = configs.find {it.stringValue("type").get() == 'test.Bar' }
+
+        then:
+        config
+        config.stringValue("type").get() == 'test.Bar'
+        config.enumValues("accessType", TypeHint.AccessType) == [TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS] as TypeHint.AccessType[]
+
+        when:
+        config = configs.find {it.classValue("type").get() == String[].class }
 
         then:
         config

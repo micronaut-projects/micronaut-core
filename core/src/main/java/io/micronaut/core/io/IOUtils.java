@@ -73,7 +73,7 @@ public class IOUtils {
      * @since 3.5.0
      */
     @Blocking
-    @SuppressWarnings({"java:S2095", "java:S1141"})
+    @SuppressWarnings({"java:S2095", "java:S1141", "java:S3776"})
     public static void eachFile(@NonNull URI uri, String path, @NonNull Consumer<Path> consumer) {
         Path myPath;
         try {
@@ -94,7 +94,6 @@ public class IOUtils {
             }
 
             if (myPath != null) {
-
                 try (Stream<Path> walk = Files.walk(myPath, 1)) {
                     for (Iterator<Path> it = walk.iterator(); it.hasNext();) {
                         final Path currentPath = it.next();

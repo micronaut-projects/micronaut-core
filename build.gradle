@@ -16,8 +16,11 @@ tasks.named("updateVersionCatalogs") {
 }
 
 if (System.getenv("SONAR_TOKEN") != null) {
+    // deprecated and compile time only classes excluded from coverage
     def coverageExcludes = [
         "**/ServiceDescriptionProcessor.java",
+        "**/GraalReflectionConfigurer.java",
+        "**/graal/ServiceLoaderInitialization.java",
         "**/graal/ServiceLoaderInitialization.java",
         "**/DirectoryClassWriterOutputVisitor.java",
         "**/GroovyClassWriterOutputVisitor.java"

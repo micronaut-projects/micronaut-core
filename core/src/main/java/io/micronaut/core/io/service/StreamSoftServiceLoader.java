@@ -34,7 +34,10 @@ import java.util.stream.Stream;
  *
  * @author Graeme Rocher
  * @since 1.0
+ * @deprecated Use {@link io.micronaut.core.io.service.SoftServiceLoader#collectAll(java.util.Collection)} instead
  */
+@Deprecated
+@SuppressWarnings({"java:S1118", "java:S1133"})
 public class StreamSoftServiceLoader {
 
     /**

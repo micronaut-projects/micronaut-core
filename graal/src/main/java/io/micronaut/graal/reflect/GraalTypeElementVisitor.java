@@ -19,15 +19,16 @@ import java.io.IOException;
 import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Import;
 import io.micronaut.context.visitor.BeanImportVisitor;
 import io.micronaut.core.annotation.AnnotationClassValue;
@@ -65,38 +66,14 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
      */
     public static final int POSITION = -200;
 
-    /**
-     * Beans are those requiring full reflective access to all public members.
-     * @deprecated will be removed in a future release
-     */
-    @Deprecated
-    @SuppressWarnings("java:S1133")
-    protected static Set<String> packages = new HashSet<>();
+    private static final TypeHint.AccessType[] DEFAULT_ACCESS_TYPE = {TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS};
 
-    /**
-     * Classes only require classloading access.
-     * @deprecated will be removed in a future release
-     */
-    @Deprecated
-    @SuppressWarnings("java:S1133")
-    protected static Map<String, Map<String, Object>> classes = new HashMap<>();
-
-    /**
-     * Arrays requiring reflective instantiation.
-     * @deprecated will be removed in a future release
-     */
-    @Deprecated
-    @SuppressWarnings("java:S1133")
-    protected static Set<String> arrays = new HashSet<>();
+    private final boolean isSubclass = getClass() != GraalTypeElementVisitor.class;
 
     /**
      * Elements that the config originates from.
      */
-    protected static Set<ClassElement> originatingElements = new HashSet<>();
-
-    private static final TypeHint.AccessType[] DEFAULT_ACCESS_TYPE = {TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS};
-
-    private boolean isSubclass = getClass() != GraalTypeElementVisitor.class;
+    private final Set<ClassElement> originatingElements = new HashSet<>();
 
     @Override
     public int getOrder() {
@@ -127,6 +104,7 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
         originatingElements.clear();
     }
 
+    @SuppressWarnings("java:S3776")
     @Override
     public void visitClass(ClassElement element, VisitorContext context) {
         if (!isSubclass && !element.hasStereotype(Deprecated.class)) {
@@ -224,47 +202,15 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
             Map<String, ReflectionConfigData> reflectiveClasses,
             ClassElement beanElement,
             boolean isImport) {
-        final MethodElement constructor = beanElement.getPrimaryConstructor().orElse(null);
-        if (constructor != null) {
-            if (constructor.hasAnnotation(ReflectiveAccess.class)) {
-                processMethodElement(constructor, reflectiveClasses);
-            } else {
-                if (isImport) {
-                    if (!constructor.isPublic()) {
-                        processMethodElement(constructor, reflectiveClasses);
-                    }
-                } else {
-                    if (constructor.isPrivate()) {
-                        processMethodElement(constructor, reflectiveClasses);
-                    }
-                }
-            }
-        }
+        processBeanConstructor(reflectiveClasses, beanElement, isImport);
 
-        ElementQuery<MethodElement> injectedMethodsThatNeedReflection = ElementQuery.ALL_METHODS
-                .onlyInstance()
-                .onlyInjected();
+        processBeanMethods(reflectiveClasses, beanElement, isImport);
 
-        if (isImport) {
-            // methods that are injected but not public and are imported need reflection
-            beanElement
-                    .getEnclosedElements(injectedMethodsThatNeedReflection
-                             .modifiers((elementModifiers ->
-                                 !elementModifiers.contains(ElementModifier.PUBLIC))))
-                    .forEach(m -> processMethodElement(m, reflectiveClasses));
-        } else {
-            beanElement
-                    .getEnclosedElements(injectedMethodsThatNeedReflection
-                                                 .modifiers((elementModifiers ->
-                                                                     elementModifiers.contains(ElementModifier.PRIVATE))))
-                    .forEach(m -> processMethodElement(m, reflectiveClasses));
-        }
-        // methods with explicit reflective access
-        beanElement.getEnclosedElements(
-                ElementQuery.ALL_METHODS.annotated(ann -> ann.hasAnnotation(ReflectiveAccess.class))
-        ).forEach(m -> processMethodElement(m, reflectiveClasses));
+        processBeanFields(reflectiveClasses, beanElement, isImport);
 
+    }
 
+    private void processBeanFields(Map<String, ReflectionConfigData> reflectiveClasses, ClassElement beanElement, boolean isImport) {
         final ElementQuery<FieldElement> reflectiveFieldQuery = ElementQuery.ALL_FIELDS
                 .onlyInstance()
                 .onlyInjected();
@@ -281,7 +227,57 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                     .forEach(e -> processFieldElement(e, reflectiveClasses));
 
         }
+    }
 
+    private void processBeanMethods(Map<String, ReflectionConfigData> reflectiveClasses, ClassElement beanElement, boolean isImport) {
+        ElementQuery<MethodElement> injectedMethodsThatNeedReflection = ElementQuery.ALL_METHODS
+                .onlyInstance()
+                .onlyInjected();
+
+        if (isImport) {
+            final Predicate<Set<ElementModifier>> nonPublicOnly = elementModifiers ->
+                    !elementModifiers.contains(ElementModifier.PUBLIC);
+            // methods that are injected but not public and are imported need reflection
+            beanElement
+                    .getEnclosedElements(injectedMethodsThatNeedReflection
+                             .modifiers(nonPublicOnly))
+                    .forEach(m -> processMethodElement(m, reflectiveClasses));
+            beanElement.getEnclosedElements(
+                    ElementQuery
+                            .ALL_METHODS
+                            .onlyInstance()
+                            .modifiers(nonPublicOnly)
+                            .annotated(ann -> ann.hasAnnotation(Executable.class))
+            ).forEach(m -> processMethodElement(m, reflectiveClasses));
+        } else {
+            final Predicate<Set<ElementModifier>> privateOnly = elementModifiers ->
+                    elementModifiers.contains(ElementModifier.PRIVATE);
+            beanElement
+                    .getEnclosedElements(injectedMethodsThatNeedReflection
+                                                 .modifiers(privateOnly))
+                    .forEach(m -> processMethodElement(m, reflectiveClasses));
+            beanElement.getEnclosedElements(
+                    ElementQuery
+                            .ALL_METHODS
+                            .onlyInstance()
+                            .modifiers(privateOnly)
+                            .annotated(ann -> ann.hasAnnotation(Executable.class))
+            ).forEach(m -> processMethodElement(m, reflectiveClasses));
+        }
+        // methods with explicit reflective access
+        beanElement.getEnclosedElements(
+                ElementQuery.ALL_METHODS.annotated(ann -> ann.hasAnnotation(ReflectiveAccess.class))
+        ).forEach(m -> processMethodElement(m, reflectiveClasses));
+    }
+
+    private void processBeanConstructor(Map<String, ReflectionConfigData> reflectiveClasses, ClassElement beanElement, boolean isImport) {
+        final MethodElement constructor = beanElement.getPrimaryConstructor().orElse(null);
+        if (constructor != null &&
+                (constructor.hasAnnotation(ReflectiveAccess.class) ||
+                         (isImport && !constructor.isPublic()) ||
+                         (!isImport && constructor.isPrivate()))) {
+            processMethodElement(constructor, reflectiveClasses);
+        }
     }
 
     private void addBean(String beanName, Map<String, ReflectionConfigData> reflectiveClasses) {

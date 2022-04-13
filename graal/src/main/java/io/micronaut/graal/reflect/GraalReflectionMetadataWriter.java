@@ -21,7 +21,6 @@ import java.io.OutputStream;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.graal.GraalReflectionConfigurer;
 import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.writer.AbstractAnnotationMetadataWriter;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import org.objectweb.asm.ClassWriter;
