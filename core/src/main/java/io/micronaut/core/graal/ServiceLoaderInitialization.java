@@ -41,6 +41,7 @@ import io.micronaut.core.io.service.SoftServiceLoader;
 import org.graalvm.nativeimage.ImageSingletons;
 import org.graalvm.nativeimage.hosted.Feature;
 import org.graalvm.nativeimage.hosted.RuntimeReflection;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Integrates {@link io.micronaut.core.io.service.SoftServiceLoader} with GraalVM Native Image.
@@ -54,42 +55,30 @@ final class ServiceLoaderFeature implements Feature {
 
     @Override
     public void beforeAnalysis(BeforeAnalysisAccess access) {
-        Collection<GraalReflectionConfigurer> configurers = new ArrayList<>();
-        SoftServiceLoader.load(GraalReflectionConfigurer.class, access.getApplicationClassLoader())
-                .collectAll(configurers);
+        configureForReflection(access);
 
-        final GraalReflectionConfigurer.ReflectionConfigurationContext context = new GraalReflectionConfigurer.ReflectionConfigurationContext() {
-            @Override
-            public Class<?> findClassByName(@NonNull String name) {
-                return access.findClassByName(name);
+        StaticServiceDefinitions staticServiceDefinitions = buildStaticServiceDefinitions(access);
+        final Collection<Set<String>> allTypeNames = staticServiceDefinitions.serviceTypeMap.values();
+        for (Set<String> typeNameSet : allTypeNames) {
+            for (String typeName : typeNameSet) {
+                try {
+                    final Class<?> c = access.findClassByName(typeName);
+                    if (c != null) {
+                        RuntimeReflection.registerForReflectiveInstantiation(c);
+                        RuntimeReflection.register(c);
+                    }
+                } catch (NoClassDefFoundError e) {
+                    // missing dependencies ignore and let it fail at runtime
+                }
             }
-
-            @Override
-            public void register(Class<?>... types) {
-                RuntimeReflection.register(types);
-            }
-
-            @Override
-            public void register(Method... methods) {
-                RuntimeReflection.register(methods);
-            }
-
-            @Override
-            public void register(Field... fields) {
-                RuntimeReflection.register(fields);
-            }
-
-            @Override
-            public void register(Constructor<?>... constructors) {
-                RuntimeReflection.register(constructors);
-            }
-        };
-        for (GraalReflectionConfigurer configurer : configurers) {
-            configurer.configure(context);
         }
+        ImageSingletons.add(StaticServiceDefinitions.class, staticServiceDefinitions);
+    }
 
-        final String path = "META-INF/micronaut/";
+    @NotNull
+    private StaticServiceDefinitions buildStaticServiceDefinitions(BeforeAnalysisAccess access) {
         StaticServiceDefinitions staticServiceDefinitions = new StaticServiceDefinitions();
+        final String path = "META-INF/micronaut/";
         try {
             final Enumeration<URL> micronautResources = access.getApplicationClassLoader().getResources(path);
             while (micronautResources.hasMoreElements()) {
@@ -128,21 +117,43 @@ final class ServiceLoaderFeature implements Feature {
         } catch (IOException e) {
             // ignore
         }
-        final Collection<Set<String>> allTypeNames = staticServiceDefinitions.serviceTypeMap.values();
-        for (Set<String> typeNameSet : allTypeNames) {
-            for (String typeName : typeNameSet) {
-                try {
-                    final Class<?> c = access.findClassByName(typeName);
-                    if (c != null) {
-                        RuntimeReflection.registerForReflectiveInstantiation(c);
-                        RuntimeReflection.register(c);
-                    }
-                } catch (NoClassDefFoundError e) {
-                    // missing dependencies ignore and let it fail at runtime
-                }
+        return staticServiceDefinitions;
+    }
+
+    private void configureForReflection(BeforeAnalysisAccess access) {
+        Collection<GraalReflectionConfigurer> configurers = new ArrayList<>();
+        SoftServiceLoader.load(GraalReflectionConfigurer.class, access.getApplicationClassLoader())
+                .collectAll(configurers);
+
+        final GraalReflectionConfigurer.ReflectionConfigurationContext context = new GraalReflectionConfigurer.ReflectionConfigurationContext() {
+            @Override
+            public Class<?> findClassByName(@NonNull String name) {
+                return access.findClassByName(name);
             }
+
+            @Override
+            public void register(Class<?>... types) {
+                RuntimeReflection.register(types);
+            }
+
+            @Override
+            public void register(Method... methods) {
+                RuntimeReflection.register(methods);
+            }
+
+            @Override
+            public void register(Field... fields) {
+                RuntimeReflection.register(fields);
+            }
+
+            @Override
+            public void register(Constructor<?>... constructors) {
+                RuntimeReflection.register(constructors);
+            }
+        };
+        for (GraalReflectionConfigurer configurer : configurers) {
+            configurer.configure(context);
         }
-        ImageSingletons.add(StaticServiceDefinitions.class, staticServiceDefinitions);
     }
 }
 
