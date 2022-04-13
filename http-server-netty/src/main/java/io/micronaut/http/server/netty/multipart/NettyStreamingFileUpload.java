@@ -134,16 +134,11 @@ public class NettyStreamingFileUpload implements StreamingFileUpload {
      * @return The temporal file
      */
     protected File createTemp(String location) {
-        File tempFile;
         try {
-            tempFile = Files.createTempFile(DiskFileUpload.prefix, DiskFileUpload.postfix + '_' + location).toFile();
+            return Files.createTempFile(DiskFileUpload.prefix, DiskFileUpload.postfix + '_' + location).toFile();
         } catch (IOException e) {
-            throw new MultipartException("Unable to create temp directory: " + e.getMessage(), e);
+            throw new MultipartException("Unable to create temp file: " + e.getMessage(), e);
         }
-        if (tempFile.delete()) {
-            return tempFile;
-        }
-        return null;
     }
 
     @Override

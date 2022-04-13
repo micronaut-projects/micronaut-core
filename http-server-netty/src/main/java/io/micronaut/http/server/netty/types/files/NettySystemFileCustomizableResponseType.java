@@ -34,6 +34,7 @@ import io.netty.channel.DefaultFileRegion;
 import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.HttpChunkedInput;
 import io.netty.handler.codec.http.LastHttpContent;
+import io.netty.handler.codec.http2.Http2StreamChannel;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.stream.ChunkedFile;
 import io.netty.util.ResourceLeakDetector;
@@ -119,7 +120,9 @@ public class NettySystemFileCustomizableResponseType extends SystemFile implemen
             FileHolder file = new FileHolder(getFile());
 
             // Write the content.
-            if (context.pipeline().get(SslHandler.class) == null && context.pipeline().get(SmartHttpContentCompressor.class).shouldSkip(finalResponse)) {
+            if (context.pipeline().get(SslHandler.class) == null &&
+                    context.pipeline().get(SmartHttpContentCompressor.class).shouldSkip(finalResponse) &&
+                    !(context.channel() instanceof Http2StreamChannel)) {
                 // SSL not enabled - can use zero-copy file transfer.
                 context.write(new DefaultFileRegion(file.raf.getChannel(), 0, getLength()), context.newProgressivePromise())
                         .addListener(file);

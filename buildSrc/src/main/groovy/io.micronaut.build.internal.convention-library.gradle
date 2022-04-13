@@ -1,0 +1,24 @@
+plugins {
+    id "io.micronaut.build.internal.base-module"
+    id "io.micronaut.build.internal.convention-base"
+    id "io.micronaut.build.internal.sanity-checks"
+    id "com.github.johnrengelman.shadow"
+}
+
+configurations {
+    shadowCompile
+    all {
+        resolutionStrategy.eachDependency { DependencyResolveDetails details ->
+            String group = details.requested.group
+            if (group == 'org.ow2.asm') {
+                details.useVersion(libs.versions.asm.get())
+            }
+        }
+    }
+}
+
+tasks.named("shadowJar") {
+    configurations = [project.configurations.shadowCompile]
+    relocate "com.github.benmanes.caffeine", "io.micronaut.caffeine"
+    relocate "org.objectweb.asm", "io.micronaut.asm"
+}

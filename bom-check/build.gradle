@@ -1,7 +1,0 @@
-plugins {
-    id 'io.micronaut.build.internal.bom-checker'
-}
-
-repositories {
-    mavenCentral()
-}

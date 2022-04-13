@@ -1,0 +1,17 @@
+[
+    {
+        "type": "io.micronaut.core.annotation.AnnotationMetadata",
+        "member": "Method io.micronaut.core.annotation.AnnotationMetadata.getStereotypeAnnotationNames()",
+        "reason": "AnnotationMetadata is an internally implemented data structure and not designed to be implemented by consumers of the framework."
+    },
+    {
+        "type": "io.micronaut.core.annotation.AnnotationMetadata",
+        "member": "Method io.micronaut.core.annotation.AnnotationMetadata.getDeclaredStereotypeAnnotationNames()",
+        "reason": "AnnotationMetadata is an internally implemented data structure and not designed to be implemented by consumers of the framework."
+    },
+    {
+        "type": "io.micronaut.core.annotation.AnnotationMetadata",
+        "member": "Class io.micronaut.core.annotation.AnnotationMetadata",
+        "reason": "AnnotationMetadata is an internally implemented data structure and not designed to be implemented by consumers of the framework."
+    }
+]

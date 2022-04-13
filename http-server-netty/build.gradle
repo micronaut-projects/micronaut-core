@@ -1,10 +1,21 @@
+plugins {
+    id "io.micronaut.build.internal.convention-library"
+}
+
 import org.apache.tools.ant.taskdefs.condition.Os
 
 internalSanityChecks {
     expectedServiceCount.put('io.micronaut.inject.BeanDefinitionReference', 24)
 }
 
-test {
+micronautBuild {
+    core {
+        usesMicronautTestJunit()
+        usesMicronautTestSpock()
+    }
+}
+
+tasks.named("test") {
     systemProperty("io.netty.leakDetection.level", "paranoid")
     systemProperty("io.netty.customResourceLeakDetector", "io.micronaut.http.server.netty.fuzzing.BufferLeakDetection")
     maxHeapSize("1G")
@@ -34,14 +45,7 @@ dependencies {
     if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_15)) {
         testImplementation libs.bcpkix
     }
-    testImplementation(libs.managed.micronaut.test.junit5) {
-        exclude module:'micronaut-runtime'
-        exclude module:'micronaut-inject'
-    }
-    testImplementation(libs.managed.micronaut.test.spock) {
-        exclude module:'micronaut-runtime'
-        exclude module:'micronaut-inject'
-    }
+
     testImplementation(libs.managed.micronaut.xml) {
         exclude module:'micronaut-inject'
         exclude module:'micronaut-http'
@@ -68,10 +72,7 @@ dependencies {
         }
     }
     testImplementation libs.managed.logback
-    testImplementation(libs.managed.micronaut.test.junit5) {
-        exclude module:'micronaut-runtime'
-        exclude module:'micronaut-inject'
-    }
+
     // Adding these for now since micronaut-test isnt resolving correctly ... probably need to upgrade gradle there too
     testImplementation libs.junit.jupiter.api
 }

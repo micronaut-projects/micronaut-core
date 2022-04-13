@@ -47,15 +47,15 @@ The `native-image` tool was extracted from the base GraalVM distribution and is 
 $ gu install native-image
 ----
 
-Now you can build a native image with Gradle by running the `nativeImage` task:
+Now you can build a native image with Gradle by running the `nativeCompile` task:
 
 .Creating native image with Gradle
 [source,bash]
 ----
-$ ./gradlew nativeImage
+$ ./gradlew nativeCompile
 ----
 
-The native image will be built in the `build/native-image` directory.
+The native image will be built in the `build/native/nativeCompile` directory.
 
 To create a native image with Maven and the Micronaut Maven plugin, use the `native-image` packaging format:
 

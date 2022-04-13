@@ -537,7 +537,7 @@ public class NameUtils {
                 return Character.toString(Character.toLowerCase(name.charAt(0)));
             }
             for (int i = 1; i < Math.min(length, 3); i++) {
-                if (Character.isLowerCase(name.charAt(i))) {
+                if (!Character.isUpperCase(name.charAt(i))) {
                     char[] chars = name.toCharArray();
                     chars[0] = Character.toLowerCase(chars[0]);
                     return new String(chars);

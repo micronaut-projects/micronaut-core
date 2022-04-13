@@ -1217,6 +1217,22 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     }
 
     @Override
+    public Set<String> getStereotypeAnnotationNames() {
+        if (allStereotypes != null) {
+            return Collections.unmodifiableSet(allStereotypes.keySet());
+        }
+        return Collections.emptySet();
+    }
+
+    @Override
+    public Set<String> getDeclaredStereotypeAnnotationNames() {
+        if (declaredStereotypes != null) {
+            return Collections.unmodifiableSet(declaredStereotypes.keySet());
+        }
+        return Collections.emptySet();
+    }
+
+    @Override
     public @NonNull
     Set<String> getDeclaredAnnotationNames() {
         if (declaredAnnotations != null) {

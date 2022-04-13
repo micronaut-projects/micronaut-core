@@ -29,6 +29,15 @@ import java.util.*;
  * @since 1.0
  */
 public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, AnnotationMetadata {
+    @Override
+    default Set<String> getStereotypeAnnotationNames() {
+        return getAnnotationMetadata().getStereotypeAnnotationNames();
+    }
+
+    @Override
+    default Set<String> getDeclaredStereotypeAnnotationNames() {
+        return getAnnotationMetadata().getDeclaredStereotypeAnnotationNames();
+    }
 
     @NonNull
     @Override

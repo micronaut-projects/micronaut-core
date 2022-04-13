@@ -75,6 +75,9 @@ class MessageUtils {
         if (currentSegment instanceof AbstractBeanResolutionContext.FieldSegment) {
             return buildMessageForField(resolutionContext, currentSegment.getDeclaringType(), currentSegment.getName(), message, circular);
         }
+        if (currentSegment instanceof AbstractBeanResolutionContext.AnnotationSegment) {
+            return buildMessage(resolutionContext, currentSegment.getArgument(), message, circular);
+        }
         throw new IllegalStateException("Unknown segment: " + currentSegment);
     }
 

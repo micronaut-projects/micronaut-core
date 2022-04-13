@@ -493,7 +493,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         staticInit.dup();
         // 1: return argument
         ClassElement genericReturnType = beanMethodData.methodElement.getGenericReturnType();
-        pushArgument(introspectionType, classWriter, staticInit, classElement.getName(), genericReturnType, defaults, loadTypeMethods);
+        pushReturnTypeArgument(introspectionType, classWriter, staticInit, classElement.getName(), genericReturnType, defaults, loadTypeMethods);
         // 2: name
         staticInit.push(beanMethodData.methodElement.getName());
         // 3: annotation metadata

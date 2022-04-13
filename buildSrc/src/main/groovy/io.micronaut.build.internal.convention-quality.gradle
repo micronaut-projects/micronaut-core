@@ -1,0 +1,40 @@
+plugins {
+    id "io.micronaut.build.internal.quality-reporting"
+    id 'test-report-aggregation'
+    id "org.aim42.htmlSanityCheck"
+}
+
+tasks.named("htmlSanityCheck") {
+    sourceDir = new File("${rootProject.buildDir}/docs/guide/")
+    sourceDocuments = fileTree(sourceDir) {
+        include "index.html"
+    }
+}
+
+tasks.named("docs") {
+    finalizedBy(htmlSanityCheck)
+}
+
+reporting {
+    reports {
+        testAggregateTestReport(AggregateTestReport) {
+            testType = TestSuiteType.UNIT_TEST
+        }
+    }
+}
+
+def root = project
+
+project.afterEvaluate {
+    allprojects { p ->
+        p.plugins.withId('java') {
+            root.dependencies {
+                testReportAggregation p
+            }
+        }
+    }
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('testAggregateTestReport')
+}

@@ -12,14 +12,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/cache@v2.1.7
+      - uses: actions/cache@v3
         with:
           path: ~/.gradle/caches
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle') }}
           restore-keys: |
             ${{ runner.os }}-gradle-
       - name: Set up JDK
-        uses: actions/setup-java@v2
+        uses: actions/setup-java@v3
         with:
           distribution: 'adopt'
           java-version: '8'
@@ -32,7 +32,7 @@ jobs:
           GRADLE_ENTERPRISE_CACHE_PASSWORD: ${{ secrets.GRADLE_ENTERPRISE_CACHE_PASSWORD }}
         run: ./gradlew useLatestVersions
       - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v3.14.0
+        uses: peter-evans/create-pull-request@v4
         with:
           token: ${{ secrets.GH_TOKEN }}
           committer: micronaut-build <${{ secrets.MICRONAUT_BUILD_EMAIL }}>
