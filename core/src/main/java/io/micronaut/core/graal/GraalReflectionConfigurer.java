@@ -38,6 +38,7 @@ import org.graalvm.nativeimage.hosted.RuntimeReflection;
  *
  * @author graemerocher
  * @since 3.5.0
+ * @see io.micronaut.core.annotation.ReflectionConfig
  */
 @Internal
 public interface GraalReflectionConfigurer extends AnnotationMetadataProvider {
@@ -56,7 +57,11 @@ public interface GraalReflectionConfigurer extends AnnotationMetadataProvider {
         final List<AnnotationValue<ReflectionConfig>> values = annotationMetadata.getAnnotationValuesByType(
                 ReflectionConfig.class);
         for (AnnotationValue<ReflectionConfig> reflectConfig : values) {
-            reflectConfig.classValue("type").ifPresent(t -> {
+            reflectConfig.stringValue("type").ifPresent(className -> {
+                Class<?> t = access.findClassByName(className);
+                if (t == null) {
+                    return;
+                }
                 RuntimeReflection.register(t);
                 final Set<TypeHint.AccessType> accessType = CollectionUtils.setOf(
                     reflectConfig.enumValues("accessType", TypeHint.AccessType.class)
@@ -110,7 +115,18 @@ public interface GraalReflectionConfigurer extends AnnotationMetadataProvider {
                 for (AnnotationValue<ReflectionConfig.ReflectiveMethodConfig> mrc :
                         methodConfig) {
                     mrc.stringValue("name").ifPresent(n -> {
-                        final Class<?>[] parameterTypes = mrc.classValues("parameterTypes");
+                        final String[] typeNames = mrc.stringValues("parameterTypes");
+                        final Class<?>[] parameterTypes = new Class<?>[typeNames.length];
+                        for (int i = 0; i < typeNames.length; i++) {
+                            String typeName = typeNames[i];
+                            final Class<?> pt = access.findClassByName(typeName);
+                            if (pt == null) {
+                                // bail out
+                                return;
+                            } else {
+                                parameterTypes[i] = pt;
+                            }
+                        }
                         if (n.equals("<init>")) {
                             ReflectionUtils.findConstructor(t, parameterTypes)
                                     .ifPresent(RuntimeReflection::register);

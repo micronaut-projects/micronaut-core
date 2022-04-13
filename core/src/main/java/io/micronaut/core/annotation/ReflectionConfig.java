@@ -24,6 +24,7 @@ import java.lang.annotation.RetentionPolicy;
  *
  * @since 3.5.0
  * @author graemerocher
+ * @see io.micronaut.core.graal.GraalReflectionConfigurer
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Repeatable(ReflectionConfig.ReflectionConfigList.class)
@@ -51,6 +52,7 @@ public @interface ReflectionConfig {
     /**
      * Method configuration.
      */
+    @Retention(RetentionPolicy.RUNTIME)
     @interface ReflectiveMethodConfig {
         /**
          * @return The name of the method.
@@ -66,6 +68,7 @@ public @interface ReflectionConfig {
     /**
      * Field configuration.
      */
+    @Retention(RetentionPolicy.RUNTIME)
     @interface ReflectiveFieldConfig {
         /**
          * @return The name of the method.
