@@ -109,11 +109,11 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     }
 
     @Override
-    public <T> void addDependentBean(BeanIdentifier identifier, BeanDefinition<T> definition, T bean) {
+    public <T> void addDependentBean(BeanRegistration<T> beanRegistration) {
         if (dependentBeans == null) {
             dependentBeans = new ArrayList<>(3);
         }
-        dependentBeans.add(new BeanRegistration<>(identifier, definition, bean));
+        dependentBeans.add(beanRegistration);
     }
 
     @Override

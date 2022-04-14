@@ -211,12 +211,10 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
 
     /**
      * Adds a dependent bean to the resolution context.
-     * @param identifier The identifier
-     * @param definition The bean definition
-     * @param bean The bean
+     * @param beanRegistration The bean registration
      * @param <T> The generic type
      */
-    <T> void addDependentBean(BeanIdentifier identifier, BeanDefinition<T> definition, T bean);
+    <T> void addDependentBean(BeanRegistration<T> beanRegistration);
 
     /**
      * @return The dependent beans that must be destroyed by an upstream bean
