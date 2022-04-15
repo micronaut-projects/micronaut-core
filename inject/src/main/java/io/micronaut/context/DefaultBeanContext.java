@@ -124,6 +124,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
@@ -1827,13 +1828,16 @@ public class DefaultBeanContext implements InitializableBeanContext {
     protected void initializeEventListeners() {
         final Collection<BeanDefinition<BeanCreatedEventListener>> beanCreatedDefinitions = getBeanDefinitions(BeanCreatedEventListener.class);
         final HashMap<Class, List<BeanCreatedEventListener>> beanCreatedListeners = new HashMap<>(beanCreatedDefinitions.size());
+        final HashMap<Class<?>, List<String>> requiredComponents = new HashMap<>();
 
         //noinspection ArraysAsListWithZeroOrOneArgument
         beanCreatedListeners.put(AnnotationProcessor.class, Arrays.asList(new AnnotationProcessorListener()));
         for (BeanDefinition<BeanCreatedEventListener> beanCreatedDefinition : beanCreatedDefinitions) {
+            populateRequiredComponents(requiredComponents, beanCreatedDefinition);
+
             try (BeanResolutionContext context = newResolutionContext(beanCreatedDefinition, null)) {
-                final BeanCreatedEventListener listener;
-                final Qualifier qualifier = beanCreatedDefinition.getDeclaredQualifier();
+                final BeanCreatedEventListener<?> listener;
+                final Qualifier<BeanCreatedEventListener> qualifier = beanCreatedDefinition.getDeclaredQualifier();
                 if (beanCreatedDefinition.isSingleton()) {
                     listener = createAndRegisterSingleton(
                             context,
@@ -1856,19 +1860,28 @@ public class DefaultBeanContext implements InitializableBeanContext {
                 }
                 beanCreatedListeners.computeIfAbsent(argument.getType(), aClass -> new ArrayList<>(10))
                         .add(listener);
-
             }
         }
-        for (List<BeanCreatedEventListener> listenerList : beanCreatedListeners.values()) {
-            OrderUtil.sort(listenerList);
+        for (Map.Entry<Class, List<BeanCreatedEventListener>> entry : beanCreatedListeners.entrySet()) {
+            List<BeanCreatedEventListener> listeners = entry.getValue();
+            OrderUtil.sort(listeners);
+            if (LOG.isWarnEnabled() && requiredComponents.containsKey(entry.getKey())) {
+                Set<String> eventListenerTypes = new LinkedHashSet<>(listeners.size());
+                for (BeanCreatedEventListener<?> listener: listeners) {
+                    eventListenerTypes.add(listener.getClass().getName());
+                }
+                List<String> offendingBeans = requiredComponents.get(entry.getKey());
+                Collections.sort(offendingBeans);
+                LOG.warn("The bean created event listeners {} will not be executed because one or more other bean created event listeners inject {}. The event listeners {} should inject a provider to delay initialization of the bean", eventListenerTypes, entry.getKey().getName(), offendingBeans);
+            }
         }
 
         final HashMap<Class, List<BeanInitializedEventListener>> beanInitializedListeners = new HashMap<>(beanCreatedDefinitions.size());
         final Collection<BeanDefinition<BeanInitializedEventListener>> beanInitializedDefinitions = getBeanDefinitions(BeanInitializedEventListener.class);
         for (BeanDefinition<BeanInitializedEventListener> definition : beanInitializedDefinitions) {
             try (BeanResolutionContext context = newResolutionContext(definition, null)) {
-                final Qualifier qualifier = definition.getDeclaredQualifier();
-                final BeanInitializedEventListener listener;
+                final Qualifier<BeanInitializedEventListener> qualifier = definition.getDeclaredQualifier();
+                final BeanInitializedEventListener<?> listener;
                 if (definition.isSingleton()) {
                     listener = createAndRegisterSingleton(
                             context,
@@ -3822,6 +3835,32 @@ public class DefaultBeanContext implements InitializableBeanContext {
         }
 
         return sorted;
+    }
+
+    private void populateRequiredComponents(HashMap<Class<?>, List<String>> requiredComponents, BeanDefinition<BeanCreatedEventListener> beanCreatedDefinition) {
+        Set<Class<?>> types = new HashSet<>();
+        //We can't use getRequiredComponents because that unwraps Provider<Bean> and
+        //we shouldn't log warnings for those because they won't be initialized early
+        try {
+            for (Argument<?> argument : beanCreatedDefinition.getConstructor().getArguments()) {
+                types.add(argument.getType());
+            }
+        } catch (UnsupportedOperationException unused) {
+            //no-op
+        }
+        for (FieldInjectionPoint<?, ?> field: beanCreatedDefinition.getInjectedFields()) {
+            types.add(field.getType());
+        }
+        for (MethodInjectionPoint<?, ?> method: beanCreatedDefinition.getInjectedMethods()) {
+            Argument<?>[] methodArguments = method.getArguments();
+            if (methodArguments.length > 0) {
+                types.add(methodArguments[0].getType());
+            }
+        }
+        for (Class<?> type: types) {
+            requiredComponents.computeIfAbsent(type, aClass -> new ArrayList<>(10))
+                    .add(beanCreatedDefinition.getBeanType().getName());
+        }
     }
 
     @NonNull
