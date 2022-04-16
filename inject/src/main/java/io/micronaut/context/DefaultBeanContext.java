@@ -124,7 +124,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
@@ -1828,14 +1827,21 @@ public class DefaultBeanContext implements InitializableBeanContext {
     protected void initializeEventListeners() {
         final Collection<BeanDefinition<BeanCreatedEventListener>> beanCreatedDefinitions = getBeanDefinitions(BeanCreatedEventListener.class);
         final HashMap<Class<?>, List<BeanCreatedEventListener<?>>> beanCreatedListeners = new HashMap<>(beanCreatedDefinitions.size());
-        final HashMap<Class<?>, List<String>> requiredComponents = new HashMap<>();
+        final HashMap<BeanDefinition<?>, List<List<Argument<?>>>> invalidListeners = new HashMap<>();
 
+        final HashMap<BeanDefinition<?>, Argument<?>> beanCreationTargets = new HashMap<>();
+        for (BeanDefinition<BeanCreatedEventListener> beanCreatedDefinition: beanCreatedDefinitions) {
+            List<Argument<?>> typeArguments = beanCreatedDefinition.getTypeArguments(BeanCreatedEventListener.class);
+            Argument<?> argument = CollectionUtils.last(typeArguments);
+            if (argument == null) {
+                argument = Argument.OBJECT_ARGUMENT;
+            }
+            beanCreationTargets.put(beanCreatedDefinition, argument);
+        }
         //noinspection ArraysAsListWithZeroOrOneArgument
         beanCreatedListeners.put(AnnotationProcessor.class, Arrays.asList(new AnnotationProcessorListener()));
         for (BeanDefinition<BeanCreatedEventListener> beanCreatedDefinition : beanCreatedDefinitions) {
-            populateRequiredComponents(requiredComponents, beanCreatedDefinition);
-
-            try (BeanResolutionContext context = newResolutionContext(beanCreatedDefinition, null)) {
+            try (ValidatingBeanResolutionContext context = new ValidatingBeanResolutionContext(beanCreatedDefinition, beanCreationTargets)) {
                 final BeanCreatedEventListener<?> listener;
                 final Qualifier<BeanCreatedEventListener> qualifier = beanCreatedDefinition.getDeclaredQualifier();
                 if (beanCreatedDefinition.isSingleton()) {
@@ -1853,19 +1859,21 @@ public class DefaultBeanContext implements InitializableBeanContext {
                             qualifier
                     );
                 }
-                List<Argument<?>> typeArguments = beanCreatedDefinition.getTypeArguments(BeanCreatedEventListener.class);
-                Argument<?> argument = CollectionUtils.last(typeArguments);
-                if (argument == null) {
-                    argument = Argument.OBJECT_ARGUMENT;
-                }
-                beanCreatedListeners.computeIfAbsent(argument.getType(), aClass -> new ArrayList<>(10))
+
+                beanCreatedListeners.computeIfAbsent(beanCreationTargets.get(beanCreatedDefinition).getType(), aClass -> new ArrayList<>(10))
                         .add(listener);
+                Map<BeanDefinition<?>, List<List<Argument<?>>>> foundTargets = context.getValidatedPath().getFoundTargets();
+                for (Map.Entry<BeanDefinition<?>, List<List<Argument<?>>>> entry: foundTargets.entrySet()) {
+                        invalidListeners.computeIfAbsent(entry.getKey(), (key) -> new ArrayList<>())
+                                        .addAll(entry.getValue());
+                }
             }
         }
-        for (Map.Entry<Class<?>, List<BeanCreatedEventListener<?>>> entry : beanCreatedListeners.entrySet()) {
-            List<BeanCreatedEventListener<?>> listeners = entry.getValue();
+        for (List<BeanCreatedEventListener<?>> listeners: beanCreatedListeners.values()) {
             OrderUtil.sort(listeners);
-            checkForEagerInitializedBeans(requiredComponents, entry.getKey(), listeners);
+        }
+        for (Map.Entry<BeanDefinition<?>, List<List<Argument<?>>>> entry: invalidListeners.entrySet()) {
+            handleEagerInitializedDependencies(entry.getKey(), beanCreationTargets.get(entry.getKey()), entry.getValue());
         }
 
         final HashMap<Class, List<BeanInitializedEventListener>> beanInitializedListeners = new HashMap<>(beanCreatedDefinitions.size());
@@ -3829,41 +3837,20 @@ public class DefaultBeanContext implements InitializableBeanContext {
         return sorted;
     }
 
-    private void populateRequiredComponents(HashMap<Class<?>, List<String>> requiredComponents, BeanDefinition<BeanCreatedEventListener> beanCreatedDefinition) {
-        Set<Class<?>> types = new HashSet<>();
-        //We can't use getRequiredComponents because that unwraps Provider<Bean> and
-        //we shouldn't log warnings for those because they won't be initialized early
-        try {
-            for (Argument<?> argument : beanCreatedDefinition.getConstructor().getArguments()) {
-                types.add(argument.getType());
+    private void handleEagerInitializedDependencies(BeanDefinition<?> listener,
+                                                    Argument<?> listensTo,
+                                                    List<List<Argument<?>>> targets) {
+        if (LOG.isWarnEnabled()) {
+            List<String> paths = new ArrayList<>(targets.size());
+            for (List<Argument<?>> line: targets) {
+                paths.add("    " + line.stream()
+                        .map(Argument::getType)
+                        .map(Class::getName)
+                        .collect(Collectors.joining(AbstractBeanResolutionContext.DefaultPath.RIGHT_ARROW)));
             }
-        } catch (UnsupportedOperationException unused) {
-            //no-op
-        }
-        for (FieldInjectionPoint<?, ?> field: beanCreatedDefinition.getInjectedFields()) {
-            types.add(field.getType());
-        }
-        for (MethodInjectionPoint<?, ?> method: beanCreatedDefinition.getInjectedMethods()) {
-            Argument<?>[] methodArguments = method.getArguments();
-            if (methodArguments.length > 0) {
-                types.add(methodArguments[0].getType());
-            }
-        }
-        for (Class<?> type: types) {
-            requiredComponents.computeIfAbsent(type, aClass -> new ArrayList<>(10))
-                    .add(beanCreatedDefinition.getBeanType().getName());
-        }
-    }
-
-    private void checkForEagerInitializedBeans(HashMap<Class<?>, List<String>> requiredComponents, Class<?> listenedTo, List<BeanCreatedEventListener<?>> listeners) {
-        if (LOG.isWarnEnabled() && requiredComponents.containsKey(listenedTo)) {
-            Set<String> eventListenerTypes = new LinkedHashSet<>(listeners.size());
-            for (BeanCreatedEventListener<?> listener: listeners) {
-                eventListenerTypes.add(listener.getClass().getName());
-            }
-            List<String> offendingBeans = requiredComponents.get(listenedTo);
-            Collections.sort(offendingBeans);
-            LOG.warn("The bean created event listeners {} will not be executed because one or more other bean created event listeners inject {}. The event listeners {} should inject a provider to delay initialization of the bean", eventListenerTypes, listenedTo.getName(), offendingBeans);
+            LOG.warn("The bean created event listener {} will not be executed because one or more other bean created event listeners inject {}:\n" +
+                    "{}\n" +
+                    "Change at least one point in the path to be lazy initialized by injecting a provider to avoid this issue", listener.getBeanType().getName(), listensTo.getType().getName(), String.join("\n", paths));
         }
     }
 
@@ -4404,10 +4391,65 @@ public class DefaultBeanContext implements InitializableBeanContext {
         }
     }
 
-    private class SingletonBeanResolutionContext extends AbstractBeanResolutionContext {
+    static class ValidatedPath extends AbstractBeanResolutionContext.DefaultPath {
 
-        public SingletonBeanResolutionContext(BeanDefinition<?> beanDefinition) {
+        private final HashMap<BeanDefinition<?>, Argument<?>> beanCreationTargets;
+        private final BeanDefinition<?> beanDefinition;
+        private Map<BeanDefinition<?>, List<List<Argument<?>>>> foundTargets = new HashMap<>();
+
+        ValidatedPath(
+                BeanResolutionContext resolutionContext,
+                HashMap<BeanDefinition<?>, Argument<?>> beanCreationTargets,
+                BeanDefinition<?> beanDefinition) {
+            super(resolutionContext);
+            this.beanCreationTargets = beanCreationTargets;
+            this.beanDefinition = beanDefinition;
+        }
+
+        private List<Argument<?>> getHierarchy() {
+            List<Argument<?>> hierarchy = new ArrayList<>(size() + 1);
+            hierarchy.add(beanDefinition.asArgument());
+            for (Iterator<BeanResolutionContext.Segment<?>> it = descendingIterator(); it.hasNext();) {
+                BeanResolutionContext.Segment<?> segment = it.next();
+                hierarchy.add(segment.getArgument());
+            }
+            return hierarchy;
+        }
+
+        Map<BeanDefinition<?>, List<List<Argument<?>>>> getFoundTargets() {
+            return foundTargets;
+        }
+
+        @Override
+        public void push(BeanResolutionContext.Segment<?> segment) {
+            super.push(segment);
+            Argument<?> argument = segment.getArgument();
+            if (argument.isContainerType()) {
+                argument = argument.getFirstTypeVariable().orElse(null);
+                if (argument == null) {
+                    return;
+                }
+            }
+            if (argument.isProvider()) {
+                return;
+            }
+            for (Map.Entry<BeanDefinition<?>, Argument<?>> entry : beanCreationTargets.entrySet()) {
+                if (entry.getValue().typeHashCode() == argument.typeHashCode()) {
+                    foundTargets.computeIfAbsent(entry.getKey(), (bd) -> new ArrayList<>(5))
+                            .add(getHierarchy());
+                }
+            }
+        }
+    }
+
+    class SingletonBeanResolutionContext extends AbstractBeanResolutionContext {
+
+        SingletonBeanResolutionContext(BeanDefinition<?> beanDefinition) {
             super(DefaultBeanContext.this, beanDefinition);
+        }
+
+        SingletonBeanResolutionContext(BeanDefinition<?> beanDefinition, Function<BeanResolutionContext, Path> path) {
+            super(DefaultBeanContext.this, beanDefinition, path);
         }
 
         @Override
@@ -4431,6 +4473,17 @@ public class DefaultBeanContext implements InitializableBeanContext {
         @Override
         public <T> T getInFlightBean(BeanIdentifier beanIdentifier) {
             return (T) singlesInCreation.get(beanIdentifier);
+        }
+    }
+
+    private final class ValidatingBeanResolutionContext extends SingletonBeanResolutionContext {
+
+        private ValidatingBeanResolutionContext(BeanDefinition<?> beanDefinition, HashMap<BeanDefinition<?>, Argument<?>> beanCreationTargets) {
+            super(beanDefinition, (brc) -> new ValidatedPath(brc, beanCreationTargets, beanDefinition));
+        }
+
+        ValidatedPath getValidatedPath() {
+            return (ValidatedPath) getPath();
         }
     }
 }

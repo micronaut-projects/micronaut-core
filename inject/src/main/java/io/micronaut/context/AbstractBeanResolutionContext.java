@@ -30,6 +30,7 @@ import io.micronaut.core.type.ArgumentCoercible;
 import io.micronaut.inject.*;
 
 import java.util.*;
+import java.util.function.Function;
 
 /**
  * Default implementation of the {@link BeanResolutionContext} interface.
@@ -53,9 +54,14 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
      */
     @Internal
     public AbstractBeanResolutionContext(BeanContext context, BeanDefinition rootDefinition) {
+        this(context, rootDefinition, DefaultPath::new);
+    }
+
+    @Internal
+    protected AbstractBeanResolutionContext(BeanContext context, BeanDefinition rootDefinition, Function<BeanResolutionContext, Path> path) {
         this.context = context;
         this.rootDefinition = rootDefinition;
-        this.path = new DefaultPath();
+        this.path = path.apply(this);
     }
 
     /**
@@ -185,14 +191,16 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     /**
      * Class that represents a default path.
      */
-    class DefaultPath extends LinkedList<Segment<?>> implements Path {
+    static class DefaultPath extends LinkedList<Segment<?>> implements Path {
 
         public static final String RIGHT_ARROW = " --> ";
+        private final BeanResolutionContext resolutionContext;
 
         /**
-         * Default constructor.
+         * @param resolutionContext The resolution context
          */
-        DefaultPath() {
+        DefaultPath(BeanResolutionContext resolutionContext) {
+            this.resolutionContext = resolutionContext;
         }
 
         @Override
@@ -263,9 +271,9 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
                 Segment<?> previous = peek();
                 MethodSegment methodSegment = new MethodArgumentSegment(declaringType, methodName, argument, arguments, requiresReflection, previous instanceof MethodSegment ? (MethodSegment) previous : null);
                 if (contains(methodSegment)) {
-                    throw new CircularDependencyException(AbstractBeanResolutionContext.this, argument, "Circular dependency detected");
+                    throw new CircularDependencyException(resolutionContext, argument, "Circular dependency detected");
                 } else {
-                    path.push(methodSegment);
+                    push(methodSegment);
                 }
             }
             return this;
@@ -282,7 +290,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
             MethodSegment methodSegment = new MethodArgumentSegment(declaringType, methodInjectionPoint.getName(), argument,
                     methodInjectionPoint.getArguments(), methodInjectionPoint.requiresReflection(), previous instanceof MethodSegment ? (MethodSegment) previous : null);
             if (contains(methodSegment)) {
-                throw new CircularDependencyException(AbstractBeanResolutionContext.this, methodInjectionPoint, argument, "Circular dependency detected");
+                throw new CircularDependencyException(resolutionContext, methodInjectionPoint, argument, "Circular dependency detected");
             } else {
                 push(methodSegment);
             }
@@ -295,7 +303,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
             Segment<?> previous = peek();
             MethodSegment methodSegment = new MethodArgumentSegment(declaringType, methodName, argument, arguments, requiresReflection, previous instanceof MethodSegment ? (MethodSegment) previous : null);
             if (contains(methodSegment)) {
-                throw new CircularDependencyException(AbstractBeanResolutionContext.this, declaringType, methodName, argument, "Circular dependency detected");
+                throw new CircularDependencyException(resolutionContext, declaringType, methodName, argument, "Circular dependency detected");
             } else {
                 push(methodSegment);
             }
@@ -307,7 +315,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         public Path pushFieldResolve(BeanDefinition declaringType, FieldInjectionPoint fieldInjectionPoint) {
             FieldSegment fieldSegment = new FieldSegment(declaringType, fieldInjectionPoint.asArgument(), fieldInjectionPoint.requiresReflection());
             if (contains(fieldSegment)) {
-                throw new CircularDependencyException(AbstractBeanResolutionContext.this, fieldInjectionPoint, "Circular dependency detected");
+                throw new CircularDependencyException(resolutionContext, fieldInjectionPoint, "Circular dependency detected");
             } else {
                 push(fieldSegment);
             }
@@ -318,7 +326,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         public Path pushFieldResolve(BeanDefinition declaringType, Argument fieldAsArgument, boolean requiresReflection) {
             FieldSegment fieldSegment = new FieldSegment(declaringType, fieldAsArgument, requiresReflection);
             if (contains(fieldSegment)) {
-                throw new CircularDependencyException(AbstractBeanResolutionContext.this, declaringType, fieldAsArgument.getName(), "Circular dependency detected");
+                throw new CircularDependencyException(resolutionContext, declaringType, fieldAsArgument.getName(), "Circular dependency detected");
             } else {
                 push(fieldSegment);
             }
@@ -329,7 +337,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         public Path pushAnnotationResolve(BeanDefinition beanDefinition, Argument annotationMemberBeanAsArgument) {
             AnnotationSegment annotationSegment = new AnnotationSegment(beanDefinition, annotationMemberBeanAsArgument);
             if (contains(annotationSegment)) {
-                throw new CircularDependencyException(AbstractBeanResolutionContext.this, beanDefinition, annotationMemberBeanAsArgument.getName(), "Circular dependency detected");
+                throw new CircularDependencyException(resolutionContext, beanDefinition, annotationMemberBeanAsArgument.getName(), "Circular dependency detected");
             } else {
                 push(annotationSegment);
             }
@@ -348,25 +356,25 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
                         if (declaringType instanceof ProxyBeanDefinition) {
                             // take into account proxies
                             if (!((ProxyBeanDefinition) declaringType).getTargetDefinitionType().equals(declaringBean.getClass())) {
-                                throw new CircularDependencyException(AbstractBeanResolutionContext.this, argument, "Circular dependency detected");
+                                throw new CircularDependencyException(resolutionContext, argument, "Circular dependency detected");
                             } else {
                                 push(constructorSegment);
                             }
                         } else if (declaringBean instanceof ProxyBeanDefinition) {
                             // take into account proxies
                             if (!((ProxyBeanDefinition) declaringBean).getTargetDefinitionType().equals(declaringType.getClass())) {
-                                throw new CircularDependencyException(AbstractBeanResolutionContext.this, argument, "Circular dependency detected");
+                                throw new CircularDependencyException(resolutionContext, argument, "Circular dependency detected");
                             } else {
                                 push(constructorSegment);
                             }
                         } else {
-                            throw new CircularDependencyException(AbstractBeanResolutionContext.this, argument, "Circular dependency detected");
+                            throw new CircularDependencyException(resolutionContext, argument, "Circular dependency detected");
                         }
                     } else {
                         push(constructorSegment);
                     }
                 } else {
-                    throw new CircularDependencyException(AbstractBeanResolutionContext.this, argument, "Circular dependency detected");
+                    throw new CircularDependencyException(resolutionContext, argument, "Circular dependency detected");
                 }
             } else {
                 push(constructorSegment);

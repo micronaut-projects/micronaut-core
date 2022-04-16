@@ -17,9 +17,13 @@ class BeanCreatedListenerWarningSpec extends Specification {
         out.close()
 
         then:
-        output.contains("The bean created event listeners [io.micronaut.inject.lifecycle.beancreationeventlistener.ACreatedListener] will not be executed because one or more other bean created event listeners inject io.micronaut.inject.lifecycle.beancreationeventlistener.A. The event listeners [io.micronaut.inject.lifecycle.beancreationeventlistener.OffendingConstructorListener, io.micronaut.inject.lifecycle.beancreationeventlistener.OffendingFieldListener, io.micronaut.inject.lifecycle.beancreationeventlistener.OffendingMethodListener] should inject a provider to delay initialization of the bean")
-        !output.contains("The bean created event listeners [io.micronaut.inject.lifecycle.beancreationeventlistener.CCreatedListener] will not be executed")
-
+        output.contains("The bean created event listener io.micronaut.inject.lifecycle.beancreationeventlistener.ACreatedListener will not be executed because one or more other bean created event listeners inject io.micronaut.inject.lifecycle.beancreationeventlistener.A:")
+        output.contains("    io.micronaut.inject.lifecycle.beancreationeventlistener.OffendingFieldListener --> io.micronaut.inject.lifecycle.beancreationeventlistener.A")
+        output.contains("    io.micronaut.inject.lifecycle.beancreationeventlistener.OffendingMethodListener --> io.micronaut.inject.lifecycle.beancreationeventlistener.A")
+        output.contains("    io.micronaut.inject.lifecycle.beancreationeventlistener.OffendingConstructorListener --> io.micronaut.inject.lifecycle.beancreationeventlistener.A")
+        output.contains("    io.micronaut.inject.lifecycle.beancreationeventlistener.OffendingChainListener --> io.micronaut.inject.lifecycle.beancreationeventlistener.D --> io.micronaut.inject.lifecycle.beancreationeventlistener.E --> io.micronaut.inject.lifecycle.beancreationeventlistener.A")
+        !output.contains("The bean created event listener io.micronaut.inject.lifecycle.beancreationeventlistener.CCreatedListener will not be executed")
+        !output.contains("NotOffendingChainListener") //because F injects a provider of G
         cleanup:
         System.out = oldOut
         context.close()
