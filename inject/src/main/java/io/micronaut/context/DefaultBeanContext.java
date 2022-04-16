@@ -225,7 +225,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
     private final String[] eagerInitStereotypes;
     private final boolean eagerInitStereotypesPresent;
     private final boolean eagerInitSingletons;
-    private Set<Map.Entry<Class, List<BeanCreatedEventListener>>> beanCreationEventListeners;
+    private Set<Map.Entry<Class<?>, List<BeanCreatedEventListener<?>>>> beanCreationEventListeners;
     private BeanDefinitionValidator beanValidator;
     private List<BeanDefinitionReference> beanDefinitionReferences;
     private List<BeanConfiguration> beanConfigurationsList;
@@ -1827,7 +1827,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
      */
     protected void initializeEventListeners() {
         final Collection<BeanDefinition<BeanCreatedEventListener>> beanCreatedDefinitions = getBeanDefinitions(BeanCreatedEventListener.class);
-        final HashMap<Class, List<BeanCreatedEventListener>> beanCreatedListeners = new HashMap<>(beanCreatedDefinitions.size());
+        final HashMap<Class<?>, List<BeanCreatedEventListener<?>>> beanCreatedListeners = new HashMap<>(beanCreatedDefinitions.size());
         final HashMap<Class<?>, List<String>> requiredComponents = new HashMap<>();
 
         //noinspection ArraysAsListWithZeroOrOneArgument
@@ -1862,18 +1862,10 @@ public class DefaultBeanContext implements InitializableBeanContext {
                         .add(listener);
             }
         }
-        for (Map.Entry<Class, List<BeanCreatedEventListener>> entry : beanCreatedListeners.entrySet()) {
-            List<BeanCreatedEventListener> listeners = entry.getValue();
+        for (Map.Entry<Class<?>, List<BeanCreatedEventListener<?>>> entry : beanCreatedListeners.entrySet()) {
+            List<BeanCreatedEventListener<?>> listeners = entry.getValue();
             OrderUtil.sort(listeners);
-            if (LOG.isWarnEnabled() && requiredComponents.containsKey(entry.getKey())) {
-                Set<String> eventListenerTypes = new LinkedHashSet<>(listeners.size());
-                for (BeanCreatedEventListener<?> listener: listeners) {
-                    eventListenerTypes.add(listener.getClass().getName());
-                }
-                List<String> offendingBeans = requiredComponents.get(entry.getKey());
-                Collections.sort(offendingBeans);
-                LOG.warn("The bean created event listeners {} will not be executed because one or more other bean created event listeners inject {}. The event listeners {} should inject a provider to delay initialization of the bean", eventListenerTypes, entry.getKey().getName(), offendingBeans);
-            }
+            checkForEagerInitializedBeans(requiredComponents, entry.getKey(), listeners);
         }
 
         final HashMap<Class, List<BeanInitializedEventListener>> beanInitializedListeners = new HashMap<>(beanCreatedDefinitions.size());
@@ -2399,7 +2391,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
         if (bean != null) {
             Qualifier<T> finalQualifier = qualifier != null ? qualifier : declaredQualifier;
             if (!(bean instanceof BeanCreatedEventListener) && CollectionUtils.isNotEmpty(beanCreationEventListeners)) {
-                for (Map.Entry<Class, List<BeanCreatedEventListener>> entry : beanCreationEventListeners) {
+                for (Map.Entry<Class<?>, List<BeanCreatedEventListener<?>>> entry : beanCreationEventListeners) {
                     if (entry.getKey().isAssignableFrom(beanType)) {
                         BeanKey<T> beanKey = new BeanKey<>(beanDefinition, finalQualifier);
                         for (BeanCreatedEventListener<?> listener : entry.getValue()) {
@@ -3860,6 +3852,18 @@ public class DefaultBeanContext implements InitializableBeanContext {
         for (Class<?> type: types) {
             requiredComponents.computeIfAbsent(type, aClass -> new ArrayList<>(10))
                     .add(beanCreatedDefinition.getBeanType().getName());
+        }
+    }
+
+    private void checkForEagerInitializedBeans(HashMap<Class<?>, List<String>> requiredComponents, Class<?> listenedTo, List<BeanCreatedEventListener<?>> listeners) {
+        if (LOG.isWarnEnabled() && requiredComponents.containsKey(listenedTo)) {
+            Set<String> eventListenerTypes = new LinkedHashSet<>(listeners.size());
+            for (BeanCreatedEventListener<?> listener: listeners) {
+                eventListenerTypes.add(listener.getClass().getName());
+            }
+            List<String> offendingBeans = requiredComponents.get(listenedTo);
+            Collections.sort(offendingBeans);
+            LOG.warn("The bean created event listeners {} will not be executed because one or more other bean created event listeners inject {}. The event listeners {} should inject a provider to delay initialization of the bean", eventListenerTypes, listenedTo.getName(), offendingBeans);
         }
     }
 
