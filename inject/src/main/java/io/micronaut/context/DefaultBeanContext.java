@@ -1824,6 +1824,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
     /**
      * Initialize the event listeners.
      */
+    @SuppressWarnings("java:S3740")
     protected void initializeEventListeners() {
         final Collection<BeanDefinition<BeanCreatedEventListener>> beanCreatedDefinitions = getBeanDefinitions(BeanCreatedEventListener.class);
         final HashMap<Class<?>, List<BeanCreatedEventListener<?>>> beanCreatedListeners = new HashMap<>(beanCreatedDefinitions.size());
@@ -1841,30 +1842,15 @@ public class DefaultBeanContext implements InitializableBeanContext {
         //noinspection ArraysAsListWithZeroOrOneArgument
         beanCreatedListeners.put(AnnotationProcessor.class, Arrays.asList(new AnnotationProcessorListener()));
         for (BeanDefinition<BeanCreatedEventListener> beanCreatedDefinition : beanCreatedDefinitions) {
-            try (ValidatingBeanResolutionContext context = new ValidatingBeanResolutionContext(beanCreatedDefinition, beanCreationTargets)) {
-                final BeanCreatedEventListener<?> listener;
+            try (ScanningBeanResolutionContext context = new ScanningBeanResolutionContext(beanCreatedDefinition, beanCreationTargets)) {
                 final Qualifier<BeanCreatedEventListener> qualifier = beanCreatedDefinition.getDeclaredQualifier();
-                if (beanCreatedDefinition.isSingleton()) {
-                    listener = createAndRegisterSingleton(
-                            context,
-                            beanCreatedDefinition,
-                            beanCreatedDefinition.getBeanType(),
-                            qualifier
-                    );
-                } else {
-                    listener = doCreateBean(
-                            context,
-                            beanCreatedDefinition,
-                            Argument.of(BeanCreatedEventListener.class),
-                            qualifier
-                    );
-                }
+                final BeanCreatedEventListener<?> listener = createListener(beanCreatedDefinition, qualifier, context, Argument.of(BeanCreatedEventListener.class));
 
                 beanCreatedListeners.computeIfAbsent(beanCreationTargets.get(beanCreatedDefinition).getType(), aClass -> new ArrayList<>(10))
                         .add(listener);
-                Map<BeanDefinition<?>, List<List<Argument<?>>>> foundTargets = context.getValidatedPath().getFoundTargets();
+                Map<BeanDefinition<?>, List<List<Argument<?>>>> foundTargets = context.getFoundTargets();
                 for (Map.Entry<BeanDefinition<?>, List<List<Argument<?>>>> entry: foundTargets.entrySet()) {
-                        invalidListeners.computeIfAbsent(entry.getKey(), (key) -> new ArrayList<>())
+                        invalidListeners.computeIfAbsent(entry.getKey(), key -> new ArrayList<>())
                                         .addAll(entry.getValue());
                 }
             }
@@ -1881,22 +1867,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
         for (BeanDefinition<BeanInitializedEventListener> definition : beanInitializedDefinitions) {
             try (BeanResolutionContext context = newResolutionContext(definition, null)) {
                 final Qualifier<BeanInitializedEventListener> qualifier = definition.getDeclaredQualifier();
-                final BeanInitializedEventListener<?> listener;
-                if (definition.isSingleton()) {
-                    listener = createAndRegisterSingleton(
-                            context,
-                            definition,
-                            definition.getBeanType(),
-                            qualifier
-                    );
-                } else {
-                    listener = doCreateBean(
-                            context,
-                            definition,
-                            Argument.of(BeanInitializedEventListener.class),
-                            qualifier
-                    );
-                }
+                final BeanInitializedEventListener<?> listener = createListener(definition, qualifier, context, Argument.of(BeanInitializedEventListener.class));
                 List<Argument<?>> typeArguments = definition.getTypeArguments(BeanInitializedEventListener.class);
                 Argument<?> argument = CollectionUtils.last(typeArguments);
                 if (argument == null) {
@@ -1913,6 +1884,27 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
         this.beanCreationEventListeners = beanCreatedListeners.entrySet();
         this.beanInitializedEventListeners = beanInitializedListeners.entrySet();
+    }
+
+    private <T> T createListener(BeanDefinition<T> definition,
+                               Qualifier<T> qualifier,
+                               BeanResolutionContext context,
+                               Argument<T> argument) {
+        if (definition.isSingleton()) {
+            return createAndRegisterSingleton(
+                    context,
+                    definition,
+                    definition.getBeanType(),
+                    qualifier
+            );
+        } else {
+            return doCreateBean(
+                    context,
+                    definition,
+                    argument,
+                    qualifier
+            );
+        }
     }
 
     /**
@@ -4391,65 +4383,10 @@ public class DefaultBeanContext implements InitializableBeanContext {
         }
     }
 
-    static class ValidatedPath extends AbstractBeanResolutionContext.DefaultPath {
-
-        private final HashMap<BeanDefinition<?>, Argument<?>> beanCreationTargets;
-        private final BeanDefinition<?> beanDefinition;
-        private Map<BeanDefinition<?>, List<List<Argument<?>>>> foundTargets = new HashMap<>();
-
-        ValidatedPath(
-                BeanResolutionContext resolutionContext,
-                HashMap<BeanDefinition<?>, Argument<?>> beanCreationTargets,
-                BeanDefinition<?> beanDefinition) {
-            super(resolutionContext);
-            this.beanCreationTargets = beanCreationTargets;
-            this.beanDefinition = beanDefinition;
-        }
-
-        private List<Argument<?>> getHierarchy() {
-            List<Argument<?>> hierarchy = new ArrayList<>(size() + 1);
-            hierarchy.add(beanDefinition.asArgument());
-            for (Iterator<BeanResolutionContext.Segment<?>> it = descendingIterator(); it.hasNext();) {
-                BeanResolutionContext.Segment<?> segment = it.next();
-                hierarchy.add(segment.getArgument());
-            }
-            return hierarchy;
-        }
-
-        Map<BeanDefinition<?>, List<List<Argument<?>>>> getFoundTargets() {
-            return foundTargets;
-        }
-
-        @Override
-        public void push(BeanResolutionContext.Segment<?> segment) {
-            super.push(segment);
-            Argument<?> argument = segment.getArgument();
-            if (argument.isContainerType()) {
-                argument = argument.getFirstTypeVariable().orElse(null);
-                if (argument == null) {
-                    return;
-                }
-            }
-            if (argument.isProvider()) {
-                return;
-            }
-            for (Map.Entry<BeanDefinition<?>, Argument<?>> entry : beanCreationTargets.entrySet()) {
-                if (entry.getValue().typeHashCode() == argument.typeHashCode()) {
-                    foundTargets.computeIfAbsent(entry.getKey(), (bd) -> new ArrayList<>(5))
-                            .add(getHierarchy());
-                }
-            }
-        }
-    }
-
     class SingletonBeanResolutionContext extends AbstractBeanResolutionContext {
 
         SingletonBeanResolutionContext(BeanDefinition<?> beanDefinition) {
             super(DefaultBeanContext.this, beanDefinition);
-        }
-
-        SingletonBeanResolutionContext(BeanDefinition<?> beanDefinition, Function<BeanResolutionContext, Path> path) {
-            super(DefaultBeanContext.this, beanDefinition, path);
         }
 
         @Override
@@ -4476,14 +4413,49 @@ public class DefaultBeanContext implements InitializableBeanContext {
         }
     }
 
-    private final class ValidatingBeanResolutionContext extends SingletonBeanResolutionContext {
+    private final class ScanningBeanResolutionContext extends SingletonBeanResolutionContext {
 
-        private ValidatingBeanResolutionContext(BeanDefinition<?> beanDefinition, HashMap<BeanDefinition<?>, Argument<?>> beanCreationTargets) {
-            super(beanDefinition, (brc) -> new ValidatedPath(brc, beanCreationTargets, beanDefinition));
+        private final HashMap<BeanDefinition<?>, Argument<?>> beanCreationTargets;
+        private final Map<BeanDefinition<?>, List<List<Argument<?>>>> foundTargets = new HashMap<>();
+
+        private ScanningBeanResolutionContext(BeanDefinition<?> beanDefinition, HashMap<BeanDefinition<?>, Argument<?>> beanCreationTargets) {
+            super(beanDefinition);
+            this.beanCreationTargets = beanCreationTargets;
         }
 
-        ValidatedPath getValidatedPath() {
-            return (ValidatedPath) getPath();
+        private List<Argument<?>> getHierarchy() {
+            List<Argument<?>> hierarchy = new ArrayList<>(path.size() + 1);
+            hierarchy.add(rootDefinition.asArgument());
+            for (Iterator<BeanResolutionContext.Segment<?>> it = path.descendingIterator(); it.hasNext();) {
+                BeanResolutionContext.Segment<?> segment = it.next();
+                hierarchy.add(segment.getArgument());
+            }
+            return hierarchy;
+        }
+
+        @Override
+        protected void onNewSegment(Segment<?> segment) {
+            Argument<?> argument = segment.getArgument();
+            if (argument.isContainerType()) {
+                argument = argument.getFirstTypeVariable().orElse(null);
+                if (argument == null) {
+                    return;
+                }
+            }
+            if (argument.isProvider()) {
+                return;
+            }
+            for (Map.Entry<BeanDefinition<?>, Argument<?>> entry : beanCreationTargets.entrySet()) {
+                if (entry.getValue().typeHashCode() == argument.typeHashCode()) {
+                    foundTargets.computeIfAbsent(entry.getKey(), bd -> new ArrayList<>(5))
+                            .add(getHierarchy());
+                }
+            }
+        }
+
+        @SuppressWarnings("java:S1452")
+        Map<BeanDefinition<?>, List<List<Argument<?>>>> getFoundTargets() {
+            return foundTargets;
         }
     }
 }
