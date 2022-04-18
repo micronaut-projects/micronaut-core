@@ -21,6 +21,7 @@ class BeanCreatedListenerWarningSpec extends Specification {
         output.contains("    io.micronaut.inject.lifecycle.beancreationeventlistener.OffendingFieldListener --> io.micronaut.inject.lifecycle.beancreationeventlistener.A")
         output.contains("    io.micronaut.inject.lifecycle.beancreationeventlistener.OffendingMethodListener --> io.micronaut.inject.lifecycle.beancreationeventlistener.A")
         output.contains("    io.micronaut.inject.lifecycle.beancreationeventlistener.OffendingConstructorListener --> io.micronaut.inject.lifecycle.beancreationeventlistener.A")
+        output.contains("    io.micronaut.inject.lifecycle.beancreationeventlistener.OffendingInterfaceListener --> io.micronaut.inject.lifecycle.beancreationeventlistener.AInterface")
         output.contains("    io.micronaut.inject.lifecycle.beancreationeventlistener.OffendingChainListener --> io.micronaut.inject.lifecycle.beancreationeventlistener.D --> io.micronaut.inject.lifecycle.beancreationeventlistener.E --> io.micronaut.inject.lifecycle.beancreationeventlistener.A")
         !output.contains("The bean created event listener io.micronaut.inject.lifecycle.beancreationeventlistener.CCreatedListener will not be executed")
         !output.contains("NotOffendingChainListener") //because F injects a provider of G

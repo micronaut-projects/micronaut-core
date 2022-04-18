@@ -4446,7 +4446,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                 return;
             }
             for (Map.Entry<BeanDefinition<?>, Argument<?>> entry : beanCreationTargets.entrySet()) {
-                if (entry.getValue().typeHashCode() == argument.typeHashCode()) {
+                if (argument.isAssignableFrom(entry.getValue())) {
                     foundTargets.computeIfAbsent(entry.getKey(), bd -> new ArrayList<>(5))
                             .add(getHierarchy());
                 }
