@@ -45,3 +45,20 @@ micronaut:
 ----
 
 The above configuration creates a fixed thread pool with 75 threads.
+
+In Micronaut methods are executed asynchronously by default. For example, methods that return reactive results execute asynchronously in Netty. Others execute in a dedicated I/O thread pool. Sometimes methods that are asynchronous need to execute in a blocking manner. The ann:core.annotation.Blocking[] facilitates this and is used to override default asynchronous execution, by routing calls to the IO executor. Examples might include subscribing to returned reactive types in a blocking manner, or for testing.  ann:core.annotation.Blocking[] is inherited so it can be used as a meta-annotation.
+
+There are some places where the Micronaut framework uses ann:core.annotation.Blocking[] already.
+|===
+|Blocking Type|Description
+
+|link:{micronautapi}http/client/BlockingHttpClient.html[BlockingHttpClient]
+| Intended for testing, and provides blocking versions for a subset of api:http.client.HttpClient[] operations.
+|link:{micronautapi}core/io/IOUtils.html[IOUtils]
+| Reads the contents of a `BufferedReader` in a blocking manner, and returns that as a `String`.
+|link:{micronautapi}context/env/BootstrapPropertySourceLocator.html[BootstrapPropertySourceLocator]
+| Resolves either remote or local api:context.env.PropertySource[] instances for the current `Environment`.
+
+|===
+
+TIP: https://micronaut-projects.github.io/micronaut-data/latest/guide/[Micronaut Data] also utilizes `@Blocking` for some transaction operations, CRUD interceptors, and repositories.
