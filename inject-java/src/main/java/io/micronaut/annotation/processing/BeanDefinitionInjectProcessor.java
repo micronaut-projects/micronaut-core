@@ -2253,7 +2253,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             return shouldExclude(configurationMetadata.getIncludes(), configurationMetadata.getExcludes(), propertyName);
         }
 
-
         private void cleanupScopeAndQualifierAnnotations(MutableAnnotationMetadata producedAnnotationMetadata,
                                                          AnnotationMetadata producedTypeAnnotationMetadata,
                                                          AnnotationMetadata producingElementAnnotationMetadata) {
