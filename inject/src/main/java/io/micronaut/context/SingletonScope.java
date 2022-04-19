@@ -76,13 +76,12 @@ final class SingletonScope {
                                                   @Nullable T createdBean,
                                                   @NonNull List<BeanRegistration<?>> dependents) {
 
-        BeanRegistration<T> registration;
+
         DefaultBeanContext.BeanKey<T> key = new DefaultBeanContext.BeanKey<>(beanDefinition.asArgument(), qualifier);
-        if (dependents.isEmpty()) {
-            registration = new BeanDisposingRegistration<>(beanContext, key, beanDefinition, createdBean);
-        } else {
-            registration = new BeanDisposingRegistration<>(beanContext, key, beanDefinition, createdBean, dependents);
-        }
+        BeanRegistration<T> registration = dependents.isEmpty() ?
+            new BeanDisposingRegistration<>(beanContext, key, beanDefinition, createdBean) :
+            new BeanDisposingRegistration<>(beanContext, key, beanDefinition, createdBean, dependents);
+        
         singletonByBeanDefinition.put(BeanDefinitionIdentity.of(beanDefinition), registration);
         if (!beanDefinition.isSingleton()) {
             // In some cases you can register an instance of non-singleton bean and expect it act as a singleton
