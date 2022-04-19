@@ -17,9 +17,7 @@ dependencies {
 
 def micronautVersionInfo = tasks.register("micronautVersionInfo", WriteMicronautVersionInfoTask) {
     it.version = projectVersion
-    it.extraBomProperties = [
-            'io.micronaut.grpc:micronaut-grpc'
-    ]
+    it.configuration.set(configurations.bomVersions)
     it.outputDirectory = layout.buildDirectory.dir("version-info")
 }
 
