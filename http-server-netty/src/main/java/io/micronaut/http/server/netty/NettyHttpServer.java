@@ -640,6 +640,11 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         return new HttpPipelineBuilder(NettyHttpServer.this, nettyEmbeddedServices, sslConfiguration, routingHandler, hostResolver);
     }
 
+    /**
+     * Builds Embedded Channel.
+     * @param ssl SSL
+     * @return Embedded Channel
+     */
     @Internal
     public EmbeddedChannel buildEmbeddedChannel(boolean ssl) {
         EmbeddedChannel embeddedChannel = new EmbeddedChannel();

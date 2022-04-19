@@ -1217,7 +1217,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
                 org.objectweb.asm.commons.Method propertyGetterMethod = org.objectweb.asm.commons.Method.getMethod(propertyGetter.getDescription(false));
                 // getter might be an interface method
-                if (propertyGetter.isAbstract()) {
+                if (visitData.memberBeanType.getType().isInterface()) {
                     adapter.invokeInterface(injectedType, propertyGetterMethod);
                 } else {
                     adapter.invokeVirtual(injectedType, propertyGetterMethod);
@@ -1816,7 +1816,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                     ElementQuery.ALL_METHODS
                             .onlyAccessible(beanTypeElement)
                             .onlyInstance()
-                            .named((name) -> name.equals(NameUtils.getterNameFor(annotationMemberProperty, readPrefixes)))
+                            .named((name) -> annotationMemberProperty.equals(NameUtils.getPropertyNameForGetter(name, readPrefixes)))
                             .filter((e) -> !e.hasParameters())
             ).orElse(null);
         }
