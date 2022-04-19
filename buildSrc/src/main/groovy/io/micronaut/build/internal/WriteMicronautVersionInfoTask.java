@@ -13,7 +13,10 @@ import org.gradle.api.file.DirectoryProperty;
 import org.gradle.api.provider.Property;
 import org.gradle.api.tasks.CacheableTask;
 import org.gradle.api.tasks.Input;
+import org.gradle.api.tasks.InputFiles;
 import org.gradle.api.tasks.OutputDirectory;
+import org.gradle.api.tasks.PathSensitive;
+import org.gradle.api.tasks.PathSensitivity;
 import org.gradle.api.tasks.TaskAction;
 import org.gradle.maven.MavenModule;
 import org.gradle.maven.MavenPomArtifact;
@@ -35,8 +38,9 @@ public abstract class WriteMicronautVersionInfoTask extends DefaultTask {
     @Input
     public abstract Property<String> getVersion();
 
-    @Input
-    public abstract Property<Configuration> getConfiguration();
+    @InputFiles
+    @PathSensitive(PathSensitivity.RELATIVE)
+    public Configuration configuration;
 
     @OutputDirectory
     public abstract DirectoryProperty getOutputDirectory();
@@ -44,7 +48,7 @@ public abstract class WriteMicronautVersionInfoTask extends DefaultTask {
     @TaskAction
     public void writeVersionInfo() throws IOException {
         Map<String, String> props = new TreeMap<>();
-        for (Dependency dependency : getConfiguration().get().getAllDependencies()) {
+        for (Dependency dependency : configuration.getAllDependencies()) {
             getLogger().lifecycle("Scanning {}:{}:{}", dependency.getGroup(), dependency.getName(), dependency.getVersion());
             Map<String, String> bomProperties = bomProperties(dependency.getGroup(), dependency.getName(), dependency.getVersion());
             for (Map.Entry<String, String> entry : bomProperties.entrySet()) {
@@ -90,5 +94,9 @@ public abstract class WriteMicronautVersionInfoTask extends DefaultTask {
             });
         }
         return props;
+    }
+
+    public Configuration getConfiguration() {
+        return configuration;
     }
 }
