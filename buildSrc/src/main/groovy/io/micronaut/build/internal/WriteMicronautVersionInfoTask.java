@@ -10,7 +10,6 @@ import org.gradle.api.artifacts.result.ArtifactResolutionResult;
 import org.gradle.api.artifacts.result.ComponentArtifactsResult;
 import org.gradle.api.artifacts.result.ResolvedArtifactResult;
 import org.gradle.api.file.DirectoryProperty;
-import org.gradle.api.provider.ListProperty;
 import org.gradle.api.provider.Property;
 import org.gradle.api.tasks.CacheableTask;
 import org.gradle.api.tasks.Input;
@@ -21,7 +20,6 @@ import org.gradle.maven.MavenPomArtifact;
 import org.xml.sax.SAXException;
 
 import javax.xml.parsers.ParserConfigurationException;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
@@ -39,9 +37,6 @@ public abstract class WriteMicronautVersionInfoTask extends DefaultTask {
 
     @Input
     public abstract Property<Configuration> getConfiguration();
-
-    @Input
-    public abstract ListProperty<String> getExtraBomProperties();
 
     @OutputDirectory
     public abstract DirectoryProperty getOutputDirectory();
