@@ -16,6 +16,7 @@
 package io.micronaut.context;
 
 import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.reflect.GenericTypeUtils;
@@ -45,6 +46,7 @@ import java.util.stream.Stream;
  * @param <T> The bean type
  * @since 3.5.0
  */
+@Internal
 final class NoInjectionBeanDefinition<T> implements BeanDefinition<T>, BeanDefinitionReference<T> {
     private final Class<?> singletonClass;
     private final Map<Class<?>, List<Argument<?>>> typeArguments = new HashMap<>();
