@@ -13,7 +13,7 @@ class BeanImportSpec extends AbstractTypeElementSpec {
 
     void "test parse bean import"() {
         given:
-        def context = buildContext('''
+        ApplicationContext context = buildContext('''
 package beanimporttest;
 
 import io.micronaut.context.annotation.Import;
@@ -27,9 +27,9 @@ class BeanImportTest {
 ''')
         when:
         Car car = getBean(context, 'org.atinject.tck.auto.Car')
-        def test = Tck.testsFor(car, false, true)
+        Test test = Tck.testsFor(car, false, true)
 
-        def result = new TestResult()
+        TestResult result = new TestResult()
         test.run(result)
 
         then:
