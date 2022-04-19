@@ -38,6 +38,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 /**
  * Default implementation of {@link AnnotationMetadata}.
@@ -1398,13 +1399,45 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @Override
     public DefaultAnnotationMetadata clone() {
         return new DefaultAnnotationMetadata(
-                declaredAnnotations != null ? new HashMap<>(declaredAnnotations) : null,
-                declaredStereotypes != null ? new HashMap<>(declaredStereotypes) : null,
-                allStereotypes != null ? new HashMap<>(allStereotypes) : null,
-                allAnnotations != null ? new HashMap<>(allAnnotations) : null,
-                annotationsByStereotype != null ? new HashMap<>(annotationsByStereotype) : null,
+                declaredAnnotations != null ? cloneMapOfMapValue(declaredAnnotations) : null,
+                declaredStereotypes != null ? cloneMapOfMapValue(declaredStereotypes) : null,
+                allStereotypes != null ? cloneMapOfMapValue(allStereotypes) : null,
+                allAnnotations != null ? cloneMapOfMapValue(allAnnotations) : null,
+                annotationsByStereotype != null ? cloneMapOfListValue(annotationsByStereotype) : null,
                 hasPropertyExpressions
         );
+    }
+
+    protected final <X, Y, K> Map<K, Map<X, Y>> cloneMapOfMapValue(Map<K, Map<X, Y>> toClone) {
+        return toClone.entrySet().stream()
+                .map(e -> new AbstractMap.SimpleEntry<>(e.getKey(), cloneMap(e.getValue())))
+                .collect(Collectors.toMap(AbstractMap.SimpleEntry::getKey, AbstractMap.SimpleEntry::getValue, (a, b) -> a, () -> {
+                    if (toClone instanceof HashMap) {
+                        return new HashMap<>();
+                    }
+                    return new LinkedHashMap<>();
+                }));
+    }
+
+    protected final <K, V> Map<K, List<V>> cloneMapOfListValue(Map<K, List<V>> toClone) {
+        return toClone.entrySet().stream()
+                .map(e -> new AbstractMap.SimpleEntry<>(e.getKey(), new ArrayList<>(e.getValue())))
+                .collect(Collectors.toMap(AbstractMap.SimpleEntry::getKey, AbstractMap.SimpleEntry::getValue, (a, b) -> a, () -> {
+                    if (toClone instanceof HashMap) {
+                        return new HashMap<>();
+                    }
+                    return new LinkedHashMap<>();
+                }));
+    }
+
+    protected final <K, V> Map<K, V> cloneMap(Map<K, V> map) {
+        if (map instanceof HashMap) {
+            return (Map<K, V>) ((HashMap<K, V>) map).clone();
+        }
+        if (map instanceof LinkedHashMap) {
+            return (Map<K, V>) ((LinkedHashMap<K, V>) map).clone();
+        }
+        return new HashMap<>(map);
     }
 
     /**
