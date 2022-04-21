@@ -49,23 +49,18 @@ import java.util.Set;
  *
  * @author graemerocher
  * @since 2.0.0
+ * @deprecated No longer needed and will be removed in a future release
  */
 @SupportedOptions({
         AbstractInjectAnnotationProcessor.MICRONAUT_PROCESSING_INCREMENTAL,
         AbstractInjectAnnotationProcessor.MICRONAUT_PROCESSING_ANNOTATIONS
 })
+@Deprecated
 public class ServiceDescriptionProcessor extends AbstractInjectAnnotationProcessor {
-    private static final Set<String> SUPPORTED_ANNOTATIONS;
+    private static final Set<String> SUPPORTED_ANNOTATIONS = Collections.emptySet();
     private static final Set<String> SUPPORTED_SERVICE_TYPES = Collections.singleton(
             ApplicationContextConfigurer.class.getName()
     );
-
-    static {
-        Set<String> annotations = new HashSet<>(2);
-        annotations.add(Generated.class.getName());
-        annotations.add(ContextConfigurer.class.getName());
-        SUPPORTED_ANNOTATIONS = Collections.unmodifiableSet(annotations);
-    }
 
     private final Map<String, Set<String>> serviceDescriptors = new HashMap<>();
 

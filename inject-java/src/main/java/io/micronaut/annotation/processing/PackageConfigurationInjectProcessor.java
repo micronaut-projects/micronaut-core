@@ -62,8 +62,10 @@ public class PackageConfigurationInjectProcessor extends AbstractInjectAnnotatio
             return false;
         }
         AnnotationElementScanner scanner = new AnnotationElementScanner();
-        Set<? extends Element> elements = roundEnv.getRootElements();
-        ElementFilter.packagesIn(elements).forEach(element -> element.accept(scanner, element));
+        for (TypeElement annotation : annotations) {
+            final Set<? extends Element> elements = roundEnv.getElementsAnnotatedWith(annotation);
+            ElementFilter.packagesIn(elements).forEach(element -> element.accept(scanner, element));
+        }
         try {
             classWriterOutputVisitor.finish();
         } catch (Exception e) {
