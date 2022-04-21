@@ -155,8 +155,8 @@ abstract class AbstractTypeElementSpec extends Specification {
      * @return the GraalReflectionConfigurer if it is correct
      **/
     protected GraalReflectionConfigurer buildReflectionConfigurer(String className, @Language("java") String cls) {
-        def beanDefName= (className.startsWith('$') ? '' : '$') + NameUtils.getSimpleName(className) + GraalReflectionConfigurer.CLASS_SUFFIX
-        def packageName = NameUtils.getPackageName(className)
+        String beanDefName = (className.startsWith('$') ? '' : '$') + NameUtils.getSimpleName(className) + GraalReflectionConfigurer.CLASS_SUFFIX
+        String packageName = NameUtils.getPackageName(className)
         String beanFullName = "${packageName}.${beanDefName}"
 
         ClassLoader classLoader = buildClassLoader(className, cls)
