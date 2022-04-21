@@ -63,6 +63,7 @@ import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.configuration.ConfigurationMetadata;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
+import io.micronaut.inject.configuration.ConfigurationMetadataWriter;
 import io.micronaut.inject.configuration.PropertyMetadata;
 import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.visitor.BeanElementVisitor;
@@ -105,6 +106,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.ServiceConfigurationError;
+import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -215,83 +218,86 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
     public final boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
         processingOver = roundEnv.processingOver();
 
-        annotations = annotations
-                .stream()
-                .filter(ann -> {
-                    final String name = ann.getQualifiedName().toString();
-                    String packageName = NameUtils.getPackageName(name);
-                    return !name.equals(AnnotationUtil.KOTLIN_METADATA) && !AnnotationUtil.STEREOTYPE_EXCLUDES.contains(packageName);
-                })
-                .filter(ann -> annotationUtils.hasStereotype(ann, ANNOTATION_STEREOTYPES) || isProcessedAnnotation(ann.getQualifiedName().toString()))
-                .collect(Collectors.toSet());
+        if (!processingOver) {
 
-        if (!annotations.isEmpty()) {
-            TypeElement groovyObjectTypeElement = elementUtils.getTypeElement("groovy.lang.GroovyObject");
-            TypeMirror groovyObjectType = groovyObjectTypeElement != null ? groovyObjectTypeElement.asType() : null;
-            // accumulate all the class elements for all annotated elements
-            annotations.forEach(annotation -> roundEnv.getElementsAnnotatedWith(annotation)
+            annotations = annotations
                     .stream()
-                    // filtering annotation definitions, which are not processed
-                    .filter(element -> element.getKind() != ANNOTATION_TYPE)
-                    .forEach(element -> {
-                        TypeElement typeElement = modelUtils.classElementFor(element);
-                        if (typeElement == null) {
-                            return;
-                        }
-                        if (element.getKind() == ENUM) {
-                            final AnnotationMetadata am = annotationUtils.getAnnotationMetadata(element);
-                            if (isDeclaredBeanInMetadata(am)) {
-                                error(element, "Enum types cannot be defined as beans");
-                            }
-                            return;
-                        }
-                        // skip Groovy code, handled by InjectTransform. Required for GroovyEclipse compiler
-                        if ((groovyObjectType != null && typeUtils.isAssignable(typeElement.asType(), groovyObjectType))) {
-                            return;
-                        }
+                    .filter(ann -> {
+                        final String name = ann.getQualifiedName().toString();
+                        String packageName = NameUtils.getPackageName(name);
+                        return !name.equals(AnnotationUtil.KOTLIN_METADATA) && !AnnotationUtil.STEREOTYPE_EXCLUDES.contains(packageName);
+                    })
+                    .filter(ann -> annotationUtils.hasStereotype(ann, ANNOTATION_STEREOTYPES) || isProcessedAnnotation(ann.getQualifiedName().toString()))
+                    .collect(Collectors.toSet());
 
-                        String name = typeElement.getQualifiedName().toString();
-                        if (!beanDefinitions.contains(name) && !processed.contains(name) && !name.endsWith(BeanDefinitionVisitor.PROXY_SUFFIX)) {
-                            boolean isInterface = JavaModelUtils.resolveKind(typeElement, ElementKind.INTERFACE).isPresent();
-                            if (!isInterface) {
-                                beanDefinitions.add(name);
-                            } else {
-                                if (annotationUtils.hasStereotype(typeElement, INTRODUCTION_TYPE) || annotationUtils.hasStereotype(typeElement, ConfigurationReader.class)) {
+            if (!annotations.isEmpty()) {
+                TypeElement groovyObjectTypeElement = elementUtils.getTypeElement("groovy.lang.GroovyObject");
+                TypeMirror groovyObjectType = groovyObjectTypeElement != null ? groovyObjectTypeElement.asType() : null;
+                // accumulate all the class elements for all annotated elements
+                annotations.forEach(annotation -> roundEnv.getElementsAnnotatedWith(annotation)
+                        .stream()
+                        // filtering annotation definitions, which are not processed
+                        .filter(element -> element.getKind() != ANNOTATION_TYPE)
+                        .forEach(element -> {
+                            TypeElement typeElement = modelUtils.classElementFor(element);
+                            if (typeElement == null) {
+                                return;
+                            }
+                            if (element.getKind() == ENUM) {
+                                final AnnotationMetadata am = annotationUtils.getAnnotationMetadata(element);
+                                if (isDeclaredBeanInMetadata(am)) {
+                                    error(element, "Enum types cannot be defined as beans");
+                                }
+                                return;
+                            }
+                            // skip Groovy code, handled by InjectTransform. Required for GroovyEclipse compiler
+                            if ((groovyObjectType != null && typeUtils.isAssignable(typeElement.asType(), groovyObjectType))) {
+                                return;
+                            }
+
+                            String name = typeElement.getQualifiedName().toString();
+                            if (!beanDefinitions.contains(name) && !processed.contains(name) && !name.endsWith(BeanDefinitionVisitor.PROXY_SUFFIX)) {
+                                boolean isInterface = JavaModelUtils.resolveKind(typeElement, ElementKind.INTERFACE).isPresent();
+                                if (!isInterface) {
                                     beanDefinitions.add(name);
+                                } else {
+                                    if (annotationUtils.hasStereotype(typeElement, INTRODUCTION_TYPE) || annotationUtils.hasStereotype(typeElement, ConfigurationReader.class)) {
+                                        beanDefinitions.add(name);
+                                    }
                                 }
                             }
+                        }));
+            }
+
+            // remove already processed in previous round
+            for (String name : processed) {
+                beanDefinitions.remove(name);
+            }
+
+            // process remaining
+            int count = beanDefinitions.size();
+            if (count > 0) {
+                note("Creating bean classes for %s type elements", count);
+                beanDefinitions.forEach(className -> {
+                    if (processed.add(className)) {
+                        final TypeElement refreshedClassElement = elementUtils.getTypeElement(className);
+                        try {
+                            final AnnBeanElementVisitor visitor = new AnnBeanElementVisitor(refreshedClassElement);
+                            refreshedClassElement.accept(visitor, className);
+                            visitor.getBeanDefinitionWriters().forEach((name, writer) -> {
+                                String beanDefinitionName = writer.getBeanDefinitionName();
+                                if (processed.add(beanDefinitionName)) {
+                                    processBeanDefinitions(writer);
+                                }
+                            });
+                            AnnotationUtils.invalidateMetadata(refreshedClassElement);
+                        } catch (PostponeToNextRoundException e) {
+                            processed.remove(className);
                         }
-                    }));
-        }
-
-        // remove already processed in previous round
-        for (String name : processed) {
-            beanDefinitions.remove(name);
-        }
-
-        // process remaining
-        int count = beanDefinitions.size();
-        if (count > 0) {
-            note("Creating bean classes for %s type elements", count);
-            beanDefinitions.forEach(className -> {
-                if (processed.add(className)) {
-                    final TypeElement refreshedClassElement = elementUtils.getTypeElement(className);
-                    try {
-                        final AnnBeanElementVisitor visitor = new AnnBeanElementVisitor(refreshedClassElement);
-                        refreshedClassElement.accept(visitor, className);
-                        visitor.getBeanDefinitionWriters().forEach((name, writer) -> {
-                            String beanDefinitionName = writer.getBeanDefinitionName();
-                            if (processed.add(beanDefinitionName)) {
-                                processBeanDefinitions(writer);
-                            }
-                        });
-                        AnnotationUtils.invalidateMetadata(refreshedClassElement);
-                    } catch (PostponeToNextRoundException e) {
-                        processed.remove(className);
                     }
-                }
-            });
-            AnnotationUtils.invalidateCache();
+                });
+                AnnotationUtils.invalidateCache();
+            }
         }
 
         /*
@@ -320,6 +326,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         error("Unexpected error: %s", message != null ? message : e.getClass().getSimpleName());
                     }
                 }
+
+                writeConfigurationMetadata();
             } finally {
                 AnnotationUtils.invalidateCache();
                 AbstractAnnotationMetadataBuilder.clearMutated();
@@ -340,6 +348,31 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             String message = e.getMessage();
             error("Error occurred writing META-INF files: %s", message != null ? message : e);
         }
+    }
+
+    private void writeConfigurationMetadata() {
+        ConfigurationMetadataBuilder.getConfigurationMetadataBuilder().ifPresent(metadataBuilder -> {
+            try {
+                if (metadataBuilder.hasMetadata()) {
+                    ServiceLoader<ConfigurationMetadataWriter> writers = ServiceLoader.load(ConfigurationMetadataWriter.class, getClass().getClassLoader());
+
+                    try {
+                        for (ConfigurationMetadataWriter writer : writers) {
+                            try {
+                                writer.write(metadataBuilder, classWriterOutputVisitor);
+                            } catch (IOException e) {
+                                warning("Error occurred writing configuration metadata: %s", e.getMessage());
+                            }
+                        }
+                    } catch (ServiceConfigurationError e) {
+                        warning("Unable to load ConfigurationMetadataWriter due to : %s", e.getMessage());
+                    }
+                }
+            } finally {
+                ConfigurationMetadataBuilder.setConfigurationMetadataBuilder(null);
+            }
+        });
+
     }
 
     private void processBeanDefinitions(BeanDefinitionVisitor beanDefinitionWriter) {
