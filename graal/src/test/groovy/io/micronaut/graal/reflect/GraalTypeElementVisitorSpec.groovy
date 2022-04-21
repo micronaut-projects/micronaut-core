@@ -10,7 +10,7 @@ class GraalTypeElementVisitorSpec extends AbstractTypeElementSpec {
 
     void "an @Introspected class doesn't add anything to reflect.json"() {
         when:
-        GraalReflectionConfigurer configurer = buildReflectionConfigurer( 'test.Test', '''
+        buildReflectionConfigurer( 'test.Test', '''
 package test;
 
 import io.micronaut.core.annotation.Introspected;
