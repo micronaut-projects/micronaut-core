@@ -83,6 +83,7 @@ class Bar {}
         config.stringValue("type").get() == 'test.Bar'
         config.enumValues("accessType", TypeHint.AccessType) == [TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS] as TypeHint.AccessType[]
         config.getAnnotations("methods").size() == 1
+        config.getAnnotations("methods").first().stringValue("name").get() == 'foo'
     }
 
     void "test write reflect.json for @TypeHint with classes and type names"() {
