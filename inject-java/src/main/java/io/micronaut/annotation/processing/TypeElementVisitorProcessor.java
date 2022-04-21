@@ -222,8 +222,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
             TypeElement groovyObjectTypeElement = elementUtils.getTypeElement("groovy.lang.GroovyObject");
             TypeMirror groovyObjectType = groovyObjectTypeElement != null ? groovyObjectTypeElement.asType() : null;
-
-
+            
             Set<TypeElement> elements = new LinkedHashSet<>();
 
             for (TypeElement annotation : annotations) {
