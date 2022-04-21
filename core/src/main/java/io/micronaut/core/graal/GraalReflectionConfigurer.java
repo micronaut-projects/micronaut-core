@@ -86,7 +86,7 @@ public interface GraalReflectionConfigurer extends AnnotationMetadataProvider {
                         }
                     }
                 }
-                if (accessType.contains(TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS)) {
+                if (accessType.contains(TypeHint.AccessType.ALL_DECLARED_FIELDS)) {
                     final Field[] fields = t.getDeclaredFields();
                     context.register(fields);
                 }
