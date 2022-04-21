@@ -1,13 +1,10 @@
 package io.micronaut.graal.reflect
 
-import groovy.json.JsonSlurper
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.core.annotation.ReflectionConfig
 import io.micronaut.core.annotation.TypeHint
 import io.micronaut.core.graal.GraalReflectionConfigurer
-
-import javax.persistence.AccessType
 
 class GraalTypeElementVisitorSpec extends AbstractTypeElementSpec {
 
