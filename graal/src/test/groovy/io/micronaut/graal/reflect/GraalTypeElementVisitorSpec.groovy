@@ -104,13 +104,13 @@ class Bar {}
 ''')
 
         when:
-        def configs = configurer.getAnnotationMetadata().getAnnotationValuesByType(ReflectionConfig)
+        List<AnnotationValue<ReflectionConfig>> configs = configurer.getAnnotationMetadata().getAnnotationValuesByType(ReflectionConfig)
 
         then:
         configs.size() == 2
 
         when:
-        def config = configs.find {it.stringValue("type").get() == 'test.Bar' }
+        AnnotationValue<ReflectionConfig> config = configs.find {it.stringValue("type").get() == 'test.Bar' }
 
         then:
         config
