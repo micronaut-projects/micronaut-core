@@ -35,6 +35,7 @@ import io.netty.util.AsciiString;
 import io.netty.util.DefaultAttributeMap;
 
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.charset.Charset;
 import java.util.Collection;
 import java.util.Locale;
@@ -72,8 +73,22 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
     public AbstractNettyHttpRequest(io.netty.handler.codec.http.HttpRequest nettyRequest, ConversionService conversionService) {
         this.nettyRequest = nettyRequest;
         this.conversionService = conversionService;
-        String fullUri = nettyRequest.uri();
-        this.uri = URI.create(fullUri);
+        URI fullUri = URI.create(nettyRequest.uri());
+        if (fullUri.getAuthority() != null || fullUri.getScheme() != null) {
+            // http://example.com/foo -> /foo
+            try {
+                fullUri = new URI(
+                        null, // scheme
+                        null, // authority
+                        fullUri.getPath(),
+                        fullUri.getQuery(),
+                        fullUri.getFragment()
+                );
+            } catch (URISyntaxException e) {
+                throw new IllegalArgumentException(e);
+            }
+        }
+        this.uri = fullUri;
         this.httpMethodName = nettyRequest.method().name();
         this.httpMethod = HttpMethod.parse(httpMethodName);
     }
@@ -153,7 +168,7 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
             synchronized (this) { // double check
                 httpParameters = this.httpParameters;
                 if (httpParameters == null) {
-                    httpParameters = decodeParameters(nettyRequest.uri());
+                    httpParameters = decodeParameters();
                     this.httpParameters = httpParameters;
                 }
             }
@@ -210,7 +225,7 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
             synchronized (this) { // double check
                 path = this.path;
                 if (path == null) {
-                    path = decodePath(nettyRequest.uri());
+                    path = decodePath();
                     this.path = path;
                 }
             }
@@ -228,17 +243,17 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
      * @param uri The URI
      * @return The query string decoder
      */
-    protected QueryStringDecoder createDecoder(String uri) {
+    protected final QueryStringDecoder createDecoder(URI uri) {
         Charset charset = getCharacterEncoding();
         return charset != null ? new QueryStringDecoder(uri, charset) : new QueryStringDecoder(uri);
     }
 
-    private String decodePath(String uri) {
+    private String decodePath() {
         QueryStringDecoder queryStringDecoder = createDecoder(uri);
         return queryStringDecoder.rawPath();
     }
 
-    private NettyHttpParameters decodeParameters(String uri) {
+    private NettyHttpParameters decodeParameters() {
         QueryStringDecoder queryStringDecoder = createDecoder(uri);
         return new NettyHttpParameters(queryStringDecoder.parameters(), conversionService, null);
     }

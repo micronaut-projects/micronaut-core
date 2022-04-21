@@ -16,6 +16,7 @@ class BufferLeakDetection<T> extends ResourceLeakDetector<T> {
 
     private static final List<ResourceLeakDetector<?>> allDetectors = new CopyOnWriteArrayList<>()
 
+    private static final String BASE_CANARY_STRING = "canary-" + UUID.randomUUID() + "-"
     private static volatile String canaryString = null
 
     private static volatile String currentTest = null
@@ -54,13 +55,21 @@ class BufferLeakDetection<T> extends ResourceLeakDetector<T> {
 
     // adapted from https://github.com/netty/netty/blob/86603872776e3ff5a60dea3c104358e486eed588/common/src/test/java/io/netty/util/ResourceLeakDetectorTest.java
     private static synchronized void triggerGc() {
+        // timeout of last resort for the loop below. use nanoTime because it's monotonic
+        long startTime = System.nanoTime()
+
         // need to randomize this every time, since ResourceLeakDetector will deduplicate leaks
-        canaryString = "canary-" + UUID.randomUUID()
+        canaryString = BASE_CANARY_STRING + UUID.randomUUID()
         canaryDetected = false
 
         leakCanary()
 
         do {
+            if (System.nanoTime() - startTime > 30_000_000_000L) {
+                LOG.warn("Canary leak detection failed.")
+                break
+            }
+
             // Trigger GC.
             System.gc();
 
@@ -99,6 +108,10 @@ class BufferLeakDetection<T> extends ResourceLeakDetector<T> {
         def canary = canaryString
         if (canary != null && records.contains(canary)) {
             canaryDetected = true
+            return
+        }
+        if (records.contains(BASE_CANARY_STRING)) {
+            // probably a canary from another run that ran into a timeout, drop
             return
         }
 

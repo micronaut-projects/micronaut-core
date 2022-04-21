@@ -25,7 +25,6 @@ import org.jetbrains.annotations.NotNull;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -72,11 +71,11 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
     @Override
     public MutableAnnotationMetadata clone() {
         final MutableAnnotationMetadata cloned = new MutableAnnotationMetadata(
-                declaredAnnotations != null ? new HashMap<>(declaredAnnotations) : null,
-                declaredStereotypes != null ? new HashMap<>(declaredStereotypes) : null,
-                allStereotypes != null ? new HashMap<>(allStereotypes) : null,
-                allAnnotations != null ? new HashMap<>(allAnnotations) : null,
-                annotationsByStereotype != null ? new HashMap<>(annotationsByStereotype) : null,
+                declaredAnnotations != null ? cloneMapOfMapValue(declaredAnnotations) : null,
+                declaredStereotypes != null ? cloneMapOfMapValue(declaredStereotypes) : null,
+                allStereotypes != null ? cloneMapOfMapValue(allStereotypes) : null,
+                allAnnotations != null ? cloneMapOfMapValue(allAnnotations) : null,
+                annotationsByStereotype != null ? cloneMapOfListValue(annotationsByStereotype) : null,
                 hasPropertyExpressions
         );
         if (annotationDefaultValues != null) {
