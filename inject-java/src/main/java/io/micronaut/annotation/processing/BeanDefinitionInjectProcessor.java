@@ -351,18 +351,14 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
     }
 
     private void writeConfigurationMetadata() {
-        ConfigurationMetadataBuilder.getConfigurationMetadataBuilder().ifPresent(metadataBuilder -> {
+        ConfigurationMetadataBuilder.getConfigurationMetadataBuilder().ifPresent(builder -> {
             try {
-                if (metadataBuilder.hasMetadata()) {
+                if (builder.hasMetadata()) {
                     ServiceLoader<ConfigurationMetadataWriter> writers = ServiceLoader.load(ConfigurationMetadataWriter.class, getClass().getClassLoader());
 
                     try {
                         for (ConfigurationMetadataWriter writer : writers) {
-                            try {
-                                writer.write(metadataBuilder, classWriterOutputVisitor);
-                            } catch (IOException e) {
-                                warning("Error occurred writing configuration metadata: %s", e.getMessage());
-                            }
+                            writeConfigurationMetadata(builder, writer);
                         }
                     } catch (ServiceConfigurationError e) {
                         warning("Unable to load ConfigurationMetadataWriter due to : %s", e.getMessage());
@@ -373,6 +369,14 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             }
         });
 
+    }
+
+    private void writeConfigurationMetadata(ConfigurationMetadataBuilder<?> metadataBuilder, ConfigurationMetadataWriter writer) {
+        try {
+            writer.write(metadataBuilder, classWriterOutputVisitor);
+        } catch (IOException e) {
+            warning("Error occurred writing configuration metadata: %s", e.getMessage());
+        }
     }
 
     private void processBeanDefinitions(BeanDefinitionVisitor beanDefinitionWriter) {
