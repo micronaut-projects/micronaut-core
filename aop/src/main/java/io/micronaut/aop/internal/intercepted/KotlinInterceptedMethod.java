@@ -100,13 +100,8 @@ final class KotlinInterceptedMethod implements io.micronaut.aop.kotlin.KotlinInt
 
     @Override
     public CompletableFuture<Object> interceptResultAsCompletionStage() {
-        CompletableFutureContinuation completableFutureContinuation;
-        if (continuation instanceof CompletableFutureContinuation) {
-            completableFutureContinuation = (CompletableFutureContinuation) continuation;
-        } else {
-            completableFutureContinuation = new CompletableFutureContinuation(continuation);
-            replaceContinuation.accept(completableFutureContinuation);
-        }
+        CompletableFutureContinuation completableFutureContinuation = new CompletableFutureContinuation(continuation);
+        replaceContinuation.accept(completableFutureContinuation);
         Object result = context.proceed();
         replaceContinuation.accept(continuation);
         if (result != KotlinUtils.COROUTINE_SUSPENDED) {
@@ -117,13 +112,8 @@ final class KotlinInterceptedMethod implements io.micronaut.aop.kotlin.KotlinInt
 
     @Override
     public CompletableFuture<Object> interceptResultAsCompletionStage(Interceptor<?, ?> from) {
-        CompletableFutureContinuation completableFutureContinuation;
-        if (continuation instanceof CompletableFutureContinuation) {
-            completableFutureContinuation = (CompletableFutureContinuation) continuation;
-        } else {
-            completableFutureContinuation = new CompletableFutureContinuation(continuation);
-            replaceContinuation.accept(completableFutureContinuation);
-        }
+        CompletableFutureContinuation completableFutureContinuation = new CompletableFutureContinuation(continuation);
+        replaceContinuation.accept(completableFutureContinuation);
         Object result = context.proceed(from);
         replaceContinuation.accept(continuation);
         if (result != KotlinUtils.COROUTINE_SUSPENDED) {
