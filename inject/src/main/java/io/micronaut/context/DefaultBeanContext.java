@@ -2210,7 +2210,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
         Class<T> beanType = beanDefinition.getBeanType();
         Qualifier<T> finalQualifier = qualifier != null ? qualifier : beanDefinition.getDeclaredQualifier();
         if (!(bean instanceof BeanCreatedEventListener) && CollectionUtils.isNotEmpty(beanCreationEventListeners)) {
-            for (Map.Entry<Class, List<BeanCreatedEventListener>> entry : beanCreationEventListeners) {
+            for (Map.Entry<Class<?>, List<BeanCreatedEventListener<?>>> entry : beanCreationEventListeners) {
                 if (entry.getKey().isAssignableFrom(beanType)) {
                     BeanKey<T> beanKey = new BeanKey<>(beanDefinition, finalQualifier);
                     for (BeanCreatedEventListener<?> listener : entry.getValue()) {
@@ -3782,8 +3782,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
         }
 
         private List<Argument<?>> getHierarchy() {
-            List<Argument<?>> hierarchy = new ArrayList<>(path.size() + 1);
-            hierarchy.add(rootDefinition.asArgument());
+            List<Argument<?>> hierarchy = new ArrayList<>(path.size());
             for (Iterator<BeanResolutionContext.Segment<?>> it = path.descendingIterator(); it.hasNext();) {
                 BeanResolutionContext.Segment<?> segment = it.next();
                 hierarchy.add(segment.getArgument());
