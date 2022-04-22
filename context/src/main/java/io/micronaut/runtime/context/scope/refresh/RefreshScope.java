@@ -192,7 +192,7 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
             if (value.isPresent()) {
                 String configPrefix = value.get();
                 if (keySet.stream().anyMatch(key -> key.startsWith(configPrefix))) {
-                    beanContext.refreshBean(registration.getIdentifier());
+                    beanContext.refreshBean(registration);
                 }
             }
         }
@@ -202,7 +202,7 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
         Collection<BeanRegistration<?>> registrations =
             beanContext.getActiveBeanRegistrations(Qualifiers.byStereotype(ConfigurationProperties.class));
         for (BeanRegistration<?> registration : registrations) {
-            beanContext.refreshBean(registration.getIdentifier());
+            beanContext.refreshBean(registration);
         }
     }
 

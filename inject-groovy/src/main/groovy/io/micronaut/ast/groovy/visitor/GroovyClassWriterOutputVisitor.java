@@ -15,6 +15,12 @@
  */
 package io.micronaut.ast.groovy.visitor;
 
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.util.Optional;
+
 import io.micronaut.ast.groovy.utils.InMemoryByteCodeGroovyClassLoader;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.ast.Element;
@@ -22,12 +28,6 @@ import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import io.micronaut.inject.writer.DirectoryClassWriterOutputVisitor;
 import io.micronaut.inject.writer.GeneratedFile;
 import org.codehaus.groovy.control.CompilationUnit;
-
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.util.Optional;
 
 class GroovyClassWriterOutputVisitor implements ClassWriterOutputVisitor {
 
@@ -79,6 +79,19 @@ class GroovyClassWriterOutputVisitor implements ClassWriterOutputVisitor {
                     classesDir
             );
             outputVisitor.visitServiceDescriptor(type, classname);
+            outputVisitor.finish();
+        }
+    }
+
+    @Override
+    @SuppressWarnings("java:S1075")
+    public void visitServiceDescriptor(String type, String classname, Element originatingElement) {
+        File classesDir = compilationUnit.getConfiguration().getTargetDirectory();
+        if (classesDir != null) {
+            DirectoryClassWriterOutputVisitor outputVisitor = new DirectoryClassWriterOutputVisitor(
+                    classesDir
+            );
+            outputVisitor.visitServiceDescriptor(type, classname, originatingElement);
             outputVisitor.finish();
         }
     }

@@ -1,7 +1,6 @@
 plugins {
     id "io.micronaut.build.internal.base-module"
     id "io.micronaut.build.internal.convention-base"
-    id "io.micronaut.build.internal.sanity-checks"
     id "com.github.johnrengelman.shadow"
 }
 

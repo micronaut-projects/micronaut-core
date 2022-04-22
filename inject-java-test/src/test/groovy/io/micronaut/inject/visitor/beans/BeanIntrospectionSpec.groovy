@@ -3736,17 +3736,15 @@ class MyConfig {
 }
 """)
 
-        when:
-        BeanIntrospector beanIntrospector = BeanIntrospector.forClassLoader(classLoader)
+        BeanIntrospection beanIntrospection = classLoader.loadClass('test.$io_micronaut_inject_visitor_beans_TestClass$Introspection').newInstance()
 
-        then:
-        BeanIntrospection beanIntrospection = beanIntrospector.getIntrospection(TestClass)
+        expect:
         beanIntrospection != null
         beanIntrospection.getBeanProperties().size() == 2
     }
 
     void "test targeting abstract class with @Introspected(classes = ) with custom getter"() {
-        ClassLoader classLoader = buildClassLoader("test.Test", """
+        ClassLoader classLoader = buildClassLoader(TestCustomGetterClass.name, """
 package test;
 
 import io.micronaut.core.annotation.Introspected;
@@ -3756,12 +3754,9 @@ class MyConfig {
 
 }
 """)
+        BeanIntrospection beanIntrospection = classLoader.loadClass('test.$io_micronaut_inject_visitor_beans_TestCustomGetterClass$Introspection').newInstance()
 
-        when:
-        BeanIntrospector beanIntrospector = BeanIntrospector.forClassLoader(classLoader)
-
-        then:
-        BeanIntrospection beanIntrospection = beanIntrospector.getIntrospection(TestCustomGetterClass)
+        expect:
         beanIntrospection != null
         beanIntrospection.getBeanProperties().size() == 2
     }
@@ -4202,8 +4197,7 @@ import io.micronaut.core.annotation.Introspected;
 class MyConfig {
 }''')
         when:
-        BeanIntrospector beanIntrospector = BeanIntrospector.forClassLoader(classLoader)
-        BeanIntrospection beanIntrospection = beanIntrospector.getIntrospection(TestMatchingGetterClass)
+        BeanIntrospection beanIntrospection = classLoader.loadClass('test.$io_micronaut_inject_visitor_beans_TestMatchingGetterClass$Introspection').newInstance()
 
         then:
         beanIntrospection

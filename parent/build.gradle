@@ -1,3 +1,26 @@
+import io.micronaut.build.internal.WriteMicronautVersionInfoTask
+
+apply plugin:'base'
+
+configurations {
+    bomVersions
+}
+
+repositories {
+    mavenCentral()
+}
+
+// Include any of our boms that hava required properties
+dependencies {
+    bomVersions(libs.boms.micronaut.grpc)
+}
+
+def micronautVersionInfo = tasks.register("micronautVersionInfo", WriteMicronautVersionInfoTask) {
+    it.version = projectVersion
+    it.configuration = configurations.bomVersions
+    it.outputDirectory = layout.buildDirectory.dir("version-info")
+}
+
 group projectGroupId
 version projectVersion
 
@@ -32,6 +55,14 @@ ext.extraPomInfo = {
         'maven-shade-plugin.version'('3.2.4')
         'maven-surefire-plugin.version'('2.22.2') // Override actual Maven surefire and failsafe version (2.12) to get native support for executing tests on the JUnit Platform (JUnit 5)
         'protoc-jar-maven-plugin.version'('3.11.4')
+        // inject the properties from the required boms
+        micronautVersionInfo.flatMap { it.outputDirectory.file(WriteMicronautVersionInfoTask.MICRONAUT_VERSIONS_PROPERTIES_FILE_NAME) }
+                .get()
+                .asFile
+                .text
+                .readLines()*.split('=', 2).each {
+            "${it[0]}"(it[1])
+        }
     }
     delegate.profiles {
         delegate.profile {
@@ -248,3 +279,9 @@ ext.extraPomInfo = {
 }
 
 apply plugin: "io.micronaut.build.internal.publishing"
+
+afterEvaluate {
+    tasks.named("generatePomFileForMavenPublication", GenerateMavenPom).configure {
+        dependsOn micronautVersionInfo
+    }
+}

@@ -83,6 +83,18 @@ public interface ClassWriterOutputVisitor {
     void visitServiceDescriptor(String type, String classname);
 
     /**
+     * Allows adding a class that will be written to the {@code META-INF/services} file under the given type and class
+     * name.
+     *
+     * @param type      the fully qualified service name
+     * @param classname the fully qualified classname
+     * @param originatingElement The originating element
+     * @throws IOException If the file couldn't be created
+     * @since 3.5.0
+     */
+    void visitServiceDescriptor(String type, String classname, Element originatingElement);
+
+    /**
      * Visit a file within the META-INF directory of the classes directory.
      *
      * @param path The path to the file
@@ -134,8 +146,25 @@ public interface ClassWriterOutputVisitor {
      * @param type      The service type
      * @param classname the fully qualified classname
      * @throws IOException If the file couldn't be created
+     * @deprecated Use {@link #visitServiceDescriptor(String, String, io.micronaut.inject.ast.Element)}
      */
-    default void visitServiceDescriptor(Class type, String classname) {
+    @Deprecated
+    @SuppressWarnings("java:S1133")
+    default void visitServiceDescriptor(Class<?> type, String classname) {
         visitServiceDescriptor(type.getName(), classname);
+    }
+
+    /**
+     * Allows adding a class that will be written to the {@code META-INF/services} file under the given type and class
+     * name.
+     *
+     * @param type      The service type
+     * @param classname the fully qualified classname
+     * @param originatingElement The originating element
+     * @throws IOException If the file couldn't be created
+     * @since 3.5.0
+     */
+    default void visitServiceDescriptor(Class<?> type, String classname, Element originatingElement) {
+        visitServiceDescriptor(type.getName(), classname, originatingElement);
     }
 }

@@ -5,6 +5,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Prototype
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.reflect.ReflectionUtils
+import io.micronaut.core.util.CollectionUtils
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Issue
@@ -384,7 +385,6 @@ class Test {}
         modifier << ['private', 'protected', 'static']
     }
 
-    @Issue("https://github.com/micronaut-projects/micronaut-core/pull/7165")
     void "if a factory field bean defines Bean and Prototype scopes and the original bean type scope is Singleton BeanDefinition getScope returns Prototype and BeanDefinition getAnnotationNamesByStereotype for javax.inject.Scope returns Prototype The original qualifier is not present if the factory field bean does not define a Qualifier"() {
 
         given:
@@ -432,22 +432,19 @@ class Bar1 {
                 .find { it.getDeclaringType().get().simpleName.contains("TestFactory") }
         then:
         bar1BeanDefinition.getScope().get() == Prototype.class
-        bar1BeanDefinition.declaredQualifier
-        bar1BeanDefinition.declaredQualifier.toString() == "@Abc and @Some"
-        bar1BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).size() == 2
+        bar1BeanDefinition.declaredQualifier == null
+        bar1BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).size() == 1
 
         when:
         Collection<String> annotationNamesByScopeStereoType = bar1BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).asCollection()
 
         then:
         annotationNamesByScopeStereoType.any {it == "io.micronaut.context.annotation.Prototype" }
-        annotationNamesByScopeStereoType.any {it == AnnotationUtil.SINGLETON }
 
         cleanup:
         context.close()
     }
 
-    @Issue("https://github.com/micronaut-projects/micronaut-core/pull/7165")
     void "if a factory field bean defines a @Bean and @Singleton scopes, BeanDefinition::getScope return empty but BeanDefinition::getAnnotationNamesByStereotype for javax.inject.Scope returns javax.inject.Singleton The original qualifier is not present if the factory field bean does not define a Qualifier"() {
         given:
         ApplicationContext context = buildContext('test.TestFactory$TestField', '''\
@@ -492,8 +489,7 @@ class Bar2 {
         then:
         !bar2BeanDefinition.getScope().isPresent() // javax.inject.Singleton is not present :-/
         bar2BeanDefinition.singleton
-        bar2BeanDefinition.declaredQualifier
-        bar2BeanDefinition.declaredQualifier.toString() == "@Abc and @Some"
+        bar2BeanDefinition.declaredQualifier == null
         bar2BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).size() == 1
         bar2BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).iterator().next() == AnnotationUtil.SINGLETON
 
@@ -501,7 +497,6 @@ class Bar2 {
         context.close()
     }
 
-    @Issue("https://github.com/micronaut-projects/micronaut-core/pull/7165")
     void "if a factory field bean defines a @Bean scope and the original type did not have any scope, BeanDefinition::getScope and BeanDefinition::getAnnotationNamesByStereotype for javax.inject.Scope return empty. if factory field bean defines a qualifier, the original Qualifier is overridden"() {
         given:
         ApplicationContext context = buildContext('test.TestFactory$TestField', '''\
@@ -552,14 +547,13 @@ class Bar3 {
 
         then:
         !bar3BeanDefinition.getScope().isPresent()
-        bar3BeanDefinition.declaredQualifier.toString() == "@Named('test.Xyz') and @Abc and @Some"
+        bar3BeanDefinition.declaredQualifier.toString() == "@Named('test.Xyz')"
         bar3BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).size() == 0
 
         cleanup:
         context.close()
     }
 
-    @Issue("https://github.com/micronaut-projects/micronaut-core/pull/7165")
     void "if factory field bean defines a @Bean scope and no qualifier, the original Scope and Qualifier are used"() {
         given:
         ApplicationContext context = buildContext('test.TestFactory$TestField', '''\
@@ -606,7 +600,7 @@ class Bar4 {
         then:
         !bar4BeanDefinition.getScope().isPresent()
         bar4BeanDefinition.singleton
-        bar4BeanDefinition.declaredQualifier.toString() == "@Abc and @Some"
+        bar4BeanDefinition.declaredQualifier.toString() == "@Abc"
         bar4BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).size() == 1
         bar4BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).iterator().next() == AnnotationUtil.SINGLETON
 
@@ -614,7 +608,6 @@ class Bar4 {
         context.close()
     }
 
-    @Issue("https://github.com/micronaut-projects/micronaut-core/pull/7165")
     void "if factory field bean defines a @Bean scope, BeanDefinition::getScope and BeanDefinition::getAnnotationNamesByStereotype for javax.inject.Scope return empty, even if original bean defines @Singleton If factory field bean defines a qualifier, the original Qualifier is overridden"() {
         given:
         ApplicationContext context = buildContext('test.TestFactory$TestField', '''\
@@ -665,9 +658,8 @@ class Bar5 {
 
         then:
         !bar5BeanDefinition.getScope().isPresent()
-        bar5BeanDefinition.declaredQualifier.toString() == "@Named('test.Xyz') and @Abc and @Some"
-        bar5BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).size() == 1
-        bar5BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).iterator().next() == AnnotationUtil.SINGLETON
+        bar5BeanDefinition.declaredQualifier.toString() == "@Named('test.Xyz')"
+        CollectionUtils.isEmpty(bar5BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE))
 
         cleanup:
         context.close()
@@ -725,14 +717,14 @@ class Bar6 {
                 .find {it.getDeclaringType().get().simpleName.contains("TestFactory")}
         then:
         bar6BeanDefinition.getScope().get() == Prototype.class
-        bar6BeanDefinition.declaredQualifier.toString() == "@Named('test.Xyz') and @Abc and @Some"
+        bar6BeanDefinition.declaredQualifier.toString() == "@Named('test.Xyz')"
 
         when:
         Collection<String> annotationNamesByScopeStereoType = bar6BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).asCollection()
 
         then:
+        annotationNamesByScopeStereoType.size() == 1
         annotationNamesByScopeStereoType.any {it == "io.micronaut.context.annotation.Prototype" }
-        annotationNamesByScopeStereoType.any {it == AnnotationUtil.SINGLETON }
 
         cleanup:
         context.close()
@@ -775,7 +767,7 @@ class Bar7 {
                 .find {it.getDeclaringType().get().simpleName.contains("TestFactory")}
         then:
         bar7BeanDefinition.getScope().get() == Prototype.class
-        bar7BeanDefinition.declaredQualifier.toString() == "@Some"
+        bar7BeanDefinition.declaredQualifier == null
 
         when:
         Collection<String> annotationNamesByScopeStereoType = bar7BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).asCollection()
