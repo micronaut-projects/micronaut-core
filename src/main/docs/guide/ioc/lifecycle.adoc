@@ -31,3 +31,8 @@ snippet::io.micronaut.docs.lifecycle.Connection[tags="class", indent=0]
 <2> The annotation value matches the method name
 
 NOTE: Simply implementing the `Closeable` or `AutoCloseable` interface is not enough for a bean to be closed with the context. One of the above methods must be used.
+
+== Dependent Beans
+
+Dependent beans are the beans used in the construction of your bean.
+If the dependent bean's scope is `@Prototype` or unknown, it will be destroyed along with your instance.
