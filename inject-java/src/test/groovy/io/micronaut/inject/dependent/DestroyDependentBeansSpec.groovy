@@ -2,7 +2,9 @@ package io.micronaut.inject.dependent
 
 import io.micronaut.aop.InterceptedProxy
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.BeanRegistration
 import io.micronaut.context.scope.CustomScope
+import io.micronaut.inject.dependent.listeners.AnotherSingletonBeanA
 import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.runtime.context.scope.Refreshable
 import spock.lang.Specification
@@ -77,5 +79,139 @@ class DestroyDependentBeansSpec extends Specification {
         TestData.DESTRUCTION_ORDER.count("BeanC") == 3
         TestData.DESTRUCTION_ORDER.count("BeanB") == 3
         TestData.DESTRUCTION_ORDER.count("TestInterceptor") == 3
+    }
+
+    void "test destroy dependent objects from singleton bean without callback"() {
+        given:
+            TestData.DESTRUCTION_ORDER.clear()
+
+        when:
+            def context = ApplicationContext.run()
+            def bean = context.getBean(SingletonBeanANoCallback)
+
+        then:
+            !bean.beanBField.destroyed
+            !bean.beanBConstructor.destroyed
+            !bean.beanBMethod.destroyed
+
+        when:
+            def registration = context.findBeanRegistration(bean).orElse(null)
+        then:
+            registration
+        when:
+            List<BeanRegistration> dependents = registration.dependents
+        then: "Validate dependents"
+            dependents.size() == 5
+            dependents[0].bean instanceof BeanB
+
+        when:
+            List<BeanRegistration> beanBDependents = dependents[0].dependents
+        then:"Validate BeanB dependents"
+            beanBDependents.size() == 2
+            beanBDependents[0].bean instanceof TestInterceptor
+            beanBDependents[0].dependents == null
+            beanBDependents[1].bean instanceof BeanC
+            beanBDependents[1].dependents == null
+
+        when:"When the context is stopped"
+            context.stop()
+
+        then:"Dependent objects stored"
+            bean.beanBField.destroyed
+            bean.beanBConstructor.destroyed
+            bean.beanBMethod.destroyed
+            bean.beanBField.beanC.destroyed
+            bean.beanBConstructor.beanC.destroyed
+            bean.beanBMethod.beanC.destroyed
+            bean.collection.every { it.destroyed }
+            // don't want to depend on field/method order so have to do this
+            TestData.DESTRUCTION_ORDER.count("BeanE") == 1
+            TestData.DESTRUCTION_ORDER.count("BeanD") == 1
+            TestData.DESTRUCTION_ORDER.count("BeanC") == 3
+            TestData.DESTRUCTION_ORDER.count("BeanB") == 3
+            TestData.DESTRUCTION_ORDER.count("TestInterceptor") == 3
+    }
+
+    void "test destroy dependent objects from prototype bean without callback"() {
+        given:
+            TestData.DESTRUCTION_ORDER.clear()
+
+        when:
+            def context = ApplicationContext.run()
+            def beanDefinition = context.getBeanDefinition(PrototypeBeanA)
+            def registration = context.getBeanRegistration(beanDefinition)
+            def bean = registration.bean
+
+        then:
+            !bean.beanBField.destroyed
+            !bean.beanBConstructor.destroyed
+            !bean.beanBMethod.destroyed
+
+        when:
+            List<BeanRegistration> dependents = registration.dependents
+        then: "Validate dependents"
+            dependents.size() == 5
+            dependents[0].bean instanceof BeanB
+
+        when:
+            List<BeanRegistration> beanBDependents = dependents[0].dependents
+        then:"Validate BeanB dependents"
+            beanBDependents.size() == 2
+            beanBDependents[0].bean instanceof TestInterceptor
+            beanBDependents[0].dependents == null
+            beanBDependents[1].bean instanceof BeanC
+            beanBDependents[1].dependents == null
+
+        when:"When the context is stopped"
+            context.destroyBean(registration)
+
+        then:"Dependent objects stored"
+            bean.beanBField.destroyed
+            bean.beanBConstructor.destroyed
+            bean.beanBMethod.destroyed
+            bean.beanBField.beanC.destroyed
+            bean.beanBConstructor.beanC.destroyed
+            bean.beanBMethod.beanC.destroyed
+            bean.collection.every { it.destroyed }
+            // don't want to depend on field/method order so have to do this
+            TestData.DESTRUCTION_ORDER.count("BeanE") == 1
+            TestData.DESTRUCTION_ORDER.count("BeanD") == 1
+            TestData.DESTRUCTION_ORDER.count("BeanC") == 3
+            TestData.DESTRUCTION_ORDER.count("BeanB") == 3
+            TestData.DESTRUCTION_ORDER.count("TestInterceptor") == 3
+    }
+
+    void "test destroy dependent objects from singleton using listeners"() {
+        given:
+            TestData.DESTRUCTION_ORDER.clear()
+
+        when:
+            def context = ApplicationContext.run()
+            def bean = context.getBean(AnotherSingletonBeanA)
+
+        then:
+            !bean.beanBField.destroyed
+            !bean.beanBConstructor.destroyed
+            !bean.beanBMethod.destroyed
+
+        when:"When the context is stopped"
+            context.stop()
+
+        then:"Dependent objects stored"
+            bean.destroyed
+            bean.beanBField.destroyed
+            bean.beanBConstructor.destroyed
+            bean.beanBMethod.destroyed
+            bean.beanBField.beanC.destroyed
+            bean.beanBConstructor.beanC.destroyed
+            bean.beanBMethod.beanC.destroyed
+            bean.collection.every { it.destroyed }
+            // don't want to depend on field/method order so have to do this
+            TestData.DESTRUCTION_ORDER.first() == 'AnotherSingletonBeanA'
+            TestData.DESTRUCTION_ORDER.count("AnotherBeanE") == 1
+            TestData.DESTRUCTION_ORDER.count("AnotherBeanD") == 1
+            TestData.DESTRUCTION_ORDER.count("AnotherBeanC") == 3
+            TestData.DESTRUCTION_ORDER.count("AnotherBeanB") == 3
+            TestData.DESTRUCTION_ORDER.count("TestInterceptor") == 3
     }
 }
