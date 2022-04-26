@@ -2,6 +2,8 @@ In many cases, you may want to make available as a bean a class that is not part
 
 A factory is a class annotated with the link:{api}/io/micronaut/context/annotation/Factory.html[Factory] annotation that provides one or more methods annotated with a bean scope annotation. Which annotation you use depends on what scope you want the bean to be in. See the section on <<scopes, bean scopes>> for more information.
 
+NOTE: The factory has the default scope singleton and will be destroyed with the context. If you want to dispose the factory after it produces a bean, use @Prototype scope.
+
 The return types of methods annotated with a bean scope annotation are the bean types. This is best illustrated by an example:
 
 snippet::io.micronaut.docs.factories.CrankShaft,io.micronaut.docs.factories.V8Engine,io.micronaut.docs.factories.EngineFactory[tags="class",indent=0]

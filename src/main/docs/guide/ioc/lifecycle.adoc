@@ -1,6 +1,6 @@
-== When The Context Starts
+== When The Bean Is Constructed
 
-To invoke a method when a bean is constructed, use the `jakarta.annotation.PostConstruct` annotation:
+To invoke a method when the bean is constructed, use the `jakarta.annotation.PostConstruct` annotation:
 
 snippet::io.micronaut.docs.lifecycle.V8Engine[tags="imports, class", indent=0]
 
@@ -10,9 +10,9 @@ snippet::io.micronaut.docs.lifecycle.V8Engine[tags="imports, class", indent=0]
 
 To manage when a bean is constructed, see the section on <<scopes, bean scopes>>.
 
-== When The Context Closes
+== When The Bean Is Destroyed
 
-To invoke a method when the context is closed, use the `javax.annotation.PreDestroy` annotation:
+To invoke a method when the bean is destroyed, use the `javax.annotation.PreDestroy` annotation:
 
 snippet::io.micronaut.docs.lifecycle.PreDestroyBean[tags="class", indent=0]
 
