@@ -443,6 +443,8 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
                 Enumeration<URL> serviceConfigs = classLoader.getResources(META_INF_SERVICES + '/' + serviceName);
                 while (serviceConfigs.hasMoreElements()) {
                     URL url = serviceConfigs.nextElement();
+                    if (url.getPath().contains("/build/temp/kapt3"))
+                        continue;
                     UrlServicesLoader<S> task = new UrlServicesLoader<>(url, lineCondition, transformer);
                     tasks.add(task);
                     task.fork();
