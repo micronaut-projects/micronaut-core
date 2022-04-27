@@ -2074,9 +2074,10 @@ public class DefaultHttpClient implements
             traceRequest(finalRequest, nettyRequest);
         }
 
-        FullHttpResponseHandler<O> handler = new FullHttpResponseHandler<>(channel, channelPool, secure, finalRequest, bodyType, errorType);
-        channel.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_FULL_HTTP_RESPONSE, handler);
-        Publisher<HttpResponse<O>> publisher = new NettyFuturePublisher<>(handler.responsePromise, true);
+        Promise<HttpResponse<O>> responsePromise = channel.eventLoop().newPromise();
+        channel.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_FULL_HTTP_RESPONSE,
+                new FullHttpResponseHandler<>(responsePromise, channelPool, secure, finalRequest, bodyType, errorType));
+        Publisher<HttpResponse<O>> publisher = new NettyFuturePublisher<>(responsePromise, true);
         if (bodyType != null && bodyType.isVoid()) {
             // don't emit response if bodyType is void
             publisher = Flux.from(publisher).filter(r -> false);
@@ -2149,7 +2150,7 @@ public class DefaultHttpClient implements
                 false
         );
         HttpRequest nettyRequest = requestWriter.getNettyRequest();
-        Promise<MutableHttpResponse<?>> responsePromise = channel.eventLoop().newPromise();
+        Promise<HttpResponse<?>> responsePromise = channel.eventLoop().newPromise();
         ChannelPipeline pipeline = channel.pipeline();
         pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE_FULL, new StreamFullHttpResponseHandler(responsePromise, parentRequest, finalRequest));
         pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE_STREAM, new StreamStreamHttpResponseHandler(responsePromise, parentRequest, finalRequest));
@@ -3313,11 +3314,69 @@ public class DefaultHttpClient implements
         Duration retry;
     }
 
-    private class FullHttpResponseHandler<O> extends SimpleChannelInboundHandlerInstrumented<FullHttpResponse> {
-        final Promise<HttpResponse<O>> responsePromise;
+    private abstract class BaseHttpResponseHandler<R extends io.netty.handler.codec.http.HttpResponse, O> extends SimpleChannelInboundHandlerInstrumented<R> {
+        private final Promise<O> responsePromise;
+        private final io.micronaut.http.HttpRequest<?> parentRequest;
+        private final io.micronaut.http.HttpRequest<?> finalRequest;
 
+        public BaseHttpResponseHandler(Promise<O> responsePromise, io.micronaut.http.HttpRequest<?> parentRequest, io.micronaut.http.HttpRequest<?> finalRequest) {
+            super(combineFactories());
+            this.responsePromise = responsePromise;
+            this.parentRequest = parentRequest;
+            this.finalRequest = finalRequest;
+        }
+
+        @Override
+        public abstract boolean acceptInboundMessage(Object msg);
+
+        @Override
+        public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+            responsePromise.tryFailure(mapException(finalRequest, cause));
+        }
+
+        @Override
+        protected void channelReadInstrumented(ChannelHandlerContext ctx, R msg) throws Exception {
+            if (responsePromise.isDone()) {
+                return;
+            }
+
+            if (log.isDebugEnabled()) {
+                log.debug("Received response {} from {}", msg.status().code(), finalRequest.getUri());
+            }
+
+            MutableHttpRequest<Object> redirectRequest = handleRedirect(finalRequest, msg);
+            if (redirectRequest != null) {
+                Flux.from(resolveRedirectURI(parentRequest, redirectRequest))
+                        .flatMap(makeRedirectHandler(parentRequest, redirectRequest))
+                        .subscribe(new NettyPromiseSubscriber<>(responsePromise));
+                return;
+            }
+
+            HttpResponseStatus status = msg.status();
+            int statusCode = status.code();
+            HttpStatus httpStatus;
+            try {
+                httpStatus = HttpStatus.valueOf(statusCode);
+            } catch (IllegalArgumentException e) {
+                responsePromise.tryFailure(e);
+                return;
+            }
+
+            HttpHeaders headers = msg.headers();
+            if (log.isTraceEnabled()) {
+                log.trace("HTTP Client Streaming Response Received ({}) for Request: {} {}", msg.status(), finalRequest.getMethodName(), finalRequest.getUri());
+                traceHeaders(headers);
+            }
+            buildResponse(responsePromise, msg, httpStatus);
+        }
+
+        protected abstract Function<URI, Publisher<? extends O>> makeRedirectHandler(io.micronaut.http.HttpRequest<?> parentRequest, MutableHttpRequest<Object> redirectRequest);
+
+        protected abstract void buildResponse(Promise<? super O> promise, R msg, HttpStatus httpStatus);
+    }
+
+    private class FullHttpResponseHandler<O> extends BaseHttpResponseHandler<FullHttpResponse, HttpResponse<O>> {
         private final boolean secure;
-        private final io.micronaut.http.HttpRequest<?> request;
         private final Argument<O> bodyType;
         private final Argument<?> errorType;
         private final ChannelPool channelPool;
@@ -3325,12 +3384,14 @@ public class DefaultHttpClient implements
         private boolean keepAlive = true;
 
         public FullHttpResponseHandler(
-                Channel channel,
-                ChannelPool channelPool, boolean secure, io.micronaut.http.HttpRequest<?> request, Argument<O> bodyType, Argument<?> errorType) {
-            super(combineFactories());
-            this.responsePromise = channel.eventLoop().newPromise();
+                Promise<HttpResponse<O>> responsePromise,
+                ChannelPool channelPool,
+                boolean secure,
+                io.micronaut.http.HttpRequest<?> request,
+                Argument<O> bodyType,
+                Argument<?> errorType) {
+            super(responsePromise, request, request);
             this.secure = secure;
-            this.request = request;
             this.bodyType = bodyType;
             this.errorType = errorType;
             this.channelPool = channelPool;
@@ -3342,79 +3403,58 @@ public class DefaultHttpClient implements
         }
 
         @Override
-        protected void channelReadInstrumented(ChannelHandlerContext channelHandlerContext, FullHttpResponse fullResponse) {
+        protected Function<URI, Publisher<? extends HttpResponse<O>>> makeRedirectHandler(io.micronaut.http.HttpRequest<?> parentRequest, MutableHttpRequest<Object> redirectRequest) {
+            return buildExchangePublisher(parentRequest, redirectRequest, bodyType, errorType);
+        }
+
+        @Override
+        protected void channelReadInstrumented(ChannelHandlerContext channelHandlerContext, FullHttpResponse fullResponse) throws Exception {
             try {
-                HttpResponseStatus status = fullResponse.status();
-                int statusCode = status.code();
-                HttpStatus httpStatus;
-                try {
-                    httpStatus = HttpStatus.valueOf(statusCode);
-                } catch (IllegalArgumentException e) {
-                    if (!responsePromise.tryFailure(e) && log.isWarnEnabled()) {
-                        log.warn("Unsupported http status after handler completed: " + e.getMessage(), e);
-                    }
-                    return;
-                }
-
-                try {
-                    HttpHeaders headers = fullResponse.headers();
-
-                    if (log.isDebugEnabled()) {
-                        log.debug("Received response {} from {}", status.code(), request.getUri());
-                    }
-
-                    if (log.isTraceEnabled()) {
-                        traceHeaders(headers);
-                        traceBody("Response", fullResponse.content());
-                    }
-
-                    MutableHttpRequest<Object> redirectRequest = handleRedirect(request, fullResponse);
-                    if (redirectRequest != null) {
-                        Flux.from(resolveRedirectURI(request, redirectRequest))
-                                .switchMap(buildExchangePublisher(request, redirectRequest, bodyType, errorType))
-                                .subscribe(new NettyPromiseSubscriber<>(responsePromise));
-                        return;
-                    }
-
-                    if (statusCode == HttpStatus.NO_CONTENT.getCode()) {
-                        // normalize the NO_CONTENT header, since http content aggregator adds it even if not present in the response
-                        headers.remove(HttpHeaderNames.CONTENT_LENGTH);
-                    }
-
-                    boolean convertBodyWithBodyType = statusCode < 400 ||
-                            (!DefaultHttpClient.this.configuration.isExceptionOnErrorStatus() && bodyType.equalsType(errorType));
-                    FullNettyClientHttpResponse<O> response
-                            = new FullNettyClientHttpResponse<>(fullResponse, httpStatus, mediaTypeCodecRegistry, byteBufferFactory, bodyType, convertBodyWithBodyType);
-
-                    if (convertBodyWithBodyType) {
-                        responsePromise.trySuccess(response);
-                        response.onComplete();
-                    } else { // error flow
-                        try {
-                            responsePromise.tryFailure(makeErrorFromRequestBody(status, response, errorType));
-                            response.onComplete();
-                        } catch (HttpClientResponseException t) {
-                            responsePromise.tryFailure(t);
-                            response.onComplete();
-                        } catch (Exception t) {
-                            response.onComplete();
-                            responsePromise.tryFailure(makeErrorBodyParseError(fullResponse, httpStatus, t));
-                        }
-                    }
-                } catch (HttpClientResponseException t) {
-                    responsePromise.tryFailure(t);
-                } catch (Throwable t) {
-                    makeNormalBodyParseError(fullResponse, httpStatus, errorType, t, cause -> {
-                        if (!responsePromise.tryFailure(cause) && log.isWarnEnabled()) {
-                            log.warn("Exception fired after handler completed: " + t.getMessage(), t);
-                        }
-                    });
-                }
+                super.channelReadInstrumented(channelHandlerContext, fullResponse);
             } finally {
                 if (!HttpUtil.isKeepAlive(fullResponse)) {
                     keepAlive = false;
                 }
                 channelHandlerContext.pipeline().remove(this);
+            }
+        }
+
+        @Override
+        protected void buildResponse(Promise<? super HttpResponse<O>> promise, FullHttpResponse msg, HttpStatus httpStatus) {
+            try {
+                if (httpStatus == HttpStatus.NO_CONTENT) {
+                    // normalize the NO_CONTENT header, since http content aggregator adds it even if not present in the response
+                    msg.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
+                }
+
+                boolean convertBodyWithBodyType = httpStatus.getCode() < 400 ||
+                        (!DefaultHttpClient.this.configuration.isExceptionOnErrorStatus() && bodyType.equalsType(errorType));
+                FullNettyClientHttpResponse<O> response
+                        = new FullNettyClientHttpResponse<>(msg, httpStatus, mediaTypeCodecRegistry, byteBufferFactory, bodyType, convertBodyWithBodyType);
+
+                if (convertBodyWithBodyType) {
+                    promise.trySuccess(response);
+                    response.onComplete();
+                } else { // error flow
+                    try {
+                        promise.tryFailure(makeErrorFromRequestBody(msg.status(), response, errorType));
+                        response.onComplete();
+                    } catch (HttpClientResponseException t) {
+                        promise.tryFailure(t);
+                        response.onComplete();
+                    } catch (Exception t) {
+                        response.onComplete();
+                        promise.tryFailure(makeErrorBodyParseError(msg, httpStatus, t));
+                    }
+                }
+            } catch (HttpClientResponseException t) {
+                promise.tryFailure(t);
+            } catch (Exception t) {
+                makeNormalBodyParseError(msg, httpStatus, errorType, t, cause -> {
+                    if (!promise.tryFailure(cause) && log.isWarnEnabled()) {
+                        log.warn("Exception fired after handler completed: " + t.getMessage(), t);
+                    }
+                });
             }
         }
 
@@ -3443,70 +3483,14 @@ public class DefaultHttpClient implements
 
         @Override
         public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-            responsePromise.tryFailure(mapException(request, cause));
+            super.exceptionCaught(ctx, cause);
             keepAlive = false;
             ctx.pipeline().remove(this);
         }
     }
 
-    private abstract class BaseStreamHttpResponseHandler<R extends io.netty.handler.codec.http.HttpResponse> extends SimpleChannelInboundHandlerInstrumented<R> {
-        private final Promise<MutableHttpResponse<?>> responsePromise;
-        private final io.micronaut.http.HttpRequest<?> parentRequest;
-        private final io.micronaut.http.HttpRequest<?> finalRequest;
-
-        public BaseStreamHttpResponseHandler(Promise<MutableHttpResponse<?>> responsePromise, io.micronaut.http.HttpRequest<?> parentRequest, io.micronaut.http.HttpRequest<?> finalRequest) {
-            super(combineFactories());
-            this.responsePromise = responsePromise;
-            this.parentRequest = parentRequest;
-            this.finalRequest = finalRequest;
-        }
-
-        @Override
-        public abstract boolean acceptInboundMessage(Object msg);
-
-        @Override
-        public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-            responsePromise.tryFailure(mapException(finalRequest, cause));
-        }
-
-        @Override
-        protected void channelReadInstrumented(ChannelHandlerContext ctx, R msg) throws Exception {
-            if (responsePromise.isDone()) {
-                return;
-            }
-
-            MutableHttpRequest<Object> redirectRequest = handleRedirect(finalRequest, msg);
-            if (redirectRequest != null) {
-                Flux.from(resolveRedirectURI(parentRequest, redirectRequest))
-                        .flatMap(uri -> buildStreamExchange(parentRequest, redirectRequest, uri, null))
-                        .subscribe(new NettyPromiseSubscriber<>(responsePromise));
-                return;
-            }
-
-            HttpResponseStatus status = msg.status();
-            int statusCode = status.code();
-            HttpStatus httpStatus;
-            try {
-                httpStatus = HttpStatus.valueOf(statusCode);
-            } catch (IllegalArgumentException e) {
-                responsePromise.tryFailure(e);
-                return;
-            }
-
-            MutableHttpResponse<?> response = buildResponse(msg, httpStatus);
-            HttpHeaders headers = msg.headers();
-            if (log.isTraceEnabled()) {
-                log.trace("HTTP Client Streaming Response Received ({}) for Request: {} {}", msg.status(), finalRequest.getMethodName(), finalRequest.getUri());
-                traceHeaders(headers);
-            }
-            responsePromise.trySuccess(response);
-        }
-
-        protected abstract MutableHttpResponse<?> buildResponse(R msg, HttpStatus httpStatus);
-    }
-
-    private class StreamFullHttpResponseHandler extends BaseStreamHttpResponseHandler<FullHttpResponse> {
-        public StreamFullHttpResponseHandler(Promise<MutableHttpResponse<?>> responsePromise, io.micronaut.http.HttpRequest<?> parentRequest, io.micronaut.http.HttpRequest<?> finalRequest) {
+    private class StreamFullHttpResponseHandler extends BaseHttpResponseHandler<FullHttpResponse, HttpResponse<?>> {
+        public StreamFullHttpResponseHandler(Promise<HttpResponse<?>> responsePromise, io.micronaut.http.HttpRequest<?> parentRequest, io.micronaut.http.HttpRequest<?> finalRequest) {
             super(responsePromise, parentRequest, finalRequest);
         }
 
@@ -3516,7 +3500,7 @@ public class DefaultHttpClient implements
         }
 
         @Override
-        protected MutableHttpResponse<?> buildResponse(FullHttpResponse msg, HttpStatus httpStatus) {
+        protected void buildResponse(Promise<? super HttpResponse<?>> promise, FullHttpResponse msg, HttpStatus httpStatus) {
             Publisher<HttpContent> bodyPublisher;
             if (msg.content() instanceof EmptyByteBuf) {
                 bodyPublisher = Publishers.empty();
@@ -3529,7 +3513,7 @@ public class DefaultHttpClient implements
                     msg.headers(),
                     bodyPublisher
             );
-            return new NettyStreamedHttpResponse<>(nettyResponse, httpStatus);
+            promise.trySuccess(new NettyStreamedHttpResponse<>(nettyResponse, httpStatus));
         }
 
         @Override
@@ -3543,10 +3527,15 @@ public class DefaultHttpClient implements
             super.handlerRemoved(ctx);
             removeReadTimeoutHandler(ctx.pipeline());
         }
+
+        @Override
+        protected Function<URI, Publisher<? extends HttpResponse<?>>> makeRedirectHandler(io.micronaut.http.HttpRequest<?> parentRequest, MutableHttpRequest<Object> redirectRequest) {
+            return uri -> buildStreamExchange(parentRequest, redirectRequest, uri, null);
+        }
     }
 
-    private class StreamStreamHttpResponseHandler extends BaseStreamHttpResponseHandler<StreamedHttpResponse> {
-        public StreamStreamHttpResponseHandler(Promise<MutableHttpResponse<?>> responsePromise, io.micronaut.http.HttpRequest<?> parentRequest, io.micronaut.http.HttpRequest<?> finalRequest) {
+    private class StreamStreamHttpResponseHandler extends BaseHttpResponseHandler<StreamedHttpResponse, HttpResponse<?>> {
+        public StreamStreamHttpResponseHandler(Promise<HttpResponse<?>> responsePromise, io.micronaut.http.HttpRequest<?> parentRequest, io.micronaut.http.HttpRequest<?> finalRequest) {
             super(responsePromise, parentRequest, finalRequest);
         }
 
@@ -3556,8 +3545,13 @@ public class DefaultHttpClient implements
         }
 
         @Override
-        protected MutableHttpResponse<?> buildResponse(StreamedHttpResponse msg, HttpStatus httpStatus) {
-            return new NettyStreamedHttpResponse<>(msg, httpStatus);
+        protected void buildResponse(Promise<? super HttpResponse<?>> promise, StreamedHttpResponse msg, HttpStatus httpStatus) {
+            promise.trySuccess(new NettyStreamedHttpResponse<>(msg, httpStatus));
+        }
+
+        @Override
+        protected Function<URI, Publisher<? extends HttpResponse<?>>> makeRedirectHandler(io.micronaut.http.HttpRequest<?> parentRequest, MutableHttpRequest<Object> redirectRequest) {
+            return uri -> buildStreamExchange(parentRequest, redirectRequest, uri, null);
         }
     }
 }
