@@ -1770,6 +1770,23 @@ public class DefaultBeanContext implements InitializableBeanContext {
     }
 
     /**
+     * Filters out all duplicate beans in case of class loader picking up classes from multiple paths (i.e.
+     * kapt and Javac)
+     * @param List of bean definition references
+     * @return a new list without any duplicate beans
+     */
+    protected List<BeanDefinitionReference> removeDuplicateBeans(List<BeanDefinitionReference> references) {
+        Set<String> duplicateSet = new HashSet<>();
+        return beanDefinitionReferences.stream().filter(beanDefinitionReference -> {
+            if (!duplicateSet.contains(beanDefinitionReference.getBeanDefinitionName())) {
+                duplicateSet.add(beanDefinitionReference.getBeanDefinitionName());
+                return true;
+            }
+            return false;
+        }).collect(Collectors.toList());
+    }
+
+    /**
      * Resolves the {@link BeanDefinitionReference} class instances. Default implementation uses ServiceLoader pattern.
      *
      * @return The bean definition classes
@@ -1780,6 +1797,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
             final SoftServiceLoader<BeanDefinitionReference> definitions = SoftServiceLoader.load(BeanDefinitionReference.class, classLoader);
             beanDefinitionReferences = new ArrayList<>(300);
             definitions.collectAll(beanDefinitionReferences, BeanDefinitionReference::isPresent);
+            beanDefinitionReferences = removeDuplicateBeans(beanDefinitionReferences);
         }
         return beanDefinitionReferences;
     }
