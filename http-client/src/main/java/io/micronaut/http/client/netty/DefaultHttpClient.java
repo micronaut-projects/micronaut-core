@@ -3284,7 +3284,6 @@ public class DefaultHttpClient implements
             }
         }
 
-
         /**
          * Create a {@link HttpClientResponseException} from a response with a failed HTTP status.
          */
