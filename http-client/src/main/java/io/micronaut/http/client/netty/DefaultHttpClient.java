@@ -840,7 +840,7 @@ public class DefaultHttpClient implements
         final io.micronaut.http.HttpRequest<Object> parentRequest = ServerRequestContext.currentRequest().orElse(null);
         Publisher<URI> uriPublisher = resolveRequestURI(request);
         return Flux.from(uriPublisher)
-                .switchMap(buildExchangePublisher(parentRequest, request, bodyType, errorType));
+                .switchMap(uri -> exchangeImpl(uri, parentRequest, request, bodyType, errorType));
     }
 
     @Override
@@ -1188,115 +1188,108 @@ public class DefaultHttpClient implements
     }
 
     /**
-     * @param <I>           The input type
-     * @param <O>           The output type
-     * @param <E>           The error type
-     * @param parentRequest The parent request
-     * @param request       The request
-     * @param bodyType      The body type
-     * @param errorType     The error type
-     * @return A {@link Function}
+     * Implementation of {@link #exchange(io.micronaut.http.HttpRequest, Argument, Argument)} (after URI resolution).
      */
-    protected <I, O, E> Function<URI, Publisher<? extends io.micronaut.http.HttpResponse<O>>> buildExchangePublisher(
+    private <I, O, E> Publisher<? extends io.micronaut.http.HttpResponse<O>> exchangeImpl(
+            URI requestURI,
             io.micronaut.http.HttpRequest<?> parentRequest,
             io.micronaut.http.HttpRequest<I> request,
             @NonNull Argument<O> bodyType,
             @NonNull Argument<E> errorType) {
         AtomicReference<io.micronaut.http.HttpRequest<?>> requestWrapper = new AtomicReference<>(request);
-        return requestURI -> {
-            Flux<io.micronaut.http.HttpResponse<O>> responsePublisher = Flux.create(emitter -> {
 
-                boolean multipart = MediaType.MULTIPART_FORM_DATA_TYPE.equals(request.getContentType().orElse(null));
-                if (poolMap != null && !multipart) {
-                    try {
-                        RequestKey requestKey = new RequestKey(requestURI);
-                        ChannelPool channelPool = poolMap.get(requestKey);
-                        Future<Channel> channelFuture = channelPool.acquire();
-                        addInstrumentedListener(channelFuture, future -> {
-                            if (future.isSuccess()) {
-                                Channel channel = future.get();
-                                try {
-                                    sendRequestThroughChannel(
-                                            requestWrapper.get(),
-                                            bodyType,
-                                            errorType,
-                                            emitter,
-                                            channel,
-                                            requestKey.isSecure(),
-                                            channelPool
-                                    );
-                                } catch (Exception e) {
-                                    emitter.error(e);
-                                }
-                            } else {
-                                Throwable cause = future.cause();
-                                emitter.error(
-                                        new HttpClientException("Connect Error: " + cause.getMessage(), cause)
-                                );
-                            }
-                        });
-                    } catch (HttpClientException e) {
-                        emitter.error(e);
-                    }
-                } else {
-                    SslContext sslContext = buildSslContext(requestURI);
-                    ChannelFuture connectionFuture = doConnect(request, requestURI, sslContext, false, null);
-                    addInstrumentedListener(connectionFuture, future -> {
-                        if (!future.isSuccess()) {
-                            Throwable cause = future.cause();
-                            if (emitter.isCancelled()) {
-                                log.trace("Connection to {} failed, but emitter already cancelled.", requestURI, cause);
-                            } else {
-                                emitter.error(
-                                        new HttpClientException("Connect Error: " + cause.getMessage(), cause)
-                                );
-                            }
-                        } else {
+        Flux<io.micronaut.http.HttpResponse<O>> responsePublisher = Flux.create(emitter -> {
+
+            boolean multipart = MediaType.MULTIPART_FORM_DATA_TYPE.equals(request.getContentType().orElse(null));
+            if (poolMap != null && !multipart) {
+                try {
+                    RequestKey requestKey = new RequestKey(requestURI);
+                    ChannelPool channelPool = poolMap.get(requestKey);
+                    Future<Channel> channelFuture = channelPool.acquire();
+                    addInstrumentedListener(channelFuture, future -> {
+                        if (future.isSuccess()) {
+                            Channel channel = future.get();
                             try {
                                 sendRequestThroughChannel(
                                         requestWrapper.get(),
                                         bodyType,
                                         errorType,
                                         emitter,
-                                        connectionFuture.channel(),
-                                        sslContext != null,
-                                        null);
+                                        channel,
+                                        requestKey.isSecure(),
+                                        channelPool
+                                );
                             } catch (Exception e) {
                                 emitter.error(e);
                             }
+                        } else {
+                            Throwable cause = future.cause();
+                            emitter.error(
+                                    new HttpClientException("Connect Error: " + cause.getMessage(), cause)
+                            );
                         }
                     });
+                } catch (HttpClientException e) {
+                    emitter.error(e);
                 }
-
-            }, FluxSink.OverflowStrategy.ERROR);
-
-            Publisher<io.micronaut.http.HttpResponse<O>> finalPublisher = applyFilterToResponsePublisher(
-                    parentRequest,
-                    request,
-                    requestURI,
-                    requestWrapper,
-                    responsePublisher
-            );
-            Flux<io.micronaut.http.HttpResponse<O>> finalReactiveSequence = Flux.from(finalPublisher);
-            // apply timeout to flowable too in case a filter applied another policy
-            Optional<Duration> readTimeout = configuration.getReadTimeout();
-            if (readTimeout.isPresent()) {
-                // add an additional second, because generally the timeout should occur
-                // from the Netty request handling pipeline
-                final Duration rt = readTimeout.get();
-                if (!rt.isNegative()) {
-                    Duration duration = rt.plus(Duration.ofSeconds(1));
-                    finalReactiveSequence = finalReactiveSequence.timeout(duration)
-                            .onErrorResume(throwable -> {
-                                if (throwable instanceof TimeoutException) {
-                                    return Flux.error(ReadTimeoutException.TIMEOUT_EXCEPTION);
-                                }
-                                return Flux.error(throwable);
-                            });
-                }
+            } else {
+                SslContext sslContext = buildSslContext(requestURI);
+                ChannelFuture connectionFuture = doConnect(request, requestURI, sslContext, false, null);
+                addInstrumentedListener(connectionFuture, future -> {
+                    if (!future.isSuccess()) {
+                        Throwable cause = future.cause();
+                        if (emitter.isCancelled()) {
+                            log.trace("Connection to {} failed, but emitter already cancelled.", requestURI, cause);
+                        } else {
+                            emitter.error(
+                                    new HttpClientException("Connect Error: " + cause.getMessage(), cause)
+                            );
+                        }
+                    } else {
+                        try {
+                            sendRequestThroughChannel(
+                                    requestWrapper.get(),
+                                    bodyType,
+                                    errorType,
+                                    emitter,
+                                    connectionFuture.channel(),
+                                    sslContext != null,
+                                    null);
+                        } catch (Exception e) {
+                            emitter.error(e);
+                        }
+                    }
+                });
             }
-            return finalReactiveSequence;
-        };
+
+        }, FluxSink.OverflowStrategy.ERROR);
+
+        Publisher<io.micronaut.http.HttpResponse<O>> finalPublisher = applyFilterToResponsePublisher(
+                parentRequest,
+                request,
+                requestURI,
+                requestWrapper,
+                responsePublisher
+        );
+        Flux<io.micronaut.http.HttpResponse<O>> finalReactiveSequence = Flux.from(finalPublisher);
+        // apply timeout to flowable too in case a filter applied another policy
+        Optional<Duration> readTimeout = configuration.getReadTimeout();
+        if (readTimeout.isPresent()) {
+            // add an additional second, because generally the timeout should occur
+            // from the Netty request handling pipeline
+            final Duration rt = readTimeout.get();
+            if (!rt.isNegative()) {
+                Duration duration = rt.plus(Duration.ofSeconds(1));
+                finalReactiveSequence = finalReactiveSequence.timeout(duration)
+                        .onErrorResume(throwable -> {
+                            if (throwable instanceof TimeoutException) {
+                                return Flux.error(ReadTimeoutException.TIMEOUT_EXCEPTION);
+                            }
+                            return Flux.error(throwable);
+                        });
+            }
+        }
+        return finalReactiveSequence;
     }
 
     /**
@@ -3391,7 +3384,7 @@ public class DefaultHttpClient implements
 
         @Override
         protected Function<URI, Publisher<? extends HttpResponse<O>>> makeRedirectHandler(io.micronaut.http.HttpRequest<?> parentRequest, MutableHttpRequest<Object> redirectRequest) {
-            return buildExchangePublisher(parentRequest, redirectRequest, bodyType, errorType);
+            return uri -> exchangeImpl(uri, parentRequest, redirectRequest, bodyType, errorType);
         }
 
         @Override
