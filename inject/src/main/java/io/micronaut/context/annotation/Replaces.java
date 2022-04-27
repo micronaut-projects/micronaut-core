@@ -15,6 +15,8 @@
  */
 package io.micronaut.context.annotation;
 
+import io.micronaut.core.annotation.Internal;
+
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
@@ -54,7 +56,7 @@ public @interface Replaces {
      *
      * @return The qualifier
      */
-    Class<? extends Annotation>[] qualifier() default {};
+    Class<? extends Annotation> qualifier() default ReplacesQualifierDefaultValue.class;
 
     /**
      * The name of the qualifiers of the bean that should be replaced.
@@ -62,4 +64,9 @@ public @interface Replaces {
      * @return The qualifier
      */
     String named() default "";
+
+    @Internal
+    @interface ReplacesQualifierDefaultValue
+    {
+    }
 }
