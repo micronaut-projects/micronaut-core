@@ -2488,12 +2488,22 @@ public class DefaultBeanContext implements InitializableBeanContext {
                 }
             }
 
+            Optional<Class<?>> declaringType = definitionToBeReplaced instanceof BeanDefinition ?
+                ((BeanDefinition<?>) definitionToBeReplaced).getDeclaringType() :
+                Optional.empty();
+
             if (named.isPresent() || qualifier.isPresent()) {
                 if (named.isPresent() && qualifier.isPresent()) {
                     throw new ConfigurationException("Both \"named\" and \"qualifier\" should not be present: " + replacesAnnotation);
                 }
                 return qualifiedByNamed(definitionToBeReplaced, replacedBeanType, named) ||
                     qualifiedByQualifier(definitionToBeReplaced, replacedBeanType, qualifier);
+            } else if (factory.isPresent() && declaringType.isPresent()) {
+                if (factory.get() == declaringType.get()) {
+                    return checkIfTypeMatches(definitionToBeReplaced, annotationMetadata).apply(replacedBeanType);
+                } else {
+                    return false;
+                }
             } else {
                 return checkIfTypeMatches(definitionToBeReplaced, annotationMetadata).apply(replacedBeanType);
             }
