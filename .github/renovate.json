@@ -1,0 +1,10 @@
+{
+  "extends": [
+    "config:base"
+  ],
+  "addLabels": ["dependency-upgrade"],
+  "schedule": [
+    "after 10am"
+  ],
+  "timezone": "Europe/Prague"
+}
