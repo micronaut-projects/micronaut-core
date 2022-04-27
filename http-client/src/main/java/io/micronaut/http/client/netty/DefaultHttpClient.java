@@ -2204,95 +2204,6 @@ public class DefaultHttpClient implements
         }
     }
 
-    /**
-     * Create a {@link HttpClientResponseException} from a response with a failed HTTP status.
-     */
-    private HttpClientResponseException makeErrorFromRequestBody(HttpResponseStatus status, FullNettyClientHttpResponse<?> response, Argument<?> errorType) {
-        if (errorType != null && errorType != HttpClient.DEFAULT_ERROR_TYPE) {
-            return new HttpClientResponseException(
-                    status.reasonPhrase(),
-                    null,
-                    response,
-                    new HttpClientErrorDecoder() {
-                        @Override
-                        public Argument<?> getErrorType(MediaType mediaType) {
-                            return errorType;
-                        }
-                    }
-            );
-        } else {
-            return new HttpClientResponseException(status.reasonPhrase(), response);
-        }
-    }
-
-    /**
-     * Create a {@link HttpClientResponseException} if parsing of the HTTP error body failed.
-     */
-    private HttpClientResponseException makeErrorBodyParseError(FullHttpResponse fullResponse, HttpStatus httpStatus, Throwable t) {
-        FullNettyClientHttpResponse<Object> errorResponse = new FullNettyClientHttpResponse<>(
-                fullResponse,
-                httpStatus,
-                mediaTypeCodecRegistry,
-                byteBufferFactory,
-                null,
-                false
-        );
-        // this onComplete call disables further parsing by HttpClientResponseException
-        errorResponse.onComplete();
-        return new HttpClientResponseException(
-                "Error decoding HTTP error response body: " + t.getMessage(),
-                t,
-                errorResponse,
-                null
-        );
-    }
-
-    private void makeNormalBodyParseError(FullHttpResponse fullResponse, HttpStatus httpStatus, Argument<?> errorType, Throwable t, Consumer<HttpClientResponseException> forward) {
-        FullNettyClientHttpResponse<Object> response = new FullNettyClientHttpResponse<>(
-                fullResponse,
-                httpStatus,
-                mediaTypeCodecRegistry,
-                byteBufferFactory,
-                null,
-                false
-        );
-        HttpClientResponseException clientResponseError = new HttpClientResponseException(
-                "Error decoding HTTP response body: " + t.getMessage(),
-                t,
-                response,
-                new HttpClientErrorDecoder() {
-                    @Override
-                    public Argument<?> getErrorType(MediaType mediaType) {
-                        return errorType;
-                    }
-                }
-        );
-        try {
-            forward.accept(clientResponseError);
-        } finally {
-            response.onComplete();
-        }
-    }
-
-    private HttpClientException mapException(io.micronaut.http.HttpRequest<?> request, Throwable cause) {
-        String message = cause.getMessage();
-        if (message == null) {
-            message = cause.getClass().getSimpleName();
-        }
-        if (log.isTraceEnabled()) {
-            log.trace("HTTP Client exception ({}) occurred for request : {} {}",
-                    message, request.getMethodName(), request.getUri());
-        }
-
-        if (cause instanceof TooLongFrameException) {
-            return (new ContentLengthExceededException(configuration.getMaxContentLength()));
-        } else if (cause instanceof io.netty.handler.timeout.ReadTimeoutException) {
-            return ReadTimeoutException.TIMEOUT_EXCEPTION;
-        } else {
-            return new HttpClientException("Error occurred reading HTTP response: " + message, cause);
-        }
-    }
-
     private void addReadTimeoutHandler(ChannelPipeline pipeline) {
         if (readTimeoutMillis != null) {
             if (httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0) {
@@ -2327,23 +2238,6 @@ public class DefaultHttpClient implements
     private void removeReadTimeoutHandler(ChannelPipeline pipeline) {
         if (readTimeoutMillis != null && pipeline.context(ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT) != null) {
             pipeline.remove(ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT);
-        }
-    }
-
-    private void setRedirectHeaders(@Nullable io.micronaut.http.HttpRequest<?> request, MutableHttpRequest<Object> redirectRequest) {
-        if (request != null) {
-            for (Map.Entry<String, List<String>> originalHeader : request.getHeaders()) {
-                if (!REDIRECT_HEADER_BLOCKLIST.contains(originalHeader.getKey())) {
-                    final List<String> originalHeaderValue = originalHeader.getValue();
-                    if (originalHeaderValue != null && !originalHeaderValue.isEmpty()) {
-                        for (String value : originalHeaderValue) {
-                            if (value != null) {
-                                redirectRequest.header(originalHeader.getKey(), value);
-                            }
-                        }
-                    }
-                }
-            }
         }
     }
 
@@ -3204,7 +3098,24 @@ public class DefaultHttpClient implements
 
         @Override
         public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-            responsePromise.tryFailure(mapException(finalRequest, cause));
+            String message = cause.getMessage();
+            if (message == null) {
+                message = cause.getClass().getSimpleName();
+            }
+            if (log.isTraceEnabled()) {
+                log.trace("HTTP Client exception ({}) occurred for request : {} {}",
+                        message, finalRequest.getMethodName(), finalRequest.getUri());
+            }
+
+            HttpClientException result;
+            if (cause instanceof TooLongFrameException) {
+                result = (new ContentLengthExceededException(configuration.getMaxContentLength()));
+            } else if (cause instanceof io.netty.handler.timeout.ReadTimeoutException) {
+                result = ReadTimeoutException.TIMEOUT_EXCEPTION;
+            } else {
+                result = new HttpClientException("Error occurred reading HTTP response: " + message, cause);
+            }
+            responsePromise.tryFailure(result);
         }
 
         @Override
@@ -3253,6 +3164,23 @@ public class DefaultHttpClient implements
                 traceHeaders(headers);
             }
             buildResponse(responsePromise, msg, httpStatus);
+        }
+
+        private void setRedirectHeaders(@Nullable io.micronaut.http.HttpRequest<?> request, MutableHttpRequest<Object> redirectRequest) {
+            if (request != null) {
+                for (Map.Entry<String, List<String>> originalHeader : request.getHeaders()) {
+                    if (!REDIRECT_HEADER_BLOCKLIST.contains(originalHeader.getKey())) {
+                        final List<String> originalHeaderValue = originalHeader.getValue();
+                        if (originalHeaderValue != null && !originalHeaderValue.isEmpty()) {
+                            for (String value : originalHeaderValue) {
+                                if (value != null) {
+                                    redirectRequest.header(originalHeader.getKey(), value);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         protected abstract Function<URI, Publisher<? extends O>> makeRedirectHandler(io.micronaut.http.HttpRequest<?> parentRequest, MutableHttpRequest<Object> redirectRequest);
@@ -3335,7 +3263,7 @@ public class DefaultHttpClient implements
                     response.onComplete();
                 } else { // error flow
                     try {
-                        promise.tryFailure(makeErrorFromRequestBody(msg.status(), response, errorType));
+                        promise.tryFailure(makeErrorFromRequestBody(msg.status(), response));
                         response.onComplete();
                     } catch (HttpClientResponseException t) {
                         promise.tryFailure(t);
@@ -3348,11 +3276,82 @@ public class DefaultHttpClient implements
             } catch (HttpClientResponseException t) {
                 promise.tryFailure(t);
             } catch (Exception t) {
-                makeNormalBodyParseError(msg, httpStatus, errorType, t, cause -> {
+                makeNormalBodyParseError(msg, httpStatus, t, cause -> {
                     if (!promise.tryFailure(cause) && log.isWarnEnabled()) {
                         log.warn("Exception fired after handler completed: " + t.getMessage(), t);
                     }
                 });
+            }
+        }
+
+
+        /**
+         * Create a {@link HttpClientResponseException} from a response with a failed HTTP status.
+         */
+        private HttpClientResponseException makeErrorFromRequestBody(HttpResponseStatus status, FullNettyClientHttpResponse<?> response) {
+            if (errorType != null && errorType != HttpClient.DEFAULT_ERROR_TYPE) {
+                return new HttpClientResponseException(
+                        status.reasonPhrase(),
+                        null,
+                        response,
+                        new HttpClientErrorDecoder() {
+                            @Override
+                            public Argument<?> getErrorType(MediaType mediaType) {
+                                return errorType;
+                            }
+                        }
+                );
+            } else {
+                return new HttpClientResponseException(status.reasonPhrase(), response);
+            }
+        }
+
+        /**
+         * Create a {@link HttpClientResponseException} if parsing of the HTTP error body failed.
+         */
+        private HttpClientResponseException makeErrorBodyParseError(FullHttpResponse fullResponse, HttpStatus httpStatus, Throwable t) {
+            FullNettyClientHttpResponse<Object> errorResponse = new FullNettyClientHttpResponse<>(
+                    fullResponse,
+                    httpStatus,
+                    mediaTypeCodecRegistry,
+                    byteBufferFactory,
+                    null,
+                    false
+            );
+            // this onComplete call disables further parsing by HttpClientResponseException
+            errorResponse.onComplete();
+            return new HttpClientResponseException(
+                    "Error decoding HTTP error response body: " + t.getMessage(),
+                    t,
+                    errorResponse,
+                    null
+            );
+        }
+
+        private void makeNormalBodyParseError(FullHttpResponse fullResponse, HttpStatus httpStatus, Throwable t, Consumer<HttpClientResponseException> forward) {
+            FullNettyClientHttpResponse<Object> response = new FullNettyClientHttpResponse<>(
+                    fullResponse,
+                    httpStatus,
+                    mediaTypeCodecRegistry,
+                    byteBufferFactory,
+                    null,
+                    false
+            );
+            HttpClientResponseException clientResponseError = new HttpClientResponseException(
+                    "Error decoding HTTP response body: " + t.getMessage(),
+                    t,
+                    response,
+                    new HttpClientErrorDecoder() {
+                        @Override
+                        public Argument<?> getErrorType(MediaType mediaType) {
+                            return errorType;
+                        }
+                    }
+            );
+            try {
+                forward.accept(clientResponseError);
+            } finally {
+                response.onComplete();
             }
         }
 
