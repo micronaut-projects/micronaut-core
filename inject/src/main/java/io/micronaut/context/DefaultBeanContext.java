@@ -2477,6 +2477,16 @@ public class DefaultBeanContext implements InitializableBeanContext {
             Class replacedBeanType = replacesAnnotation.classValue().orElse(getCanonicalBeanType(replacingCandidate));
             final Optional<String> named = replacesAnnotation.stringValue(NAMED_MEMBER);
             final Optional<AnnotationClassValue<?>> qualifier = replacesAnnotation.annotationClassValue(QUALIFIER_MEMBER);
+            Optional<Class<?>> factory = replacesAnnotation.classValue("factory");
+            if (LOG.isDebugEnabled()) {
+                if (factory.isPresent()) {
+                    LOG.debug("Bean [{}] replaces existing bean of type [{}] in factory type [{}]",
+                        replacingCandidate.getBeanType(), replacedBeanType, factory.get());
+                } else {
+                    LOG.debug("Bean [{}] replaces existing bean of type [{}]",
+                        replacingCandidate.getBeanType(), replacedBeanType);
+                }
+            }
 
             if (named.isPresent() || qualifier.isPresent()) {
                 if (named.isPresent() && qualifier.isPresent()) {
