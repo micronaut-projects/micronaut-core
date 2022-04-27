@@ -2113,31 +2113,6 @@ public class DefaultHttpClient implements
         }
     }
 
-    @Nullable
-    private MutableHttpRequest<Object> handleRedirect(
-            io.micronaut.http.HttpRequest<?> finalRequest,
-            io.netty.handler.codec.http.HttpResponse nettyResponse
-    ) {
-        int statusCode = nettyResponse.status().code();
-        HttpHeaders headers = nettyResponse.headers();
-        if (statusCode > 300 && statusCode < 400 && configuration.isFollowRedirects() && headers.contains(HttpHeaderNames.LOCATION)) {
-            String location = headers.get(HttpHeaderNames.LOCATION);
-
-            MutableHttpRequest<Object> redirectRequest;
-            if (statusCode == 307) {
-                redirectRequest = io.micronaut.http.HttpRequest.create(finalRequest.getMethod(), location);
-                finalRequest.getBody().ifPresent(redirectRequest::body);
-            } else {
-                redirectRequest = io.micronaut.http.HttpRequest.GET(location);
-            }
-
-            setRedirectHeaders(finalRequest, redirectRequest);
-            return redirectRequest;
-        } else {
-            return null;
-        }
-    }
-
     private void streamRequestThroughChannel0(
             io.micronaut.http.HttpRequest<?> parentRequest,
             final io.micronaut.http.HttpRequest<?> finalRequest,
@@ -3344,8 +3319,20 @@ public class DefaultHttpClient implements
                 log.debug("Received response {} from {}", msg.status().code(), finalRequest.getUri());
             }
 
-            MutableHttpRequest<Object> redirectRequest = handleRedirect(finalRequest, msg);
-            if (redirectRequest != null) {
+            int code = msg.status().code();
+            HttpHeaders headers1 = msg.headers();
+            if (code > 300 && code < 400 && configuration.isFollowRedirects() && headers1.contains(HttpHeaderNames.LOCATION)) {
+                String location = headers1.get(HttpHeaderNames.LOCATION);
+
+                MutableHttpRequest<Object> redirectRequest;
+                if (code == 307) {
+                    redirectRequest = io.micronaut.http.HttpRequest.create(finalRequest.getMethod(), location);
+                    finalRequest.getBody().ifPresent(redirectRequest::body);
+                } else {
+                    redirectRequest = io.micronaut.http.HttpRequest.GET(location);
+                }
+
+                setRedirectHeaders(finalRequest, redirectRequest);
                 Flux.from(resolveRedirectURI(parentRequest, redirectRequest))
                         .flatMap(makeRedirectHandler(parentRequest, redirectRequest))
                         .subscribe(new NettyPromiseSubscriber<>(responsePromise));
