@@ -65,8 +65,10 @@ public @interface Replaces {
      */
     String named() default "";
 
+    /**
+     * Stub for the default value of {@link Replaces#qualifier()}
+     */
     @Internal
-    @interface ReplacesQualifierDefaultValue
-    {
+    @interface ReplacesQualifierDefaultValue {
     }
 }
