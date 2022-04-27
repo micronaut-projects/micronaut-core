@@ -3410,8 +3410,21 @@ public class DefaultHttpClient implements
         @Override
         protected void channelReadInstrumented(ChannelHandlerContext channelHandlerContext, FullHttpResponse fullResponse) throws Exception {
             try {
+                // corresponding release is the SimpleChannelInboundHandler autoRelease
+                // this should probably be dropped at some point
+                fullResponse.retain();
                 super.channelReadInstrumented(channelHandlerContext, fullResponse);
             } finally {
+                // leave one reference for SimpleChannelInboundHandler autoRelease
+                if (fullResponse.refCnt() > 1) {
+                    try {
+                        ReferenceCountUtil.release(fullResponse);
+                    } catch (Exception e) {
+                        if (log.isDebugEnabled()) {
+                            log.debug("Failed to release response: {}", fullResponse);
+                        }
+                    }
+                }
                 if (!HttpUtil.isKeepAlive(fullResponse)) {
                     keepAlive = false;
                 }
