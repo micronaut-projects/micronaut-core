@@ -1077,16 +1077,61 @@ public class DefaultHttpClient implements
             @NonNull io.micronaut.http.HttpRequest<I> request,
             @NonNull URI requestURI,
             @Nullable Argument<?> errorType) {
-        SslContext sslContext = buildSslContext(requestURI);
 
         AtomicReference<io.micronaut.http.HttpRequest<?>> requestWrapper = new AtomicReference<>(request);
-        Flux<MutableHttpResponse<Object>> streamResponsePublisher = Flux.create(emitter -> {
+        Flux<MutableHttpResponse<Object>> streamResponsePublisher = connectAndStream(parentRequest, request, requestURI, buildSslContext(requestURI), requestWrapper, false, true);
 
+        streamResponsePublisher = readBodyOnError(errorType, streamResponsePublisher);
+
+        // apply filters
+        streamResponsePublisher = Flux.from(
+                applyFilterToResponsePublisher(parentRequest, request, requestURI, requestWrapper, streamResponsePublisher)
+        );
+
+        return streamResponsePublisher.subscribeOn(scheduler);
+    }
+
+    @Override
+    public Publisher<MutableHttpResponse<?>> proxy(@NonNull io.micronaut.http.HttpRequest<?> request) {
+        return Flux.from(resolveRequestURI(request))
+                .flatMap(requestURI -> {
+                    io.micronaut.http.MutableHttpRequest<?> httpRequest = request instanceof MutableHttpRequest
+                            ? (io.micronaut.http.MutableHttpRequest<?>) request
+                            : request.mutate();
+                    httpRequest.headers(headers -> headers.remove(HttpHeaderNames.HOST));
+
+                    AtomicReference<io.micronaut.http.HttpRequest<?>> requestWrapper = new AtomicReference<>(httpRequest);
+                    Flux<MutableHttpResponse<Object>> proxyResponsePublisher = connectAndStream(request, request, requestURI, buildSslContext(requestURI), requestWrapper, true, false);
+                    // apply filters
+                    //noinspection unchecked
+                    proxyResponsePublisher = Flux.from(
+                            applyFilterToResponsePublisher(
+                                    request,
+                                    requestWrapper.get(),
+                                    requestURI,
+                                    requestWrapper,
+                                    (Publisher) proxyResponsePublisher
+                            )
+                    );
+                    return proxyResponsePublisher;
+                });
+    }
+
+    private <I> Flux<MutableHttpResponse<Object>> connectAndStream(
+            io.micronaut.http.HttpRequest<?> parentRequest,
+            io.micronaut.http.HttpRequest<I> request,
+            URI requestURI,
+            SslContext sslContext,
+            AtomicReference<io.micronaut.http.HttpRequest<?>> requestWrapper,
+            boolean isProxy,
+            boolean failOnError
+    ) {
+        return Flux.create(emitter -> {
             ChannelFuture channelFuture;
             try {
                 if (httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0) {
 
-                    channelFuture = doConnect(request, requestURI, sslContext, true, channelHandlerContext -> {
+                    channelFuture = doConnect(request, requestURI, sslContext, true, isProxy, channelHandlerContext -> {
                         try {
                             final Channel channel = channelHandlerContext.channel();
                             request.setAttribute(NettyClientHttpRequest.CHANNEL, channel);
@@ -1094,15 +1139,16 @@ public class DefaultHttpClient implements
                                     parentRequest,
                                     requestWrapper.get(),
                                     channel,
-                                    true
+                                    failOnError
                             ).subscribe(new ForwardingSubscriber<>(emitter));
-                        } catch (Throwable e) {
+                        } catch (Exception e) {
                             emitter.error(e);
                         }
                     });
                 } else {
-                    channelFuture = doConnect(request, requestURI, sslContext, true, null);
-                    addInstrumentedListener(channelFuture, (ChannelFutureListener) f -> {
+                    channelFuture = doConnect(request, requestURI, sslContext, true, isProxy, null);
+                    addInstrumentedListener(channelFuture,
+                            (ChannelFutureListener) f -> {
                                 if (f.isSuccess()) {
                                     Channel channel = f.channel();
                                     request.setAttribute(NettyClientHttpRequest.CHANNEL, channel);
@@ -1110,7 +1156,7 @@ public class DefaultHttpClient implements
                                             parentRequest,
                                             requestWrapper.get(),
                                             channel,
-                                            true
+                                            failOnError
                                     ).subscribe(new ForwardingSubscriber<>(emitter));
                                 } else {
                                     Throwable cause = f.cause();
@@ -1129,15 +1175,6 @@ public class DefaultHttpClient implements
             emitter.onDispose(disposable);
             emitter.onCancel(disposable);
         }, FluxSink.OverflowStrategy.BUFFER);
-
-        streamResponsePublisher = readBodyOnError(errorType, streamResponsePublisher);
-
-        // apply filters
-        streamResponsePublisher = Flux.from(
-                applyFilterToResponsePublisher(parentRequest, request, requestURI, requestWrapper, streamResponsePublisher)
-        );
-
-        return streamResponsePublisher.subscribeOn(scheduler);
     }
 
     /**
@@ -2604,81 +2641,6 @@ public class DefaultHttpClient implements
                 }
             }
         };
-    }
-
-    @Override
-    public Publisher<MutableHttpResponse<?>> proxy(@NonNull io.micronaut.http.HttpRequest<?> request) {
-        return Flux.from(resolveRequestURI(request))
-                .flatMap(requestURI -> {
-                    io.micronaut.http.MutableHttpRequest<?> httpRequest = request instanceof MutableHttpRequest
-                            ? (io.micronaut.http.MutableHttpRequest<?>) request
-                            : request.mutate();
-                    httpRequest.headers(headers -> headers.remove(HttpHeaderNames.HOST));
-
-                    AtomicReference<io.micronaut.http.HttpRequest<?>> requestWrapper = new AtomicReference<>(httpRequest);
-                    Flux<MutableHttpResponse<Object>> proxyResponsePublisher = Flux.create(emitter -> {
-                        SslContext sslContext = buildSslContext(requestURI);
-                        ChannelFuture channelFuture;
-                        try {
-                            if (httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0) {
-
-                                channelFuture = doConnect(request, requestURI, sslContext, true, true, channelHandlerContext -> {
-                                    try {
-                                        final Channel channel = channelHandlerContext.channel();
-                                        request.setAttribute(NettyClientHttpRequest.CHANNEL, channel);
-                                        this.streamRequestThroughChannel(
-                                                request,
-                                                requestWrapper.get(),
-                                                channel,
-                                                false
-                                        ).subscribe(new ForwardingSubscriber<>(emitter));
-                                    } catch (Throwable e) {
-                                        emitter.error(e);
-                                    }
-                                });
-                            } else {
-                                channelFuture = doConnect(request, requestURI, sslContext, true, true, null);
-                                addInstrumentedListener(channelFuture,
-                                        (ChannelFutureListener) f -> {
-                                            if (f.isSuccess()) {
-                                                Channel channel = f.channel();
-                                                request.setAttribute(NettyClientHttpRequest.CHANNEL, channel);
-                                                this.streamRequestThroughChannel(
-                                                        request,
-                                                        requestWrapper.get(),
-                                                        channel,
-                                                        false
-                                                ).subscribe(new ForwardingSubscriber<>(emitter));
-                                            } else {
-                                                Throwable cause = f.cause();
-                                                emitter.error(
-                                                        new HttpClientException("Connect error:" + cause.getMessage(), cause)
-                                                );
-                                            }
-                                        });
-                            }
-                        } catch (HttpClientException e) {
-                            emitter.error(e);
-                            return;
-                        }
-
-                        Disposable disposable = buildDisposableChannel(channelFuture);
-                        emitter.onDispose(disposable);
-                        emitter.onCancel(disposable::dispose);
-                    }, FluxSink.OverflowStrategy.BUFFER);
-                    // apply filters
-                    //noinspection unchecked
-                    proxyResponsePublisher = Flux.from(
-                            applyFilterToResponsePublisher(
-                                    request,
-                                    requestWrapper.get(),
-                                    requestURI,
-                                    requestWrapper,
-                                    (Publisher) proxyResponsePublisher
-                            )
-                    );
-                    return proxyResponsePublisher;
-                });
     }
 
     /**
