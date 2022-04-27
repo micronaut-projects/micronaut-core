@@ -803,7 +803,9 @@ public class DefaultHttpClient implements
 
     @Override
     public <I> Publisher<io.micronaut.http.HttpResponse<ByteBuffer<?>>> exchangeStream(@NonNull io.micronaut.http.HttpRequest<I> request, @NonNull Argument<?> errorType) {
-        return new MicronautFlux<>(Flux.from(resolveRequestURI(request)).flatMap(buildExchangeStreamPublisher(request, errorType)))
+        io.micronaut.http.HttpRequest<Object> parentRequest = ServerRequestContext.currentRequest().orElse(null);
+        return new MicronautFlux<>(Flux.from(resolveRequestURI(request))
+                .flatMap(uri -> exchangeStreamImpl(parentRequest, request, errorType, uri)))
                 .doAfterNext(byteBufferHttpResponse -> {
                     ByteBuffer<?> buffer = byteBufferHttpResponse.body();
                     if (buffer instanceof ReferenceCounted) {
@@ -960,47 +962,37 @@ public class DefaultHttpClient implements
         }, FluxSink.OverflowStrategy.ERROR);
     }
 
-    /**
-     * @param request   The request
-     * @param errorType The error type
-     * @param <I>       The input type
-     * @return A {@link Function}
-     */
-    protected <I> Function<URI, Publisher<HttpResponse<ByteBuffer<?>>>> buildExchangeStreamPublisher(@NonNull io.micronaut.http.HttpRequest<I> request,
-                                                                                                     @NonNull Argument<?> errorType) {
-        final io.micronaut.http.HttpRequest<Object> parentRequest = ServerRequestContext.currentRequest().orElse(null);
-        return requestURI -> {
-            Flux<io.micronaut.http.HttpResponse<Object>> streamResponsePublisher = Flux.from(buildStreamExchange(parentRequest, request, requestURI, errorType));
-            return streamResponsePublisher.switchMap(response -> {
-                StreamedHttpResponse streamedHttpResponse = NettyHttpResponseBuilder.toStreamResponse(response);
-                Flux<HttpContent> httpContentReactiveSequence = Flux.from(streamedHttpResponse);
-                return httpContentReactiveSequence
-                        .filter(message -> !(message.content() instanceof EmptyByteBuf))
-                        .map(message -> {
-                            ByteBuf byteBuf = message.content();
-                            if (log.isTraceEnabled()) {
-                                log.trace("HTTP Client Streaming Response Received Chunk (length: {}) for Request: {} {}",
-                                            byteBuf.readableBytes(), request.getMethodName(), request.getUri());
-                                    traceBody("Response", byteBuf);
-                            }
-                            ByteBuffer<?> byteBuffer = byteBufferFactory.wrap(byteBuf);
-                            NettyStreamedHttpResponse<ByteBuffer<?>> thisResponse = new NettyStreamedHttpResponse<>(
-                                    streamedHttpResponse,
-                                    response.status()
-                            );
-                            thisResponse.setBody(byteBuffer);
-                            return (HttpResponse<ByteBuffer<?>>) new HttpResponseWrapper<>(thisResponse);
-                        });
-            }).doOnTerminate(() -> {
-                final Object o = request.getAttribute(NettyClientHttpRequest.CHANNEL).orElse(null);
-                if (o instanceof Channel) {
-                    final Channel c = (Channel) o;
-                    if (c.isOpen()) {
-                        c.close();
-                    }
+    private <I> Flux<HttpResponse<ByteBuffer<?>>> exchangeStreamImpl(io.micronaut.http.HttpRequest<Object> parentRequest, io.micronaut.http.HttpRequest<I> request, Argument<?> errorType, URI requestURI) {
+        Flux<HttpResponse<Object>> streamResponsePublisher = Flux.from(buildStreamExchange(parentRequest, request, requestURI, errorType));
+        return streamResponsePublisher.switchMap(response -> {
+            StreamedHttpResponse streamedHttpResponse = NettyHttpResponseBuilder.toStreamResponse(response);
+            Flux<HttpContent> httpContentReactiveSequence = Flux.from(streamedHttpResponse);
+            return httpContentReactiveSequence
+                    .filter(message -> !(message.content() instanceof EmptyByteBuf))
+                    .map(message -> {
+                        ByteBuf byteBuf = message.content();
+                        if (log.isTraceEnabled()) {
+                            log.trace("HTTP Client Streaming Response Received Chunk (length: {}) for Request: {} {}",
+                                    byteBuf.readableBytes(), request.getMethodName(), request.getUri());
+                            traceBody("Response", byteBuf);
+                        }
+                        ByteBuffer<?> byteBuffer = byteBufferFactory.wrap(byteBuf);
+                        NettyStreamedHttpResponse<ByteBuffer<?>> thisResponse = new NettyStreamedHttpResponse<>(
+                                streamedHttpResponse,
+                                response.status()
+                        );
+                        thisResponse.setBody(byteBuffer);
+                        return (HttpResponse<ByteBuffer<?>>) new HttpResponseWrapper<>(thisResponse);
+                    });
+        }).doOnTerminate(() -> {
+            final Object o = request.getAttribute(NettyClientHttpRequest.CHANNEL).orElse(null);
+            if (o instanceof Channel) {
+                final Channel c = (Channel) o;
+                if (c.isOpen()) {
+                    c.close();
                 }
-            });
-        };
+            }
+        });
     }
 
     /**
