@@ -16,6 +16,12 @@
 package io.micronaut.docs.replaces;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.docs.replaces.qualifiers.annotations.beans.SomeInterfaceClientReplaceQualifiers;
+import io.micronaut.docs.replaces.qualifiers.annotations.beans.SomeInterfaceReplaceQualifiersImplOneReplacement;
+import io.micronaut.docs.replaces.qualifiers.annotations.beans.SomeInterfaceReplaceQualifiersImplTwoReplacement;
+import io.micronaut.docs.replaces.qualifiers.named.beans.SomeInterfaceClientReplaceNamed;
+import io.micronaut.docs.replaces.qualifiers.named.beans.SomeInterfaceReplaceNamedImplOneReplacement;
+import io.micronaut.docs.replaces.qualifiers.named.beans.SomeInterfaceReplaceNamedImplTwoReplacement;
 import io.micronaut.docs.requires.Book;
 import org.junit.Assert;
 import org.junit.Test;
@@ -27,10 +33,18 @@ public class ReplacesTest {
         ApplicationContext applicationContext = ApplicationContext.run();
 
         Assert.assertTrue(
-                applicationContext.getBean(BookService.class) instanceof MockBookService
+            applicationContext.getBean(BookService.class) instanceof MockBookService
         );
         Assert.assertEquals("An OK Novel", applicationContext.getBean(Book.class).getTitle());
         Assert.assertEquals("Learning 305", applicationContext.getBean(TextBook.class).getTitle());
+
+        final SomeInterfaceClientReplaceQualifiers someInterfaceClientReplaceQualifiers = applicationContext.getBean(SomeInterfaceClientReplaceQualifiers.class);
+        Assert.assertTrue(someInterfaceClientReplaceQualifiers.getSomeInterfaceOne() instanceof SomeInterfaceReplaceQualifiersImplOneReplacement);
+        Assert.assertTrue(someInterfaceClientReplaceQualifiers.getSomeInterfaceTwo() instanceof SomeInterfaceReplaceQualifiersImplTwoReplacement);
+
+        final SomeInterfaceClientReplaceNamed someInterfaceClientReplaceNamed = applicationContext.getBean(SomeInterfaceClientReplaceNamed.class);
+        Assert.assertTrue(someInterfaceClientReplaceNamed.getSomeInterfaceOne() instanceof SomeInterfaceReplaceNamedImplOneReplacement);
+        Assert.assertTrue(someInterfaceClientReplaceNamed.getSomeInterfaceTwo() instanceof SomeInterfaceReplaceNamedImplTwoReplacement);
 
         applicationContext.stop();
     }

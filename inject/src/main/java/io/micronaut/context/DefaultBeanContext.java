@@ -41,6 +41,7 @@ import io.micronaut.context.exceptions.BeanContextException;
 import io.micronaut.context.exceptions.BeanCreationException;
 import io.micronaut.context.exceptions.BeanDestructionException;
 import io.micronaut.context.exceptions.BeanInstantiationException;
+import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.context.exceptions.DependencyInjectionException;
 import io.micronaut.context.exceptions.DisabledBeanException;
 import io.micronaut.context.exceptions.NoSuchBeanException;
@@ -51,6 +52,7 @@ import io.micronaut.context.scope.BeanCreationContext;
 import io.micronaut.context.scope.CreatedBean;
 import io.micronaut.context.scope.CustomScope;
 import io.micronaut.context.scope.CustomScopeRegistry;
+import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
@@ -167,6 +169,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
     private static final String INTRODUCTION_TYPE = "io.micronaut.aop.Introduction";
     private static final String ADAPTER_TYPE = "io.micronaut.aop.Adapter";
     private static final String NAMED_MEMBER = "named";
+    private static final String QUALIFIER_MEMBER = "qualifier";
     private static final String PARALLEL_TYPE = Parallel.class.getName();
     private static final String INDEXES_TYPE = Indexes.class.getName();
     private static final String REPLACES_ANN = Replaces.class.getName();
@@ -2436,74 +2439,73 @@ public class DefaultBeanContext implements InitializableBeanContext {
                     replacementTypes.add(candidate);
                 }
             }
+
             if (!replacementTypes.isEmpty()) {
-
-                candidates.removeIf(definition -> {
-                    if (!definition.isEnabled(this, resolutionContext)) {
-                        return true;
-                    }
-                    final AnnotationMetadata annotationMetadata = definition.getAnnotationMetadata();
-                    if (annotationMetadata.hasDeclaredStereotype(Infrastructure.class)) {
-                        return false;
-                    }
-
-                    Optional<Class<?>> declaringType = Optional.empty();
-
-                    if (definition instanceof BeanDefinition) {
-                        declaringType = ((BeanDefinition<?>) definition).getDeclaringType();
-                    }
-                    Function<Class, Boolean> comparisonFunction = null;
-
-                    for (BeanType<T> replacingCandidate : replacementTypes) {
-                        if (definition == replacingCandidate) {
-                            // don't replace yourself
-                            continue;
-                        }
-                        if (replacingCandidate instanceof ProxyBeanDefinition && ((ProxyBeanDefinition<T>) replacingCandidate).getTargetDefinitionType() == definition.getClass()) {
-                            continue;
-                        }
-
-                        final AnnotationValue<Replaces> replacesAnn = replacingCandidate.getAnnotation(Replaces.class);
-                        Class beanType = replacesAnn.classValue().orElse(getCanonicalBeanType(replacingCandidate));
-                        if (replacesAnn.contains(NAMED_MEMBER)) {
-                            final String qualifier = replacesAnn.stringValue(NAMED_MEMBER).orElse(null);
-                            if (qualifier != null) {
-                                final Optional qualified = Qualifiers.<T>byName(qualifier)
-                                        .qualify(beanType, Stream.of(definition));
-                                if (qualified.isPresent()) {
-                                    return true;
-                                }
-                                continue;
-                            }
-                        }
-
-                        Optional<Class<?>> factory = replacesAnn.classValue("factory");
-                        if (LOG.isDebugEnabled()) {
-                            if (factory.isPresent()) {
-                                LOG.debug("Bean [{}] replaces existing bean of type [{}] in factory type [{}]", replacingCandidate.getBeanType(), beanType, factory.get());
-                            } else {
-                                LOG.debug("Bean [{}] replaces existing bean of type [{}]", replacingCandidate.getBeanType(), beanType);
-                            }
-                        }
-                        if (comparisonFunction == null) {
-                            comparisonFunction = typeMatches(definition, annotationMetadata);
-                        }
-                        if (factory.isPresent() && declaringType.isPresent()) {
-                            if (factory.get() == declaringType.get()) {
-                                if (comparisonFunction.apply(beanType)) {
-                                    return true;
-                                }
-                            }
-                        } else {
-                            if (comparisonFunction.apply(beanType)) {
-                                return true;
-                            }
-                        }
-                    }
-                    return false;
-                });
+                candidates.removeIf(definition -> checkIfReplacementExists(resolutionContext, replacementTypes, definition));
             }
         }
+    }
+
+    private <T> boolean checkIfReplacementExists(BeanResolutionContext resolutionContext,
+                                                 List<BeanType<T>> replacementTypes,
+                                                 BeanType<T> definitionToBeReplaced) {
+        if (!definitionToBeReplaced.isEnabled(this, resolutionContext)) {
+            return true;
+        }
+        final AnnotationMetadata annotationMetadata = definitionToBeReplaced.getAnnotationMetadata();
+        if (annotationMetadata.hasDeclaredStereotype(Infrastructure.class)) {
+            return false;
+        }
+        return replacementTypes.stream()
+            .filter(isNotTheSameDefinition(definitionToBeReplaced))
+            .filter(isNotProxy(definitionToBeReplaced))
+            .anyMatch(checkIfReplaces(definitionToBeReplaced, annotationMetadata));
+    }
+
+    private <T> Predicate<BeanType<T>> isNotTheSameDefinition(BeanType<T> definitionToBeReplaced) {
+        return replacingCandidate -> replacingCandidate != definitionToBeReplaced;
+    }
+
+    private <T> Predicate<BeanType<T>> isNotProxy(BeanType<T> definitionToBeReplaced) {
+        return replacingCandidate -> !(replacingCandidate instanceof ProxyBeanDefinition &&
+            ((ProxyBeanDefinition<T>) replacingCandidate).getTargetDefinitionType() == definitionToBeReplaced.getClass());
+    }
+
+    private <T> Predicate<BeanType<T>> checkIfReplaces(BeanType<T> definitionToBeReplaced, AnnotationMetadata annotationMetadata) {
+        return replacingCandidate -> {
+            final AnnotationValue<Replaces> replacesAnnotation = replacingCandidate.getAnnotation(Replaces.class);
+            Class replacedBeanType = replacesAnnotation.classValue().orElse(getCanonicalBeanType(replacingCandidate));
+            final Optional<String> named = replacesAnnotation.stringValue(NAMED_MEMBER);
+            final Optional<AnnotationClassValue<?>> qualifier = replacesAnnotation.annotationClassValue(QUALIFIER_MEMBER);
+
+            if (named.isPresent() || qualifier.isPresent()) {
+                if (named.isPresent() && qualifier.isPresent()) {
+                    throw new ConfigurationException("Both \"named\" and \"qualifier\" should not be present: " + replacesAnnotation);
+                }
+                return qualifiedByNamed(definitionToBeReplaced, replacedBeanType, named) ||
+                    qualifiedByQualifier(definitionToBeReplaced, replacedBeanType, qualifier);
+            } else {
+                return checkIfTypeMatches(definitionToBeReplaced, annotationMetadata).apply(replacedBeanType);
+            }
+        };
+    }
+
+    private <T> boolean qualifiedByQualifier(BeanType<T> definitionToBeReplaced,
+                                             Class replacedBeanType,
+                                             Optional<AnnotationClassValue<?>> qualifier) {
+        return qualifier.flatMap(annotationClassValue -> {
+            final Class<? extends Annotation> qualifierClass = (Class<? extends Annotation>) annotationClassValue.getType().get();
+            if (!qualifierClass.isAssignableFrom(Replaces.ReplacesQualifierDefaultValue.class)) {
+                return Qualifiers.<T>byStereotype(qualifierClass).qualify(replacedBeanType, Stream.of(definitionToBeReplaced));
+            } else {
+                return Optional.empty();
+            }
+        }).isPresent();
+    }
+
+    private <T> boolean qualifiedByNamed(BeanType<T> definitionToBeReplaced, Class replacedBeanType, Optional<String> named) {
+        return named.flatMap(name -> Qualifiers.<T>byName(name).qualify(replacedBeanType, Stream.of(definitionToBeReplaced)))
+            .isPresent();
     }
 
     private <T> Class<T> getCanonicalBeanType(BeanType<T> beanType) {
@@ -2535,7 +2537,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
         }
     }
 
-    private <T> Function<Class, Boolean> typeMatches(BeanType<T> definition, AnnotationMetadata annotationMetadata) {
+    private <T> Function<Class, Boolean> checkIfTypeMatches(BeanType<T> definition, AnnotationMetadata annotationMetadata) {
         Class<T> bt;
 
         if (definition instanceof ProxyBeanDefinition) {
