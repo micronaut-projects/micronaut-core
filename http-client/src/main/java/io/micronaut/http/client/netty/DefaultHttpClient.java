@@ -1069,7 +1069,7 @@ public class DefaultHttpClient implements
     }
 
     /**
-     * Implementation of {@link #jsonStream}, {@link #dataStream}, {@link #exchangeStream}
+     * Implementation of {@link #jsonStream}, {@link #dataStream}, {@link #exchangeStream}.
      */
     @SuppressWarnings("MagicNumber")
     private  <I> Publisher<MutableHttpResponse<Object>> buildStreamExchange(
@@ -1594,17 +1594,7 @@ public class DefaultHttpClient implements
         }
     }
 
-    /**
-     * @param parentRequest     The parent request
-     * @param request           The request
-     * @param requestURI        The URI of the request
-     * @param requestWrapper    The request wrapper
-     * @param responsePublisher The response publisher
-     * @param <I>               The input type
-     * @param <O>               The output type
-     * @return The {@link Publisher} for the response
-     */
-    protected <I, O, R extends io.micronaut.http.HttpResponse<O>> Publisher<R> applyFilterToResponsePublisher(
+    private <I, O, R extends io.micronaut.http.HttpResponse<O>> Publisher<R> applyFilterToResponsePublisher(
             io.micronaut.http.HttpRequest<?> parentRequest,
             io.micronaut.http.HttpRequest<I> request,
             URI requestURI,

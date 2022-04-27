@@ -15,19 +15,17 @@
  */
 package io.micronaut.http.client.netty;
 
-import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.scheduling.instrument.Instrumentation;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
-import io.micronaut.scheduling.instrument.InvocationInstrumenterFactory;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 
 /**
  * An extension of Netty {@link SimpleChannelInboundHandler} that instruments the channel read handler
- * by using collection of available {@link InvocationInstrumenterFactory} (such as
- * {@link ServerRequestContext#with(io.micronaut.http.HttpRequest, java.util.concurrent.Callable)}) if present during
+ * by using collection of available {@link io.micronaut.scheduling.instrument.InvocationInstrumenterFactory} (such as
+ * {@link io.micronaut.http.context.ServerRequestContext#with(io.micronaut.http.HttpRequest, java.util.concurrent.Callable)}) if present during
  * the constructor call of the http client.
- * Thanks to that the {@link ServerRequestContext#currentRequest()} returns parent request.
+ * Thanks to that the {@link io.micronaut.http.context.ServerRequestContext#currentRequest()} returns parent request.
  *
  * @param <I> the type of the inbound message
  */
