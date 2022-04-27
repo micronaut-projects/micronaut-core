@@ -823,7 +823,7 @@ public class DefaultHttpClient implements
     public <I, O> Publisher<O> jsonStream(@NonNull io.micronaut.http.HttpRequest<I> request, @NonNull Argument<O> type, @NonNull Argument<?> errorType) {
         final io.micronaut.http.HttpRequest<Object> parentRequest = ServerRequestContext.currentRequest().orElse(null);
         return Flux.from(resolveRequestURI(request))
-                .flatMap(buildJsonStreamPublisher(parentRequest, request, type, errorType));
+                .flatMap(requestURI -> jsonStreamImpl(parentRequest, request, type, errorType, requestURI));
     }
 
     @SuppressWarnings("unchecked")
@@ -995,63 +995,48 @@ public class DefaultHttpClient implements
         });
     }
 
-    /**
-     * @param parentRequest The parent request
-     * @param request       The request
-     * @param type          The type
-     * @param errorType     The error type
-     * @param <I>           The input type
-     * @param <O>           The output type
-     * @return A {@link Function}
-     */
-    protected <I, O> Function<URI, Publisher<O>> buildJsonStreamPublisher(
-            io.micronaut.http.HttpRequest<?> parentRequest,
-            io.micronaut.http.HttpRequest<I> request,
-            io.micronaut.core.type.Argument<O> type,
-            io.micronaut.core.type.Argument<?> errorType) {
-        return requestURI -> {
-            Flux<io.micronaut.http.HttpResponse<Object>> streamResponsePublisher =
-                    Flux.from(buildStreamExchange(parentRequest, request, requestURI, errorType));
-            return streamResponsePublisher.switchMap(response -> {
-                if (!(response instanceof NettyStreamedHttpResponse)) {
-                    throw new IllegalStateException("Response has been wrapped in non streaming type. Do not wrap the response in client filters for stream requests");
-                }
+    private <I, O> Flux<O> jsonStreamImpl(io.micronaut.http.HttpRequest<?> parentRequest, io.micronaut.http.HttpRequest<I> request, Argument<O> type, Argument<?> errorType, URI requestURI) {
+        Flux<HttpResponse<Object>> streamResponsePublisher =
+                Flux.from(buildStreamExchange(parentRequest, request, requestURI, errorType));
+        return streamResponsePublisher.switchMap(response -> {
+            if (!(response instanceof NettyStreamedHttpResponse)) {
+                throw new IllegalStateException("Response has been wrapped in non streaming type. Do not wrap the response in client filters for stream requests");
+            }
 
-                MapperMediaTypeCodec mediaTypeCodec = (MapperMediaTypeCodec) mediaTypeCodecRegistry.findCodec(MediaType.APPLICATION_JSON_TYPE)
-                        .orElseThrow(() -> new IllegalStateException("No JSON codec found"));
+            MapperMediaTypeCodec mediaTypeCodec = (MapperMediaTypeCodec) mediaTypeCodecRegistry.findCodec(MediaType.APPLICATION_JSON_TYPE)
+                    .orElseThrow(() -> new IllegalStateException("No JSON codec found"));
 
-                StreamedHttpResponse streamResponse = NettyHttpResponseBuilder.toStreamResponse(response);
-                Flux<HttpContent> httpContentReactiveSequence = Flux.from(streamResponse);
+            StreamedHttpResponse streamResponse = NettyHttpResponseBuilder.toStreamResponse(response);
+            Flux<HttpContent> httpContentReactiveSequence = Flux.from(streamResponse);
 
-                boolean isJsonStream = response.getContentType().map(mediaType -> mediaType.equals(MediaType.APPLICATION_JSON_STREAM_TYPE)).orElse(false);
-                boolean streamArray = !Iterable.class.isAssignableFrom(type.getType()) && !isJsonStream;
-                Processor<byte[], JsonNode> jsonProcessor = mediaTypeCodec.getJsonMapper().createReactiveParser(p -> {
-                    httpContentReactiveSequence.map(content -> {
-                        ByteBuf chunk = content.content();
-                        if (log.isTraceEnabled()) {
-                            log.trace("HTTP Client Streaming Response Received Chunk (length: {}) for Request: {} {}",
-                                    chunk.readableBytes(), request.getMethodName(), request.getUri());
-                            traceBody("Chunk", chunk);
-                        }
-                        try {
-                            return ByteBufUtil.getBytes(chunk);
-                        } finally {
-                            chunk.release();
-                        }
-                    }).subscribe(p);
-                }, streamArray);
-                return Flux.from(jsonProcessor)
-                        .map(jsonNode -> mediaTypeCodec.decode(type, jsonNode));
-            }).doOnTerminate(() -> {
-                final Object o = request.getAttribute(NettyClientHttpRequest.CHANNEL).orElse(null);
-                if (o instanceof Channel) {
-                    final Channel c = (Channel) o;
-                    if (c.isOpen()) {
-                        c.close();
+            boolean isJsonStream = response.getContentType().map(mediaType -> mediaType.equals(MediaType.APPLICATION_JSON_STREAM_TYPE)).orElse(false);
+            boolean streamArray = !Iterable.class.isAssignableFrom(type.getType()) && !isJsonStream;
+            Processor<byte[], JsonNode> jsonProcessor = mediaTypeCodec.getJsonMapper().createReactiveParser(p -> {
+                httpContentReactiveSequence.map(content -> {
+                    ByteBuf chunk = content.content();
+                    if (log.isTraceEnabled()) {
+                        log.trace("HTTP Client Streaming Response Received Chunk (length: {}) for Request: {} {}",
+                                chunk.readableBytes(), request.getMethodName(), request.getUri());
+                        traceBody("Chunk", chunk);
                     }
+                    try {
+                        return ByteBufUtil.getBytes(chunk);
+                    } finally {
+                        chunk.release();
+                    }
+                }).subscribe(p);
+            }, streamArray);
+            return Flux.from(jsonProcessor)
+                    .map(jsonNode -> mediaTypeCodec.decode(type, jsonNode));
+        }).doOnTerminate(() -> {
+            final Object o = request.getAttribute(NettyClientHttpRequest.CHANNEL).orElse(null);
+            if (o instanceof Channel) {
+                final Channel c = (Channel) o;
+                if (c.isOpen()) {
+                    c.close();
                 }
-            });
-        };
+            }
+        });
     }
 
     /**
