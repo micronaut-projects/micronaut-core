@@ -784,7 +784,9 @@ public class DefaultHttpClient implements
 
     @Override
     public <I> Publisher<ByteBuffer<?>> dataStream(@NonNull io.micronaut.http.HttpRequest<I> request, @NonNull Argument<?> errorType) {
-        return new MicronautFlux<>(Flux.from(resolveRequestURI(request)).flatMap(buildDataStreamPublisher(request, errorType)))
+        final io.micronaut.http.HttpRequest<Object> parentRequest = ServerRequestContext.currentRequest().orElse(null);
+        return new MicronautFlux<>(Flux.from(resolveRequestURI(request))
+                .flatMap(requestURI -> dataStreamImpl(request, errorType, parentRequest, requestURI)))
                 .doAfterNext(buffer -> {
                     Object o = buffer.asNativeBuffer();
                     if (o instanceof ByteBuf) {
@@ -1039,52 +1041,31 @@ public class DefaultHttpClient implements
         });
     }
 
-    /**
-     * @param request The request
-     * @param <I>     The input type
-     * @return A {@link Function}
-     * @deprecated Use {@link #buildDataStreamPublisher(io.micronaut.http.HttpRequest, Argument)} instead
-     */
-    @Deprecated
-    protected <I> Function<URI, Publisher<ByteBuffer<?>>> buildDataStreamPublisher(io.micronaut.http.HttpRequest<I> request) {
-        return buildDataStreamPublisher(request, null);
-    }
-
-    /**
-     * @param request   The request
-     * @param errorType The error type
-     * @param <I>       The input type
-     * @return A {@link Function}
-     */
-    protected <I> Function<URI, Publisher<ByteBuffer<?>>> buildDataStreamPublisher(@NonNull io.micronaut.http.HttpRequest<I> request,
-                                                                                   @NonNull Argument<?> errorType) {
-        final io.micronaut.http.HttpRequest<Object> parentRequest = ServerRequestContext.currentRequest().orElse(null);
-        return requestURI -> {
-            Flux<io.micronaut.http.HttpResponse<Object>> streamResponsePublisher = Flux.from(buildStreamExchange(parentRequest, request, requestURI, errorType));
-            Function<HttpContent, ByteBuffer<?>> contentMapper = message -> {
-                ByteBuf byteBuf = message.content();
-                return byteBufferFactory.wrap(byteBuf);
-            };
-            return streamResponsePublisher.switchMap(response -> {
-                if (!(response instanceof NettyStreamedHttpResponse)) {
-                    throw new IllegalStateException("Response has been wrapped in non streaming type. Do not wrap the response in client filters for stream requests");
-                }
-                NettyStreamedHttpResponse nettyStreamedHttpResponse = (NettyStreamedHttpResponse) response;
-                Flux<HttpContent> httpContentReactiveSequence = Flux.from(nettyStreamedHttpResponse.getNettyResponse());
-                return httpContentReactiveSequence
-                        .filter(message -> !(message.content() instanceof EmptyByteBuf))
-                        .map(contentMapper);
-            })
-                    .doOnTerminate(() -> {
-                        final Object o = request.getAttribute(NettyClientHttpRequest.CHANNEL).orElse(null);
-                        if (o instanceof Channel) {
-                            final Channel c = (Channel) o;
-                            if (c.isOpen()) {
-                                c.close();
-                            }
-                        }
-                    });
+    private <I> Flux<ByteBuffer<?>> dataStreamImpl(io.micronaut.http.HttpRequest<I> request, Argument<?> errorType, io.micronaut.http.HttpRequest<Object> parentRequest, URI requestURI) {
+        Flux<HttpResponse<Object>> streamResponsePublisher = Flux.from(buildStreamExchange(parentRequest, request, requestURI, errorType));
+        Function<HttpContent, ByteBuffer<?>> contentMapper = message -> {
+            ByteBuf byteBuf = message.content();
+            return byteBufferFactory.wrap(byteBuf);
         };
+        return streamResponsePublisher.switchMap(response -> {
+                    if (!(response instanceof NettyStreamedHttpResponse)) {
+                        throw new IllegalStateException("Response has been wrapped in non streaming type. Do not wrap the response in client filters for stream requests");
+                    }
+                    NettyStreamedHttpResponse nettyStreamedHttpResponse = (NettyStreamedHttpResponse) response;
+                    Flux<HttpContent> httpContentReactiveSequence = Flux.from(nettyStreamedHttpResponse.getNettyResponse());
+                    return httpContentReactiveSequence
+                            .filter(message -> !(message.content() instanceof EmptyByteBuf))
+                            .map(contentMapper);
+                })
+                .doOnTerminate(() -> {
+                    final Object o = request.getAttribute(NettyClientHttpRequest.CHANNEL).orElse(null);
+                    if (o instanceof Channel) {
+                        final Channel c = (Channel) o;
+                        if (c.isOpen()) {
+                            c.close();
+                        }
+                    }
+                });
     }
 
     /**
