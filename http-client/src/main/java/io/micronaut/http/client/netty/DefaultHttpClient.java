@@ -1069,15 +1069,10 @@ public class DefaultHttpClient implements
     }
 
     /**
-     * @param parentRequest The parent request
-     * @param request       The request
-     * @param requestURI    The request URI
-     * @param errorType     The error type
-     * @param <I>           The input type
-     * @return A {@link Flux}
+     * Implementation of {@link #jsonStream}, {@link #dataStream}, {@link #exchangeStream}
      */
     @SuppressWarnings("MagicNumber")
-    protected <I> Publisher<MutableHttpResponse<Object>> buildStreamExchange(
+    private  <I> Publisher<MutableHttpResponse<Object>> buildStreamExchange(
             @Nullable io.micronaut.http.HttpRequest<?> parentRequest,
             @NonNull io.micronaut.http.HttpRequest<I> request,
             @NonNull URI requestURI,
