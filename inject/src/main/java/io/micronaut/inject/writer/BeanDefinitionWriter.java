@@ -1820,7 +1820,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                     ElementQuery.ALL_METHODS
                             .onlyAccessible(beanTypeElement)
                             .onlyInstance()
-                            .named((name) -> annotationMemberProperty.equals(NameUtils.getPropertyNameForGetter(name, readPrefixes)))
+                            .named(name -> annotationMemberProperty.equals(NameUtils.getPropertyNameForGetter(name, readPrefixes)))
                             .filter((e) -> !e.hasParameters())
             ).orElse(null);
         }
