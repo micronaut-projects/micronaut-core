@@ -164,9 +164,9 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
     @Override
     public List<BeanRegistration<?>> popDependentBeans() {
-        List<BeanRegistration<?>> dependentBeans = this.dependentBeans;
+        List<BeanRegistration<?>> result = this.dependentBeans;
         this.dependentBeans = null;
-        return dependentBeans;
+        return result;
     }
 
     @Override
