@@ -428,7 +428,7 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
             // All qualifiers are removed from the factory class anyway, so we can skip the hierarchy
             annotationMetadata = annotationMetadata.getDeclaredMetadata();
         }
-        final List<String> annotations = getAnnotationNamesByStereotype(AnnotationUtil.QUALIFIER);
+        final List<String> annotations = annotationMetadata.getAnnotationNamesByStereotype(AnnotationUtil.QUALIFIER);
         if (!annotations.isEmpty()) {
             if (annotations.size() == 1) {
                 final String annotation = annotations.iterator().next();
