@@ -6,7 +6,6 @@ import io.micronaut.inject.dependent.TestData;
 import jakarta.annotation.PreDestroy;
 import jakarta.inject.Singleton;
 
-//@Singleton
 @Factory
 public class MyBean3Factory {
 
