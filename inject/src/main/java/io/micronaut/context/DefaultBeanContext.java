@@ -1075,7 +1075,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
             if (beanDefinition.isPresent()) {
                 BeanDefinition<T> definition = beanDefinition.get();
                 BeanKey<T> key = new BeanKey<>(definition, definition.getDeclaredQualifier());
-                destroyBean(BeanDisposingRegistration.of(this, key, definition, bean));
+                destroyBean(BeanRegistration.of(this, key, definition, bean));
             }
         }
         return bean;
