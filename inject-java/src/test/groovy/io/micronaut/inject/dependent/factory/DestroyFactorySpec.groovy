@@ -1,6 +1,8 @@
 package io.micronaut.inject.dependent.factory
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.BeanRegistration
+import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.dependent.TestData
 import spock.lang.Specification
 
@@ -11,10 +13,10 @@ class DestroyFactorySpec extends Specification {
             TestData.DESTRUCTION_ORDER.clear()
 
         when:
-            def context = ApplicationContext.run()
-            def beanDefinition = context.getBeanDefinition(MyBean1)
-            def registration = context.getBeanRegistration(beanDefinition)
             def bean = registration.bean
+            ApplicationContext context = ApplicationContext.run()
+            BeanDefinition<MyBean1> beanDefinition = context.getBeanDefinition(MyBean1)
+            BeanRegistration<MyBean1> registration = context.getBeanRegistration(beanDefinition)
 
         then:
             MyBean1Factory.destroyed == 1 // prototype

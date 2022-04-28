@@ -16,8 +16,8 @@ class DestroyDependentBeansSpec extends Specification {
         TestData.DESTRUCTION_ORDER.clear()
 
         when:
-        def context = ApplicationContext.run()
-        def bean = context.getBean(SingletonBeanA)
+        ApplicationContext context = ApplicationContext.run()
+        SingletonBeanA bean = context.getBean(SingletonBeanA)
 
         then:
         !bean.beanBField.destroyed
@@ -50,9 +50,9 @@ class DestroyDependentBeansSpec extends Specification {
         TestData.DESTRUCTION_ORDER.clear()
         
         when:
-        def context = ApplicationContext.run()
-        def bean = context.getBean(ScopedBeanA)
-        def refreshScope = context.getBean(CustomScope, Qualifiers.byExactTypeArgumentName(Refreshable.class.name))
+        ApplicationContext context = ApplicationContext.run()
+        ScopedBeanA bean = context.getBean(ScopedBeanA)
+        CustomScope refreshScope = context.getBean(CustomScope, Qualifiers.byExactTypeArgumentName(Refreshable.class.name))
 
         then:
         TestData.DESTRUCTION_ORDER.isEmpty()
@@ -64,7 +64,7 @@ class DestroyDependentBeansSpec extends Specification {
 
 
         when:"When the context is stopped"
-        def target = bean.interceptedTarget()
+        ScopedBeanA target = ((InterceptedProxy<ScopedBeanA>) bean).interceptedTarget()
         context.stop()
 
         then:"Dependent objects stored"
@@ -86,8 +86,8 @@ class DestroyDependentBeansSpec extends Specification {
             TestData.DESTRUCTION_ORDER.clear()
 
         when:
-            def context = ApplicationContext.run()
-            def bean = context.getBean(SingletonBeanANoCallback)
+            ApplicationContext context = ApplicationContext.run()
+            SingletonBeanANoCallback bean = context.getBean(SingletonBeanANoCallback)
 
         then:
             !bean.beanBField.destroyed
@@ -137,10 +137,10 @@ class DestroyDependentBeansSpec extends Specification {
             TestData.DESTRUCTION_ORDER.clear()
 
         when:
-            def context = ApplicationContext.run()
-            def beanDefinition = context.getBeanDefinition(PrototypeBeanA)
-            def registration = context.getBeanRegistration(beanDefinition)
-            def bean = registration.bean
+            ApplicationContext context = ApplicationContext.run()
+            BeanDefinition<PrototypeBeanA> beanDefinition = context.getBeanDefinition(PrototypeBeanA)
+            BeanRegistration<PrototypeBeanA> registration = context.getBeanRegistration(beanDefinition)
+            PrototypeBeanA bean = registration.bean
 
         then:
             !bean.beanBField.destroyed
@@ -186,8 +186,8 @@ class DestroyDependentBeansSpec extends Specification {
             TestData.DESTRUCTION_ORDER.clear()
 
         when:
-            def context = ApplicationContext.run()
-            def bean = context.getBean(AnotherSingletonBeanA)
+            ApplicationContext context = ApplicationContext.run()
+            AnotherSingletonBeanA bean = context.getBean(AnotherSingletonBeanA)
 
         then:
             !bean.beanBField.destroyed
