@@ -10,7 +10,6 @@ class DestroyFactorySpec extends Specification {
 
     void "test destroy dependent objects from singleton using listeners"() {
         when:
-            def bean = registration.bean
             ApplicationContext context = ApplicationContext.run()
             BeanDefinition<MyBean1> beanDefinition = context.getBeanDefinition(MyBean1)
             BeanRegistration<MyBean1> registration = context.getBeanRegistration(beanDefinition)
