@@ -93,10 +93,9 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
                                              List<BeanRegistration<?>> dependents) {
         boolean hasDependents = CollectionUtils.isNotEmpty(dependents);
         if (beanDefinition instanceof DisposableBeanDefinition || bean instanceof LifeCycle || hasDependents) {
-            if (hasDependents) {
-                return new BeanDisposingRegistration<>(beanContext, identifier, beanDefinition, bean, dependents);
-            }
-            return new BeanDisposingRegistration<>(beanContext, identifier, beanDefinition, bean);
+            return hasDependents ?
+                new BeanDisposingRegistration<>(beanContext, identifier, beanDefinition, bean, dependents) :
+                new BeanDisposingRegistration<>(beanContext, identifier, beanDefinition, bean);
         }
         return new BeanRegistration<>(identifier, beanDefinition, bean);
     }
