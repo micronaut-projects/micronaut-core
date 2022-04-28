@@ -33,7 +33,6 @@ class InterceptorSpec : StringSpec() {
         "test correct interceptors calls" {
             runBlocking {
                 myService.someCall()
-                println(MyService.events)
                 MyService.events.size shouldBeExactly 8
                 MyService.events[0] shouldBe "intercept1-start"
                 MyService.events[1] shouldBe "intercept2-start"
