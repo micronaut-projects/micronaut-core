@@ -161,7 +161,8 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
         for (CreatedBean<?> created : refreshableBeans.values()) {
             if (created.bean() == bean) {
                 //noinspection unchecked
-                return Optional.of(new BeanRegistration<>(
+                return Optional.of(BeanRegistration.of(
+                        beanContext,
                         created.id(),
                         (BeanDefinition<T>) created.definition(),
                         (T) created.bean()

@@ -332,6 +332,18 @@ public interface BeanDefinitionRegistry {
     }
 
     /**
+     * Find a bean registration for the given bean definition.
+     *
+     * @param beanDefinition The bean definition
+     * @param <T>            The concrete type
+     * @return The bean registration
+     * @throws NoSuchBeanException if the bean doesn't exist
+     * @since 3.5.0
+     */
+    @NonNull
+    <T> BeanRegistration<T> getBeanRegistration(@NonNull BeanDefinition<T> beanDefinition);
+
+    /**
      * Obtain the original {@link BeanDefinition} for a {@link io.micronaut.inject.ProxyBeanDefinition}.
      *
      * @param beanType  The type
