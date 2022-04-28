@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.qualifiers;
 
+import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanType;
 
@@ -29,22 +30,33 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 @Internal
-class AnnotationQualifier<T> extends NameQualifier<T> {
+class AnnotationQualifier<T> implements Qualifier<T> {
 
-    private final Annotation qualifier;
+    final Annotation annotation;
 
     /**
-     * @param qualifier The qualifier
+     * @param annotation The qualifier
      */
-    AnnotationQualifier(Annotation qualifier) {
-        super(qualifier.annotationType());
-        this.qualifier = qualifier;
+    AnnotationQualifier(Annotation annotation) {
+        this.annotation = annotation;
     }
 
     @Override
     public <BT extends BeanType<T>> Stream<BT> reduce(Class<T> beanType, Stream<BT> candidates) {
-        String name = qualifier.annotationType().getSimpleName();
-        return reduceByAnnotation(beanType, candidates, name, qualifier.annotationType().getName());
+        String qualifiedName = annotation.annotationType().getName();
+        String annotationSimpleName = annotation.annotationType().getSimpleName();
+        return candidates.filter(candidate -> {
+            if (!Utils.matchType(beanType, candidate)) {
+                return false;
+            }
+            if (Utils.matchAny(beanType, candidate)) {
+                return true;
+            }
+            if (candidate.getAnnotationMetadata().hasDeclaredAnnotation(qualifiedName)) {
+                return true;
+            }
+            return Utils.matchByCandidateName(candidate, beanType, annotationSimpleName);
+        });
     }
 
     @Override
@@ -55,19 +67,16 @@ class AnnotationQualifier<T> extends NameQualifier<T> {
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-
-        AnnotationQualifier<?> that = (AnnotationQualifier<?>) o;
-
-        return qualifier.equals(that.qualifier);
+        return Utils.annotationQualifiersEquals(this, o);
     }
 
     @Override
     public int hashCode() {
-        return qualifier.hashCode();
+        return annotation.hashCode();
     }
 
     @Override
     public String toString() {
-        return '@' + qualifier.annotationType().getSimpleName();
+        return '@' + annotation.annotationType().getSimpleName();
     }
 }

@@ -60,19 +60,7 @@ final class AnnotationStereotypeQualifier<T> implements Qualifier<T> {
         if (o == null) {
             return false;
         }
-        if (o instanceof AnnotationStereotypeQualifier) {
-            AnnotationStereotypeQualifier<?> that = (AnnotationStereotypeQualifier<?>) o;
-            return Objects.equals(stereotype.getName(), that.stereotype.getName());
-        } else if (o instanceof NamedAnnotationStereotypeQualifier) {
-            NamedAnnotationStereotypeQualifier<?> that = (NamedAnnotationStereotypeQualifier<?>) o;
-            return Objects.equals(stereotype.getName(), that.stereotype);
-        } else if (o instanceof AnnotationMetadataQualifier) {
-            AnnotationMetadataQualifier<?> that = (AnnotationMetadataQualifier<?>) o;
-            if (that.qualifierAnn == null) {
-                return Objects.equals(stereotype.getName(), that.qualifiedName);
-            }
-        }
-        return false;
+        return Utils.annotationQualifiersEquals(this, o);
     }
 
     @Override
