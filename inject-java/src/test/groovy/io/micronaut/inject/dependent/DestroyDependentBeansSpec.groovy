@@ -2,8 +2,10 @@ package io.micronaut.inject.dependent
 
 import io.micronaut.aop.InterceptedProxy
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.BeanDisposingRegistration
 import io.micronaut.context.BeanRegistration
 import io.micronaut.context.scope.CustomScope
+import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.dependent.listeners.AnotherSingletonBeanA
 import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.runtime.context.scope.Refreshable
@@ -12,9 +14,6 @@ import spock.lang.Specification
 class DestroyDependentBeansSpec extends Specification {
 
     void "test destroy dependent objects from singleton"() {
-        given:
-        TestData.DESTRUCTION_ORDER.clear()
-
         when:
         ApplicationContext context = ApplicationContext.run()
         SingletonBeanA bean = context.getBean(SingletonBeanA)
@@ -43,12 +42,12 @@ class DestroyDependentBeansSpec extends Specification {
         TestData.DESTRUCTION_ORDER.count("BeanC") == 3
         TestData.DESTRUCTION_ORDER.count("BeanB") == 3
         TestData.DESTRUCTION_ORDER.count("TestInterceptor") == 3
+
+        cleanup:
+        TestData.DESTRUCTION_ORDER.clear()
     }
 
     void "test destroy dependent bean objects for custom scope"() {
-        given:
-        TestData.DESTRUCTION_ORDER.clear()
-        
         when:
         ApplicationContext context = ApplicationContext.run()
         ScopedBeanA bean = context.getBean(ScopedBeanA)
@@ -61,7 +60,6 @@ class DestroyDependentBeansSpec extends Specification {
         !bean.beanBConstructor.destroyed
         !bean.beanBMethod.destroyed
         bean instanceof InterceptedProxy
-
 
         when:"When the context is stopped"
         ScopedBeanA target = ((InterceptedProxy<ScopedBeanA>) bean).interceptedTarget()
@@ -79,12 +77,12 @@ class DestroyDependentBeansSpec extends Specification {
         TestData.DESTRUCTION_ORDER.count("BeanC") == 3
         TestData.DESTRUCTION_ORDER.count("BeanB") == 3
         TestData.DESTRUCTION_ORDER.count("TestInterceptor") == 3
+
+        cleanup:
+        TestData.DESTRUCTION_ORDER.clear()
     }
 
     void "test destroy dependent objects from singleton bean without callback"() {
-        given:
-            TestData.DESTRUCTION_ORDER.clear()
-
         when:
             ApplicationContext context = ApplicationContext.run()
             SingletonBeanANoCallback bean = context.getBean(SingletonBeanANoCallback)
@@ -95,7 +93,7 @@ class DestroyDependentBeansSpec extends Specification {
             !bean.beanBMethod.destroyed
 
         when:
-            def registration = context.findBeanRegistration(bean).orElse(null)
+            BeanRegistration<SingletonBeanANoCallback> registration = context.findBeanRegistration(bean).orElse(null)
         then:
             registration
         when:
@@ -105,6 +103,7 @@ class DestroyDependentBeansSpec extends Specification {
             dependents[0].bean instanceof BeanB
 
         when:
+
             List<BeanRegistration> beanBDependents = dependents[0].dependents
         then:"Validate BeanB dependents"
             beanBDependents.size() == 2
@@ -130,12 +129,12 @@ class DestroyDependentBeansSpec extends Specification {
             TestData.DESTRUCTION_ORDER.count("BeanC") == 3
             TestData.DESTRUCTION_ORDER.count("BeanB") == 3
             TestData.DESTRUCTION_ORDER.count("TestInterceptor") == 3
+
+        cleanup:
+            TestData.DESTRUCTION_ORDER.clear()
     }
 
     void "test destroy dependent objects from prototype bean without callback"() {
-        given:
-            TestData.DESTRUCTION_ORDER.clear()
-
         when:
             ApplicationContext context = ApplicationContext.run()
             BeanDefinition<PrototypeBeanA> beanDefinition = context.getBeanDefinition(PrototypeBeanA)
@@ -179,12 +178,11 @@ class DestroyDependentBeansSpec extends Specification {
             TestData.DESTRUCTION_ORDER.count("BeanC") == 3
             TestData.DESTRUCTION_ORDER.count("BeanB") == 3
             TestData.DESTRUCTION_ORDER.count("TestInterceptor") == 3
+        cleanup:
+            TestData.DESTRUCTION_ORDER.clear()
     }
 
     void "test destroy dependent objects from singleton using listeners"() {
-        given:
-            TestData.DESTRUCTION_ORDER.clear()
-
         when:
             ApplicationContext context = ApplicationContext.run()
             AnotherSingletonBeanA bean = context.getBean(AnotherSingletonBeanA)
@@ -213,5 +211,7 @@ class DestroyDependentBeansSpec extends Specification {
             TestData.DESTRUCTION_ORDER.count("AnotherBeanC") == 3
             TestData.DESTRUCTION_ORDER.count("AnotherBeanB") == 3
             TestData.DESTRUCTION_ORDER.count("TestInterceptor") == 3
+        cleanup:
+            TestData.DESTRUCTION_ORDER.clear()
     }
 }

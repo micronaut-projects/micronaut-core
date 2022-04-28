@@ -9,9 +9,6 @@ import spock.lang.Specification
 class DestroyFactorySpec extends Specification {
 
     void "test destroy dependent objects from singleton using listeners"() {
-        given:
-            TestData.DESTRUCTION_ORDER.clear()
-
         when:
             def bean = registration.bean
             ApplicationContext context = ApplicationContext.run()
@@ -57,5 +54,8 @@ class DestroyFactorySpec extends Specification {
 
             TestData.DESTRUCTION_ORDER.count("MyBean3") == 1
             TestData.DESTRUCTION_ORDER.count("MyBean3Factory") == 1
+
+        cleanup:
+            TestData.DESTRUCTION_ORDER.clear()
     }
 }
