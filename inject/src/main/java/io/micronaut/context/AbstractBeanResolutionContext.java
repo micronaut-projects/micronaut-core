@@ -157,9 +157,9 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
     @Override
     public BeanRegistration<?> getAndResetDependentFactoryBean() {
-        BeanRegistration<?> dependentFactory = this.dependentFactory;
+        BeanRegistration<?> result = this.dependentFactory;
         this.dependentFactory = null;
-        return dependentFactory;
+        return result;
     }
 
     @Override
