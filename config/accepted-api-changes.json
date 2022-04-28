@@ -103,5 +103,15 @@
         "type": "io.micronaut.http.client.ProxyHttpClient",
         "member": "Method io.micronaut.http.client.ProxyHttpClient.proxy(io.micronaut.http.HttpRequest,io.micronaut.http.client.ProxyRequestOptions)",
         "reason": "New method added with a default implementation"
+    },
+    {
+        "type": "io.micronaut.context.annotation.Replaces",
+        "member": "Class io.micronaut.context.annotation.Replaces",
+        "reason": "Improvement of the API"
+    },
+    {
+        "type": "io.micronaut.context.annotation.Replaces",
+        "member": "Method io.micronaut.context.annotation.Replaces.qualifier()",
+        "reason": "Improvement of the API"
     }
 ]
