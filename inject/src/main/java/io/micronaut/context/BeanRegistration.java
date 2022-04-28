@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.order.Ordered;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
 import io.micronaut.inject.BeanType;
@@ -90,7 +91,7 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
                                              @NonNull K bean,
                                              @Nullable
                                              List<BeanRegistration<?>> dependents) {
-        boolean hasDependents = dependents != null && !dependents.isEmpty();
+        boolean hasDependents = CollectionUtils.isNotEmpty(dependents);
         if (beanDefinition instanceof DisposableBeanDefinition || bean instanceof LifeCycle || hasDependents) {
             if (hasDependents) {
                 return new BeanDisposingRegistration<>(beanContext, identifier, beanDefinition, bean, dependents);
