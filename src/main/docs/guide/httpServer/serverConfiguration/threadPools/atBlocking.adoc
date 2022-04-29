@@ -10,7 +10,7 @@ There are some places where the Micronaut framework uses ann:core.annotation.Blo
 |Blocking Type|Description
 
 |link:{micronautapi}http/client/BlockingHttpClient.html[BlockingHttpClient]
-| Intended for testing, and provides blocking versions for a subset of api:http.client.HttpClient[] operations.
+| Intended for testing, provides blocking versions for a subset of api:http.client.HttpClient[] operations.
 |link:{micronautapi}core/io/IOUtils.html[IOUtils]
 | Reads the contents of a `BufferedReader` in a blocking manner, and returns that as a `String`.
 |link:{micronautapi}context/env/BootstrapPropertySourceLocator.html[BootstrapPropertySourceLocator]
