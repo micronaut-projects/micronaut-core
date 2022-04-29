@@ -19,6 +19,8 @@ import spock.lang.Issue
 import spock.lang.Specification
 import spock.lang.Unroll
 
+import java.nio.charset.StandardCharsets
+
 class UriBuilderSpec extends Specification {
 
     void "test uri builder expand"() {

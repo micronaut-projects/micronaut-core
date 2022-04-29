@@ -106,10 +106,9 @@ class DefaultUriBuilder implements UriBuilder {
                     this.host = host;
                 }
                 if (port != null) {
-                    this.port = Integer.valueOf(port);
+                    this.port = Integer.parseInt(port);
                 }
                 if (path != null) {
-
                     if (fragment != null) {
                         this.fragment = fragment;
                     }
@@ -275,66 +274,61 @@ class DefaultUriBuilder implements UriBuilder {
     }
 
     private URI constructUri(Map<String, ? super Object> values) {
-        String scheme = this.scheme;
-        if (StringUtils.isNotEmpty(scheme) && isTemplate(scheme, values)) {
-            scheme = UriTemplate.of(scheme).expand(values);
-        }
-
-        String userInfo = this.userInfo;
-        if (StringUtils.isNotEmpty(userInfo)) {
-            if (userInfo.contains(":")) {
-                final String[] sa = userInfo.split(":");
-                userInfo = expandOrEncode(sa[0], values) + ":" + expandOrEncode(sa[1], values);
-            } else {
-                userInfo = expandOrEncode(userInfo, values);
-            }
-        }
-
-        String host = this.host == null ? null : expandOrEncode(this.host, values);
-
-        String path = this.path.toString();
-        if (StringUtils.isNotEmpty(path) && isTemplate(path, values)) {
-            path = UriTemplate.of(path).expand(values);
-        }
-
-        String queryParams = this.queryParams.isEmpty() ? null : buildQueryParams(values);
-
-        String fragment = StringUtils.isEmpty(this.fragment) ? this.fragment : expandOrEncode(this.fragment, values);
-
-        StringBuilder builder = new StringBuilder();
-        if (StringUtils.isNotEmpty(scheme)) {
-            builder.append(scheme).append("://");
-        }
-        if (StringUtils.isNotEmpty(userInfo)) {
-            builder.append(userInfo).append('@');
-        }
-        if (StringUtils.isNotEmpty(host)) {
-            builder.append(host);
-        }
-        if (port != -1) {
-            builder.append(':').append(port);
-        }
-        if (StringUtils.isNotEmpty(path)) {
-            if (builder.length() > 0 && path.charAt(0) != '/') {
-                builder.append('/');
-            }
-            builder.append(encodePath(path));
-        }
-        if (StringUtils.isNotEmpty(queryParams)) {
-            builder.append('?').append(queryParams);
-        }
-        if (StringUtils.isNotEmpty(fragment)) {
-            if (fragment.charAt(0) != '#') {
-                builder.append('#');
-            }
-            builder.append(fragment);
-        }
-
+        String scheme = isTemplate(this.scheme, values) ? UriTemplate.of(this.scheme).expand(values) : this.scheme;
+        String userInfo = expandOrEncodeUserInfo(this.userInfo, values);
+        String host = expandOrEncodeForm(this.host, values);
+        String path = expandOrEncodePath(this.path.toString(), values);
+        String queryParams = buildQueryParams(values);
+        String fragment = expandOrEncodeFragment(this.fragment, values);
         try {
-            return new URI(builder.toString());
+            return new URI(buildUriString(scheme, userInfo, host, path, queryParams, fragment));
         } catch (URISyntaxException e) {
             throw new UriSyntaxException(e);
         }
+    }
+
+    private String buildUriString(String scheme, String userInfo, String host, String path, String queryParams, String fragment) {
+        /*
+         * The is no one correct way to construct a URI. We drop elements
+         * from the URI when they would be invalid such as userInfo without
+         * an authority. And we delimit the tokens by taking into account several
+         * specs and what's most compatible between them:
+         *   https://datatracker.ietf.org/doc/html/rfc1738#section-3.3
+         *   https://datatracker.ietf.org/doc/html/rfc2396#section-3
+         *   https://datatracker.ietf.org/doc/html/rfc3986#section-3
+         */
+        StringBuilder uriText = new StringBuilder();
+        if (StringUtils.isNotEmpty(scheme)) {
+            uriText.append(scheme).append(":");
+        }
+        if (StringUtils.isNotEmpty(host)) {
+            if (StringUtils.isNotEmpty(userInfo)) {
+                uriText.append(userInfo).append('@');
+            }
+            uriText.append("//").append(host);
+
+            if (port != -1) {
+                uriText.append(':').append(port);
+            }
+        }
+        if (StringUtils.isEmpty(path)) {
+            uriText.append('/');
+        } else {
+            if (uriText.length() > 0 && path.charAt(0) != '/') {
+                uriText.append('/');
+            }
+            uriText.append(path);
+        }
+        if (StringUtils.isNotEmpty(queryParams)) {
+            uriText.append('?').append(queryParams);
+        }
+        if (StringUtils.isNotEmpty(fragment)) {
+            if (fragment.charAt(0) != '#') {
+                uriText.append('#');
+            }
+            uriText.append(fragment);
+        }
+        return uriText.toString();
     }
 
     private boolean isTemplate(String value, Map<String, ? super Object> values) {
@@ -348,11 +342,11 @@ class DefaultUriBuilder implements UriBuilder {
             while (nameIterator.hasNext()) {
                 Map.Entry<String, List<String>> entry = nameIterator.next();
                 String rawName = entry.getKey();
-                String name = expandOrEncode(rawName, values);
+                String name = expandOrEncodeForm(rawName, values);
 
                 final Iterator<String> i = entry.getValue().iterator();
                 while (i.hasNext()) {
-                    String v = expandOrEncode(i.next(), values);
+                    String v = expandOrEncodeForm(i.next(), values);
                     builder.append(name).append('=').append(v);
                     if (i.hasNext()) {
                         builder.append('&');
@@ -368,50 +362,83 @@ class DefaultUriBuilder implements UriBuilder {
         return null;
     }
 
-    private boolean isValidPathChar(char c) {
-        return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')
-                || c == '-' || c == '.' || c == '_' || c == '~'
-                || c == '!' || c == '$' || c == '&' || c == '\'' || c == '(' || c == ')'
-                || c == '*' || c == '+' || c == ',' || c == ';' || c == '=' || c == ':' || c == '@' || c == '/';
+    private String expandOrEncodeUserInfo(String userInfo, Map<String, ? super Object> values) {
+        if (StringUtils.isNotEmpty(userInfo)) {
+            if (userInfo.contains(":")) {
+                final String[] sa = userInfo.split(":");
+                userInfo = expandOrEncodeForm(sa[0], values) + ":" + expandOrEncodeForm(sa[1], values);
+            } else {
+                userInfo = expandOrEncodeForm(userInfo, values);
+            }
+        }
+        return userInfo;
     }
 
-    private String encodePath(String path) {
-        StringBuilder builder = new StringBuilder(path.length());
-        for (int i = 0; i < path.length(); i++) {
-            char c = path.charAt(i);
-            if (isValidPathChar(c)) {
-                builder.append(c);
+    private String expandOrEncodeForm(String value, Map<String, ? super Object> values) {
+        try {
+            if (StringUtils.isEmpty(value)) {
+                return null;
+            }
+            return isTemplate(value, values) ? UriTemplate.of(value).expand(values) : URLEncoder.encode(value, StandardCharsets.UTF_8.name());
+        } catch (UnsupportedEncodingException e) {
+            throw new IllegalStateException("No available charset: " + e.getMessage());
+        }
+    }
+
+    private String expandOrEncodePath(String path, Map<String, ? super Object> values) {
+        return isTemplate(path, values) ? UriTemplate.of(path).expand(values) : encode(path, false);
+    }
+
+    private String expandOrEncodeFragment(String fragment, Map<String, ? super Object> values) {
+        return isTemplate(fragment, values) ? UriTemplate.of(fragment).expand(values) : encode(fragment, true);
+    }
+
+    private boolean isAllowed(char c) {
+        /* See:
+         *   "Path" -- https://datatracker.ietf.org/doc/html/rfc3986#section-3.3
+         *   "Characters" -- https://datatracker.ietf.org/doc/html/rfc3986#section-2
+         */
+        return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') // alpha-numeric unreserved chars
+                || c == '-' || c == '.' || c == '_' || c == '~' // other unreserved chars
+                || c == '!' || c == '$' || c == '&' || c == '\'' || c == '(' || c == ')' // sub-delim chars
+                || c == '*' || c == '+' || c == ',' || c == ';' || c == '=' // more sub-delim chars
+                || c == ':' || c == '@' //other pchars
+                || c == '/'; //allow slashes too since a whole path or URI can be tested, not just segments
+    }
+
+    private String encode(String pathOrFragment, boolean allowQuestionMark) {
+        final int pathLen = pathOrFragment.length();
+        StringBuilder uriPath = new StringBuilder(pathLen);
+        for (int i = 0; i < pathLen; i++) {
+            char c = pathOrFragment.charAt(i);
+            if (isAllowed(c)) {
+                uriPath.append(c);
             } else if (c == '%') {
-                if (i + 2 >= path.length()) {
-                    throw new IllegalArgumentException("Invalid URI percent-encoding");
+                if (i + 2 >= pathOrFragment.length()) {
+                    char c1 = pathOrFragment.charAt(i + 1);
+                    char c2 = pathOrFragment.charAt(i + 2);
+                    if (c1 >= '0' && c2 >= '0' && c1 <= '9' && c2 <= '9') {
+                        uriPath.append("%").append(c1).append(c2);
+                        i += 2;
+                    } else {
+                        uriPath.append("%25");
+                    }
+                } else {
+                    uriPath.append("%25");
                 }
-                builder.append('%').append(i + 1).append(i + 2);
-                i += 2;
             } else if (c == ' ') {
-                builder.append("%20");
+                uriPath.append("%20");
+            } else if (allowQuestionMark && c == '?') {
+                uriPath.append('?');
             } else {
                 //TODO This does percent-encoding. Make this more efficient as URLEncoder.encode is not intended to be called char-by-char
                 try {
-                    builder.append(URLEncoder.encode(String.valueOf(c), StandardCharsets.UTF_8.toString()));
+                    uriPath.append(URLEncoder.encode(String.valueOf(c), StandardCharsets.UTF_8.toString()));
                 } catch (UnsupportedEncodingException e) {
                     throw new IllegalStateException("No charset found: " + e.getMessage());
                 }
             }
         }
-        return builder.toString();
-    }
-
-
-    private String expandOrEncode(String value, Map<String, ? super Object> values) {
-        if (isTemplate(value, values)) {
-            value = UriTemplate.of(value).expand(values);
-        } else {
-            try {
-                value = URLEncoder.encode(value, StandardCharsets.UTF_8.name());
-            } catch (UnsupportedEncodingException e) {
-                throw new IllegalStateException("No available charset: " + e.getMessage());
-            }
-        }
-        return value;
+        return uriPath.toString();
     }
 }
