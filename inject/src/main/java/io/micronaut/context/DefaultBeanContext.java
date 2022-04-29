@@ -2686,13 +2686,16 @@ public class DefaultBeanContext implements InitializableBeanContext {
                     path.pushBeanCreate(definition, beanType);
                 }
                 try {
+                    List<BeanRegistration<?>> dependentBeans = context.popDependentBeans();
                     T createdBean = doCreateBean(context, definition, qualifier);
-                    return singletonScope.registerSingletonBean(
+                    BeanRegistration<T> registration = singletonScope.registerSingletonBean(
                             definition,
                             qualifier,
                             createdBean,
                             context.getAndResetDependentBeans()
                     );
+                    context.pushDependentBeans(dependentBeans);
+                    return registration;
                 } finally {
                     if (isNewPath) {
                         path.pop();
@@ -2758,14 +2761,17 @@ public class DefaultBeanContext implements InitializableBeanContext {
                         @NonNull
                         @Override
                         public CreatedBean<T> create() throws BeanCreationException {
+                            List<BeanRegistration<?>> dependentBeans = resolutionContext.popDependentBeans();
                             final T bean = doCreateBean(resolutionContext, finalDefinition, beanType, qualifier);
-                            return BeanRegistration.of(
+                            BeanRegistration<T> registration = BeanRegistration.of(
                                     DefaultBeanContext.this,
                                     beanKey,
                                     finalDefinition,
                                     bean,
                                     resolutionContext.getAndResetDependentBeans()
                             );
+                            resolutionContext.pushDependentBeans(dependentBeans);
+                            return registration;
                         }
                     }
             );
