@@ -2477,54 +2477,78 @@ public class DefaultBeanContext implements InitializableBeanContext {
             Class replacedBeanType = replacesAnnotation.classValue().orElse(getCanonicalBeanType(replacingCandidate));
             final Optional<String> named = replacesAnnotation.stringValue(NAMED_MEMBER);
             final Optional<AnnotationClassValue<?>> qualifier = replacesAnnotation.annotationClassValue(QUALIFIER_MEMBER);
-            Optional<Class<?>> factory = replacesAnnotation.classValue("factory");
-            if (LOG.isDebugEnabled()) {
-                if (factory.isPresent()) {
-                    LOG.debug("Bean [{}] replaces existing bean of type [{}] in factory type [{}]",
-                        replacingCandidate.getBeanType(), replacedBeanType, factory.get());
+
+            if (named.isPresent() && qualifier.isPresent()) {
+                throw new ConfigurationException("Both \"named\" and \"qualifier\" should not be present: " + replacesAnnotation);
+            }
+
+            if (named.isPresent()) {
+                final String name = named.get();
+                if (qualifiedByNamed(definitionToBeReplaced, replacedBeanType, name)) {
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Bean [{}] replaces existing bean of type [{}] qualified by name [{}]",
+                            replacingCandidate.getBeanType(), definitionToBeReplaced.getBeanType(), name);
+                    }
+                    return true;
                 } else {
-                    LOG.debug("Bean [{}] replaces existing bean of type [{}]",
-                        replacingCandidate.getBeanType(), replacedBeanType);
+                    return false;
                 }
             }
+
+            if (qualifier.isPresent()) {
+                final AnnotationClassValue<?> qualifierClassValue = qualifier.get();
+                if (qualifiedByQualifier(definitionToBeReplaced, replacedBeanType, qualifierClassValue)) {
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Bean [{}] replaces existing bean of type [{}] qualified by qualifier [{}]",
+                            replacingCandidate.getBeanType(), definitionToBeReplaced.getBeanType(), qualifierClassValue);
+                    }
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+
+            Optional<Class<?>> factory = replacesAnnotation.classValue("factory");
 
             Optional<Class<?>> declaringType = definitionToBeReplaced instanceof BeanDefinition ?
                 ((BeanDefinition<?>) definitionToBeReplaced).getDeclaringType() :
                 Optional.empty();
-
-            if (named.isPresent() || qualifier.isPresent()) {
-                if (named.isPresent() && qualifier.isPresent()) {
-                    throw new ConfigurationException("Both \"named\" and \"qualifier\" should not be present: " + replacesAnnotation);
-                }
-                return qualifiedByNamed(definitionToBeReplaced, replacedBeanType, named) ||
-                    qualifiedByQualifier(definitionToBeReplaced, replacedBeanType, qualifier);
-            } else if (factory.isPresent() && declaringType.isPresent()) {
-                if (factory.get() == declaringType.get()) {
-                    return checkIfTypeMatches(definitionToBeReplaced, annotationMetadata).apply(replacedBeanType);
+            if (factory.isPresent() && declaringType.isPresent()) {
+                final boolean factoryReplaces = factory.get() == declaringType.get() &&
+                    checkIfTypeMatches(definitionToBeReplaced, annotationMetadata, replacedBeanType);
+                if (factoryReplaces) {
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Bean [{}] replaces existing bean of type [{}] in factory type [{}]",
+                            replacingCandidate.getBeanType(), replacedBeanType, factory.get());
+                    }
+                    return true;
                 } else {
                     return false;
                 }
-            } else {
-                return checkIfTypeMatches(definitionToBeReplaced, annotationMetadata).apply(replacedBeanType);
             }
+
+            final boolean isTypeMatches = checkIfTypeMatches(definitionToBeReplaced, annotationMetadata, replacedBeanType);
+            if (isTypeMatches && LOG.isDebugEnabled()) {
+                LOG.debug("Bean [{}] replaces existing bean of type [{}]", replacingCandidate.getBeanType(), replacedBeanType);
+            }
+            return isTypeMatches;
         };
     }
 
     private <T> boolean qualifiedByQualifier(BeanType<T> definitionToBeReplaced,
                                              Class replacedBeanType,
-                                             Optional<AnnotationClassValue<?>> qualifier) {
-        return qualifier.flatMap(annotationClassValue -> {
-            final Class<? extends Annotation> qualifierClass = (Class<? extends Annotation>) annotationClassValue.getType().get();
-            if (!qualifierClass.isAssignableFrom(Replaces.ReplacesQualifierDefaultValue.class)) {
-                return Qualifiers.<T>byStereotype(qualifierClass).qualify(replacedBeanType, Stream.of(definitionToBeReplaced));
-            } else {
-                return Optional.empty();
-            }
-        }).isPresent();
+                                             AnnotationClassValue<?> qualifier) {
+        final Class<? extends Annotation> qualifierClass = (Class<? extends Annotation>) qualifier.getType().get();
+        if (!qualifierClass.isAssignableFrom(Annotation.class)) {
+            return Qualifiers.<T>byStereotype(qualifierClass).qualify(replacedBeanType, Stream.of(definitionToBeReplaced))
+                .isPresent();
+        } else {
+            throw new ConfigurationException(String.format("Default qualifier value was used while replacing %s", replacedBeanType));
+        }
     }
 
-    private <T> boolean qualifiedByNamed(BeanType<T> definitionToBeReplaced, Class replacedBeanType, Optional<String> named) {
-        return named.flatMap(name -> Qualifiers.<T>byName(name).qualify(replacedBeanType, Stream.of(definitionToBeReplaced)))
+    private <T> boolean qualifiedByNamed(BeanType<T> definitionToBeReplaced, Class replacedBeanType, String named) {
+        return Qualifiers.<T>byName(named).qualify(replacedBeanType, Stream.of(definitionToBeReplaced))
             .isPresent();
     }
 
@@ -2557,29 +2581,31 @@ public class DefaultBeanContext implements InitializableBeanContext {
         }
     }
 
-    private <T> Function<Class, Boolean> checkIfTypeMatches(BeanType<T> definition, AnnotationMetadata annotationMetadata) {
+    private <T> boolean checkIfTypeMatches(BeanType<T> definitionToBeReplaced,
+                                                            AnnotationMetadata annotationMetadata,
+                                                            Class replacingCandidate) {
         Class<T> bt;
 
-        if (definition instanceof ProxyBeanDefinition) {
-            bt = ((ProxyBeanDefinition<T>) definition).getTargetType();
-        } else if (definition instanceof AdvisedBeanType) {
+        if (definitionToBeReplaced instanceof ProxyBeanDefinition) {
+            bt = ((ProxyBeanDefinition<T>) definitionToBeReplaced).getTargetType();
+        } else if (definitionToBeReplaced instanceof AdvisedBeanType) {
             //noinspection unchecked
-            bt = (Class<T>) ((AdvisedBeanType<T>) definition).getInterceptedType();
+            bt = (Class<T>) ((AdvisedBeanType<T>) definitionToBeReplaced).getInterceptedType();
         } else {
-            bt = definition.getBeanType();
+            bt = definitionToBeReplaced.getBeanType();
             if (annotationMetadata.hasStereotype(INTRODUCTION_TYPE)) {
                 Class<? super T> superclass = bt.getSuperclass();
                 if (superclass == Object.class) {
                     // interface introduction
-                    return clazz -> clazz.isAssignableFrom(bt);
+                    return replacingCandidate.isAssignableFrom(bt);
                 } else {
                     // abstract class introduction
-                    return clazz -> clazz == superclass;
+                    return replacingCandidate == superclass;
                 }
             }
             if (annotationMetadata.hasStereotype(AnnotationUtil.ANN_AROUND)) {
                 Class<? super T> superclass = bt.getSuperclass();
-                return clazz -> clazz == superclass || clazz == bt;
+                return replacingCandidate == superclass || replacingCandidate == bt;
             }
         }
 
@@ -2589,13 +2615,13 @@ public class DefaultBeanContext implements InitializableBeanContext {
                 defaultImpl = annotationMetadata.classValue(DefaultImplementation.class, "name");
             }
             if (defaultImpl.filter(impl -> impl == bt).isPresent()) {
-                return clazz -> clazz.isAssignableFrom(bt);
+                return replacingCandidate.isAssignableFrom(bt);
             } else {
-                return clazz -> clazz == bt;
+                return replacingCandidate == bt;
             }
         }
 
-        return clazz -> clazz != Object.class && clazz.isAssignableFrom(bt);
+        return replacingCandidate != Object.class && replacingCandidate.isAssignableFrom(bt);
     }
 
     private <T> void doInject(BeanResolutionContext resolutionContext, T instance, BeanDefinition definition) {

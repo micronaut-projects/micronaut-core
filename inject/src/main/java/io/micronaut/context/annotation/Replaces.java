@@ -56,7 +56,7 @@ public @interface Replaces {
      *
      * @return The qualifier
      */
-    Class<? extends Annotation> qualifier() default ReplacesQualifierDefaultValue.class;
+    Class<? extends Annotation> qualifier() default Annotation.class;
 
     /**
      * The name of the qualifiers of the bean that should be replaced.
@@ -64,11 +64,4 @@ public @interface Replaces {
      * @return The qualifier
      */
     String named() default "";
-
-    /**
-     * Stub for the default value of {@link Replaces#qualifier()}
-     */
-    @Internal
-    @interface ReplacesQualifierDefaultValue {
-    }
 }
