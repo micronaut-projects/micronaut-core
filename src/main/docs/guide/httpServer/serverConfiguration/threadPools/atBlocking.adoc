@@ -4,7 +4,7 @@ If you set `micronaut.server.thread-selection` to `AUTO`, The Micronaut Framewor
 
 NOTE: `@Blocking` only works if you are using `AUTO` thread selection. Micronaut Framework defaults to `MANUAL` thread selection since Micronaut 2.0. We recommend the usage of ann:scheduling.annotation.ExecuteOn[] annotation to execute the blocking operations on a different thread pool. `@ExecutesOn` works for both `MANUAL` and `AUTO` thread selection.
 
-There are some places where the Micronaut framework uses ann:core.annotation.Blocking[] already.
+There are some places where the Micronaut framework uses ann:core.annotation.Blocking[] internally:
 
 |===
 |Blocking Type|Description
