@@ -15,20 +15,23 @@
  */
 package io.micronaut.http.uri;
 
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.value.MutableConvertibleMultiValues;
 import io.micronaut.core.convert.value.MutableConvertibleMultiValuesMap;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.exceptions.UriSyntaxException;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 
 import static io.micronaut.http.uri.UriTemplate.PATTERN_FULL_PATH;
@@ -42,7 +45,6 @@ import static io.micronaut.http.uri.UriTemplate.PATTERN_FULL_URI;
  */
 class DefaultUriBuilder implements UriBuilder {
 
-    private String authority;
     private final MutableConvertibleMultiValues<String> queryParams;
     private String scheme;
     private String userInfo;
@@ -53,13 +55,13 @@ class DefaultUriBuilder implements UriBuilder {
 
     /**
      * Constructor to create from a URI.
+     *
      * @param uri The URI
      */
     @SuppressWarnings("unchecked")
     DefaultUriBuilder(URI uri) {
         this.scheme = uri.getScheme();
         this.userInfo = uri.getRawUserInfo();
-        this.authority = uri.getRawAuthority();
         this.host = uri.getHost();
         this.port = uri.getPort();
         this.path = new StringBuilder();
@@ -114,7 +116,7 @@ class DefaultUriBuilder implements UriBuilder {
                     this.path = new StringBuilder(path);
                 }
                 if (query != null) {
-                    final Map parameters = new QueryStringDecoder(query).parameters();
+                    final Map parameters = new QueryStringDecoder(query, StandardCharsets.UTF_8, false).parameters();
                     this.queryParams = new MutableConvertibleMultiValuesMap<>(parameters);
                 } else {
                     this.queryParams = new MutableConvertibleMultiValuesMap<>();
@@ -132,7 +134,7 @@ class DefaultUriBuilder implements UriBuilder {
 
                 this.path = new StringBuilder(path);
                 if (query != null) {
-                    final Map parameters = new QueryStringDecoder(uri.toString()).parameters();
+                    final Map parameters = new QueryStringDecoder(query, StandardCharsets.UTF_8, false).parameters();
                     this.queryParams = new MutableConvertibleMultiValuesMap<>(parameters);
                 } else {
                     this.queryParams = new MutableConvertibleMultiValuesMap<>();
@@ -258,18 +260,13 @@ class DefaultUriBuilder implements UriBuilder {
     @NonNull
     @Override
     public URI build() {
-        try {
-            return new URI(reconstructAsString(null));
-        } catch (URISyntaxException e) {
-            throw new UriSyntaxException(e);
-        }
+        return constructUri(null);
     }
 
     @NonNull
     @Override
     public URI expand(Map<String, ? super Object> values) {
-        String uri = reconstructAsString(values);
-        return URI.create(uri);
+        return constructUri(values);
     }
 
     @Override
@@ -277,79 +274,67 @@ class DefaultUriBuilder implements UriBuilder {
         return build().toString();
     }
 
-    private String reconstructAsString(Map<String, ? super Object> values) {
-        StringBuilder builder = new StringBuilder();
+    private URI constructUri(Map<String, ? super Object> values) {
         String scheme = this.scheme;
-        String host = this.host;
+        if (StringUtils.isNotEmpty(scheme) && isTemplate(scheme, values)) {
+            scheme = UriTemplate.of(scheme).expand(values);
+        }
+
+        String userInfo = this.userInfo;
+        if (StringUtils.isNotEmpty(userInfo)) {
+            if (userInfo.contains(":")) {
+                final String[] sa = userInfo.split(":");
+                userInfo = expandOrEncode(sa[0], values) + ":" + expandOrEncode(sa[1], values);
+            } else {
+                userInfo = expandOrEncode(userInfo, values);
+            }
+        }
+
+        String host = this.host == null ? null : expandOrEncode(this.host, values);
+
+        String path = this.path.toString();
+        if (StringUtils.isNotEmpty(path) && isTemplate(path, values)) {
+            path = UriTemplate.of(path).expand(values);
+        }
+
+        String queryParams = this.queryParams.isEmpty() ? null : buildQueryParams(values);
+
+        String fragment = StringUtils.isEmpty(this.fragment) ? this.fragment : expandOrEncode(this.fragment, values);
+
+        StringBuilder builder = new StringBuilder();
         if (StringUtils.isNotEmpty(scheme)) {
-            if (isTemplate(scheme, values)) {
-                scheme = UriTemplate.of(scheme).expand(values);
-            }
-            builder.append(scheme)
-                   .append(":");
+            builder.append(scheme).append("://");
         }
-
-        final boolean hasPort = port != -1;
-        final boolean hasHost = host != null;
-        final boolean hasUserInfo = StringUtils.isNotEmpty(userInfo);
-        if (hasUserInfo || hasHost || hasPort) {
-            builder.append("//");
-            if (hasUserInfo) {
-                String userInfo = this.userInfo;
-                if (userInfo.contains(":")) {
-                    final String[] sa = userInfo.split(":");
-                    userInfo = expandOrEncode(sa[0], values) + ":" + expandOrEncode(sa[1], values);
-                } else {
-                    userInfo = expandOrEncode(userInfo, values);
-                }
-                builder.append(userInfo);
-                builder.append("@");
-            }
-
-            if (hasHost) {
-                host = expandOrEncode(host, values);
-                builder.append(host);
-            }
-
-            if (hasPort) {
-                builder.append(":").append(port);
-            }
-        } else {
-            String authority = this.authority;
-            if (StringUtils.isNotEmpty(authority)) {
-                authority = expandOrEncode(authority, values);
-                builder.append("//")
-                       .append(authority);
-            }
+        if (StringUtils.isNotEmpty(userInfo)) {
+            builder.append(userInfo).append('@');
         }
-
-        StringBuilder path = this.path;
+        if (StringUtils.isNotEmpty(host)) {
+            builder.append(host);
+        }
+        if (port != -1) {
+            builder.append(':').append(port);
+        }
         if (StringUtils.isNotEmpty(path)) {
             if (builder.length() > 0 && path.charAt(0) != '/') {
                 builder.append('/');
             }
-            String pathStr = path.toString();
-            if (isTemplate(pathStr, values)) {
-                pathStr = UriTemplate.of(pathStr).expand(values);
-            }
-
-            builder.append(pathStr);
+            builder.append(encodePath(path));
         }
-
-        if (!queryParams.isEmpty()) {
-            builder.append('?');
-            builder.append(buildQueryParams(values));
+        if (StringUtils.isNotEmpty(queryParams)) {
+            builder.append('?').append(queryParams);
         }
-
-        String fragment = this.fragment;
         if (StringUtils.isNotEmpty(fragment)) {
-            fragment = expandOrEncode(fragment, values);
             if (fragment.charAt(0) != '#') {
                 builder.append('#');
             }
             builder.append(fragment);
         }
-        return builder.toString();
+
+        try {
+            return new URI(builder.toString());
+        } catch (URISyntaxException e) {
+            throw new UriSyntaxException(e);
+        }
     }
 
     private boolean isTemplate(String value, Map<String, ? super Object> values) {
@@ -383,20 +368,50 @@ class DefaultUriBuilder implements UriBuilder {
         return null;
     }
 
+    private boolean isValidPathChar(char c) {
+        return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')
+                || c == '-' || c == '.' || c == '_' || c == '~'
+                || c == '!' || c == '$' || c == '&' || c == '\'' || c == '(' || c == ')'
+                || c == '*' || c == '+' || c == ',' || c == ';' || c == '=' || c == ':' || c == '@' || c == '/';
+    }
+
+    private String encodePath(String path) {
+        StringBuilder builder = new StringBuilder(path.length());
+        for (int i = 0; i < path.length(); i++) {
+            char c = path.charAt(i);
+            if (isValidPathChar(c)) {
+                builder.append(c);
+            } else if (c == '%') {
+                if (i + 2 >= path.length()) {
+                    throw new IllegalArgumentException("Invalid URI percent-encoding");
+                }
+                builder.append('%').append(i + 1).append(i + 2);
+                i += 2;
+            } else if (c == ' ') {
+                builder.append("%20");
+            } else {
+                //TODO This does percent-encoding. Make this more efficient as URLEncoder.encode is not intended to be called char-by-char
+                try {
+                    builder.append(URLEncoder.encode(String.valueOf(c), StandardCharsets.UTF_8.toString()));
+                } catch (UnsupportedEncodingException e) {
+                    throw new IllegalStateException("No charset found: " + e.getMessage());
+                }
+            }
+        }
+        return builder.toString();
+    }
+
+
     private String expandOrEncode(String value, Map<String, ? super Object> values) {
         if (isTemplate(value, values)) {
             value = UriTemplate.of(value).expand(values);
         } else {
-            value = encode(value);
+            try {
+                value = URLEncoder.encode(value, StandardCharsets.UTF_8.name());
+            } catch (UnsupportedEncodingException e) {
+                throw new IllegalStateException("No available charset: " + e.getMessage());
+            }
         }
         return value;
-    }
-
-    private String encode(String userInfo) {
-        try {
-            return URLEncoder.encode(userInfo, StandardCharsets.UTF_8.name());
-        } catch (UnsupportedEncodingException e) {
-            throw new IllegalStateException("No available charset: " + e.getMessage());
-        }
     }
 }

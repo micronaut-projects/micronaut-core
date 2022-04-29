@@ -51,7 +51,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
     private static final String STRING_PATTERN_HOST_IPV6 = "\\[[\\p{XDigit}\\:\\.]*[%\\p{Alnum}]*\\]";
     private static final String STRING_PATTERN_HOST = "(" + STRING_PATTERN_HOST_IPV6 + "|" + STRING_PATTERN_HOST_IPV4 + ")";
     private static final String STRING_PATTERN_PORT = "(\\d*(?:\\{[^/]+?\\})?)";
-    private static final String STRING_PATTERN_PATH = "([^#]*)";
+    private static final String STRING_PATTERN_PATH = "([^#?]*)";
     private static final String STRING_PATTERN_QUERY = "([^#]*)";
     private static final String STRING_PATTERN_REMAINING = "(.*)";
     private static final char QUERY_OPERATOR = '?';
@@ -74,6 +74,24 @@ public class UriTemplate implements Comparable<UriTemplate> {
 
     protected final String templateString;
     final List<PathSegment> segments = new ArrayList<>();
+
+    private static class UrlHelper {
+        String encodeOrEscape(boolean formEncode, String str, boolean query) {
+            if (formEncode) {
+                try {
+                    String encoded = URLEncoder.encode(str, "UTF-8");
+                    if (query) {
+                        return encoded;
+                    } else {
+                        return encoded.replace("+", "%20");
+                    }
+                } catch (UnsupportedEncodingException e) {
+                    throw new IllegalStateException("No available encoding", e);
+                }
+            }
+            return str.replace("%", "%25").replaceAll("\\s", "%20");
+        }
+    }
 
     /**
      * Construct a new URI template for the given template.
@@ -217,7 +235,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
             }
             if (segment instanceof UriTemplateParser.VariablePathSegment) {
                 UriTemplateParser.VariablePathSegment varPathSegment = (UriTemplateParser.VariablePathSegment) segment;
-                if (varPathSegment.isQuerySegment && ! queryParameter) {
+                if (varPathSegment.isQuerySegment && !queryParameter) {
                     // reset anyPrevious* when we reach query parameters
                     queryParameter = true;
                     anyPreviousHasContent = false;
@@ -280,7 +298,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
         Integer thisRawLength = 0;
         Integer thatRawLength = 0;
 
-        for (PathSegment segment: this.segments) {
+        for (PathSegment segment : this.segments) {
             if (segment.isVariable()) {
                 if (!segment.isQuerySegment()) {
                     thisVariableCount++;
@@ -290,7 +308,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
             }
         }
 
-        for (PathSegment segment: o.segments) {
+        for (PathSegment segment : o.segments) {
             if (segment.isVariable()) {
                 if (!segment.isQuerySegment()) {
                     thatVariableCount++;
@@ -351,7 +369,8 @@ public class UriTemplate implements Comparable<UriTemplate> {
 
     /**
      * Normalize a nested URI.
-     * @param uri The URI
+     *
+     * @param uri    The URI
      * @param nested The nested URI
      * @return The new URI
      */
@@ -515,7 +534,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
         String parentString = this.templateString;
         int parentLen = parentString.length();
         return (parentLen > 0 && parentString.charAt(parentLen - 1) != SLASH_OPERATOR) &&
-            templateString.charAt(0) != SLASH_OPERATOR &&
+                templateString.charAt(0) != SLASH_OPERATOR &&
                 isAdditionalPathVar(templateString, len);
     }
 
@@ -567,8 +586,8 @@ public class UriTemplate implements Comparable<UriTemplate> {
         /**
          * Expands the query segment.
          *
-         * @param parameters         The parameters
-         * @param previousHasContent Whether there was previous content
+         * @param parameters             The parameters
+         * @param previousHasContent     Whether there was previous content
          * @param anyPreviousHasOperator Whether an operator is present
          * @return The expanded string
          */
@@ -815,16 +834,20 @@ public class UriTemplate implements Comparable<UriTemplate> {
             segments.add(new VariablePathSegment(isQuerySegment, variable, prefix, delimiter, encode, modifierChar, operator, modifierStr, previousDelimiter, repeatPrefix));
         }
 
+
         /**
          * Raw path segment implementation.
          */
         private static class RawPathSegment implements PathSegment {
+            private static final UrlHelper urlHelper = new UrlHelper();
             private final boolean isQuerySegment;
             private final String value;
 
             public RawPathSegment(boolean isQuerySegment, String value) {
                 this.isQuerySegment = isQuerySegment;
-                this.value = value;
+                this.value = urlHelper.encodeOrEscape(true, value, isQuerySegment);
+                //TODO need to escape fragments differently than paths
+                //TODO re-use path encoder from DefaultUriBuilder
             }
 
             @Override
@@ -851,7 +874,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
                 if (isQuerySegment != that.isQuerySegment) {
                     return false;
                 }
-                return value != null ? value.equals(that.value) : that.value == null;
+                return Objects.equals(value, that.value);
             }
 
             @Override
@@ -885,8 +908,9 @@ public class UriTemplate implements Comparable<UriTemplate> {
         /**
          * Variable path segment implementation.
          */
-        private class VariablePathSegment implements PathSegment {
+        private static class VariablePathSegment implements PathSegment {
 
+            private static final UrlHelper urlHelper = new UrlHelper();
             private final boolean isQuerySegment;
             private final String variable;
             private final String prefix;
@@ -953,10 +977,6 @@ public class UriTemplate implements Comparable<UriTemplate> {
                 return builder.toString();
             }
 
-            private String escape(String v) {
-                return v.replace("%", "%25").replaceAll("\\s", "%20");
-            }
-
             @Override
             public String expand(Map<String, Object> parameters, boolean previousHasContent, boolean anyPreviousHasOperator) {
                 Object found = parameters.get(variable);
@@ -989,7 +1009,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
                         for (Object o : iter) {
                             if (o != null) {
                                 String v = o.toString();
-                                joiner.add(encode ? encode(v, isQuery) : escape(v));
+                                joiner.add(urlHelper.encodeOrEscape(encode, v, isQuery));
                             }
                         }
                         result = joiner.toString();
@@ -1022,13 +1042,13 @@ public class UriTemplate implements Comparable<UriTemplate> {
                         map.forEach((key, some) -> {
                             String ks = key.toString();
                             Iterable<?> values = (some instanceof Iterable) ? (Iterable) some : Collections.singletonList(some);
-                            for (Object value: values) {
+                            for (Object value : values) {
                                 if (value == null) {
                                     continue;
                                 }
                                 String vs = value.toString();
-                                String ek = encode ? encode(ks, isQuery) : escape(ks);
-                                String ev = encode ? encode(vs, isQuery) : escape(vs);
+                                String ek = urlHelper.encodeOrEscape(encode, ks, isQuery);
+                                String ev = urlHelper.encodeOrEscape(encode, vs, isQuery);
                                 if (modifierChar == EXPAND_MODIFIER) {
                                     String finalValue = ek + '=' + ev;
                                     joiner.add(finalValue);
@@ -1042,7 +1062,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
                     } else {
                         String str = found.toString();
                         str = applyModifier(modifierStr, modifierChar, str, str.length());
-                        result = encode ? encode(str, isQuery) : escape(str);
+                        result = urlHelper.encodeOrEscape(encode, str, isQuery);
                     }
                     int len = result.length();
                     StringBuilder finalResult = new StringBuilder(previousHasContent && previousDelimiter != null ? previousDelimiter : "");
@@ -1095,18 +1115,6 @@ public class UriTemplate implements Comparable<UriTemplate> {
                 return result;
             }
 
-            private String encode(String str, boolean query) {
-                try {
-                    String encoded = URLEncoder.encode(str, "UTF-8");
-                    if (query) {
-                        return encoded;
-                    } else {
-                        return encoded.replace("+", "%20");
-                    }
-                } catch (UnsupportedEncodingException e) {
-                    throw new IllegalStateException("No available encoding", e);
-                }
-            }
 
             private Object expandPOJO(Object found) {
                 // Check for common expanded types, such as list or Map
