@@ -25,6 +25,7 @@ import org.reactivestreams.Subscription;
  *
  * @since 3.5.0
  * @author yawkat
+ * @param <T> The message type
  */
 final class NettyFuturePublisher<T> implements Publisher<T> {
     private final Future<T> future;

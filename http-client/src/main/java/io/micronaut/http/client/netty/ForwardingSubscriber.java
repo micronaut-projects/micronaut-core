@@ -25,6 +25,7 @@ import reactor.core.publisher.FluxSink;
  *
  * @since 3.5.0
  * @author yawkat
+ * @param <T> The message type
  */
 @Internal
 final class ForwardingSubscriber<T> implements Subscriber<T> {

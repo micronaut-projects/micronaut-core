@@ -24,6 +24,7 @@ import org.reactivestreams.Subscription;
  *
  * @since 3.5.0
  * @author yawkat
+ * @param <T> The message type
  */
 final class NettyPromiseSubscriber<T> implements Subscriber<T> {
     private final Promise<? super T> promise;
