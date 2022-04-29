@@ -18,4 +18,4 @@ There are some places where the Micronaut framework uses ann:core.annotation.Blo
 
 |===
 
-TIP: https://micronaut-projects.github.io/micronaut-data/latest/guide/[Micronaut Data] also utilizes `@Blocking` for some transaction operations, CRUD interceptors, and repositories.
+TIP: https://micronaut-projects.github.io/micronaut-data/latest/guide/[Micronaut Data] also utilizes `@Blocking` internally for some transaction operations, CRUD interceptors, and repositories.
