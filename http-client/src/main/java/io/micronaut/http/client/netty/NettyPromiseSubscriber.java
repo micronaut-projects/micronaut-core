@@ -19,11 +19,17 @@ import io.netty.util.concurrent.Promise;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
+/**
+ * {@link Subscriber} implementation that writes into a netty {@link Promise} on completion.
+ *
+ * @since 3.5.0
+ * @author yawkat
+ */
 final class NettyPromiseSubscriber<T> implements Subscriber<T> {
     private final Promise<? super T> promise;
     private T value;
 
-    public NettyPromiseSubscriber(Promise<? super T> promise) {
+    NettyPromiseSubscriber(Promise<? super T> promise) {
         this.promise = promise;
     }
 

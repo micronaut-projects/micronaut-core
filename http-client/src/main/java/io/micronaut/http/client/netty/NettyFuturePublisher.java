@@ -20,10 +20,20 @@ import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
+/**
+ * {@link Publisher} implementation that reads items from a netty {@link Future}.
+ *
+ * @since 3.5.0
+ * @author yawkat
+ */
 final class NettyFuturePublisher<T> implements Publisher<T> {
     private final Future<T> future;
     private final boolean forwardCancel;
 
+    /**
+     * @param future        The netty future to use as the source of this publisher
+     * @param forwardCancel Whether to forward calls to {@link Subscription#cancel()} to the future.
+     */
     NettyFuturePublisher(Future<T> future, boolean forwardCancel) {
         this.future = future;
         this.forwardCancel = forwardCancel;

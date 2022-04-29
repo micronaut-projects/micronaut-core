@@ -15,10 +15,18 @@
  */
 package io.micronaut.http.client.netty;
 
+import io.micronaut.core.annotation.Internal;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import reactor.core.publisher.FluxSink;
 
+/**
+ * {@link Subscriber} implementation that forwards items into a {@link FluxSink}.
+ *
+ * @since 3.5.0
+ * @author yawkat
+ */
+@Internal
 final class ForwardingSubscriber<T> implements Subscriber<T> {
     private final FluxSink<T> sink;
 
