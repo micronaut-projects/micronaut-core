@@ -129,7 +129,7 @@ public interface UriBuilder {
      */
     static @NonNull UriBuilder of(@NonNull URI uri) {
         ArgumentUtils.requireNonNull("uri", uri);
-        return new DefaultUriBuilder(uri);
+        return new DefaultUriBuilder(uri, new DefaultUriEncoder());
     }
 
     /**
@@ -140,6 +140,6 @@ public interface UriBuilder {
      */
     static @NonNull UriBuilder of(@NonNull CharSequence uri) {
         ArgumentUtils.requireNonNull("uri", uri);
-        return new DefaultUriBuilder(uri);
+        return new DefaultUriBuilder(uri, new DefaultUriEncoder());
     }
 }

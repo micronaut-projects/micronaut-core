@@ -19,8 +19,6 @@ import io.micronaut.core.beans.BeanMap;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.StringUtils;
 
-import java.io.UnsupportedEncodingException;
-import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -68,30 +66,10 @@ public class UriTemplate implements Comparable<UriTemplate> {
     // Regex patterns that matches URIs. See RFC 3986, appendix B
     static final Pattern PATTERN_SCHEME = Pattern.compile("^" + STRING_PATTERN_SCHEME + "//.*");
     static final Pattern PATTERN_FULL_PATH = Pattern.compile("^([^#\\?]*)(\\?([^#]*))?(\\#(.*))?$");
-    static final Pattern PATTERN_FULL_URI = Pattern.compile(
-            "^(" + STRING_PATTERN_SCHEME + ")?" + "(//(" + STRING_PATTERN_USER_INFO + "@)?" + STRING_PATTERN_HOST + "(:" + STRING_PATTERN_PORT +
-                    ")?" + ")?" + STRING_PATTERN_PATH + "(\\?" + STRING_PATTERN_QUERY + ")?" + "(#" + STRING_PATTERN_REMAINING + ")?");
+    static final Pattern PATTERN_FULL_URI = Pattern.compile("^(" + STRING_PATTERN_SCHEME + ")?" + "(//(" + STRING_PATTERN_USER_INFO + "@)?" + STRING_PATTERN_HOST + "(:" + STRING_PATTERN_PORT + ")?" + ")?" + STRING_PATTERN_PATH + "(\\?" + STRING_PATTERN_QUERY + ")?" + "(#" + STRING_PATTERN_REMAINING + ")?");
 
     protected final String templateString;
     final List<PathSegment> segments = new ArrayList<>();
-
-    private static class UrlHelper {
-        String encodeOrEscape(boolean formEncode, String str, boolean query) {
-            if (formEncode) {
-                try {
-                    String encoded = URLEncoder.encode(str, "UTF-8");
-                    if (query) {
-                        return encoded;
-                    } else {
-                        return encoded.replace("+", "%20");
-                    }
-                } catch (UnsupportedEncodingException e) {
-                    throw new IllegalStateException("No available encoding", e);
-                }
-            }
-            return str.replace("%", "%25").replaceAll("\\s", "%20");
-        }
-    }
 
     /**
      * Construct a new URI template for the given template.
@@ -200,11 +178,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
      * @return The number of segments that are raw
      */
     public int getRawSegmentLength() {
-        return segments.stream()
-                .filter(segment -> !segment.isVariable())
-                .map(CharSequence::length)
-                .reduce(Integer::sum)
-                .orElse(0);
+        return segments.stream().filter(segment -> !segment.isVariable()).map(CharSequence::length).reduce(Integer::sum).orElse(0);
     }
 
     /**
@@ -235,7 +209,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
             }
             if (segment instanceof UriTemplateParser.VariablePathSegment) {
                 UriTemplateParser.VariablePathSegment varPathSegment = (UriTemplateParser.VariablePathSegment) segment;
-                if (varPathSegment.isQuerySegment && !queryParameter) {
+                if (varPathSegment.segmentType == SegmentType.QUERY && !queryParameter) {
                     // reset anyPrevious* when we reach query parameters
                     queryParameter = true;
                     anyPreviousHasContent = false;
@@ -533,9 +507,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
     private boolean shouldPrependSlash(String templateString, int len) {
         String parentString = this.templateString;
         int parentLen = parentString.length();
-        return (parentLen > 0 && parentString.charAt(parentLen - 1) != SLASH_OPERATOR) &&
-                templateString.charAt(0) != SLASH_OPERATOR &&
-                isAdditionalPathVar(templateString, len);
+        return (parentLen > 0 && parentString.charAt(parentLen - 1) != SLASH_OPERATOR) && templateString.charAt(0) != SLASH_OPERATOR && isAdditionalPathVar(templateString, len);
     }
 
     private boolean isAdditionalPathVar(String templateString, int len) {
@@ -555,6 +527,23 @@ public class UriTemplate implements Comparable<UriTemplate> {
         return templateString.charAt(0) != SLASH_OPERATOR;
     }
 
+    protected enum SegmentType {
+        PATH, QUERY, HASH;
+
+        /**
+         * @param isQuerySegment Whether the segment is a query string
+         * @return either {@link #PATH} or {@link #QUERY}. Any fragments/hashes
+         * will be returned as {@link #PATH}.
+         * @deprecated This is useful as part of the work to deprecate any methods which
+         * had {@code boolean isQuerySegment} visible in their signature.
+         * To be removed in version 4.0.
+         */
+        @Deprecated
+        static SegmentType fromDeprecated(boolean isQuerySegment) {
+            return isQuerySegment ? SegmentType.QUERY : SegmentType.PATH;
+        }
+    }
+
     /**
      * Represents an expandable path segment.
      */
@@ -562,9 +551,18 @@ public class UriTemplate implements Comparable<UriTemplate> {
 
         /**
          * @return Whether this segment is part of the query string
+         * @deprecated for removal in version 4.0 for better handling of fragments/hashes
          */
+        @Deprecated
         default boolean isQuerySegment() {
             return false;
+        }
+
+        /**
+         * @return Whether this segment is part of the path, query string, or fragment
+         */
+        default SegmentType getSegmentType() {
+            return SegmentType.PATH;
         }
 
         /**
@@ -598,6 +596,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
      * An URI template parser.
      */
     protected static class UriTemplateParser {
+
         private static final int STATE_TEXT = 0; // raw text
         private static final int STATE_VAR_START = 1; // the start of a URI variable ie. {
         private static final int STATE_VAR_CONTENT = 2; // within a URI variable. ie. {var}
@@ -609,7 +608,8 @@ public class UriTemplate implements Comparable<UriTemplate> {
         private char operator = OPERATOR_NONE; // zero means no operator
         private char modifier = OPERATOR_NONE; // zero means no modifier
         private String varDelimiter;
-        private boolean isQuerySegment = false;
+        private SegmentType segmentType = SegmentType.PATH;
+        private final UriEncoder uriEncoder = new DefaultUriEncoder();
 
         /**
          * @param templateText The template
@@ -634,14 +634,18 @@ public class UriTemplate implements Comparable<UriTemplate> {
                         if (c == VAR_START) {
                             if (buff.length() > 0) {
                                 String val = buff.toString();
-                                addRawContentSegment(segments, val, isQuerySegment);
+                                addRawContentSegment(segments, val, segmentType);
                             }
                             buff.delete(0, buff.length());
                             state = STATE_VAR_START;
                             continue;
                         } else {
-                            if (c == QUERY_OPERATOR || c == HASH_OPERATOR) {
-                                isQuerySegment = true;
+                            if (c == QUERY_OPERATOR) {
+                                segmentType = SegmentType.QUERY;
+                            } else if (c == HASH_OPERATOR) {
+                                segmentType = SegmentType.HASH;
+                            } else {
+                                segmentType = SegmentType.PATH;
                             }
                             buff.append(c);
                             continue;
@@ -717,7 +721,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
                                     String modifierStr = modBuff.toString();
                                     char modifierChar = modifier;
                                     String previous = state == STATE_VAR_NEXT || state == STATE_VAR_NEXT_MODIFIER ? this.varDelimiter : null;
-                                    addVariableSegment(segments, val, prefix, delimiter, encode, repeatPrefix, modifierStr, modifierChar, operator, previous, isQuerySegment);
+                                    addVariableSegment(segments, val, prefix, delimiter, encode, repeatPrefix, modifierStr, modifierChar, operator, previous, segmentType);
                                 }
                                 boolean hasAnotherVar = state == STATE_VAR_NEXT && c != VAR_END;
                                 if (hasAnotherVar) {
@@ -770,8 +774,9 @@ public class UriTemplate implements Comparable<UriTemplate> {
                             case ';':
                             case QUERY_OPERATOR:
                             case AND_OPERATOR:
+                                segmentType = SegmentType.QUERY;
                             case HASH_OPERATOR:
-                                isQuerySegment = true;
+                                segmentType = SegmentType.HASH;
                                 // fall through
                             case '+':
                             case DOT_OPERATOR:
@@ -791,7 +796,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
 
             if (state == STATE_TEXT && buff.length() > 0) {
                 String val = buff.toString();
-                addRawContentSegment(segments, val, isQuerySegment);
+                addRawContentSegment(segments, val, segmentType);
             }
         }
 
@@ -800,10 +805,23 @@ public class UriTemplate implements Comparable<UriTemplate> {
          *
          * @param segments       The segments
          * @param value          The value
-         * @param isQuerySegment Whether is a query segment
+         * @param isQuerySegment Whether the segment is a query string
+         * @deprecated for removal in version 4.0. Use {@link #addRawContentSegment(List, String, SegmentType)} which better handles fragments/hashes.
          */
+        @Deprecated
         protected void addRawContentSegment(List<PathSegment> segments, String value, boolean isQuerySegment) {
-            segments.add(new RawPathSegment(isQuerySegment, value));
+            segments.add(new RawPathSegment(SegmentType.fromDeprecated(isQuerySegment), value, uriEncoder));
+        }
+
+        /**
+         * Adds a raw content segment.
+         *
+         * @param segments    The segments
+         * @param value       The value
+         * @param segmentType Whether the segment is a query string, path, or fragment/hash
+         */
+        protected void addRawContentSegment(List<PathSegment> segments, String value, SegmentType segmentType) {
+            segments.add(new RawPathSegment(segmentType, value, uriEncoder));
         }
 
         /**
@@ -819,40 +837,50 @@ public class UriTemplate implements Comparable<UriTemplate> {
          * @param modifierChar      The modifier as char
          * @param operator          The currently active operator
          * @param previousDelimiter The delimiter to use if a variable appeared before this variable
-         * @param isQuerySegment    Whether is a query segment
+         * @param isQuerySegment    Whether the segment is a query string
+         * @deprecated for removal in version 4.0.
+         * Use {@link #addVariableSegment(List, String, String, String, boolean, boolean, String, char, char, String, SegmentType)}
+         * instead which better handles fragments/hashes.
          */
-        protected void addVariableSegment(List<PathSegment> segments,
-                                          String variable,
-                                          String prefix,
-                                          String delimiter,
-                                          boolean encode,
-                                          boolean repeatPrefix,
-                                          String modifierStr,
-                                          char modifierChar,
-                                          char operator,
-                                          String previousDelimiter, boolean isQuerySegment) {
-            segments.add(new VariablePathSegment(isQuerySegment, variable, prefix, delimiter, encode, modifierChar, operator, modifierStr, previousDelimiter, repeatPrefix));
+        @Deprecated
+        protected void addVariableSegment(List<PathSegment> segments, String variable, String prefix, String delimiter, boolean encode, boolean repeatPrefix, String modifierStr, char modifierChar, char operator, String previousDelimiter, boolean isQuerySegment) {
+            segments.add(new VariablePathSegment(SegmentType.fromDeprecated(isQuerySegment), uriEncoder, variable, prefix, delimiter, encode, modifierChar, operator, modifierStr, previousDelimiter, repeatPrefix));
         }
 
+        /**
+         * Adds a new variable segment.
+         *
+         * @param segments          The segments to augment
+         * @param variable          The variable
+         * @param prefix            The prefix to use when expanding the variable
+         * @param delimiter         The delimiter to use when expanding the variable
+         * @param encode            Whether to URL encode the variable
+         * @param repeatPrefix      Whether to repeat the prefix for each expanded variable
+         * @param modifierStr       The modifier string
+         * @param modifierChar      The modifier as char
+         * @param operator          The currently active operator
+         * @param previousDelimiter The delimiter to use if a variable appeared before this variable
+         * @param segmentType       hether the segment is a query string, path, or fragment/hash
+         */
+        protected void addVariableSegment(List<PathSegment> segments, String variable, String prefix, String delimiter, boolean encode, boolean repeatPrefix, String modifierStr, char modifierChar, char operator, String previousDelimiter, SegmentType segmentType) {
+            segments.add(new VariablePathSegment(segmentType, uriEncoder, variable, prefix, delimiter, encode, modifierChar, operator, modifierStr, previousDelimiter, repeatPrefix));
+        }
 
         /**
          * Raw path segment implementation.
          */
         private static class RawPathSegment implements PathSegment {
-            private static final UrlHelper urlHelper = new UrlHelper();
-            private final boolean isQuerySegment;
+            private final SegmentType segmentType;
             private final String value;
 
-            public RawPathSegment(boolean isQuerySegment, String value) {
-                this.isQuerySegment = isQuerySegment;
-                this.value = urlHelper.encodeOrEscape(true, value, isQuerySegment);
-                //TODO need to escape fragments differently than paths
-                //TODO re-use path encoder from DefaultUriBuilder
+            public RawPathSegment(SegmentType segmentType, String value, UriEncoder uriEncoder) {
+                this.segmentType = segmentType;
+                this.value = value;
             }
 
             @Override
-            public boolean isQuerySegment() {
-                return isQuerySegment;
+            public SegmentType getSegmentType() {
+                return segmentType;
             }
 
             @Override
@@ -871,7 +899,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
 
                 RawPathSegment that = (RawPathSegment) o;
 
-                if (isQuerySegment != that.isQuerySegment) {
+                if (getSegmentType() != that.getSegmentType()) {
                     return false;
                 }
                 return Objects.equals(value, that.value);
@@ -879,7 +907,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
 
             @Override
             public int hashCode() {
-                int result = (isQuerySegment ? 1 : 0);
+                int result = Objects.hashCode(segmentType);
                 result = 31 * result + (value != null ? value.hashCode() : 0);
                 return result;
             }
@@ -910,8 +938,8 @@ public class UriTemplate implements Comparable<UriTemplate> {
          */
         private static class VariablePathSegment implements PathSegment {
 
-            private static final UrlHelper urlHelper = new UrlHelper();
-            private final boolean isQuerySegment;
+            private final SegmentType segmentType;
+            private final UriEncoder uriEncoder;
             private final String variable;
             private final String prefix;
             private final String delimiter;
@@ -922,8 +950,9 @@ public class UriTemplate implements Comparable<UriTemplate> {
             private final String previousDelimiter;
             private final boolean repeatPrefix;
 
-            public VariablePathSegment(boolean isQuerySegment, String variable, String prefix, String delimiter, boolean encode, char modifierChar, char operator, String modifierStr, String previousDelimiter, boolean repeatPrefix) {
-                this.isQuerySegment = isQuerySegment;
+            public VariablePathSegment(SegmentType segmentType, UriEncoder uriEncoder, String variable, String prefix, String delimiter, boolean encode, char modifierChar, char operator, String modifierStr, String previousDelimiter, boolean repeatPrefix) {
+                this.segmentType = segmentType;
+                this.uriEncoder = uriEncoder;
                 this.variable = variable;
                 this.prefix = prefix;
                 this.delimiter = delimiter;
@@ -946,7 +975,12 @@ public class UriTemplate implements Comparable<UriTemplate> {
 
             @Override
             public boolean isQuerySegment() {
-                return isQuerySegment;
+                return segmentType == SegmentType.QUERY;
+            }
+
+            @Override
+            public SegmentType getSegmentType() {
+                return segmentType;
             }
 
             @Override
@@ -995,6 +1029,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
                         found = Arrays.asList((Object[]) found);
                     }
                     boolean isQuery = operator == QUERY_OPERATOR;
+                    boolean isHash = operator == HASH_OPERATOR;
 
                     if (modifierChar == EXPAND_MODIFIER) {
                         found = expandPOJO(found); // Turn POJO into a Map
@@ -1009,7 +1044,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
                         for (Object o : iter) {
                             if (o != null) {
                                 String v = o.toString();
-                                joiner.add(urlHelper.encodeOrEscape(encode, v, isQuery));
+                                joiner.add(uriEncoder.encode(v, isQuery));
                             }
                         }
                         result = joiner.toString();
@@ -1047,8 +1082,8 @@ public class UriTemplate implements Comparable<UriTemplate> {
                                     continue;
                                 }
                                 String vs = value.toString();
-                                String ek = urlHelper.encodeOrEscape(encode, ks, isQuery);
-                                String ev = urlHelper.encodeOrEscape(encode, vs, isQuery);
+                                String ek = uriEncoder.encode(ks, '/', '?');
+                                String ev = uriEncoder.encode(vs, '/', '?');
                                 if (modifierChar == EXPAND_MODIFIER) {
                                     String finalValue = ek + '=' + ev;
                                     joiner.add(finalValue);
