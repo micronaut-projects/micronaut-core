@@ -29,6 +29,7 @@ dependencies {
     implementation libs.managed.reactor
 
     compileOnly libs.kotlin.stdlib
+    compileOnly libs.managed.netty.transport.native.unix.common
 
     testCompileOnly project(":inject-groovy")
     testAnnotationProcessor project(":inject-java")

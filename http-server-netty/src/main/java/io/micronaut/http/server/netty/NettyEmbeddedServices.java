@@ -36,6 +36,7 @@ import io.micronaut.web.router.resource.StaticResourceResolver;
 import io.micronaut.websocket.context.WebSocketBeanRegistry;
 import io.netty.channel.ChannelOutboundHandler;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.ServerChannel;
 import io.netty.channel.socket.ServerSocketChannel;
 
 /**
@@ -156,6 +157,16 @@ public interface NettyEmbeddedServices {
      * @return The {@link io.netty.channel.socket.ServerSocketChannel}
      */
     @NonNull ServerSocketChannel getServerSocketChannelInstance(@NonNull EventLoopGroupConfiguration workerConfig);
+
+    /**
+     * Gets the domain server socket channel instance.
+     * @param workerConfig The worker config
+     * @return The {@link io.netty.channel.unix.DomainSocketChannel}
+     * @throws UnsupportedOperationException if domain sockets are not supported.
+     */
+    @NonNull default ServerChannel getDomainServerChannelInstance(@NonNull EventLoopGroupConfiguration workerConfig) {
+        throw new UnsupportedOperationException("Domain sockets not supported");
+    }
 
     /**
      * Get an event publisher for the server for the given type.

@@ -135,8 +135,8 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private AccessLogger accessLogger;
     private Http2Settings http2Settings = new Http2Settings();
     private boolean keepAliveOnServerError = DEFAULT_KEEP_ALIVE_ON_SERVER_ERROR;
-    private boolean bindToRouterExposedPorts = true;
     private String pcapLoggingPathPattern = null;
+    private Map<String, NettyListenerConfiguration> listeners = null;
 
     /**
      * Default empty constructor.
@@ -543,6 +543,22 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     @Internal
     public void setPcapLoggingPathPattern(String pcapLoggingPathPattern) {
         this.pcapLoggingPathPattern = pcapLoggingPathPattern;
+    }
+
+    /**
+     * Get the explicit netty listener configurations, or {@code null} if they should be implicit.
+     * @return The listeners
+     */
+    public Map<String, NettyListenerConfiguration> getListeners() {
+        return listeners;
+    }
+
+    /**
+     * Set the explicit netty listener configurations, or {@code null} if they should be implicit.
+     * @param listeners The listeners
+     */
+    public void setListeners(Map<String, NettyListenerConfiguration> listeners) {
+        this.listeners = listeners;
     }
 
     /**
