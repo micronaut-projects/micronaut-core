@@ -111,14 +111,15 @@ class ListenerConfigurationSpec extends Specification {
     def 'unix domain socket'(boolean abstract_) {
         given:
         def tmpDir = Files.createTempDirectory(null)
-        def path = (abstract_ ? '\0' : '') + tmpDir.resolve('test').toString()
+        def path = tmpDir.resolve('test')
+        def bindPath = (abstract_ ? '\0' : '') + path.toString()
         def server = (NettyEmbeddedServer) ApplicationContext.run(
                 EmbeddedServer,
                 [
                         'micronaut.netty.event-loops.default.prefer-native-transport': true,
                         'micronaut.netty.event-loops.parent.prefer-native-transport': true,
                         'micronaut.server.netty.listeners.a.family': 'UNIX',
-                        'micronaut.server.netty.listeners.a.path': path,
+                        'micronaut.server.netty.listeners.a.path': bindPath,
                 ])
         def responses = new CopyOnWriteArrayList<FullHttpResponse>()
 
@@ -140,7 +141,7 @@ class ListenerConfigurationSpec extends Specification {
                                 })
                     }
                 })
-                .remoteAddress(new DomainSocketAddress(path))
+                .remoteAddress(new DomainSocketAddress(bindPath))
 
         when:
         def channel = bootstrap.connect().sync().channel()
@@ -158,7 +159,7 @@ class ListenerConfigurationSpec extends Specification {
         group.shutdownGracefully()
         server.close()
         if (!abstract_) {
-            Files.deleteIfExists(Path.of(path))
+            Files.deleteIfExists(path)
         }
         Files.deleteIfExists(tmpDir)
 
