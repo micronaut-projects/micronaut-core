@@ -88,7 +88,7 @@ follow a slightly different strategy.
 
 All Micronaut repos have 2 dependency upgrade checking mechanism:
 
-1. Dependabot: it has the advantage that it performs dependency upgrades not only on build dependencies, but also on
+1. Renovate: it has the advantage that it performs dependency upgrades not only on build dependencies, but also on
    GitHub Actions workflows. On the other hand, its biggest downside is that it's unable to find newer versions for
    those defined in `gradle.properties`. It will also send different PRs for the same version upgrade if the artifact ID
    is different. For example, if you have `com.example:client:1.0` and `com.example:server:1.0`, and a new 1.1 version
@@ -99,9 +99,9 @@ All Micronaut repos have 2 dependency upgrade checking mechanism:
    during weekdays.
 
 The consequence of having both approaches in place is that we get multiple dependency upgrade PRs: one created by
-`micronaut-build` via our automation, and one or many (one per dependency) created by Dependabot. When merging those, it
+`micronaut-build` via our automation, and one or many (one per dependency) created by Renovate. When merging those, it
 is better to prefer the `micronaut-build` ones, if possible, for 2 reasons: a) they attempt to upgrade multiple dependencies
-in a single PR, which creates less noise in the Git history; b) Once you merge that, Dependabot will react and automatically
+in a single PR, which creates less noise in the Git history; b) Once you merge that, Renovate will react and automatically
 close its own PRs if the dependecy is up-to-date.
 
 When an upgrade to a new version arrives, we need to be careful when merging, so that we don't introduce an
@@ -111,7 +111,7 @@ information.
 
 Note that if a new version arrives and we are not ready yet to do the upgrade, you need to
 [pin the old version](https://github.com/micronaut-projects/micronaut-build/#configuration-options), because otherwise,
-Dependabot and our workflow will keep sending PRs. You should also create an issue to upgrade so that it's not forgotten.
+Renovate and our workflow will keep sending PRs. You should also create an issue to upgrade so that it's not forgotten.
 
 #### Files sync
 
@@ -126,7 +126,7 @@ template repo will get propagated automatically. The files propagated are:
   * `gradle.yml`.
   * `release.yml`.
   * `release-notes.yml`.
-* Dependabot configuration (`.github/dependabot.yml`).
+* Renovate configuration (`.github/renovate.json`).
 * Gradle wrapper.
 * `.gitignore`.
 * `ISSUE_TEMPLATE.md`, `LICENSE`, `MAINTAINING.md`, `config/HEADER` and `config/spotless.license.java`.
