@@ -331,11 +331,9 @@ class DefaultUriBuilder implements UriBuilder {
             String pathStr = path.toString();
             if (isTemplate(pathStr, values)) {
                 pathStr = UriTemplate.of(pathStr).expand(values);
-            } else if (pathStr.chars().filter(ch -> ch == '/').count() <= 1) {
+            } else if (pathStr.chars().filter(ch -> ch == '/').count() == 1 && pathStr.charAt(0) == '/') { // encode only if the path has a single leading slash
                 final String templateVariable = "pathString";
-                pathStr = (pathStr.charAt(0) == '/') ?
-                        UriTemplate.of("/{" + templateVariable + "}").expand(Collections.singletonMap(templateVariable, pathStr.substring(1))) :
-                        UriTemplate.of("{" + templateVariable + "}").expand(Collections.singletonMap(templateVariable, pathStr));
+                pathStr = UriTemplate.of("/{" + templateVariable + "}").expand(Collections.singletonMap(templateVariable, pathStr.substring(1)));
             }
 
             builder.append(pathStr);
