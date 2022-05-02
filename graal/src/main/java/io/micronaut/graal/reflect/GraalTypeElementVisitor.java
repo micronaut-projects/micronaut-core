@@ -36,11 +36,11 @@ import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.GeneratedFile;
 import jakarta.inject.Inject;
 
-import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.Writer;
+import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -302,19 +302,19 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
     }
 
     private void generateNativeImageProperties(VisitorContext visitorContext) {
-        List<Map> json;
+        List<Map<String, Object>> json;
 
         Optional<Path> projectDir = visitorContext.getProjectDir();
 
-        File userReflectJsonFile = projectDir
-                .map(projectPath -> Paths.get(projectPath.toString(), BASE_REFLECT_JSON).toFile())
+        Path userReflectJsonFile = projectDir
+                .map(projectPath -> projectPath.resolve(BASE_REFLECT_JSON))
                 .orElse(null);
 
-        if (userReflectJsonFile != null && userReflectJsonFile.exists()) {
-            try {
-                json = MAPPER.readValue(userReflectJsonFile, new TypeReference<List<Map>>() {
+        if (userReflectJsonFile != null && Files.exists(userReflectJsonFile)) {
+            try (InputStream stream = Files.newInputStream(userReflectJsonFile)) {
+                json = MAPPER.readValue(stream, new TypeReference<List<Map<String, Object>>>() {
                 });
-            } catch (Throwable e) {
+            } catch (IOException e) {
                 visitorContext.fail("Error parsing base reflect.json: " + BASE_REFLECT_JSON, null);
                 return;
             }
@@ -334,9 +334,7 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                     originatingElements.toArray(Element.EMPTY_ELEMENT_ARRAY)
             );
             generatedFile.ifPresent(gf -> {
-                for (Map<String, Object> value : classes.values()) {
-                    json.add(value);
-                }
+                json.addAll(classes.values());
 
                 for (String array : arrays) {
                     json.add(CollectionUtils.mapOf(
