@@ -29,7 +29,6 @@ import spock.util.concurrent.PollingConditions
 import javax.net.ssl.HttpsURLConnection
 import javax.net.ssl.SSLContext
 import java.nio.file.Files
-import java.nio.file.Path
 import java.security.SecureRandom
 import java.util.concurrent.CopyOnWriteArrayList
 
@@ -68,6 +67,52 @@ class ListenerConfigurationSpec extends Specification {
 
         cleanup:
         server.close()
+    }
+
+    def 'port before start'() {
+        given:
+        def ctx = ApplicationContext.run(
+                [
+                        'micronaut.server.netty.listeners.a.port': 1234,
+                        'micronaut.server.netty.listeners.b.port': 5678,
+                ])
+        def server = ctx.getBean(NettyEmbeddedServer)
+
+        expect:
+        server.port == 1234
+    }
+
+    def 'port error messages'() {
+        when:
+        ApplicationContext.run([
+                'micronaut.server.netty.listeners.a.port': -1,
+                'micronaut.server.netty.listeners.b.port': -1,
+        ]).getBean(NettyEmbeddedServer).port
+
+        then:
+        def e = thrown UnsupportedOperationException
+        e.message.contains("random port")
+
+        when:
+        ApplicationContext.run([
+                'micronaut.server.netty.listeners.a.family': 'unix',
+                'micronaut.server.netty.listeners.a.path': '/foo',
+                'micronaut.server.netty.listeners.b.port': -1,
+        ]).getBean(NettyEmbeddedServer).port
+
+        then:
+        e = thrown UnsupportedOperationException
+        e.message.contains("random port")
+
+        when:
+        ApplicationContext.run([
+                'micronaut.server.netty.listeners.a.family': 'UNIX',
+                'micronaut.server.netty.listeners.a.path': '/foo',
+        ]).getBean(NettyEmbeddedServer).port
+
+        then:
+        e = thrown UnsupportedOperationException
+        e.message.contains("unix domain socket")
     }
 
     def 'random port, ssl'() {
