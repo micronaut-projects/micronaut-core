@@ -15,9 +15,13 @@
  */
 package io.micronaut.http.uri
 
+import io.micronaut.core.util.CollectionUtils
 import spock.lang.Issue
 import spock.lang.Specification
 import spock.lang.Unroll
+import spock.lang.PendingFeature
+import spock.lang.See
+
 class UriBuilderSpec extends Specification {
 
     @Issue("https://github.com/micronaut-projects/micronaut-core/issues/7288")
@@ -191,4 +195,15 @@ class UriBuilderSpec extends Specification {
                 .build()
                 .toString()
     }
+
+    @PendingFeature(reason = "not sure if its worth the effort to implement this corner case")
+    @See("https://datatracker.ietf.org/doc/html/rfc3986#section-3.4")
+    void "fragments with adjacent, reserved/unsafe chars"() {
+        expect:
+        '/#the%20date%20%272022-12-31%27/events' == UriBuilder.of("/")
+                .fragment("the date '{year}-{month}-{day}'/events")
+                .expand(CollectionUtils.mapOf("year", "2022", "month", "12", "day", "31"))
+                .toString()
+    }
+
 }
