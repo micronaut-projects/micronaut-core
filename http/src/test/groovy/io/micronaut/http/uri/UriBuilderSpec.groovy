@@ -18,8 +18,20 @@ package io.micronaut.http.uri
 import spock.lang.Issue
 import spock.lang.Specification
 import spock.lang.Unroll
-
 class UriBuilderSpec extends Specification {
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/7288")
+    void "path encodes"() {
+        given:
+        String path = "this has a space in it"
+        String expected = "/this%20has%20a%20space%20in%20it";
+
+        expect:
+        expected == UriBuilder.of("")
+                .path(path)
+                .build()
+                .toString()
+    }
 
     void "test uri builder expand"() {
         given:
@@ -72,7 +84,6 @@ class UriBuilderSpec extends Specification {
 
         UriBuilder uriBuilder = UriBuilder.of("/api").path("v1").path("secretendpoint");
         for (String paramKey : params.keySet()) {
-            System.out.println(paramKey)
             uriBuilder = uriBuilder.queryParam(paramKey, params.get(paramKey));
         }
 
@@ -156,5 +167,28 @@ class UriBuilderSpec extends Specification {
 
         expect:
         uri == 'myurl?%24top=10&%24filter=xyz'
+    }
+
+    void "fragments in URIs"() {
+        expect:
+        '/#foo' ==  UriBuilder.of("/").fragment("foo").build().toString()
+        '/#foo' ==  UriBuilder.of("").fragment("foo").build().toString()
+    }
+
+    void "query params in URIs"() {
+        expect:
+        '/foo?foo=bar' == UriBuilder.of("/foo")
+                .queryParam("foo", "bar")
+                .build()
+                .toString()
+    }
+
+    void "query params and fragments in URIs"() {
+        expect:
+        '/foo?foo=bar#baz' == UriBuilder.of("/foo")
+                .queryParam("foo", "bar")
+                .fragment("baz")
+                .build()
+                .toString()
     }
 }

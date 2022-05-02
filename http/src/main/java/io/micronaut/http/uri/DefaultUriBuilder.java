@@ -331,6 +331,13 @@ class DefaultUriBuilder implements UriBuilder {
             String pathStr = path.toString();
             if (isTemplate(pathStr, values)) {
                 pathStr = UriTemplate.of(pathStr).expand(values);
+            } else {
+                final String templateVariable = "pathString";
+                if (pathStr.chars().filter(ch -> ch == '/').count() <= 1) {
+                    pathStr = (pathStr.charAt(0) == '/') ?
+                            UriTemplate.of("/{" + templateVariable + "}").expand(Collections.singletonMap(templateVariable, pathStr.substring(1))) :
+                            UriTemplate.of("{" + templateVariable + "}").expand(Collections.singletonMap(templateVariable, pathStr));
+                }
             }
 
             builder.append(pathStr);
@@ -343,6 +350,9 @@ class DefaultUriBuilder implements UriBuilder {
 
         String fragment = this.fragment;
         if (StringUtils.isNotEmpty(fragment)) {
+            if (builder.length() == 0) {
+                builder.append('/');
+            }
             fragment = expandOrEncode(fragment, values);
             if (fragment.charAt(0) != '#') {
                 builder.append('#');
