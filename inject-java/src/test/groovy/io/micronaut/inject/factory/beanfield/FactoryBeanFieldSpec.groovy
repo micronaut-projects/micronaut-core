@@ -6,6 +6,7 @@ import io.micronaut.context.annotation.Prototype
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.util.CollectionUtils
 import io.micronaut.inject.BeanDefinition
+import io.micronaut.inject.factory.RemappedAnnotation
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Issue
 import spock.lang.Unroll
@@ -838,24 +839,28 @@ class Bar8 {
 
 ''')
         when:
-            def bar7BeanDefinition = context.getBeanDefinitions(context.classLoader.loadClass('test.Bar7'))
-                    .find {it.getDeclaringType().get().simpleName.contains("TestFactory")}
+        BeanDefinition<?> bar7BeanDefinition = findBeanDefinitionByDeclaringType(context, 'test.Bar7')
 
-            def bar8BeanDefinition = context.getBeanDefinitions(context.classLoader.loadClass('test.Bar8'))
-                    .find {it.getDeclaringType().get().simpleName.contains("TestFactory")}
+        BeanDefinition<?>  bar8BeanDefinition = findBeanDefinitionByDeclaringType(context,'test.Bar8')
 
         then:
-            bar7BeanDefinition.getScope().get() == Prototype.class
-            bar7BeanDefinition.declaredQualifier.toString() == "@Named('test.Xyz')"
-            bar7BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).size() == 1
-            bar7BeanDefinition.hasAnnotation(io.micronaut.inject.factory.RemappedAnnotation)
+        bar7BeanDefinition.getScope().get() == Prototype.class
+        bar7BeanDefinition.declaredQualifier.toString() == "@Named('test.Xyz')"
+        bar7BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).size() == 1
+        bar7BeanDefinition.hasAnnotation(RemappedAnnotation)
+
         and:
-            bar8BeanDefinition.getScope().get() == Prototype.class
-            bar8BeanDefinition.declaredQualifier.toString() == "@Named('test.Xyz')"
-            bar8BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).size() == 1
-            bar8BeanDefinition.hasAnnotation(io.micronaut.inject.factory.RemappedAnnotation)
+        bar8BeanDefinition.getScope().get() == Prototype.class
+        bar8BeanDefinition.declaredQualifier.toString() == "@Named('test.Xyz')"
+        bar8BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).size() == 1
+        bar8BeanDefinition.hasAnnotation(RemappedAnnotation)
 
         cleanup:
-            context.close()
+        context.close()
+    }
+
+    private static BeanDefinition<?> findBeanDefinitionByDeclaringType(ApplicationContext context, String name, String declaringTypeSimpleName = "TestFactory") {
+        context.getBeanDefinitions(context.classLoader.loadClass(name))
+                .find {it.getDeclaringType().get().simpleName.contains(declaringTypeSimpleName)}
     }
 }
