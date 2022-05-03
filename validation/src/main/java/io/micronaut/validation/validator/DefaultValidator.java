@@ -97,7 +97,7 @@ import java.util.stream.Collectors;
 @Requires(property = ValidatorConfiguration.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
 public class DefaultValidator implements Validator, ExecutableMethodValidator, ReactiveValidator, AnnotatedElementValidator, BeanDefinitionValidator {
 
-    private static final List<Class> DEFAULT_GROUPS = Collections.singletonList(Default.class);
+    private static final List<Class<?>> DEFAULT_GROUPS = Collections.singletonList(Default.class);
     private final ConstraintValidatorRegistry constraintValidatorRegistry;
     private final ClockProvider clockProvider;
     private final ValueExtractorRegistry valueExtractorRegistry;
@@ -272,7 +272,6 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         final DefaultConstraintValidatorContext context = new DefaultConstraintValidatorContext();
         try {
             context.addPropertyNode(element.getName(), null);
-            //noinspection unchecked
             validatePropertyInternal(
                     null,
                     element,
@@ -286,7 +285,6 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             context.removeLast();
         }
 
-        //noinspection unchecked
         return Collections.unmodifiableSet(overallViolations.stream()
                 .map(ConstraintViolation::getMessage).collect(Collectors.toSet()));
     }
@@ -1807,7 +1805,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
     private final class DefaultConstraintValidatorContext implements ConstraintValidatorContext {
         final Set<Object> validatedObjects = new HashSet<>(20);
         final PathImpl currentPath;
-        final List<Class> groups;
+        final List<Class<?>> groups;
         String messageTemplate = null;
 
         private <T> DefaultConstraintValidatorContext(T object, Class<?>... groups) {
@@ -1819,7 +1817,13 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                 validatedObjects.add(object);
             }
             if (ArrayUtils.isNotEmpty(groups)) {
-                this.groups = Arrays.asList(groups);
+                sanityCheckGroups(groups);
+
+                List<Class<?>> groupList = new ArrayList<>();
+                for (Class<?> group: groups) {
+                    addInheritedGroups(group, groupList);
+                }
+                this.groups = Collections.unmodifiableList(groupList);
             } else {
                 this.groups = DEFAULT_GROUPS;
             }
@@ -1829,6 +1833,30 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
 
         private DefaultConstraintValidatorContext(Class<?>... groups) {
             this(null, groups);
+        }
+
+        private void sanityCheckGroups(Class<?>[] groups) {
+            ArgumentUtils.requireNonNull("groups", groups);
+
+            for (Class<?> clazz : groups) {
+                if (clazz == null) {
+                    throw new IllegalArgumentException("Validation groups must be non-null");
+                }
+                if (!clazz.isInterface()) {
+                    throw new IllegalArgumentException(
+                        "Validation groups must be interfaces. " + clazz.getName() + " is not.");
+                }
+            }
+        }
+
+        private void addInheritedGroups(Class<?> group, List<Class<?>> groups) {
+            if (!groups.contains(group)) {
+                groups.add(group);
+            }
+
+            for (Class<?> inheritedGroup : group.getInterfaces()) {
+                addInheritedGroups(inheritedGroup, groups);
+            }
         }
 
         @NonNull

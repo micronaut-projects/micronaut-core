@@ -13,5 +13,55 @@
         "type": "io.micronaut.core.annotation.AnnotationMetadata",
         "member": "Class io.micronaut.core.annotation.AnnotationMetadata",
         "reason": "AnnotationMetadata is an internally implemented data structure and not designed to be implemented by consumers of the framework."
+    },
+    {
+        "type": "io.micronaut.inject.writer.ClassWriterOutputVisitor",
+        "member": "Class io.micronaut.inject.writer.ClassWriterOutputVisitor",
+        "reason": "Classes in the io.micronaut.inject.writer package are considered non-public implementation detail"
+    },
+    {
+        "type": "io.micronaut.inject.writer.ClassWriterOutputVisitor",
+        "member": "Method io.micronaut.inject.writer.ClassWriterOutputVisitor.visitServiceDescriptor(java.lang.Class,java.lang.String,io.micronaut.inject.ast.Element)",
+        "reason": "Classes in the io.micronaut.inject.writer package are considered non-public implementation detail"
+    },
+    {
+        "type": "io.micronaut.graal.reflect.GraalTypeElementVisitor",
+        "member": "Class io.micronaut.graal.reflect.GraalTypeElementVisitor",
+        "reason": "The Graal visitor is internal to the compiler and implementation detail not part of the public API"
+    },
+    {
+        "type": "io.micronaut.graal.reflect.GraalTypeElementVisitor",
+        "member": "Field originatingElements",
+        "reason": "The Graal visitor is internal to the compiler and implementation detail not part of the public API"
+    },
+    {
+        "type": "io.micronaut.graal.reflect.GraalTypeElementVisitor",
+        "member": "Field classes",
+        "reason": "The Graal visitor is internal to the compiler and implementation detail not part of the public API"
+    },
+    {
+        "type": "io.micronaut.graal.reflect.GraalTypeElementVisitor",
+        "member": "Field packages",
+        "reason": "The Graal visitor is internal to the compiler and implementation detail not part of the public API"
+    },
+    {
+        "type": "io.micronaut.graal.reflect.GraalTypeElementVisitor",
+        "member": "Field arrays",
+        "reason": "The Graal visitor is internal to the compiler and implementation detail not part of the public API"
+    },
+    {
+        "type": "io.micronaut.graal.reflect.GraalTypeElementVisitor",
+        "member": "Method io.micronaut.graal.reflect.GraalTypeElementVisitor.visitConstructor(io.micronaut.inject.ast.ConstructorElement,io.micronaut.inject.visitor.VisitorContext)",
+        "reason": "The Graal visitor is internal to the compiler and implementation detail not part of the public API"
+    },
+    {
+        "type": "io.micronaut.graal.reflect.GraalTypeElementVisitor",
+        "member": "Method io.micronaut.graal.reflect.GraalTypeElementVisitor.visitField(io.micronaut.inject.ast.FieldElement,io.micronaut.inject.visitor.VisitorContext)",
+        "reason": "The Graal visitor is internal to the compiler and implementation detail not part of the public API"
+    },
+    {
+        "type": "io.micronaut.graal.reflect.GraalTypeElementVisitor",
+        "member": "Method io.micronaut.graal.reflect.GraalTypeElementVisitor.visitMethod(io.micronaut.inject.ast.MethodElement,io.micronaut.inject.visitor.VisitorContext)",
+        "reason": "The Graal visitor is internal to the compiler and implementation detail not part of the public API"
     }
 ]

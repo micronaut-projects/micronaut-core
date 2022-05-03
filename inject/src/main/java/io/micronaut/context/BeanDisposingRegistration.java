@@ -15,13 +15,11 @@
  */
 package io.micronaut.context;
 
-import io.micronaut.context.exceptions.BeanDestructionException;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanDefinition;
-import io.micronaut.inject.DisposableBeanDefinition;
+import io.micronaut.inject.BeanIdentifier;
 
 import java.util.List;
-import java.util.ListIterator;
 
 /**
  * The disposing bean registration.
@@ -34,53 +32,32 @@ import java.util.ListIterator;
 final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> {
     private final BeanContext beanContext;
     private final List<BeanRegistration<?>> dependents;
-    private final boolean hasDependents;
 
-    BeanDisposingRegistration(BeanContext beanContext, DefaultBeanContext.BeanKey<BT> key, BeanDefinition<BT> beanDefinition, BT createdBean, List<BeanRegistration<?>> dependents) {
-        super(key, beanDefinition, createdBean);
+    BeanDisposingRegistration(BeanContext beanContext,
+                              BeanIdentifier identifier,
+                              BeanDefinition<BT> beanDefinition,
+                              BT createdBean,
+                              List<BeanRegistration<?>> dependents) {
+        super(identifier, beanDefinition, createdBean);
         this.beanContext = beanContext;
         this.dependents = dependents;
-        this.hasDependents = true;
     }
 
-    BeanDisposingRegistration(BeanContext beanContext, DefaultBeanContext.BeanKey<BT> key, BeanDefinition<BT> beanDefinition, BT createdBean) {
-        super(key, beanDefinition, createdBean);
+    BeanDisposingRegistration(BeanContext beanContext,
+                              BeanIdentifier identifier,
+                              BeanDefinition<BT> beanDefinition,
+                              BT createdBean) {
+        super(identifier, beanDefinition, createdBean);
         this.beanContext = beanContext;
-        this.hasDependents = false;
         this.dependents = null;
     }
 
     @Override
     public void close() {
-        final BeanDefinition<BT> definition = definition();
-        final BT beanToDestroy = getBean();
-        if (definition instanceof DisposableBeanDefinition) {
-            ((DisposableBeanDefinition<BT>) definition).dispose(beanContext, beanToDestroy);
-        }
-        if (beanToDestroy instanceof LifeCycle) {
-            try {
-                ((LifeCycle) beanToDestroy).stop();
-            } catch (Exception e) {
-                throw new BeanDestructionException(definition, e);
-            }
-        }
-        if (hasDependents) {
-            final ListIterator<BeanRegistration<?>> i = dependents.listIterator(dependents.size());
-            while (i.hasPrevious()) {
-                final BeanRegistration<?> dependent = i.previous();
-                final Object bean = dependent.getBean();
-                final BeanDefinition<?> beanDefinition = dependent.getBeanDefinition();
-                if (beanDefinition instanceof DisposableBeanDefinition) {
-                    try {
-                        //noinspection unchecked
-                        ((DisposableBeanDefinition) beanDefinition).dispose(beanContext, bean);
-                    } catch (Exception e) {
-                        if (DefaultBeanContext.LOG.isErrorEnabled()) {
-                            DefaultBeanContext.LOG.error("Error disposing dependent bean of type " + beanDefinition.getBeanType().getName() + ": " + e.getMessage(), e);
-                        }
-                    }
-                }
-            }
-        }
+        beanContext.destroyBean(this);
+    }
+
+    public List<BeanRegistration<?>> getDependents() {
+        return dependents;
     }
 }

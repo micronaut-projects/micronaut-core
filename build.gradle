@@ -14,3 +14,21 @@ tasks.named("updateVersionCatalogs") {
     // workaround Gradle variant selection problem
     ignoredModules.add("com.github.ben-manes.caffeine:caffeine")
 }
+
+if (System.getenv("SONAR_TOKEN") != null) {
+    // deprecated and compile time only classes excluded from coverage
+    def coverageExcludes = [
+        "**/StreamSoftServiceLoader.java",
+        "**/ServiceDescriptionProcessor.java",
+        "**/GraalReflectionConfigurer.java",
+        "**/graal/ServiceLoaderInitialization.java",
+        "**/graal/ServiceLoaderInitialization.java",
+        "**/DirectoryClassWriterOutputVisitor.java",
+        "**/GroovyClassWriterOutputVisitor.java"
+    ]
+    sonarqube {
+        properties {
+            property "sonar.exclusions", coverageExcludes.join(",")
+        }
+    }
+}

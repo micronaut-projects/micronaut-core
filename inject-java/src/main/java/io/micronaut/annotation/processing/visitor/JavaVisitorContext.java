@@ -244,6 +244,11 @@ public class JavaVisitorContext implements VisitorContext, BeanElementVisitorCon
     }
 
     @Override
+    public void visitServiceDescriptor(String type, String classname, io.micronaut.inject.ast.Element originatingElement) {
+        outputVisitor.visitServiceDescriptor(type, classname, originatingElement);
+    }
+
+    @Override
     public Optional<GeneratedFile> visitMetaInfFile(String path, io.micronaut.inject.ast.Element... originatingElements) {
         return outputVisitor.visitMetaInfFile(path, originatingElements);
     }

@@ -39,6 +39,11 @@ public class ContextConfigurerVisitor implements TypeElementVisitor<ContextConfi
     );
 
     @Override
+    public VisitorKind getVisitorKind() {
+        return VisitorKind.ISOLATING;
+    }
+
+    @Override
     public String getElementType() {
         return ContextConfigurer.class.getName();
     }
@@ -50,7 +55,7 @@ public class ContextConfigurerVisitor implements TypeElementVisitor<ContextConfi
                 .stream()
                 .map(Element::getName)
                 .filter(SUPPORTED_SERVICE_TYPES::contains)
-                .forEach(serviceType -> context.visitServiceDescriptor(serviceType, element.getName()));
+                .forEach(serviceType -> context.visitServiceDescriptor(serviceType, element.getName(), element));
     }
 
     /**
