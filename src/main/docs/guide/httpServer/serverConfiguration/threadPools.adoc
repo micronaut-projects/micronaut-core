@@ -29,19 +29,3 @@ NOTE: The default value for the number of threads is the value of the system pro
 See the following table for configuring event loops:
 
 include::{includedir}configurationProperties/io.micronaut.http.netty.channel.DefaultEventLoopGroupConfiguration.adoc[]
-
-==== Blocking Operations
-
-When dealing with blocking operations, Micronaut shifts the blocking operations to an unbound, caching I/O thread pool by default. You can configure the I/O thread pool using the api:scheduling.executor.ExecutorConfiguration[] named `io`. For example:
-
-.Configuring the Server I/O Thread Pool
-[source,yaml]
-----
-micronaut:
-  executors:
-    io:
-      type: fixed
-      nThreads: 75
-----
-
-The above configuration creates a fixed thread pool with 75 threads.

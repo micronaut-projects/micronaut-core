@@ -354,6 +354,16 @@ final class HttpPipelineBuilder {
         void configureForAlpn() {
             pipeline.addLast(new ApplicationProtocolNegotiationHandler(server.getServerConfiguration().getFallbackProtocol()) {
                 @Override
+                public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+                    if (routingInBoundHandler.isIgnorable(cause)) {
+                        // just abandon ship, nothing can be done here to recover
+                        ctx.close();
+                    } else {
+                        super.exceptionCaught(ctx, cause);
+                    }
+                }
+
+                @Override
                 public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
                     if (evt instanceof SslHandshakeCompletionEvent) {
                         SslHandshakeCompletionEvent event = (SslHandshakeCompletionEvent) evt;

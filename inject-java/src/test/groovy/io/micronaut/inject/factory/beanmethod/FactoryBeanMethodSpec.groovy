@@ -153,6 +153,12 @@ class Bar8 {
 
         BeanDefinition<?> bar8BeanDefinition = findBeanDefinitionByDeclaringType(context, 'test.Bar8')
 
+            def bar7BeanDefinition = context.getBeanDefinitions(context.classLoader.loadClass('test.Bar7'))
+                    .find {it.getDeclaringType().get().simpleName.contains("TestFactory")}
+
+            def bar8BeanDefinition = context.getBeanDefinitions(context.classLoader.loadClass('test.Bar8'))
+                    .find {it.getDeclaringType().get().simpleName.contains("TestFactory")}
+
         then:
         bar1BeanDefinition.getScope().get() == Prototype.class
         bar1BeanDefinition.declaredQualifier == null
