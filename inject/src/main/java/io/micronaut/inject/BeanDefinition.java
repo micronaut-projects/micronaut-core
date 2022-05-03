@@ -437,22 +437,20 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
                     return null;
                 }
                 return Qualifiers.byAnnotation(annotationMetadata, annotation);
-            } else {
-                Qualifier<T>[] qualifiers = new Qualifier[annotations.size()];
-                int i = 0;
-                for (String annotationName : annotations) {
-                    qualifiers[i++] = Qualifiers.byAnnotation(annotationMetadata, annotationName);
-                }
-                return Qualifiers.byQualifiers(qualifiers);
             }
-        } else {
-            Qualifier<T> qualifier = resolveDynamicQualifier();
-            if (qualifier == null) {
-                String name = annotationMetadata.stringValue(AnnotationUtil.NAMED).orElse(null);
-                qualifier = name != null ? Qualifiers.byAnnotation(annotationMetadata, name) : null;
+            Qualifier<T>[] qualifiers = new Qualifier[annotations.size()];
+            int i = 0;
+            for (String annotationName : annotations) {
+                qualifiers[i++] = Qualifiers.byAnnotation(annotationMetadata, annotationName);
             }
-            return qualifier;
+            return Qualifiers.byQualifiers(qualifiers);
         }
+        Qualifier<T> qualifier = resolveDynamicQualifier();
+        if (qualifier == null) {
+            String name = annotationMetadata.stringValue(AnnotationUtil.NAMED).orElse(null);
+            qualifier = name != null ? Qualifiers.byAnnotation(annotationMetadata, name) : null;
+        }
+        return qualifier;
     }
 
     /**
