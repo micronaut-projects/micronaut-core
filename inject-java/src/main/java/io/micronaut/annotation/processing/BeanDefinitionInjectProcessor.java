@@ -1125,6 +1125,11 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     );
                     AnnotationMetadata producedTypeAnnotationMetadata = annotationUtils.getAnnotationMetadata(producedTypeElement);
                     AnnotationMetadata elementAnnotationMetadata = annotationUtils.getAnnotationMetadata(element);
+                    if (elementAnnotationMetadata instanceof AnnotationMetadataHierarchy) {
+                        // If the element has added annotation from a type visitor, annotation metadata is a hierarchy
+                        // We only need actual element metadata
+                        elementAnnotationMetadata = elementAnnotationMetadata.getDeclaredMetadata();
+                    }
                     cleanupScopeAndQualifierAnnotations((MutableAnnotationMetadata) producedAnnotationMetadata, producedTypeAnnotationMetadata, elementAnnotationMetadata);
                     producedTypeName = producedTypeElement.getQualifiedName().toString();
                 }
