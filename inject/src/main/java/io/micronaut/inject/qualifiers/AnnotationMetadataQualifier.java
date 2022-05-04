@@ -51,7 +51,7 @@ class AnnotationMetadataQualifier<T> implements Qualifier<T> {
     @NonNull
     final String annotationName;
     @NonNull
-    private final String annotationSimpleName;
+    final String annotationSimpleName;
     @Nullable
     final AnnotationValue<Annotation> qualifierAnn;
 
@@ -136,10 +136,8 @@ class AnnotationMetadataQualifier<T> implements Qualifier<T> {
         }
         Map<CharSequence, Object> map = new HashMap<>();
         for (Map.Entry<CharSequence, Object> entry : bindingValues.entrySet()) {
-            if (!nonBinding.contains(entry.getKey().toString())) {
-                if (map.put(entry.getKey(), entry.getValue()) != null) {
-                    throw new IllegalStateException("Duplicate key: " + entry.getKey());
-                }
+            if (!nonBinding.contains(entry.getKey().toString()) && map.put(entry.getKey(), entry.getValue()) != null) {
+                throw new IllegalStateException("Duplicate key: " + entry.getKey());
             }
         }
         return map;
