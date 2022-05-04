@@ -595,10 +595,8 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 applicationContext.getEventPublisher(ServiceStoppedEvent.class)
                         .publishEvent(new ServiceStoppedEvent(serviceInstance));
             }
-            if (isDefault) {
-                if (applicationContext.isRunning()) {
-                    applicationContext.stop();
-                }
+            if (isDefault && applicationContext.isRunning()) {
+                applicationContext.stop();
             }
             serverConfiguration.getMultipart().getLocation().ifPresent(dir -> DiskFileUpload.baseDirectory = null);
             this.activeListeners = null;
