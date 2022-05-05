@@ -4,6 +4,8 @@ import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Prototype
 import io.micronaut.core.annotation.AnnotationUtil
+import io.micronaut.inject.BeanDefinition
+import io.micronaut.inject.factory.RemappedAnnotation
 
 class FactoryBeanMethodSpec extends AbstractTypeElementSpec {
 
@@ -135,23 +137,21 @@ class Bar8 {
 ''')
 
         when:
-            def bar1BeanDefinition = context.getBeanDefinitions(context.classLoader.loadClass('test.Bar1'))
-                    .find {it.getDeclaringType().get().simpleName.contains("TestFactory")}
+        BeanDefinition<?> bar1BeanDefinition = findBeanDefinitionByDeclaringType(context, 'test.Bar1')
 
-            def bar2BeanDefinition = context.getBeanDefinitions(context.classLoader.loadClass('test.Bar2'))
-                    .find {it.getDeclaringType().get().simpleName.contains("TestFactory")}
+        BeanDefinition<?> bar2BeanDefinition = findBeanDefinitionByDeclaringType(context, 'test.Bar2')
 
-            def bar3BeanDefinition = context.getBeanDefinitions(context.classLoader.loadClass('test.Bar3'))
-                    .find {it.getDeclaringType().get().simpleName.contains("TestFactory")}
+        BeanDefinition<?> bar3BeanDefinition = findBeanDefinitionByDeclaringType(context, 'test.Bar3')
 
-            def bar4BeanDefinition = context.getBeanDefinitions(context.classLoader.loadClass('test.Bar4'))
-                    .find {it.getDeclaringType().get().simpleName.contains("TestFactory")}
+        BeanDefinition<?> bar4BeanDefinition = findBeanDefinitionByDeclaringType(context, 'test.Bar4')
 
-            def bar5BeanDefinition = context.getBeanDefinitions(context.classLoader.loadClass('test.Bar5'))
-                    .find {it.getDeclaringType().get().simpleName.contains("TestFactory")}
+        BeanDefinition<?> bar5BeanDefinition = findBeanDefinitionByDeclaringType(context, 'test.Bar5')
 
-            def bar6BeanDefinition = context.getBeanDefinitions(context.classLoader.loadClass('test.Bar6'))
-                    .find {it.getDeclaringType().get().simpleName.contains("TestFactory")}
+        BeanDefinition<?>  bar6BeanDefinition = findBeanDefinitionByDeclaringType(context, 'test.Bar6')
+
+        BeanDefinition<?> bar7BeanDefinition = findBeanDefinitionByDeclaringType(context, 'test.Bar7')
+
+        BeanDefinition<?> bar8BeanDefinition = findBeanDefinitionByDeclaringType(context, 'test.Bar8')
 
             def bar7BeanDefinition = context.getBeanDefinitions(context.classLoader.loadClass('test.Bar7'))
                     .find {it.getDeclaringType().get().simpleName.contains("TestFactory")}
@@ -160,45 +160,56 @@ class Bar8 {
                     .find {it.getDeclaringType().get().simpleName.contains("TestFactory")}
 
         then:
-            bar1BeanDefinition.getScope().get() == Prototype.class
-            bar1BeanDefinition.declaredQualifier == null
-            bar1BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).size() == 1
+        bar1BeanDefinition.getScope().get() == Prototype.class
+        bar1BeanDefinition.declaredQualifier == null
+        bar1BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).size() == 1
+
         and:
-            !bar2BeanDefinition.getScope().isPresent() // javax.inject.Singleton is not present :-/
-            bar2BeanDefinition.singleton
-            bar2BeanDefinition.declaredQualifier == null
-            bar2BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).size() == 1
-            bar2BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).iterator().next() == AnnotationUtil.SINGLETON
+        !bar2BeanDefinition.getScope().isPresent() // javax.inject.Singleton is not present :-/
+        bar2BeanDefinition.singleton
+        bar2BeanDefinition.declaredQualifier == null
+        bar2BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).size() == 1
+        bar2BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).iterator().next() == AnnotationUtil.SINGLETON
+
         and:
-            !bar3BeanDefinition.getScope().isPresent()
-            bar3BeanDefinition.declaredQualifier.toString() == "@Named('test.Xyz')"
-            bar3BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).size() == 0
+        !bar3BeanDefinition.getScope().isPresent()
+        bar3BeanDefinition.declaredQualifier.toString() == "@Named('test.Xyz')"
+        bar3BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).size() == 0
+
         and:
-            !bar4BeanDefinition.getScope().isPresent()
-            bar4BeanDefinition.singleton
-            bar4BeanDefinition.declaredQualifier.toString() == "@Abc"
-            bar4BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).size() == 1
-            bar4BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).iterator().next() == AnnotationUtil.SINGLETON
+        !bar4BeanDefinition.getScope().isPresent()
+        bar4BeanDefinition.singleton
+        bar4BeanDefinition.declaredQualifier.toString() == "@Abc"
+        bar4BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).size() == 1
+        bar4BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).iterator().next() == AnnotationUtil.SINGLETON
+
         and:
-            !bar5BeanDefinition.getScope().isPresent()
-            bar5BeanDefinition.declaredQualifier.toString() == "@Named('test.Xyz')"
-            bar5BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).size() == 0
+        !bar5BeanDefinition.getScope().isPresent()
+        bar5BeanDefinition.declaredQualifier.toString() == "@Named('test.Xyz')"
+        bar5BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).size() == 0
         and:
-            bar6BeanDefinition.getScope().get() == Prototype.class
-            bar6BeanDefinition.declaredQualifier.toString() == "@Named('test.Xyz')"
-            bar6BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).size() == 1
+        bar6BeanDefinition.getScope().get() == Prototype.class
+        bar6BeanDefinition.declaredQualifier.toString() == "@Named('test.Xyz')"
+        bar6BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).size() == 1
+
         and:
-            bar7BeanDefinition.getScope().get() == Prototype.class
-            bar7BeanDefinition.declaredQualifier.toString() == "@Named('test.Xyz')"
-            bar7BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).size() == 1
-            bar7BeanDefinition.hasAnnotation(io.micronaut.inject.factory.RemappedAnnotation)
+        bar7BeanDefinition.getScope().get() == Prototype.class
+        bar7BeanDefinition.declaredQualifier.toString() == "@Named('test.Xyz')"
+        bar7BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).size() == 1
+        bar7BeanDefinition.hasAnnotation(RemappedAnnotation)
+
         and:
-            bar8BeanDefinition.getScope().get() == Prototype.class
-            bar8BeanDefinition.declaredQualifier.toString() == "@Named('test.Xyz')"
-            bar8BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).size() == 1
-            bar8BeanDefinition.hasAnnotation(io.micronaut.inject.factory.RemappedAnnotation)
+        bar8BeanDefinition.getScope().get() == Prototype.class
+        bar8BeanDefinition.declaredQualifier.toString() == "@Named('test.Xyz')"
+        bar8BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).size() == 1
+        bar8BeanDefinition.hasAnnotation(RemappedAnnotation)
 
         cleanup:
-            context.close()
+        context.close()
+    }
+
+    private static BeanDefinition<?> findBeanDefinitionByDeclaringType(ApplicationContext context, String name, String declaringTypeSimpleName = "TestFactory") {
+        context.getBeanDefinitions(context.classLoader.loadClass(name))
+                .find {it.getDeclaringType().get().simpleName.contains(declaringTypeSimpleName)}
     }
 }
