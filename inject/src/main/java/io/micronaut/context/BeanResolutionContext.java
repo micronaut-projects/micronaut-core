@@ -224,6 +224,41 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     }
 
     /**
+     * @return The current dependent beans that must be destroyed by an upstream bean
+     *
+     * @since 3.5.0
+     */
+    default @Nullable List<BeanRegistration<?>> popDependentBeans() {
+        return null;
+    }
+
+    /**
+     * The push the current dependent beans that must be destroyed by an upstream bean.
+     *
+     * @param dependentBeans Dependent beans collection that can be used to add more dependents
+     * @since 3.5.0
+     */
+    default void pushDependentBeans(@Nullable List<BeanRegistration<?>> dependentBeans) {
+    }
+
+    /**
+     * Marks first dependent as factory.
+     * Dependent can be missing which means it's a singleton or scoped bean.
+     *
+     * @since 3.5.0
+     */
+    default void markDependentAsFactory() {
+    }
+
+    /**
+     * @return The dependent factory beans that was used to create the bean in context
+     * @since 3.5.0
+     */
+    default @Nullable BeanRegistration<?> getAndResetDependentFactoryBean() {
+        return null;
+    }
+
+    /**
      * Represents a path taken to resolve a bean definitions dependencies.
      */
     interface Path extends Deque<Segment<?>>, AutoCloseable {

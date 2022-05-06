@@ -78,9 +78,7 @@ final class SingletonScope {
 
 
         DefaultBeanContext.BeanKey<T> key = new DefaultBeanContext.BeanKey<>(beanDefinition.asArgument(), qualifier);
-        BeanRegistration<T> registration = dependents.isEmpty() ?
-            new BeanDisposingRegistration<>(beanContext, key, beanDefinition, createdBean) :
-            new BeanDisposingRegistration<>(beanContext, key, beanDefinition, createdBean, dependents);
+        BeanRegistration<T> registration = BeanRegistration.of(beanContext, key, beanDefinition, createdBean, dependents);
         
         singletonByBeanDefinition.put(BeanDefinitionIdentity.of(beanDefinition), registration);
         if (!beanDefinition.isSingleton()) {

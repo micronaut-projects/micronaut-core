@@ -257,6 +257,17 @@ final class JsonNodeTraversingParser extends ParserMinimalBase {
 
     @Override
     public byte[] getBinaryValue(Base64Variant b64variant) throws IOException {
+        JsonNode currentNode = currentNodeOrNull();
+
+        if (currentNode != null && currentNode.isNull()) {
+            return null;
+        }
+
+        String text = getText();
+        if (text != null) {
+            return b64variant.decode(text);
+        }
+
         return null;
     }
 

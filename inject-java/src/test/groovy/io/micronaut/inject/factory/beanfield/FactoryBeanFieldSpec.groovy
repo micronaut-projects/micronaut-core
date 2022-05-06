@@ -4,7 +4,6 @@ import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Prototype
 import io.micronaut.core.annotation.AnnotationUtil
-import io.micronaut.core.reflect.ReflectionUtils
 import io.micronaut.core.util.CollectionUtils
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.qualifiers.Qualifiers
@@ -778,5 +777,85 @@ class Bar7 {
 
         cleanup:
         context.close()
+    }
+
+    void "newly introduced annotation should not break inherited qualifier/scope"() {
+        given:
+            ApplicationContext context = buildContext('test.TestFactory$TestField', '''\
+package test;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import java.lang.annotation.Documented;
+import java.lang.annotation.Retention;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.aop.*;
+import io.micronaut.context.annotation.*;
+import jakarta.inject.*;
+import jakarta.inject.Singleton;
+
+@Some
+@Factory
+class TestFactory$TestField {
+
+    @io.micronaut.inject.factory.RemappedAnnotation
+    @Bean
+    @Xyz
+    @Prototype
+    Bar7 bar7 = new Bar7();
+    
+    @Bean
+    @Xyz
+    @Prototype
+    Bar8 bar8 = new Bar8();
+}
+
+@Abc
+@Singleton
+class Bar7 {
+}
+
+@Abc
+@Singleton
+@io.micronaut.inject.factory.RemappedAnnotation
+class Bar8 {
+}
+
+@Retention(RUNTIME)
+@Qualifier
+@interface Abc {
+}
+
+@Retention(RUNTIME)
+@Qualifier
+@interface Xyz {
+}
+
+@Retention(RUNTIME)
+@Qualifier
+@interface Some {
+}
+
+''')
+        when:
+            def bar7BeanDefinition = context.getBeanDefinitions(context.classLoader.loadClass('test.Bar7'))
+                    .find {it.getDeclaringType().get().simpleName.contains("TestFactory")}
+
+            def bar8BeanDefinition = context.getBeanDefinitions(context.classLoader.loadClass('test.Bar8'))
+                    .find {it.getDeclaringType().get().simpleName.contains("TestFactory")}
+
+        then:
+            bar7BeanDefinition.getScope().get() == Prototype.class
+            bar7BeanDefinition.declaredQualifier.toString() == "@Named('test.Xyz')"
+            bar7BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).size() == 1
+            bar7BeanDefinition.hasAnnotation(io.micronaut.inject.factory.RemappedAnnotation)
+        and:
+            bar8BeanDefinition.getScope().get() == Prototype.class
+            bar8BeanDefinition.declaredQualifier.toString() == "@Named('test.Xyz')"
+            bar8BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).size() == 1
+            bar8BeanDefinition.hasAnnotation(io.micronaut.inject.factory.RemappedAnnotation)
+
+        cleanup:
+            context.close()
     }
 }

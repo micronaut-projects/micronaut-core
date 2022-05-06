@@ -184,7 +184,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     }
 
     /**
-     * Sets the {@link ThreadSelection} model to use for the server.
+     * Sets the {@link io.micronaut.scheduling.executor.ThreadSelection} model to use for the server. Default value MANUAL.
      * @param threadSelection The thread selection model
      */
     public void setThreadSelection(ThreadSelection threadSelection) {

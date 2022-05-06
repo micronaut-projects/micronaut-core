@@ -47,6 +47,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     private Map<CharSequence, Object> attributes;
     private Qualifier<?> qualifier;
     private List<BeanRegistration<?>> dependentBeans;
+    private BeanRegistration<?> dependentFactory;
 
     /**
      * @param context        The bean context
@@ -110,6 +111,10 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
     @Override
     public <T> void addDependentBean(BeanRegistration<T> beanRegistration) {
+        if (beanRegistration.getBeanDefinition() == rootDefinition) {
+            // Don't add self
+            return;
+        }
         if (dependentBeans == null) {
             dependentBeans = new ArrayList<>(3);
         }
@@ -132,9 +137,44 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         if (dependentBeans == null) {
             return Collections.emptyList();
         }
-        final List<BeanRegistration<?>> registrations = Collections.unmodifiableList(new ArrayList<>(dependentBeans));
-        dependentBeans.clear();
+        final List<BeanRegistration<?>> registrations = Collections.unmodifiableList(dependentBeans);
+        dependentBeans = null;
         return registrations;
+    }
+
+    @Override
+    public void markDependentAsFactory() {
+        if (dependentBeans != null) {
+            if (dependentBeans.isEmpty()) {
+                return;
+            }
+            if (dependentBeans.size() != 1) {
+                throw new IllegalStateException("Expected only one bean dependent!");
+            }
+            dependentFactory = dependentBeans.remove(0);
+        }
+    }
+
+    @Override
+    public BeanRegistration<?> getAndResetDependentFactoryBean() {
+        BeanRegistration<?> result = this.dependentFactory;
+        this.dependentFactory = null;
+        return result;
+    }
+
+    @Override
+    public List<BeanRegistration<?>> popDependentBeans() {
+        List<BeanRegistration<?>> result = this.dependentBeans;
+        this.dependentBeans = null;
+        return result;
+    }
+
+    @Override
+    public void pushDependentBeans(List<BeanRegistration<?>> dependentBeans) {
+        if (this.dependentBeans != null && !this.dependentBeans.isEmpty()) {
+            throw new IllegalStateException("Found existing dependent beans!");
+        }
+        this.dependentBeans = dependentBeans;
     }
 
     @Override
