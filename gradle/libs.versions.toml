@@ -64,7 +64,6 @@ managed-jna = "5.7.0"
 managed-jsr305 = "3.0.2"
 managed-kafka = "2.8.0"
 managed-ktor = "1.6.1"
-managed-liquibase = ""
 managed-logback = "1.2.10"
 managed-lombok = "1.18.22"
 managed-maven-native-plugin = "0.9.11"
@@ -257,8 +256,6 @@ managed-jna = { module = "net.java.dev.jna:jna", version.ref = "managed-jna" }
 managed-jsr305 = { module = "com.google.code.findbugs:jsr305", version.ref = "managed-jsr305" }
 
 managed-kafka212 = { module = "org.apache.kafka:kafka_2.12", version.ref = "managed-kafka" }
-
-managed-liquibase = { module = "org.liquibase:liquibase-core", version.ref = "managed-liquibase" }
 
 managed-logback = { module = "ch.qos.logback:logback-classic", version.ref = "managed-logback" }
 
