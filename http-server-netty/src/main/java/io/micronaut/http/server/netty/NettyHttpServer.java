@@ -40,7 +40,6 @@ import io.micronaut.http.netty.websocket.WebSocketSessionRepository;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.exceptions.ServerStartupException;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
-import io.micronaut.http.server.netty.configuration.NettyListenerConfiguration;
 import io.micronaut.http.server.netty.ssl.ServerSslBuilder;
 import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandlerRegistry;
 import io.micronaut.http.server.util.DefaultHttpHostResolver;
@@ -140,7 +139,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     private final Collection<ChannelPipelineListener> pipelineListeners = new ArrayList<>(2);
     @Nullable
     private volatile List<Listener> activeListeners = null;
-    private final List<NettyListenerConfiguration> listenerConfigurations;
+    private final List<NettyHttpServerConfiguration.NettyListenerConfiguration> listenerConfigurations;
 
     /**
      * @param serverConfiguration                     The Netty HTTP server configuration
@@ -191,31 +190,31 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         this.listenerConfigurations = buildListenerConfigurations();
     }
 
-    private List<NettyListenerConfiguration> buildListenerConfigurations() {
-        Map<String, NettyListenerConfiguration> explicit = serverConfiguration.getListeners();
+    private List<NettyHttpServerConfiguration.NettyListenerConfiguration> buildListenerConfigurations() {
+        List<NettyHttpServerConfiguration.NettyListenerConfiguration> explicit = serverConfiguration.getListeners();
         if (explicit != null) {
             if (explicit.isEmpty()) {
                 throw new IllegalArgumentException("When configuring listeners explicitly, must specify at least one");
             }
-            return new ArrayList<>(explicit.values());
+            return explicit;
         } else {
             String configuredHost = serverConfiguration.getHost().orElse(null);
-            List<NettyListenerConfiguration> implicit = new ArrayList<>(2);
+            List<NettyHttpServerConfiguration.NettyListenerConfiguration> implicit = new ArrayList<>(2);
             final ServerSslBuilder serverSslBuilder = nettyEmbeddedServices.getServerSslBuilder();
             if (serverSslBuilder != null && this.sslConfiguration.isEnabled()) {
-                implicit.add(NettyListenerConfiguration.createTcp(configuredHost, sslConfiguration.getPort(), true));
+                implicit.add(NettyHttpServerConfiguration.NettyListenerConfiguration.createTcp(configuredHost, sslConfiguration.getPort(), true));
             } else {
-                implicit.add(NettyListenerConfiguration.createTcp(configuredHost, getHttpPort(serverConfiguration), false));
+                implicit.add(NettyHttpServerConfiguration.NettyListenerConfiguration.createTcp(configuredHost, getHttpPort(serverConfiguration), false));
             }
             if (isDefault) {
                 if (serverConfiguration.isDualProtocol()) {
-                    implicit.add(NettyListenerConfiguration.createTcp(configuredHost, getHttpPort(serverConfiguration), false));
+                    implicit.add(NettyHttpServerConfiguration.NettyListenerConfiguration.createTcp(configuredHost, getHttpPort(serverConfiguration), false));
                 }
                 final Router router = this.nettyEmbeddedServices.getRouter();
                 final Set<Integer> exposedPorts = router.getExposedPorts();
                 for (int exposedPort : exposedPorts) {
                     if (exposedPort == -1 || exposedPort == 0 || implicit.stream().noneMatch(cfg -> cfg.getPort() == exposedPort)) {
-                        NettyListenerConfiguration mgmt = NettyListenerConfiguration.createTcp(configuredHost, exposedPort, false);
+                        NettyHttpServerConfiguration.NettyListenerConfiguration mgmt = NettyHttpServerConfiguration.NettyListenerConfiguration.createTcp(configuredHost, exposedPort, false);
                         mgmt.setExposeDefaultRoutes(false);
                         implicit.add(mgmt);
                     }
@@ -281,7 +280,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             serverBootstrap = serverBootstrap.group(parentGroup, workerGroup);
 
             List<Listener> listeners = new ArrayList<>();
-            for (NettyListenerConfiguration listenerConfiguration : listenerConfigurations) {
+            for (NettyHttpServerConfiguration.NettyListenerConfiguration listenerConfiguration : listenerConfigurations) {
                 Listener listener = bind(serverBootstrap, listenerConfiguration, workerConfig);
                 listeners.add(listener);
             }
@@ -340,7 +339,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         boolean hasUnix = false;
         if (listenersLocal == null) {
             // not started, try to infer from config
-            for (NettyListenerConfiguration listenerCfg : listenerConfigurations) {
+            for (NettyHttpServerConfiguration.NettyListenerConfiguration listenerCfg : listenerConfigurations) {
                 switch (listenerCfg.getFamily()) {
                     case TCP:
                         if (listenerCfg.getPort() == -1) {
@@ -473,7 +472,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         return new ServerBootstrap();
     }
 
-    private Listener bind(ServerBootstrap bootstrap, NettyListenerConfiguration cfg, EventLoopGroupConfiguration workerConfig) {
+    private Listener bind(ServerBootstrap bootstrap, NettyHttpServerConfiguration.NettyListenerConfiguration cfg, EventLoopGroupConfiguration workerConfig) {
         String prettyAddr;
         switch (cfg.getFamily()) {
             case TCP:
@@ -742,11 +741,11 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
     private class Listener extends ChannelInitializer<Channel> {
         Channel serverChannel;
-        NettyListenerConfiguration config;
+        NettyHttpServerConfiguration.NettyListenerConfiguration config;
 
         private volatile HttpPipelineBuilder httpPipelineBuilder;
 
-        Listener(NettyListenerConfiguration config) {
+        Listener(NettyHttpServerConfiguration.NettyListenerConfiguration config) {
             this.config = config;
             refresh();
         }
