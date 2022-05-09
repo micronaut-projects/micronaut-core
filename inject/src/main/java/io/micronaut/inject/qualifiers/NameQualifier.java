@@ -58,10 +58,10 @@ class NameQualifier<T> implements Qualifier<T>, io.micronaut.core.naming.Named {
         check("beanType", beanType).notNull();
         check("candidates", candidates).notNull();
         return candidates.filter(candidate -> {
-            if (!Utils.matchType(beanType, candidate)) {
+            if (!QualifierUtils.matchType(beanType, candidate)) {
                 return false;
             }
-            if (Utils.matchAny(beanType, candidate)) {
+            if (QualifierUtils.matchAny(beanType, candidate)) {
                 return true;
             }
             AnnotationMetadata annotationMetadata = candidate.getAnnotationMetadata();

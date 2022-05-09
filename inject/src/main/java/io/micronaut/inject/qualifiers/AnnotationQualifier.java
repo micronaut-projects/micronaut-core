@@ -46,16 +46,16 @@ class AnnotationQualifier<T> implements Qualifier<T> {
         String qualifiedName = annotation.annotationType().getName();
         String annotationSimpleName = annotation.annotationType().getSimpleName();
         return candidates.filter(candidate -> {
-            if (!Utils.matchType(beanType, candidate)) {
+            if (!QualifierUtils.matchType(beanType, candidate)) {
                 return false;
             }
-            if (Utils.matchAny(beanType, candidate)) {
+            if (QualifierUtils.matchAny(beanType, candidate)) {
                 return true;
             }
             if (candidate.getAnnotationMetadata().hasDeclaredAnnotation(qualifiedName)) {
                 return true;
             }
-            return Utils.matchByCandidateName(candidate, beanType, annotationSimpleName);
+            return QualifierUtils.matchByCandidateName(candidate, beanType, annotationSimpleName);
         });
     }
 
@@ -67,7 +67,7 @@ class AnnotationQualifier<T> implements Qualifier<T> {
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        return Utils.annotationQualifiersEquals(this, o);
+        return QualifierUtils.annotationQualifiersEquals(this, o);
     }
 
     @Override

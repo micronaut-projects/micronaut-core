@@ -103,10 +103,10 @@ class AnnotationMetadataQualifier<T> implements Qualifier<T> {
     @Override
     public <BT extends BeanType<T>> Stream<BT> reduce(Class<T> beanType, Stream<BT> candidates) {
         return candidates.filter(candidate -> {
-            if (!Utils.matchType(beanType, candidate)) {
+            if (!QualifierUtils.matchType(beanType, candidate)) {
                 return false;
             }
-            if (Utils.matchAny(beanType, candidate)) {
+            if (QualifierUtils.matchAny(beanType, candidate)) {
                 return true;
             }
             if (qualifierAnn == null) {
@@ -124,7 +124,7 @@ class AnnotationMetadataQualifier<T> implements Qualifier<T> {
                     }
                 }
             }
-            return Utils.matchByCandidateName(candidate, beanType, annotationSimpleName);
+            return QualifierUtils.matchByCandidateName(candidate, beanType, annotationSimpleName);
         });
     }
 
@@ -151,7 +151,7 @@ class AnnotationMetadataQualifier<T> implements Qualifier<T> {
         if (o == null) {
             return false;
         }
-        return Utils.annotationQualifiersEquals(this, o);
+        return QualifierUtils.annotationQualifiersEquals(this, o);
     }
 
     @Override

@@ -16,6 +16,7 @@
 package io.micronaut.inject.qualifiers;
 
 import io.micronaut.context.annotation.Any;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.naming.NameResolver;
@@ -32,9 +33,10 @@ import java.util.Optional;
  * @author Denis Stepanov
  * @since 3.5.0
  */
-final class Utils {
+@Internal
+final class QualifierUtils {
 
-    private Utils() {
+    private QualifierUtils() {
     }
 
     /**

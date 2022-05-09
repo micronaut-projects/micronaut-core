@@ -60,7 +60,7 @@ final class AnnotationStereotypeQualifier<T> implements Qualifier<T> {
         if (o == null) {
             return false;
         }
-        return Utils.annotationQualifiersEquals(this, o);
+        return QualifierUtils.annotationQualifiersEquals(this, o);
     }
 
     @Override
