@@ -27,7 +27,7 @@ ext.extraPomInfo = {
         'function-maven-plugin.version'('0.9.8')
         'jib-maven-plugin.version'('3.1.4')
         'maven-compiler-plugin.version'('3.10.1') // Override actual Maven compiler version (3.1) because some bugs cause annotation processors doesn't work well
-        'maven-failsafe-plugin.version'('2.22.3') // Override actual Maven surefire and failsafe version (2.12) to get native support for executing tests on the JUnit Platform (JUnit 5)
+        'maven-failsafe-plugin.version'('2.22.2') // Override actual Maven surefire and failsafe version (2.12) to get native support for executing tests on the JUnit Platform (JUnit 5)
         'maven-resources-plugin.version'('3.2.0')
         'maven-shade-plugin.version'('3.2.4')
         'maven-surefire-plugin.version'('2.22.2') // Override actual Maven surefire and failsafe version (2.12) to get native support for executing tests on the JUnit Platform (JUnit 5)
