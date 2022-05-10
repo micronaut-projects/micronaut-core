@@ -1111,11 +1111,9 @@ public class DefaultBeanContext implements InitializableBeanContext {
         if (LOG_LIFECYCLE.isDebugEnabled()) {
             LOG_LIFECYCLE.debug("Destroying bean [{}] with identifier [{}]", registration.bean, registration.identifier);
         }
-        if (registration.beanDefinition instanceof ProxyBeanDefinition) {
-            if (registration.bean instanceof InterceptedBeanProxy) {
-                // Ignore the proxy and destroy the target
-                destroyProxyTargetBean(registration);
-            }
+        if (registration.beanDefinition instanceof ProxyBeanDefinition && registration.bean instanceof InterceptedBeanProxy) {
+            // Ignore the proxy and destroy the target
+            destroyProxyTargetBean(registration);
             return;
         }
         T beanToDestroy = registration.getBean();
