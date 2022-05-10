@@ -13,15 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.aop;
+package io.micronaut.inject.lifecycle.proxytargetbeanwithpredestroy;
 
-import io.micronaut.inject.proxy.InterceptedBean;
+import io.micronaut.runtime.context.scope.ScopedProxy;
+import jakarta.inject.Scope;
 
-/**
- * An interface implemented by generated proxy classes.
- *
- * @author Graeme Rocher
- * @since 1.0
- */
-public interface Intercepted extends InterceptedBean {
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+@ScopedProxy
+@Documented
+@Retention(RUNTIME)
+@Target({ElementType.TYPE, ElementType.METHOD})
+@Scope
+public @interface CustomScope {
 }

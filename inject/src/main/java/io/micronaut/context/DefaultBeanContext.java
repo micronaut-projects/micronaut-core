@@ -99,6 +99,7 @@ import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.inject.ParametrizedBeanFactory;
 import io.micronaut.inject.ProxyBeanDefinition;
 import io.micronaut.inject.ValidatedBeanDefinition;
+import io.micronaut.inject.proxy.InterceptedBeanProxy;
 import io.micronaut.inject.qualifiers.AnyQualifier;
 import io.micronaut.inject.qualifiers.Qualified;
 import io.micronaut.inject.qualifiers.Qualifiers;
@@ -111,13 +112,13 @@ import org.slf4j.LoggerFactory;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.EventListener;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -180,7 +181,6 @@ public class DefaultBeanContext implements InitializableBeanContext {
     protected final AtomicBoolean terminating = new AtomicBoolean(false);
 
     final Map<BeanIdentifier, BeanRegistration<?>> singlesInCreation = new ConcurrentHashMap<>(5);
-    Set<Map.Entry<Class, List<BeanInitializedEventListener>>> beanInitializedEventListeners;
 
     private final SingletonScope singletonScope = new SingletonScope(this);
 
@@ -223,10 +223,15 @@ public class DefaultBeanContext implements InitializableBeanContext {
     private final String[] eagerInitStereotypes;
     private final boolean eagerInitStereotypesPresent;
     private final boolean eagerInitSingletons;
-    private Set<Map.Entry<Class, List<BeanCreatedEventListener>>> beanCreationEventListeners;
+
     private BeanDefinitionValidator beanValidator;
     private List<BeanDefinitionReference> beanDefinitionReferences;
     private List<BeanConfiguration> beanConfigurationsList;
+
+    private Set<Map.Entry<Class<?>, List<BeanCreatedEventListener>>> beanCreationEventListeners;
+    Set<Map.Entry<Class<?>, List<BeanInitializedEventListener>>> beanInitializedEventListeners;
+    private Set<Map.Entry<Class<?>, List<BeanPreDestroyEventListener>>> beanPreDestroyEventListeners;
+    private Set<Map.Entry<Class<?>, List<BeanDestroyedEventListener>>> beanDestroyedEventListeners;
 
     /**
      * Construct a new bean context using the same classloader that loaded this DefaultBeanContext class.
@@ -407,6 +412,8 @@ public class DefaultBeanContext implements InitializableBeanContext {
             singletonScope.clear();
             beanInitializedEventListeners = null;
             beanCreationEventListeners = null;
+            beanPreDestroyEventListeners = null;
+            beanDestroyedEventListeners = null;
 
             terminating.set(false);
             running.set(false);
@@ -446,7 +453,6 @@ public class DefaultBeanContext implements InitializableBeanContext {
         }
     }
 
-    @SuppressWarnings("unchecked")
     @Override
     public Collection<BeanRegistration<?>> getActiveBeanRegistrations(Qualifier<?> qualifier) {
         if (qualifier == null) {
@@ -455,7 +461,6 @@ public class DefaultBeanContext implements InitializableBeanContext {
         return singletonScope.getBeanRegistrations(qualifier);
     }
 
-    @SuppressWarnings("unchecked")
     @Override
     public <T> Collection<BeanRegistration<T>> getActiveBeanRegistrations(Class<T> beanType) {
         if (beanType == null) {
@@ -1097,7 +1102,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                 return beanRegistration.bean;
             }
         }
-        return null;
+        throw new IllegalArgumentException("Cannot destroy non-singleton bean using bean definition! Use 'destroyBean(BeanRegistration)` or `destroyBean(<BeanInstance>)`.");
     }
 
     @Nullable
@@ -1106,34 +1111,20 @@ public class DefaultBeanContext implements InitializableBeanContext {
         if (LOG_LIFECYCLE.isDebugEnabled()) {
             LOG_LIFECYCLE.debug("Destroying bean [{}] with identifier [{}]", registration.bean, registration.identifier);
         }
-        if (registration.bean != null) {
-            purgeCacheForBeanInstance(registration.bean);
-            if (registration.beanDefinition.isSingleton()) {
-                singletonScope.purgeCacheForBeanInstance(registration.beanDefinition, registration.bean);
-            }
+        if (registration.beanDefinition instanceof ProxyBeanDefinition && registration.bean instanceof InterceptedBeanProxy) {
+            // Ignore the proxy and destroy the target
+            destroyProxyTargetBean(registration);
+            return;
         }
-        BeanDefinition<T> definition = registration.getBeanDefinition();
-        Argument<T> beanType;
-        if (definition instanceof ProxyBeanDefinition) {
-            beanType = Argument.of(((ProxyBeanDefinition<T>) definition).getTargetType());
-        } else {
-            beanType = definition.asArgument();
-        }
-        final List<BeanPreDestroyEventListener> preDestroyEventListeners = resolveListeners(BeanPreDestroyEventListener.class, beanType);
         T beanToDestroy = registration.getBean();
-        if (CollectionUtils.isNotEmpty(preDestroyEventListeners)) {
-            for (BeanPreDestroyEventListener<T> listener : preDestroyEventListeners) {
-                try {
-                    final BeanPreDestroyEvent<T> event = new BeanPreDestroyEvent<>(this, definition, beanToDestroy);
-                    beanToDestroy = Objects.requireNonNull(
-                            listener.onPreDestroy(event),
-                            "PreDestroy event listener illegally returned null: " + listener.getClass()
-                    );
-                } catch (Exception e) {
-                    throw new BeanDestructionException(definition, e);
-                }
+        BeanDefinition<T> definition = registration.getBeanDefinition();
+        if (beanToDestroy != null) {
+            purgeCacheForBeanInstance(beanToDestroy);
+            if (definition.isSingleton()) {
+                singletonScope.purgeCacheForBeanInstance(definition, beanToDestroy);
             }
         }
+        beanToDestroy = triggerPreDestroyListeners(definition, beanToDestroy);
 
         if (definition instanceof DisposableBeanDefinition) {
             ((DisposableBeanDefinition<T>) definition).dispose(this, beanToDestroy);
@@ -1161,24 +1152,110 @@ public class DefaultBeanContext implements InitializableBeanContext {
             }
         }
 
-        final List<BeanDestroyedEventListener> postDestroyListeners = resolveListeners(BeanDestroyedEventListener.class, beanType);
-        if (CollectionUtils.isNotEmpty(postDestroyListeners)) {
-            for (BeanDestroyedEventListener<T> listener : postDestroyListeners) {
-                try {
-                    final BeanDestroyedEvent<T> event = new BeanDestroyedEvent<>(this, definition, beanToDestroy);
-                    listener.onDestroyed(event);
-                } catch (Exception e) {
-                    throw new BeanDestructionException(definition, e);
+        triggerBeanDestroyedListeners(definition, beanToDestroy);
+    }
+
+    @NonNull
+    private <T> T triggerPreDestroyListeners(@NonNull BeanDefinition<T> beanDefinition, @NonNull T bean) {
+        if (beanPreDestroyEventListeners == null) {
+            beanPreDestroyEventListeners = loadListeners(BeanPreDestroyEventListener.class).entrySet();
+        }
+        if (!beanPreDestroyEventListeners.isEmpty()) {
+            Class<T> beanType = getBeanType(beanDefinition);
+            for (Map.Entry<Class<?>, List<BeanPreDestroyEventListener>> entry : beanPreDestroyEventListeners) {
+                if (entry.getKey().isAssignableFrom(beanType)) {
+                    final BeanPreDestroyEvent<T> event = new BeanPreDestroyEvent<>(this, beanDefinition, bean);
+                    for (BeanPreDestroyEventListener<T> listener : entry.getValue()) {
+                        try {
+                            bean = Objects.requireNonNull(
+                                    listener.onPreDestroy(event),
+                                    "PreDestroy event listener illegally returned null: " + listener.getClass()
+                            );
+                        } catch (Exception e) {
+                            throw new BeanDestructionException(beanDefinition, e);
+                        }
+                    }
+
+                }
+            }
+        }
+        return bean;
+    }
+
+    private <T> void destroyProxyTargetBean(@NonNull BeanRegistration<T> registration) {
+        Set<Object> destroyed = Collections.emptySet();
+        if (registration instanceof BeanDisposingRegistration) {
+            BeanDisposingRegistration<?> disposingRegistration = (BeanDisposingRegistration<?>) registration;
+            if (disposingRegistration.getDependents() != null) {
+                destroyed = Collections.newSetFromMap(new IdentityHashMap<>());
+                for (BeanRegistration<?> beanRegistration : disposingRegistration.getDependents()) {
+                    destroyBean(beanRegistration);
+                    destroyed.add(beanRegistration.bean);
+                }
+            }
+        }
+        BeanDefinition<T> proxyTargetBeanDefinition = findProxyTargetBeanDefinition(registration.beanDefinition)
+                .orElseThrow(() -> new IllegalStateException("Cannot find a proxy target bean definition for: " + registration.beanDefinition));
+        Optional<CustomScope<?>> declaredScope = customScopeRegistry.findDeclaredScope(proxyTargetBeanDefinition);
+        if (!declaredScope.isPresent()) {
+            if (proxyTargetBeanDefinition.isSingleton()) {
+                return;
+            }
+            // Scope is not present, try to get the actual target bean and destroy it
+            if (registration.bean instanceof InterceptedBeanProxy) {
+                InterceptedBeanProxy<T> interceptedProxy = (InterceptedBeanProxy<T>) registration.bean;
+                if (interceptedProxy.hasCachedInterceptedTarget()) {
+                    T interceptedTarget = interceptedProxy.interceptedTarget();
+                    if (destroyed.contains(interceptedTarget)) {
+                        return;
+                    }
+                    destroyBean(BeanRegistration.of(this,
+                            new BeanKey<>(proxyTargetBeanDefinition, proxyTargetBeanDefinition.getDeclaredQualifier()),
+                            proxyTargetBeanDefinition,
+                            interceptedTarget,
+                            registration instanceof BeanDisposingRegistration ? ((BeanDisposingRegistration<T>) registration).getDependents() : null
+                    ));
+                }
+            }
+            return;
+        }
+        CustomScope<?> customScope = declaredScope.get();
+        Optional<BeanRegistration<T>> targetBeanRegistration = customScope.findBeanRegistration(proxyTargetBeanDefinition);
+        if (targetBeanRegistration.isPresent()) {
+            BeanRegistration<T> targetRegistration = targetBeanRegistration.get();
+            customScope.remove(targetRegistration.identifier);
+            destroyBean(targetRegistration);
+        }
+    }
+
+    @NonNull
+    private <T> void triggerBeanDestroyedListeners(@NonNull BeanDefinition<T> beanDefinition, @NonNull T bean) {
+        if (beanDestroyedEventListeners == null) {
+            beanDestroyedEventListeners = loadListeners(BeanDestroyedEventListener.class).entrySet();
+        }
+        if (!beanDestroyedEventListeners.isEmpty()) {
+            Class<T> beanType = getBeanType(beanDefinition);
+            for (Map.Entry<Class<?>, List<BeanDestroyedEventListener>> entry : beanDestroyedEventListeners) {
+                if (entry.getKey().isAssignableFrom(beanType)) {
+                    final BeanDestroyedEvent<T> event = new BeanDestroyedEvent<>(this, beanDefinition, bean);
+                    for (BeanDestroyedEventListener<T> listener : entry.getValue()) {
+                        try {
+                            listener.onDestroyed(event);
+                        } catch (Exception e) {
+                            throw new BeanDestructionException(beanDefinition, e);
+                        }
+                    }
                 }
             }
         }
     }
 
     @NonNull
-    private <T extends EventListener> List<T> resolveListeners(Class<T> type, Argument<?> genericType) {
-        return streamOfType(Argument.of(type, genericType))
-                .sorted(OrderUtil.COMPARATOR)
-                .collect(Collectors.toList());
+    private <T> Class<T> getBeanType(@NonNull BeanDefinition<T> beanDefinition) {
+        if (beanDefinition instanceof ProxyBeanDefinition) {
+            return ((ProxyBeanDefinition<T>) beanDefinition).getTargetType();
+        }
+        return beanDefinition.getBeanType();
     }
 
     /**
@@ -1681,47 +1758,33 @@ public class DefaultBeanContext implements InitializableBeanContext {
      * Initialize the event listeners.
      */
     protected void initializeEventListeners() {
-        final Collection<BeanDefinition<BeanCreatedEventListener>> beanCreatedDefinitions = getBeanDefinitions(BeanCreatedEventListener.class);
-        final HashMap<Class, List<BeanCreatedEventListener>> beanCreatedListeners = new HashMap<>(beanCreatedDefinitions.size());
-
-        //noinspection ArraysAsListWithZeroOrOneArgument
-        beanCreatedListeners.put(AnnotationProcessor.class, Arrays.asList(new AnnotationProcessorListener()));
-        for (BeanDefinition<BeanCreatedEventListener> beanCreatedDefinition : beanCreatedDefinitions) {
-            try (BeanResolutionContext context = newResolutionContext(beanCreatedDefinition, null)) {
-                BeanCreatedEventListener<?> listener = resolveBeanRegistration(context, beanCreatedDefinition).bean;
-                List<Argument<?>> typeArguments = beanCreatedDefinition.getTypeArguments(BeanCreatedEventListener.class);
-                Argument<?> argument = CollectionUtils.last(typeArguments);
-                if (argument == null) {
-                    argument = Argument.OBJECT_ARGUMENT;
-                }
-                beanCreatedListeners.computeIfAbsent(argument.getType(), aClass -> new ArrayList<>(10))
-                        .add(listener);
-            }
-        }
-        for (List<BeanCreatedEventListener> listenerList : beanCreatedListeners.values()) {
-            OrderUtil.sort(listenerList);
-        }
-
-        final HashMap<Class, List<BeanInitializedEventListener>> beanInitializedListeners = new HashMap<>(beanCreatedDefinitions.size());
-        final Collection<BeanDefinition<BeanInitializedEventListener>> beanInitializedDefinitions = getBeanDefinitions(BeanInitializedEventListener.class);
-        for (BeanDefinition<BeanInitializedEventListener> definition : beanInitializedDefinitions) {
-            try (BeanResolutionContext context = newResolutionContext(definition, null)) {
-                BeanInitializedEventListener<?> listener = resolveBeanRegistration(context, definition).bean;
-                List<Argument<?>> typeArguments = definition.getTypeArguments(BeanInitializedEventListener.class);
-                Argument<?> argument = CollectionUtils.last(typeArguments);
-                if (argument == null) {
-                    argument = Argument.OBJECT_ARGUMENT;
-                }
-                beanInitializedListeners.computeIfAbsent(argument.getType(), aClass -> new ArrayList<>(10))
-                        .add(listener);
-            }
-        }
-        for (List<BeanInitializedEventListener> listenerList : beanInitializedListeners.values()) {
-            OrderUtil.sort(listenerList);
-        }
-
+        final Map<Class<?>, List<BeanCreatedEventListener>> beanCreatedListeners = loadListeners(BeanCreatedEventListener.class);
+        beanCreatedListeners.put(AnnotationProcessor.class, Collections.singletonList(new AnnotationProcessorListener()));
+        final Map<Class<?>, List<BeanInitializedEventListener>> beanInitializedListeners = loadListeners(BeanInitializedEventListener.class);
         this.beanCreationEventListeners = beanCreatedListeners.entrySet();
         this.beanInitializedEventListeners = beanInitializedListeners.entrySet();
+    }
+
+    @NotNull
+    private <T extends EventListener> Map<Class<?>, List<T>> loadListeners(@NotNull Class<T> listenerType) {
+        final Collection<BeanDefinition<T>> beanDefinitions = getBeanDefinitions(listenerType);
+        final HashMap<Class<?>, List<T>> typeToListener = new HashMap<>(beanDefinitions.size(), 1);
+        for (BeanDefinition<T> beanCreatedDefinition : beanDefinitions) {
+            try (BeanResolutionContext context = newResolutionContext(beanCreatedDefinition, null)) {
+                T listener = resolveBeanRegistration(context, beanCreatedDefinition).bean;
+                List<Argument<?>> typeArguments = beanCreatedDefinition.getTypeArguments(listenerType);
+                Argument<?> argument = CollectionUtils.last(typeArguments);
+                if (argument == null) {
+                    argument = Argument.OBJECT_ARGUMENT;
+                }
+                typeToListener.computeIfAbsent(argument.getType(), aClass -> new ArrayList<>(10))
+                        .add(listener);
+            }
+        }
+        for (List<T> listenerList : typeToListener.values()) {
+            OrderUtil.sort(listenerList);
+        }
+        return typeToListener;
     }
 
     /**
@@ -2218,10 +2281,27 @@ public class DefaultBeanContext implements InitializableBeanContext {
                                   @NonNull BeanDefinition<T> beanDefinition,
                                   @Nullable Qualifier<T> qualifier,
                                   @NonNull T bean) {
-        Class<T> beanType = beanDefinition.getBeanType();
         Qualifier<T> finalQualifier = qualifier != null ? qualifier : beanDefinition.getDeclaredQualifier();
+
+        bean = triggerBeanCreatedEventListener(resolutionContext, beanDefinition, bean, finalQualifier);
+
+        if (beanDefinition instanceof ValidatedBeanDefinition) {
+            bean = ((ValidatedBeanDefinition<T>) beanDefinition).validate(resolutionContext, bean);
+        }
+        if (LOG_LIFECYCLE.isDebugEnabled()) {
+            LOG_LIFECYCLE.debug("Created bean [{}] from definition [{}] with qualifier [{}]", bean, beanDefinition, finalQualifier);
+        }
+        return bean;
+    }
+
+    @NonNull
+    private <T> T triggerBeanCreatedEventListener(@NonNull BeanResolutionContext resolutionContext,
+                                                  @NonNull BeanDefinition<T> beanDefinition,
+                                                  @NonNull T bean,
+                                                  @Nullable Qualifier<T> finalQualifier) {
+        Class<T> beanType = beanDefinition.getBeanType();
         if (!(bean instanceof BeanCreatedEventListener) && CollectionUtils.isNotEmpty(beanCreationEventListeners)) {
-            for (Map.Entry<Class, List<BeanCreatedEventListener>> entry : beanCreationEventListeners) {
+            for (Map.Entry<Class<?>, List<BeanCreatedEventListener>> entry : beanCreationEventListeners) {
                 if (entry.getKey().isAssignableFrom(beanType)) {
                     BeanKey<T> beanKey = new BeanKey<>(beanDefinition, finalQualifier);
                     for (BeanCreatedEventListener<?> listener : entry.getValue()) {
@@ -2233,18 +2313,12 @@ public class DefaultBeanContext implements InitializableBeanContext {
                 }
             }
         }
-        if (beanDefinition instanceof ValidatedBeanDefinition) {
-            bean = ((ValidatedBeanDefinition<T>) beanDefinition).validate(resolutionContext, bean);
-        }
-        if (LOG_LIFECYCLE.isDebugEnabled()) {
-            LOG_LIFECYCLE.debug("Created bean [{}] from definition [{}] with qualifier [{}]", bean, beanDefinition, finalQualifier);
-        }
         return bean;
     }
 
     @NotNull
     private <T> Map<String, Object> getRequiredArgumentValues(@NonNull BeanResolutionContext resolutionContext,
-                                                              @NonNull  Argument<?>[] requiredArguments,
+                                                              @NonNull Argument<?>[] requiredArguments,
                                                               @Nullable Map<String, Object> argumentValues,
                                                               @NonNull BeanDefinition<T> beanDefinition) {
         Map<String, Object> convertedValues;
@@ -2713,14 +2787,21 @@ public class DefaultBeanContext implements InitializableBeanContext {
         final boolean isProxy = definition.isProxy();
         final boolean isScopedProxyDefinition = definition.hasStereotype(SCOPED_PROXY_ANN);
 
-        T bean;
         if (isProxy && isScopedProxyDefinition && qualifier != PROXY_TARGET_QUALIFIER
                 && (definition.getDeclaredQualifier() == null)) {
             // With scopes proxies we have to inject a reference into the injection point
-            return getScopedBeanInterceptorForDefinition(resolutionContext, beanType, qualifier, definition);
+            Qualifier<T> q = qualifier;
+            if (q == null) {
+                q = definition.getDeclaredQualifier();
+            }
+            BeanRegistration<T> registration = createPrototypeRegistration(resolutionContext, beanType, q, definition);
+            T bean = registration.bean;
+            if (bean instanceof Qualified) {
+                ((Qualified<T>) bean).$withBeanQualifier(q);
+            }
+            return registration;
         }
 
-        BeanKey<T> beanKey = new BeanKey<>(beanType, qualifier);
         BeanResolutionContext.Segment<?> currentSegment = resolutionContext
                 .getPath()
                 .currentSegment()
@@ -2742,50 +2823,48 @@ public class DefaultBeanContext implements InitializableBeanContext {
                         qualifier
                 );
             }
-            BeanDefinition<T> finalDefinition = definition;
-
-            bean = registeredScope.getOrCreate(
-                    new BeanCreationContext<T>() {
-                        @NonNull
-                        @Override
-                        public BeanDefinition<T> definition() {
-                            return finalDefinition;
-                        }
-
-                        @NonNull
-                        @Override
-                        public BeanIdentifier id() {
-                            return beanKey;
-                        }
-
-                        @NonNull
-                        @Override
-                        public CreatedBean<T> create() throws BeanCreationException {
-                            List<BeanRegistration<?>> dependentBeans = resolutionContext.popDependentBeans();
-                            final T bean = doCreateBean(resolutionContext, finalDefinition, beanType, qualifier);
-                            BeanRegistration<T> registration = BeanRegistration.of(
-                                    DefaultBeanContext.this,
-                                    beanKey,
-                                    finalDefinition,
-                                    bean,
-                                    resolutionContext.getAndResetDependentBeans()
-                            );
-                            resolutionContext.pushDependentBeans(dependentBeans);
-                            return registration;
-                        }
-                    }
-            );
-            return BeanRegistration.of(this, beanKey, finalDefinition, bean);
+            return getOrCreateScopedRegistration(resolutionContext, registeredScope, qualifier, beanType, definition);
         }
-        return getUnknownScopeBean(resolutionContext, beanType, qualifier, definition);
+        // Unknown scope, prototype scope etc
+        return createPrototypeRegistration(resolutionContext, beanType, qualifier, definition);
+    }
+
+    @NonNull
+    private <T> BeanRegistration<T> getOrCreateScopedRegistration(@NonNull BeanResolutionContext resolutionContext,
+                                                                  @NonNull CustomScope<?> registeredScope,
+                                                                  @Nullable Qualifier<T> qualifier,
+                                                                  @NonNull Argument<T> beanType,
+                                                                  @NonNull BeanDefinition<T> definition) {
+        BeanKey<T> beanKey = new BeanKey<>(beanType, qualifier);
+        T bean = registeredScope.getOrCreate(
+                new BeanCreationContext<T>() {
+                    @NonNull
+                    @Override
+                    public BeanDefinition<T> definition() {
+                        return definition;
+                    }
+
+                    @NonNull
+                    @Override
+                    public BeanIdentifier id() {
+                        return beanKey;
+                    }
+
+                    @NonNull
+                    @Override
+                    public CreatedBean<T> create() throws BeanCreationException {
+                        return createPrototypeRegistration(resolutionContext, beanType, qualifier, definition);
+                    }
+                }
+        );
+        return BeanRegistration.of(this, beanKey, definition, bean);
     }
 
     @NotNull
-    private <T> BeanRegistration<T> getUnknownScopeBean(@NonNull BeanResolutionContext resolutionContext,
-                                                        @NonNull Argument<T> beanType,
-                                                        @Nullable Qualifier<T> qualifier,
-                                                        @NonNull BeanDefinition<T> definition) {
-        // Unknown scope, prototype scope etc
+    private <T> BeanRegistration<T> createPrototypeRegistration(@NonNull BeanResolutionContext resolutionContext,
+                                                                @NonNull Argument<T> beanType,
+                                                                @Nullable Qualifier<T> qualifier,
+                                                                @NonNull BeanDefinition<T> definition) {
         List<BeanRegistration<?>> parentDependentBeans = resolutionContext.popDependentBeans();
         T bean = doCreateBean(resolutionContext, definition, qualifier);
         BeanRegistration<?> dependentFactoryBean = resolutionContext.getAndResetDependentFactoryBean();
@@ -2799,22 +2878,6 @@ public class DefaultBeanContext implements InitializableBeanContext {
         // Unknown scope and prototype beans are treated as beans dependent
         resolutionContext.addDependentBean(beanRegistration);
         return beanRegistration;
-    }
-
-    @NotNull
-    private <T> BeanRegistration<T> getScopedBeanInterceptorForDefinition(@NonNull BeanResolutionContext resolutionContext,
-                                                                          @NonNull Argument<T> beanType,
-                                                                          @Nullable Qualifier<T> qualifier,
-                                                                          @NonNull BeanDefinition<T> definition) {
-        Qualifier<T> q = qualifier;
-        if (q == null) {
-            q = definition.getDeclaredQualifier();
-        }
-        T bean = doCreateBean(resolutionContext, definition, q);
-        if (bean instanceof Qualified) {
-            ((Qualified<T>) bean).$withBeanQualifier(q);
-        }
-        return BeanRegistration.of(this, new BeanKey<>(beanType, qualifier), definition, bean);
     }
 
     /**
@@ -3699,6 +3762,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
     /**
      * Class used as a bean candidate key.
+     *
      * @param <T> The bean candidate type
      */
     static final class BeanCandidateKey<T> {

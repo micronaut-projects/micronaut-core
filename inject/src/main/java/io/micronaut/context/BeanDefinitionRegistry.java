@@ -24,6 +24,8 @@ import io.micronaut.inject.BeanDefinitionReference;
 
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.inject.ProxyBeanDefinition;
+
 import java.util.Collection;
 import java.util.Objects;
 import java.util.Optional;
@@ -376,6 +378,25 @@ public interface BeanDefinitionRegistry {
     /**
      * Obtain the original {@link BeanDefinition} for a {@link io.micronaut.inject.ProxyBeanDefinition}.
      *
+     * @param proxyBeanDefinition  The proxy bean definition
+     * @param <T>       The concrete type
+     * @return An {@link Optional} of the bean definition
+     * @throws io.micronaut.context.exceptions.NonUniqueBeanException When multiple possible bean definitions exist for the given type
+     * @since 3.5.0
+     */
+    default @NonNull <T> Optional<BeanDefinition<T>> findProxyTargetBeanDefinition(@NonNull BeanDefinition<T> proxyBeanDefinition) {
+        Objects.requireNonNull(proxyBeanDefinition, "Proxy bean definition cannot be null");
+        if (proxyBeanDefinition instanceof ProxyBeanDefinition) {
+            Class<T> targetType = ((ProxyBeanDefinition<T>) proxyBeanDefinition).getTargetType();
+            Qualifier<T> targetQualifier = proxyBeanDefinition.getDeclaredQualifier();
+            return findProxyTargetBeanDefinition(targetType, targetQualifier);
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * Obtain the proxy {@link BeanDefinition} for the bean of type and qualifier.
+     *
      * @param beanType  The type
      * @param qualifier The qualifier
      * @param <T>       The concrete type
@@ -386,7 +407,7 @@ public interface BeanDefinitionRegistry {
     @NonNull <T> Optional<BeanDefinition<T>> findProxyBeanDefinition(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier);
 
     /**
-     * Obtain the original {@link BeanDefinition} for a {@link io.micronaut.inject.ProxyBeanDefinition}.
+     * Obtain the proxy {@link BeanDefinition} for the bean of type and qualifier.
      *
      * @param beanType  The type
      * @param qualifier The qualifier

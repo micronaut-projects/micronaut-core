@@ -1,4 +1,4 @@
-package io.micronaut.inject.lifecycle.beanwithprivatepredestroy;
+package io.micronaut.inject.lifecycle.proxytargetbeanprototypewithpredestroy;
 
 import io.micronaut.context.event.BeanDestroyedEvent;
 import io.micronaut.context.event.BeanDestroyedEventListener;
@@ -7,14 +7,14 @@ import org.junit.jupiter.api.Assertions;
 
 @Singleton
 public class CDestroyedListener implements BeanDestroyedEventListener<C> {
-    private boolean called = false;
+    private int called = 0;
     @Override
     public void onDestroyed(BeanDestroyedEvent<C> event) {
-        this.called = true;
-        Assertions.assertTrue(event.getBean().isClosed());
+        this.called++;
+        Assertions.assertEquals(1, C.closed);
     }
 
-    public boolean isCalled() {
+    public int getCalled() {
         return called;
     }
 }

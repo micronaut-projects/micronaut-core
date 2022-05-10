@@ -1740,7 +1740,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             if (!requiresReflection && modelUtils.isInheritedAndNotPublic(this.concreteClassElement, declaringClass, javaMethodElement)) {
                 requiresReflection = true;
             }
-
+            boolean lifecycleMethod = false;
             if (javaMethodElement.hasDeclaredAnnotation(AnnotationUtil.POST_CONSTRUCT)) {
                 BeanDefinitionVisitor writer = getOrCreateBeanDefinitionWriter(concreteClass, concreteClass.getQualifiedName());
                 addOriginatingElementIfNecessary(writer, declaringClass);
@@ -1750,7 +1750,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         requiresReflection,
                         javaVisitorContext
                 );
-            } else if (javaMethodElement.hasDeclaredAnnotation(AnnotationUtil.PRE_DESTROY)) {
+                lifecycleMethod = true;
+            }
+            if (javaMethodElement.hasDeclaredAnnotation(AnnotationUtil.PRE_DESTROY)) {
                 BeanDefinitionVisitor writer = getOrCreateBeanDefinitionWriter(concreteClass, concreteClass.getQualifiedName());
                 addOriginatingElementIfNecessary(writer, declaringClass);
                 writer.visitPreDestroyMethod(
@@ -1759,7 +1761,12 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         requiresReflection,
                         javaVisitorContext
                 );
-            } else if (javaMethodElement.hasDeclaredStereotype(AnnotationUtil.INJECT) ||
+                lifecycleMethod = true;
+            }
+            if (lifecycleMethod) {
+                return;
+            }
+            if (javaMethodElement.hasDeclaredStereotype(AnnotationUtil.INJECT) ||
                     javaMethodElement.hasDeclaredStereotype(ConfigurationInject.class)) {
                 BeanDefinitionVisitor writer = getOrCreateBeanDefinitionWriter(concreteClass, concreteClass.getQualifiedName());
                 addOriginatingElementIfNecessary(writer, declaringClass);

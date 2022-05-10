@@ -13,15 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.aop;
+package io.micronaut.inject.proxy;
 
-import io.micronaut.inject.proxy.InterceptedBean;
+import io.micronaut.core.annotation.Internal;
 
 /**
- * An interface implemented by generated proxy classes.
- *
- * @author Graeme Rocher
- * @since 1.0
+ * An internal interface implemented by generated proxy classes.
+ * Inject aware version of AOP interface.
+
+ * @author Denis Stepanov
+ * @since 3.5.0
  */
-public interface Intercepted extends InterceptedBean {
+@Internal
+public interface InterceptedBean {
 }
