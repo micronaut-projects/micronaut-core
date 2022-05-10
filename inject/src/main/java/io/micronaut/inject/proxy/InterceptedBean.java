@@ -25,5 +25,5 @@ import io.micronaut.core.annotation.Internal;
  * @since 3.5.0
  */
 @Internal
-public interface Intercepted {
+public interface InterceptedBean {
 }

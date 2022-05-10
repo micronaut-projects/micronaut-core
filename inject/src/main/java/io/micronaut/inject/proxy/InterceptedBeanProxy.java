@@ -19,7 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.qualifiers.Qualified;
 
 /**
- * An internal {@link Intercepted} that proxies another instance.
+ * An internal {@link InterceptedBean} that proxies another instance.
  * Inject aware version of AOP interface.
  *
  * @param <T> The declaring type
@@ -28,7 +28,7 @@ import io.micronaut.inject.qualifiers.Qualified;
  * @since 3.5.0
  */
 @Internal
-public interface InterceptedProxy<T> extends Intercepted, Qualified<T> {
+public interface InterceptedBeanProxy<T> extends InterceptedBean, Qualified<T> {
 
     /**
      * This method will return the target object being proxied.

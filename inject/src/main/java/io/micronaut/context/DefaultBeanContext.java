@@ -99,7 +99,7 @@ import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.inject.ParametrizedBeanFactory;
 import io.micronaut.inject.ProxyBeanDefinition;
 import io.micronaut.inject.ValidatedBeanDefinition;
-import io.micronaut.inject.proxy.InterceptedProxy;
+import io.micronaut.inject.proxy.InterceptedBeanProxy;
 import io.micronaut.inject.qualifiers.AnyQualifier;
 import io.micronaut.inject.qualifiers.Qualified;
 import io.micronaut.inject.qualifiers.Qualifiers;
@@ -1111,7 +1111,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
         if (LOG_LIFECYCLE.isDebugEnabled()) {
             LOG_LIFECYCLE.debug("Destroying bean [{}] with identifier [{}]", registration.bean, registration.identifier);
         }
-        if (registration.bean instanceof InterceptedProxy) {
+        if (registration.bean instanceof InterceptedBeanProxy) {
             // Ignore the proxy and destroy the target
             destroyProxyTargetBean(registration);
             return;
@@ -1200,8 +1200,8 @@ public class DefaultBeanContext implements InitializableBeanContext {
         if (!declaredScope.isPresent()) {
             LOG.debug("Cannot find a scope for a bean definition: {}", proxyTargetBeanDefinition);
             if (!proxyTargetBeanDefinition.isSingleton()
-                    && registration.bean instanceof InterceptedProxy) {
-                InterceptedProxy<T> interceptedProxy = (InterceptedProxy<T>) registration.bean;
+                    && registration.bean instanceof InterceptedBeanProxy) {
+                InterceptedBeanProxy<T> interceptedProxy = (InterceptedBeanProxy<T>) registration.bean;
                 if (interceptedProxy.hasCachedInterceptedTarget()) {
                     T interceptedTarget = interceptedProxy.interceptedTarget();
                     if (destroyed.contains(interceptedTarget)) {
