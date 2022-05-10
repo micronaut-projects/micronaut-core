@@ -79,7 +79,8 @@ class ListenerConfigurationSpec extends Specification {
         def server = ctx.getBean(NettyEmbeddedServer)
 
         expect:
-        server.port == 1234
+        // which is picked is currently unspecified
+        [1234, 5678].contains(server.port)
     }
 
     def 'port error messages'() {
