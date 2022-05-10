@@ -118,6 +118,7 @@ class ListenerConfigurationSpec extends Specification {
 
     def 'random port, ssl'() {
         given:
+        def unsecuredPort = SocketUtils.findAvailableTcpPort()
         def server = (NettyEmbeddedServer) ApplicationContext.run(
                 EmbeddedServer,
                 [
@@ -125,13 +126,13 @@ class ListenerConfigurationSpec extends Specification {
                         'micronaut.server.ssl.build-self-signed': true,
                         'micronaut.server.netty.listeners.a.port': -1,
                         'micronaut.server.netty.listeners.a.ssl': true,
-                        'micronaut.server.netty.listeners.b.port': -1,
+                        'micronaut.server.netty.listeners.b.port': unsecuredPort,
                         'micronaut.server.netty.listeners.b.ssl': false,
                 ])
-        def ports = new ArrayList(server.boundPorts)
+        def securedPort = server.boundPorts.stream().filter(p -> p != unsecuredPort).findAny().get()
 
         when:
-        def httpsConnection = (HttpsURLConnection) new URL('https://' + server.host + ':' + ports[0]).openConnection()
+        def httpsConnection = (HttpsURLConnection) new URL('https://' + server.host + ':' + securedPort).openConnection()
         def sslCtx = SSLContext.getInstance("SSL")
         sslCtx.init(null, InsecureTrustManagerFactory.INSTANCE.trustManagers, new SecureRandom())
         httpsConnection.SSLSocketFactory = sslCtx.socketFactory
@@ -141,7 +142,7 @@ class ListenerConfigurationSpec extends Specification {
         thrown FileNotFoundException
 
         when:
-        def httpConnection = (HttpURLConnection) new URL('http://' + server.host + ':' + ports[1]).openConnection()
+        def httpConnection = (HttpURLConnection) new URL('http://' + server.host + ':' + unsecuredPort).openConnection()
         httpConnection.connect()
         httpConnection.inputStream
         then:
