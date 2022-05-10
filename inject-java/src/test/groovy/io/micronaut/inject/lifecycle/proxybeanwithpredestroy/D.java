@@ -13,13 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.aop;
+package io.micronaut.inject.lifecycle.proxybeanwithpredestroy;
 
-/**
- * An interface implemented by generated proxy classes.
- *
- * @author Graeme Rocher
- * @since 1.0
- */
-public interface Intercepted extends io.micronaut.inject.proxy.Intercepted {
+import io.micronaut.context.annotation.Prototype;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
+
+@Prototype
+public class D {
+
+    static int created;
+    static int destroyed;
+
+    @PostConstruct
+    public void create() {
+        created++;
+    }
+
+    @PreDestroy
+    public void destroy() {
+        destroyed++;
+    }
+
 }

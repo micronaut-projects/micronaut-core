@@ -13,26 +13,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.aop;
+package io.micronaut.inject.proxy;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.qualifiers.Qualified;
 
 /**
- * A {@link Intercepted} that proxies another instance.
+ * An internal {@link Intercepted} that proxies another instance.
+ * Inject aware version of AOP interface.
  *
  * @param <T> The declaring type
  *
- * @author Graeme Rocher
- * @since 1.0
+ * @author Denis Stepanov
+ * @since 3.5.0
  */
-public interface InterceptedProxy<T> extends Intercepted, Qualified<T>, io.micronaut.inject.proxy.InterceptedProxy<T> {
+@Internal
+public interface InterceptedProxy<T> extends Intercepted, Qualified<T> {
 
     /**
      * This method will return the target object being proxied.
      *
      * @return The proxy target
      */
-    @Override
     T interceptedTarget();
 
     /**
@@ -40,8 +42,8 @@ public interface InterceptedProxy<T> extends Intercepted, Qualified<T>, io.micro
      *
      * @return true if the target is cached
      */
-    @Override
     default boolean hasCachedInterceptedTarget() {
         return false;
     }
+
 }
