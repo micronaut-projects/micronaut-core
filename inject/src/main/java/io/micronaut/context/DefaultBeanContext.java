@@ -1112,8 +1112,10 @@ public class DefaultBeanContext implements InitializableBeanContext {
             LOG_LIFECYCLE.debug("Destroying bean [{}] with identifier [{}]", registration.bean, registration.identifier);
         }
         if (registration.beanDefinition instanceof ProxyBeanDefinition) {
-            // Ignore the proxy and destroy the target
-            destroyProxyTargetBean(registration);
+            if (registration.bean instanceof InterceptedBeanProxy) {
+                // Ignore the proxy and destroy the target
+                destroyProxyTargetBean(registration);
+            }
             return;
         }
         T beanToDestroy = registration.getBean();
@@ -1198,9 +1200,11 @@ public class DefaultBeanContext implements InitializableBeanContext {
                 .orElseThrow(() -> new IllegalStateException("Cannot find a proxy target bean definition for: " + registration.beanDefinition));
         Optional<CustomScope<?>> declaredScope = customScopeRegistry.findDeclaredScope(proxyTargetBeanDefinition);
         if (!declaredScope.isPresent()) {
-            LOG.debug("Cannot find a scope for a bean definition: {}", proxyTargetBeanDefinition);
-            if (!proxyTargetBeanDefinition.isSingleton()
-                    && registration.bean instanceof InterceptedBeanProxy) {
+            if (proxyTargetBeanDefinition.isSingleton()) {
+                return;
+            }
+            // Scope is not present, try to get the actual target bean and destroy it
+            if (registration.bean instanceof InterceptedBeanProxy) {
                 InterceptedBeanProxy<T> interceptedProxy = (InterceptedBeanProxy<T>) registration.bean;
                 if (interceptedProxy.hasCachedInterceptedTarget()) {
                     T interceptedTarget = interceptedProxy.interceptedTarget();
