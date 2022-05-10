@@ -30,6 +30,7 @@ import io.micronaut.core.type.ArgumentCoercible;
 import io.micronaut.inject.*;
 
 import java.util.*;
+import java.util.stream.Stream;
 
 /**
  * Default implementation of the {@link BeanResolutionContext} interface.
@@ -40,26 +41,64 @@ import java.util.*;
 @Internal
 public abstract class AbstractBeanResolutionContext implements BeanResolutionContext {
 
-    protected final BeanContext context;
-    protected final BeanDefinition rootDefinition;
+    protected final DefaultBeanContext context;
+    protected final BeanDefinition<?> rootDefinition;
     private final Path path;
     private Map<CharSequence, Object> attributes;
     private Qualifier<?> qualifier;
     private List<BeanRegistration<?>> dependentBeans;
+    private BeanRegistration<?> dependentFactory;
 
     /**
      * @param context        The bean context
      * @param rootDefinition The bean root definition
      */
     @Internal
-    public AbstractBeanResolutionContext(BeanContext context, BeanDefinition rootDefinition) {
+    protected AbstractBeanResolutionContext(DefaultBeanContext context, BeanDefinition<?> rootDefinition) {
         this.context = context;
         this.rootDefinition = rootDefinition;
         this.path = new DefaultPath();
     }
 
+    @NonNull
+    @Override
+    public <T> T getBean(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+        return context.getBean(this, beanType, qualifier);
+    }
+
+    @NonNull
+    @Override
+    public <T> Collection<T> getBeansOfType(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+        return context.getBeansOfType(this, beanType, qualifier);
+    }
+
+    @NonNull
+    @Override
+    public <T> Stream<T> streamOfType(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+        return context.streamOfType(this, beanType, qualifier);
+    }
+
+    @NonNull
+    @Override
+    public <T> Optional<T> findBean(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+        return context.findBean(this, beanType, qualifier);
+    }
+
+    @NonNull
+    @Override
+    public <T> T inject(@Nullable BeanDefinition<?> beanDefinition, @NonNull T instance) {
+        return context.inject(this, beanDefinition, instance);
+    }
+
+    @NonNull
+    @Override
+    public <T> Collection<BeanRegistration<T>> getBeanRegistrations(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+        return context.getBeanRegistrations(this, beanType, qualifier);
+    }
+
     /**
      * Copy the state from a previous resolution context.
+     *
      * @param context The previous context
      */
     public void copyStateFrom(@NonNull AbstractBeanResolutionContext context) {
@@ -71,16 +110,20 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     }
 
     @Override
-    public <T> void addDependentBean(BeanIdentifier identifier, BeanDefinition<T> definition, T bean) {
+    public <T> void addDependentBean(BeanRegistration<T> beanRegistration) {
+        if (beanRegistration.getBeanDefinition() == rootDefinition) {
+            // Don't add self
+            return;
+        }
         if (dependentBeans == null) {
             dependentBeans = new ArrayList<>(3);
         }
-        dependentBeans.add(new BeanRegistration<>(identifier, definition, bean));
+        dependentBeans.add(beanRegistration);
     }
 
     @Override
     public void destroyInjectScopedBeans() {
-        final CustomScope<?> injectScope = ((DefaultBeanContext) context).getCustomScopeRegistry()
+        final CustomScope<?> injectScope = context.getCustomScopeRegistry()
                 .findScope(InjectScope.class.getName())
                 .orElse(null);
         if (injectScope instanceof LifeCycle<?>) {
@@ -94,9 +137,44 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         if (dependentBeans == null) {
             return Collections.emptyList();
         }
-        final List<BeanRegistration<?>> registrations = Collections.unmodifiableList(new ArrayList<>(dependentBeans));
-        dependentBeans.clear();
+        final List<BeanRegistration<?>> registrations = Collections.unmodifiableList(dependentBeans);
+        dependentBeans = null;
         return registrations;
+    }
+
+    @Override
+    public void markDependentAsFactory() {
+        if (dependentBeans != null) {
+            if (dependentBeans.isEmpty()) {
+                return;
+            }
+            if (dependentBeans.size() != 1) {
+                throw new IllegalStateException("Expected only one bean dependent!");
+            }
+            dependentFactory = dependentBeans.remove(0);
+        }
+    }
+
+    @Override
+    public BeanRegistration<?> getAndResetDependentFactoryBean() {
+        BeanRegistration<?> result = this.dependentFactory;
+        this.dependentFactory = null;
+        return result;
+    }
+
+    @Override
+    public List<BeanRegistration<?>> popDependentBeans() {
+        List<BeanRegistration<?>> result = this.dependentBeans;
+        this.dependentBeans = null;
+        return result;
+    }
+
+    @Override
+    public void pushDependentBeans(List<BeanRegistration<?>> dependentBeans) {
+        if (this.dependentBeans != null && !this.dependentBeans.isEmpty()) {
+            throw new IllegalStateException("Found existing dependent beans!");
+        }
+        this.dependentBeans = dependentBeans;
     }
 
     @Override
@@ -223,16 +301,16 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
                     int totalLength = path.length() - 3;
                     String spaces = String.join("", Collections.nCopies(totalLength, " "));
                     path.append(ls)
-                        .append("^")
-                        .append(spaces)
-                        .append("|")
-                        .append(ls)
-                        .append("|")
-                        .append(spaces)
-                        .append("|").append(ls)
-                        .append("|")
-                        .append(spaces)
-                        .append("|").append(ls).append('+');
+                            .append("^")
+                            .append(spaces)
+                            .append("|")
+                            .append(ls)
+                            .append("|")
+                            .append(spaces)
+                            .append("|").append(ls)
+                            .append("|")
+                            .append(spaces)
+                            .append("|").append(ls).append('+');
                     path.append(String.join("", Collections.nCopies(totalLength, "-"))).append('+');
                 }
             }
@@ -498,11 +576,11 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         private final boolean requiresReflection;
 
         /**
-         * @param declaringType        The declaring type
-         * @param methodName           The method name
-         * @param argument             The argument
-         * @param arguments            The arguments
-         * @param requiresReflection   Is requires reflection
+         * @param declaringType      The declaring type
+         * @param methodName         The method name
+         * @param argument           The argument
+         * @param arguments          The arguments
+         * @param requiresReflection Is requires reflection
          */
         MethodSegment(BeanDefinition declaringType, String methodName, Argument argument, Argument[] arguments, boolean requiresReflection) {
             super(declaringType, methodName, argument);
@@ -552,9 +630,9 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         private final boolean requiresReflection;
 
         /**
-         * @param declaringClass      The declaring class
-         * @param argument            The argument
-         * @param requiresReflection  Is requires reflection
+         * @param declaringClass     The declaring class
+         * @param argument           The argument
+         * @param requiresReflection Is requires reflection
          */
         FieldSegment(BeanDefinition declaringClass, Argument argument, boolean requiresReflection) {
             super(declaringClass, argument.getName(), argument);
@@ -599,12 +677,13 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
     /**
      * A segment that represents annotation.
+     *
      * @since 3.3.0
      */
     public static final class AnnotationSegment extends AbstractSegment implements InjectionPoint {
         /**
-         * @param beanDefinition      The bean definition
-         * @param argument            The argument
+         * @param beanDefinition The bean definition
+         * @param argument       The argument
          */
         AnnotationSegment(BeanDefinition beanDefinition, Argument argument) {
             super(beanDefinition, argument.getName(), argument);

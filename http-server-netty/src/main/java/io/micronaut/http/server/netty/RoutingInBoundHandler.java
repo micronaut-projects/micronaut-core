@@ -1419,7 +1419,15 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         return byteBuf;
     }
 
-    private boolean isIgnorable(Throwable cause) {
+    /**
+     * Is the exception ignorable by Micronaut.
+     * @param cause The cause
+     * @return True if it can be ignored.
+     */
+    protected boolean isIgnorable(Throwable cause) {
+        if (cause instanceof ClosedChannelException || cause.getCause() instanceof ClosedChannelException) {
+            return true;
+        }
         String message = cause.getMessage();
         return cause instanceof IOException && message != null && IGNORABLE_ERROR_MESSAGE.matcher(message).matches();
     }

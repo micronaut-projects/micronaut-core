@@ -79,13 +79,11 @@ $ ./hello-world
 
 Micronaut itself does not rely on reflection or dynamic classloading, so it works automatically with GraalVM native, however certain third-party libraries used by Micronaut may require additional input about uses of reflection.
 
-Micronaut includes an annotation processor that helps to generate the `reflect-config.json` metadata files that are automatically picked up by the `native-image` tool:
+Micronaut includes an annotation processor that helps to generate reflection configuration that is automatically picked up by the `native-image` tool:
 
 dependency:micronaut-graal[scope="annotationProcessor"]
 
-This processor generates:
-
-- A `reflect-config.json` file in the `META-INF/native-image` directory in your build classes directory (`target/classes` with Maven and typically `build/classes/java/main` with Gradle).
+This processor generates additional classes that implement the api:core.graal.GraalReflectionConfigurer[] inteface and programmatically register reflection configuration.
 
 For example the following class:
 
@@ -101,18 +99,21 @@ class Test {
 }
 ----
 
-The above example results in the public methods, declared fields and declared constructors of `example.Test` being included in `reflect-config.json`.
+The above example results in the public methods, declared fields and declared constructors of `example.Test` being registered for reflective access.
 
 If you have more advanced requirements and only wish to include certain fields or methods, use the annotation on any constructor, field or method to include only the specific field, constructor or method.
 
-TIP: To provide your own `reflect.json`, add one to `src/main/graal/reflect.json` and it will be automatically picked up.
-
 === Adding Additional Classes for Reflective Access
 
-To inform Micronaut of additional classes to be included in the generated `reflect.json` file at compile time, either annotate a class with ann:core.annotation.ReflectiveAccess[] or ann:core.annotation.TypeHint[].
+To inform Micronaut of additional classes to be included in the generated reflection configuration a number of annotations are available including:
 
-Both allows for reflective access, and the latter is typically used on a module or `Application` class to include classes that are needed reflectively. For example, the following is from Micronaut's Jackson module:
+* ann:core.annotation.ReflectiveAccess[] - An annotation that can be declared on a specific type, constructor, method or field to enable reflective access just for the annotated element.
+* ann:core.annotation.TypeHint[] - An annotation that allows to bulk configuration of reflective access to one or many types
+* ann:core.annotation.ReflectionConfig[] - A repeatable annotation that directly models the https://www.graalvm.org/22.0/reference-manual/native-image/Reflection/#manual-configuration[GraalVM reflection config JSON format]
 
+The `@ReflectiveAccess` annotation is typically used on a particular type, constructor, method or field whilst the latter two are typically used on a module or `Application` class to include classes that are needed reflectively. For example, the following is from Micronaut's Jackson module with `@TypeHint`:
+
+.Using the `@TypeHint` annotation
 [source,java]
 ----
 @TypeHint(
@@ -128,6 +129,29 @@ Both allows for reflective access, and the latter is typically used on a module 
 
 <1> The `value` member specifies which classes require reflection.
 <2> The `accessType` member specifies if only classloading access is needed or whether full reflection on all public members is needed.
+
+Or alternatively with the `@ReflectionConfig` annotation which is repeatable and allows distinct configuration per type:
+
+.Using the `@ReflectionConfig` annotation
+[source,java]
+----
+@ReflectionConfig(
+    type = PropertyNamingStrategy.UpperCamelCaseStrategy.class,
+    accessType = TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS
+)
+@ReflectionConfig(
+    type = ArrayList.class,
+    accessType = TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS
+)
+@ReflectionConfig(
+    type = LinkedHashMap.class,
+    accessType = TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS
+)
+@ReflectionConfig(
+    type = HashSet.class,
+    accessType = TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS
+)
+----
 
 === Generating Native Images
 

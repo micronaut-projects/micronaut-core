@@ -32,7 +32,7 @@ class ContextScopeSpec extends Specification {
         beanContext.start()
 
         then:"So is the bean"
-        beanContext.@singletonObjects.values().find() { it.bean instanceof A }
+        beanContext.@singletonScope.@singletonByBeanDefinition.values().find() { it.bean instanceof A }
     }
 
     @Context
