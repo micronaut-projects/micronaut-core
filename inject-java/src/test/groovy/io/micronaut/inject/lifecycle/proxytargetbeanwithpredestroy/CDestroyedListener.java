@@ -11,7 +11,7 @@ public class CDestroyedListener implements BeanDestroyedEventListener<C> {
     @Override
     public void onDestroyed(BeanDestroyedEvent<C> event) {
         this.called++;
-        Assertions.assertEquals(C.closed, 1);
+        Assertions.assertEquals(1, C.closed);
     }
 
     public int getCalled() {

@@ -11,7 +11,7 @@ public class CPreDestroyEventListener implements BeanPreDestroyEventListener<C> 
     @Override
     public C onPreDestroy(BeanPreDestroyEvent<C> event) {
         this.called++;
-        Assertions.assertEquals(C.closed, 0);
+        Assertions.assertEquals(0, C.closed);
         return event.getBean();
     }
 
