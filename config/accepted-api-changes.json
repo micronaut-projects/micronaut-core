@@ -63,5 +63,15 @@
         "type": "io.micronaut.graal.reflect.GraalTypeElementVisitor",
         "member": "Method io.micronaut.graal.reflect.GraalTypeElementVisitor.visitMethod(io.micronaut.inject.ast.MethodElement,io.micronaut.inject.visitor.VisitorContext)",
         "reason": "The Graal visitor is internal to the compiler and implementation detail not part of the public API"
+    },
+    {
+        "type": "io.micronaut.aop.InterceptedProxy",
+        "member": "Class io.micronaut.aop.InterceptedProxy",
+        "reason": "Class now extends similar interface from the Inject module allowing to detect intercepted proxies"
+    },
+    {
+        "type": "io.micronaut.aop.InterceptedProxy",
+        "member": "Method io.micronaut.aop.InterceptedProxy.hasCachedInterceptedTarget()",
+        "reason": "New default method introduced to detect cached target, the interface is only implemented by the class generation"
     }
 ]

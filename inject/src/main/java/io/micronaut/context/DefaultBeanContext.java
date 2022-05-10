@@ -1111,7 +1111,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
         if (LOG_LIFECYCLE.isDebugEnabled()) {
             LOG_LIFECYCLE.debug("Destroying bean [{}] with identifier [{}]", registration.bean, registration.identifier);
         }
-        if (registration.bean instanceof InterceptedBeanProxy) {
+        if (registration.beanDefinition instanceof ProxyBeanDefinition) {
             // Ignore the proxy and destroy the target
             destroyProxyTargetBean(registration);
             return;
