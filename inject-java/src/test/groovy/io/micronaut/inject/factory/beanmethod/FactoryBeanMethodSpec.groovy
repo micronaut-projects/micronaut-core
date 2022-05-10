@@ -171,7 +171,7 @@ class Bar8 {
             bar2BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).iterator().next() == AnnotationUtil.SINGLETON
         and:
             !bar3BeanDefinition.getScope().isPresent()
-            bar3BeanDefinition.declaredQualifier.toString() == "@Named('test.Xyz')"
+            bar3BeanDefinition.declaredQualifier.toString() == "@Xyz"
             bar3BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).size() == 0
         and:
             !bar4BeanDefinition.getScope().isPresent()
@@ -181,20 +181,20 @@ class Bar8 {
             bar4BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).iterator().next() == AnnotationUtil.SINGLETON
         and:
             !bar5BeanDefinition.getScope().isPresent()
-            bar5BeanDefinition.declaredQualifier.toString() == "@Named('test.Xyz')"
+            bar5BeanDefinition.declaredQualifier.toString() == "@Xyz"
             bar5BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).size() == 0
         and:
             bar6BeanDefinition.getScope().get() == Prototype.class
-            bar6BeanDefinition.declaredQualifier.toString() == "@Named('test.Xyz')"
+            bar6BeanDefinition.declaredQualifier.toString() == "@Xyz"
             bar6BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).size() == 1
         and:
             bar7BeanDefinition.getScope().get() == Prototype.class
-            bar7BeanDefinition.declaredQualifier.toString() == "@Named('test.Xyz')"
+            bar7BeanDefinition.declaredQualifier.toString() == "@Xyz"
             bar7BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).size() == 1
             bar7BeanDefinition.hasAnnotation(io.micronaut.inject.factory.RemappedAnnotation)
         and:
             bar8BeanDefinition.getScope().get() == Prototype.class
-            bar8BeanDefinition.declaredQualifier.toString() == "@Named('test.Xyz')"
+            bar8BeanDefinition.declaredQualifier.toString() == "@Xyz"
             bar8BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).size() == 1
             bar8BeanDefinition.hasAnnotation(io.micronaut.inject.factory.RemappedAnnotation)
 

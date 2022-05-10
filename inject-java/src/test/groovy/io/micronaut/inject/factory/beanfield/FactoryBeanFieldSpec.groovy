@@ -546,7 +546,7 @@ class Bar3 {
 
         then:
         !bar3BeanDefinition.getScope().isPresent()
-        bar3BeanDefinition.declaredQualifier.toString() == "@Named('test.Xyz')"
+        bar3BeanDefinition.declaredQualifier.toString() == "@Xyz"
         bar3BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).size() == 0
 
         cleanup:
@@ -657,7 +657,7 @@ class Bar5 {
 
         then:
         !bar5BeanDefinition.getScope().isPresent()
-        bar5BeanDefinition.declaredQualifier.toString() == "@Named('test.Xyz')"
+        bar5BeanDefinition.declaredQualifier.toString() == "@Xyz"
         CollectionUtils.isEmpty(bar5BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE))
 
         cleanup:
@@ -716,7 +716,7 @@ class Bar6 {
                 .find {it.getDeclaringType().get().simpleName.contains("TestFactory")}
         then:
         bar6BeanDefinition.getScope().get() == Prototype.class
-        bar6BeanDefinition.declaredQualifier.toString() == "@Named('test.Xyz')"
+        bar6BeanDefinition.declaredQualifier.toString() == "@Xyz"
 
         when:
         Collection<String> annotationNamesByScopeStereoType = bar6BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).asCollection()
@@ -846,16 +846,16 @@ class Bar8 {
 
         then:
             bar7BeanDefinition.getScope().get() == Prototype.class
-            bar7BeanDefinition.declaredQualifier.toString() == "@Named('test.Xyz')"
+            bar7BeanDefinition.declaredQualifier.toString() == "@Xyz"
             bar7BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).size() == 1
             bar7BeanDefinition.hasAnnotation(io.micronaut.inject.factory.RemappedAnnotation)
         and:
             bar8BeanDefinition.getScope().get() == Prototype.class
-            bar8BeanDefinition.declaredQualifier.toString() == "@Named('test.Xyz')"
+            bar8BeanDefinition.declaredQualifier.toString() == "@Xyz"
             bar8BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).size() == 1
             bar8BeanDefinition.hasAnnotation(io.micronaut.inject.factory.RemappedAnnotation)
 
         cleanup:
-            context.close()
+        context.close()
     }
 }
