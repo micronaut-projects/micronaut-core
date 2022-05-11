@@ -19,6 +19,7 @@ import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
 import spock.lang.Specification
 
+// proxyTarget = false proxies are always destroyed
 class ProxyBeanWithPreDestroySpec extends Specification {
 
     def setup() {
