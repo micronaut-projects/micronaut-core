@@ -22,6 +22,7 @@ import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Infrastructure;
 import io.micronaut.context.annotation.Parallel;
 import io.micronaut.context.annotation.Primary;
+import io.micronaut.context.annotation.Prototype;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Secondary;
 import io.micronaut.context.env.PropertyPlaceholderResolver;
@@ -182,7 +183,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
     final Map<BeanIdentifier, BeanRegistration<?>> singlesInCreation = new ConcurrentHashMap<>(5);
 
-    private final SingletonScope singletonScope = new SingletonScope(this);
+    private final SingletonScope singletonScope = new SingletonScope();
 
     private final BeanContextConfiguration beanContextConfiguration;
     private final Collection<BeanDefinitionReference> beanDefinitionsClasses = new ConcurrentLinkedQueue<>();
@@ -684,7 +685,8 @@ public class DefaultBeanContext implements InitializableBeanContext {
         if (beanDefinition != null && beanDefinition.getBeanType().isInstance(singleton)) {
             try (BeanResolutionContext context = newResolutionContext(beanDefinition, null)) {
                 doInject(context, singleton, beanDefinition);
-                singletonScope.registerSingletonBean(beanDefinition, qualifier, singleton, Collections.emptyList());
+                DefaultBeanContext.BeanKey<T> key = new DefaultBeanContext.BeanKey<>(beanDefinition.asArgument(), qualifier);
+                singletonScope.registerSingletonBean(BeanRegistration.of(this, key, beanDefinition, singleton), qualifier);
             }
         } else {
             NoInjectionBeanDefinition<T> dynamicRegistration = new NoInjectionBeanDefinition<>(singleton.getClass(), qualifier);
@@ -696,7 +698,8 @@ public class DefaultBeanContext implements InitializableBeanContext {
                 beanDefinition = dynamicRegistration;
             }
             beanDefinitionsClasses.add(dynamicRegistration);
-            singletonScope.registerSingletonBean(dynamicRegistration, qualifier, singleton, Collections.emptyList());
+            DefaultBeanContext.BeanKey<T> key = new DefaultBeanContext.BeanKey<>(beanDefinition.asArgument(), qualifier);
+            singletonScope.registerSingletonBean(BeanRegistration.of(this, key, dynamicRegistration, singleton), qualifier);
 
             for (Class indexedType : indexedTypes) {
                 if (indexedType == type || indexedType.isAssignableFrom(type)) {
@@ -1105,16 +1108,24 @@ public class DefaultBeanContext implements InitializableBeanContext {
         throw new IllegalArgumentException("Cannot destroy non-singleton bean using bean definition! Use 'destroyBean(BeanRegistration)` or `destroyBean(<BeanInstance>)`.");
     }
 
-    @Nullable
     @Override
     public <T> void destroyBean(@NonNull BeanRegistration<T> registration) {
+        destroyBean(registration, false);
+    }
+
+    private <T> void destroyBean(@NonNull BeanRegistration<T> registration, boolean dependent) {
         if (LOG_LIFECYCLE.isDebugEnabled()) {
             LOG_LIFECYCLE.debug("Destroying bean [{}] with identifier [{}]", registration.bean, registration.identifier);
         }
-        if (registration.beanDefinition instanceof ProxyBeanDefinition && registration.bean instanceof InterceptedBeanProxy) {
-            // Ignore the proxy and destroy the target
-            destroyProxyTargetBean(registration);
-            return;
+        if (registration.beanDefinition instanceof ProxyBeanDefinition) {
+            if (registration.bean instanceof InterceptedBeanProxy) {
+                // Ignore the proxy and destroy the target
+                destroyProxyTargetBean(registration, dependent);
+                return;
+            }
+            if (dependent && registration.beanDefinition.isSingleton()) {
+                return;
+            }
         }
         T beanToDestroy = registration.getBean();
         BeanDefinition<T> definition = registration.getBeanDefinition();
@@ -1141,7 +1152,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
             if (CollectionUtils.isNotEmpty(dependents)) {
                 final ListIterator<BeanRegistration<?>> i = dependents.listIterator(dependents.size());
                 while (i.hasPrevious()) {
-                    destroyBean(i.previous());
+                    destroyBean(i.previous(), true);
                 }
             }
         } else {
@@ -1182,14 +1193,14 @@ public class DefaultBeanContext implements InitializableBeanContext {
         return bean;
     }
 
-    private <T> void destroyProxyTargetBean(@NonNull BeanRegistration<T> registration) {
+    private <T> void destroyProxyTargetBean(@NonNull BeanRegistration<T> registration, boolean dependent) {
         Set<Object> destroyed = Collections.emptySet();
         if (registration instanceof BeanDisposingRegistration) {
             BeanDisposingRegistration<?> disposingRegistration = (BeanDisposingRegistration<?>) registration;
             if (disposingRegistration.getDependents() != null) {
                 destroyed = Collections.newSetFromMap(new IdentityHashMap<>());
                 for (BeanRegistration<?> beanRegistration : disposingRegistration.getDependents()) {
-                    destroyBean(beanRegistration);
+                    destroyBean(beanRegistration, true);
                     destroyed.add(beanRegistration.bean);
                 }
             }
@@ -1220,11 +1231,13 @@ public class DefaultBeanContext implements InitializableBeanContext {
             return;
         }
         CustomScope<?> customScope = declaredScope.get();
+        if (dependent) {
+            return;
+        }
         Optional<BeanRegistration<T>> targetBeanRegistration = customScope.findBeanRegistration(proxyTargetBeanDefinition);
         if (targetBeanRegistration.isPresent()) {
             BeanRegistration<T> targetRegistration = targetBeanRegistration.get();
             customScope.remove(targetRegistration.identifier);
-            destroyBean(targetRegistration);
         }
     }
 
@@ -2719,23 +2732,38 @@ public class DefaultBeanContext implements InitializableBeanContext {
                                                             @NonNull BeanDefinition<T> definition,
                                                             @NonNull Argument<T> beanType,
                                                             @Nullable Qualifier<T> qualifier) {
-        if (definition.isSingleton() && !definition.hasStereotype(SCOPED_PROXY_ANN)) {
+        final boolean isScopedProxyDefinition = definition.hasStereotype(SCOPED_PROXY_ANN);
+
+        if (definition.isSingleton() && !isScopedProxyDefinition) {
             return findOrCreateSingletonBeanRegistration(resolutionContext, definition, beanType, qualifier);
         }
-        try (BeanResolutionContext context = newResolutionContext(definition, resolutionContext)) {
-            final BeanResolutionContext.Path path = context.getPath();
-            final boolean isNewPath = path.isEmpty();
-            if (isNewPath) {
-                path.pushBeanCreate(definition, beanType);
+
+        final boolean isProxy = definition.isProxy();
+
+        if (isProxy && isScopedProxyDefinition && qualifier != PROXY_TARGET_QUALIFIER
+                && (definition.getDeclaredQualifier() == null)) {
+            // With scopes proxies we have to inject a reference into the injection point
+            Qualifier<T> q = qualifier;
+            if (q == null) {
+                q = definition.getDeclaredQualifier();
             }
-            try {
-                return getNotSingletonBeanForDefinition(context, beanType, qualifier, definition);
-            } finally {
-                if (isNewPath) {
-                    path.pop();
-                }
+            BeanRegistration<T> registration = createRegistration(resolutionContext, beanType, q, definition, true);
+            T bean = registration.bean;
+            if (bean instanceof Qualified) {
+                ((Qualified<T>) bean).$withBeanQualifier(q);
             }
+            return registration;
         }
+
+        CustomScope<?> customScope = findCustomScope(resolutionContext, definition, isProxy, isScopedProxyDefinition);
+        if (customScope != null) {
+            if (isProxy) {
+                definition = getProxyTargetBeanDefinition(beanType, qualifier);
+            }
+            return getOrCreateScopedRegistration(resolutionContext, customScope, qualifier, beanType, definition);
+        }
+        // Unknown scope, prototype scope etc
+        return createRegistration(resolutionContext, beanType, qualifier, definition, true);
     }
 
     @NonNull
@@ -2753,84 +2781,67 @@ public class DefaultBeanContext implements InitializableBeanContext {
             if (beanRegistration != null) {
                 return beanRegistration;
             }
-            try (BeanResolutionContext context = newResolutionContext(definition, resolutionContext)) {
-                final BeanResolutionContext.Path path = context.getPath();
-                final boolean isNewPath = path.isEmpty();
-                if (isNewPath) {
-                    path.pushBeanCreate(definition, beanType);
-                }
-                try {
-                    List<BeanRegistration<?>> dependentBeans = context.popDependentBeans();
-                    T createdBean = doCreateBean(context, definition, qualifier);
-                    BeanRegistration<T> registration = singletonScope.registerSingletonBean(
-                            definition,
-                            qualifier,
-                            createdBean,
-                            context.getAndResetDependentBeans()
-                    );
-                    context.pushDependentBeans(dependentBeans);
-                    return registration;
-                } finally {
-                    if (isNewPath) {
-                        path.pop();
-                    }
-                }
-            }
-        }
-    }
-
-    @NonNull
-    private <T> BeanRegistration<T> getNotSingletonBeanForDefinition(@NonNull BeanResolutionContext resolutionContext,
-                                                                     @NonNull Argument<T> beanType,
-                                                                     @Nullable Qualifier<T> qualifier,
-                                                                     @NonNull BeanDefinition<T> definition) {
-        final boolean isProxy = definition.isProxy();
-        final boolean isScopedProxyDefinition = definition.hasStereotype(SCOPED_PROXY_ANN);
-
-        if (isProxy && isScopedProxyDefinition && qualifier != PROXY_TARGET_QUALIFIER
-                && (definition.getDeclaredQualifier() == null)) {
-            // With scopes proxies we have to inject a reference into the injection point
-            Qualifier<T> q = qualifier;
-            if (q == null) {
-                q = definition.getDeclaredQualifier();
-            }
-            BeanRegistration<T> registration = createPrototypeRegistration(resolutionContext, beanType, q, definition);
-            T bean = registration.bean;
-            if (bean instanceof Qualified) {
-                ((Qualified<T>) bean).$withBeanQualifier(q);
-            }
+            BeanRegistration<T> registration = createRegistration(resolutionContext, beanType, qualifier, definition, false);
+            singletonScope.registerSingletonBean(registration, qualifier);
             return registration;
         }
+    }
 
-        BeanResolutionContext.Segment<?> currentSegment = resolutionContext
-                .getPath()
-                .currentSegment()
-                .orElse(null);
-        CustomScope<?> registeredScope = null;
-
-        if (currentSegment != null) {
-            Argument<?> argument = currentSegment.getArgument();
-            registeredScope = customScopeRegistry.findDeclaredScope(argument).orElse(null);
+    @Nullable
+    private <T> CustomScope<?> findCustomScope(@Nullable BeanResolutionContext resolutionContext,
+                                               @NonNull BeanDefinition<T> definition,
+                                               boolean isProxy,
+                                               boolean isScopedProxyDefinition) {
+        if (definition.isSingleton()) {
+            return null;
         }
 
-        if (registeredScope == null && (!isScopedProxyDefinition || !isProxy)) {
-            registeredScope = customScopeRegistry.findDeclaredScope(definition).orElse(null);
-        }
-        if (registeredScope != null) {
-            if (isProxy) {
-                definition = getProxyTargetBeanDefinition(
-                        beanType,
-                        qualifier
-                );
+        Optional<Class<? extends Annotation>> scope = definition.getScope();
+        if (scope.isPresent()) {
+            Class<? extends Annotation> scopeAnnotation = scope.get();
+            if (scopeAnnotation == Prototype.class) {
+                return null;
             }
-            return getOrCreateScopedRegistration(resolutionContext, registeredScope, qualifier, beanType, definition);
+            CustomScope<?> customScope = customScopeRegistry.findScope(scopeAnnotation).orElse(null);
+            if (customScope != null) {
+                return customScope;
+            }
+        } else {
+            Optional<String> scopeName = definition.getScopeName();
+            if (scopeName.isPresent()) {
+                String scopeAnnotation = scopeName.get();
+                if (Prototype.class.getName().equals(scopeAnnotation)) {
+                    return null;
+                }
+                CustomScope<?> customScope = customScopeRegistry.findScope(scopeAnnotation).orElse(null);
+                if (customScope != null) {
+                    return customScope;
+                }
+            }
         }
-        // Unknown scope, prototype scope etc
-        return createPrototypeRegistration(resolutionContext, beanType, qualifier, definition);
+
+        if (resolutionContext != null) {
+            BeanResolutionContext.Segment<?> currentSegment = resolutionContext
+                    .getPath()
+                    .currentSegment()
+                    .orElse(null);
+            if (currentSegment != null) {
+                Argument<?> argument = currentSegment.getArgument();
+                CustomScope<?> customScope = customScopeRegistry.findDeclaredScope(argument).orElse(null);
+                if (customScope != null) {
+                    return customScope;
+                }
+            }
+        }
+
+        if (!isScopedProxyDefinition || !isProxy) {
+            return customScopeRegistry.findDeclaredScope(definition).orElse(null);
+        }
+        return null;
     }
 
     @NonNull
-    private <T> BeanRegistration<T> getOrCreateScopedRegistration(@NonNull BeanResolutionContext resolutionContext,
+    private <T> BeanRegistration<T> getOrCreateScopedRegistration(@Nullable BeanResolutionContext resolutionContext,
                                                                   @NonNull CustomScope<?> registeredScope,
                                                                   @Nullable Qualifier<T> qualifier,
                                                                   @NonNull Argument<T> beanType,
@@ -2853,7 +2864,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                     @NonNull
                     @Override
                     public CreatedBean<T> create() throws BeanCreationException {
-                        return createPrototypeRegistration(resolutionContext, beanType, qualifier, definition);
+                        return createRegistration(resolutionContext, beanType, qualifier, definition, true);
                     }
                 }
         );
@@ -2861,23 +2872,38 @@ public class DefaultBeanContext implements InitializableBeanContext {
     }
 
     @NotNull
-    private <T> BeanRegistration<T> createPrototypeRegistration(@NonNull BeanResolutionContext resolutionContext,
-                                                                @NonNull Argument<T> beanType,
-                                                                @Nullable Qualifier<T> qualifier,
-                                                                @NonNull BeanDefinition<T> definition) {
-        List<BeanRegistration<?>> parentDependentBeans = resolutionContext.popDependentBeans();
-        T bean = doCreateBean(resolutionContext, definition, qualifier);
-        BeanRegistration<?> dependentFactoryBean = resolutionContext.getAndResetDependentFactoryBean();
-        if (dependentFactoryBean != null) {
-            destroyBean(dependentFactoryBean);
+    private <T> BeanRegistration<T> createRegistration(@Nullable BeanResolutionContext resolutionContext,
+                                                       @NonNull Argument<T> beanType,
+                                                       @Nullable Qualifier<T> qualifier,
+                                                       @NonNull BeanDefinition<T> definition,
+                                                       boolean dependent) {
+        try (BeanResolutionContext context = newResolutionContext(definition, resolutionContext)) {
+            final BeanResolutionContext.Path path = context.getPath();
+            final boolean isNewPath = path.isEmpty();
+            if (isNewPath) {
+                path.pushBeanCreate(definition, beanType);
+            }
+            try {
+                List<BeanRegistration<?>> parentDependentBeans = context.popDependentBeans();
+                T bean = doCreateBean(context, definition, qualifier);
+                BeanRegistration<?> dependentFactoryBean = context.getAndResetDependentFactoryBean();
+                if (dependentFactoryBean != null) {
+                    destroyBean(dependentFactoryBean);
+                }
+                BeanKey<T> beanKey = new BeanKey<>(beanType, qualifier);
+                List<BeanRegistration<?>> dependentBeans = context.getAndResetDependentBeans();
+                BeanRegistration<T> beanRegistration = BeanRegistration.of(this, beanKey, definition, bean, dependentBeans);
+                context.pushDependentBeans(parentDependentBeans);
+                if (dependent) {
+                    context.addDependentBean(beanRegistration);
+                }
+                return beanRegistration;
+            } finally {
+                if (isNewPath) {
+                    path.pop();
+                }
+            }
         }
-        BeanKey<T> beanKey = new BeanKey<>(beanType, qualifier);
-        List<BeanRegistration<?>> dependentBeans = resolutionContext.getAndResetDependentBeans();
-        BeanRegistration<T> beanRegistration = BeanRegistration.of(this, beanKey, definition, bean, dependentBeans);
-        resolutionContext.pushDependentBeans(parentDependentBeans);
-        // Unknown scope and prototype beans are treated as beans dependent
-        resolutionContext.addDependentBean(beanRegistration);
-        return beanRegistration;
     }
 
     /**

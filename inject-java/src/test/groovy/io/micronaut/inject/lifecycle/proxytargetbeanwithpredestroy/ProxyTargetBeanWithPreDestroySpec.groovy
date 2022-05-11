@@ -67,12 +67,12 @@ class ProxyTargetBeanWithPreDestroySpec extends Specification {
         when:
             context.destroyBean(root)
 
-        then:
-            B.interceptCalled == 2
-            B.noArgsDestroyCalled == 1
-            B.injectedDestroyCalled == 1
+        then: "Custom scope instance not destroyed"
+            B.interceptCalled == 1
+            B.noArgsDestroyCalled == 0
+            B.injectedDestroyCalled == 0
             D.created == 2 // Create proxy + target
-            D.destroyed == 2
+            D.destroyed == 1
 
         cleanup:
             context.close()
@@ -129,12 +129,12 @@ class ProxyTargetBeanWithPreDestroySpec extends Specification {
         when:
             context.destroyBean(registration)
 
-        then:
-            B.interceptCalled == 2
-            B.noArgsDestroyCalled == 1
-            B.injectedDestroyCalled == 1
+        then: "Custom scope instance not destroyed"
+            B.interceptCalled == 1
+            B.noArgsDestroyCalled == 0
+            B.injectedDestroyCalled == 0
             D.created == 2
-            D.destroyed == 2  // Destroy proxy + target
+            D.destroyed == 1  // Destroy proxy
 
         cleanup:
             context.close()
