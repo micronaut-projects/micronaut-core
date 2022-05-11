@@ -26,6 +26,7 @@ import io.micronaut.inject.BeanIdentifier;
 import io.micronaut.inject.BeanType;
 import io.micronaut.inject.DisposableBeanDefinition;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
@@ -124,6 +125,15 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
      */
     public T getBean() {
         return bean;
+    }
+
+    /**
+     * @return Dependent registrations
+     * @since 3.5.0
+     */
+    @NonNull
+    public List<BeanRegistration<?>> getDependents() {
+        return Collections.emptyList();
     }
 
     @Override

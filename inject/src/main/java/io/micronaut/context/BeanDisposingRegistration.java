@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
 
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -57,7 +58,8 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> {
         beanContext.destroyBean(this);
     }
 
+    @Override
     public List<BeanRegistration<?>> getDependents() {
-        return dependents;
+        return dependents == null ? Collections.emptyList() : Collections.unmodifiableList(dependents);
     }
 }

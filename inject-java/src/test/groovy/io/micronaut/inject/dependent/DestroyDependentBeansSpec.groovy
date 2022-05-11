@@ -2,7 +2,6 @@ package io.micronaut.inject.dependent
 
 import io.micronaut.aop.InterceptedProxy
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.BeanDisposingRegistration
 import io.micronaut.context.BeanRegistration
 import io.micronaut.context.scope.CustomScope
 import io.micronaut.inject.BeanDefinition
@@ -108,9 +107,9 @@ class DestroyDependentBeansSpec extends Specification {
         then:"Validate BeanB dependents"
             beanBDependents.size() == 2
             beanBDependents[0].bean instanceof TestInterceptor
-            beanBDependents[0].dependents == null
+            beanBDependents[0].dependents == []
             beanBDependents[1].bean instanceof BeanC
-            beanBDependents[1].dependents == null
+            beanBDependents[1].dependents == []
 
         when:"When the context is stopped"
             context.stop()
@@ -157,9 +156,9 @@ class DestroyDependentBeansSpec extends Specification {
         then:"Validate BeanB dependents"
             beanBDependents.size() == 2
             beanBDependents[0].bean instanceof TestInterceptor
-            beanBDependents[0].dependents == null
+            beanBDependents[0].dependents == []
             beanBDependents[1].bean instanceof BeanC
-            beanBDependents[1].dependents == null
+            beanBDependents[1].dependents == []
 
         when:"When the context is stopped"
             context.destroyBean(registration)

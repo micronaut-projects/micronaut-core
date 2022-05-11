@@ -1137,7 +1137,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
             }
         }
         if (registration instanceof BeanDisposingRegistration) {
-            List<BeanRegistration<?>> dependents = ((BeanDisposingRegistration<T>) registration).getDependents();
+            List<BeanRegistration<?>> dependents = registration.getDependents();
             if (CollectionUtils.isNotEmpty(dependents)) {
                 final ListIterator<BeanRegistration<?>> i = dependents.listIterator(dependents.size());
                 while (i.hasPrevious()) {
@@ -1184,14 +1184,11 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
     private <T> void destroyProxyTargetBean(@NonNull BeanRegistration<T> registration) {
         Set<Object> destroyed = Collections.emptySet();
-        if (registration instanceof BeanDisposingRegistration) {
-            BeanDisposingRegistration<?> disposingRegistration = (BeanDisposingRegistration<?>) registration;
-            if (disposingRegistration.getDependents() != null) {
-                destroyed = Collections.newSetFromMap(new IdentityHashMap<>());
-                for (BeanRegistration<?> beanRegistration : disposingRegistration.getDependents()) {
-                    destroyBean(beanRegistration);
-                    destroyed.add(beanRegistration.bean);
-                }
+        if (!registration.getDependents().isEmpty()) {
+            destroyed = Collections.newSetFromMap(new IdentityHashMap<>());
+            for (BeanRegistration<?> beanRegistration : registration.getDependents()) {
+                destroyBean(beanRegistration);
+                destroyed.add(beanRegistration.bean);
             }
         }
         BeanDefinition<T> proxyTargetBeanDefinition = findProxyTargetBeanDefinition(registration.beanDefinition)
@@ -1213,7 +1210,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                             new BeanKey<>(proxyTargetBeanDefinition, proxyTargetBeanDefinition.getDeclaredQualifier()),
                             proxyTargetBeanDefinition,
                             interceptedTarget,
-                            registration instanceof BeanDisposingRegistration ? ((BeanDisposingRegistration<T>) registration).getDependents() : null
+                            registration.getDependents()
                     ));
                 }
             }
