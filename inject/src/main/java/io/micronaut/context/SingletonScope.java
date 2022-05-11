@@ -39,8 +39,6 @@ import java.util.stream.Stream;
 @Internal
 final class SingletonScope {
 
-    private final DefaultBeanContext beanContext;
-
     /**
      * The main collection storing registrations for {@link BeanDefinition}.
      */
@@ -50,15 +48,6 @@ final class SingletonScope {
      * Index collection to retrieve a the registration by {@link Argument} and {@link Qualifier}.
      */
     private final Map<DefaultBeanContext.BeanKey, BeanRegistration> singletonByArgumentAndQualifier = new ConcurrentHashMap<>(100);
-
-    /**
-     * The default constructor.
-     *
-     * @param beanContext The bean context.
-     */
-    SingletonScope(DefaultBeanContext beanContext) {
-        this.beanContext = beanContext;
-    }
 
     /**
      * Register singleton.
