@@ -223,6 +223,9 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
             }
             for (CreatedBean<?> createdBean : scopeMap.values()) {
                 if (createdBean.bean() == bean) {
+                    if (createdBean instanceof BeanRegistration) {
+                        return Optional.of((BeanRegistration<T>) createdBean);
+                    }
                     return Optional.of(
                             new BeanRegistration<>(
                                     createdBean.id(),

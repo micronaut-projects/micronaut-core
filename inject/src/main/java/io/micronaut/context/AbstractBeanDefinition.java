@@ -683,10 +683,10 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             resolutionContext.addInFlightBean(key, new BeanRegistration(key, this, bean));
         }
 
-        final Set<Map.Entry<Class, List<BeanInitializedEventListener>>> beanInitializedEventListeners
+        final Set<Map.Entry<Class<?>, List<BeanInitializedEventListener>>> beanInitializedEventListeners
                 = ((DefaultBeanContext) context).beanInitializedEventListeners;
         if (CollectionUtils.isNotEmpty(beanInitializedEventListeners)) {
-            for (Map.Entry<Class, List<BeanInitializedEventListener>> entry : beanInitializedEventListeners) {
+            for (Map.Entry<Class<?>, List<BeanInitializedEventListener>> entry : beanInitializedEventListeners) {
                 if (entry.getKey().isAssignableFrom(getBeanType())) {
                     for (BeanInitializedEventListener listener : entry.getValue()) {
                         bean = listener.onInitialized(new BeanInitializingEvent(context, this, bean));

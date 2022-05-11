@@ -15,6 +15,7 @@
  */
 package io.micronaut.aop;
 
+import io.micronaut.inject.proxy.InterceptedBeanProxy;
 import io.micronaut.inject.qualifiers.Qualified;
 
 /**
@@ -25,13 +26,24 @@ import io.micronaut.inject.qualifiers.Qualified;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface InterceptedProxy<T> extends Intercepted, Qualified<T> {
+public interface InterceptedProxy<T> extends Intercepted, Qualified<T>, InterceptedBeanProxy<T> {
 
     /**
      * This method will return the target object being proxied.
      *
      * @return The proxy target
      */
+    @Override
     T interceptedTarget();
 
+    /**
+     * Check if the proxy has the target cached before calling {@link #interceptedTarget()}.
+     *
+     * @return true if the target is cached
+     * @since 3.5.0
+     */
+    @Override
+    default boolean hasCachedInterceptedTarget() {
+        return false;
+    }
 }

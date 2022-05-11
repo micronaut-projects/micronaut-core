@@ -17,6 +17,7 @@ package io.micronaut.context.scope;
 
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.core.annotation.Indexed;
+import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
 
 import java.lang.annotation.Annotation;
@@ -64,6 +65,18 @@ public interface CustomScope<A extends Annotation> {
      * @return The bean definition if it can be resolved
      */
     default <T> Optional<BeanRegistration<T>> findBeanRegistration(T bean) {
+        return Optional.empty();
+    }
+
+    /**
+     * Get the {@link io.micronaut.inject.BeanDefinition} for the given bean.
+     *
+     * @param beanDefinition The bean definition
+     * @param <T> The bean generic type
+     * @return The bean definition if it can be resolved
+     * @since 3.5.0
+     */
+    default <T> Optional<BeanRegistration<T>> findBeanRegistration(BeanDefinition<T> beanDefinition) {
         return Optional.empty();
     }
 }
