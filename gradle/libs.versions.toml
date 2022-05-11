@@ -25,7 +25,6 @@ javax-el-impl = "2.2.1-b05"
 kotest-junit5 = "4.6.4"
 logbook-netty = "2.4.1"
 log4j = "2.17.1"
-mongo-javadriver = "3.12.11"
 mysql-driver = "8.0.27"
 powermock = "2.0.9"
 selenium = "3.141.59"
@@ -440,8 +439,6 @@ log4j = { module = "org.apache.logging.log4j:log4j-core", version.ref = "log4j" 
 logbook-netty = { module = "org.zalando:logbook-netty", version.ref = "logbook-netty" }
 
 micronaut-docs = { module = "io.micronaut.docs:micronaut-docs-asciidoc-config-props", version.ref = "micronaut-docs" }
-
-mongo-javadriver = { module = "org.mongodb:mongo-java-driver", version.ref = "mongo-javadriver" }
 
 mysql-driver = { module = "mysql:mysql-connector-java", version.ref = "mysql-driver" }
 
