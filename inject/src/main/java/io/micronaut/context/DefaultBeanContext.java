@@ -3854,6 +3854,6 @@ public class DefaultBeanContext implements InitializableBeanContext {
     }
 
     private static final class CollectionHolder<T> {
-        volatile Collection<BeanRegistration<T>> registrations;
+        Collection<BeanRegistration<T>> registrations;
     }
 }
