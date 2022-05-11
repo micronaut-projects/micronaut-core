@@ -63,23 +63,15 @@ final class SingletonScope {
     /**
      * Register singleton.
      *
-     * @param beanDefinition The bean definition
-     * @param qualifier      The qualifier
-     * @param createdBean    The registered instance
-     * @param dependents     The dependents
-     * @param <T>            The singleton type
+     * @param registration The bean registration
+     * @param qualifier    The qualifier
+     * @param <T>          The singleton type
      * @return The new registration
      */
     @NonNull
-    <T> BeanRegistration<T> registerSingletonBean(@NonNull BeanDefinition<T> beanDefinition,
-                                                  @Nullable Qualifier<T> qualifier,
-                                                  @Nullable T createdBean,
-                                                  @NonNull List<BeanRegistration<?>> dependents) {
+    <T> BeanRegistration<T> registerSingletonBean(@NonNull BeanRegistration<T> registration, Qualifier qualifier) {
 
-
-        DefaultBeanContext.BeanKey<T> key = new DefaultBeanContext.BeanKey<>(beanDefinition.asArgument(), qualifier);
-        BeanRegistration<T> registration = BeanRegistration.of(beanContext, key, beanDefinition, createdBean, dependents);
-        
+        BeanDefinition<T> beanDefinition = registration.beanDefinition;
         singletonByBeanDefinition.put(BeanDefinitionIdentity.of(beanDefinition), registration);
         if (!beanDefinition.isSingleton()) {
             // In some cases you can register an instance of non-singleton bean and expect it act as a singleton
@@ -95,11 +87,11 @@ final class SingletonScope {
             DefaultBeanContext.BeanKey<T> beanKey = new DefaultBeanContext.BeanKey<>(beanDefinition, beanDefinition.getDeclaredQualifier());
             singletonByArgumentAndQualifier.put(beanKey, registration);
         }
-        if (createdBean != null && createdBean.getClass() != beanDefinition.getBeanType()) {
+        if (registration.bean != null && registration.bean.getClass() != beanDefinition.getBeanType()) {
             // If the actual type differs, allow to inject the actual implementation for cases like:
             // `MyInterface factoryBean() { new Impl.. }`
             // This might be something to remove in 4.0
-            DefaultBeanContext.BeanKey<T> concrete = new DefaultBeanContext.BeanKey<>((Class<T>) createdBean.getClass(), qualifier);
+            DefaultBeanContext.BeanKey<T> concrete = new DefaultBeanContext.BeanKey<>((Class<T>) registration.bean.getClass(), qualifier);
             singletonByArgumentAndQualifier.put(concrete, registration);
         }
         return registration;

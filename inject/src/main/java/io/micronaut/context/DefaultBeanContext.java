@@ -685,7 +685,8 @@ public class DefaultBeanContext implements InitializableBeanContext {
         if (beanDefinition != null && beanDefinition.getBeanType().isInstance(singleton)) {
             try (BeanResolutionContext context = newResolutionContext(beanDefinition, null)) {
                 doInject(context, singleton, beanDefinition);
-                singletonScope.registerSingletonBean(beanDefinition, qualifier, singleton, Collections.emptyList());
+                DefaultBeanContext.BeanKey<T> key = new DefaultBeanContext.BeanKey<>(beanDefinition.asArgument(), qualifier);
+                singletonScope.registerSingletonBean(BeanRegistration.of(this, key, beanDefinition, singleton), qualifier);
             }
         } else {
             NoInjectionBeanDefinition<T> dynamicRegistration = new NoInjectionBeanDefinition<>(singleton.getClass(), qualifier);
@@ -697,7 +698,8 @@ public class DefaultBeanContext implements InitializableBeanContext {
                 beanDefinition = dynamicRegistration;
             }
             beanDefinitionsClasses.add(dynamicRegistration);
-            singletonScope.registerSingletonBean(dynamicRegistration, qualifier, singleton, Collections.emptyList());
+            DefaultBeanContext.BeanKey<T> key = new DefaultBeanContext.BeanKey<>(beanDefinition.asArgument(), qualifier);
+            singletonScope.registerSingletonBean(BeanRegistration.of(this, key, dynamicRegistration, singleton), qualifier);
 
             for (Class indexedType : indexedTypes) {
                 if (indexedType == type || indexedType.isAssignableFrom(type)) {
@@ -2745,7 +2747,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
             if (q == null) {
                 q = definition.getDeclaredQualifier();
             }
-            BeanRegistration<T> registration = createPrototypeRegistration(resolutionContext, beanType, q, definition);
+            BeanRegistration<T> registration = createRegistration(resolutionContext, beanType, q, definition, true);
             T bean = registration.bean;
             if (bean instanceof Qualified) {
                 ((Qualified<T>) bean).$withBeanQualifier(q);
@@ -2761,7 +2763,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
             return getOrCreateScopedRegistration(resolutionContext, customScope, qualifier, beanType, definition);
         }
         // Unknown scope, prototype scope etc
-        return createPrototypeRegistration(resolutionContext, beanType, qualifier, definition);
+        return createRegistration(resolutionContext, beanType, qualifier, definition, true);
     }
 
     @NonNull
@@ -2779,29 +2781,9 @@ public class DefaultBeanContext implements InitializableBeanContext {
             if (beanRegistration != null) {
                 return beanRegistration;
             }
-            try (BeanResolutionContext context = newResolutionContext(definition, resolutionContext)) {
-                final BeanResolutionContext.Path path = context.getPath();
-                final boolean isNewPath = path.isEmpty();
-                if (isNewPath) {
-                    path.pushBeanCreate(definition, beanType);
-                }
-                try {
-                    List<BeanRegistration<?>> dependentBeans = context.popDependentBeans();
-                    T createdBean = doCreateBean(context, definition, qualifier);
-                    BeanRegistration<T> registration = singletonScope.registerSingletonBean(
-                            definition,
-                            qualifier,
-                            createdBean,
-                            context.getAndResetDependentBeans()
-                    );
-                    context.pushDependentBeans(dependentBeans);
-                    return registration;
-                } finally {
-                    if (isNewPath) {
-                        path.pop();
-                    }
-                }
-            }
+            BeanRegistration<T> registration = createRegistration(resolutionContext, beanType, qualifier, definition, false);
+            singletonScope.registerSingletonBean(registration, qualifier);
+            return registration;
         }
     }
 
@@ -2882,7 +2864,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                     @NonNull
                     @Override
                     public CreatedBean<T> create() throws BeanCreationException {
-                        return createPrototypeRegistration(resolutionContext, beanType, qualifier, definition);
+                        return createRegistration(resolutionContext, beanType, qualifier, definition, true);
                     }
                 }
         );
@@ -2890,10 +2872,11 @@ public class DefaultBeanContext implements InitializableBeanContext {
     }
 
     @NotNull
-    private <T> BeanRegistration<T> createPrototypeRegistration(@Nullable BeanResolutionContext resolutionContext,
-                                                                @NonNull Argument<T> beanType,
-                                                                @Nullable Qualifier<T> qualifier,
-                                                                @NonNull BeanDefinition<T> definition) {
+    private <T> BeanRegistration<T> createRegistration(@Nullable BeanResolutionContext resolutionContext,
+                                                       @NonNull Argument<T> beanType,
+                                                       @Nullable Qualifier<T> qualifier,
+                                                       @NonNull BeanDefinition<T> definition,
+                                                       boolean dependent) {
         try (BeanResolutionContext context = newResolutionContext(definition, resolutionContext)) {
             final BeanResolutionContext.Path path = context.getPath();
             final boolean isNewPath = path.isEmpty();
@@ -2901,17 +2884,19 @@ public class DefaultBeanContext implements InitializableBeanContext {
                 path.pushBeanCreate(definition, beanType);
             }
             try {
-                List<BeanRegistration<?>> parentDependentBeans = resolutionContext.popDependentBeans();
-                T bean = doCreateBean(resolutionContext, definition, qualifier);
-                BeanRegistration<?> dependentFactoryBean = resolutionContext.getAndResetDependentFactoryBean();
+                List<BeanRegistration<?>> parentDependentBeans = context.popDependentBeans();
+                T bean = doCreateBean(context, definition, qualifier);
+                BeanRegistration<?> dependentFactoryBean = context.getAndResetDependentFactoryBean();
                 if (dependentFactoryBean != null) {
                     destroyBean(dependentFactoryBean);
                 }
                 BeanKey<T> beanKey = new BeanKey<>(beanType, qualifier);
-                List<BeanRegistration<?>> dependentBeans = resolutionContext.getAndResetDependentBeans();
+                List<BeanRegistration<?>> dependentBeans = context.getAndResetDependentBeans();
                 BeanRegistration<T> beanRegistration = BeanRegistration.of(this, beanKey, definition, bean, dependentBeans);
-                resolutionContext.pushDependentBeans(parentDependentBeans);
-                resolutionContext.addDependentBean(beanRegistration);
+                context.pushDependentBeans(parentDependentBeans);
+                if (dependent) {
+                    context.addDependentBean(beanRegistration);
+                }
                 return beanRegistration;
             } finally {
                 if (isNewPath) {
