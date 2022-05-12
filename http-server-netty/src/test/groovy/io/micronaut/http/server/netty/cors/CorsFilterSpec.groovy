@@ -240,7 +240,7 @@ class CorsFilterSpec extends Specification {
 
         then: "the request is successful"
         1 * headers.getOrigin() >> Optional.of('http://www.foo.com')
-        result.isEmpty()
+        !result.isPresent()
     }
 
     void "test handleResponse when configuration not present"() {
