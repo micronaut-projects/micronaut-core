@@ -57,7 +57,7 @@ jobs:
            PREDICTIVE_TEST_SELECTION: "${{ github.event_name == 'pull_request' && 'true' || 'false' }}"
       - name: Publish Test Report
         if: always()
-        uses: mikepenz/action-junit-report@v3.0.2
+        uses: mikepenz/action-junit-report@v3.0.3
         with:
           check_name: GraalVM CE CI / Test Report (Java ${{ matrix.java }})
           report_paths: '**/build/test-results/test/TEST-*.xml'
