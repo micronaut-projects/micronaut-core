@@ -185,7 +185,7 @@ class AnnotationValueBuilderSpec extends Specification {
                                 Long.class
                         },
                         "annotation class"      : new AnnotationClassValue<>(String.class),
-                        "annotation class array": new AnnotationClassValue<>[]{
+                        "annotation class array": new AnnotationClassValue[]{
                                 new AnnotationClassValue<>(String.class),
                                 new AnnotationClassValue<>(Long.class)
                         },
