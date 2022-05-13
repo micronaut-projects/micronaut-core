@@ -25,7 +25,6 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
 import jakarta.inject.Singleton;
-import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -68,7 +67,7 @@ public class CustomScopeScope implements CustomScope<io.micronaut.inject.lifecyc
         return findByBeanDefinition(beanDefinition);
     }
 
-    @NotNull
+    @NonNull
     private <T> Optional<BeanRegistration<T>> findByBeanDefinition(BeanDefinition<T> beanDefinition) {
         return beans.stream().filter(br -> br.getBeanDefinition().equals(beanDefinition)).map(br -> (BeanRegistration<T>) br).findFirst();
     }

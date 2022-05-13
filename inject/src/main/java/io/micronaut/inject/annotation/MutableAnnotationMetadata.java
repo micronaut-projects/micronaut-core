@@ -20,7 +20,6 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.CollectionUtils;
-import org.jetbrains.annotations.NotNull;
 
 import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
@@ -88,7 +87,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
         return cloned;
     }
 
-    @NotNull
+    @NonNull
     @Override
     public Map<String, Object> getDefaultValues(@NonNull String annotation) {
         Map<String, Object> values = super.getDefaultValues(annotation);

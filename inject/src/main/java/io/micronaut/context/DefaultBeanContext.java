@@ -106,7 +106,6 @@ import io.micronaut.inject.qualifiers.Qualified;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.inject.validation.BeanDefinitionValidator;
 import jakarta.inject.Singleton;
-import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -1020,7 +1019,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
         return doCreateBean(resolutionContext, definition, qualifier, argumentValues);
     }
 
-    @NotNull
+    @NonNull
     private <T> Map<String, Object> resolveArgumentValues(BeanResolutionContext resolutionContext, BeanDefinition<T> definition, Object[] args) {
         if (!(definition instanceof ParametrizedBeanFactory)) {
             return Collections.emptyMap();
@@ -1778,8 +1777,8 @@ public class DefaultBeanContext implements InitializableBeanContext {
         this.beanInitializedEventListeners = beanInitializedListeners.entrySet();
     }
 
-    @NotNull
-    private <T extends EventListener> Map<Class<?>, List<T>> loadListeners(@NotNull Class<T> listenerType) {
+    @NonNull
+    private <T extends EventListener> Map<Class<?>, List<T>> loadListeners(@NonNull Class<T> listenerType) {
         final Collection<BeanDefinition<T>> beanDefinitions = getBeanDefinitions(listenerType);
         final HashMap<Class<?>, List<T>> typeToListener = new HashMap<>(beanDefinitions.size(), 1);
         for (BeanDefinition<T> beanCreatedDefinition : beanDefinitions) {
@@ -2224,7 +2223,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
         return postBeanCreated(resolutionContext, beanDefinition, qualifier, bean);
     }
 
-    @NotNull
+    @NonNull
     private <T> T resolveByBeanDefinition(@NonNull BeanResolutionContext resolutionContext,
                                           @NonNull BeanDefinition<T> beanDefinition) {
         ConstructorInjectionPoint<T> constructor = beanDefinition.getConstructor();
@@ -2329,7 +2328,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
         return bean;
     }
 
-    @NotNull
+    @NonNull
     private <T> Map<String, Object> getRequiredArgumentValues(@NonNull BeanResolutionContext resolutionContext,
                                                               @NonNull Argument<?>[] requiredArguments,
                                                               @Nullable Map<String, Object> argumentValues,
@@ -2862,7 +2861,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
         return BeanRegistration.of(this, beanKey, definition, bean);
     }
 
-    @NotNull
+    @NonNull
     @Internal
     final <T> BeanRegistration<T> createRegistration(@Nullable BeanResolutionContext resolutionContext,
                                                      @NonNull Argument<T> beanType,
