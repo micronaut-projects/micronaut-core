@@ -191,7 +191,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
     private final Map<BeanKey, Boolean> containsBeanCache = new ConcurrentHashMap<>(30);
     private final Map<CharSequence, Object> attributes = Collections.synchronizedMap(new HashMap<>(5));
 
-    private final Map<BeanKey, Collection> singletonBeanRegistrations = new ConcurrentHashMap<>(50);
+    private final Map<BeanKey, CollectionHolder> singletonBeanRegistrations = new ConcurrentHashMap<>(50);
 
     private final Map<BeanCandidateKey, Optional<BeanDefinition>> beanConcreteCandidateCache =
             new ConcurrentLinkedHashMap.Builder<BeanCandidateKey, Optional<BeanDefinition>>().maximumWeightedCapacity(30).build();
@@ -2775,16 +2775,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
         if (beanRegistration != null) {
             return beanRegistration;
         }
-        synchronized (singletonScope) {
-            // Check if have been added
-            beanRegistration = singletonScope.findBeanRegistration(definition, beanType, qualifier);
-            if (beanRegistration != null) {
-                return beanRegistration;
-            }
-            BeanRegistration<T> registration = createRegistration(resolutionContext, beanType, qualifier, definition, false);
-            singletonScope.registerSingletonBean(registration, qualifier);
-            return registration;
-        }
+        return singletonScope.getOrCreate(this, resolutionContext, definition, beanType, qualifier);
     }
 
     @Nullable
@@ -2872,11 +2863,12 @@ public class DefaultBeanContext implements InitializableBeanContext {
     }
 
     @NotNull
-    private <T> BeanRegistration<T> createRegistration(@Nullable BeanResolutionContext resolutionContext,
-                                                       @NonNull Argument<T> beanType,
-                                                       @Nullable Qualifier<T> qualifier,
-                                                       @NonNull BeanDefinition<T> definition,
-                                                       boolean dependent) {
+    @Internal
+    final <T> BeanRegistration<T> createRegistration(@Nullable BeanResolutionContext resolutionContext,
+                                                     @NonNull Argument<T> beanType,
+                                                     @Nullable Qualifier<T> qualifier,
+                                                     @NonNull BeanDefinition<T> definition,
+                                                     boolean dependent) {
         try (BeanResolutionContext context = newResolutionContext(definition, resolutionContext)) {
             final BeanResolutionContext.Path path = context.getPath();
             final boolean isNewPath = path.isEmpty();
@@ -3266,10 +3258,10 @@ public class DefaultBeanContext implements InitializableBeanContext {
         if (LOG.isTraceEnabled()) {
             LOG.trace("Looking up existing beans for key: {}", key);
         }
-        Collection<BeanRegistration<T>> existing = singletonBeanRegistrations.get(key);
-        if (existing != null) {
-            logResolvedExistingBeanRegistrations(beanType, qualifier, existing);
-            return existing;
+        CollectionHolder<T> existing = singletonBeanRegistrations.get(key);
+        if (existing != null && existing.registrations != null) {
+            logResolvedExistingBeanRegistrations(beanType, qualifier, existing.registrations);
+            return existing.registrations;
         }
 
         Collection<BeanDefinition<T>> beanDefinitions = findBeanCandidatesInternal(resolutionContext, beanType);
@@ -3290,14 +3282,14 @@ public class DefaultBeanContext implements InitializableBeanContext {
                 }
             }
             if (allCandidatesAreSingleton) {
-                synchronized (singletonScope) {
-                    existing = singletonBeanRegistrations.get(key);
-                    if (existing != null) {
-                        logResolvedExistingBeanRegistrations(beanType, qualifier, existing);
-                        return existing;
+                CollectionHolder<T> holder = singletonBeanRegistrations.computeIfAbsent(key, beanKey -> new CollectionHolder<T>());
+                synchronized (holder) {
+                    if (holder.registrations != null) {
+                        logResolvedExistingBeanRegistrations(beanType, qualifier, holder.registrations);
+                        return holder.registrations;
                     }
-                    beanRegistrations = resolveBeanRegistrations(resolutionContext, beanDefinitions, beanType, qualifier);
-                    singletonBeanRegistrations.put(key, beanRegistrations);
+                    holder.registrations = resolveBeanRegistrations(resolutionContext, beanDefinitions, beanType, qualifier);
+                    return holder.registrations;
                 }
             } else {
                 beanRegistrations = resolveBeanRegistrations(resolutionContext, beanDefinitions, beanType, qualifier);
@@ -3859,5 +3851,9 @@ public class DefaultBeanContext implements InitializableBeanContext {
         public <T> BeanRegistration<T> getInFlightBean(BeanIdentifier beanIdentifier) {
             return (BeanRegistration<T>) singlesInCreation.get(beanIdentifier);
         }
+    }
+
+    private static final class CollectionHolder<T> {
+        Collection<BeanRegistration<T>> registrations;
     }
 }

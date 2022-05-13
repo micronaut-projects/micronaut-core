@@ -40,14 +40,50 @@ import java.util.stream.Stream;
 final class SingletonScope {
 
     /**
+     * The locks used to prevent re-creating of the same singleton.
+     */
+    private final Map<BeanDefinitionIdentity, Object> singletonsInCreationLocks = new ConcurrentHashMap<>(5, 1);
+
+    /**
      * The main collection storing registrations for {@link BeanDefinition}.
      */
     private final Map<BeanDefinitionIdentity, BeanRegistration> singletonByBeanDefinition = new ConcurrentHashMap<>(100);
 
     /**
-     * Index collection to retrieve a the registration by {@link Argument} and {@link Qualifier}.
+     * Index collection to retrieve a registration by {@link Argument} and {@link Qualifier}.
      */
     private final Map<DefaultBeanContext.BeanKey, BeanRegistration> singletonByArgumentAndQualifier = new ConcurrentHashMap<>(100);
+
+    @NonNull
+    <T> BeanRegistration<T> getOrCreate(@NonNull DefaultBeanContext beanContext,
+                                        @Nullable BeanResolutionContext resolutionContext,
+                                        @NonNull BeanDefinition<T> definition,
+                                        @NonNull Argument<T> beanType,
+                                        @Nullable Qualifier<T> qualifier) {
+        BeanRegistration<T> beanRegistration = findBeanRegistration(definition, beanType, qualifier);
+        if (beanRegistration != null) {
+            return beanRegistration;
+        }
+        BeanDefinitionIdentity identity = BeanDefinitionIdentity.of(definition);
+        BeanRegistration<T> existingRegistration = singletonByBeanDefinition.get(identity);
+        if (existingRegistration != null) {
+            return existingRegistration;
+        }
+        Object lock = singletonsInCreationLocks.computeIfAbsent(identity, beanDefinitionIdentity -> new Object());
+        synchronized (lock) {
+            try {
+                existingRegistration = singletonByBeanDefinition.get(identity);
+                if (existingRegistration != null) {
+                    return existingRegistration;
+                }
+                BeanRegistration<T> newRegistration = beanContext.createRegistration(resolutionContext, beanType, qualifier, definition, false);
+                registerSingletonBean(newRegistration, qualifier);
+                return newRegistration;
+            } finally {
+                singletonsInCreationLocks.remove(identity);
+            }
+        }
+    }
 
     /**
      * Register singleton.
@@ -126,7 +162,7 @@ final class SingletonScope {
 
     /**
      * @param beanType The beanType
-     * @param <T> The bean type
+     * @param <T>      The bean type
      * @return Active singleton registrations by beanType
      */
     @SuppressWarnings("unchecked")
@@ -147,7 +183,7 @@ final class SingletonScope {
      *
      * @param beanDefinition The beanDefinition
      * @param qualifier      The qualifier
-     * @param <T> The bean type
+     * @param <T>            The bean type
      * @return found registration or null
      */
     @Nullable
@@ -159,7 +195,7 @@ final class SingletonScope {
      * Find active bean registration by provided identifier.
      *
      * @param identifier The identifier
-     * @param <T> The bean type
+     * @param <T>        The bean type
      * @return found registration or null
      */
     @Nullable
@@ -176,7 +212,7 @@ final class SingletonScope {
      * Find active bean registration by provided bean instance.
      *
      * @param bean The bean
-     * @param <T> The bean type
+     * @param <T>  The bean type
      * @return found registration or null
      */
     @Nullable
@@ -196,7 +232,7 @@ final class SingletonScope {
      * Find active bean registration by provided bean definition.
      *
      * @param definition The
-     * @param <T> The bean type
+     * @param <T>        The bean type
      * @return found registration or null
      */
     @Nullable
@@ -210,7 +246,7 @@ final class SingletonScope {
      * @param beanDefinition The beanDefinition
      * @param beanType       The beanType
      * @param qualifier      The qualifier
-     * @param <T> The bean type
+     * @param <T>            The bean type
      * @return found registration or null
      */
     @Nullable
