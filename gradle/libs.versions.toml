@@ -7,6 +7,7 @@ blaze = "1.6.4"
 caffeine = "2.9.3"
 compile-testing = "0.19"
 geb = "3.4.1"
+hibernate = "5.6.8.Final"
 hibernate-validator = "6.1.6.Final"
 htmlSanityCheck = "1.1.6"
 htmlunit = "2.47.1"
@@ -191,8 +192,6 @@ boms-testcontainers = { module = "org.testcontainers:testcontainers-bom", versio
 # Libraries which start with managed- are managed by Micronaut in the sense
 # that they will appear in the Micronaut BOM
 #
-managed-commons-dbcp = { module = "org.apache.commons:commons-dbcp2", version.ref = "managed-commons-dbcp" }
-
 managed-dekorate = { module = "io.dekorate:dekorate-project", version.ref = "managed-dekorate" }
 managed-dekorate-jaeger-annotations = { module = "io.dekorate:jaeger-annotations", version.ref = "managed-dekorate" }
 managed-dekorate-knative-annotations = { module = "io.dekorate:knative-annotations", version.ref = "managed-dekorate" }
