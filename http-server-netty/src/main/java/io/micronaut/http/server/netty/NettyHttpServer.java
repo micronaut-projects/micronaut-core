@@ -473,36 +473,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     }
 
     private Listener bind(ServerBootstrap bootstrap, NettyHttpServerConfiguration.NettyListenerConfiguration cfg, EventLoopGroupConfiguration workerConfig) {
-        String prettyAddr;
-        switch (cfg.getFamily()) {
-            case TCP:
-                if (cfg.getHost() == null) {
-                    prettyAddr = "*:" + cfg.getPort();
-                } else {
-                    prettyAddr = cfg.getHost() + ":" + cfg.getPort();
-                }
-                break;
-            case UNIX:
-                if (cfg.getPath().startsWith("\0")) {
-                    prettyAddr = "unix:@" + cfg.getPath().substring(1);
-                } else {
-                    prettyAddr = "unix:" + cfg.getPath();
-                }
-                break;
-            default:
-                throw new UnsupportedOperationException("Unsupported family: " + cfg.getFamily());
-        }
-
-        Optional<String> applicationName = serverConfiguration.getApplicationConfiguration().getName();
-        if (applicationName.isPresent()) {
-            if (LOG.isTraceEnabled()) {
-                LOG.trace("Binding {} server to {}", applicationName.get(), prettyAddr);
-            }
-        } else {
-            if (LOG.isTraceEnabled()) {
-                LOG.trace("Binding server to {}", prettyAddr);
-            }
-        }
+        logBind(cfg);
 
         try {
             Listener listener = new Listener(cfg);
@@ -539,13 +510,45 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             if (LOG.isErrorEnabled()) {
                 //noinspection ConstantConditions
                 if (isBindError) {
-                    LOG.error("Unable to start server. Port {} already in use.", prettyAddr);
+                    LOG.error("Unable to start server. Port {} already in use.", displayAddress(cfg));
                 } else {
                     LOG.error("Error starting Micronaut server: " + e.getMessage(), e);
                 }
             }
             stopInternal();
-            throw new ServerStartupException("Unable to start Micronaut server on " + prettyAddr, e);
+            throw new ServerStartupException("Unable to start Micronaut server on " + displayAddress(cfg), e);
+        }
+    }
+
+    private void logBind(NettyHttpServerConfiguration.NettyListenerConfiguration cfg) {
+        Optional<String> applicationName = serverConfiguration.getApplicationConfiguration().getName();
+        if (applicationName.isPresent()) {
+            if (LOG.isTraceEnabled()) {
+                LOG.trace("Binding {} server to {}", applicationName.get(), displayAddress(cfg));
+            }
+        } else {
+            if (LOG.isTraceEnabled()) {
+                LOG.trace("Binding server to {}", displayAddress(cfg));
+            }
+        }
+    }
+
+    private static String displayAddress(NettyHttpServerConfiguration.NettyListenerConfiguration cfg) {
+        switch (cfg.getFamily()) {
+            case TCP:
+                if (cfg.getHost() == null) {
+                    return "*:" + cfg.getPort();
+                } else {
+                    return cfg.getHost() + ":" + cfg.getPort();
+                }
+            case UNIX:
+                if (cfg.getPath().startsWith("\0")) {
+                    return "unix:@" + cfg.getPath().substring(1);
+                } else {
+                    return "unix:" + cfg.getPath();
+                }
+            default:
+                throw new UnsupportedOperationException("Unsupported family: " + cfg.getFamily());
         }
     }
 
