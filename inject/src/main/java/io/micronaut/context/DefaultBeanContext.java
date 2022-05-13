@@ -4276,7 +4276,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
             }
 
             NoInjectionBeanDefinition that = (NoInjectionBeanDefinition) o;
-            return singletonClass.equals(that.singletonClass);
+            return singletonClass.equals(that.singletonClass) && Objects.equals(qualifier, that.qualifier);
         }
 
         @Override
