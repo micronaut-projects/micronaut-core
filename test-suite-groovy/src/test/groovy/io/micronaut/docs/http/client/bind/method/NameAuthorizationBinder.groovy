@@ -6,7 +6,8 @@ import io.micronaut.http.MutableHttpRequest
 import io.micronaut.http.client.bind.AnnotatedClientRequestBinder
 import io.micronaut.http.client.bind.ClientRequestUriContext
 import jakarta.inject.Singleton
-import org.jetbrains.annotations.NotNull
+
+import javax.validation.constraints.NotNull
 
 //tag::clazz[]
 

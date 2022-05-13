@@ -8,9 +8,10 @@ import io.micronaut.core.util.StringUtils
 import io.micronaut.http.MutableHttpRequest
 import io.micronaut.http.client.bind.AnnotatedClientArgumentRequestBinder
 import io.micronaut.http.client.bind.ClientRequestUriContext
-import org.jetbrains.annotations.NotNull
 
 import jakarta.inject.Singleton
+
+import javax.validation.constraints.NotNull
 
 @Singleton
 class MetadataClientArgumentBinder implements AnnotatedClientArgumentRequestBinder<Metadata> {
