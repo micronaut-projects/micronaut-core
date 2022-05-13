@@ -7,7 +7,6 @@ blaze = "1.6.4"
 caffeine = "2.9.3"
 compile-testing = "0.19"
 geb = "3.4.1"
-hibernate = ""
 hibernate-validator = "6.1.6.Final"
 htmlSanityCheck = "1.1.6"
 htmlunit = "2.47.1"
@@ -37,7 +36,6 @@ wiremock = "2.27.2"
 # Versions which start with managed- are managed by Micronaut in the sense
 # that they will appear in the Micronaut BOM as <properties>
 #
-managed-commons-dbcp = ""
 managed-dekorate = "1.0.3"
 managed-elasticsearch = "7.16.3"
 managed-ignite = "2.8.1"
