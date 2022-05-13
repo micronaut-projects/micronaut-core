@@ -11,18 +11,16 @@ import io.micronaut.http.client.bind.ClientRequestUriContext
 
 import jakarta.inject.Singleton
 
-import javax.validation.constraints.NotNull
-
 @Singleton
 class MetadataClientArgumentBinder implements AnnotatedClientArgumentRequestBinder<Metadata> {
 
     final Class<Metadata> annotationType = Metadata
 
     @Override
-    void bind(@NotNull ArgumentConversionContext<Object> context,
+    void bind(@NonNull ArgumentConversionContext<Object> context,
               @NonNull ClientRequestUriContext uriContext,
-              @NotNull Object value,
-              @NotNull MutableHttpRequest<?> request) {
+              @NonNull Object value,
+              @NonNull MutableHttpRequest<?> request) {
         if (value instanceof Map) {
             for (entry in value.entrySet()) {
                 String key = NameUtils.hyphenate(StringUtils.capitalize(entry.key as String), false)

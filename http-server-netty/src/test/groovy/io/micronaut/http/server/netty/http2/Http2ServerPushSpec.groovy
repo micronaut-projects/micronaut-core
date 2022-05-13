@@ -2,6 +2,7 @@ package io.micronaut.http.server.netty.http2
 
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requires
+import io.micronaut.core.annotation.NonNull
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.PushCapableHttpRequest
@@ -43,8 +44,6 @@ import io.netty.handler.ssl.SslContextBuilder
 import io.netty.handler.ssl.SupportedCipherSuiteFilter
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory
 import jakarta.inject.Inject
-import org.intellij.lang.annotations.Language
-import org.jetbrains.annotations.NotNull
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
@@ -156,7 +155,7 @@ class Http2ServerPushSpec extends Specification {
                     .option(ChannelOption.AUTO_READ, true)
                     .handler(new ChannelInitializer<SocketChannel>() {
                         @Override
-                        protected void initChannel(@NotNull SocketChannel ch) throws Exception {
+                        protected void initChannel(@NonNull SocketChannel ch) throws Exception {
                             def connection = new DefaultHttp2Connection(false)
                             def http2Settings = Http2Settings.defaultSettings()
                             http2Settings.pushEnabled(pushEnabled);
@@ -263,7 +262,6 @@ class Http2ServerPushSpec extends Specification {
                 request.serverPush(HttpRequest.GET("/serverPush/resource1"))
                 request.serverPush(HttpRequest.GET("/serverPush/resource2"))
             }
-            @Language('HTML')
             def s = """<!doctype html>
 <html lang="en">
 <body>

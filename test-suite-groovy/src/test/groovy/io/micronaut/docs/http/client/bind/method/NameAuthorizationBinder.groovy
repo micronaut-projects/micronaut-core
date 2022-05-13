@@ -7,13 +7,11 @@ import io.micronaut.http.client.bind.AnnotatedClientRequestBinder
 import io.micronaut.http.client.bind.ClientRequestUriContext
 import jakarta.inject.Singleton
 
-import javax.validation.constraints.NotNull
-
 //tag::clazz[]
 
 @Singleton // <1>
 public class NameAuthorizationBinder implements AnnotatedClientRequestBinder<NameAuthorization> { // <2>
-    @NotNull
+    @NonNull
     @Override
     Class<NameAuthorization> getAnnotationType() {
         return NameAuthorization.class

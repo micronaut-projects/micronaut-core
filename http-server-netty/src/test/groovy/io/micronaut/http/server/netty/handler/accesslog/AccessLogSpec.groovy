@@ -5,6 +5,7 @@ import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
+import io.micronaut.core.annotation.NonNull
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
@@ -49,7 +50,6 @@ import io.netty.handler.ssl.SupportedCipherSuiteFilter
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory
 import io.netty.util.ReferenceCountUtil
 import jakarta.inject.Singleton
-import org.jetbrains.annotations.NotNull
 import org.slf4j.LoggerFactory
 import reactor.core.publisher.Mono
 import spock.lang.Issue
@@ -79,13 +79,13 @@ class AccessLogSpec extends Specification {
                 .option(ChannelOption.AUTO_READ, true)
                 .handler(new ChannelInitializer<Channel>() {
                     @Override
-                    protected void initChannel(@NotNull Channel ch) throws Exception {
+                    protected void initChannel(@NonNull Channel ch) throws Exception {
                         ch.pipeline()
                                 .addLast(new HttpClientCodec())
                                 .addLast(new HttpObjectAggregator(1024))
                                 .addLast(new ChannelInboundHandlerAdapter() {
                                     @Override
-                                    void channelRead(@NotNull ChannelHandlerContext ctx_, @NotNull Object msg) throws Exception {
+                                    void channelRead(@NonNull ChannelHandlerContext ctx_, @NonNull Object msg) throws Exception {
                                         responses.add(msg)
                                     }
                                 })
@@ -146,13 +146,13 @@ class AccessLogSpec extends Specification {
                 .option(ChannelOption.AUTO_READ, true)
                 .handler(new ChannelInitializer<Channel>() {
                     @Override
-                    protected void initChannel(@NotNull Channel ch) throws Exception {
+                    protected void initChannel(@NonNull Channel ch) throws Exception {
                         ch.pipeline()
                                 .addLast(new HttpClientCodec())
                                 .addLast(new HttpObjectAggregator(1024))
                                 .addLast(new ChannelInboundHandlerAdapter() {
                                     @Override
-                                    void channelRead(@NotNull ChannelHandlerContext ctx_, @NotNull Object msg) throws Exception {
+                                    void channelRead(@NonNull ChannelHandlerContext ctx_, @NonNull Object msg) throws Exception {
                                         responses.add(msg)
                                     }
                                 })
@@ -211,13 +211,13 @@ class AccessLogSpec extends Specification {
                 .option(ChannelOption.AUTO_READ, true)
                 .handler(new ChannelInitializer<Channel>() {
                     @Override
-                    protected void initChannel(@NotNull Channel ch) throws Exception {
+                    protected void initChannel(@NonNull Channel ch) throws Exception {
                         ch.pipeline()
                                 .addLast(new HttpClientCodec())
                                 .addLast(new HttpObjectAggregator(1024))
                                 .addLast(new ChannelInboundHandlerAdapter() {
                                     @Override
-                                    void channelRead(@NotNull ChannelHandlerContext ctx_, @NotNull Object msg) throws Exception {
+                                    void channelRead(@NonNull ChannelHandlerContext ctx_, @NonNull Object msg) throws Exception {
                                         responses.add(msg)
                                     }
                                 })
@@ -306,7 +306,7 @@ class AccessLogSpec extends Specification {
                 .option(ChannelOption.AUTO_READ, true)
                 .handler(new ChannelInitializer<Channel>() {
                     @Override
-                    protected void initChannel(@NotNull Channel ch) throws Exception {
+                    protected void initChannel(@NonNull Channel ch) throws Exception {
                         def connection = new DefaultHttp2Connection(false)
                         def connectionHandler = new HttpToHttp2ConnectionHandlerBuilder()
                                 .initialSettings(Http2Settings.defaultSettings())
@@ -331,7 +331,7 @@ class AccessLogSpec extends Specification {
                                                 .addLast(connectionHandler)
                                                 .addLast(new ChannelInboundHandlerAdapter() {
                                                     @Override
-                                                    void channelRead(@NotNull ChannelHandlerContext ctx__, @NotNull Object msg) throws Exception {
+                                                    void channelRead(@NonNull ChannelHandlerContext ctx__, @NonNull Object msg) throws Exception {
                                                         responses.add(msg)
                                                     }
                                                 })
@@ -407,7 +407,7 @@ class AccessLogSpec extends Specification {
                 .option(ChannelOption.AUTO_READ, true)
                 .handler(new ChannelInitializer<Channel>() {
                     @Override
-                    protected void initChannel(@NotNull Channel ch) throws Exception {
+                    protected void initChannel(@NonNull Channel ch) throws Exception {
                         def connection = new DefaultHttp2Connection(false)
                         def connectionHandler = new HttpToHttp2ConnectionHandlerBuilder()
                                 .initialSettings(Http2Settings.defaultSettings())
@@ -428,7 +428,7 @@ class AccessLogSpec extends Specification {
                                 .addLast(upgradeHandler)
                                 .addLast(new ChannelInboundHandlerAdapter() {
                                     @Override
-                                    void channelRead(@NotNull ChannelHandlerContext ctx_, @NotNull Object msg) throws Exception {
+                                    void channelRead(@NonNull ChannelHandlerContext ctx_, @NonNull Object msg) throws Exception {
                                         if (responses.isEmpty()) {
                                             ctx_.channel().write(request2)
                                             ctx_.channel().write(request3)
@@ -506,7 +506,7 @@ class AccessLogSpec extends Specification {
                 .option(ChannelOption.AUTO_READ, true)
                 .handler(new ChannelInitializer<Channel>() {
                     @Override
-                    protected void initChannel(@NotNull Channel ch) throws Exception {
+                    protected void initChannel(@NonNull Channel ch) throws Exception {
                         def connection = new DefaultHttp2Connection(false)
                         def connectionHandler = new HttpToHttp2ConnectionHandlerBuilder()
                                 .initialSettings(Http2Settings.defaultSettings())
@@ -527,7 +527,7 @@ class AccessLogSpec extends Specification {
                                 .addLast(upgradeHandler)
                                 .addLast(new ChannelInboundHandlerAdapter() {
                                     @Override
-                                    void channelRead(@NotNull ChannelHandlerContext ctx_, @NotNull Object msg) throws Exception {
+                                    void channelRead(@NonNull ChannelHandlerContext ctx_, @NonNull Object msg) throws Exception {
                                         if (responses.isEmpty()) {
                                             ctx_.channel().write(request2)
                                             ctx_.channel().write(request3)
