@@ -499,9 +499,14 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
                 }
 
                 for (URI uri : uniqueURIs) {
-                    final MicronautMetaServicesLoader<S> task = new MicronautMetaServicesLoader<>(uri, path, transformer);
-                    tasks.add(task);
-                    task.fork();
+                    String uriStr = uri.toString();
+                    // on GraalVM there are spurious extra resources that end with # and then a number
+                    // we ignore this extra ones
+                    if (!(uriStr.startsWith("resource:") && uriStr.contains("#"))) {
+                        final MicronautMetaServicesLoader<S> task = new MicronautMetaServicesLoader<>(uri, path, transformer);
+                        tasks.add(task);
+                        task.fork();
+                    }
                 }
             } catch (IOException | URISyntaxException e) {
                 throw new ServiceConfigurationError("Failed to load resources for service: " + serviceName, e);
