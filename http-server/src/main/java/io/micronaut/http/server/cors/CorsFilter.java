@@ -20,7 +20,6 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ImmutableArgumentConversionContext;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
@@ -32,8 +31,6 @@ import io.micronaut.http.filter.HttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
 import io.micronaut.http.filter.ServerFilterPhase;
 import io.micronaut.http.server.HttpServerConfiguration;
-import io.micronaut.web.router.Router;
-import io.micronaut.web.router.UriRouteMatch;
 import org.reactivestreams.Publisher;
 
 import java.util.List;
@@ -59,15 +56,11 @@ public class CorsFilter implements HttpServerFilter {
 
     protected final HttpServerConfiguration.CorsConfiguration corsConfiguration;
 
-    private final Router router;
-
     /**
      * @param corsConfiguration The {@link CorsOriginConfiguration} instance
-     * @param router the {@link Router} instance
      */
-    public CorsFilter(HttpServerConfiguration.CorsConfiguration corsConfiguration, Router router) {
+    public CorsFilter(HttpServerConfiguration.CorsConfiguration corsConfiguration) {
         this.corsConfiguration = corsConfiguration;
-        this.router = router;
     }
 
     @Override
@@ -89,7 +82,7 @@ public class CorsFilter implements HttpServerFilter {
 
     @Override
     public int getOrder() {
-        return ServerFilterPhase.METRICS.before();
+        return ServerFilterPhase.METRICS.after();
     }
 
     /**
@@ -136,13 +129,7 @@ public class CorsFilter implements HttpServerFilter {
     protected Optional<MutableHttpResponse<?>> handleRequest(HttpRequest request) {
         HttpHeaders headers = request.getHeaders();
         Optional<String> originHeader = headers.getOrigin();
-
-        final List<UriRouteMatch<?, ?>> anyMatchingRoutes = router
-                .findAny(request.getUri().toString(), request)
-                .collect(Collectors.toList());
-
-
-        if (originHeader.isPresent() && !anyMatchingRoutes.isEmpty()) {
+        if (originHeader.isPresent()) {
 
             String requestOrigin = originHeader.get();
             boolean preflight = CorsUtil.isPreflightRequest(request);
@@ -176,10 +163,7 @@ public class CorsFilter implements HttpServerFilter {
                         }
                     }
 
-                    request.setAttribute(HttpAttributes.URI_TEMPLATE, anyMatchingRoutes.get(0).getRoute().getUriMatchTemplate().toString());
-
                     MutableHttpResponse<Object> ok = HttpResponse.ok();
-
                     handleResponse(request, ok);
                     return Optional.of(ok);
                 }

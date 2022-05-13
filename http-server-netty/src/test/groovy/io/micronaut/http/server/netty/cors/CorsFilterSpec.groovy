@@ -15,26 +15,18 @@
  */
 package io.micronaut.http.server.netty.cors
 
-import io.micronaut.context.ApplicationContext
 import io.micronaut.http.*
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Get
 import io.micronaut.http.server.HttpServerConfiguration
 import io.micronaut.http.server.cors.CorsFilter
 import io.micronaut.http.server.cors.CorsOriginConfiguration
-import io.micronaut.runtime.server.EmbeddedServer
-import io.micronaut.web.router.Router
-import org.apache.http.client.utils.URIBuilder
 import spock.lang.Specification
 
 import static io.micronaut.http.HttpHeaders.*
 
 class CorsFilterSpec extends Specification {
 
-    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
-
     CorsFilter buildCorsHandler(HttpServerConfiguration.CorsConfiguration config) {
-        new CorsFilter(config ?: new HttpServerConfiguration.CorsConfiguration(), embeddedServer.getApplicationContext().getBean(Router))
+        new CorsFilter(config ?: new HttpServerConfiguration.CorsConfiguration())
     }
 
     void "test handleRequest for non CORS request"() {
@@ -44,8 +36,6 @@ class CorsFilterSpec extends Specification {
         HttpHeaders headers = Mock(HttpHeaders)
         request.getHeaders() >> headers
         headers.getOrigin() >> Optional.empty()
-        def uri = new URIBuilder( '/example' )
-        request.getUri() >> uri.build()
         CorsFilter corsHandler = buildCorsHandler(config)
 
         when:
@@ -60,8 +50,6 @@ class CorsFilterSpec extends Specification {
         HttpRequest request = Mock(HttpRequest)
         HttpHeaders headers = Mock(HttpHeaders)
         request.getHeaders() >> headers
-        def uri = new URIBuilder( '/example' )
-        request.getUri() >> uri.build()
 
         def config = new HttpServerConfiguration.CorsConfiguration()
         CorsOriginConfiguration originConfig = new CorsOriginConfiguration()
@@ -83,8 +71,6 @@ class CorsFilterSpec extends Specification {
         HttpRequest request = Mock(HttpRequest)
         HttpHeaders headers = Mock(HttpHeaders)
         request.getHeaders() >> headers
-        def uri = new URIBuilder( '/example' )
-        request.getUri() >> uri.build()
 
         def config = new HttpServerConfiguration.CorsConfiguration()
         CorsOriginConfiguration originConfig = new CorsOriginConfiguration()
@@ -114,8 +100,6 @@ class CorsFilterSpec extends Specification {
         HttpRequest request = Mock(HttpRequest)
         HttpHeaders headers = Mock(HttpHeaders)
         request.getHeaders() >> headers
-        def uri = new URIBuilder( '/example' )
-        request.getUri() >> uri.build()
 
         def config = new HttpServerConfiguration.CorsConfiguration()
         CorsOriginConfiguration originConfig = new CorsOriginConfiguration()
@@ -140,8 +124,6 @@ class CorsFilterSpec extends Specification {
         HttpRequest request = Mock(HttpRequest)
         HttpHeaders headers = Mock(HttpHeaders)
         request.getHeaders() >> headers
-        def uri = new URIBuilder( '/example' )
-        request.getUri() >> uri.build()
 
         def config = new HttpServerConfiguration.CorsConfiguration()
         CorsOriginConfiguration originConfig = new CorsOriginConfiguration()
@@ -166,8 +148,6 @@ class CorsFilterSpec extends Specification {
         HttpRequest request = Mock(HttpRequest)
         HttpHeaders headers = Mock(HttpHeaders)
         request.getHeaders() >> headers
-        def uri = new URIBuilder( '/example' )
-        request.getUri() >> uri.build()
         def config = new HttpServerConfiguration.CorsConfiguration()
         CorsOriginConfiguration originConfig = new CorsOriginConfiguration()
         originConfig.allowedOrigins = ['http://www.foo.com']
@@ -194,8 +174,6 @@ class CorsFilterSpec extends Specification {
         HttpRequest request = Mock(HttpRequest)
         HttpHeaders headers = Mock(HttpHeaders)
         request.getHeaders() >> headers
-        def uri = new URIBuilder( '/example' )
-        request.getUri() >> uri.build()
         def config = new HttpServerConfiguration.CorsConfiguration()
         CorsOriginConfiguration originConfig = new CorsOriginConfiguration()
         originConfig.allowedOrigins = ['http://www.foo.com']
@@ -217,32 +195,6 @@ class CorsFilterSpec extends Specification {
         result.get().status == HttpStatus.OK
     }
 
-    void "test preflight handleRequest on route that doesn't exists"() {
-        given:
-        HttpRequest request = Mock(HttpRequest)
-        HttpHeaders headers = Mock(HttpHeaders)
-        request.getHeaders() >> headers
-        def uri = new URIBuilder( '/doesnt-exists-route' )
-        request.getUri() >> uri.build()
-        def config = new HttpServerConfiguration.CorsConfiguration()
-        CorsOriginConfiguration originConfig = new CorsOriginConfiguration()
-        originConfig.allowedOrigins = ['http://www.foo.com']
-        originConfig.allowedMethods = [HttpMethod.GET]
-        originConfig.allowedHeaders = ['foo', 'bar']
-        config.configurations = new LinkedHashMap<String, CorsOriginConfiguration>()
-        config.configurations.put('foo', originConfig)
-        CorsFilter corsHandler = buildCorsHandler(config)
-        request.getMethod() >> HttpMethod.OPTIONS
-
-        when:
-        headers.contains(ACCESS_CONTROL_REQUEST_METHOD) >> true
-        def result = corsHandler.handleRequest(request)
-
-        then: "the request is successful"
-        1 * headers.getOrigin() >> Optional.of('http://www.foo.com')
-        !result.isPresent()
-    }
-
     void "test handleResponse when configuration not present"() {
         given:
         def config = new HttpServerConfiguration.CorsConfiguration()
@@ -254,8 +206,6 @@ class CorsFilterSpec extends Specification {
         HttpRequest request = Mock(HttpRequest)
         HttpHeaders headers = Mock(HttpHeaders)
         request.getHeaders() >> headers
-        def uri = new URIBuilder( '/example' )
-        request.getUri() >> uri.build()
 
 
         when:
@@ -279,8 +229,6 @@ class CorsFilterSpec extends Specification {
         HttpHeaders headers = Mock(HttpHeaders)
         request.getHeaders() >> headers
         headers.getOrigin() >> Optional.of('http://www.foo.com')
-        def uri = new URIBuilder( '/example' )
-        request.getUri() >> uri.build()
 
         when:
         headers.contains(ACCESS_CONTROL_REQUEST_METHOD) >> true
@@ -313,8 +261,6 @@ class CorsFilterSpec extends Specification {
         request.getHeaders() >> headers
         headers.getOrigin() >> Optional.of('http://www.foo.com')
         request.getMethod() >> HttpMethod.OPTIONS
-        def uri = new URIBuilder( '/example' )
-        request.getUri() >> uri.build()
 
 
         when:
@@ -346,8 +292,7 @@ class CorsFilterSpec extends Specification {
         request.getHeaders() >> headers
         headers.getOrigin() >> Optional.of('http://www.foo.com')
         request.getMethod() >> HttpMethod.OPTIONS
-        def uri = new URIBuilder( '/example' )
-        request.getUri() >> uri.build()
+
 
         when:
         headers.contains(ACCESS_CONTROL_REQUEST_METHOD) >> true
@@ -363,12 +308,5 @@ class CorsFilterSpec extends Specification {
         response.getHeaders().get(ACCESS_CONTROL_ALLOW_CREDENTIALS) == 'true' // Allow credentials header is set
         response.getHeaders().get(ACCESS_CONTROL_ALLOW_HEADERS) == 'X-Header,Y-Header' // Allow headers are echo'd from the request
         response.getHeaders().get(ACCESS_CONTROL_MAX_AGE) == '1800' // Max age is set from config
-    }
-
-    @Controller
-    static class TestController{
-
-        @Get("/example")
-        String example() { return "Example"}
     }
 }
