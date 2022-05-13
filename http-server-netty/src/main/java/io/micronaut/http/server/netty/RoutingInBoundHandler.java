@@ -454,7 +454,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         }
     }
 
-    private void setRouteAttributes(HttpRequest request, UriRouteMatch<Object, Object> route) {
+    private void setRouteAttributes(HttpRequest<?> request, UriRouteMatch<Object, Object> route) {
         request.setAttribute(HttpAttributes.ROUTE, route.getRoute());
         request.setAttribute(HttpAttributes.ROUTE_MATCH, route);
         request.setAttribute(HttpAttributes.ROUTE_INFO, route);
