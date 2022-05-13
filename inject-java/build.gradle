@@ -30,7 +30,6 @@ dependencies {
     testImplementation libs.hibernate
     testImplementation libs.junit4
     testImplementation libs.compile.testing
-    testImplementation libs.mongo.javadriver
     testImplementation(libs.managed.neo4j.bolt) {
         version {
             require "1.4.5"
