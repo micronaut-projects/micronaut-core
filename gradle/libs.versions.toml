@@ -16,6 +16,7 @@ jakarta-inject-api = "2.0.1"
 jakarta-inject-tck = "2.0.1"
 javax-inject = "1"
 javax-persistence = "2.2"
+jetbrains-annotations = "23.0.0"
 jetty = "9.4.44.v20210927"
 jmh = "1.29"
 jsr107 = "1.1.1"
@@ -407,6 +408,8 @@ junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api", version.re
 junit-jupiter-engine = { module = "org.junit.jupiter:junit-jupiter-engine", version.ref = "managed-junit5" }
 junit-vintage = { module = "org.junit.vintage:junit-vintage-engine", version.ref = "managed-junit5" }
 junit4 = { module = "junit:junit", version.ref = "junit4" }
+
+jetbrains-annotations = { module = "org.jetbrains:annotations", version.ref = "jetbrains-annotations" }
 
 kotlin-annotation-processing-embeddable = { module = "org.jetbrains.kotlin:kotlin-annotation-processing-embeddable", version.ref = "managed-kotlin" }
 kotlin-compiler-embeddable = { module = "org.jetbrains.kotlin:kotlin-compiler-embeddable", version.ref = "managed-kotlin" }

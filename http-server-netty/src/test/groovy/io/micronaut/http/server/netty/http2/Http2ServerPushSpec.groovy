@@ -44,6 +44,7 @@ import io.netty.handler.ssl.SslContextBuilder
 import io.netty.handler.ssl.SupportedCipherSuiteFilter
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory
 import jakarta.inject.Inject
+import org.intellij.lang.annotations.Language
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
@@ -262,6 +263,7 @@ class Http2ServerPushSpec extends Specification {
                 request.serverPush(HttpRequest.GET("/serverPush/resource1"))
                 request.serverPush(HttpRequest.GET("/serverPush/resource2"))
             }
+            @Language('HTML')
             def s = """<!doctype html>
 <html lang="en">
 <body>
