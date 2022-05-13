@@ -121,6 +121,7 @@ httpServer:
     threadPools:
       title: Configuring Server Thread Pools
       blockingOperations: Blocking Operations
+      atBlocking: '@Blocking'
     nettyPipeline: Configuring the Netty Pipeline
     listener: Advanced Listener Configuration
     cors: Configuring CORS
