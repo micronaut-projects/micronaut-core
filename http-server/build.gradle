@@ -1,7 +1,6 @@
-internalSanityChecks {
-    expectedServiceCount.put('io.micronaut.inject.BeanDefinitionReference', 32)
-    expectedServiceCount.put('io.micronaut.inject.BeanConfiguration', 1)
-}           
+plugins {
+    id "io.micronaut.build.internal.convention-library"
+}
 
 dependencies {
     api project(":websocket")

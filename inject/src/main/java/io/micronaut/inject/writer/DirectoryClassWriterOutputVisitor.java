@@ -22,7 +22,10 @@ import io.micronaut.inject.ast.Element;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.Optional;
 
 /**
@@ -45,6 +48,7 @@ public class DirectoryClassWriterOutputVisitor extends AbstractClassWriterOutput
     }
 
     @Override
+    @SuppressWarnings("java:S3878")
     public OutputStream visitClass(String classname, @Nullable Element originatingElement) throws IOException {
         return visitClass(classname, new Element[]{ originatingElement });
     }
@@ -52,11 +56,24 @@ public class DirectoryClassWriterOutputVisitor extends AbstractClassWriterOutput
     @Override
     public OutputStream visitClass(String classname, Element... originatingElements) throws IOException {
         File targetFile = new File(targetDir, getClassFileName(classname)).getCanonicalFile();
-        File parentDir = targetFile.getParentFile();
-        if (!parentDir.exists() && !parentDir.mkdirs()) {
-            throw new IOException("Cannot create parent directory: " + targetFile.getParentFile());
-        }
+        makeParent(targetFile.toPath());
         return Files.newOutputStream(targetFile.toPath());
+    }
+
+    @Override
+    @SuppressWarnings("java:S1075")
+    public void visitServiceDescriptor(String type, String classname, Element originatingElement) {
+        final String path = "META-INF/micronaut/" + type + "/" + classname;
+        try {
+            final Path filePath = targetDir.toPath().resolve(path);
+            makeParent(filePath);
+            Files.write(filePath, "".getBytes(StandardCharsets.UTF_8),
+                        StandardOpenOption.WRITE,
+                        StandardOpenOption.CREATE
+            );
+        } catch (IOException e) {
+            throw new ClassGenerationException("Unable to generate Bean entry at path: " + path, e);
+        }
     }
 
     @Override
@@ -77,6 +94,13 @@ public class DirectoryClassWriterOutputVisitor extends AbstractClassWriterOutput
             return Optional.of(new FileBackedGeneratedFile(f));
         }
         return Optional.empty();
+    }
+
+    private void makeParent(Path filePath) throws IOException {
+        final Path parent = filePath.getParent();
+        if (!Files.exists(parent)) {
+            Files.createDirectories(parent);
+        }
     }
 
     private String getClassFileName(String className) {

@@ -161,7 +161,8 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
         for (CreatedBean<?> created : refreshableBeans.values()) {
             if (created.bean() == bean) {
                 //noinspection unchecked
-                return Optional.of(new BeanRegistration<>(
+                return Optional.of(BeanRegistration.of(
+                        beanContext,
                         created.id(),
                         (BeanDefinition<T>) created.definition(),
                         (T) created.bean()
@@ -192,7 +193,7 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
             if (value.isPresent()) {
                 String configPrefix = value.get();
                 if (keySet.stream().anyMatch(key -> key.startsWith(configPrefix))) {
-                    beanContext.refreshBean(registration.getIdentifier());
+                    beanContext.refreshBean(registration);
                 }
             }
         }
@@ -202,7 +203,7 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
         Collection<BeanRegistration<?>> registrations =
             beanContext.getActiveBeanRegistrations(Qualifiers.byStereotype(ConfigurationProperties.class));
         for (BeanRegistration<?> registration : registrations) {
-            beanContext.refreshBean(registration.getIdentifier());
+            beanContext.refreshBean(registration);
         }
     }
 

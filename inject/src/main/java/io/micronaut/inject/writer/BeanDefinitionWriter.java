@@ -472,6 +472,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private static final org.objectweb.asm.commons.Method METHOD_QUALIFIER_BY_TYPE = org.objectweb.asm.commons.Method.getMethod(
             ReflectionUtils.getRequiredMethod(Qualifiers.class, "byType", Class[].class)
     );
+
+    private static final org.objectweb.asm.commons.Method METHOD_BEAN_RESOLUTION_CONTEXT_MARK_FACTORY = org.objectweb.asm.commons.Method.getMethod(
+            ReflectionUtils.getRequiredMethod(BeanResolutionContext.class, "markDependentAsFactory")
+    );
     private static final Type TYPE_QUALIFIERS = Type.getType(Qualifiers.class);
     private static final Type TYPE_QUALIFIER = Type.getType(Qualifier.class);
 
@@ -869,7 +873,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         } else {
             constructor = factoryField;
 
-            autoApplyNamed(factoryField);
+            autoApplyNamedIfPresent(factoryField, factoryField.getAnnotationMetadata());
             // now prepare the implementation of the build method. See BeanFactory interface
             visitBuildFactoryMethodDefinition(factoryClass, factoryField);
             // now override the injectBean method
@@ -1217,7 +1221,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
                 org.objectweb.asm.commons.Method propertyGetterMethod = org.objectweb.asm.commons.Method.getMethod(propertyGetter.getDescription(false));
                 // getter might be an interface method
-                if (propertyGetter.isAbstract()) {
+                if (visitData.memberBeanType.getType().isInterface()) {
                     adapter.invokeInterface(injectedType, propertyGetterMethod);
                 } else {
                     adapter.invokeVirtual(injectedType, propertyGetterMethod);
@@ -1816,7 +1820,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                     ElementQuery.ALL_METHODS
                             .onlyAccessible(beanTypeElement)
                             .onlyInstance()
-                            .named((name) -> name.equals(NameUtils.getterNameFor(annotationMemberProperty, readPrefixes)))
+                            .named(name -> annotationMemberProperty.equals(NameUtils.getPropertyNameForGetter(name, readPrefixes)))
                             .filter((e) -> !e.hasParameters())
             ).orElse(null);
         }
@@ -3092,9 +3096,14 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                     org.objectweb.asm.commons.Method.getMethod(METHOD_GET_BEAN)
             );
 
-            // store a reference to the bean being built at index 3
-            int factoryVar = buildMethodVisitor.newLocal(JavaModelUtils.getTypeReference(factoryClass));
-            buildMethodVisitor.storeLocal(factoryVar);
+            int factoryVar = buildMethodVisitor.newLocal(factoryType);
+            buildMethodVisitor.storeLocal(factoryVar, factoryType);
+
+            // BeanResolutionContext
+            buildMethodVisitor.loadArg(0);
+            // .markDependentAsFactory()
+            buildMethodVisitor.invokeInterface(TYPE_RESOLUTION_CONTEXT, METHOD_BEAN_RESOLUTION_CONTEXT_MARK_FACTORY);
+
             buildMethodVisitor.loadLocal(factoryVar);
             pushCastToType(buildMethodVisitor, factoryClass);
             String methodDescriptor = getMethodDescriptorForReturnType(beanType, parameterList);

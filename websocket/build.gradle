@@ -1,9 +1,9 @@
+plugins {
+    id "io.micronaut.build.internal.convention-library"
+}
+
 import java.time.Duration
 
-
-internalSanityChecks {
-    expectedServiceCount.put('io.micronaut.inject.BeanDefinitionReference', 1)
-}           
 
 dependencies {
 	annotationProcessor project(":inject-java")

@@ -16,12 +16,26 @@
 package io.micronaut.core.io;
 
 import io.micronaut.core.annotation.Blocking;
+import io.micronaut.core.annotation.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.Reader;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.nio.file.FileSystem;
+import java.nio.file.FileSystemNotFoundException;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.function.Consumer;
+import java.util.stream.Stream;
 
 /**
  * Utility methods for I/O operations.
@@ -29,10 +43,75 @@ import java.io.Reader;
  * @author Graeme Rocher
  * @since 1.0
  */
+@SuppressWarnings("java:S1118")
 public class IOUtils {
 
-    private static final Logger LOG = LoggerFactory.getLogger(IOUtils.class);
     private static final int BUFFER_MAX = 8192;
+
+    /**
+     * Iterates over each directory in a JAR or file system.
+     * @param url The URL
+     * @param path The path
+     * @param consumer The consumer
+     *                 @since 3.5.0
+     */
+    @Blocking
+    @SuppressWarnings({"java:S2095", "S1141"})
+    public static void eachFile(@NonNull URL url, String path, @NonNull Consumer<Path> consumer) {
+        try {
+            eachFile(url.toURI(), path, consumer);
+        } catch (URISyntaxException e) {
+            // ignore and proceed
+        }
+    }
+
+    /**
+     * Iterates over each directory in a JAR or file system.
+     * @param uri The URI
+     * @param path The path
+     * @param consumer The consumer
+     * @since 3.5.0
+     */
+    @Blocking
+    @SuppressWarnings({"java:S2095", "java:S1141", "java:S3776"})
+    public static void eachFile(@NonNull URI uri, String path, @NonNull Consumer<Path> consumer) {
+        Path myPath;
+        try {
+            FileSystem fileSystem = null;
+            try {
+                if ("jar".equals(uri.getScheme())) {
+                    try {
+                        fileSystem = FileSystems.getFileSystem(uri);
+                    } catch (FileSystemNotFoundException e) {
+                        fileSystem = FileSystems.newFileSystem(uri, Collections.emptyMap());
+                    }
+                    myPath = fileSystem.getPath(path);
+                } else {
+                    myPath = Paths.get(uri);
+                }
+            } catch (FileSystemNotFoundException e) {
+                myPath = null;
+            }
+
+            if (myPath != null) {
+                try (Stream<Path> walk = Files.walk(myPath, 1)) {
+                    for (Iterator<Path> it = walk.iterator(); it.hasNext();) {
+                        final Path currentPath = it.next();
+                        if (currentPath.equals(myPath) || Files.isHidden(currentPath) || currentPath.getFileName().startsWith(".")) {
+                            continue;
+                        }
+                        consumer.accept(currentPath);
+                    }
+                } finally {
+                    if (fileSystem != null && fileSystem.isOpen()) {
+                        fileSystem.close();
+                    }
+                }
+            }
+        } catch (IOException e) {
+            // ignore, can't do anything here and can't log because class used in compiler
+        }
+    }
 
     /**
      * Read the content of the BufferedReader and return it as a String in a blocking manner.
@@ -67,12 +146,15 @@ public class IOUtils {
                     reader.close();
                 }
             } catch (IOException e) {
-                if (LOG.isWarnEnabled()) {
-                    LOG.warn("Failed to close reader: " + e.getMessage(), e);
+                if (IOLogging.LOG.isWarnEnabled()) {
+                    IOLogging.LOG.warn("Failed to close reader: " + e.getMessage(), e);
                 }
             }
         }
         return answer.toString();
     }
 
+    private static final class IOLogging {
+        private static final Logger LOG = LoggerFactory.getLogger(IOLogging.class);
+    }
 }

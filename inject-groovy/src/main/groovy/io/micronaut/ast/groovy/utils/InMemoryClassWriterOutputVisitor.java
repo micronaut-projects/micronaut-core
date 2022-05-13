@@ -63,6 +63,13 @@ public class InMemoryClassWriterOutputVisitor implements ClassWriterOutputVisito
     }
 
     @Override
+    public void visitServiceDescriptor(String type, String classname, Element originatingElement) {
+        if (StringUtils.isNotEmpty(type) && StringUtils.isNotEmpty(classname)) {
+            serviceDescriptors.computeIfAbsent(type, s -> new LinkedHashSet<>()).add(classname);
+        }
+    }
+
+    @Override
     public Optional<GeneratedFile> visitMetaInfFile(String path, Element... originatingElements) {
         return Optional.empty();
     }

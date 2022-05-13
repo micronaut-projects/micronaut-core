@@ -50,6 +50,13 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
         this.definition = definition;
     }
 
+    /**
+     * @return the attributes
+     */
+    public Map<String, Object> getAttributes() {
+        return attributes;
+    }
+
     @Nullable
     @Override
     public Qualifier<T> resolveDynamicQualifier() {

@@ -2,4 +2,3 @@ io.micronaut.annotation.processing.TypeElementVisitorProcessor
 io.micronaut.annotation.processing.AggregatingTypeElementVisitorProcessor
 io.micronaut.annotation.processing.PackageConfigurationInjectProcessor
 io.micronaut.annotation.processing.BeanDefinitionInjectProcessor
-io.micronaut.annotation.processing.ServiceDescriptionProcessor

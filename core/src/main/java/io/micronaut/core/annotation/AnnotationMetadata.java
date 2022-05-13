@@ -111,6 +111,33 @@ public interface AnnotationMetadata extends AnnotationSource {
     }
 
     /**
+     * Returns the names of the annotations which are stereotypes.
+     *
+     * <p>A stereotype is a meta-annotation (an annotation declared on another annotation).</p>
+     * @return The names of the stereotype annotations
+     * @since 3.4.1
+     * @see #getDeclaredStereotypeAnnotationNames()
+     */
+    default @NonNull Set<String> getStereotypeAnnotationNames() {
+        return Collections.emptySet();
+    }
+
+    /**
+     * Returns the names of the annotations which are declared stereotypes.
+     *
+     * <p>A stereotype is a meta-annotation (an annotation declared on another annotation).</p>
+     *
+     * <p>A stereotype is considered declared when it it is a meta-annotation that is present on an annotation directly declared on the element and not inherited from a super class.</p>
+     * @return The names of the stereotype annotations
+     * @since 3.4.1
+     * @see #getStereotypeAnnotationNames()
+     * @see #getDeclaredAnnotationNames()
+     */
+    default @NonNull Set<String> getDeclaredStereotypeAnnotationNames() {
+        return Collections.emptySet();
+    }
+
+    /**
      * All the declared annotation names this metadata declares.
      *
      * @return All the declared annotation names this metadata declares

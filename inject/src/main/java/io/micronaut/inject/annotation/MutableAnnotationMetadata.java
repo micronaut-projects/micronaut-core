@@ -72,15 +72,18 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
     @Override
     public MutableAnnotationMetadata clone() {
         final MutableAnnotationMetadata cloned = new MutableAnnotationMetadata(
-                declaredAnnotations != null ? new HashMap<>(declaredAnnotations) : null,
-                declaredStereotypes != null ? new HashMap<>(declaredStereotypes) : null,
-                allStereotypes != null ? new HashMap<>(allStereotypes) : null,
-                allAnnotations != null ? new HashMap<>(allAnnotations) : null,
-                annotationsByStereotype != null ? new HashMap<>(annotationsByStereotype) : null,
+                declaredAnnotations != null ? cloneMapOfMapValue(declaredAnnotations) : null,
+                declaredStereotypes != null ? cloneMapOfMapValue(declaredStereotypes) : null,
+                allStereotypes != null ? cloneMapOfMapValue(allStereotypes) : null,
+                allAnnotations != null ? cloneMapOfMapValue(allAnnotations) : null,
+                annotationsByStereotype != null ? cloneMapOfListValue(annotationsByStereotype) : null,
                 hasPropertyExpressions
         );
         if (annotationDefaultValues != null) {
             cloned.annotationDefaultValues = new LinkedHashMap<>(annotationDefaultValues);
+        }
+        if (repeated != null) {
+            cloned.repeated = new HashMap<>(repeated);
         }
         return cloned;
     }

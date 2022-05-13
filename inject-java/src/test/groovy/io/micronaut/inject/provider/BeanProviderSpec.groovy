@@ -17,13 +17,12 @@ package io.micronaut.inject.provider
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.BeanContext
-import io.micronaut.context.BeanContextConfiguration
-import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.exceptions.NoSuchBeanException
+import io.micronaut.context.exceptions.NonUniqueBeanException
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanDefinitionReference
-import io.micronaut.inject.annotation.TestCachePuts
+import io.micronaut.inject.annotation.MutableAnnotationMetadata
+import io.micronaut.inject.qualifiers.Qualifiers
 
 class BeanProviderSpec extends AbstractTypeElementSpec {
 
@@ -199,5 +198,126 @@ class Bar {}
 
         cleanup:
         context.close()
+    }
+
+    void "test BeanProvider's find method" () {
+        given:
+        ApplicationContext context = buildContext('''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.context.annotation.*;
+import io.micronaut.context.BeanProvider;
+
+@jakarta.inject.Qualifier
+@java.lang.annotation.Documented
+@java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.RUNTIME)
+@interface OneQualifier { }
+
+@jakarta.inject.Qualifier
+@java.lang.annotation.Documented
+@java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.RUNTIME)
+@interface TwoQualifier { }
+
+interface BeanNumber { }
+
+@OneQualifier
+class BeanOne implements BeanNumber { }
+
+@OneQualifier
+@TwoQualifier
+class BeanOneTwo implements BeanNumber { }
+
+@jakarta.inject.Singleton
+class Test {
+    public BeanProvider<BeanNumber> provider;
+    public BeanProvider<BeanNumber> providerTwo;
+    Test(@OneQualifier BeanProvider<BeanNumber> provider, @TwoQualifier BeanProvider<BeanNumber> providerTwo) {
+        this.provider = provider;
+        this.providerTwo = providerTwo;
+    }
+}
+''')
+        when: 'retrieve test bean'
+        def bean = getBean(context, 'test.Test')
+
+        then: 'providerTwo successfully finds BeanOneTwo because of injection point qualifier'
+        bean.provider.isPresent()
+        bean.providerTwo.find(null).get().class.name == 'test.BeanOneTwo'
+
+        when: 'attempt to find bean through provider with null qualifier as argument'
+        bean.provider.find(null)
+
+        then: 'NonUniqueBeanException is thrown, as both BeanOne and BeanOneTwo are qualified by @OneQualifier'
+        thrown(NonUniqueBeanException)
+
+        when: 'attempt to find bean through provider with @TwoQualifier as argument'
+        def metadata = new MutableAnnotationMetadata()
+        metadata.addDeclaredAnnotation('test.TwoQualifier', Collections.emptyMap())
+        def foundBean = bean.provider.find(Qualifiers.byAnnotation(metadata, 'test.TwoQualifier'))
+
+        then: 'BeanOneTwo is found'
+        foundBean.isPresent()
+        foundBean.get().class.name == 'test.BeanOneTwo'
+    }
+
+    void "test BeanProvider's get by qualifier method" () {
+        given:
+        ApplicationContext context = buildContext('''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.context.annotation.*;
+import io.micronaut.context.BeanProvider;
+
+@jakarta.inject.Qualifier
+@java.lang.annotation.Documented
+@java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.RUNTIME)
+@interface OneQualifier { }
+
+@jakarta.inject.Qualifier
+@java.lang.annotation.Documented
+@java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.RUNTIME)
+@interface TwoQualifier { }
+
+interface BeanNumber { }
+
+@OneQualifier
+class BeanOne implements BeanNumber { }
+
+@OneQualifier
+@TwoQualifier
+class BeanOneTwo implements BeanNumber { }
+
+@jakarta.inject.Singleton
+class Test {
+    public BeanProvider<BeanNumber> provider;
+    public BeanProvider<BeanNumber> providerTwo;
+    Test(@OneQualifier BeanProvider<BeanNumber> provider, @TwoQualifier BeanProvider<BeanNumber> providerTwo) {
+        this.provider = provider;
+        this.providerTwo = providerTwo;
+    }
+}
+''')
+        when: 'retrieve test bean'
+        def bean = getBean(context, 'test.Test')
+
+        then: 'providerTwo successfully gets BeanOneTwo because of injection point qualifier'
+        bean.provider.isPresent()
+        bean.providerTwo.get(null).class.name == 'test.BeanOneTwo'
+
+        when: 'attempt to get bean through provider with null qualifier as argument'
+        bean.provider.get(null)
+
+        then: 'NonUniqueBeanException is thrown, as both BeanOne and BeanOneTwo are qualified by @OneQualifier'
+        thrown(NonUniqueBeanException)
+
+        when: 'attempt to get bean through provider with @TwoQualifier as argument'
+        def metadata = new MutableAnnotationMetadata()
+        metadata.addDeclaredAnnotation('test.TwoQualifier', Collections.emptyMap())
+        def foundBean = bean.provider.get(Qualifiers.byAnnotation(metadata, 'test.TwoQualifier'))
+
+        then: 'BeanOneTwo is returned'
+        foundBean.class.name == 'test.BeanOneTwo'
     }
 }

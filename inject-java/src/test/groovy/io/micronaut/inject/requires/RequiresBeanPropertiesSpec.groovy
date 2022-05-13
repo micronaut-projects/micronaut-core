@@ -899,4 +899,45 @@ class TestBeanFactory
         cleanup:
         context.close()
     }
+
+    void "test requires with default interface methods"() {
+        given:
+        ApplicationContext context = buildContext('test.TestBean', '''
+package test;
+import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.ConfigurationProperties;import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.annotation.Property;import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.util.Toggleable;
+import jakarta.inject.Singleton;
+
+interface Configuration extends Toggleable {}
+
+@Singleton
+class ConfigurationImpl implements Configuration
+{
+    private boolean enabled = false;
+    
+    @Override 
+    public boolean isEnabled() {
+        return this.enabled;
+    }
+}
+
+@Requires(bean = Configuration.class, beanProperty = "enabled", value = "true")
+@Singleton
+class TestBean {
+}
+''')
+        def type = context.classLoader.loadClass('test.TestBean')
+
+        when:
+        context.getBean(type)
+
+        then:
+        thrown(NoSuchBeanException.class)
+
+        cleanup:
+        context.close()
+
+    }
 }

@@ -23,6 +23,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.qualifiers.AnyQualifier;
+import io.micronaut.inject.qualifiers.Qualifiers;
 
 import java.util.Iterator;
 import java.util.Optional;
@@ -63,6 +64,17 @@ public final class BeanProviderDefinition extends AbstractProviderDefinition<Bea
             private final Qualifier<Object> finalQualifier =
                     qualifier instanceof AnyQualifier ? null : qualifier;
 
+            private Qualifier<Object> qualify(Qualifier<Object> qualifier) {
+                if (finalQualifier == null) {
+                    return qualifier;
+                } else if (qualifier == null) {
+                    return finalQualifier;
+                }
+
+                //noinspection unchecked
+                return Qualifiers.byQualifiers(finalQualifier, qualifier);
+            }
+
             @Override
             public Object get() {
                 return ((DefaultBeanContext) context).getBean(resolutionContext, argument, finalQualifier);
@@ -70,7 +82,7 @@ public final class BeanProviderDefinition extends AbstractProviderDefinition<Bea
 
             @Override
             public Optional<Object> find(Qualifier<Object> qualifier) {
-                return ((DefaultBeanContext) context).findBean(resolutionContext, argument, finalQualifier);
+                return ((DefaultBeanContext) context).findBean(resolutionContext, argument, qualify(qualifier));
             }
 
             @Override
@@ -80,7 +92,7 @@ public final class BeanProviderDefinition extends AbstractProviderDefinition<Bea
 
             @Override
             public Object get(Qualifier<Object> qualifier) {
-                return ((DefaultBeanContext) context).getBean(resolutionContext, argument, qualifier);
+                return ((DefaultBeanContext) context).getBean(resolutionContext, argument, qualify(qualifier));
             }
 
             @Override

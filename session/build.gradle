@@ -1,11 +1,6 @@
-ext {
-    shadowJarEnabled = true
+plugins {
+    id "io.micronaut.build.internal.convention-core-library"
 }
-
-internalSanityChecks {
-    expectedServiceCount.put('io.micronaut.inject.BeanDefinitionReference', 14)
-    expectedServiceCount.put('io.micronaut.inject.BeanConfiguration', 1)
-}           
 
 dependencies {
     annotationProcessor project(":inject-java")

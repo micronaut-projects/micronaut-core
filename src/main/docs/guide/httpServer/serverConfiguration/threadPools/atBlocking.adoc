@@ -1,0 +1,21 @@
+You can use the ann:core.annotation.Blocking[] annotation to mark methods as blocking.
+
+If you set `micronaut.server.thread-selection` to `AUTO`, The Micronaut Framework offloads the execution of methods annotated with `@Blocking` to the IO thread pool (See: api:io.micronaut.scheduling.TaskExecutors[]).
+
+NOTE: `@Blocking` only works if you are using `AUTO` thread selection. Micronaut Framework defaults to `MANUAL` thread selection since Micronaut 2.0. We recommend the usage of ann:scheduling.annotation.ExecuteOn[] annotation to execute the blocking operations on a different thread pool. `@ExecutesOn` works for both `MANUAL` and `AUTO` thread selection.
+
+There are some places where the Micronaut framework uses ann:core.annotation.Blocking[] internally:
+
+|===
+|Blocking Type|Description
+
+|link:{micronautapi}http/client/BlockingHttpClient.html[BlockingHttpClient]
+| Intended for testing, provides blocking versions for a subset of api:http.client.HttpClient[] operations.
+|link:{micronautapi}core/io/IOUtils.html[IOUtils]
+| Reads the contents of a `BufferedReader` in a blocking manner, and returns that as a `String`.
+|link:{micronautapi}context/env/BootstrapPropertySourceLocator.html[BootstrapPropertySourceLocator]
+| Resolves either remote or local api:context.env.PropertySource[] instances for the current `Environment`.
+
+|===
+
+TIP: https://micronaut-projects.github.io/micronaut-data/latest/guide/[Micronaut Data] also utilizes `@Blocking` internally for some transaction operations, CRUD interceptors, and repositories.
