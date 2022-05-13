@@ -1,0 +1,40 @@
+Instead of configuring a single port, you can also specify each listener manually.
+
+[source, yaml]
+----
+micronaut:
+  server:
+    netty:
+      listeners:
+        httpListener: # listener name can be an arbitrary value
+          host: 127.0.0.1 # optional, by default binds to all interfaces
+          port: 8086
+          ssl: false
+        httpsListener:
+          port: 8087
+          ssl: true
+----
+
+WARNING: If you specify listeners manually, other configuration such as `micronaut.server.port` will be ignored.
+
+SSL can be enabled or disabled for each listener individually. When enabled, the SSL will be configured <<https, as described above>>.
+
+The embedded server also supports binding to unix domain sockets using netty. This requires the following dependency:
+
+dependency:netty-transport-native-unix-common[groupId="io.netty",artifactId="netty-transport-native-unix-common"]
+
+The server must also be configured to <<serverConfiguration, use native transport>> (epoll or kqueue).
+
+[source, yaml]
+----
+micronaut:
+  server:
+    netty:
+      listeners:
+        unixListener: # listener name can be an arbitrary value
+          family: UNIX
+          path: /run/micronaut.socket
+          ssl: true
+----
+
+NOTE: To use an abstract domain socket instead of a normal one, prefix the path with a NUL character, like `"\0/run/micronaut.socket"`
