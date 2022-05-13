@@ -64,6 +64,17 @@ public final class BeanProviderDefinition extends AbstractProviderDefinition<Bea
             private final Qualifier<Object> finalQualifier =
                     qualifier instanceof AnyQualifier ? null : qualifier;
 
+            private Qualifier<Object> qualify(Qualifier<Object> qualifier) {
+                if (finalQualifier == null) {
+                    return qualifier;
+                } else if (qualifier == null) {
+                    return finalQualifier;
+                }
+
+                //noinspection unchecked
+                return Qualifiers.byQualifiers(finalQualifier, qualifier);
+            }
+
             @Override
             public Object get() {
                 return ((DefaultBeanContext) context).getBean(resolutionContext, argument, finalQualifier);
@@ -71,16 +82,7 @@ public final class BeanProviderDefinition extends AbstractProviderDefinition<Bea
 
             @Override
             public Optional<Object> find(Qualifier<Object> qualifier) {
-                Qualifier<Object> actualQualifier;
-                if (finalQualifier == null) {
-                    actualQualifier = qualifier;
-                } else if (qualifier == null) {
-                    actualQualifier = finalQualifier;
-                } else {
-                    actualQualifier = Qualifiers.byQualifiers(finalQualifier, qualifier);
-                }
-
-                return ((DefaultBeanContext) context).findBean(resolutionContext, argument, actualQualifier);
+                return ((DefaultBeanContext) context).findBean(resolutionContext, argument, qualify(qualifier));
             }
 
             @Override
@@ -90,7 +92,7 @@ public final class BeanProviderDefinition extends AbstractProviderDefinition<Bea
 
             @Override
             public Object get(Qualifier<Object> qualifier) {
-                return ((DefaultBeanContext) context).getBean(resolutionContext, argument, qualifier);
+                return ((DefaultBeanContext) context).getBean(resolutionContext, argument, qualify(qualifier));
             }
 
             @Override
