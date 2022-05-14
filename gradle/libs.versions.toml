@@ -133,7 +133,7 @@ managed-protobuf = "3.17.2"
 managed-reactive-pg-client = "0.11.4"
 managed-reactive-streams = "1.0.3"
 # This should be kept aligned with https://github.com/micronaut-projects/micronaut-reactor/blob/master/gradle.properties from the BOM
-managed-reactor = "3.4.17"
+managed-reactor = "3.4.18"
 managed-rxjava1 = "1.3.8"
 managed-rxjava1-interop = "0.13.7"
 managed-slf4j = "1.7.29"
