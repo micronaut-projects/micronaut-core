@@ -31,10 +31,7 @@ import io.micronaut.http.filter.HttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
 import io.micronaut.http.filter.ServerFilterPhase;
 import io.micronaut.http.server.HttpServerConfiguration;
-import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.RouteMatchUtils;
-import io.micronaut.web.router.Router;
-import io.micronaut.web.router.UriRouteMatch;
 import org.reactivestreams.Publisher;
 
 import java.util.List;
