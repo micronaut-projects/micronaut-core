@@ -23,9 +23,12 @@ import io.micronaut.http.server.HttpServerConfiguration
 import io.micronaut.http.server.cors.CorsFilter
 import io.micronaut.http.server.cors.CorsOriginConfiguration
 import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.web.router.RouteMatch
 import io.micronaut.web.router.Router
 import org.apache.http.client.utils.URIBuilder
 import spock.lang.Specification
+
+import java.util.stream.Collectors
 
 import static io.micronaut.http.HttpHeaders.*
 
@@ -34,8 +37,7 @@ class CorsFilterSpec extends Specification {
     EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
 
     CorsFilter buildCorsHandler(HttpServerConfiguration.CorsConfiguration config) {
-        new CorsFilter(config ?: new HttpServerConfiguration.CorsConfiguration(),
-                embeddedServer.getApplicationContext().getBean(Router))
+        new CorsFilter(config ?: new HttpServerConfiguration.CorsConfiguration())
     }
 
     void "test handleRequest for non CORS request"() {
@@ -45,8 +47,6 @@ class CorsFilterSpec extends Specification {
         HttpHeaders headers = Mock(HttpHeaders)
         request.getHeaders() >> headers
         headers.getOrigin() >> Optional.empty()
-        def uri = new URIBuilder( '/example' )
-        request.getUri() >> uri.build()
         CorsFilter corsHandler = buildCorsHandler(config)
 
         when:
@@ -61,8 +61,6 @@ class CorsFilterSpec extends Specification {
         HttpRequest request = Mock(HttpRequest)
         HttpHeaders headers = Mock(HttpHeaders)
         request.getHeaders() >> headers
-        def uri = new URIBuilder( '/example' )
-        request.getUri() >> uri.build()
 
         def config = new HttpServerConfiguration.CorsConfiguration()
         CorsOriginConfiguration originConfig = new CorsOriginConfiguration()
@@ -84,8 +82,7 @@ class CorsFilterSpec extends Specification {
         HttpRequest request = Mock(HttpRequest)
         HttpHeaders headers = Mock(HttpHeaders)
         request.getHeaders() >> headers
-        def uri = new URIBuilder( '/example' )
-        request.getUri() >> uri.build()
+        request.getAttribute(HttpAttributes.ROUTE_MATCH, RouteMatch.class) >> Optional.empty()
 
         def config = new HttpServerConfiguration.CorsConfiguration()
         CorsOriginConfiguration originConfig = new CorsOriginConfiguration()
@@ -139,8 +136,6 @@ class CorsFilterSpec extends Specification {
         HttpRequest request = Mock(HttpRequest)
         HttpHeaders headers = Mock(HttpHeaders)
         request.getHeaders() >> headers
-        def uri = new URIBuilder( '/example' )
-        request.getUri() >> uri.build()
 
         def config = new HttpServerConfiguration.CorsConfiguration()
         CorsOriginConfiguration originConfig = new CorsOriginConfiguration()
@@ -165,8 +160,6 @@ class CorsFilterSpec extends Specification {
         HttpRequest request = Mock(HttpRequest)
         HttpHeaders headers = Mock(HttpHeaders)
         request.getHeaders() >> headers
-        def uri = new URIBuilder( '/example' )
-        request.getUri() >> uri.build()
         def config = new HttpServerConfiguration.CorsConfiguration()
         CorsOriginConfiguration originConfig = new CorsOriginConfiguration()
         originConfig.allowedOrigins = ['http://www.foo.com']
@@ -176,6 +169,13 @@ class CorsFilterSpec extends Specification {
         config.configurations.put('foo', originConfig)
         CorsFilter corsHandler = buildCorsHandler(config)
         request.getMethod() >> HttpMethod.OPTIONS
+        def uri = new URIBuilder( '/example' )
+        request.getUri() >> uri.build()
+        def route = embeddedServer.getApplicationContext().getBean(Router).
+                findAny(request.getUri().toString(), request)
+                .collect(Collectors.toList()).get(0)
+
+        request.getAttribute(HttpAttributes.ROUTE_MATCH, RouteMatch.class) >> Optional.of(route.getRoute())
 
         when:
         headers.contains(ACCESS_CONTROL_REQUEST_METHOD) >> true
@@ -193,8 +193,6 @@ class CorsFilterSpec extends Specification {
         HttpRequest request = Mock(HttpRequest)
         HttpHeaders headers = Mock(HttpHeaders)
         request.getHeaders() >> headers
-        def uri = new URIBuilder( '/example' )
-        request.getUri() >> uri.build()
         def config = new HttpServerConfiguration.CorsConfiguration()
         CorsOriginConfiguration originConfig = new CorsOriginConfiguration()
         originConfig.allowedOrigins = ['http://www.foo.com']
@@ -204,6 +202,13 @@ class CorsFilterSpec extends Specification {
         config.configurations.put('foo', originConfig)
         CorsFilter corsHandler = buildCorsHandler(config)
         request.getMethod() >> HttpMethod.OPTIONS
+        def uri = new URIBuilder( '/example' )
+        request.getUri() >> uri.build()
+        def route = embeddedServer.getApplicationContext().getBean(Router).
+                findAny(request.getUri().toString(), request)
+                .collect(Collectors.toList()).get(0)
+
+        request.getAttribute(HttpAttributes.ROUTE_MATCH, RouteMatch.class) >> Optional.of(route.getRoute())
 
         when:
         headers.contains(ACCESS_CONTROL_REQUEST_METHOD) >> true
@@ -227,8 +232,6 @@ class CorsFilterSpec extends Specification {
         HttpRequest request = Mock(HttpRequest)
         HttpHeaders headers = Mock(HttpHeaders)
         request.getHeaders() >> headers
-        def uri = new URIBuilder( '/example' )
-        request.getUri() >> uri.build()
 
         when:
         def result = corsHandler.handleRequest(request)
@@ -251,8 +254,6 @@ class CorsFilterSpec extends Specification {
         HttpHeaders headers = Mock(HttpHeaders)
         request.getHeaders() >> headers
         headers.getOrigin() >> Optional.of('http://www.foo.com')
-        def uri = new URIBuilder( '/example' )
-        request.getUri() >> uri.build()
 
         when:
         headers.contains(ACCESS_CONTROL_REQUEST_METHOD) >> true
@@ -287,7 +288,11 @@ class CorsFilterSpec extends Specification {
         request.getMethod() >> HttpMethod.OPTIONS
         def uri = new URIBuilder( '/example' )
         request.getUri() >> uri.build()
+        def route = embeddedServer.getApplicationContext().getBean(Router).
+                findAny(request.getUri().toString(), request)
+                .collect(Collectors.toList()).get(0)
 
+        request.getAttribute(HttpAttributes.ROUTE_MATCH, RouteMatch.class) >> Optional.of(route.getRoute())
 
         when:
         headers.contains(ACCESS_CONTROL_REQUEST_METHOD) >> true
@@ -320,6 +325,11 @@ class CorsFilterSpec extends Specification {
         request.getMethod() >> HttpMethod.OPTIONS
         def uri = new URIBuilder( '/example' )
         request.getUri() >> uri.build()
+        def route = embeddedServer.getApplicationContext().getBean(Router).
+                findAny(request.getUri().toString(), request)
+                .collect(Collectors.toList()).get(0)
+
+        request.getAttribute(HttpAttributes.ROUTE_MATCH, RouteMatch.class) >> Optional.of(route.getRoute())
 
         when:
         headers.contains(ACCESS_CONTROL_REQUEST_METHOD) >> true
@@ -353,6 +363,7 @@ class CorsFilterSpec extends Specification {
         config.configurations.put('foo', originConfig)
         CorsFilter corsHandler = buildCorsHandler(config)
         request.getMethod() >> HttpMethod.OPTIONS
+        request.getAttribute(HttpAttributes.ROUTE_MATCH, RouteMatch.class) >> Optional.empty()
 
         when:
         headers.contains(ACCESS_CONTROL_REQUEST_METHOD) >> true

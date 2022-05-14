@@ -31,6 +31,8 @@ import io.micronaut.http.filter.HttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
 import io.micronaut.http.filter.ServerFilterPhase;
 import io.micronaut.http.server.HttpServerConfiguration;
+import io.micronaut.web.router.RouteMatch;
+import io.micronaut.web.router.RouteMatchUtils;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteMatch;
 import org.reactivestreams.Publisher;
@@ -58,15 +60,11 @@ public class CorsFilter implements HttpServerFilter {
 
     protected final HttpServerConfiguration.CorsConfiguration corsConfiguration;
 
-    private final Router router;
-
     /**
      * @param corsConfiguration The {@link CorsOriginConfiguration} instance
-     * @param router the {@link Router} instance
      */
-    public CorsFilter(HttpServerConfiguration.CorsConfiguration corsConfiguration, Router router) {
+    public CorsFilter(HttpServerConfiguration.CorsConfiguration corsConfiguration) {
         this.corsConfiguration = corsConfiguration;
-        this.router = router;
     }
 
     @Override
@@ -156,11 +154,7 @@ public class CorsFilter implements HttpServerFilter {
                     }
                 }
 
-                final List<UriRouteMatch<?, ?>> anyMatchingRoutes = router
-                        .findAny(request.getUri().toString(), request)
-                        .collect(Collectors.toList());
-
-                if (preflight && !anyMatchingRoutes.isEmpty()) {
+                if (preflight && RouteMatchUtils.findRouteMatch(request).isPresent()) {
                     Optional<List<String>> accessControlHeaders = headers.get(ACCESS_CONTROL_REQUEST_HEADERS, ConversionContext.LIST_OF_STRING);
 
                     List<String> allowedHeaders = config.getAllowedHeaders();
