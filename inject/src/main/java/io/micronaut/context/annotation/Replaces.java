@@ -15,8 +15,6 @@
  */
 package io.micronaut.context.annotation;
 
-import io.micronaut.core.annotation.Internal;
-
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
