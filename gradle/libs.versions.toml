@@ -30,7 +30,7 @@ powermock = "2.0.9"
 selenium = "3.141.59"
 smallrye = "5.1.0"
 systemlambda = "1.2.1"
-vertx = "3.9.12"
+vertx = "3.9.13"
 wiremock = "2.27.2"
 
 #
