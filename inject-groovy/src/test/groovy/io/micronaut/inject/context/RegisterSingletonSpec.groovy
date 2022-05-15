@@ -46,7 +46,6 @@ class RegisterSingletonSpec extends Specification {
         context.close()
     }
 
-
     void "test register named singleton method"() {
         given:
         BeanContext context = new DefaultBeanContext().start()
