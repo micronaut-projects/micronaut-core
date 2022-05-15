@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.naming.Named;
 import io.micronaut.http.netty.AbstractNettyHttpRequest;
 import io.micronaut.http.context.event.HttpRequestReceivedEvent;
@@ -64,7 +65,6 @@ import io.netty.handler.stream.ChunkedWriteHandler;
 import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.util.AsciiString;
 import io.netty.util.ReferenceCountUtil;
-import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -481,7 +481,7 @@ final class HttpPipelineBuilder {
             }
         }
 
-        @NotNull
+        @NonNull
         private HttpServerCodec createServerCodec() {
             return new HttpServerCodec(
                     server.getServerConfiguration().getMaxInitialLineLength(),

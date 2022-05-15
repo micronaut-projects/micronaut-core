@@ -100,7 +100,6 @@ import io.micronaut.inject.visitor.BeanElementVisitor;
 import io.micronaut.inject.visitor.BeanElementVisitorContext;
 import io.micronaut.inject.visitor.VisitorContext;
 import jakarta.inject.Singleton;
-import org.jetbrains.annotations.NotNull;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Label;
@@ -3449,7 +3448,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         );
     }
 
-    @NotNull
+    @NonNull
     private String newInnerClassName() {
         return this.beanDefinitionName + "$" + ++innerClassIndex;
     }
