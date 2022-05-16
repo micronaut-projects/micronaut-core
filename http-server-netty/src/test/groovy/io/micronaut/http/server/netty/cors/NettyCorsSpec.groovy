@@ -316,8 +316,12 @@ class NettyCorsSpec extends AbstractMicronautSpec {
     static class TestController {
 
         @Get
-        @Post
         HttpResponse index() {
+            HttpResponse.noContent()
+        }
+
+        @Post
+        HttpResponse indexPost() {
             HttpResponse.noContent()
         }
 
