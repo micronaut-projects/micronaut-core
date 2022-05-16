@@ -3361,7 +3361,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                 return true;
             });
         }
-        return candidateStream;
+        return candidateStream.filter(c -> !c.isAbstract());
     }
 
     private <T> void addCandidateToList(@Nullable BeanResolutionContext resolutionContext,
