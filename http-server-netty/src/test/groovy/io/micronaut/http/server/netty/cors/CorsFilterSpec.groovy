@@ -26,6 +26,8 @@ import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.web.router.RouteMatch
 import io.micronaut.web.router.Router
 import org.apache.http.client.utils.URIBuilder
+import spock.lang.AutoCleanup
+import spock.lang.Shared
 import spock.lang.Specification
 
 import java.util.stream.Collectors
@@ -34,6 +36,7 @@ import static io.micronaut.http.HttpHeaders.*
 
 class CorsFilterSpec extends Specification {
 
+    @Shared @AutoCleanup
     EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
 
     CorsFilter buildCorsHandler(HttpServerConfiguration.CorsConfiguration config) {
@@ -171,11 +174,11 @@ class CorsFilterSpec extends Specification {
         request.getMethod() >> HttpMethod.OPTIONS
         def uri = new URIBuilder( '/example' )
         request.getUri() >> uri.build()
-        def route = embeddedServer.getApplicationContext().getBean(Router).
+        def routes = embeddedServer.getApplicationContext().getBean(Router).
                 findAny(request.getUri().toString(), request)
-                .collect(Collectors.toList()).get(0)
+                .collect(Collectors.toList())
 
-        request.getAttribute(HttpAttributes.ROUTE_MATCH, RouteMatch.class) >> Optional.of(route.getRoute())
+        request.getAttribute(HttpAttributes.AVAILABLE_HTTP_METHODS, _) >> Optional.of(routes.stream().map(route->route.getHttpMethod()).collect(Collectors.toList()))
 
         when:
         headers.contains(ACCESS_CONTROL_REQUEST_METHOD) >> true
@@ -204,11 +207,11 @@ class CorsFilterSpec extends Specification {
         request.getMethod() >> HttpMethod.OPTIONS
         def uri = new URIBuilder( '/example' )
         request.getUri() >> uri.build()
-        def route = embeddedServer.getApplicationContext().getBean(Router).
+        def routes = embeddedServer.getApplicationContext().getBean(Router).
                 findAny(request.getUri().toString(), request)
-                .collect(Collectors.toList()).get(0)
+                .collect(Collectors.toList())
 
-        request.getAttribute(HttpAttributes.ROUTE_MATCH, RouteMatch.class) >> Optional.of(route.getRoute())
+        request.getAttribute(HttpAttributes.AVAILABLE_HTTP_METHODS, _) >> Optional.of(routes.stream().map(route->route.getHttpMethod()).collect(Collectors.toList()))
 
         when:
         headers.contains(ACCESS_CONTROL_REQUEST_METHOD) >> true
@@ -288,11 +291,11 @@ class CorsFilterSpec extends Specification {
         request.getMethod() >> HttpMethod.OPTIONS
         def uri = new URIBuilder( '/example' )
         request.getUri() >> uri.build()
-        def route = embeddedServer.getApplicationContext().getBean(Router).
+        def routes = embeddedServer.getApplicationContext().getBean(Router).
                 findAny(request.getUri().toString(), request)
-                .collect(Collectors.toList()).get(0)
+                .collect(Collectors.toList())
 
-        request.getAttribute(HttpAttributes.ROUTE_MATCH, RouteMatch.class) >> Optional.of(route.getRoute())
+        request.getAttribute(HttpAttributes.AVAILABLE_HTTP_METHODS, _) >> Optional.of(routes.stream().map(route->route.getHttpMethod()).collect(Collectors.toList()))
 
         when:
         headers.contains(ACCESS_CONTROL_REQUEST_METHOD) >> true
@@ -300,7 +303,7 @@ class CorsFilterSpec extends Specification {
 
         then: "the response is not modified"
         2 * headers.get(ACCESS_CONTROL_REQUEST_HEADERS, _) >> Optional.of(['X-Header', 'Y-Header'])
-        1 * headers.getFirst(ACCESS_CONTROL_REQUEST_METHOD, _) >> Optional.of(HttpMethod.GET)
+        2 * headers.getFirst(ACCESS_CONTROL_REQUEST_METHOD, _) >> Optional.of(HttpMethod.GET)
         response.getHeaders().get(ACCESS_CONTROL_ALLOW_METHODS) == 'GET'
         response.getHeaders().get(ACCESS_CONTROL_ALLOW_ORIGIN) == 'http://www.foo.com' // The origin is echo'd
         response.getHeaders().get(VARY) == 'Origin' // The vary header is set
@@ -325,11 +328,11 @@ class CorsFilterSpec extends Specification {
         request.getMethod() >> HttpMethod.OPTIONS
         def uri = new URIBuilder( '/example' )
         request.getUri() >> uri.build()
-        def route = embeddedServer.getApplicationContext().getBean(Router).
+        def routes = embeddedServer.getApplicationContext().getBean(Router).
                 findAny(request.getUri().toString(), request)
-                .collect(Collectors.toList()).get(0)
+                .collect(Collectors.toList())
 
-        request.getAttribute(HttpAttributes.ROUTE_MATCH, RouteMatch.class) >> Optional.of(route.getRoute())
+        request.getAttribute(HttpAttributes.AVAILABLE_HTTP_METHODS, _) >> Optional.of(routes.stream().map(route->route.getHttpMethod()).collect(Collectors.toList()))
 
         when:
         headers.contains(ACCESS_CONTROL_REQUEST_METHOD) >> true
@@ -337,7 +340,7 @@ class CorsFilterSpec extends Specification {
 
         then: "the response is not modified"
         2 * headers.get(ACCESS_CONTROL_REQUEST_HEADERS, _) >> Optional.of(['X-Header', 'Y-Header'])
-        1 * headers.getFirst(ACCESS_CONTROL_REQUEST_METHOD, _) >> Optional.of(HttpMethod.GET)
+        2 * headers.getFirst(ACCESS_CONTROL_REQUEST_METHOD, _) >> Optional.of(HttpMethod.GET)
         response.getHeaders().get(ACCESS_CONTROL_ALLOW_METHODS) == 'GET'
         response.getHeaders().get(ACCESS_CONTROL_ALLOW_ORIGIN) == 'http://www.foo.com' // The origin is echo'd
         response.getHeaders().get(VARY) == 'Origin' // The vary header is set
@@ -363,7 +366,11 @@ class CorsFilterSpec extends Specification {
         config.configurations.put('foo', originConfig)
         CorsFilter corsHandler = buildCorsHandler(config)
         request.getMethod() >> HttpMethod.OPTIONS
-        request.getAttribute(HttpAttributes.ROUTE_MATCH, RouteMatch.class) >> Optional.empty()
+        def routes = embeddedServer.getApplicationContext().getBean(Router).
+                findAny(request.getUri().toString(), request)
+                .collect(Collectors.toList())
+
+        request.getAttribute(HttpAttributes.AVAILABLE_HTTP_METHODS, _) >> Optional.of(routes.stream().map(route->route.getHttpMethod()).collect(Collectors.toList()))
 
         when:
         headers.contains(ACCESS_CONTROL_REQUEST_METHOD) >> true
@@ -372,6 +379,36 @@ class CorsFilterSpec extends Specification {
 
         then: "the request is successful"
         2 * headers.getOrigin() >> Optional.of('http://www.foo.com')
+        !result.isPresent()
+    }
+
+    void "test preflight handleRequest on route that does exist but doesn't handle requested HTTP Method"() {
+        given:
+        def config = new HttpServerConfiguration.CorsConfiguration()
+        CorsOriginConfiguration originConfig = new CorsOriginConfiguration()
+        originConfig.exposedHeaders = ['Foo-Header', 'Bar-Header']
+        config.configurations = new LinkedHashMap<String, CorsOriginConfiguration>()
+        config.configurations.put('foo', originConfig)
+        CorsFilter corsHandler = buildCorsHandler(config)
+        HttpRequest request = Mock(HttpRequest)
+        HttpHeaders headers = Mock(HttpHeaders)
+        request.getHeaders() >> headers
+        headers.getOrigin() >> Optional.of('http://www.foo.com')
+        request.getMethod() >> HttpMethod.OPTIONS
+        def uri = new URIBuilder( '/example' )
+        request.getUri() >> uri.build()
+        def routes = embeddedServer.getApplicationContext().getBean(Router).
+                findAny(request.getUri().toString(), request)
+                .collect(Collectors.toList())
+
+        request.getAttribute(HttpAttributes.AVAILABLE_HTTP_METHODS, _) >> Optional.of(routes.stream().map(route->route.getHttpMethod()).collect(Collectors.toList()))
+        when:
+        headers.contains(ACCESS_CONTROL_REQUEST_METHOD) >> true
+        def result = corsHandler.handleRequest(request)
+
+        then: "the request is successful"
+        1 * headers.getFirst(ACCESS_CONTROL_REQUEST_METHOD, _) >> Optional.of(HttpMethod.POST)
+        2 * headers.get(ACCESS_CONTROL_REQUEST_HEADERS, _) >> Optional.of(['X-Header', 'Y-Header'])
         !result.isPresent()
     }
 
