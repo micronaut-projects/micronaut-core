@@ -408,7 +408,6 @@ class CorsFilterSpec extends Specification {
 
         then: "the request is successful"
         1 * headers.getFirst(ACCESS_CONTROL_REQUEST_METHOD, _) >> Optional.of(HttpMethod.POST)
-        2 * headers.get(ACCESS_CONTROL_REQUEST_HEADERS, _) >> Optional.of(['X-Header', 'Y-Header'])
         !result.isPresent()
     }
 
