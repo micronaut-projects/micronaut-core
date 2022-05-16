@@ -1,6 +1,7 @@
 package io.micronaut.http.server.netty
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.annotation.NonNull
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Body
@@ -47,7 +48,6 @@ import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler
 import io.netty.handler.ssl.SslContextBuilder
 import io.netty.handler.ssl.SupportedCipherSuiteFilter
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory
-import org.jetbrains.annotations.NotNull
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import io.micronaut.core.async.annotation.SingleResult
@@ -263,13 +263,13 @@ class MaxRequestSizeSpec extends Specification {
                 .channel(NioSocketChannel)
                 .handler(new ChannelInitializer<Channel>() {
                     @Override
-                    protected void initChannel(@NotNull Channel ch) throws Exception {
+                    protected void initChannel(@NonNull Channel ch) throws Exception {
                         ch.pipeline()
                                 .addLast(new HttpClientCodec())
                                 .addLast(new HttpObjectAggregator(1024))
                                 .addLast(new ChannelInboundHandlerAdapter() {
                                     @Override
-                                    void channelRead(@NotNull ChannelHandlerContext ctx, @NotNull Object msg) throws Exception {
+                                    void channelRead(@NonNull ChannelHandlerContext ctx, @NonNull Object msg) throws Exception {
                                         responses.add(msg)
                                     }
                                 })
@@ -366,7 +366,7 @@ class MaxRequestSizeSpec extends Specification {
                 .option(ChannelOption.AUTO_READ, true)
                 .handler(new ChannelInitializer<SocketChannel>() {
                     @Override
-                    protected void initChannel(@NotNull SocketChannel ch) throws Exception {
+                    protected void initChannel(@NonNull SocketChannel ch) throws Exception {
                         def connection = new DefaultHttp2Connection(false)
                         def connectionHandler = new HttpToHttp2ConnectionHandlerBuilder()
                                 .initialSettings(Http2Settings.defaultSettings())

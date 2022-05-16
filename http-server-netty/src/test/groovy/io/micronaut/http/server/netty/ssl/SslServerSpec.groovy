@@ -1,6 +1,7 @@
 package io.micronaut.http.server.netty.ssl
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.annotation.NonNull
 import io.micronaut.runtime.server.EmbeddedServer
 import io.netty.bootstrap.Bootstrap
 import io.netty.channel.ChannelHandlerContext
@@ -15,7 +16,6 @@ import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler
 import io.netty.handler.ssl.SslContextBuilder
 import io.netty.handler.ssl.SupportedCipherSuiteFilter
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory
-import org.jetbrains.annotations.NotNull
 import spock.lang.Specification
 
 import java.util.concurrent.CompletableFuture
@@ -51,7 +51,7 @@ class SslServerSpec extends Specification {
                 .option(ChannelOption.AUTO_READ, true)
                 .handler(new ChannelInitializer<SocketChannel>() {
                     @Override
-                    protected void initChannel(@NotNull SocketChannel ch) throws Exception {
+                    protected void initChannel(@NonNull SocketChannel ch) throws Exception {
                         ch.pipeline()
                                 .addLast(sslContext.newHandler(ch.alloc(), embeddedServer.host, embeddedServer.port))
                                 .addLast(new ApplicationProtocolNegotiationHandler('fallback') {

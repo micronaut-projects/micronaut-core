@@ -21,8 +21,6 @@ import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 
-import javax.annotation.PostConstruct;
-import javax.annotation.PreDestroy;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -208,8 +206,8 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
         annotationPredicates.add((metadata) ->
                 metadata.hasDeclaredAnnotation(AnnotationUtil.INJECT) ||
                 (metadata.hasDeclaredStereotype(AnnotationUtil.QUALIFIER) && !metadata.hasDeclaredAnnotation(Bean.class)) ||
-                metadata.hasDeclaredAnnotation(PreDestroy.class) ||
-                metadata.hasDeclaredAnnotation(PostConstruct.class));
+                metadata.hasDeclaredAnnotation(AnnotationUtil.PRE_DESTROY) ||
+                metadata.hasDeclaredAnnotation(AnnotationUtil.POST_CONSTRUCT));
         return new DefaultElementQuery<>(
                 elementType, onlyAccessibleType,
                 onlyDeclared,

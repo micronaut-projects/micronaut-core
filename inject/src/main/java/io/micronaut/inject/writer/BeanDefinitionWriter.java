@@ -100,7 +100,6 @@ import io.micronaut.inject.visitor.BeanElementVisitor;
 import io.micronaut.inject.visitor.BeanElementVisitorContext;
 import io.micronaut.inject.visitor.VisitorContext;
 import jakarta.inject.Singleton;
-import org.jetbrains.annotations.NotNull;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Label;
@@ -471,6 +470,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             );
     private static final org.objectweb.asm.commons.Method METHOD_QUALIFIER_BY_TYPE = org.objectweb.asm.commons.Method.getMethod(
             ReflectionUtils.getRequiredMethod(Qualifiers.class, "byType", Class[].class)
+    );
+
+    private static final org.objectweb.asm.commons.Method METHOD_BEAN_RESOLUTION_CONTEXT_MARK_FACTORY = org.objectweb.asm.commons.Method.getMethod(
+            ReflectionUtils.getRequiredMethod(BeanResolutionContext.class, "markDependentAsFactory")
     );
     private static final Type TYPE_QUALIFIERS = Type.getType(Qualifiers.class);
     private static final Type TYPE_QUALIFIER = Type.getType(Qualifier.class);
@@ -1816,7 +1819,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                     ElementQuery.ALL_METHODS
                             .onlyAccessible(beanTypeElement)
                             .onlyInstance()
-                            .named((name) -> annotationMemberProperty.equals(NameUtils.getPropertyNameForGetter(name, readPrefixes)))
+                            .named(name -> annotationMemberProperty.equals(NameUtils.getPropertyNameForGetter(name, readPrefixes)))
                             .filter((e) -> !e.hasParameters())
             ).orElse(null);
         }
@@ -3092,9 +3095,14 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                     org.objectweb.asm.commons.Method.getMethod(METHOD_GET_BEAN)
             );
 
-            // store a reference to the bean being built at index 3
-            int factoryVar = buildMethodVisitor.newLocal(JavaModelUtils.getTypeReference(factoryClass));
-            buildMethodVisitor.storeLocal(factoryVar);
+            int factoryVar = buildMethodVisitor.newLocal(factoryType);
+            buildMethodVisitor.storeLocal(factoryVar, factoryType);
+
+            // BeanResolutionContext
+            buildMethodVisitor.loadArg(0);
+            // .markDependentAsFactory()
+            buildMethodVisitor.invokeInterface(TYPE_RESOLUTION_CONTEXT, METHOD_BEAN_RESOLUTION_CONTEXT_MARK_FACTORY);
+
             buildMethodVisitor.loadLocal(factoryVar);
             pushCastToType(buildMethodVisitor, factoryClass);
             String methodDescriptor = getMethodDescriptorForReturnType(beanType, parameterList);
@@ -3440,7 +3448,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         );
     }
 
-    @NotNull
+    @NonNull
     private String newInnerClassName() {
         return this.beanDefinitionName + "$" + ++innerClassIndex;
     }

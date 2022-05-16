@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty.types.files;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
@@ -40,7 +41,6 @@ import io.netty.handler.stream.ChunkedFile;
 import io.netty.util.ResourceLeakDetector;
 import io.netty.util.ResourceLeakDetectorFactory;
 import io.netty.util.ResourceLeakTracker;
-import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -176,7 +176,7 @@ public class NettySystemFileCustomizableResponseType extends SystemFile implemen
         }
 
         @Override
-        public void operationComplete(@NotNull ChannelFuture future) throws Exception {
+        public void operationComplete(@NonNull ChannelFuture future) throws Exception {
             close();
         }
 
