@@ -1093,12 +1093,19 @@ public class DefaultHttpClient implements
 
     @Override
     public Publisher<MutableHttpResponse<?>> proxy(@NonNull io.micronaut.http.HttpRequest<?> request) {
+        return proxy(request, false);
+    }
+
+    @Override
+    public Publisher<MutableHttpResponse<?>> proxy(@NonNull io.micronaut.http.HttpRequest<?> request, boolean retainHostHeader) {
         return Flux.from(resolveRequestURI(request))
                 .flatMap(requestURI -> {
                     io.micronaut.http.MutableHttpRequest<?> httpRequest = request instanceof MutableHttpRequest
                             ? (io.micronaut.http.MutableHttpRequest<?>) request
                             : request.mutate();
-                    httpRequest.headers(headers -> headers.remove(HttpHeaderNames.HOST));
+                    if (!retainHostHeader) {
+                        httpRequest.headers(headers -> headers.remove(HttpHeaderNames.HOST));
+                    }
 
                     AtomicReference<io.micronaut.http.HttpRequest<?>> requestWrapper = new AtomicReference<>(httpRequest);
                     Flux<MutableHttpResponse<Object>> proxyResponsePublisher = connectAndStream(request, request, requestURI, buildSslContext(requestURI), requestWrapper, true, false);

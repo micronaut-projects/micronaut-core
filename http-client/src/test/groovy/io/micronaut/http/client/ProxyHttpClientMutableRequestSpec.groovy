@@ -2,7 +2,6 @@ package io.micronaut.http.client
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.*
-import io.micronaut.core.io.socket.SocketUtils
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
@@ -15,11 +14,10 @@ import io.micronaut.http.annotation.Post
 import io.micronaut.http.annotation.Produces
 import io.micronaut.http.filter.FilterChain
 import io.micronaut.http.filter.HttpFilter
+import io.micronaut.http.uri.UriBuilder
 import io.micronaut.runtime.server.EmbeddedServer
 import jakarta.inject.Named
 import org.reactivestreams.Publisher
-import org.reactivestreams.Subscriber
-import org.reactivestreams.Subscription
 import reactor.core.publisher.Flux
 import spock.lang.Issue
 import spock.lang.Specification
@@ -60,6 +58,11 @@ class ProxyHttpClientMutableRequestSpec extends Specification {
         then:
         result == "Host: $helloEmbeddedServer.host:$helloEmbeddedServer.port"
 
+        when:'https://github.com/micronaut-projects/micronaut-core/issues/7158'
+        result = client.retrieve(HttpRequest.GET('/hello/host-update').accept(MediaType.TEXT_PLAIN))
+        then:
+        result == "Host: foo"
+
         cleanup:
         helloEmbeddedServer.close()
         client.close()
@@ -99,7 +102,14 @@ class ProxyHttpClientMutableRequestSpec extends Specification {
 
         @Override
         Publisher<? extends HttpResponse<?>> doFilter(HttpRequest<?> request, FilterChain chain) {
-            proxyHttpClient.proxy(request)
+            if (request.path == "/hello/host-update") {
+                def mutableReq = request.mutate()
+                        .uri(UriBuilder.of(request.uri).replacePath("/hello/host").build())
+                mutableReq.getHeaders().set("Host", "foo")
+                return proxyHttpClient.proxy(mutableReq, true)
+            } else {
+                return proxyHttpClient.proxy(request)
+            }
         }
     }
 
