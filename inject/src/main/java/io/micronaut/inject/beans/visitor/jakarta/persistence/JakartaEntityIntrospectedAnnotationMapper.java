@@ -35,7 +35,7 @@ import java.util.List;
  * @since 3.5
  */
 @Internal
-class JakartaEntityIntrospectedAnnotationMapper implements NamedAnnotationMapper {
+public class JakartaEntityIntrospectedAnnotationMapper implements NamedAnnotationMapper {
     @NonNull
     @Override
     public String getName() {

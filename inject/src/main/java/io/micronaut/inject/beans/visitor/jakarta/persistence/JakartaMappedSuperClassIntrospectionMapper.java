@@ -25,7 +25,7 @@ import io.micronaut.core.annotation.NonNull;
  * @since 3.5
  */
 @Internal
-final class JakartaMappedSuperClassIntrospectionMapper extends JakartaEntityIntrospectedAnnotationMapper {
+public final class JakartaMappedSuperClassIntrospectionMapper extends JakartaEntityIntrospectedAnnotationMapper {
     @NonNull
     @Override
     public String getName() {
