@@ -1,0 +1,27 @@
+changelog:
+  exclude:
+    authors:
+      - micronaut-build
+  categories:
+    - title: Breaking Changes 🛠
+      labels:
+        - 'type: breaking'
+    - title: New Features 🎉
+      labels:
+        - 'type: enhancement'
+    - title: Bug Fixes 🐞
+      labels:
+        - 'type: bug'
+    - title: Improvements ⭐
+      labels:
+        - 'type: improvement'
+    - title: Docs 📖
+      labels:
+        - 'type: docs'
+    - title: Dependency updates 🚀
+      labels:
+        - 'type: dependency-upgrade'
+        - 'dependency-upgrade'
+    - title: Other Changes 💡
+      labels:
+        - "*"
