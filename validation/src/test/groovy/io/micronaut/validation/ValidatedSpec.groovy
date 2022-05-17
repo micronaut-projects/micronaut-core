@@ -236,7 +236,7 @@ class ValidatedSpec extends Specification {
 
         then:
         result.message == 'Bad Request'
-        result._embedded.errors.size == 1
+        result._embedded.errors.size() == 1
         result._embedded.errors.find { it.message == 'pojo.email: Email should be valid' }
 
         cleanup:
@@ -268,7 +268,7 @@ class ValidatedSpec extends Specification {
 
         then:
         result.message == 'Bad Request'
-        result._embedded.errors.size == 3
+        result._embedded.errors.size() == 3
         result._embedded.errors.find { it.message == 'pojos[0].email: Email should be valid' }
         result._embedded.errors.find { it.message == 'pojos[0].name: must not be blank' }
         result._embedded.errors.find { it.message == 'pojos[2].name: must not be blank' }
@@ -302,7 +302,7 @@ class ValidatedSpec extends Specification {
 
         then:
         result.message == 'Bad Request'
-        result._embedded.errors.size == 2
+        result._embedded.errors.size() == 2
         result._embedded.errors.find { it.message == 'pojo.email: Email should be valid' }
         result._embedded.errors.find { it.message == 'pojo.name: must not be blank' }
 
@@ -367,7 +367,7 @@ class ValidatedSpec extends Specification {
 
         then:
         result.message == 'Bad Request'
-        result._embedded.errors.size == 1
+        result._embedded.errors.size() == 1
         result._embedded.errors.find { it.message == 'amount: numeric value out of bounds (<3 digits>.<2 digits> expected)' }
 
         cleanup:
@@ -431,7 +431,7 @@ class ValidatedSpec extends Specification {
 
         then:
         result.message == 'Bad Request'
-        result._embedded.errors.size == 1
+        result._embedded.errors.size() == 1
         result._embedded.errors.find { it.message == 'limit: must be greater than or equal to 1' }
 
         cleanup:
@@ -515,7 +515,7 @@ class ValidatedSpec extends Specification {
 
         then:
         result.message == 'Bad Request'
-        result._embedded.errors.size == 1
+        result._embedded.errors.size() == 1
         result._embedded.errors.find { it.message == 'limit: must not be null' }
 
         cleanup:
@@ -554,7 +554,7 @@ class ValidatedSpec extends Specification {
 
         then:
         result.message == 'Bad Request'
-        result._embedded.errors.size == 1
+        result._embedded.errors.size() == 1
         result._embedded.errors.find { it.message == 'value: size must be between 2 and 2147483647' }
 
         cleanup:
@@ -675,7 +675,7 @@ class ValidatedSpec extends Specification {
 
         then:
         result.message == 'Bad Request'
-        result._embedded.errors.size == 1
+        result._embedded.errors.size() == 1
         result._embedded.errors.find { it.message == 'pojo: Cannot validate io.micronaut.validation.PojoNoIntrospection. No bean introspection present. Please add @Introspected to the class and ensure Micronaut annotation processing is enabled' }
 
         cleanup:

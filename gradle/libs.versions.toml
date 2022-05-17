@@ -127,7 +127,6 @@ managed-neo4j = "3.5.32"
 managed-neo4j-java-driver = "4.2.7"
 managed-netty = "4.1.77.Final"
 managed-picocli = "4.6.3"
-managed-protobuf = "3.17.2"
 managed-reactive-pg-client = "0.11.4"
 managed-reactive-streams = "1.0.3"
 # This should be kept aligned with https://github.com/micronaut-projects/micronaut-reactor/blob/master/gradle.properties from the BOM
@@ -187,7 +186,6 @@ boms-kotlin-coroutines = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-bo
 boms-ktor = { module = "io.ktor:ktor-bom", version.ref = "managed-ktor" }
 boms-micrometer = { module = "io.micrometer:micrometer-bom", version.ref = "managed-micrometer" }
 boms-netty = { module = "io.netty:netty-bom", version.ref = "managed-netty" }
-boms-protobuf = { module = "com.google.protobuf:protobuf-bom", version.ref = "managed-protobuf" }
 boms-testcontainers = { module = "org.testcontainers:testcontainers-bom", version.ref = "managed-testcontainers" }
 
 #

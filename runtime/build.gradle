@@ -48,3 +48,10 @@ spotless {
         targetExclude '**/io/micronaut/scheduling/cron/CronExpression.java'
     }
 }
+
+tasks.withType(Test) {
+    if(JavaVersion.current().majorVersion.toInteger() >= 17) {
+        logger.warn("Opening java.util, so SystemLambda can work")
+        jvmArgs += ['--add-opens', 'java.base/java.util=ALL-UNNAMED']
+    }
+}

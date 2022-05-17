@@ -32,3 +32,10 @@ dependencies {
     testRuntimeOnly libs.junit.jupiter.engine
 
 }
+
+tasks.withType(Test) {
+    if(JavaVersion.current().majorVersion.toInteger() >= 17) {
+        logger.warn("Opening java.util, so SystemLambda can work")
+        jvmArgs += ['--add-opens', 'java.base/java.util=ALL-UNNAMED']
+    }
+}
