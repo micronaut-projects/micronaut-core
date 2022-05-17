@@ -99,7 +99,7 @@ public class SystemFile implements FileCustomizableResponseType {
     @Override
     public void process(MutableHttpResponse response) {
         if (attachmentName != null) {
-            response.header(HttpHeaders.CONTENT_DISPOSITION, String.format(ATTACHMENT_HEADER, attachmentName));
+            response.header(HttpHeaders.CONTENT_DISPOSITION, StreamedFile.buildAttachmentHeader(attachmentName));
         }
     }
 }

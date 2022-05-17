@@ -26,6 +26,7 @@ import io.micronaut.http.server.types.CustomizableResponseType;
  */
 public interface FileCustomizableResponseType extends CustomizableResponseType {
 
+    @Deprecated
     String ATTACHMENT_HEADER = "attachment; filename=\"%s\"";
 
     /**
