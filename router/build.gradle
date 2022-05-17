@@ -2,10 +2,6 @@ plugins {
     id "io.micronaut.build.internal.convention-library"
 }
 
-internalSanityChecks {
-    expectedServiceCount.put('io.micronaut.inject.BeanDefinitionReference', 16)
-}           
-
 dependencies {
     annotationProcessor project(":inject-java")
 

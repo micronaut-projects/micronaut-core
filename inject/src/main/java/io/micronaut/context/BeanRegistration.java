@@ -17,12 +17,16 @@ package io.micronaut.context;
 
 import io.micronaut.context.scope.CreatedBean;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.order.Ordered;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
 import io.micronaut.inject.BeanType;
+import io.micronaut.inject.DisposableBeanDefinition;
 
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -47,6 +51,53 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
         this.identifier = identifier;
         this.beanDefinition = beanDefinition;
         this.bean = bean;
+    }
+
+    /**
+     * Creates new bean registration. Possibly disposing registration can be returned.
+     *
+     * @param beanContext    The bean context
+     * @param identifier     The bean identifier
+     * @param beanDefinition The bean definition
+     * @param bean           The bean instance
+     * @param <K>            The bean registration type
+     * @return new bean registration
+     * @since 3.5.0
+     */
+    @NonNull
+    public static <K> BeanRegistration<K> of(@NonNull BeanContext beanContext,
+                                             @NonNull BeanIdentifier identifier,
+                                             @NonNull BeanDefinition<K> beanDefinition,
+                                             @NonNull K bean) {
+        return of(beanContext, identifier, beanDefinition, bean, null);
+    }
+
+    /**
+     * Creates new bean registration. Possibly disposing registration can be returned.
+     *
+     * @param beanContext    The bean context
+     * @param identifier     The bean identifier
+     * @param beanDefinition The bean definition
+     * @param bean           The bean instance
+     * @param dependents     The dependents
+     * @param <K>            The bean registration type
+     * @return new bean registration
+     * @since 3.5.0
+     */
+    @NonNull
+    public static <K> BeanRegistration<K> of(@NonNull BeanContext beanContext,
+                                             @NonNull BeanIdentifier identifier,
+                                             @NonNull BeanDefinition<K> beanDefinition,
+                                             @NonNull K bean,
+                                             @Nullable
+                                             List<BeanRegistration<?>> dependents) {
+        boolean hasDependents = CollectionUtils.isNotEmpty(dependents);
+        if (beanDefinition instanceof DisposableBeanDefinition || bean instanceof LifeCycle || hasDependents) {
+            return hasDependents ?
+                new BeanDisposingRegistration<>(beanContext, identifier, beanDefinition, bean, dependents) :
+                new BeanDisposingRegistration<>(beanContext, identifier, beanDefinition, bean);
+        }
+        return new BeanRegistration<>(identifier, beanDefinition, bean);
     }
 
     @Override

@@ -21,6 +21,7 @@ import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Internal;
@@ -62,9 +63,6 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
-
-import javax.annotation.PostConstruct;
-import javax.annotation.PreDestroy;
 
 /**
  * Abstract implementation of the {@link BeanElementBuilder} interface that should be implemented by downstream language specific implementations.
@@ -233,16 +231,20 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
     }
 
     private void handleMethod(MethodElement methodElement, boolean requiresReflection) {
-        final InternalBeanElementMethod m = new InternalBeanElementMethod(
-                methodElement,
-                requiresReflection
-        );
-        if (m.getAnnotationMetadata().hasDeclaredAnnotation(PreDestroy.class)) {
-            m.preDestroy();
-        } else if (m.getAnnotationMetadata().hasDeclaredAnnotation(PostConstruct.class)) {
-            m.postConstruct();
-        } else {
-            m.inject();
+        boolean lifecycleMethod = false;
+        if (methodElement.getAnnotationMetadata().hasDeclaredAnnotation(AnnotationUtil.PRE_DESTROY)) {
+            new InternalBeanElementMethod(methodElement, requiresReflection)
+                    .preDestroy();
+            lifecycleMethod = true;
+        }
+        if (methodElement.getAnnotationMetadata().hasDeclaredAnnotation(AnnotationUtil.POST_CONSTRUCT)) {
+            new InternalBeanElementMethod(methodElement, requiresReflection)
+                    .postConstruct();
+            lifecycleMethod = true;
+        }
+        if (!lifecycleMethod) {
+            new InternalBeanElementMethod(methodElement, requiresReflection)
+                    .inject();
         }
     }
 

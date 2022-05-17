@@ -17,6 +17,7 @@ package io.micronaut.core.io.service;
 
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.io.IOUtils;
 import io.micronaut.core.optim.StaticOptimizations;
 import io.micronaut.core.reflect.ClassUtils;
 
@@ -26,19 +27,25 @@ import java.io.InputStreamReader;
 import java.io.UncheckedIOException;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Enumeration;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.ServiceConfigurationError;
+import java.util.Set;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.RecursiveAction;
 import java.util.function.Consumer;
@@ -142,9 +149,10 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
             return Optional.of(i.next());
         }
 
-        Optional<Class> alternativeClass = ClassUtils.forName(alternative, classLoader);
-        if (alternativeClass.isPresent()) {
-            return Optional.of(newService(alternative, alternativeClass));
+        @SuppressWarnings("unchecked") Class<S> alternativeClass = ClassUtils.forName(alternative, classLoader)
+                .orElse(null);
+        if (alternativeClass != null) {
+            return Optional.of(createService(alternative, alternativeClass));
         }
         return Optional.empty();
     }
@@ -166,11 +174,15 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
         }
     }
 
-    private void collectDynamicServices(Collection<S> values, Predicate<S> predicate, String name) {
+    private void collectDynamicServices(
+            Collection<S> values,
+            Predicate<S> predicate,
+            String name) {
         ServiceCollector<S> collector = newCollector(name, condition, classLoader, className -> {
             try {
-                final Class<?> loadedClass = Class.forName(className, false, classLoader);
-                S result = (S) loadedClass.getDeclaredConstructor().newInstance();
+                @SuppressWarnings("unchecked") final Class<S> loadedClass =
+                        (Class<S>) Class.forName(className, false, classLoader);
+                S result = loadedClass.getDeclaredConstructor().newInstance();
                 if (predicate != null && !predicate.test(result)) {
                     return null;
                 }
@@ -202,9 +214,10 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
      * @return The iterator
      */
     @Override
+    @NonNull
     public Iterator<ServiceDefinition<S>> iterator() {
         return new Iterator<ServiceDefinition<S>>() {
-            Iterator<ServiceDefinition<S>> loaded = loadedServices.values().iterator();
+            final Iterator<ServiceDefinition<S>> loaded = loadedServices.values().iterator();
 
             @Override
             public boolean hasNext() {
@@ -229,7 +242,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
                     return nextService;
                 }
                 // should not happen
-                throw new Error("Bug in iterator");
+                throw new ServiceConfigurationError("Bug in iterator");
             }
         };
     }
@@ -238,10 +251,36 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
      * @param name The name
      * @param loadedClass The loaded class
      * @return The service definition
+     * @deprecated No longer used
      */
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({"unchecked", "ProtectedMemberInFinalClass", "OptionalUsedAsFieldOrParameterType", "java:S3740",
+            "java:S1133", "rawtypes"})
+    @Deprecated
     protected ServiceDefinition<S> newService(String name, Optional<Class> loadedClass) {
-        return new DefaultServiceDefinition(name, loadedClass);
+        return new DefaultServiceDefinition<>(name, loadedClass.orElse(null));
+    }
+
+    /**
+     * @param name The name
+     * @param loadedClass The loaded class
+     * @return The service definition
+     */
+    private ServiceDefinition<S> createService(String name, Class<S> loadedClass) {
+        return new DefaultServiceDefinition<>(name, loadedClass);
+    }
+
+    @SuppressWarnings("java:S3398")
+    private static Set<String> computeServiceTypeNames(URI uri, String path) {
+        Set<String> typeNames = new HashSet<>();
+        IOUtils.eachFile(
+                uri, path, currentPath -> {
+                    if (Files.isRegularFile(currentPath)) {
+                        final String typeName = currentPath.getFileName().toString();
+                        typeNames.add(typeName);
+                    }
+                }
+        );
+        return typeNames;
     }
 
     public static <S> ServiceCollector<S> newCollector(String serviceName,
@@ -338,6 +377,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
         private Iterator<String> unprocessed = null;
 
         @Override
+        @SuppressWarnings({"java:S3776", "java:S135"})
         public boolean hasNext() {
 
             if (serviceConfigs == null) {
@@ -390,10 +430,11 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
 
             String nextName = unprocessed.next();
             try {
-                final Class<?> loadedClass = Class.forName(nextName, false, classLoader);
-                return newService(nextName, Optional.of(loadedClass));
+                @SuppressWarnings("unchecked")
+                final Class<S> loadedClass = (Class<S>) Class.forName(nextName, false, classLoader);
+                return createService(nextName, loadedClass);
             } catch (NoClassDefFoundError | ClassNotFoundException e) {
-                return newService(nextName, Optional.empty());
+                return createService(nextName, null);
             }
         }
     }
@@ -422,6 +463,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
      *
      * @param <S> The type
      */
+    @SuppressWarnings("java:S1948")
     private static class DefaultServiceCollector<S> extends RecursiveActionValuesCollector<S> implements ServiceCollector<S> {
 
         private final String serviceName;
@@ -447,7 +489,26 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
                     tasks.add(task);
                     task.fork();
                 }
-            } catch (IOException e) {
+                final String path = "META-INF/micronaut/" + serviceName;
+                final Enumeration<URL> micronautResources = classLoader.getResources(path);
+                Set<URI> uniqueURIs = new LinkedHashSet<>();
+                while (micronautResources.hasMoreElements()) {
+                    URL url = micronautResources.nextElement();
+                    final URI uri = url.toURI();
+                    uniqueURIs.add(uri);
+                }
+
+                for (URI uri : uniqueURIs) {
+                    String uriStr = uri.toString();
+                    // on GraalVM there are spurious extra resources that end with # and then a number
+                    // we ignore this extra ones
+                    if (!(uriStr.startsWith("resource:") && uriStr.contains("#"))) {
+                        final MicronautMetaServicesLoader<S> task = new MicronautMetaServicesLoader<>(uri, path, transformer);
+                        tasks.add(task);
+                        task.fork();
+                    }
+                }
+            } catch (IOException | URISyntaxException e) {
                 throw new ServiceConfigurationError("Failed to load resources for service: " + serviceName, e);
             }
         }
@@ -461,12 +522,45 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
         }
     }
 
+    private static final class MicronautMetaServicesLoader<S> extends RecursiveActionValuesCollector<S> {
+        private final URI uri;
+        private final transient Function<String, S> transformer;
+        private final List<ServiceInstanceLoader<S>> tasks = new LinkedList<>();
+        private final String path;
+
+        private MicronautMetaServicesLoader(URI uri, String path, Function<String, S> transformer) {
+            this.uri = uri;
+            this.path = path;
+            this.transformer = transformer;
+        }
+
+        @Override
+        public void collect(Collection<S> values) {
+            for (ServiceInstanceLoader<S> task : tasks) {
+                task.join();
+                task.collect(values);
+            }
+        }
+
+        @Override
+        @SuppressWarnings("java:S2095")
+        protected void compute() {
+            Set<String> typeNames = computeServiceTypeNames(uri, path);
+            for (String typeName : typeNames) {
+                ServiceInstanceLoader<S> task = new ServiceInstanceLoader<>(typeName, transformer);
+                tasks.add(task);
+                task.fork();
+            }
+        }
+    }
+
     /**
      * Reads URL, parses the file and produces sub tasks to initialize the entry.
      *
      * @param <S> The type
      */
-    private static class UrlServicesLoader<S> extends RecursiveActionValuesCollector<S> {
+    @SuppressWarnings("java:S1948")
+    private static final class UrlServicesLoader<S> extends RecursiveActionValuesCollector<S> {
 
         private final URL url;
         private final Predicate<String> lineCondition;
@@ -480,6 +574,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
         }
 
         @Override
+        @SuppressWarnings({"java:S3776", "java:S135"})
         protected void compute() {
             try {
                 try (BufferedReader reader = new BufferedReader(new InputStreamReader(url.openStream()))) {
@@ -522,7 +617,8 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
      *
      * @param <S> The type
      */
-    private static class ServiceInstanceLoader<S> extends RecursiveActionValuesCollector<S> {
+    @SuppressWarnings("java:S1948")
+    private static final class ServiceInstanceLoader<S> extends RecursiveActionValuesCollector<S> {
 
         private final String className;
         private final Function<String, S> transformer;
@@ -545,9 +641,9 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
 
         public void collect(Collection<S> values) {
             if (throwable != null) {
-                throw new RuntimeException("Failed to load a service: " + throwable.getMessage(), throwable);
+                throw new ServiceLoadingException("Failed to load a service: " + throwable.getMessage(), throwable);
             }
-            if (result != null) {
+            if (result != null && !values.contains(result)) {
                 values.add(result);
             }
         }
@@ -599,6 +695,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
             this.serviceLoaders = serviceLoaders;
         }
 
+        @SuppressWarnings("java:S1452")
         public Map<String, StaticServiceLoader<?>> getServiceLoaders() {
             return serviceLoaders;
         }
@@ -608,6 +705,10 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
      * Exception thrown when a service cannot be loaded.
      */
     private static class ServiceLoadingException extends RuntimeException {
+        public ServiceLoadingException(String message, Throwable cause) {
+            super(message, cause);
+        }
+
         public ServiceLoadingException(Throwable cause) {
             super(cause);
         }

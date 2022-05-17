@@ -8,10 +8,10 @@ import jakarta.inject.Singleton;
 
 @Singleton
 public class CDestroyedListener implements BeanDestroyedEventListener<C> {
-    private boolean called = true;
+    private boolean called = false;
     @Override
     public void onDestroyed(BeanDestroyedEvent<C> event) {
-        this.called = called;
+        this.called = true;
         Assertions.assertTrue(event.getBean().isClosed());
     }
 

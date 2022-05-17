@@ -106,7 +106,8 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
         }
         outputVisitor.visitServiceDescriptor(
                 BeanDefinitionReference.class,
-                beanDefinitionReferenceClassName
+                beanDefinitionReferenceClassName,
+                getOriginatingElement()
         );
     }
 

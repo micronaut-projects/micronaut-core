@@ -3,11 +3,6 @@ plugins {
     id "org.jetbrains.kotlin.jvm"
 }
 
-internalSanityChecks {
-    expectedServiceCount.put('io.micronaut.core.beans.BeanIntrospectionReference', 6)
-    expectedServiceCount.put('io.micronaut.inject.BeanDefinitionReference', 21)
-}
-
 dependencies {
     annotationProcessor project(":inject-java")
     annotationProcessor project(":graal")

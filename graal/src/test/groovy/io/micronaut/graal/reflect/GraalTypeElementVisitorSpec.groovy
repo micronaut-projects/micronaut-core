@@ -1,13 +1,16 @@
 package io.micronaut.graal.reflect
 
-import groovy.json.JsonSlurper
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.core.annotation.AnnotationValue
+import io.micronaut.core.annotation.ReflectionConfig
+import io.micronaut.core.annotation.TypeHint
+import io.micronaut.core.graal.GraalReflectionConfigurer
 
 class GraalTypeElementVisitorSpec extends AbstractTypeElementSpec {
 
     void "an @Introspected class doesn't add anything to reflect.json"() {
         when:
-        Reader reader = readGenerated("native-image/test/test/reflect-config.json", 'test.Test', '''
+        buildReflectionConfigurer( 'test.Test', '''
 package test;
 
 import io.micronaut.core.annotation.Introspected;
@@ -20,13 +23,13 @@ class Test {
 ''')
 
         then:
-        !reader
+        thrown(ClassNotFoundException)
     }
 
     void "test write reflect.json for @TypeHint with classes"() {
 
         given:
-        Reader reader = readGenerated("native-image/test/test/reflect-config.json", 'test.Test', '''
+        GraalReflectionConfigurer configurer = buildReflectionConfigurer('test.Test', '''
 package test;
 
 import io.micronaut.core.annotation.*;
@@ -41,24 +44,52 @@ class Bar {}
 ''')
 
         when:
-        def json = new JsonSlurper().parse(reader)
-        json = json.sort { it.name }
-        def entry = json?.find { it.name == 'test.Bar'}
-        then:
-        entry
-        entry.name == 'test.Bar'
-        !entry.allPublicMethods
-        !entry.allDeclaredFields
-        entry.allDeclaredConstructors
+        AnnotationValue<ReflectionConfig> config = configurer.getAnnotationMetadata().getAnnotationValuesByType(ReflectionConfig).first()
 
-        cleanup:
-        reader.close()
+        then:
+        config
+        config.stringValue("type").get() == 'test.Bar'
+        config.enumValues("accessType", TypeHint.AccessType) == [TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS] as TypeHint.AccessType[]
+    }
+
+    void "test write reflect.json for @ReflectionConfig with classes"() {
+
+        given:
+        GraalReflectionConfigurer configurer = buildReflectionConfigurer('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.*;
+
+@ReflectionConfig(
+    type = Bar.class,
+    accessType = TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS,
+    methods = @ReflectionConfig.ReflectiveMethodConfig(
+            name = "foo"
+    )
+)
+class Test {
+    
+}
+
+class Bar {}
+
+''')
+
+        when:
+        AnnotationValue<ReflectionConfig> config = configurer.getAnnotationMetadata().getAnnotationValuesByType(ReflectionConfig).first()
+
+        then:
+        config
+        config.stringValue("type").get() == 'test.Bar'
+        config.enumValues("accessType", TypeHint.AccessType) == [TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS] as TypeHint.AccessType[]
+        config.getAnnotations("methods").size() == 1
+        config.getAnnotations("methods").first().stringValue("name").get() == 'foo'
     }
 
     void "test write reflect.json for @TypeHint with classes and type names"() {
 
         given:
-        Reader reader = readGenerated("native-image/test/test/reflect-config.json", 'test.Test', '''
+        GraalReflectionConfigurer configurer = buildReflectionConfigurer('test.Test', '''
 package test;
 
 import io.micronaut.core.annotation.*;
@@ -73,26 +104,74 @@ class Bar {}
 ''')
 
         when:
-        def json = new JsonSlurper().parse(reader)
-        json = json.sort { it.name }
-        def entry = json?.find { it.name == 'test.Bar'}
-        then:
-        entry
-        entry.name == 'test.Bar'
-        !entry.allPublicMethods
-        !entry.allDeclaredFields
-        entry.allDeclaredConstructors
-        json?.find { it.name == 'java.lang.String'}
+        List<AnnotationValue<ReflectionConfig>> configs = configurer.getAnnotationMetadata().getAnnotationValuesByType(ReflectionConfig)
 
-        cleanup:
-        reader.close()
+        then:
+        configs.size() == 2
+
+        when:
+        AnnotationValue<ReflectionConfig> config = configs.find {it.stringValue("type").get() == 'test.Bar' }
+
+        then:
+        config
+        config.stringValue("type").get() == 'test.Bar'
+        config.enumValues("accessType", TypeHint.AccessType) == [TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS] as TypeHint.AccessType[]
+
+        when:
+        config = configs.find {it.classValue("type").get() == String }
+
+        then:
+        config
+        config.enumValues("accessType", TypeHint.AccessType) == [TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS] as TypeHint.AccessType[]
+
+    }
+
+    void "test write reflect.json for @TypeHint with classes and arrays"() {
+
+        given:
+        GraalReflectionConfigurer configurer = buildReflectionConfigurer('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.*;
+
+@TypeHint(value = {Bar.class, String[].class})
+class Test {
+    
+}
+
+class Bar {}
+
+''')
+
+        when:
+        def configs = configurer.getAnnotationMetadata().getAnnotationValuesByType(ReflectionConfig)
+
+        then:
+        configs.size() == 2
+
+        when:
+        def config = configs.find {it.stringValue("type").get() == 'test.Bar' }
+
+        then:
+        config
+        config.stringValue("type").get() == 'test.Bar'
+        config.enumValues("accessType", TypeHint.AccessType) == [TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS] as TypeHint.AccessType[]
+
+        when:
+        config = configs.find {it.classValue("type").get() == String[].class }
+
+        then:
+        config
+        config.enumValues("accessType", TypeHint.AccessType) == [TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS] as TypeHint.AccessType[]
+
     }
 
     void "test write reflect.json for @TypeHint with access type"() {
-
         given:
-        Reader reader = readGenerated("native-image/test/test/reflect-config.json", 'test.Test', '''
+        GraalReflectionConfigurer configurer = buildReflectionConfigurer('test.Test', '''
 package test;
+
+import io.micronaut.core.annotation.*;
 
 import io.micronaut.core.annotation.*;
 
@@ -106,24 +185,18 @@ class Bar {}
 ''')
 
         when:
-        def json = new JsonSlurper().parse(reader)
-        json = json.sort { it.name }
-        def entry = json?.find { it.name == 'test.Bar'}
-        then:
-        entry
-        entry.name == 'test.Bar'
-        entry.allPublicMethods
-        !entry.allDeclaredFields
-        !entry.allDeclaredConstructors
+        AnnotationValue<ReflectionConfig> config = configurer.getAnnotationMetadata().getAnnotationValuesByType(ReflectionConfig).first()
 
-        cleanup:
-        reader.close()
+        then:
+        config
+        config.stringValue("type").get() == 'test.Bar'
+        config.enumValues("accessType", TypeHint.AccessType) == [TypeHint.AccessType.ALL_PUBLIC_METHODS] as TypeHint.AccessType[]
     }
 
     void "test write reflect.json for @ReflectiveAccess with access type"() {
 
         given:
-        Reader reader = readGenerated("native-image/test/test/reflect-config.json", 'test.Test', '''
+        GraalReflectionConfigurer configurer = buildReflectionConfigurer('test.Test', '''
 package test;
 
 import io.micronaut.core.annotation.*;
@@ -143,25 +216,22 @@ class Test {
 ''')
 
         when:
-        def json = new JsonSlurper().parse(reader)
-        json = json.sort { it.name }
-        def entry = json?.find { it.name == 'test.Test'}
-        then:
-        entry
-        entry.name == 'test.Test'
-        entry.fields
-        entry.fields[0].name == 'name'
-        entry.methods
-        entry.methods[0].name == 'getFoo'
+        AnnotationValue<ReflectionConfig> config = configurer.getAnnotationMetadata().getAnnotationValuesByType(ReflectionConfig).first()
 
-        cleanup:
-        reader.close()
+        then:
+        config
+        config.stringValue("type").get() == 'test.Test'
+        config.enumValues("accessType", TypeHint.AccessType) == [] as TypeHint.AccessType[]
+        config.getAnnotations("methods").size() == 1
+        config.getAnnotations("methods").first().stringValue("name").get() == 'getFoo'
+        config.getAnnotations("fields").size() == 1
+        config.getAnnotations("fields").first().stringValue("name").get() == 'name'
     }
 
     void "test write reflect.json for @Inject on private fields or methods"() {
 
         given:
-        Reader reader = readGenerated("native-image/test/test/reflect-config.json", 'test.Test', '''
+        GraalReflectionConfigurer configurer = buildReflectionConfigurer('test.Test', '''
 package test;
 
 import io.micronaut.core.annotation.*;
@@ -181,25 +251,22 @@ class Other {}
 ''')
 
         when:
-        def json = new JsonSlurper().parse(reader)
-        json = json.sort { it.name }
-        def entry = json?.find { it.name == 'test.Test'}
-        then:
-        entry
-        entry.name == 'test.Test'
-        entry.fields
-        entry.fields[0].name == 'name'
-        entry.methods
-        entry.methods[0].name == 'setFoo'
+        AnnotationValue<ReflectionConfig> config = configurer.getAnnotationMetadata().getAnnotationValuesByType(ReflectionConfig).first()
 
-        cleanup:
-        reader.close()
+        then:
+        config
+        config.stringValue("type").get() == 'test.Test'
+        config.enumValues("accessType", TypeHint.AccessType) == [] as TypeHint.AccessType[]
+        config.getAnnotations("methods").size() == 1
+        config.getAnnotations("methods").first().stringValue("name").get() == 'setFoo'
+        config.getAnnotations("fields").size() == 1
+        config.getAnnotations("fields").first().stringValue("name").get() == 'name'
     }
 
     void "test write reflect.json for @ReflectiveAccess with inheritance"() {
 
         given:
-        Reader reader = readGenerated("native-image/test/test/reflect-config.json", 'test.HTTPCheck', '''
+        GraalReflectionConfigurer configurer = buildReflectionConfigurer('test.HTTPCheck', '''
 package test;
 
 import io.micronaut.core.annotation.*;
@@ -228,23 +295,20 @@ abstract class NewCheck {
 ''')
 
         when:
-        def json = new JsonSlurper().parse(reader)
-        json = json.sort { it.name }
-        def entry = json?.find { it.name == 'test.HTTPCheck'}
-        then:
-        entry
-        entry.name == 'test.HTTPCheck'
-        entry.methods.size() == 1
-        entry.methods[0].name == 'setInterval'
-        entry.methods[0].parameterTypes == ['java.lang.String']
+        AnnotationValue<ReflectionConfig> config = configurer.getAnnotationMetadata().getAnnotationValuesByType(ReflectionConfig).first()
 
-        cleanup:
-        reader.close()
+        then:
+        config
+        config.stringValue("type").get() == 'test.HTTPCheck'
+        config.enumValues("accessType", TypeHint.AccessType) == [] as TypeHint.AccessType[]
+        config.getAnnotations("methods").size() == 1
+        config.getAnnotations("methods").first().stringValue("name").get() == 'setInterval'
+        config.getAnnotations("methods").first().classValues("parameterTypes") == [String] as Class[]
     }
 
     void "test write reflect.json for @ReflectiveAccess with classes"() {
         given:
-        Reader reader = readGenerated("native-image/test/test/reflect-config.json", 'test.Test', '''
+        GraalReflectionConfigurer configurer = buildReflectionConfigurer('test.Test', '''
 package test;
 
 import io.micronaut.core.annotation.ReflectiveAccess;
@@ -256,27 +320,19 @@ class Test {
 ''')
 
         when:
-        def json = new JsonSlurper().parse(reader)
-        json = json.sort { it.name }
-        def entry = json?.find { it.name == 'test.Test'}
+        AnnotationValue<ReflectionConfig> config = configurer.getAnnotationMetadata().getAnnotationValuesByType(ReflectionConfig).first()
 
         then:
-        entry
-        entry.name == 'test.Test'
-        entry.allDeclaredFields
-        entry.allPublicMethods
-        entry.allDeclaredConstructors
-        entry.methods
-        entry.methods[0].name == '<init>'
-        entry.methods[0].parameterTypes == []
-
-        cleanup:
-        reader.close()
+        config
+        config.stringValue("type").get() == 'test.Test'
+        config.enumValues("accessType", TypeHint.AccessType) == [TypeHint.AccessType.ALL_PUBLIC_METHODS, TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS, TypeHint.AccessType.ALL_DECLARED_FIELDS] as TypeHint.AccessType[]
+        config.getAnnotations("methods").first().stringValue("name").get() == '<init>'
     }
 
     void "test write reflect.json for @Entity with classes"() {
+
         given:
-        Reader reader = readGenerated("native-image/test/test/reflect-config.json", 'test.Test', '''
+        GraalReflectionConfigurer configurer = buildReflectionConfigurer('test.Test', '''
 package test;
 
 
@@ -291,28 +347,40 @@ class Test {
 ''')
 
         when:
-        def json = new JsonSlurper().parse(reader)
-        json = json.sort { it.name }
-        def entry = json?.find { it.name == 'test.Test'}
+        AnnotationValue<ReflectionConfig> config = configurer.getAnnotationMetadata().getAnnotationValuesByType(ReflectionConfig).first()
 
         then:
-        entry
-        entry.name == 'test.Test'
-        entry.allDeclaredFields
-        entry.allPublicMethods
-        entry.allDeclaredConstructors
-        entry.methods
-        entry.methods[0].name == '<init>'
-        entry.methods[0].parameterTypes == []
-        json?.find { it.name == 'test.Test$InnerEnum'}
+        config
+        config.stringValue("type").get() == 'test.Test'
+        config.enumValues("accessType", TypeHint.AccessType) == [TypeHint.AccessType.ALL_PUBLIC_METHODS, TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS, TypeHint.AccessType.ALL_DECLARED_FIELDS] as TypeHint.AccessType[]
+        config.getAnnotations("methods").size() == 1
+        config.getAnnotations("methods").first().stringValue("name").get() == '<init>'
 
-        cleanup:
-        reader.close()
+        when:
+        configurer = buildReflectionConfigurer('test.Test$InnerEnum', '''
+package test;
+
+
+@javax.persistence.Entity
+class Test {
+
+
+    enum InnerEnum {
+        ONE, TWO;
+    }
+}
+''')
+        config = configurer.getAnnotationMetadata().getAnnotationValuesByType(ReflectionConfig).first()
+
+        then:
+        config
+        config.stringValue("type").get() == 'test.Test$InnerEnum'
+
     }
 
     void "test write reflect.json for @ReflectiveAccess with enums"() {
         given:
-        Reader reader = readGenerated("native-image/test/test/reflect-config.json", 'test.Test', '''
+        GraalReflectionConfigurer configurer = buildReflectionConfigurer('test.Test', '''
 package test;
 
 import io.micronaut.core.annotation.ReflectiveAccess;
@@ -323,21 +391,15 @@ enum Test {
 }
 ''')
 
+
         when:
-        def json = new JsonSlurper().parse(reader)
-        json = json.sort { it.name }
-        def entry = json?.find { it.name == 'test.Test'}
+        AnnotationValue<ReflectionConfig> config = configurer.getAnnotationMetadata().getAnnotationValuesByType(ReflectionConfig).first()
 
         then:
-        entry
-        entry.name == 'test.Test'
-        entry.allDeclaredFields
-        entry.allPublicMethods
-        entry.allDeclaredConstructors
-        !entry.methods
+        config
+        config.stringValue("type").get() == 'test.Test'
+        config.enumValues("accessType", TypeHint.AccessType) == [TypeHint.AccessType.ALL_PUBLIC_METHODS, TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS, TypeHint.AccessType.ALL_DECLARED_FIELDS] as TypeHint.AccessType[]
+        config.getAnnotations("methods").size() == 0
 
-        cleanup:
-        reader.close()
     }
-
 }

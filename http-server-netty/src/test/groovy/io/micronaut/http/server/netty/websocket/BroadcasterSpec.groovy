@@ -4,6 +4,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.event.BeanCreatedEvent
 import io.micronaut.context.event.BeanCreatedEventListener
+import io.micronaut.core.annotation.NonNull
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.websocket.WebSocketBroadcaster
@@ -33,7 +34,6 @@ import io.netty.handler.codec.http.websocketx.WebSocketVersion
 import io.netty.util.concurrent.Promise
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
-import org.jetbrains.annotations.NotNull
 import org.reactivestreams.Subscriber
 import org.reactivestreams.Subscription
 import spock.lang.Issue
@@ -65,7 +65,7 @@ class BroadcasterSpec extends Specification {
                 .channel(NioSocketChannel)
                 .handler(new ChannelInitializer<SocketChannel>() {
                     @Override
-                    protected void initChannel(@NotNull SocketChannel ch) throws Exception {
+                    protected void initChannel(@NonNull SocketChannel ch) throws Exception {
                         def handshaker = WebSocketClientHandshakerFactory.newHandshaker(new URI(uri), WebSocketVersion.V13, null, true, new DefaultHttpHeaders())
                         def handshakeFuture = ch.newPromise()
                         handshakes.add(handshakeFuture)
@@ -82,7 +82,7 @@ class BroadcasterSpec extends Specification {
                                 }
 
                                 @Override
-                                void channelActive(@NotNull ChannelHandlerContext ctx_) throws Exception {
+                                void channelActive(@NonNull ChannelHandlerContext ctx_) throws Exception {
                                     handshaker.handshake(ctx_.channel())
                                 }
                             })
