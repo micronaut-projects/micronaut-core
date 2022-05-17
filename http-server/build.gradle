@@ -10,6 +10,8 @@ dependencies {
     compileOnly libs.kotlinx.coroutines.reactor
     implementation libs.managed.reactor
     annotationProcessor project(":inject-java")
+
+    testImplementation libs.managed.netty.codec.http
 }
 
 //compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']
