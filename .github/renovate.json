@@ -8,5 +8,11 @@
   ],
   "prHourlyLimit": 1,
   "prConcurrentLimit": 20,
-  "timezone": "Europe/Prague"
+  "timezone": "Europe/Prague",
+  "packageRules": [
+    {
+      "matchPackagePatterns": ["actions.*"],
+      "dependencyDashboardApproval": true
+    }
+  ]
 }
