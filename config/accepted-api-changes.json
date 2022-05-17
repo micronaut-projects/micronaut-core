@@ -93,5 +93,15 @@
         "type": "io.micronaut.context.scope.CustomScope",
         "member": "Method io.micronaut.context.scope.CustomScope.findBeanRegistration(io.micronaut.inject.BeanDefinition)",
         "reason": "New method added with a default implementation"
+    },
+    {
+        "type": "io.micronaut.http.client.ProxyHttpClient",
+        "member": "Class io.micronaut.http.client.ProxyHttpClient",
+        "reason": "New method added with a default implementation"
+    },
+    {
+        "type": "io.micronaut.http.client.ProxyHttpClient",
+        "member": "Method io.micronaut.http.client.ProxyHttpClient.proxy(io.micronaut.http.HttpRequest,io.micronaut.http.client.ProxyRequestOptions)",
+        "reason": "New method added with a default implementation"
     }
 ]
