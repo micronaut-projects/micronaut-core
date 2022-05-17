@@ -26,6 +26,9 @@ import io.micronaut.http.server.types.CustomizableResponseType;
  */
 public interface FileCustomizableResponseType extends CustomizableResponseType {
 
+    /**
+     * @deprecated Unused now, please follow <a href="https://httpwg.org/specs/rfc6266.html">RFC 6266</a>
+     */
     @Deprecated
     String ATTACHMENT_HEADER = "attachment; filename=\"%s\"";
 

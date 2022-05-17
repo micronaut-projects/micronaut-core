@@ -156,7 +156,7 @@ public class StreamedFile implements FileCustomizableResponseType {
 
     // this is mostly copied from netty QueryStringEncoder
 
-    @SuppressWarnings({"S3776", "S135", "S127"}) // stay close to netty impl
+    @SuppressWarnings({"java:S3776", "java:S135", "java:S127"}) // stay close to netty impl
     static String encodeRfc6987(String s) {
         StringBuilder uriBuilder = new StringBuilder();
         for (int i = 0; i < s.length(); i++) {
