@@ -165,7 +165,7 @@ class CorsFilterSpec extends Specification {
         then: "the request is rejected because bar is not allowed"
         2 * headers.getOrigin() >> Optional.of('http://www.foo.com')
         1 * headers.getFirst(ACCESS_CONTROL_REQUEST_METHOD, _) >> Optional.of(HttpMethod.GET)
-        1 * headers.get(ACCESS_CONTROL_REQUEST_HEADERS, _) >> ['foo', 'bar']
+        1 * headers.get(ACCESS_CONTROL_REQUEST_HEADERS, _) >> Optional.of(['foo', 'bar'])
         result.get().status == HttpStatus.FORBIDDEN
     }
 
