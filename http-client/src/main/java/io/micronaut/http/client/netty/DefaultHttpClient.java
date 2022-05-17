@@ -50,6 +50,7 @@ import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.ProxyHttpClient;
+import io.micronaut.http.client.ProxyRequestOptions;
 import io.micronaut.http.client.StreamingHttpClient;
 import io.micronaut.http.client.exceptions.ContentLengthExceededException;
 import io.micronaut.http.client.exceptions.HttpClientErrorDecoder;
@@ -1093,17 +1094,18 @@ public class DefaultHttpClient implements
 
     @Override
     public Publisher<MutableHttpResponse<?>> proxy(@NonNull io.micronaut.http.HttpRequest<?> request) {
-        return proxy(request, false);
+        return proxy(request, ProxyRequestOptions.getDefault());
     }
 
     @Override
-    public Publisher<MutableHttpResponse<?>> proxy(@NonNull io.micronaut.http.HttpRequest<?> request, boolean retainHostHeader) {
+    public Publisher<MutableHttpResponse<?>> proxy(@NonNull io.micronaut.http.HttpRequest<?> request, @NonNull ProxyRequestOptions options) {
+        Objects.requireNonNull(options, "options");
         return Flux.from(resolveRequestURI(request))
                 .flatMap(requestURI -> {
                     io.micronaut.http.MutableHttpRequest<?> httpRequest = request instanceof MutableHttpRequest
                             ? (io.micronaut.http.MutableHttpRequest<?>) request
                             : request.mutate();
-                    if (!retainHostHeader) {
+                    if (!options.isRetainHostHeader()) {
                         httpRequest.headers(headers -> headers.remove(HttpHeaderNames.HOST));
                     }
 

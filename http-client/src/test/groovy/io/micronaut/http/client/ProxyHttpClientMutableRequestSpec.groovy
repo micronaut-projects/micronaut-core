@@ -106,7 +106,7 @@ class ProxyHttpClientMutableRequestSpec extends Specification {
                 def mutableReq = request.mutate()
                         .uri(UriBuilder.of(request.uri).replacePath("/hello/host").build())
                 mutableReq.getHeaders().set("Host", "foo")
-                return proxyHttpClient.proxy(mutableReq, true)
+                return proxyHttpClient.proxy(mutableReq, ProxyRequestOptions.builder().retainHostHeader().build())
             } else {
                 return proxyHttpClient.proxy(request)
             }
