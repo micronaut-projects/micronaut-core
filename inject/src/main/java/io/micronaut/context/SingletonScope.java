@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 
@@ -364,7 +365,8 @@ final class SingletonScope {
             if (beanDefinitionDelegate.definition.getClass() != that.beanDefinitionDelegate.definition.getClass()) {
                 return false;
             }
-            return beanDefinitionDelegate.getAttributes().equals(that.beanDefinitionDelegate.getAttributes());
+            return Objects.equals(beanDefinitionDelegate.getAttributes(), that.beanDefinitionDelegate.getAttributes())
+                    && Objects.equals(beanDefinitionDelegate.getQualifier(), that.beanDefinitionDelegate.getQualifier());
         }
 
         @Override

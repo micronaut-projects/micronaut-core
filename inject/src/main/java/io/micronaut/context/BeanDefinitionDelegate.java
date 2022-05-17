@@ -25,6 +25,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameResolver;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.value.ValueResolver;
 import io.micronaut.inject.*;
 import io.micronaut.inject.qualifiers.Qualifiers;
@@ -44,15 +45,32 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
     static final String PRIMARY_ATTRIBUTE = Primary.class.getName();
 
     protected final BeanDefinition<T> definition;
-    protected final Map<String, Object> attributes = new HashMap<>(2);
+    @Nullable
+    protected Map<String, Object> attributes;
+    @Nullable
+    protected final Qualifier qualifier;
 
     private BeanDefinitionDelegate(BeanDefinition<T> definition) {
+        this(definition, null);
+    }
+
+    private BeanDefinitionDelegate(BeanDefinition<T> definition, @Nullable Qualifier qualifier) {
         this.definition = definition;
+        this.qualifier = qualifier;
+    }
+
+    /**
+     * @return the qualifier
+     */
+    @Nullable
+    public Qualifier getQualifier() {
+        return qualifier;
     }
 
     /**
      * @return the attributes
      */
+    @Nullable
     public Map<String, Object> getAttributes() {
         return attributes;
     }
@@ -60,12 +78,17 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
     @Nullable
     @Override
     public Qualifier<T> resolveDynamicQualifier() {
-        Qualifier<T> qualifier = null;
+        if (qualifier != null) {
+            return qualifier;
+        }
+        if (attributes == null) {
+            return null;
+        }
         Object o = attributes.get(NAMED_ATTRIBUTE);
         if (o instanceof CharSequence) {
-            qualifier = Qualifiers.byName(o.toString());
+            return Qualifiers.byName(o.toString());
         }
-        return qualifier;
+        return null;
     }
 
     /**
@@ -91,6 +114,9 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
     }
 
     private boolean isPrimaryThroughAttribute() {
+        if (attributes == null) {
+            return false;
+        }
         Object o = attributes.get(PRIMARY_ATTRIBUTE);
         if (o instanceof Boolean) {
             return (Boolean) o;
@@ -101,7 +127,7 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
     @Override
     public T build(BeanResolutionContext resolutionContext, BeanContext context, BeanDefinition<T> definition) throws BeanInstantiationException {
         LinkedHashMap<String, Object> oldAttributes = null;
-        if (!attributes.isEmpty()) {
+        if (CollectionUtils.isNotEmpty(attributes)) {
             LinkedHashMap<String, Object> oldAttrs = new LinkedHashMap<>(attributes.size());
             attributes.forEach((key, value) -> {
                 Object previous = resolutionContext.setAttribute(key, value);
@@ -116,7 +142,7 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
             if (this.definition instanceof ParametrizedBeanFactory) {
                 ParametrizedBeanFactory<T> parametrizedBeanFactory = (ParametrizedBeanFactory<T>) this.definition;
                 Argument[] requiredArguments = parametrizedBeanFactory.getRequiredArguments();
-                Object named = attributes.get(Named.class.getName());
+                Object named = attributes == null ? null : attributes.get(Named.class.getName());
                 if (named != null) {
                     Map<String, Object> fulfilled = new LinkedHashMap<>(requiredArguments.length);
                     for (Argument argument : requiredArguments) {
@@ -145,8 +171,10 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
                 throw new IllegalStateException("Cannot construct a dynamically registered singleton");
             }
         } finally {
-            for (String key : attributes.keySet()) {
-                resolutionContext.removeAttribute(key);
+            if (attributes != null) {
+                for (String key : attributes.keySet()) {
+                    resolutionContext.removeAttribute(key);
+                }
             }
             if (oldAttributes != null) {
                 oldAttributes.forEach(resolutionContext::setAttribute);
@@ -192,14 +220,20 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
      * @param value The value
      */
     public void put(String name, Object value) {
+        if (attributes == null) {
+            attributes = new HashMap<>(2, 1);
+        }
         this.attributes.put(name, value);
     }
 
     @Override
-    public <T> Optional<T> get(String name, ArgumentConversionContext<T> conversionContext) {
+    public <K> Optional<K> get(String name, ArgumentConversionContext<K> conversionContext) {
+        if (attributes == null) {
+            return Optional.empty();
+        }
         Object value = attributes.get(name);
         if (value != null && conversionContext.getArgument().getType().isInstance(value)) {
-            return Optional.of((T) value);
+            return Optional.of((K) value);
         }
         return Optional.empty();
     }
@@ -225,6 +259,16 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
             return new ValidatingDelegate<>(definition);
         }
         return new BeanDefinitionDelegate<>(definition);
+    }
+
+    /**
+     * @param definition The bean definition type
+     * @param qualifier The bean qualifier
+     * @param <T>        The type
+     * @return The new bean definition
+     */
+    static <T> BeanDefinitionDelegate<T> create(BeanDefinition<T> definition, Qualifier qualifier) {
+        return new BeanDefinitionDelegate<>(definition, qualifier);
     }
 
     @Override
