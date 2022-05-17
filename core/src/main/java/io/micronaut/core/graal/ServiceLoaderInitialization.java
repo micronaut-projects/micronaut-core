@@ -40,6 +40,7 @@ import io.micronaut.core.io.IOUtils;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import org.graalvm.nativeimage.ImageSingletons;
 import org.graalvm.nativeimage.hosted.Feature;
+import org.graalvm.nativeimage.hosted.RuntimeClassInitialization;
 import org.graalvm.nativeimage.hosted.RuntimeReflection;
 
 /**
@@ -151,6 +152,7 @@ final class ServiceLoaderFeature implements Feature {
             }
         };
         for (GraalReflectionConfigurer configurer : configurers) {
+            RuntimeClassInitialization.initializeAtBuildTime(configurer.getClass());
             configurer.configure(context);
         }
     }
