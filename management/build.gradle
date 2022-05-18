@@ -23,7 +23,8 @@ dependencies {
         exclude module:'micronaut-bom'
     }
     testImplementation libs.managed.groovy.json
-    testRuntimeOnly(platform(libs.boms.micronaut.data))
+
+    testRuntimeOnly(platform(libs.boms.micronaut.sql))
     testRuntimeOnly libs.managed.h2
     testRuntimeOnly libs.mysql.driver
 
