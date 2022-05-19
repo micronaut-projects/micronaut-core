@@ -22,7 +22,6 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.scheduling.cron.CronExpression;
-import io.micronaut.scheduling.exceptions.SchedulerConfigurationException;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 
