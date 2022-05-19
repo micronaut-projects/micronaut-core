@@ -49,6 +49,7 @@ dependencies {
     kaptTest project(':inject-java')
     kaptTest project(':validation')
     testImplementation libs.javax.inject
+    testImplementation(platform(libs.boms.micronaut.tracing))
     testImplementation(libs.micronaut.tracing.zipkin) {
         exclude module: 'micronaut-bom'
         exclude module: 'micronaut-http-client'
@@ -57,6 +58,7 @@ dependencies {
     }
 
     testRuntimeOnly libs.junit.jupiter.engine
+    testRuntimeOnly(platform(libs.boms.micronaut.aws))
     testRuntimeOnly libs.aws.java.sdk.lambda
     if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_15)) {
         testImplementation libs.bcpkix
