@@ -2252,11 +2252,12 @@ public class DefaultBeanContext implements InitializableBeanContext {
         BeanFactory<T> beanFactory = (BeanFactory<T>) beanDefinition;
         Qualifier<T> declaredQualifier = beanDefinition.getDeclaredQualifier();
         boolean propagateQualifier = beanDefinition.isProxy() && declaredQualifier instanceof Named;
+        Qualifier prevQualifier = resolutionContext.getCurrentQualifier();
         try {
             if (propagateQualifier) {
                 resolutionContext.setAttribute(BeanDefinition.NAMED_ATTRIBUTE, ((Named) declaredQualifier).getName());
             }
-            resolutionContext.setCurrentQualifier(declaredQualifier != null ? declaredQualifier : qualifier);
+            resolutionContext.setCurrentQualifier(declaredQualifier != null && !AnyQualifier.INSTANCE.equals(declaredQualifier) ? declaredQualifier : qualifier);
             T bean;
             if (beanFactory instanceof ParametrizedBeanFactory) {
                 ParametrizedBeanFactory<T> parametrizedBeanFactory = (ParametrizedBeanFactory<T>) beanDefinition;
@@ -2281,7 +2282,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
             }
             throw new BeanInstantiationException(beanDefinition, e);
         } finally {
-            resolutionContext.setCurrentQualifier(null);
+            resolutionContext.setCurrentQualifier(prevQualifier);
             if (propagateQualifier) {
                 resolutionContext.removeAttribute(BeanDefinition.NAMED_ATTRIBUTE);
             }
@@ -2732,6 +2733,11 @@ public class DefaultBeanContext implements InitializableBeanContext {
                                                             @NonNull Argument<T> beanType,
                                                             @Nullable Qualifier<T> qualifier) {
         final boolean isScopedProxyDefinition = definition.hasStereotype(SCOPED_PROXY_ANN);
+
+        if (qualifier != null && AnyQualifier.INSTANCE.equals(definition.getDeclaredQualifier())) {
+            // Any factory bean should be stored as a new bean definition with a qualifier
+            definition = BeanDefinitionDelegate.create(definition, qualifier);
+        }
 
         if (definition.isSingleton() && !isScopedProxyDefinition) {
             return findOrCreateSingletonBeanRegistration(resolutionContext, definition, beanType, qualifier);
