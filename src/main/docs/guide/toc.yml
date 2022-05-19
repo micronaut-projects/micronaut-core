@@ -90,7 +90,9 @@ httpServer:
     bodyAnnotation: Using the @Body Annotation
     reactiveResponses: Reactive Responses
   jsonBinding: JSON Binding with Jackson
-  datavalidation: Data Validation
+  datavalidation:
+    title: Data Validation
+    validationGroups: Validation Groups
   staticResources: Serving Static Resources
   errorHandling:
     title: Error Handling
@@ -289,14 +291,14 @@ i18n:
   localizedMessageSource: Localized Message Source
 appendix:
   title: Appendices
-  architecture: 
+  architecture:
     title: Micronaut Architecture
-    compilerArch: Compiler         
+    compilerArch: Compiler
     annotationArch: Annotation Metadata
     introspectionArch: Bean Introspections
     iocArch: Bean Definitions
     aopArch: AOP Proxies
-    containerArch: Application Context 
+    containerArch: Application Context
     httpServerArch: HTTP Server
   faq: Frequently Asked Questions (FAQ)
   usingsnapshots: Using Snapshots

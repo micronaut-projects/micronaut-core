@@ -39,4 +39,13 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Inherited
 @Type(ValidatingInterceptor.class)
 public @interface Validated {
+
+  /**
+   * The validation groups that will be used for validation.
+   *
+   * @return The validation groups
+   * @since 3.5.0
+   */
+  Class<?>[] groups() default {};
+
 }
