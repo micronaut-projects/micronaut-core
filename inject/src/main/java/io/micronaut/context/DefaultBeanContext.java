@@ -1797,6 +1797,9 @@ public class DefaultBeanContext implements InitializableBeanContext {
     @NonNull
     private Map<Class<?>, List<BeanCreatedEventListener<?>>> loadCreatedListeners() {
         final Collection<BeanDefinition<BeanCreatedEventListener>> beanDefinitions = getBeanDefinitions(BeanCreatedEventListener.class);
+        if (beanDefinitions.isEmpty()) {
+            return Collections.emptyMap();
+        }
         final HashMap<Class<?>, List<BeanCreatedEventListener<?>>> typeToListener = new HashMap<>(beanDefinitions.size(), 1);
         final HashMap<BeanDefinition<?>, List<List<Argument<?>>>> invalidListeners = new HashMap<>();
         final HashMap<BeanDefinition<?>, Argument<?>> beanCreationTargets = new HashMap<>();
@@ -1837,6 +1840,9 @@ public class DefaultBeanContext implements InitializableBeanContext {
     @NonNull
     private <T extends EventListener> Map<Class<?>, List<T>> loadListeners(@NonNull Class<T> listenerType) {
         final Collection<BeanDefinition<T>> beanDefinitions = getBeanDefinitions(listenerType);
+        if (beanDefinitions.isEmpty()) {
+            return Collections.emptyMap();
+        }
         final HashMap<Class<?>, List<T>> typeToListener = new HashMap<>(beanDefinitions.size(), 1);
         for (BeanDefinition<T> beanCreatedDefinition : beanDefinitions) {
             try (BeanResolutionContext context = newResolutionContext(beanCreatedDefinition, null)) {
