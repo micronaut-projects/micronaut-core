@@ -1,5 +1,20 @@
 [
     {
+        "type": "io.micronaut.scheduling.TaskScheduler",
+        "member": "Class io.micronaut.scheduling.TaskScheduler",
+        "reason": "Added default methods"
+    },
+    {
+        "type": "io.micronaut.scheduling.TaskScheduler",
+        "member": "Method io.micronaut.scheduling.TaskScheduler.schedule(java.lang.String,java.lang.String,java.lang.Runnable)",
+        "reason": "Added default methods"
+    },
+    {
+        "type": "io.micronaut.scheduling.TaskScheduler",
+        "member": "Method io.micronaut.scheduling.TaskScheduler.schedule(java.lang.String,java.lang.String,java.util.concurrent.Callable)",
+        "reason": "Added default methods"
+    },
+    {
         "type": "io.micronaut.core.annotation.AnnotationMetadata",
         "member": "Method io.micronaut.core.annotation.AnnotationMetadata.getStereotypeAnnotationNames()",
         "reason": "AnnotationMetadata is an internally implemented data structure and not designed to be implemented by consumers of the framework."
