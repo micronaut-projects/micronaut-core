@@ -65,6 +65,26 @@
         "reason": "The Graal visitor is internal to the compiler and implementation detail not part of the public API"
     },
     {
+        "type": "io.micronaut.http.netty.channel.EventLoopGroupFactory",
+        "member": "Class io.micronaut.http.netty.channel.EventLoopGroupFactory",
+        "reason": "Added default methods"
+    },
+    {
+        "type": "io.micronaut.http.netty.channel.EventLoopGroupFactory",
+        "member": "Method io.micronaut.http.netty.channel.EventLoopGroupFactory.domainServerSocketChannelClass()",
+        "reason": "Added default methods"
+    },
+    {
+        "type": "io.micronaut.http.netty.channel.EventLoopGroupFactory",
+        "member": "Method io.micronaut.http.netty.channel.EventLoopGroupFactory.domainServerSocketChannelClass(io.micronaut.http.netty.channel.EventLoopGroupConfiguration)",
+        "reason": "Added default methods"
+    },
+    {
+        "type": "io.micronaut.http.netty.channel.EventLoopGroupFactory",
+        "member": "Method io.micronaut.http.netty.channel.EventLoopGroupFactory.domainServerSocketChannelInstance(io.micronaut.http.netty.channel.EventLoopGroupConfiguration)",
+        "reason": "Added default methods"
+    },
+    {
         "type": "io.micronaut.aop.InterceptedProxy",
         "member": "Class io.micronaut.aop.InterceptedProxy",
         "reason": "Class now extends similar interface from the Inject module allowing to detect intercepted proxies"

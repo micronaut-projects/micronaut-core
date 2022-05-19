@@ -123,6 +123,7 @@ httpServer:
       blockingOperations: Blocking Operations
       atBlocking: '@Blocking'
     nettyPipeline: Configuring the Netty Pipeline
+    listener: Advanced Listener Configuration
     cors: Configuring CORS
     https: Securing the Server with HTTPS
     dualProtocol: Enabling HTTP and HTTPS

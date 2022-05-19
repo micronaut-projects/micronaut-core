@@ -266,6 +266,7 @@ managed-netty-handler = { module = "io.netty:netty-handler", version.ref = "mana
 managed-netty-handler-proxy = { module = "io.netty:netty-handler-proxy", version.ref = "managed-netty" }
 managed-netty-transport-native-epoll = { module = "io.netty:netty-transport-native-epoll", version.ref = "managed-netty" }
 managed-netty-transport-native-kqueue = { module = "io.netty:netty-transport-native-kqueue", version.ref = "managed-netty" }
+managed-netty-transport-native-unix-common = { module = "io.netty:netty-transport-native-unix-common", version.ref = "managed-netty" }
 
 managed-micronaut-acme = { module = "io.micronaut.acme:micronaut-acme", version.ref = "managed-micronaut-acme" }
 managed-micronaut-cassandra = { module = "io.micronaut.cassandra:micronaut-cassandra", version.ref = "managed-micronaut-cassandra" }
