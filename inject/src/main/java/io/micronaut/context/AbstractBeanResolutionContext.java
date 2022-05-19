@@ -43,7 +43,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
     protected final DefaultBeanContext context;
     protected final BeanDefinition<?> rootDefinition;
-    private final Path path;
+    protected final Path path;
     private Map<CharSequence, Object> attributes;
     private Qualifier<?> qualifier;
     private List<BeanRegistration<?>> dependentBeans;
@@ -252,6 +252,10 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         return Optional.empty();
     }
 
+    protected void onNewSegment(Segment<?> segment) {
+        //no-op
+    }
+
     @NonNull
     private Map<CharSequence, Object> getAttributesOrCreate() {
         if (attributes == null) {
@@ -266,41 +270,39 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     class DefaultPath extends LinkedList<Segment<?>> implements Path {
 
         public static final String RIGHT_ARROW = " --> ";
+        private static final String CIRCULAR_ERROR_MSG = "Circular dependency detected";
 
-        /**
-         * Default constructor.
-         */
         DefaultPath() {
         }
 
         @Override
         public String toString() {
             Iterator<Segment<?>> i = descendingIterator();
-            StringBuilder path = new StringBuilder();
+            StringBuilder pathString = new StringBuilder();
             while (i.hasNext()) {
-                path.append(i.next().toString());
+                pathString.append(i.next().toString());
                 if (i.hasNext()) {
-                    path.append(RIGHT_ARROW);
+                    pathString.append(RIGHT_ARROW);
                 }
             }
-            return path.toString();
+            return pathString.toString();
         }
 
         @SuppressWarnings("MagicNumber")
         @Override
         public String toCircularString() {
             Iterator<Segment<?>> i = descendingIterator();
-            StringBuilder path = new StringBuilder();
+            StringBuilder pathString = new StringBuilder();
             String ls = CachedEnvironment.getProperty("line.separator");
             while (i.hasNext()) {
                 String segmentString = i.next().toString();
-                path.append(segmentString);
+                pathString.append(segmentString);
                 if (i.hasNext()) {
-                    path.append(RIGHT_ARROW);
+                    pathString.append(RIGHT_ARROW);
                 } else {
-                    int totalLength = path.length() - 3;
+                    int totalLength = pathString.length() - 3;
                     String spaces = String.join("", Collections.nCopies(totalLength, " "));
-                    path.append(ls)
+                    pathString.append(ls)
                             .append("^")
                             .append(spaces)
                             .append("|")
@@ -311,10 +313,10 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
                             .append("|")
                             .append(spaces)
                             .append("|").append(ls).append('+');
-                    path.append(String.join("", Collections.nCopies(totalLength, "-"))).append('+');
+                    pathString.append(String.join("", Collections.nCopies(totalLength, "-"))).append('+');
                 }
             }
-            return path.toString();
+            return pathString.toString();
         }
 
         @Override
@@ -341,9 +343,9 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
                 Segment<?> previous = peek();
                 MethodSegment methodSegment = new MethodArgumentSegment(declaringType, methodName, argument, arguments, requiresReflection, previous instanceof MethodSegment ? (MethodSegment) previous : null);
                 if (contains(methodSegment)) {
-                    throw new CircularDependencyException(AbstractBeanResolutionContext.this, argument, "Circular dependency detected");
+                    throw new CircularDependencyException(AbstractBeanResolutionContext.this, argument, CIRCULAR_ERROR_MSG);
                 } else {
-                    path.push(methodSegment);
+                    push(methodSegment);
                 }
             }
             return this;
@@ -360,7 +362,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
             MethodSegment methodSegment = new MethodArgumentSegment(declaringType, methodInjectionPoint.getName(), argument,
                     methodInjectionPoint.getArguments(), methodInjectionPoint.requiresReflection(), previous instanceof MethodSegment ? (MethodSegment) previous : null);
             if (contains(methodSegment)) {
-                throw new CircularDependencyException(AbstractBeanResolutionContext.this, methodInjectionPoint, argument, "Circular dependency detected");
+                throw new CircularDependencyException(AbstractBeanResolutionContext.this, methodInjectionPoint, argument, CIRCULAR_ERROR_MSG);
             } else {
                 push(methodSegment);
             }
@@ -373,7 +375,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
             Segment<?> previous = peek();
             MethodSegment methodSegment = new MethodArgumentSegment(declaringType, methodName, argument, arguments, requiresReflection, previous instanceof MethodSegment ? (MethodSegment) previous : null);
             if (contains(methodSegment)) {
-                throw new CircularDependencyException(AbstractBeanResolutionContext.this, declaringType, methodName, argument, "Circular dependency detected");
+                throw new CircularDependencyException(AbstractBeanResolutionContext.this, declaringType, methodName, argument, CIRCULAR_ERROR_MSG);
             } else {
                 push(methodSegment);
             }
@@ -385,7 +387,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         public Path pushFieldResolve(BeanDefinition declaringType, FieldInjectionPoint fieldInjectionPoint) {
             FieldSegment fieldSegment = new FieldSegment(declaringType, fieldInjectionPoint.asArgument(), fieldInjectionPoint.requiresReflection());
             if (contains(fieldSegment)) {
-                throw new CircularDependencyException(AbstractBeanResolutionContext.this, fieldInjectionPoint, "Circular dependency detected");
+                throw new CircularDependencyException(AbstractBeanResolutionContext.this, fieldInjectionPoint, CIRCULAR_ERROR_MSG);
             } else {
                 push(fieldSegment);
             }
@@ -396,7 +398,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         public Path pushFieldResolve(BeanDefinition declaringType, Argument fieldAsArgument, boolean requiresReflection) {
             FieldSegment fieldSegment = new FieldSegment(declaringType, fieldAsArgument, requiresReflection);
             if (contains(fieldSegment)) {
-                throw new CircularDependencyException(AbstractBeanResolutionContext.this, declaringType, fieldAsArgument.getName(), "Circular dependency detected");
+                throw new CircularDependencyException(AbstractBeanResolutionContext.this, declaringType, fieldAsArgument.getName(), CIRCULAR_ERROR_MSG);
             } else {
                 push(fieldSegment);
             }
@@ -407,7 +409,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         public Path pushAnnotationResolve(BeanDefinition beanDefinition, Argument annotationMemberBeanAsArgument) {
             AnnotationSegment annotationSegment = new AnnotationSegment(beanDefinition, annotationMemberBeanAsArgument);
             if (contains(annotationSegment)) {
-                throw new CircularDependencyException(AbstractBeanResolutionContext.this, beanDefinition, annotationMemberBeanAsArgument.getName(), "Circular dependency detected");
+                throw new CircularDependencyException(AbstractBeanResolutionContext.this, beanDefinition, annotationMemberBeanAsArgument.getName(), CIRCULAR_ERROR_MSG);
             } else {
                 push(annotationSegment);
             }
@@ -426,29 +428,35 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
                         if (declaringType instanceof ProxyBeanDefinition) {
                             // take into account proxies
                             if (!((ProxyBeanDefinition) declaringType).getTargetDefinitionType().equals(declaringBean.getClass())) {
-                                throw new CircularDependencyException(AbstractBeanResolutionContext.this, argument, "Circular dependency detected");
+                                throw new CircularDependencyException(AbstractBeanResolutionContext.this, argument, CIRCULAR_ERROR_MSG);
                             } else {
                                 push(constructorSegment);
                             }
                         } else if (declaringBean instanceof ProxyBeanDefinition) {
                             // take into account proxies
                             if (!((ProxyBeanDefinition) declaringBean).getTargetDefinitionType().equals(declaringType.getClass())) {
-                                throw new CircularDependencyException(AbstractBeanResolutionContext.this, argument, "Circular dependency detected");
+                                throw new CircularDependencyException(AbstractBeanResolutionContext.this, argument, CIRCULAR_ERROR_MSG);
                             } else {
                                 push(constructorSegment);
                             }
                         } else {
-                            throw new CircularDependencyException(AbstractBeanResolutionContext.this, argument, "Circular dependency detected");
+                            throw new CircularDependencyException(AbstractBeanResolutionContext.this, argument, CIRCULAR_ERROR_MSG);
                         }
                     } else {
                         push(constructorSegment);
                     }
                 } else {
-                    throw new CircularDependencyException(AbstractBeanResolutionContext.this, argument, "Circular dependency detected");
+                    throw new CircularDependencyException(AbstractBeanResolutionContext.this, argument, CIRCULAR_ERROR_MSG);
                 }
             } else {
                 push(constructorSegment);
             }
+        }
+
+        @Override
+        public void push(Segment<?> segment) {
+            super.push(segment);
+            AbstractBeanResolutionContext.this.onNewSegment(segment);
         }
     }
 

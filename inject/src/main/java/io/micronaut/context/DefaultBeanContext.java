@@ -228,7 +228,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
     private List<BeanDefinitionReference> beanDefinitionReferences;
     private List<BeanConfiguration> beanConfigurationsList;
 
-    private Set<Map.Entry<Class<?>, List<BeanCreatedEventListener>>> beanCreationEventListeners;
+    private Set<Map.Entry<Class<?>, List<BeanCreatedEventListener<?>>>> beanCreationEventListeners;
     Set<Map.Entry<Class<?>, List<BeanInitializedEventListener>>> beanInitializedEventListeners;
     private Set<Map.Entry<Class<?>, List<BeanPreDestroyEventListener>>> beanPreDestroyEventListeners;
     private Set<Map.Entry<Class<?>, List<BeanDestroyedEventListener>>> beanDestroyedEventListeners;
@@ -1770,11 +1770,71 @@ public class DefaultBeanContext implements InitializableBeanContext {
      * Initialize the event listeners.
      */
     protected void initializeEventListeners() {
-        final Map<Class<?>, List<BeanCreatedEventListener>> beanCreatedListeners = loadListeners(BeanCreatedEventListener.class);
+        final Map<Class<?>, List<BeanCreatedEventListener<?>>> beanCreatedListeners = loadCreatedListeners();
         beanCreatedListeners.put(AnnotationProcessor.class, Collections.singletonList(new AnnotationProcessorListener()));
         final Map<Class<?>, List<BeanInitializedEventListener>> beanInitializedListeners = loadListeners(BeanInitializedEventListener.class);
         this.beanCreationEventListeners = beanCreatedListeners.entrySet();
         this.beanInitializedEventListeners = beanInitializedListeners.entrySet();
+    }
+
+    private void handleEagerInitializedDependencies(BeanDefinition<?> listener,
+                                                    Argument<?> listensTo,
+                                                    List<List<Argument<?>>> targets) {
+        if (LOG.isWarnEnabled()) {
+            List<String> paths = new ArrayList<>(targets.size());
+            for (List<Argument<?>> line: targets) {
+                paths.add("    " + line.stream()
+                        .map(Argument::getType)
+                        .map(Class::getName)
+                        .collect(Collectors.joining(AbstractBeanResolutionContext.DefaultPath.RIGHT_ARROW)));
+            }
+            LOG.warn("The bean created event listener {} will not be executed because one or more other bean created event listeners inject {}:\n" +
+                    "{}\n" +
+                    "Change at least one point in the path to be lazy initialized by injecting a provider to avoid this issue", listener.getBeanType().getName(), listensTo.getType().getName(), String.join("\n", paths));
+        }
+    }
+
+    @NonNull
+    private Map<Class<?>, List<BeanCreatedEventListener<?>>> loadCreatedListeners() {
+        final Collection<BeanDefinition<BeanCreatedEventListener>> beanDefinitions = getBeanDefinitions(BeanCreatedEventListener.class);
+        final HashMap<Class<?>, List<BeanCreatedEventListener<?>>> typeToListener = new HashMap<>(beanDefinitions.size(), 1);
+        if (beanDefinitions.isEmpty()) {
+            return typeToListener;
+        }
+        final HashMap<BeanDefinition<?>, List<List<Argument<?>>>> invalidListeners = new HashMap<>();
+        final HashMap<BeanDefinition<?>, Argument<?>> beanCreationTargets = new HashMap<>();
+        for (BeanDefinition<BeanCreatedEventListener> beanCreatedDefinition: beanDefinitions) {
+            List<Argument<?>> typeArguments = beanCreatedDefinition.getTypeArguments(BeanCreatedEventListener.class);
+            Argument<?> argument = CollectionUtils.last(typeArguments);
+            if (argument == null) {
+                argument = Argument.OBJECT_ARGUMENT;
+            }
+            beanCreationTargets.put(beanCreatedDefinition, argument);
+        }
+        for (BeanDefinition<BeanCreatedEventListener> beanCreatedDefinition: beanDefinitions) {
+            try (ScanningBeanResolutionContext context = new ScanningBeanResolutionContext(beanCreatedDefinition, beanCreationTargets)) {
+                BeanCreatedEventListener<?> listener = resolveBeanRegistration(context, beanCreatedDefinition).bean;
+                List<Argument<?>> typeArguments = beanCreatedDefinition.getTypeArguments(BeanCreatedEventListener.class);
+                Argument<?> argument = CollectionUtils.last(typeArguments);
+                if (argument == null) {
+                    argument = Argument.OBJECT_ARGUMENT;
+                }
+                typeToListener.computeIfAbsent(argument.getType(), aClass -> new ArrayList<>(10))
+                        .add(listener);
+                Map<BeanDefinition<?>, List<List<Argument<?>>>> foundTargets = context.getFoundTargets();
+                for (Map.Entry<BeanDefinition<?>, List<List<Argument<?>>>> entry: foundTargets.entrySet()) {
+                    invalidListeners.computeIfAbsent(entry.getKey(), key -> new ArrayList<>())
+                            .addAll(entry.getValue());
+                }
+            }
+        }
+        for (List<BeanCreatedEventListener<?>> listeners: typeToListener.values()) {
+            OrderUtil.sort(listeners);
+        }
+        for (Map.Entry<BeanDefinition<?>, List<List<Argument<?>>>> entry: invalidListeners.entrySet()) {
+            handleEagerInitializedDependencies(entry.getKey(), beanCreationTargets.get(entry.getKey()), entry.getValue());
+        }
+        return typeToListener;
     }
 
     @NonNull
@@ -2314,7 +2374,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                                                   @Nullable Qualifier<T> finalQualifier) {
         Class<T> beanType = beanDefinition.getBeanType();
         if (!(bean instanceof BeanCreatedEventListener) && CollectionUtils.isNotEmpty(beanCreationEventListeners)) {
-            for (Map.Entry<Class<?>, List<BeanCreatedEventListener>> entry : beanCreationEventListeners) {
+            for (Map.Entry<Class<?>, List<BeanCreatedEventListener<?>>> entry : beanCreationEventListeners) {
                 if (entry.getKey().isAssignableFrom(beanType)) {
                     BeanKey<T> beanKey = new BeanKey<>(beanDefinition, finalQualifier);
                     for (BeanCreatedEventListener<?> listener : entry.getValue()) {
@@ -3860,5 +3920,50 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
     private static final class CollectionHolder<T> {
         Collection<BeanRegistration<T>> registrations;
+    }
+
+    private final class ScanningBeanResolutionContext extends SingletonBeanResolutionContext {
+
+        private final HashMap<BeanDefinition<?>, Argument<?>> beanCreationTargets;
+        private final Map<BeanDefinition<?>, List<List<Argument<?>>>> foundTargets = new HashMap<>();
+
+        private ScanningBeanResolutionContext(BeanDefinition<?> beanDefinition, HashMap<BeanDefinition<?>, Argument<?>> beanCreationTargets) {
+            super(beanDefinition);
+            this.beanCreationTargets = beanCreationTargets;
+        }
+
+        private List<Argument<?>> getHierarchy() {
+            List<Argument<?>> hierarchy = new ArrayList<>(path.size());
+            for (Iterator<BeanResolutionContext.Segment<?>> it = path.descendingIterator(); it.hasNext();) {
+                BeanResolutionContext.Segment<?> segment = it.next();
+                hierarchy.add(segment.getArgument());
+            }
+            return hierarchy;
+        }
+
+        @Override
+        protected void onNewSegment(Segment<?> segment) {
+            Argument<?> argument = segment.getArgument();
+            if (argument.isContainerType()) {
+                argument = argument.getFirstTypeVariable().orElse(null);
+                if (argument == null) {
+                    return;
+                }
+            }
+            if (argument.isProvider()) {
+                return;
+            }
+            for (Map.Entry<BeanDefinition<?>, Argument<?>> entry : beanCreationTargets.entrySet()) {
+                if (argument.isAssignableFrom(entry.getValue())) {
+                    foundTargets.computeIfAbsent(entry.getKey(), bd -> new ArrayList<>(5))
+                            .add(getHierarchy());
+                }
+            }
+        }
+
+        @SuppressWarnings("java:S1452")
+        Map<BeanDefinition<?>, List<List<Argument<?>>>> getFoundTargets() {
+            return foundTargets;
+        }
     }
 }
