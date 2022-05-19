@@ -95,7 +95,9 @@ public interface TaskScheduler {
      *                                    scheduled for execution
      * @throws NullPointerException       if command or delay is null
      */
-    <V> ScheduledFuture<V> schedule(String cron, String timezoneId, Callable<V> command);
+    default <V> ScheduledFuture<V> schedule(String cron, String timezoneId, Callable<V> command) {
+        return schedule(cron, command);
+    }
 
     /**
      * Creates and executes a one-shot action that becomes enabled
