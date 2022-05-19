@@ -5,14 +5,13 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.client.bind.ClientRequestUriContext;
 import jakarta.inject.Singleton;
-import org.jetbrains.annotations.NotNull;
 
 //tag::clazz[]
 import io.micronaut.http.client.bind.AnnotatedClientRequestBinder
 
 @Singleton // <1>
 class NameAuthorizationBinder: AnnotatedClientRequestBinder<NameAuthorization> { // <2>
-    @NotNull
+    @NonNull
     override fun getAnnotationType(): Class<NameAuthorization> {
         return NameAuthorization::class.java
     }

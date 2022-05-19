@@ -46,20 +46,23 @@ class RegisterSingletonSpec extends Specification {
         context.close()
     }
 
-
     void "test register named singleton method"() {
         given:
         BeanContext context = new DefaultBeanContext().start()
         def b = new B()
+        def b1 = new B()
+        def b2 = new B()
 
         when:
         context.registerSingleton(B, b, Qualifiers.byName("test"))
+        context.registerSingleton(B, b1, Qualifiers.byName("test1"))
+        context.registerSingleton(B, b2, Qualifiers.byName("test2"))
 
         then:
         context.getBean(B, Qualifiers.byName("test")) == b
-        // there are 2 because currently defining only @Inject results in
+        // there are 4 because currently defining only @Inject results in
         // another bean definition with the primary qualifier
-        context.getBeansOfType(B).size() == 2
+        context.getBeansOfType(B).size() == 4
         // no bean definition for qualifier to not injected
         b.a == null
 

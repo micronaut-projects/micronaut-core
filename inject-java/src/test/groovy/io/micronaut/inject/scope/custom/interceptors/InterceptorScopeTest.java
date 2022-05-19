@@ -25,7 +25,6 @@ import io.micronaut.runtime.context.scope.ScopedProxy;
 import jakarta.annotation.PreDestroy;
 import jakarta.inject.Scope;
 import jakarta.inject.Singleton;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -34,6 +33,10 @@ public class InterceptorScopeTest {
 
     @Test
     void testInterceptorsWithCustomScopes() {
+        // Reset in case of retry
+        MyIntercepted1Interceptor.creationCount = 0;
+        MyIntercepted2Interceptor.creationCount = 0;
+
         try (ApplicationContext beanContext = ApplicationContext.run()) {
 
             MyCustomScope scope = beanContext.getBean(MyCustomScope.class);

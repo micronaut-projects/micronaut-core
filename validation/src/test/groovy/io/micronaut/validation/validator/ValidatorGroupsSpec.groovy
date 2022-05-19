@@ -37,9 +37,21 @@ class ValidatorGroupsSpec extends AbstractTypeElementSpec {
 
         when:
         violations = validator.validate(address, GroupThree, GroupTwo)
+        List messageTemplates = violations*.messageTemplate
 
         then:
         violations.size() == 2
+        messageTemplates.contains('{javax.validation.constraints.Size.message}')
+        messageTemplates.contains('different message')
+
+        when:
+        violations = validator.validate(address, InheritedGroup)
+        messageTemplates = violations*.messageTemplate
+
+        then:
+        violations.size() == 2
+        messageTemplates.contains('{javax.validation.constraints.Size.message}')
+        messageTemplates.contains('message for default')
     }
 
     void "test validate with default group"() {
@@ -126,6 +138,7 @@ interface GroupThree {}
 class Address {
     @NotBlank(groups = GroupOne)
     @NotBlank(groups = GroupThree, message = "different message")
+    @NotBlank(message = "message for default")
     @Size(min = 5, max = 20, groups = GroupTwo)
     String street
 }
@@ -133,6 +146,7 @@ class Address {
 interface GroupOne {}
 interface GroupTwo {}
 interface GroupThree {}
+interface InheritedGroup extends Default, GroupTwo {}
 
 @Introspected
 class AddressTwo {

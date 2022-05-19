@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 
@@ -39,7 +40,10 @@ import java.util.stream.Stream;
 @Internal
 final class SingletonScope {
 
-    private final DefaultBeanContext beanContext;
+    /**
+     * The locks used to prevent re-creating of the same singleton.
+     */
+    private final Map<BeanDefinitionIdentity, Object> singletonsInCreationLocks = new ConcurrentHashMap<>(5, 1);
 
     /**
      * The main collection storing registrations for {@link BeanDefinition}.
@@ -47,41 +51,53 @@ final class SingletonScope {
     private final Map<BeanDefinitionIdentity, BeanRegistration> singletonByBeanDefinition = new ConcurrentHashMap<>(100);
 
     /**
-     * Index collection to retrieve a the registration by {@link Argument} and {@link Qualifier}.
+     * Index collection to retrieve a registration by {@link Argument} and {@link Qualifier}.
      */
     private final Map<DefaultBeanContext.BeanKey, BeanRegistration> singletonByArgumentAndQualifier = new ConcurrentHashMap<>(100);
 
-    /**
-     * The default constructor.
-     *
-     * @param beanContext The bean context.
-     */
-    SingletonScope(DefaultBeanContext beanContext) {
-        this.beanContext = beanContext;
+    @NonNull
+    <T> BeanRegistration<T> getOrCreate(@NonNull DefaultBeanContext beanContext,
+                                        @Nullable BeanResolutionContext resolutionContext,
+                                        @NonNull BeanDefinition<T> definition,
+                                        @NonNull Argument<T> beanType,
+                                        @Nullable Qualifier<T> qualifier) {
+        BeanRegistration<T> beanRegistration = findBeanRegistration(definition, beanType, qualifier);
+        if (beanRegistration != null) {
+            return beanRegistration;
+        }
+        BeanDefinitionIdentity identity = BeanDefinitionIdentity.of(definition);
+        BeanRegistration<T> existingRegistration = singletonByBeanDefinition.get(identity);
+        if (existingRegistration != null) {
+            return existingRegistration;
+        }
+        Object lock = singletonsInCreationLocks.computeIfAbsent(identity, beanDefinitionIdentity -> new Object());
+        synchronized (lock) {
+            try {
+                existingRegistration = singletonByBeanDefinition.get(identity);
+                if (existingRegistration != null) {
+                    return existingRegistration;
+                }
+                BeanRegistration<T> newRegistration = beanContext.createRegistration(resolutionContext, beanType, qualifier, definition, false);
+                registerSingletonBean(newRegistration, qualifier);
+                return newRegistration;
+            } finally {
+                singletonsInCreationLocks.remove(identity);
+            }
+        }
     }
 
     /**
      * Register singleton.
      *
-     * @param beanDefinition The bean definition
-     * @param qualifier      The qualifier
-     * @param createdBean    The registered instance
-     * @param dependents     The dependents
-     * @param <T>            The singleton type
+     * @param registration The bean registration
+     * @param qualifier    The qualifier
+     * @param <T>          The singleton type
      * @return The new registration
      */
     @NonNull
-    <T> BeanRegistration<T> registerSingletonBean(@NonNull BeanDefinition<T> beanDefinition,
-                                                  @Nullable Qualifier<T> qualifier,
-                                                  @Nullable T createdBean,
-                                                  @NonNull List<BeanRegistration<?>> dependents) {
+    <T> BeanRegistration<T> registerSingletonBean(@NonNull BeanRegistration<T> registration, Qualifier qualifier) {
 
-
-        DefaultBeanContext.BeanKey<T> key = new DefaultBeanContext.BeanKey<>(beanDefinition.asArgument(), qualifier);
-        BeanRegistration<T> registration = dependents.isEmpty() ?
-            new BeanDisposingRegistration<>(beanContext, key, beanDefinition, createdBean) :
-            new BeanDisposingRegistration<>(beanContext, key, beanDefinition, createdBean, dependents);
-        
+        BeanDefinition<T> beanDefinition = registration.beanDefinition;
         singletonByBeanDefinition.put(BeanDefinitionIdentity.of(beanDefinition), registration);
         if (!beanDefinition.isSingleton()) {
             // In some cases you can register an instance of non-singleton bean and expect it act as a singleton
@@ -97,11 +113,11 @@ final class SingletonScope {
             DefaultBeanContext.BeanKey<T> beanKey = new DefaultBeanContext.BeanKey<>(beanDefinition, beanDefinition.getDeclaredQualifier());
             singletonByArgumentAndQualifier.put(beanKey, registration);
         }
-        if (createdBean != null && createdBean.getClass() != beanDefinition.getBeanType()) {
+        if (registration.bean != null && registration.bean.getClass() != beanDefinition.getBeanType()) {
             // If the actual type differs, allow to inject the actual implementation for cases like:
             // `MyInterface factoryBean() { new Impl.. }`
             // This might be something to remove in 4.0
-            DefaultBeanContext.BeanKey<T> concrete = new DefaultBeanContext.BeanKey<>((Class<T>) createdBean.getClass(), qualifier);
+            DefaultBeanContext.BeanKey<T> concrete = new DefaultBeanContext.BeanKey<>((Class<T>) registration.bean.getClass(), qualifier);
             singletonByArgumentAndQualifier.put(concrete, registration);
         }
         return registration;
@@ -147,7 +163,7 @@ final class SingletonScope {
 
     /**
      * @param beanType The beanType
-     * @param <T> The bean type
+     * @param <T>      The bean type
      * @return Active singleton registrations by beanType
      */
     @SuppressWarnings("unchecked")
@@ -168,7 +184,7 @@ final class SingletonScope {
      *
      * @param beanDefinition The beanDefinition
      * @param qualifier      The qualifier
-     * @param <T> The bean type
+     * @param <T>            The bean type
      * @return found registration or null
      */
     @Nullable
@@ -180,7 +196,7 @@ final class SingletonScope {
      * Find active bean registration by provided identifier.
      *
      * @param identifier The identifier
-     * @param <T> The bean type
+     * @param <T>        The bean type
      * @return found registration or null
      */
     @Nullable
@@ -197,7 +213,7 @@ final class SingletonScope {
      * Find active bean registration by provided bean instance.
      *
      * @param bean The bean
-     * @param <T> The bean type
+     * @param <T>  The bean type
      * @return found registration or null
      */
     @Nullable
@@ -217,7 +233,7 @@ final class SingletonScope {
      * Find active bean registration by provided bean definition.
      *
      * @param definition The
-     * @param <T> The bean type
+     * @param <T>        The bean type
      * @return found registration or null
      */
     @Nullable
@@ -231,7 +247,7 @@ final class SingletonScope {
      * @param beanDefinition The beanDefinition
      * @param beanType       The beanType
      * @param qualifier      The qualifier
-     * @param <T> The bean type
+     * @param <T>            The bean type
      * @return found registration or null
      */
     @Nullable
@@ -349,7 +365,8 @@ final class SingletonScope {
             if (beanDefinitionDelegate.definition.getClass() != that.beanDefinitionDelegate.definition.getClass()) {
                 return false;
             }
-            return beanDefinitionDelegate.getAttributes().equals(that.beanDefinitionDelegate.getAttributes());
+            return Objects.equals(beanDefinitionDelegate.getAttributes(), that.beanDefinitionDelegate.getAttributes())
+                    && Objects.equals(beanDefinitionDelegate.getQualifier(), that.beanDefinitionDelegate.getQualifier());
         }
 
         @Override

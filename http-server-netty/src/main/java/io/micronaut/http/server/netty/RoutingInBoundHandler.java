@@ -335,12 +335,16 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         if (uriRoutes.size() > 1) {
             throw new DuplicateRouteException(requestPath, uriRoutes);
         } else if (uriRoutes.size() == 1) {
-            UriRouteMatch<Object, Object> establishedRoute = uriRoutes.get(0);
-            request.setAttribute(HttpAttributes.ROUTE, establishedRoute.getRoute());
-            request.setAttribute(HttpAttributes.ROUTE_MATCH, establishedRoute);
-            request.setAttribute(HttpAttributes.ROUTE_INFO, establishedRoute);
-            request.setAttribute(HttpAttributes.URI_TEMPLATE, establishedRoute.getRoute().getUriMatchTemplate().toString());
-            routeMatch = establishedRoute;
+            routeMatch = uriRoutes.get(0);
+            setRouteAttributes(request, routeMatch);
+        }
+
+        if (routeMatch == null && request.getMethod().equals(HttpMethod.OPTIONS)) {
+            List<UriRouteMatch<Object, Object>> anyUriRoutes = router.findAny(request.getUri().toString(), request)
+                    .collect(Collectors.toList());
+            if (!anyUriRoutes.isEmpty()) {
+                setRouteAttributes(request, anyUriRoutes.get(0));
+            }
         }
 
         RouteMatch<?> route;
@@ -448,6 +452,13 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         } else {
             handleRouteMatch(route, nettyHttpRequest, ctx);
         }
+    }
+
+    private void setRouteAttributes(HttpRequest<?> request, UriRouteMatch<Object, Object> route) {
+        request.setAttribute(HttpAttributes.ROUTE, route.getRoute());
+        request.setAttribute(HttpAttributes.ROUTE_MATCH, route);
+        request.setAttribute(HttpAttributes.ROUTE_INFO, route);
+        request.setAttribute(HttpAttributes.URI_TEMPLATE, route.getRoute().getUriMatchTemplate().toString());
     }
 
     private void handleStatusError(
@@ -1419,7 +1430,15 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         return byteBuf;
     }
 
-    private boolean isIgnorable(Throwable cause) {
+    /**
+     * Is the exception ignorable by Micronaut.
+     * @param cause The cause
+     * @return True if it can be ignored.
+     */
+    protected boolean isIgnorable(Throwable cause) {
+        if (cause instanceof ClosedChannelException || cause.getCause() instanceof ClosedChannelException) {
+            return true;
+        }
         String message = cause.getMessage();
         return cause instanceof IOException && message != null && IGNORABLE_ERROR_MESSAGE.matcher(message).matches();
     }

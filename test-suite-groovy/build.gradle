@@ -26,6 +26,7 @@ dependencies {
     testImplementation libs.logbook.netty
     testImplementation project(":function-client")
     testImplementation project(":function-web")
+    testRuntimeOnly(platform(libs.boms.micronaut.aws))
     testRuntimeOnly libs.aws.java.sdk.lambda
 
     testImplementation libs.managed.reactor

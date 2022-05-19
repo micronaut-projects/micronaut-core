@@ -40,8 +40,8 @@ import io.micronaut.core.io.IOUtils;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import org.graalvm.nativeimage.ImageSingletons;
 import org.graalvm.nativeimage.hosted.Feature;
+import org.graalvm.nativeimage.hosted.RuntimeClassInitialization;
 import org.graalvm.nativeimage.hosted.RuntimeReflection;
-import org.jetbrains.annotations.NotNull;
 
 /**
  * Integrates {@link io.micronaut.core.io.service.SoftServiceLoader} with GraalVM Native Image.
@@ -75,7 +75,7 @@ final class ServiceLoaderFeature implements Feature {
         ImageSingletons.add(StaticServiceDefinitions.class, staticServiceDefinitions);
     }
 
-    @NotNull
+    @NonNull
     private StaticServiceDefinitions buildStaticServiceDefinitions(BeforeAnalysisAccess access) {
         StaticServiceDefinitions staticServiceDefinitions = new StaticServiceDefinitions();
         final String path = "META-INF/micronaut/";
@@ -152,6 +152,7 @@ final class ServiceLoaderFeature implements Feature {
             }
         };
         for (GraalReflectionConfigurer configurer : configurers) {
+            RuntimeClassInitialization.initializeAtBuildTime(configurer.getClass());
             configurer.configure(context);
         }
     }

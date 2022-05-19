@@ -20,11 +20,11 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.CollectionUtils;
-import org.jetbrains.annotations.NotNull;
 
 import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -81,10 +81,13 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
         if (annotationDefaultValues != null) {
             cloned.annotationDefaultValues = new LinkedHashMap<>(annotationDefaultValues);
         }
+        if (repeated != null) {
+            cloned.repeated = new HashMap<>(repeated);
+        }
         return cloned;
     }
 
-    @NotNull
+    @NonNull
     @Override
     public Map<String, Object> getDefaultValues(@NonNull String annotation) {
         Map<String, Object> values = super.getDefaultValues(annotation);

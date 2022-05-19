@@ -31,13 +31,12 @@ dependencies {
     compileOnly libs.kotlin.stdlib
 
     testCompileOnly project(":inject-groovy")
+    testCompileOnly(libs.jetbrains.annotations)
     testAnnotationProcessor project(":inject-java")
     testImplementation project(":inject")
     testImplementation project(":inject-java-test")
     testImplementation project(":http-client")
     testImplementation libs.managed.spotbugs
-    testImplementation libs.powermock.junit4
-    testImplementation libs.powermock.mockito2
     if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_15)) {
         testImplementation libs.bcpkix
     }

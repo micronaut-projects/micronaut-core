@@ -1398,7 +1398,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
 
     @Override
     public DefaultAnnotationMetadata clone() {
-        return new DefaultAnnotationMetadata(
+        DefaultAnnotationMetadata cloned = new DefaultAnnotationMetadata(
                 declaredAnnotations != null ? cloneMapOfMapValue(declaredAnnotations) : null,
                 declaredStereotypes != null ? cloneMapOfMapValue(declaredStereotypes) : null,
                 allStereotypes != null ? cloneMapOfMapValue(allStereotypes) : null,
@@ -1406,6 +1406,10 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                 annotationsByStereotype != null ? cloneMapOfListValue(annotationsByStereotype) : null,
                 hasPropertyExpressions
         );
+        if (repeated != null) {
+            cloned.repeated = new HashMap<>(repeated);
+        }
+        return cloned;
     }
 
     protected final <X, Y, K> Map<K, Map<X, Y>> cloneMapOfMapValue(Map<K, Map<X, Y>> toClone) {

@@ -25,6 +25,7 @@ class BeanCreatedListenerWarningSpec extends Specification {
         output.contains("    io.micronaut.inject.lifecycle.beancreationeventlistener.OffendingChainListener --> io.micronaut.inject.lifecycle.beancreationeventlistener.D --> io.micronaut.inject.lifecycle.beancreationeventlistener.E --> io.micronaut.inject.lifecycle.beancreationeventlistener.A")
         !output.contains("The bean created event listener io.micronaut.inject.lifecycle.beancreationeventlistener.CCreatedListener will not be executed")
         !output.contains("NotOffendingChainListener") //because F injects a provider of G
+
         cleanup:
         System.out = oldOut
         context.close()
