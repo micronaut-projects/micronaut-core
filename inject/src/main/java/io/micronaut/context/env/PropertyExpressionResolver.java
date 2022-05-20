@@ -28,6 +28,7 @@ import java.util.Optional;
  * @author Denis Stepanov
  * @since 3.5.0
  */
+@FunctionalInterface
 @Experimental
 public interface PropertyExpressionResolver {
 
