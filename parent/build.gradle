@@ -13,6 +13,7 @@ repositories {
 // Include any of our boms that hava required properties
 dependencies {
     bomVersions(libs.boms.micronaut.grpc)
+    bomVersions(libs.boms.micronaut.picocli)
 }
 
 def micronautVersionInfo = tasks.register("micronautVersionInfo", WriteMicronautVersionInfoTask) {
