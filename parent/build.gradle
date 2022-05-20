@@ -18,10 +18,8 @@ dependencies {
 
 def micronautVersionInfo = tasks.register("micronautVersionInfo", WriteMicronautVersionInfoTask) {
     version = projectVersion
-    configuration = configurations.bomVersions
+    dependencies.set(configurations.bomVersions.getAllDependencies().collect { "$it.group:$it.name:$it.version" })
     outputDirectory = layout.buildDirectory.dir("version-info")
-    // TODO: Fix the caching for this task
-    outputs.upToDateWhen { false }
 }
 
 group projectGroupId
