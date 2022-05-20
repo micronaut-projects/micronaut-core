@@ -668,8 +668,9 @@ class PropertySourcePropertyResolverSpec extends Specification {
             }]
 
         expect:
-            def resolved = propertyPlaceholderResolver.resolvePlaceholders(template)
+            Optional<String> resolved = propertyPlaceholderResolver.resolvePlaceholders(template)
             if (result) {
+                assert resolved.isPresent()
                 assert resolved.get() == result
             } else {
                 assert !resolved.isPresent()
