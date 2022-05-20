@@ -189,9 +189,11 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
 
     @Override
     public void close() throws Exception {
-        for (PropertyExpressionResolver expressionResolver : getExpressionResolvers()) {
-            if (expressionResolver instanceof AutoCloseable) {
-                ((AutoCloseable) expressionResolver).close();
+        if (expressionResolvers != null) {
+            for (PropertyExpressionResolver expressionResolver : expressionResolvers) {
+                if (expressionResolver instanceof AutoCloseable) {
+                    ((AutoCloseable) expressionResolver).close();
+                }
             }
         }
     }

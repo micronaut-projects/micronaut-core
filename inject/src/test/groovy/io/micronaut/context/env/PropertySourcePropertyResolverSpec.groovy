@@ -28,6 +28,8 @@ import spock.lang.Issue
 import spock.lang.Specification
 import spock.lang.Unroll
 
+import java.util.concurrent.atomic.AtomicBoolean
+
 /**
  * @author Graeme Rocher
  * @since 1.0
@@ -640,5 +642,71 @@ class PropertySourcePropertyResolverSpec extends Specification {
 
         then:
         resolver.containsProperty("extra.listval")
+    }
+
+    void "test expression resolver"() {
+        given:
+            Map<String, Object> parameters = [foo: "bar"]
+            PropertyResolver propertyResolver = new MapPropertyResolver(parameters)
+            DefaultPropertyPlaceholderResolver propertyPlaceholderResolver = new DefaultPropertyPlaceholderResolver(propertyResolver, ConversionService.SHARED);
+            propertyPlaceholderResolver.@expressionResolvers = [new PropertyExpressionResolver() {
+                @Override
+                Optional resolve(PropertyResolver pr, ConversionService conversionService, String expression, Class requiredType) {
+                    assert requiredType == String.class
+                    assert conversionService
+                    if ("foobar" == expression) {
+                        return Optional.of("ABC")
+                    }
+                    if ("xyz" == expression) {
+                        return Optional.of("123")
+                    }
+                    if ("external" == expression) {
+                        return pr.get("foo", requiredType)
+                    }
+                    return Optional.empty()
+                }
+            }]
+
+        expect:
+            def resolved = propertyPlaceholderResolver.resolvePlaceholders(template)
+            if (result) {
+                resolved.get() == result
+            } else {
+                !resolved.isPresent()
+            }
+        where:
+            template              | result
+            "Hello \${foo}!"      | "Hello bar!"
+            "Hello \${foobar}!"   | "Hello ABC!"
+            "Hello \${xyz}!"      | "Hello 123!"
+            "Hello \${external}!" | "Hello bar!"
+            "Hello \${lol}!"      | null
+    }
+
+    void "test expression resolver is closed"() {
+        given:
+            AtomicBoolean closed = new AtomicBoolean()
+            Map<String, Object> parameters = [foo: "bar"]
+            PropertyResolver propertyResolver = new MapPropertyResolver(parameters)
+            DefaultPropertyPlaceholderResolver propertyPlaceholderResolver = new DefaultPropertyPlaceholderResolver(propertyResolver, ConversionService.SHARED);
+            propertyPlaceholderResolver.@expressionResolvers = [new PropertyExpressionResolverAutoCloseable() {
+                @Override
+                Optional resolve(PropertyResolver pr, ConversionService conversionService, String expression, Class requiredType) {
+                    return Optional.empty()
+                }
+
+                @Override
+                void close() throws Exception {
+                    closed.set(true)
+                }
+            }]
+        when:
+            !closed.get()
+            propertyPlaceholderResolver.close()
+        then:
+            closed.get()
+    }
+
+    interface PropertyExpressionResolverAutoCloseable extends PropertyExpressionResolver, AutoCloseable {
     }
 }
