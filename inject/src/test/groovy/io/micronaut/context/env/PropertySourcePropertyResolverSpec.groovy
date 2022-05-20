@@ -18,6 +18,7 @@ package io.micronaut.context.env
 import com.github.stefanbirkner.systemlambda.SystemLambda
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.ConfigurationException
+import io.micronaut.core.annotation.NonNull
 import io.micronaut.core.convert.ConversionService
 import io.micronaut.core.convert.format.MapFormat
 import io.micronaut.core.naming.conventions.StringConvention
@@ -27,6 +28,8 @@ import io.micronaut.core.value.ValueException
 import spock.lang.Issue
 import spock.lang.Specification
 import spock.lang.Unroll
+
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * @author Graeme Rocher
@@ -640,5 +643,80 @@ class PropertySourcePropertyResolverSpec extends Specification {
 
         then:
         resolver.containsProperty("extra.listval")
+    }
+
+    void "test expression resolver"() {
+        given:
+            Map<String, Object> parameters = [foo: "bar"]
+            PropertyResolver mapPropertyResolver = new MapPropertyResolver(parameters)
+            DefaultPropertyPlaceholderResolver propertyPlaceholderResolver = new DefaultPropertyPlaceholderResolver(mapPropertyResolver, ConversionService.SHARED);
+            propertyPlaceholderResolver.@expressionResolvers = [new PropertyExpressionResolver() {
+                @Override
+                @NonNull
+                <T> Optional<T> resolve(@NonNull PropertyResolver propertyResolver,
+                                        @NonNull ConversionService<? extends ConversionService> conversionService,
+                                        @NonNull String expression,
+                                        @NonNull Class<T> requiredType) {
+                    assert requiredType == String.class
+                    assert conversionService
+                    if ("foobar" == expression) {
+                        return Optional.of("ABC")
+                    }
+                    if ("xyz" == expression) {
+                        return Optional.of("123")
+                    }
+                    if ("external" == expression) {
+                        return propertyResolver.get("foo", requiredType)
+                    }
+                    return Optional.empty()
+                }
+            }]
+
+        expect:
+            Optional<String> resolved = propertyPlaceholderResolver.resolvePlaceholders(template)
+            if (result) {
+                assert resolved.isPresent()
+                assert resolved.get() == result
+            } else {
+                assert !resolved.isPresent()
+            }
+        where:
+            template              | result
+            'Hello ${foo}!'      | "Hello bar!"
+            'Hello ${foobar}!'   | "Hello ABC!"
+            'Hello ${xyz}!'      | "Hello 123!"
+            'Hello ${external}!' | "Hello bar!"
+            'Hello ${lol}!'      | null
+    }
+
+    void "test expression resolver is closed"() {
+        given:
+            AtomicBoolean closed = new AtomicBoolean()
+            Map<String, Object> parameters = [foo: "bar"]
+            PropertyResolver mapPropertyResolver = new MapPropertyResolver(parameters)
+            DefaultPropertyPlaceholderResolver propertyPlaceholderResolver = new DefaultPropertyPlaceholderResolver(mapPropertyResolver, ConversionService.SHARED);
+            propertyPlaceholderResolver.@expressionResolvers = [new PropertyExpressionResolverAutoCloseable() {
+                @Override
+                @NonNull
+                <T> Optional<T> resolve(@NonNull PropertyResolver propertyResolver,
+                                        @NonNull ConversionService<? extends ConversionService> conversionService,
+                                        @NonNull String expression,
+                                        @NonNull Class<T> requiredType) {
+                    Optional.empty()
+                }
+
+                @Override
+                void close() throws Exception {
+                    closed.set(true)
+                }
+            }]
+        when:
+            !closed.get()
+            propertyPlaceholderResolver.close()
+        then:
+            closed.get()
+    }
+
+    interface PropertyExpressionResolverAutoCloseable extends PropertyExpressionResolver, AutoCloseable {
     }
 }
