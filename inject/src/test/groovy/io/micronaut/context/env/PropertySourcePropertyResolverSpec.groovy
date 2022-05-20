@@ -18,6 +18,7 @@ package io.micronaut.context.env
 import com.github.stefanbirkner.systemlambda.SystemLambda
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.ConfigurationException
+import io.micronaut.core.annotation.NonNull
 import io.micronaut.core.convert.ConversionService
 import io.micronaut.core.convert.format.MapFormat
 import io.micronaut.core.naming.conventions.StringConvention
@@ -647,11 +648,15 @@ class PropertySourcePropertyResolverSpec extends Specification {
     void "test expression resolver"() {
         given:
             Map<String, Object> parameters = [foo: "bar"]
-            PropertyResolver propertyResolver = new MapPropertyResolver(parameters)
-            DefaultPropertyPlaceholderResolver propertyPlaceholderResolver = new DefaultPropertyPlaceholderResolver(propertyResolver, ConversionService.SHARED);
+            PropertyResolver mapPropertyResolver = new MapPropertyResolver(parameters)
+            DefaultPropertyPlaceholderResolver propertyPlaceholderResolver = new DefaultPropertyPlaceholderResolver(mapPropertyResolver, ConversionService.SHARED);
             propertyPlaceholderResolver.@expressionResolvers = [new PropertyExpressionResolver() {
                 @Override
-                Optional resolve(PropertyResolver pr, ConversionService conversionService, String expression, Class requiredType) {
+                @NonNull
+                <T> Optional<T> resolve(@NonNull PropertyResolver propertyResolver,
+                                        @NonNull ConversionService<? extends ConversionService> conversionService,
+                                        @NonNull String expression,
+                                        @NonNull Class<T> requiredType) {
                     assert requiredType == String.class
                     assert conversionService
                     if ("foobar" == expression) {
@@ -661,7 +666,7 @@ class PropertySourcePropertyResolverSpec extends Specification {
                         return Optional.of("123")
                     }
                     if ("external" == expression) {
-                        return pr.get("foo", requiredType)
+                        return propertyResolver.get("foo", requiredType)
                     }
                     return Optional.empty()
                 }
@@ -688,12 +693,16 @@ class PropertySourcePropertyResolverSpec extends Specification {
         given:
             AtomicBoolean closed = new AtomicBoolean()
             Map<String, Object> parameters = [foo: "bar"]
-            PropertyResolver propertyResolver = new MapPropertyResolver(parameters)
-            DefaultPropertyPlaceholderResolver propertyPlaceholderResolver = new DefaultPropertyPlaceholderResolver(propertyResolver, ConversionService.SHARED);
+            PropertyResolver mapPropertyResolver = new MapPropertyResolver(parameters)
+            DefaultPropertyPlaceholderResolver propertyPlaceholderResolver = new DefaultPropertyPlaceholderResolver(mapPropertyResolver, ConversionService.SHARED);
             propertyPlaceholderResolver.@expressionResolvers = [new PropertyExpressionResolverAutoCloseable() {
                 @Override
-                Optional resolve(PropertyResolver pr, ConversionService conversionService, String expression, Class requiredType) {
-                    return Optional.empty()
+                @NonNull
+                <T> Optional<T> resolve(@NonNull PropertyResolver propertyResolver,
+                                        @NonNull ConversionService<? extends ConversionService> conversionService,
+                                        @NonNull String expression,
+                                        @NonNull Class<T> requiredType) {
+                    Optional.empty()
                 }
 
                 @Override
