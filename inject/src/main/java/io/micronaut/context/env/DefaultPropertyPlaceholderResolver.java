@@ -68,20 +68,20 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
     }
 
     private Collection<PropertyExpressionResolver> getExpressionResolvers() {
-        Collection<PropertyExpressionResolver> expressionResolvers = this.expressionResolvers;
-        if (expressionResolvers == null) {
+        Collection<PropertyExpressionResolver> exResolvers = this.expressionResolvers;
+        if (exResolvers == null) {
             synchronized (this) { // double check
-                expressionResolvers = this.expressionResolvers;
-                if (expressionResolvers == null) {
+                exResolvers = this.expressionResolvers;
+                if (exResolvers == null) {
                     this.expressionResolvers = new ArrayList<>();
-                    expressionResolvers = new ArrayList<>();
+                    exResolvers = new ArrayList<>();
                     ClassLoader classLoader = (environment instanceof Environment) ? ((Environment) environment).getClassLoader() : environment.getClass().getClassLoader();
-                    SoftServiceLoader.load(PropertyExpressionResolver.class, classLoader).collectAll(expressionResolvers);
-                    this.expressionResolvers = expressionResolvers;
+                    SoftServiceLoader.load(PropertyExpressionResolver.class, classLoader).collectAll(exResolvers);
+                    this.expressionResolvers = exResolvers;
                 }
             }
         }
-        return expressionResolvers;
+        return exResolvers;
     }
 
     @Override
