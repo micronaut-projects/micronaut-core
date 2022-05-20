@@ -2,7 +2,6 @@ package io.micronaut.inject.dependent
 
 import io.micronaut.aop.InterceptedProxy
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.BeanDisposingRegistration
 import io.micronaut.context.BeanRegistration
 import io.micronaut.context.scope.CustomScope
 import io.micronaut.inject.BeanDefinition
@@ -12,6 +11,10 @@ import io.micronaut.runtime.context.scope.Refreshable
 import spock.lang.Specification
 
 class DestroyDependentBeansSpec extends Specification {
+
+    void setup() {
+        TestData.DESTRUCTION_ORDER.clear()
+    }
 
     void "test destroy dependent objects from singleton"() {
         when:
