@@ -42,6 +42,7 @@ public interface PropertyExpressionResolver {
      * @param <T>               The type
      * @return The optional resolved value
      */
+    @NonNull
     <T> Optional<T> resolve(@NonNull PropertyResolver propertyResolver,
                             @NonNull ConversionService<?> conversionService,
                             @NonNull String expression,
