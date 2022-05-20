@@ -88,6 +88,7 @@ managed-micronaut-kafka = "4.3.0"
 managed-micronaut-kotlin = "3.2.2"
 managed-micronaut-kubernetes = "3.4.0"
 managed-micronaut-micrometer = "4.2.1"
+managed-micronaut-microstream = "1.0.0-M1"
 managed-micronaut-liquibase = "5.3.0"
 managed-micronaut-mongo = "4.2.0"
 managed-micronaut-mqtt = "2.2.0"
@@ -154,6 +155,7 @@ boms-micronaut-kafka = { module = "io.micronaut.kafka:micronaut-kafka-bom", vers
 boms-micronaut-kotlin = { module = "io.micronaut.kotlin:micronaut-kotlin-bom", version.ref = "managed-micronaut-kotlin" }
 boms-micronaut-kubernetes = { module = "io.micronaut.kubernetes:micronaut-kubernetes-bom", version.ref = "managed-micronaut-kubernetes" }
 boms-micronaut-micrometer = { module = "io.micronaut.micrometer:micronaut-micrometer-bom", version.ref = "managed-micronaut-micrometer" }
+boms-micronaut-microstream = { module = "io.micronaut.microstream:micronaut-microstream-bom", version.ref = "managed-micronaut-microstream" }
 boms-micronaut-mongo = { module = "io.micronaut.mongodb:micronaut-mongo-bom", version.ref = "managed-micronaut-mongo" }
 boms-micronaut-mqtt = { module = "io.micronaut.mqtt:micronaut-mqtt-bom", version.ref = "managed-micronaut-mqtt" }
 boms-micronaut-oraclecloud = { module = "io.micronaut.oraclecloud:micronaut-oraclecloud-bom", version.ref = "managed-micronaut-oraclecloud" }
