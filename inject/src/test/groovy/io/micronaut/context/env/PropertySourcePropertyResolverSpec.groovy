@@ -676,11 +676,11 @@ class PropertySourcePropertyResolverSpec extends Specification {
             }
         where:
             template              | result
-            "Hello \${foo}!"      | "Hello bar!"
-            "Hello \${foobar}!"   | "Hello ABC!"
-            "Hello \${xyz}!"      | "Hello 123!"
-            "Hello \${external}!" | "Hello bar!"
-            "Hello \${lol}!"      | null
+            'Hello ${foo}!'      | "Hello bar!"
+            'Hello ${foobar}!'   | "Hello ABC!"
+            'Hello ${xyz}!'      | "Hello 123!"
+            'Hello ${external}!' | "Hello bar!"
+            'Hello ${lol}!'      | null
     }
 
     void "test expression resolver is closed"() {
