@@ -45,7 +45,7 @@ managed-gorm = "7.2.1"
 managed-gorm-hibernate = "7.2.2"
 # be sure to update graal version in gradle.properties as well
 managed-graal = "22.0.0.2"
-managed-graal-sdk = "22.0.0.2"
+managed-graal-sdk = "22.1.0.1"
 managed-groovy = "3.0.10"
 managed-h2 = "1.4.200"
 managed-hystrix = "1.5.18"
