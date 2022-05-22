@@ -33,7 +33,7 @@ wiremock = "2.33.2"
 # Versions which start with managed- are managed by Micronaut in the sense
 # that they will appear in the Micronaut BOM as <properties>
 #
-managed-dekorate = "1.0.3"
+managed-dekorate = "2.9.3"
 managed-elasticsearch = "7.16.3"
 managed-ignite = "2.8.1"
 managed-junit5 = "5.7.2"
