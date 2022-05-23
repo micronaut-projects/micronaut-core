@@ -2895,10 +2895,6 @@ public class DefaultBeanContext implements InitializableBeanContext {
                                                @NonNull BeanDefinition<T> definition,
                                                boolean isProxy,
                                                boolean isScopedProxyDefinition) {
-        if (definition.isSingleton()) {
-            return null;
-        }
-
         Optional<Class<? extends Annotation>> scope = definition.getScope();
         if (scope.isPresent()) {
             Class<? extends Annotation> scopeAnnotation = scope.get();
