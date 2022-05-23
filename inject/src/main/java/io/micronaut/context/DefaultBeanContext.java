@@ -2853,9 +2853,8 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
         final boolean isProxy = definition.isProxy();
 
-        if (isProxy && isScopedProxyDefinition && qualifier != PROXY_TARGET_QUALIFIER
-                && (definition.getDeclaredQualifier() == null)) {
-            // With scopes proxies we have to inject a reference into the injection point
+        if (isProxy && isScopedProxyDefinition && (qualifier == null || !qualifier.contains(PROXY_TARGET_QUALIFIER))) {
+            // AOP proxy
             Qualifier<T> q = qualifier;
             if (q == null) {
                 q = definition.getDeclaredQualifier();
