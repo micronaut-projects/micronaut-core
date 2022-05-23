@@ -98,6 +98,15 @@ public class CertificateProvidedSslBuilder extends SslBuilder<SslContext> implem
                 .forServer(getKeyManagerFactory(ssl))
                 .trustManager(getTrustManagerFactory(ssl));
 
+        setupSslBuilder(sslBuilder, ssl, httpVersion);
+        try {
+            return Optional.of(sslBuilder.build());
+        } catch (SSLException ex) {
+            throw new SslConfigurationException("An error occurred while setting up SSL", ex);
+        }
+    }
+
+    static void setupSslBuilder(SslContextBuilder sslBuilder, SslConfiguration ssl, HttpVersion httpVersion) {
         if (ssl.getProtocols().isPresent()) {
             sslBuilder.protocols(ssl.getProtocols().get());
         }
@@ -110,9 +119,9 @@ public class CertificateProvidedSslBuilder extends SslBuilder<SslContext> implem
         if (ssl.getClientAuthentication().isPresent()) {
             ClientAuthentication clientAuth = ssl.getClientAuthentication().get();
             if (clientAuth == ClientAuthentication.NEED) {
-                sslBuilder = sslBuilder.clientAuth(ClientAuth.REQUIRE);
+                sslBuilder.clientAuth(ClientAuth.REQUIRE);
             } else if (clientAuth == ClientAuthentication.WANT) {
-                sslBuilder = sslBuilder.clientAuth(ClientAuth.OPTIONAL);
+                sslBuilder.clientAuth(ClientAuth.OPTIONAL);
             }
         }
 
@@ -126,11 +135,6 @@ public class CertificateProvidedSslBuilder extends SslBuilder<SslContext> implem
                     ApplicationProtocolNames.HTTP_2,
                     ApplicationProtocolNames.HTTP_1_1
             ));
-        }
-        try {
-            return Optional.of(sslBuilder.build());
-        } catch (SSLException ex) {
-            throw new SslConfigurationException("An error occurred while setting up SSL", ex);
         }
     }
 

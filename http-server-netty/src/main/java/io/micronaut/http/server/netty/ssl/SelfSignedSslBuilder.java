@@ -93,18 +93,7 @@ public class SelfSignedSslBuilder extends SslBuilder<SslContext> implements Serv
             }
             SelfSignedCertificate ssc = new SelfSignedCertificate();
             final SslContextBuilder sslBuilder = SslContextBuilder.forServer(ssc.certificate(), ssc.privateKey());
-            final boolean isHttp2 = httpVersion == HttpVersion.HTTP_2_0;
-            if (isHttp2) {
-                SslProvider provider = SslProvider.isAlpnSupported(SslProvider.OPENSSL) ? SslProvider.OPENSSL : SslProvider.JDK;
-                sslBuilder.sslProvider(provider);
-                sslBuilder.ciphers(Http2SecurityUtil.CIPHERS, SupportedCipherSuiteFilter.INSTANCE);
-                sslBuilder.applicationProtocolConfig(new ApplicationProtocolConfig(
-                        ApplicationProtocolConfig.Protocol.ALPN,
-                        ApplicationProtocolConfig.SelectorFailureBehavior.NO_ADVERTISE,
-                        ApplicationProtocolConfig.SelectedListenerFailureBehavior.ACCEPT,
-                        ApplicationProtocolNames.HTTP_2,
-                        ApplicationProtocolNames.HTTP_1_1));
-            }
+            CertificateProvidedSslBuilder.setupSslBuilder(sslBuilder, ssl, httpVersion);
             return Optional.of(sslBuilder.build());
         } catch (CertificateException | SSLException e) {
             throw new SslConfigurationException("Encountered an error while building a self signed certificate", e);
