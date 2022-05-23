@@ -44,8 +44,9 @@ managed-google-function-invoker = "1.0.0"
 managed-gorm = "7.3.1"
 managed-gorm-hibernate = "7.2.2"
 # be sure to update graal version in gradle.properties as well
-managed-graal = "22.0.0.2"
 managed-graal-sdk = "22.1.0.1"
+managed-graal = "22.1.0"
+managed-graal-svm = "22.0.0.2"
 managed-groovy = "3.0.10"
 managed-h2 = "1.4.200"
 managed-hystrix = "1.5.18"
@@ -213,7 +214,7 @@ managed-gorm-datastore-gorm-validation = { module = "org.grails:grails-datastore
 managed-gorm-datastore-web = { module = "org.grails:grails-datastore-web", version.ref = "managed-gorm" }
 managed-gorm-hibernate = { module = "org.grails:grails-datastore-gorm-hibernate5", version.ref = "managed-gorm-hibernate" }
 
-managed-graal = { module = "org.graalvm.nativeimage:svm", version.ref = "managed-graal" }
+managed-graal = { module = "org.graalvm.nativeimage:svm", version.ref = "managed-graal-svm" }
 managed-graal-sdk = { module = "org.graalvm.sdk:graal-sdk", version.ref = "managed-graal-sdk" }
 
 managed-groovy = { module = "org.codehaus.groovy:groovy", version.ref = "managed-groovy" }
