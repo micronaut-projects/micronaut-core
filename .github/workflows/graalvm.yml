@@ -38,7 +38,7 @@ jobs:
       - name: Setup GraalVM CE
         uses: graalvm/setup-graalvm@v1
         with:
-          version: '22.0.0.2'
+          version: '22.1.0'
           java-version: ${{ matrix.java }}
           components: 'native-image'
       - name: Build with Gradle
