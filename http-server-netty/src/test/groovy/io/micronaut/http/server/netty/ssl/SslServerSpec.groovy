@@ -83,7 +83,7 @@ class SslServerSpec extends Specification {
 
     }
 
-    def 'tls 1.3'() {
+    def 'tls 1.3 for self-signed cert'() {
         given:
         def app = ApplicationContext.run([
                 "micronaut.ssl.enabled": true,
