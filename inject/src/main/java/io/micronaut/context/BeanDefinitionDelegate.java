@@ -195,7 +195,7 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
             if (named != null) {
                 value = ConversionService.SHARED.convert(named, argument).orElse(null);
             }
-            boolean isPrimary = attributes.containsKey(Primary.class.getName());
+            boolean isPrimary = attributes == null ? false : attributes.containsKey(Primary.class.getName());
             if (value == null && isPrimary) {
                 // Backwards compatibility, all qualifiers where "Named" before
                 value = ConversionService.SHARED.convert("Primary", argument).orElse(null);
