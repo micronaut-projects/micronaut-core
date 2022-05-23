@@ -17,6 +17,7 @@ package io.micronaut.context;
 
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.exceptions.BeanInstantiationException;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -27,10 +28,22 @@ import io.micronaut.core.naming.Named;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.value.ValueResolver;
-import io.micronaut.inject.*;
+import io.micronaut.inject.BeanDefinition;
+import io.micronaut.inject.BeanFactory;
+import io.micronaut.inject.DelegatingBeanDefinition;
+import io.micronaut.inject.DisposableBeanDefinition;
+import io.micronaut.inject.InitializingBeanDefinition;
+import io.micronaut.inject.InjectionPoint;
+import io.micronaut.inject.ParametrizedBeanFactory;
+import io.micronaut.inject.ValidatedBeanDefinition;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
-import java.util.*;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 
 /**
  * A delegate bean definition.
@@ -141,29 +154,8 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
         try {
             if (this.definition instanceof ParametrizedBeanFactory) {
                 ParametrizedBeanFactory<T> parametrizedBeanFactory = (ParametrizedBeanFactory<T>) this.definition;
-                Argument[] requiredArguments = parametrizedBeanFactory.getRequiredArguments();
-                Object named = attributes == null ? null : attributes.get(Named.class.getName());
-                if (named != null) {
-                    Map<String, Object> fulfilled = new LinkedHashMap<>(requiredArguments.length);
-                    for (Argument argument : requiredArguments) {
-                        Optional result = ConversionService.SHARED.convert(named, argument);
-                        String argumentName = argument.getName();
-                        if (result.isPresent()) {
-                            fulfilled.put(argumentName, result.get());
-                        } else {
-                            Qualifier namedQualifier = Qualifiers.byName(named.toString());
-                            Optional bean;
-                            try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
-                                    .pushConstructorResolve(definition, argument)) {
-                                bean = ((DefaultBeanContext) context).findBean(resolutionContext, argument, namedQualifier);
-                            }
-                            if (bean.isPresent()) {
-                                fulfilled.put(argumentName, bean.get());
-                            }
-                        }
-                    }
-                    return parametrizedBeanFactory.build(resolutionContext, context, definition, fulfilled);
-                }
+                Map<String, Object> fulfilled = getParametersValues(resolutionContext, (DefaultBeanContext) context, definition, parametrizedBeanFactory);
+                return parametrizedBeanFactory.build(resolutionContext, context, definition, fulfilled);
             }
             if (this.definition instanceof BeanFactory) {
                 return ((BeanFactory<T>) this.definition).build(resolutionContext, context, definition);
@@ -180,6 +172,53 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
                 oldAttributes.forEach(resolutionContext::setAttribute);
             }
         }
+    }
+
+    @Nullable
+    private Map<String, Object> getParametersValues(BeanResolutionContext resolutionContext,
+                                                    DefaultBeanContext context,
+                                                    BeanDefinition<T> definition,
+                                                    ParametrizedBeanFactory<T> parametrizedBeanFactory) {
+        Argument[] requiredArguments = parametrizedBeanFactory.getRequiredArguments();
+        Object named = attributes == null ? null : attributes.get(Named.class.getName());
+        Object qualifierMapValue = attributes == null ? Collections.emptyMap() : attributes.get(AnnotationUtil.QUALIFIER);
+        Map<Argument, Qualifier> qualifierMap;
+        if (qualifierMapValue instanceof Map) {
+            qualifierMap = (Map<Argument, Qualifier>) qualifierMapValue;
+        } else {
+            qualifierMap = Collections.emptyMap();
+        }
+        Map<String, Object> fulfilled = new LinkedHashMap<>(requiredArguments.length);
+        for (Argument<?> argument : requiredArguments) {
+            String argumentName = argument.getName();
+            Object value = null;
+            if (named != null) {
+                value = ConversionService.SHARED.convert(named, argument).orElse(null);
+            }
+            boolean isPrimary = attributes.containsKey(Primary.class.getName());
+            if (value == null && isPrimary) {
+                // Backwards compatibility, all qualifiers where "Named" before
+                value = ConversionService.SHARED.convert("Primary", argument).orElse(null);
+            }
+            if (value == null) {
+                Qualifier qualifier = qualifierMap.get(argument);
+                if (qualifier == null && named != null) {
+                    qualifier = Qualifiers.byName(named.toString());
+                }
+                if (qualifier == null) {
+                    if (!isPrimary) {
+                        continue;
+                    }
+                }
+                try (BeanResolutionContext.Path ignored = resolutionContext.getPath().pushConstructorResolve(definition, argument)) {
+                    value = context.findBean(resolutionContext, argument, qualifier).orElse(null);
+                }
+            }
+            if (value != null) {
+                fulfilled.put(argumentName, value);
+            }
+        }
+        return fulfilled;
     }
 
     @Override
