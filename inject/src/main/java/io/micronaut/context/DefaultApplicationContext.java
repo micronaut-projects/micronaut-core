@@ -375,40 +375,44 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         if (!dependentCandidates.isEmpty()) {
             for (BeanDefinition dependentCandidate : dependentCandidates) {
 
-                BeanDefinitionDelegate<?> delegate = BeanDefinitionDelegate.create(candidate);
-                Optional<Qualifier> optional;
+                Qualifier qualifier;
                 if (dependentCandidate instanceof BeanDefinitionDelegate) {
                     BeanDefinitionDelegate<?> parentDelegate = (BeanDefinitionDelegate) dependentCandidate;
-                    optional = parentDelegate.get(Named.class.getName(), String.class).map(Qualifiers::byName);
+                    qualifier = parentDelegate.getQualifier();
+                    if (qualifier == null) {
+                        qualifier = parentDelegate.get(AnnotationUtil.QUALIFIER, Qualifier.class).orElse(null);
+                    }
+                    if (qualifier == null) {
+                        qualifier = parentDelegate.get(Named.class.getName(), String.class).map(Qualifiers::byName).orElse(null);
+                    }
                 } else {
-                    Optional<String> qualifierName = dependentCandidate.getAnnotationNameByStereotype(AnnotationUtil.QUALIFIER);
-                    optional = qualifierName.map(name -> Qualifiers.byAnnotation(dependentCandidate, name));
+                    qualifier = dependentCandidate.getDeclaredQualifier();
                 }
+
+                BeanDefinitionDelegate<?> delegate = BeanDefinitionDelegate.create(candidate, qualifier);
 
                 if (dependentCandidate.isPrimary()) {
                     delegate.put(BeanDefinitionDelegate.PRIMARY_ATTRIBUTE, true);
                 }
 
-                optional.ifPresent(qualifier -> {
-                            String qualifierKey = AnnotationUtil.QUALIFIER;
-                            Argument<?>[] arguments = candidate.getConstructor().getArguments();
-                            for (Argument<?> argument : arguments) {
-                                Class<?> argumentType = argument.getType();
-                                if (argumentType.equals(dependentType)) {
-                                    Map<? extends Argument<?>, Qualifier> qualifedArg = Collections.singletonMap(argument, qualifier);
-                                    delegate.put(qualifierKey, qualifedArg);
-                                    break;
-                                }
-                            }
-
-                            if (qualifier instanceof Named) {
-                                delegate.put(Named.class.getName(), ((Named) qualifier).getName());
-                            }
-                            if (delegate.isEnabled(this, resolutionContext)) {
-                                transformedCandidates.add((BeanDefinition<T>) delegate);
-                            }
+                if (qualifier != null || dependentCandidate.isPrimary()) {
+                    String qualifierKey = AnnotationUtil.QUALIFIER;
+                    Argument<?>[] arguments = candidate.getConstructor().getArguments();
+                    for (Argument<?> argument : arguments) {
+                        Class<?> argumentType = argument.getType();
+                        if (argumentType.equals(dependentType)) {
+                            delegate.put(qualifierKey, Collections.singletonMap(argument, qualifier));
+                            break;
                         }
-                );
+                    }
+
+                    if (qualifier instanceof Named) {
+                        delegate.put(Named.class.getName(), ((Named) qualifier).getName());
+                    }
+                    if (delegate.isEnabled(this, resolutionContext)) {
+                        transformedCandidates.add((BeanDefinition<T>) delegate);
+                    }
+                }
             }
         }
     }

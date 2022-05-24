@@ -97,6 +97,10 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
         if (attributes == null) {
             return null;
         }
+        Object attributesQualifier = attributes.get(AnnotationUtil.QUALIFIER);
+        if (attributesQualifier instanceof Qualifier) {
+            return (Qualifier<T>) attributesQualifier;
+        }
         Object o = attributes.get(NAMED_ATTRIBUTE);
         if (o instanceof CharSequence) {
             return Qualifiers.byName(o.toString());
@@ -179,34 +183,15 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
                                                     DefaultBeanContext context,
                                                     BeanDefinition<T> definition,
                                                     ParametrizedBeanFactory<T> parametrizedBeanFactory) {
-        Argument[] requiredArguments = parametrizedBeanFactory.getRequiredArguments();
-        Object named = attributes == null ? null : attributes.get(Named.class.getName());
-        Object qualifierMapValue = attributes == null ? Collections.emptyMap() : attributes.get(AnnotationUtil.QUALIFIER);
-        Map<Argument, Qualifier> qualifierMap;
-        if (qualifierMapValue instanceof Map) {
-            qualifierMap = (Map<Argument, Qualifier>) qualifierMapValue;
-        } else {
-            qualifierMap = Collections.emptyMap();
-        }
+        Argument<Object>[] requiredArguments = (Argument<Object>[]) parametrizedBeanFactory.getRequiredArguments();
         Map<String, Object> fulfilled = new LinkedHashMap<>(requiredArguments.length);
-        for (Argument<?> argument : requiredArguments) {
+        for (Argument<Object> argument : requiredArguments) {
             String argumentName = argument.getName();
-            Object value = null;
-            if (named != null) {
-                value = ConversionService.SHARED.convert(named, argument).orElse(null);
-            }
-            boolean isPrimary = attributes == null ? false : attributes.containsKey(Primary.class.getName());
-            if (value == null && isPrimary) {
-                // Backwards compatibility, all qualifiers where "Named" before
-                value = ConversionService.SHARED.convert("Primary", argument).orElse(null);
-            }
+            Object value = resolveValueAsName(argument);
             if (value == null) {
-                Qualifier qualifier = qualifierMap.get(argument);
-                if (qualifier == null && named != null) {
-                    qualifier = Qualifiers.byName(named.toString());
-                }
+                Qualifier<Object> qualifier = resolveQualifier(argument);
                 if (qualifier == null) {
-                    if (!isPrimary) {
+                    if (!isPrimary()) {
                         continue;
                     }
                 }
@@ -219,6 +204,32 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
             }
         }
         return fulfilled;
+    }
+
+    @Nullable
+    private <K> Qualifier<K> resolveQualifier(Argument<K> argument) {
+        Object qualifierMapValue = attributes == null ? Collections.emptyMap() : attributes.get(AnnotationUtil.QUALIFIER);
+        if (qualifierMapValue instanceof Map) {
+            Qualifier<K> qualifier = ((Map<Argument, Qualifier>) qualifierMapValue).get(argument);
+            if (qualifier != null) {
+                return qualifier;
+            }
+        }
+        return (Qualifier<K>) resolveDynamicQualifier();
+    }
+
+    @Nullable
+    private Object resolveValueAsName(Argument<?> argument) {
+        Object named = attributes == null ? null : attributes.get(Named.class.getName());
+        Object value = null;
+        if (named != null) {
+            value = ConversionService.SHARED.convert(named, argument).orElse(null);
+        }
+        if (value == null && isPrimary()) {
+            // Backwards compatibility, all qualifiers where "Named" before
+            value = ConversionService.SHARED.convert("Primary", argument).orElse(null);
+        }
+        return value;
     }
 
     @Override
