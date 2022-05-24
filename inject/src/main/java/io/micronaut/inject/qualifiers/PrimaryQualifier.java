@@ -50,11 +50,6 @@ public final class PrimaryQualifier<T> implements Qualifier<T> {
     }
 
     @Override
-    public boolean contains(Qualifier<T> qualifier) {
-        return true;
-    }
-
-    @Override
     public String toString() {
         return "@Primary";
     }
