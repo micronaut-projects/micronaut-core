@@ -482,22 +482,11 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                 return super.findConcreteCandidate(beanType, qualifier, candidates);
             }
         }
-        Named named = (Named) qualifier;
-        String name = named.getName();
         for (BeanDefinition<T> candidate : candidates) {
             if (candidate instanceof BeanDefinitionDelegate) {
-
-                BeanDefinitionDelegate<T> delegate = (BeanDefinitionDelegate) candidate;
-                Optional<String> value = delegate.get(Named.class.getName(), String.class);
-                if (value.isPresent()) {
-                    if (name.equals(value.get())) {
-                        return delegate;
-                    }
-                } else {
-                    Optional<Qualifier> resolvedQualifier = delegate.get(AnnotationUtil.QUALIFIER, Qualifier.class);
-                    if (resolvedQualifier.isPresent() && resolvedQualifier.get().equals(qualifier)) {
-                        return delegate;
-                    }
+                Qualifier<T> delegateQualifier = candidate.resolveDynamicQualifier();
+                if (delegateQualifier != null && delegateQualifier.equals(qualifier)) {
+                    return candidate;
                 }
             }
         }
