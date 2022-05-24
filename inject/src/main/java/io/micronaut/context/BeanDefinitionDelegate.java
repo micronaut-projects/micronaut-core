@@ -295,16 +295,7 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
      * @return The new bean definition
      */
     static <T> BeanDefinitionDelegate<T> create(BeanDefinition<T> definition) {
-        if (definition instanceof InitializingBeanDefinition || definition instanceof DisposableBeanDefinition) {
-            if (definition instanceof ValidatedBeanDefinition) {
-                return new LifeCycleValidatingDelegate<>(definition);
-            } else {
-                return new LifeCycleDelegate<>(definition);
-            }
-        } else if (definition instanceof ValidatedBeanDefinition) {
-            return new ValidatingDelegate<>(definition);
-        }
-        return new BeanDefinitionDelegate<>(definition);
+        return create(definition, null);
     }
 
     /**
@@ -314,6 +305,15 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
      * @return The new bean definition
      */
     static <T> BeanDefinitionDelegate<T> create(BeanDefinition<T> definition, Qualifier qualifier) {
+        if (definition instanceof InitializingBeanDefinition || definition instanceof DisposableBeanDefinition) {
+            if (definition instanceof ValidatedBeanDefinition) {
+                return new LifeCycleValidatingDelegate<>(definition, qualifier);
+            } else {
+                return new LifeCycleDelegate<>(definition, qualifier);
+            }
+        } else if (definition instanceof ValidatedBeanDefinition) {
+            return new ValidatingDelegate<>(definition, qualifier);
+        }
         return new BeanDefinitionDelegate<>(definition, qualifier);
     }
 
@@ -383,8 +383,8 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
      * @param <T> The bean definition type
      */
     private static final class LifeCycleDelegate<T> extends BeanDefinitionDelegate<T> implements ProxyInitializingBeanDefinition<T>, ProxyDisposableBeanDefinition<T> {
-        private LifeCycleDelegate(BeanDefinition<T> definition) {
-            super(definition);
+        private LifeCycleDelegate(BeanDefinition<T> definition, Qualifier qualifier) {
+            super(definition, qualifier);
         }
     }
 
@@ -392,8 +392,8 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
      * @param <T> The bean definition type
      */
     private static final class ValidatingDelegate<T> extends BeanDefinitionDelegate<T> implements ProxyValidatingBeanDefinition<T> {
-        private ValidatingDelegate(BeanDefinition<T> definition) {
-            super(definition);
+        private ValidatingDelegate(BeanDefinition<T> definition, Qualifier qualifier) {
+            super(definition, qualifier);
         }
     }
 
@@ -401,8 +401,8 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
      * @param <T> The bean definition type
      */
     private static final class LifeCycleValidatingDelegate<T> extends BeanDefinitionDelegate<T> implements ProxyValidatingBeanDefinition<T>, ProxyInitializingBeanDefinition<T>, ProxyDisposableBeanDefinition<T> {
-        private LifeCycleValidatingDelegate(BeanDefinition<T> definition) {
-            super(definition);
+        private LifeCycleValidatingDelegate(BeanDefinition<T> definition, Qualifier qualifier) {
+            super(definition, qualifier);
         }
     }
 }
