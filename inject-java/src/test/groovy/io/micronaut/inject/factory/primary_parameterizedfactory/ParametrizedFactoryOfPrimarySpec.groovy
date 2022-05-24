@@ -23,14 +23,13 @@ class ParametrizedFactoryOfPrimarySpec extends Specification {
     void "test parametrized factory definition that defines a primary association"() {
         given:
             ApplicationContext beanContext = ApplicationContext.run(["myBean": [["name": "xyz"]]])
-//            def primaryBean = beanContext.getBean(MyBeanUser)
             def delegated = beanContext.getBean(MyBeanUser2)
 
         expect:
-//            primaryBean.name == "xx"
-//            primaryBean.myBean.name == "myPrimary"
-//            primaryBean.myBean.myAssocBean.name == "ROOT"
-            delegated.myBean
+            delegated.name == "xx"
+            delegated.myBean.name == "xx"
+            delegated.myBean.myBean.name == "myPrimary"
+            delegated.myBean.myBean.myAssocBean.name == "ROOT"
 
         cleanup:
             beanContext.close()
