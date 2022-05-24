@@ -97,10 +97,6 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
         if (attributes == null) {
             return null;
         }
-        Object attributesQualifier = attributes.get(AnnotationUtil.QUALIFIER);
-        if (attributesQualifier instanceof Qualifier) {
-            return (Qualifier<T>) attributesQualifier;
-        }
         Object o = attributes.get(NAMED_ATTRIBUTE);
         if (o instanceof CharSequence) {
             return Qualifiers.byName(o.toString());
