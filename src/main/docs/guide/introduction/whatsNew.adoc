@@ -61,7 +61,7 @@ A <<factories,Factory>> has the default scope `@Singleton`, and it is destroyed 
 - https://github.com/micronaut-projects/micronaut-gcp/releases/tag/v4.2.0[Micronaut GCP 4.2.0] updates to `grpc-auth`
 1.45.1 and `grpc-netty-shaded`. Moreover, we have clarified the documentation to support GraalVM Native Images when using the GCP libraries, and the Micronaut GCP Bom now includes the `com.google.cloud:native-image-support` dependency.
 - https://github.com/micronaut-projects/micronaut-aot/releases/tag/v1.1.0[Micronaut AOT 1.1.0]
-- https://github.com/micronaut-projects/micronaut-problem-json/releases/tag/v2.3.0[Micronaut SQL to 1.1.0]
+- https://github.com/micronaut-projects/micronaut-sql/releases/tag/v4.4.0[Micronaut SQL to 4.4.0]
 - https://github.com/micronaut-projects/micronaut-problem-json/releases/tag/v2.3.0[Micronaut Problem JSON to 2.3.0]
 - https://github.com/micronaut-projects/micronaut-grpc/releases/tag/v3.3.0[Micronaut GRPC to 3.3.0] allows exposing a gRPC Health Check for a grpc-server.
 - https://github.com/micronaut-projects/micronaut-serialization/releases/tag/v1.1.0[Micronaut Serialization to 1.1.0]. It allows the serialization and deserialization of object arrays.
