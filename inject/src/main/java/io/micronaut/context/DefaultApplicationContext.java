@@ -41,6 +41,7 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.BeanConfiguration;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
+import io.micronaut.inject.qualifiers.PrimaryQualifier;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -379,6 +380,11 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                 } else {
                     qualifier = dependentCandidate.getDeclaredQualifier();
                 }
+                if (qualifier == null && dependentCandidate.isPrimary()) {
+                    // Backwards compatibility, `getDeclaredQualifier` strips @Primary
+                    // This should be removed if @Primary is no longer qualifier
+                    qualifier = PrimaryQualifier.INSTANCE;
+                }
 
                 BeanDefinitionDelegate<?> delegate = BeanDefinitionDelegate.create(candidate, qualifier);
 
@@ -386,7 +392,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                     delegate.put(BeanDefinitionDelegate.PRIMARY_ATTRIBUTE, true);
                 }
 
-                if (qualifier != null || dependentCandidate.isPrimary()) {
+                if (qualifier != null) {
                     String qualifierKey = AnnotationUtil.QUALIFIER;
                     Argument<?>[] arguments = candidate.getConstructor().getArguments();
                     for (Argument<?> argument : arguments) {

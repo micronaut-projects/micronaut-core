@@ -32,7 +32,6 @@ import io.micronaut.core.util.StringUtils;
 import jakarta.inject.Named;
 
 import java.lang.annotation.Annotation;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
@@ -45,8 +44,6 @@ import java.util.Optional;
  * @since 1.0
  */
 public class Qualifiers {
-
-    private static final Qualifier PRIMARY = Qualifiers.byStereotype(Primary.class.getName());
 
     /**
      * Allows looking up the first matching instance.
@@ -137,6 +134,9 @@ public class Qualifiers {
         } else if (annotation instanceof Any) {
             //noinspection unchecked
             return AnyQualifier.INSTANCE;
+        } else if (annotation instanceof Primary) {
+            //noinspection unchecked
+            return PrimaryQualifier.INSTANCE;
         } else {
             return new AnnotationQualifier<>(annotation);
         }
@@ -154,6 +154,9 @@ public class Qualifiers {
         if (Any.class == type) {
             //noinspection unchecked
             return AnyQualifier.INSTANCE;
+        } else if (Primary.class == type) {
+            //noinspection unchecked
+            return PrimaryQualifier.INSTANCE;
         } else if (Type.class == type) {
             Optional<Class> aClass = metadata.classValue(type);
             if (aClass.isPresent()) {
@@ -191,6 +194,9 @@ public class Qualifiers {
         } else if (Any.NAME.equals(type)) {
             //noinspection unchecked
             return AnyQualifier.INSTANCE;
+        } else if (Qualifier.PRIMARY.equals(type)) {
+            //noinspection unchecked
+            return PrimaryQualifier.INSTANCE;
         } else if (Named.class.getName().equals(type) || AnnotationUtil.NAMED.equals(type)) {
             String n = metadata.stringValue(type).orElse(null);
             if (n != null) {
@@ -339,43 +345,4 @@ public class Qualifiers {
         return new InterceptorBindingQualifier<>(binding);
     }
 
-    /**
-     * Remove any {@link Primary} qualifiers.
-     *
-     * @param qualifier The qualifier to be inspected
-     * @param <T>       The bean type
-     * @return The qualifier
-     * @since 3.5.0
-     */
-    public static @Nullable <T> Qualifier<T> stripPrimaryQualifier(@Nullable Qualifier<T> qualifier) {
-        if (qualifier == null) {
-            return null;
-        }
-        if (qualifier.equals(PRIMARY)) {
-            return null;
-        }
-        if (qualifier instanceof CompositeQualifier) {
-            Qualifier[] qualifiers = ((CompositeQualifier) qualifier).getQualifiers();
-            for (Qualifier q : qualifiers) {
-                if (q.equals(PRIMARY)) {
-                    List<Qualifier> newQualifiers = new ArrayList<>(qualifiers.length);
-                    for (Qualifier value : qualifiers) {
-                        Qualifier result = stripPrimaryQualifier(value);
-                        if (result != null) {
-                            newQualifiers.add(result);
-                        }
-                    }
-                    if (newQualifiers.isEmpty()) {
-                        return null;
-                    }
-                    if (newQualifiers.size() == 1) {
-                        return newQualifiers.iterator().next();
-                    }
-                    return Qualifiers.byQualifiers(newQualifiers.toArray(new Qualifier[0]));
-                }
-                return qualifier;
-            }
-        }
-        return qualifier;
-    }
 }
