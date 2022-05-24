@@ -32,12 +32,11 @@ import io.micronaut.core.util.StringUtils;
 import jakarta.inject.Named;
 
 import java.lang.annotation.Annotation;
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 /**
  * Factory for {@link io.micronaut.context.annotation.Bean} qualifiers.
@@ -359,9 +358,13 @@ public class Qualifiers {
             Qualifier[] qualifiers = ((CompositeQualifier) qualifier).getQualifiers();
             for (Qualifier q : qualifiers) {
                 if (q.equals(PRIMARY)) {
-                    List<Qualifier> newQualifiers = Arrays.stream(qualifiers)
-                            .filter(k -> k.equals(PRIMARY))
-                            .collect(Collectors.toList());
+                    List<Qualifier> newQualifiers = new ArrayList<>(qualifiers.length);
+                    for (Qualifier value : qualifiers) {
+                        Qualifier result = stripPrimaryQualifier(value);
+                        if (result != null) {
+                            newQualifiers.add(result);
+                        }
+                    }
                     if (newQualifiers.isEmpty()) {
                         return null;
                     }
@@ -370,7 +373,7 @@ public class Qualifiers {
                     }
                     return Qualifiers.byQualifiers(newQualifiers.toArray(new Qualifier[0]));
                 }
-                return stripPrimaryQualifier(q);
+                return qualifier;
             }
         }
         return qualifier;
