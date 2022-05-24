@@ -41,7 +41,6 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.BeanConfiguration;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
-import io.micronaut.inject.qualifiers.Qualifiers;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -374,17 +373,9 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
         if (!dependentCandidates.isEmpty()) {
             for (BeanDefinition dependentCandidate : dependentCandidates) {
-
                 Qualifier qualifier;
                 if (dependentCandidate instanceof BeanDefinitionDelegate) {
-                    BeanDefinitionDelegate<?> parentDelegate = (BeanDefinitionDelegate) dependentCandidate;
-                    qualifier = parentDelegate.getQualifier();
-                    if (qualifier == null) {
-                        qualifier = parentDelegate.get(AnnotationUtil.QUALIFIER, Qualifier.class).orElse(null);
-                    }
-                    if (qualifier == null) {
-                        qualifier = parentDelegate.get(Named.class.getName(), String.class).map(Qualifiers::byName).orElse(null);
-                    }
+                    qualifier = dependentCandidate.resolveDynamicQualifier();
                 } else {
                     qualifier = dependentCandidate.getDeclaredQualifier();
                 }
