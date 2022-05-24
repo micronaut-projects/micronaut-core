@@ -17,18 +17,19 @@ package io.micronaut.inject.qualifiers;
 
 import io.micronaut.context.Qualifier;
 import io.micronaut.context.annotation.Any;
+import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Type;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.UsedByGeneratedCode;
-import io.micronaut.core.util.StringUtils;
-import jakarta.inject.Named;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.StringUtils;
+import jakarta.inject.Named;
 
 import java.lang.annotation.Annotation;
 import java.util.Collection;
@@ -133,6 +134,9 @@ public class Qualifiers {
         } else if (annotation instanceof Any) {
             //noinspection unchecked
             return AnyQualifier.INSTANCE;
+        } else if (annotation instanceof Primary) {
+            //noinspection unchecked
+            return PrimaryQualifier.INSTANCE;
         } else {
             return new AnnotationQualifier<>(annotation);
         }
@@ -150,6 +154,9 @@ public class Qualifiers {
         if (Any.class == type) {
             //noinspection unchecked
             return AnyQualifier.INSTANCE;
+        } else if (Primary.class == type) {
+            //noinspection unchecked
+            return PrimaryQualifier.INSTANCE;
         } else if (Type.class == type) {
             Optional<Class> aClass = metadata.classValue(type);
             if (aClass.isPresent()) {
@@ -187,6 +194,9 @@ public class Qualifiers {
         } else if (Any.NAME.equals(type)) {
             //noinspection unchecked
             return AnyQualifier.INSTANCE;
+        } else if (Qualifier.PRIMARY.equals(type)) {
+            //noinspection unchecked
+            return PrimaryQualifier.INSTANCE;
         } else if (Named.class.getName().equals(type) || AnnotationUtil.NAMED.equals(type)) {
             String n = metadata.stringValue(type).orElse(null);
             if (n != null) {
@@ -334,4 +344,5 @@ public class Qualifiers {
     <T> Qualifier<T> byInterceptorBindingValues(@NonNull Collection<AnnotationValue<?>> binding) {
         return new InterceptorBindingQualifier<>(binding);
     }
+
 }

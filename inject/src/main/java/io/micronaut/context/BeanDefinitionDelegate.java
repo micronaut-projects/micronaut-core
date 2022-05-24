@@ -179,34 +179,15 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
                                                     DefaultBeanContext context,
                                                     BeanDefinition<T> definition,
                                                     ParametrizedBeanFactory<T> parametrizedBeanFactory) {
-        Argument[] requiredArguments = parametrizedBeanFactory.getRequiredArguments();
-        Object named = attributes == null ? null : attributes.get(Named.class.getName());
-        Object qualifierMapValue = attributes == null ? Collections.emptyMap() : attributes.get(AnnotationUtil.QUALIFIER);
-        Map<Argument, Qualifier> qualifierMap;
-        if (qualifierMapValue instanceof Map) {
-            qualifierMap = (Map<Argument, Qualifier>) qualifierMapValue;
-        } else {
-            qualifierMap = Collections.emptyMap();
-        }
+        Argument<Object>[] requiredArguments = (Argument<Object>[]) parametrizedBeanFactory.getRequiredArguments();
         Map<String, Object> fulfilled = new LinkedHashMap<>(requiredArguments.length);
-        for (Argument<?> argument : requiredArguments) {
+        for (Argument<Object> argument : requiredArguments) {
             String argumentName = argument.getName();
-            Object value = null;
-            if (named != null) {
-                value = ConversionService.SHARED.convert(named, argument).orElse(null);
-            }
-            boolean isPrimary = attributes == null ? false : attributes.containsKey(Primary.class.getName());
-            if (value == null && isPrimary) {
-                // Backwards compatibility, all qualifiers where "Named" before
-                value = ConversionService.SHARED.convert("Primary", argument).orElse(null);
-            }
+            Object value = resolveValueAsName(argument);
             if (value == null) {
-                Qualifier qualifier = qualifierMap.get(argument);
-                if (qualifier == null && named != null) {
-                    qualifier = Qualifiers.byName(named.toString());
-                }
+                Qualifier<Object> qualifier = resolveQualifier(argument);
                 if (qualifier == null) {
-                    if (!isPrimary) {
+                    if (!isPrimary()) {
                         continue;
                     }
                 }
@@ -219,6 +200,32 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
             }
         }
         return fulfilled;
+    }
+
+    @Nullable
+    private <K> Qualifier<K> resolveQualifier(Argument<K> argument) {
+        Object qualifierMapValue = attributes == null ? Collections.emptyMap() : attributes.get(AnnotationUtil.QUALIFIER);
+        if (qualifierMapValue instanceof Map) {
+            Qualifier<K> qualifier = ((Map<Argument, Qualifier>) qualifierMapValue).get(argument);
+            if (qualifier != null) {
+                return qualifier;
+            }
+        }
+        return (Qualifier<K>) resolveDynamicQualifier();
+    }
+
+    @Nullable
+    private Object resolveValueAsName(Argument<?> argument) {
+        Object named = attributes == null ? null : attributes.get(Named.class.getName());
+        Object value = null;
+        if (named != null) {
+            value = ConversionService.SHARED.convert(named, argument).orElse(null);
+        }
+        if (value == null && isPrimary()) {
+            // Backwards compatibility, all qualifiers where "Named" before
+            value = ConversionService.SHARED.convert("Primary", argument).orElse(null);
+        }
+        return value;
     }
 
     @Override
@@ -288,16 +295,7 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
      * @return The new bean definition
      */
     static <T> BeanDefinitionDelegate<T> create(BeanDefinition<T> definition) {
-        if (definition instanceof InitializingBeanDefinition || definition instanceof DisposableBeanDefinition) {
-            if (definition instanceof ValidatedBeanDefinition) {
-                return new LifeCycleValidatingDelegate<>(definition);
-            } else {
-                return new LifeCycleDelegate<>(definition);
-            }
-        } else if (definition instanceof ValidatedBeanDefinition) {
-            return new ValidatingDelegate<>(definition);
-        }
-        return new BeanDefinitionDelegate<>(definition);
+        return create(definition, null);
     }
 
     /**
@@ -307,6 +305,15 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
      * @return The new bean definition
      */
     static <T> BeanDefinitionDelegate<T> create(BeanDefinition<T> definition, Qualifier qualifier) {
+        if (definition instanceof InitializingBeanDefinition || definition instanceof DisposableBeanDefinition) {
+            if (definition instanceof ValidatedBeanDefinition) {
+                return new LifeCycleValidatingDelegate<>(definition, qualifier);
+            } else {
+                return new LifeCycleDelegate<>(definition, qualifier);
+            }
+        } else if (definition instanceof ValidatedBeanDefinition) {
+            return new ValidatingDelegate<>(definition, qualifier);
+        }
         return new BeanDefinitionDelegate<>(definition, qualifier);
     }
 
@@ -376,8 +383,8 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
      * @param <T> The bean definition type
      */
     private static final class LifeCycleDelegate<T> extends BeanDefinitionDelegate<T> implements ProxyInitializingBeanDefinition<T>, ProxyDisposableBeanDefinition<T> {
-        private LifeCycleDelegate(BeanDefinition<T> definition) {
-            super(definition);
+        private LifeCycleDelegate(BeanDefinition<T> definition, Qualifier qualifier) {
+            super(definition, qualifier);
         }
     }
 
@@ -385,8 +392,8 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
      * @param <T> The bean definition type
      */
     private static final class ValidatingDelegate<T> extends BeanDefinitionDelegate<T> implements ProxyValidatingBeanDefinition<T> {
-        private ValidatingDelegate(BeanDefinition<T> definition) {
-            super(definition);
+        private ValidatingDelegate(BeanDefinition<T> definition, Qualifier qualifier) {
+            super(definition, qualifier);
         }
     }
 
@@ -394,8 +401,8 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
      * @param <T> The bean definition type
      */
     private static final class LifeCycleValidatingDelegate<T> extends BeanDefinitionDelegate<T> implements ProxyValidatingBeanDefinition<T>, ProxyInitializingBeanDefinition<T>, ProxyDisposableBeanDefinition<T> {
-        private LifeCycleValidatingDelegate(BeanDefinition<T> definition) {
-            super(definition);
+        private LifeCycleValidatingDelegate(BeanDefinition<T> definition, Qualifier qualifier) {
+            super(definition, qualifier);
         }
     }
 }
