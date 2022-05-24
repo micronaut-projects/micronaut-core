@@ -17,24 +17,27 @@ package io.micronaut.inject.qualifiers;
 
 import io.micronaut.context.Qualifier;
 import io.micronaut.context.annotation.Any;
+import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Type;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.UsedByGeneratedCode;
-import io.micronaut.core.util.StringUtils;
-import jakarta.inject.Named;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.StringUtils;
+import jakarta.inject.Named;
 
 import java.lang.annotation.Annotation;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * Factory for {@link io.micronaut.context.annotation.Bean} qualifiers.
@@ -43,6 +46,8 @@ import java.util.Optional;
  * @since 1.0
  */
 public class Qualifiers {
+
+    private static final Qualifier PRIMARY = Qualifiers.byStereotype(Primary.class.getName());
 
     /**
      * Allows looking up the first matching instance.
@@ -333,5 +338,41 @@ public class Qualifiers {
     public static @NonNull
     <T> Qualifier<T> byInterceptorBindingValues(@NonNull Collection<AnnotationValue<?>> binding) {
         return new InterceptorBindingQualifier<>(binding);
+    }
+
+    /**
+     * Remove any {@link Primary} qualifiers.
+     *
+     * @param qualifier The qualifier to be inspected
+     * @param <T>       The bean type
+     * @return The qualifier
+     * @since 3.5.0
+     */
+    public static @Nullable <T> Qualifier<T> stripPrimaryQualifier(@Nullable Qualifier<T> qualifier) {
+        if (qualifier == null) {
+            return null;
+        }
+        if (qualifier.equals(PRIMARY)) {
+            return null;
+        }
+        if (qualifier instanceof CompositeQualifier) {
+            Qualifier[] qualifiers = ((CompositeQualifier) qualifier).getQualifiers();
+            for (Qualifier q : qualifiers) {
+                if (q.equals(PRIMARY)) {
+                    List<Qualifier> newQualifiers = Arrays.stream(qualifiers)
+                            .filter(k -> k.equals(PRIMARY))
+                            .collect(Collectors.toList());
+                    if (newQualifiers.isEmpty()) {
+                        return null;
+                    }
+                    if (newQualifiers.size() == 1) {
+                        return newQualifiers.iterator().next();
+                    }
+                    return Qualifiers.byQualifiers(newQualifiers.toArray(new Qualifier[0]));
+                }
+                return stripPrimaryQualifier(q);
+            }
+        }
+        return qualifier;
     }
 }

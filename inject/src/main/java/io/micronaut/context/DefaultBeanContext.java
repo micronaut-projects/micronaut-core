@@ -2734,6 +2734,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                                                             @NonNull Argument<T> beanType,
                                                             @Nullable Qualifier<T> qualifier,
                                                             boolean throwNoSuchBean) {
+        qualifier = Qualifiers.stripPrimaryQualifier(qualifier);
         // allow injection the bean context
         final Class<T> beanClass = beanType.getType();
         if (thisInterfaces.contains(beanClass)) {
@@ -2840,6 +2841,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                                                             @NonNull BeanDefinition<T> definition,
                                                             @NonNull Argument<T> beanType,
                                                             @Nullable Qualifier<T> qualifier) {
+        qualifier = Qualifiers.stripPrimaryQualifier(qualifier);
         final boolean isScopedProxyDefinition = definition.hasStereotype(SCOPED_PROXY_ANN);
 
         if (qualifier != null && AnyQualifier.INSTANCE.equals(definition.getDeclaredQualifier())) {
@@ -3353,6 +3355,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
     public <T> Collection<BeanRegistration<T>> getBeanRegistrations(@Nullable BeanResolutionContext resolutionContext,
                                                                     @NonNull Argument<T> beanType,
                                                                     @Nullable Qualifier<T> qualifier) {
+        qualifier = Qualifiers.stripPrimaryQualifier(qualifier);
         boolean hasQualifier = qualifier != null;
         if (LOG.isDebugEnabled()) {
             if (hasQualifier) {
