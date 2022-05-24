@@ -20,7 +20,6 @@ class RefreshablePrimaryScopeProxySpec extends Specification {
             def myBean1 = context.getBean(MyUserBean)
         then:
             myBean1.bean.name == 'xyz1'
-            myBean1.bean.name == 'xyz1'
 
             context.getBean(MyFactory).created.intValue() == 1
         when:
