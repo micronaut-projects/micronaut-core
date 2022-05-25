@@ -32,7 +32,9 @@ import io.micronaut.core.util.StringUtils;
 import jakarta.inject.Named;
 
 import java.lang.annotation.Annotation;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -319,6 +321,30 @@ public class Qualifiers {
     public static @NonNull
     <T> Qualifier<T> byInterceptorBindingValues(@NonNull Collection<AnnotationValue<?>> binding) {
         return new InterceptorBindingQualifier<>(binding);
+    }
+
+    /**
+     * Flattens possible composed qualifiers.
+     *
+     * @param qualifier The qualifier
+     * @param <T>       The bean type
+     * @return The qualifier
+     * @since 3.5.0
+     */
+    public static @NonNull <T> Collection<Qualifier<?>> flatten(@NonNull Qualifier<T> qualifier) {
+        if (qualifier instanceof CompositeQualifier) {
+            Qualifier<?>[] qualifiers = ((CompositeQualifier<T>) qualifier).getQualifiers();
+            List<Qualifier<?>> flattenedQualifiers = new ArrayList<>(qualifiers.length);
+            for (Qualifier<?> q : qualifiers) {
+                if (q instanceof CompositeQualifier) {
+                    flattenedQualifiers.addAll(flatten(q));
+                } else {
+                    flattenedQualifiers.add(q);
+                }
+            }
+            return flattenedQualifiers;
+        }
+        return Collections.singleton(qualifier);
     }
 
     @Nullable
