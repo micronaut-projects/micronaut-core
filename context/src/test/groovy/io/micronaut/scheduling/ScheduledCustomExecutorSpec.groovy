@@ -3,11 +3,13 @@ package io.micronaut.scheduling
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.scheduling.annotation.Scheduled
+import spock.lang.Retry
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
 import java.util.concurrent.atomic.AtomicInteger
 
+@Retry
 class ScheduledCustomExecutorSpec extends Specification {
 
     void "test scheduled with a custom executor"() {
