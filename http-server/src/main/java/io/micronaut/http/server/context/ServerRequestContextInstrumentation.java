@@ -20,7 +20,6 @@ import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.micronaut.scheduling.instrument.InvocationInstrumenterFactory;
 import io.micronaut.scheduling.instrument.ReactiveInvocationInstrumenterFactory;
-import jakarta.inject.Singleton;
 
 /**
  * Instruments Micronaut such that {@link io.micronaut.http.context.ServerRequestContext} state is propagated.
@@ -28,7 +27,7 @@ import jakarta.inject.Singleton;
  * @author graemerocher
  * @since 1.0
  */
-@Singleton
+//@Singleton
 @Internal
 final class ServerRequestContextInstrumentation implements InvocationInstrumenterFactory, ReactiveInvocationInstrumenterFactory {
 
