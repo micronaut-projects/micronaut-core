@@ -30,6 +30,15 @@ class ProxyLazyCachedTargetPrototypeBeanWithPreDestroySpec extends Specification
         D.created = 0
     }
 
+    def cleanup() {
+        B.interceptCalled = 0
+        B.injectedDestroyCalled = 0
+        B.noArgsDestroyCalled = 0
+        C.closed = 0
+        D.destroyed = 0
+        D.created = 0
+    }
+
     void "test that a lazy target bean with a pre-destroy hook works"() {
         given:
             BeanContext context = new DefaultBeanContext()
