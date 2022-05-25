@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client.netty;
 
+import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.scheduling.instrument.Instrumentation;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.netty.channel.ChannelHandlerContext;
@@ -31,6 +32,7 @@ import io.netty.channel.SimpleChannelInboundHandler;
  */
 abstract class SimpleChannelInboundHandlerInstrumented<I> extends SimpleChannelInboundHandler<I> {
     private final InvocationInstrumenter instrumenter;
+    private final PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
 
     SimpleChannelInboundHandlerInstrumented(InvocationInstrumenter instrumenter) {
         this.instrumenter = instrumenter;
@@ -45,8 +47,10 @@ abstract class SimpleChannelInboundHandlerInstrumented<I> extends SimpleChannelI
 
     @Override
     protected final void channelRead0(ChannelHandlerContext ctx, I msg) throws Exception {
-        try (Instrumentation ignored = instrumenter.newInstrumentation()) {
-            channelReadInstrumented(ctx, msg);
+        try (PropagatedContext.InContext ignore = propagatedContext.propagate()) {
+            try (Instrumentation ignored = instrumenter.newInstrumentation()) {
+                channelReadInstrumented(ctx, msg);
+            }
         }
     }
 }

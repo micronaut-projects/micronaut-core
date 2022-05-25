@@ -1,0 +1,73 @@
+plugins {
+    id "io.micronaut.build.internal.convention-library"
+    id "org.jetbrains.kotlin.jvm"
+    id "org.jetbrains.kotlin.kapt"
+}
+
+micronautBuild {
+    binaryCompatibility {
+        enabled.set(false)
+    }
+}
+
+dependencies {
+    annotationProcessor project(":inject-java")
+    annotationProcessor project(":graal")
+
+    api project(':context')
+    api project(':inject')
+    api project(':aop')
+    api libs.managed.validation
+
+    compileOnly project(':core-reactive')
+    compileOnly libs.managed.reactor
+    compileOnly ("io.micronaut.rxjava2:micronaut-rxjava2-http-client:${libs.versions.managed.micronaut.rxjava2.get()}") {
+        exclude group: "io.micronaut"
+    }
+    compileOnly ("io.micronaut.rxjava3:micronaut-rxjava3-http-client:${libs.versions.managed.micronaut.rxjava3.get()}") {
+        exclude group: "io.micronaut"
+    }
+
+    testCompileOnly project(":inject-groovy")
+    testAnnotationProcessor project(":inject-java")
+
+    testImplementation project(":core-reactive")
+    testImplementation project(":inject-java-test")
+    testImplementation project(":http-client")
+    testImplementation project(':http-server-netty')
+
+    testImplementation ("io.micronaut.rxjava2:micronaut-rxjava2-http-client:${libs.versions.managed.micronaut.rxjava2.get()}") {
+        exclude group: "io.micronaut"
+    }
+    testImplementation ("io.micronaut.rxjava3:micronaut-rxjava3-http-client:${libs.versions.managed.micronaut.rxjava3.get()}") {
+        exclude group: "io.micronaut"
+    }
+    testImplementation ("io.micronaut.reactor:micronaut-reactor-http-client:${libs.versions.managed.micronaut.reactor.get()}") {
+        exclude group: "io.micronaut"
+    }
+}
+
+// Kotlin
+dependencies {
+    kapt project(':inject-java')
+    kaptTest project(':inject-java')
+
+    compileOnly libs.kotlin.stdlib
+    compileOnly libs.kotlinx.coroutines.core
+
+    testImplementation libs.kotlin.stdlib
+    testImplementation libs.kotlinx.coroutines.core
+    testImplementation libs.kotlinx.coroutines.reactor
+}
+
+tasks.named("compileKotlin") {
+    kotlinOptions {
+        jvmTarget = '1.8'
+    }
+}
+
+tasks.named("compileTestKotlin") {
+    kotlinOptions {
+        jvmTarget = '1.8'
+    }
+}

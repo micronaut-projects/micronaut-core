@@ -20,10 +20,12 @@ import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.aop.util.CompletableFutureContinuation;
 import io.micronaut.aop.util.DelegatingContextContinuation;
 import io.micronaut.aop.util.KotlinInterceptedMethodHelper;
+import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.KotlinUtils;
+import io.micronaut.aop.util.MicronautPropagatedContext;
 import kotlin.coroutines.Continuation;
 import kotlin.coroutines.CoroutineContext;
 
@@ -141,8 +143,13 @@ final class KotlinInterceptedMethodImpl implements io.micronaut.aop.kotlin.Kotli
         } else {
             throw new IllegalStateException("Cannot convert " + result + "  to 'java.util.concurrent.CompletionStage'");
         }
-        //noinspection unchecked
-        return KotlinInterceptedMethodHelper.handleResult(completionStageResult, isUnitValueType, (Continuation<? super Object>) continuation);
+        if (PropagatedContext.exists()) {
+            updateCoroutineContext(getCoroutineContext()
+                    .minusKey(MicronautPropagatedContext.Key)
+                    .plus(new MicronautPropagatedContext(PropagatedContext.get()))
+            );
+        }
+        return KotlinInterceptedMethodHelper.handleResult(completionStageResult, isUnitValueType, continuation);
     }
 
     @Override

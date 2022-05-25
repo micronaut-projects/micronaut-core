@@ -16,11 +16,13 @@
 package io.micronaut.http.server.netty.context
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.propagation.PropagatedContext
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.*
 import io.micronaut.http.client.annotation.Client
+import io.micronaut.http.context.ServerHttpRequestContext
 import io.micronaut.http.context.ServerRequestContext
 import io.micronaut.http.server.exceptions.ExceptionHandler
 import io.micronaut.runtime.server.EmbeddedServer
@@ -108,6 +110,7 @@ class ServerRequestContextSpec extends Specification {
 
         @Get("/method")
         String method() {
+            PropagatedContext.get().get(ServerHttpRequestContext)
             def request = ServerRequestContext.currentRequest().orElseThrow { -> new RuntimeException("no request") }
             request.uri
         }
@@ -123,6 +126,7 @@ class ServerRequestContextSpec extends Specification {
         @Get("/reactor-context")
         Mono<String> reactorContext() {
             Mono.deferContextual({ ctx ->
+                PropagatedContext.get().get(ServerHttpRequestContext)
                 def request = (HttpRequest) ctx.get(ServerRequestContext.KEY)
                 return Mono.just(request.uri)
             })
@@ -131,6 +135,7 @@ class ServerRequestContextSpec extends Specification {
         @Get("/reactor-context-stream")
         Flux<String> reactorContextStream() {
             Flux.deferContextual({ ctx ->
+                PropagatedContext.get().get(ServerHttpRequestContext)
                 def request = (HttpRequest) ctx.get(ServerRequestContext.KEY)
                 return Mono.just(request.uri)
             })
@@ -141,6 +146,7 @@ class ServerRequestContextSpec extends Specification {
         String thread() {
             CompletableFuture future = new CompletableFuture()
             executorService.submit({ ->
+                PropagatedContext.get().get(ServerHttpRequestContext)
                 def request = ServerRequestContext.currentRequest().orElseThrow { -> new RuntimeException("no request") }
                 future.complete request.uri
             })
@@ -162,6 +168,7 @@ class ServerRequestContextSpec extends Specification {
         HttpResponse<String> errorHandler() {
             CompletableFuture future = new CompletableFuture()
             executorService.submit({ ->
+                PropagatedContext.get().get(ServerHttpRequestContext)
                 def request = ServerRequestContext.currentRequest().orElseThrow { -> new RuntimeException("no request") }
                 future.complete HttpResponse.ok(request.uri)
             })
@@ -180,6 +187,7 @@ class ServerRequestContextSpec extends Specification {
         HttpResponse<String> handle(HttpRequest r, TestExceptionHandlerException exception) {
             CompletableFuture future = new CompletableFuture()
             executorService.submit({ ->
+                PropagatedContext.get().get(ServerHttpRequestContext)
                 def request = ServerRequestContext.currentRequest().orElseThrow { -> new RuntimeException("no request") }
                 future.complete HttpResponse.ok(request.uri).contentType(MediaType.TEXT_PLAIN_TYPE)
             })

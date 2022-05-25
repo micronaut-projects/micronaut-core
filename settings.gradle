@@ -19,6 +19,8 @@ plugins {
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
 
+enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
+
 rootProject.name = 'micronaut'
 
 include "aop"
@@ -28,6 +30,7 @@ include "core"
 include "core-reactive"
 include "core-processor"
 include "context"
+include "context-propagation"
 include "discovery-core"
 include "function"
 include "function-client"
