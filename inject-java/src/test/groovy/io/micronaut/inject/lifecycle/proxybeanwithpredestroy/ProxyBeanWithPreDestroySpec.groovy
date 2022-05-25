@@ -31,6 +31,15 @@ class ProxyBeanWithPreDestroySpec extends Specification {
         D.created = 0
     }
 
+    def cleanup() {
+        B.interceptCalled = 0
+        B.injectedDestroyCalled = 0
+        B.noArgsDestroyCalled = 0
+        C.closed = 0
+        D.destroyed = 0
+        D.created = 0
+    }
+
     void "test cannot destroyed a proxy bean by the class name"() {
         given:
             BeanContext context = new DefaultBeanContext()

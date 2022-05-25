@@ -5,6 +5,9 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.EachBean
 import io.micronaut.context.annotation.Factory
 import io.micronaut.context.annotation.Primary
+import io.micronaut.core.annotation.AnnotationMetadata
+import io.micronaut.inject.qualifiers.PrimaryQualifier
+import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.runtime.context.scope.Refreshable
 import io.micronaut.runtime.context.scope.refresh.RefreshScope
 import spock.lang.Specification
@@ -18,6 +21,11 @@ class RefreshablePrimaryScopeProxySpec extends Specification {
             ApplicationContext context = ApplicationContext.run()
         when:
             def myBean1 = context.getBean(MyUserBean)
+            context.getBean(MyNamedBean, Qualifiers.byAnnotationSimple(AnnotationMetadata.EMPTY_METADATA, Primary.class.name)).name
+            context.getBean(MyNamedBean, Qualifiers.byAnnotation(AnnotationMetadata.EMPTY_METADATA, Primary.class.name)).name
+            context.getBean(MyNamedBean, Qualifiers.byAnnotation(AnnotationMetadata.EMPTY_METADATA, Primary)).name
+            context.getBean(MyNamedBean, Qualifiers.byStereotype(Primary.class)).name
+            context.getBean(MyNamedBean, PrimaryQualifier.INSTANCE).name
         then:
             myBean1.bean.name == 'xyz1'
             myBean1.bean.name == 'xyz1'
