@@ -17,11 +17,12 @@ package io.micronaut.context;
 
 import io.micronaut.context.exceptions.NoSuchMessageException;
 import io.micronaut.core.annotation.Indexed;
-import io.micronaut.core.util.ArgumentUtils;
-
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
-import javax.inject.Singleton;
+import io.micronaut.core.order.Ordered;
+import io.micronaut.core.util.ArgumentUtils;
+import jakarta.inject.Singleton;
+
 import java.util.Collections;
 import java.util.Locale;
 import java.util.Map;
@@ -35,7 +36,7 @@ import java.util.Optional;
  */
 @Singleton
 @Indexed(MessageSource.class)
-public interface MessageSource {
+public interface MessageSource extends Ordered {
 
     /**
      * An empty message source.
@@ -57,12 +58,79 @@ public interface MessageSource {
     /**
      * Resolve a message for the given code and context.
      * @param code The code
+     * @param locale The locale to use to resolve messages.
+     * @return A message if present
+     */
+    default @NonNull Optional<String> getMessage(@NonNull String code, @NonNull Locale locale) {
+        return getMessage(code, MessageContext.of(locale));
+    }
+
+    /**
+     * Resolve a message for the given code and context.
+     * @param code The code
+     * @param locale The locale to use to resolve messages.
+     * @param variables The variables to use resolve message placeholders
+     * @return A message if present
+     */
+    default @NonNull Optional<String> getMessage(@NonNull String code, @NonNull Locale locale, @NonNull Object... variables) {
+        return getMessage(code, locale, MessageSourceUtils.variables(variables));
+    }
+
+    /**
+     * Resolve a message for the given code and context.
+     * @param code The code
+     * @param locale The locale to use to resolve messages.
+     * @param variables The variables to use resolve message placeholders
+     * @return A message if present
+     */
+    default @NonNull Optional<String> getMessage(@NonNull String code, @NonNull Locale locale, @NonNull Map<String, Object> variables) {
+        return getMessage(code, MessageContext.of(locale, variables));
+    }
+
+    /**
+     * Resolve a message for the given code and context.
+     * @param code The code
      * @param context The context
      * @return A message if present
      */
     default @NonNull Optional<String> getMessage(@NonNull String code, @NonNull MessageContext context) {
         Optional<String> rawMessage = getRawMessage(code, context);
         return rawMessage.map(message -> this.interpolate(message, context));
+    }
+
+    /**
+     * Resolve a message for the given code and context.
+     * @param code The code
+     * @param defaultMessage The default message to use if no other message is found
+     * @param locale The locale to use to resolve messages.
+     * @return A message if present
+     */
+    default @NonNull String getMessage(@NonNull String code, @NonNull String defaultMessage, @NonNull Locale locale) {
+        return getMessage(code, MessageContext.of(locale), defaultMessage);
+    }
+
+    /**
+     * Resolve a message for the given code and context.
+     * @param code The code
+     * @param defaultMessage The default message to use if no other message is found
+     * @param locale The locale to use to resolve messages.
+     * @param variables The variables to use resolve message placeholders
+     * @return A message if present
+     */
+    default @NonNull String getMessage(@NonNull String code, @NonNull String defaultMessage, @NonNull Locale locale, @NonNull Map<String, Object> variables) {
+        return getMessage(code, MessageContext.of(locale, variables), defaultMessage);
+    }
+
+    /**
+     * Resolve a message for the given code and context.
+     * @param code The code
+     * @param defaultMessage The default message to use if no other message is found
+     * @param locale The locale to use to resolve messages.
+     * @param variables The variables to use resolve message placeholders
+     * @return A message if present
+     */
+    default @NonNull String getMessage(@NonNull String code, @NonNull String defaultMessage, @NonNull Locale locale, @NonNull Object... variables) {
+        return getMessage(code, defaultMessage, locale, MessageSourceUtils.variables(variables));
     }
 
     /**
@@ -162,7 +230,7 @@ public interface MessageSource {
         }
 
         /**
-         * @return The variables to use resolve message place holders
+         * @return The variables to use resolve message placeholders
          */
         @NonNull default Map<String, Object> getVariables() {
             return Collections.emptyMap();

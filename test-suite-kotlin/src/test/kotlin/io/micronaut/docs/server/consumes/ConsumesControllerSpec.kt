@@ -1,13 +1,13 @@
 package io.micronaut.docs.server.consumes
 
-import io.kotlintest.shouldNotThrowAny
-import io.kotlintest.shouldThrow
-import io.kotlintest.specs.StringSpec
+import io.kotest.assertions.throwables.shouldNotThrowAny
+import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.core.spec.style.StringSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 
@@ -18,7 +18,7 @@ class ConsumesControllerSpec: StringSpec() {
     )
 
     val client = autoClose(
-            embeddedServer.applicationContext.createBean(RxHttpClient::class.java, embeddedServer.getURL())
+            embeddedServer.applicationContext.createBean(HttpClient::class.java, embeddedServer.getURL())
     )
 
     init {

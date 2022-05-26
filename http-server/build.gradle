@@ -1,9 +1,17 @@
+plugins {
+    id "io.micronaut.build.internal.convention-library"
+}
 
 dependencies {
     api project(":websocket")
     api project(":runtime")
     api project(":router")
+    compileOnly libs.kotlinx.coroutines.core
+    compileOnly libs.kotlinx.coroutines.reactor
+    implementation libs.managed.reactor
     annotationProcessor project(":inject-java")
+
+    testImplementation libs.managed.netty.codec.http
 }
 
 //compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']

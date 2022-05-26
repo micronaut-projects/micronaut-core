@@ -4,11 +4,12 @@ import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanFactory
+import io.micronaut.inject.writer.BeanDefinitionWriter
 
 class PropertyAdviceSpec extends AbstractBeanDefinitionSpec {
     void 'test advice can be applied to bean properties'() {
         when:"An introduction advice type is compiled that includes a concrete method that is annotated with around advice"
-        BeanDefinition beanDefinition = buildBeanDefinition('test.$MyPropertyBeanDefinition$Intercepted', '''
+        BeanDefinition beanDefinition = buildBeanDefinition('test.$MyPropertyBean' + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionWriter.PROXY_SUFFIX, '''
 package test;
 
 import io.micronaut.aop.interceptors.*;

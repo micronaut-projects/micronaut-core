@@ -1,13 +1,11 @@
 package io.micronaut.docs.annotation.requestattributes
 
-import io.kotlintest.shouldBe
-import io.kotlintest.shouldNotBe
-import io.kotlintest.specs.StringSpec
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
+import io.kotest.core.spec.style.StringSpec
 import io.micronaut.context.ApplicationContext
-import io.micronaut.http.client.RxHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
-import org.junit.Assert
-import org.junit.Test
+import reactor.core.publisher.Mono
 
 class RequestAttributeSpec: StringSpec() {
 
@@ -20,7 +18,7 @@ class RequestAttributeSpec: StringSpec() {
             val client = embeddedServer.applicationContext.getBean(StoryClient::class.java)
             val filter = embeddedServer.applicationContext.getBean(StoryClientFilter::class.java)
 
-            val story = client.getById("jan2019").blockingGet()
+            val story = Mono.from(client.getById("jan2019")).block()
             val attributes = filter.latestRequestAttributes
 
             story shouldNotBe null

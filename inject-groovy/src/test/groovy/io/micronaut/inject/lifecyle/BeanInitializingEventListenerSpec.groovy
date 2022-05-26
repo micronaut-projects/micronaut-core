@@ -22,10 +22,10 @@ import io.micronaut.context.event.BeanInitializedEventListener
 import io.micronaut.context.event.BeanInitializingEvent
 import spock.lang.Specification
 
-import javax.annotation.PostConstruct
-import javax.inject.Inject
-import javax.inject.Provider
-import javax.inject.Singleton
+import jakarta.annotation.PostConstruct
+import jakarta.inject.Inject
+import jakarta.inject.Provider
+import jakarta.inject.Singleton
 
 /**
  * Created by graemerocher on 26/05/2017.

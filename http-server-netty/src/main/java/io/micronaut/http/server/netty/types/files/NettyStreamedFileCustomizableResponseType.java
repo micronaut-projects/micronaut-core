@@ -21,7 +21,8 @@ import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.server.netty.types.NettyFileCustomizableResponseType;
 import io.micronaut.http.server.netty.types.stream.NettyStreamedCustomizableResponseType;
 import io.micronaut.http.server.types.files.StreamedFile;
-import io.netty.handler.codec.http.*;
+import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpHeaderValues;
 
 import java.io.InputStream;
 import java.net.URL;

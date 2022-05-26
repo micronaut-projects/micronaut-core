@@ -15,6 +15,8 @@
  */
 package io.micronaut.aop.factory;
 
+import io.micronaut.core.annotation.Creator;
+
 import java.util.Collections;
 import java.util.List;
 
@@ -24,6 +26,11 @@ import java.util.List;
  */
 public class ConcreteClass {
     private final AnotherClass anotherClass;
+
+    @Creator
+    ConcreteClass() {
+        this.anotherClass = null;
+    }
 
     public ConcreteClass(AnotherClass anotherClass) {
         this.anotherClass = anotherClass;

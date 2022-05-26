@@ -15,11 +15,11 @@
  */
 package io.micronaut.validation.validator.constraints;
 
-import static java.util.regex.Pattern.CASE_INSENSITIVE;
-
 import java.net.IDN;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import static java.util.regex.Pattern.CASE_INSENSITIVE;
 
 /**
  * Forked from Hibernate Validator.

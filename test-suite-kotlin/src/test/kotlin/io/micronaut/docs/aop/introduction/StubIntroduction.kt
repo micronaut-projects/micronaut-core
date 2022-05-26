@@ -17,7 +17,7 @@ package io.micronaut.docs.aop.introduction
 
 // tag::imports[]
 import io.micronaut.aop.*
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 // end::imports[]
 
 // tag::class[]

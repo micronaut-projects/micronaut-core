@@ -16,10 +16,11 @@
 package io.micronaut.http.server.netty.types.files;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.netty.AbstractNettyHttpRequest;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.SmartHttpContentCompressor;
@@ -27,14 +28,19 @@ import io.micronaut.http.server.netty.types.NettyFileCustomizableResponseType;
 import io.micronaut.http.server.types.CustomizableResponseTypeException;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
 import io.micronaut.http.server.types.files.SystemFile;
-import io.netty.channel.*;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelFutureListener;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.DefaultFileRegion;
 import io.netty.handler.codec.http.DefaultHttpResponse;
-import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpChunkedInput;
-import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.LastHttpContent;
+import io.netty.handler.codec.http2.Http2StreamChannel;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.stream.ChunkedFile;
+import io.netty.util.ResourceLeakDetector;
+import io.netty.util.ResourceLeakDetectorFactory;
+import io.netty.util.ResourceLeakTracker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,6 +49,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 /**
  * Writes a {@link File} to the Netty context.
@@ -57,8 +64,6 @@ public class NettySystemFileCustomizableResponseType extends SystemFile implemen
     private static final int LENGTH_8K = 8192;
     private static final Logger LOG = LoggerFactory.getLogger(NettySystemFileCustomizableResponseType.class);
 
-    protected final RandomAccessFile raf;
-    protected final long rafLength;
     protected Optional<FileCustomizableResponseType> delegate = Optional.empty();
 
     /**
@@ -66,15 +71,8 @@ public class NettySystemFileCustomizableResponseType extends SystemFile implemen
      */
     public NettySystemFileCustomizableResponseType(File file) {
         super(file);
-        try {
-            this.raf = new RandomAccessFile(file, "r");
-        } catch (FileNotFoundException e) {
-            throw new CustomizableResponseTypeException("Could not find file", e);
-        }
-        try {
-            this.rafLength = raf.length();
-        } catch (IOException e) {
-            throw new CustomizableResponseTypeException("Could not determine file length", e);
+        if (!file.canRead()) {
+            throw new CustomizableResponseTypeException("Could not find file");
         }
     }
 
@@ -84,11 +82,6 @@ public class NettySystemFileCustomizableResponseType extends SystemFile implemen
     public NettySystemFileCustomizableResponseType(SystemFile delegate) {
         this(delegate.getFile());
         this.delegate = Optional.of(delegate);
-    }
-
-    @Override
-    public long getLength() {
-        return rafLength;
     }
 
     @Override
@@ -115,49 +108,87 @@ public class NettySystemFileCustomizableResponseType extends SystemFile implemen
 
         if (response instanceof NettyMutableHttpResponse) {
 
-            FullHttpResponse nettyResponse = ((NettyMutableHttpResponse) response).getNativeResponse();
+            NettyMutableHttpResponse nettyResponse = ((NettyMutableHttpResponse) response);
 
             // Write the request data
-            HttpHeaders headers = nettyResponse.headers();
-            final DefaultHttpResponse finalResponse = new DefaultHttpResponse(nettyResponse.protocolVersion(), nettyResponse.status(), headers);
-            final io.micronaut.http.HttpVersion httpVersion = request.getHttpVersion();
-            final boolean isHttp2 = httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0;
-            if (isHttp2 && request instanceof NettyHttpRequest) {
-                final io.netty.handler.codec.http.HttpHeaders nativeHeaders = ((NettyHttpRequest<?>) request).getNativeRequest().headers();
-                final String streamId = nativeHeaders.get(AbstractNettyHttpRequest.STREAM_ID);
-                if (streamId != null) {
-                    finalResponse.headers().set(AbstractNettyHttpRequest.STREAM_ID, streamId);
-                }
+            final DefaultHttpResponse finalResponse = new DefaultHttpResponse(nettyResponse.getNettyHttpVersion(), nettyResponse.getNettyHttpStatus(), nettyResponse.getNettyHeaders());
+            if (request instanceof NettyHttpRequest) {
+                ((NettyHttpRequest<?>) request).prepareHttp2ResponseIfNecessary(finalResponse);
             }
             context.write(finalResponse, context.voidPromise());
 
-            ChannelFutureListener closeListener = (future) -> {
-                try {
-                    raf.close();
-                } catch (IOException e) {
-                    LOG.warn("An error occurred closing the file reference: " + getFile().getAbsolutePath(), e);
-                }
-            };
+            FileHolder file = new FileHolder(getFile());
 
             // Write the content.
-            if (context.pipeline().get(SslHandler.class) == null && context.pipeline().get(SmartHttpContentCompressor.class).shouldSkip(nettyResponse)) {
+            if (context.pipeline().get(SslHandler.class) == null &&
+                    context.pipeline().get(SmartHttpContentCompressor.class).shouldSkip(finalResponse) &&
+                    !(context.channel() instanceof Http2StreamChannel)) {
                 // SSL not enabled - can use zero-copy file transfer.
-                context.write(new DefaultFileRegion(raf.getChannel(), 0, getLength()), context.newProgressivePromise())
-                        .addListener(closeListener);
+                context.write(new DefaultFileRegion(file.raf.getChannel(), 0, getLength()), context.newProgressivePromise())
+                        .addListener(file);
                 context.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT);
             } else {
                 // SSL enabled - cannot use zero-copy file transfer.
                 try {
                     // HttpChunkedInput will write the end marker (LastHttpContent) for us.
-                    final HttpChunkedInput chunkedInput = new HttpChunkedInput(new ChunkedFile(raf, 0, getLength(), LENGTH_8K));
+                    final HttpChunkedInput chunkedInput = new HttpChunkedInput(new ChunkedFile(file.raf, 0, getLength(), LENGTH_8K));
                     context.writeAndFlush(chunkedInput, context.newProgressivePromise())
-                            .addListener(closeListener);
+                            .addListener(file);
                 } catch (IOException e) {
                     throw new CustomizableResponseTypeException("Could not read file", e);
                 }
             }
         } else {
             throw new IllegalArgumentException("Unsupported response type. Not a Netty response: " + response);
+        }
+    }
+
+    /**
+     * Wrapper class around {@link RandomAccessFile} with two purposes: Leak detection, and implementation of
+     * {@link ChannelFutureListener} that closes the file when called.
+     */
+    private static final class FileHolder implements ChannelFutureListener {
+        //to avoid initializing Netty at build time
+        private static final Supplier<ResourceLeakDetector<RandomAccessFile>> LEAK_DETECTOR = SupplierUtil.memoized(() ->
+                ResourceLeakDetectorFactory.instance().newResourceLeakDetector(RandomAccessFile.class));
+
+        final RandomAccessFile raf;
+        final long length;
+
+        private final ResourceLeakTracker<RandomAccessFile> tracker;
+
+        private final File file;
+
+        FileHolder(File file) {
+            this.file = file;
+            try {
+                this.raf = new RandomAccessFile(file, "r");
+            } catch (FileNotFoundException e) {
+                throw new CustomizableResponseTypeException("Could not find file", e);
+            }
+            this.tracker = LEAK_DETECTOR.get().track(raf);
+            try {
+                this.length = raf.length();
+            } catch (IOException e) {
+                close();
+                throw new CustomizableResponseTypeException("Could not determine file length", e);
+            }
+        }
+
+        @Override
+        public void operationComplete(@NonNull ChannelFuture future) throws Exception {
+            close();
+        }
+
+        void close() {
+            try {
+                raf.close();
+            } catch (IOException e) {
+                LOG.warn("An error occurred closing the file reference: " + file.getAbsolutePath(), e);
+            }
+            if (tracker != null) {
+                tracker.close(raf);
+            }
         }
     }
 }

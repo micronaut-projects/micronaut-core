@@ -18,6 +18,7 @@ package io.micronaut.session.http;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.session.Session;
 import io.micronaut.session.SessionStore;
+
 import java.util.Optional;
 
 /**

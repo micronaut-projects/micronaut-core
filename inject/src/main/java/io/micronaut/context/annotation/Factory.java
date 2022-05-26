@@ -15,7 +15,8 @@
  */
 package io.micronaut.context.annotation;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
+
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -37,7 +38,7 @@ import java.lang.annotation.RetentionPolicy;
  *
  * <p>Methods defined within the body of the class that are annotated with {@link Bean} will be exposed as beans.</p>
  *
- * <p>You can use a {@link javax.inject.Scope} annotation to control the scope the bean is exposed within. For example for a
+ * <p>You can use a {@link jakarta.inject.Scope} annotation to control the scope the bean is exposed within. For example for a
  * singleton instance you can annotation the method with {@link Singleton}.</p>
  *
  * <p>Methods annotated with {@link Bean} can accept arguments and Micronaut will attempt to inject those arguments from existing beans or values. For example:</p>
@@ -57,7 +58,7 @@ import java.lang.annotation.RetentionPolicy;
  * @author Graeme Rocher
  * @since 1.0
  */
-@Singleton
+@DefaultScope(Singleton.class)
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 public @interface Factory {

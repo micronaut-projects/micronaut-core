@@ -10,15 +10,14 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Error
 import io.micronaut.http.annotation.Get
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.hateoas.JsonError
 import io.micronaut.runtime.server.EmbeddedServer
+import jakarta.inject.Singleton
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
-
-import javax.inject.Singleton
 
 class SimpleControllerSpec extends Specification {
 
@@ -26,7 +25,7 @@ class SimpleControllerSpec extends Specification {
             'spec.name': SimpleControllerSpec.simpleName
     ], Environment.TEST)
 
-    @AutoCleanup @Shared RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+    @AutoCleanup @Shared HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
 
     def "should not go into infinite loop when exception occurs in bean initialization"() {

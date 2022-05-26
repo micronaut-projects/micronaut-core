@@ -15,7 +15,7 @@
  */
 package io.micronaut.docs.ioc.validation.custom;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 import javax.validation.constraints.NotBlank;
 import java.time.Duration;
 
@@ -30,5 +30,12 @@ public class HolidayService {
         return "Person " + person + " is off on holiday for " + d.toMinutes() + " minutes";
     }
     // end::method[]
+
+    public String startHoliday(@DurationPattern String fromDuration, @DurationPattern String toDuration, @NotBlank String person
+    ) {
+        final Duration d = Duration.parse(fromDuration);
+        final Duration e = Duration.parse(toDuration);
+        return "Person " + person + " is off on holiday from " + d + " to " + e;
+    }
 }
 // end::class[]

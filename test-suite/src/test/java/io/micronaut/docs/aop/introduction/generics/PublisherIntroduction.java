@@ -18,11 +18,14 @@ package io.micronaut.docs.aop.introduction.generics;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import java.lang.reflect.Method;
-import javax.inject.Singleton;
+
+import io.micronaut.core.annotation.Nullable;
+import jakarta.inject.Singleton;
 
 @Singleton
 public final class PublisherIntroduction implements MethodInterceptor<GenericPublisher<?>, Object> {
 
+    @Nullable
     @Override
     public Object intercept(final MethodInvocationContext<GenericPublisher<?>, Object> context) {
         final Method method = context.getTargetMethod();

@@ -191,6 +191,16 @@ interface EnvironmentAnnotationMetadata extends AnnotationMetadata {
      * @param annotation The annotation
      * @param member The member
      * @param valueMapper The value mapper
+     * @return The int value
+     */
+    @NonNull
+    String[] stringValues(@NonNull String annotation, @NonNull String member, Function<Object, Object> valueMapper);
+
+    /**
+     * Retrieve the string value and optionally map its value.
+     * @param annotation The annotation
+     * @param member The member
+     * @param valueMapper The value mapper
      * @return The string value
      */
     @NonNull

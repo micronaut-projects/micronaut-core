@@ -25,12 +25,17 @@ import io.micronaut.discovery.ServiceInstanceList;
 import io.micronaut.http.client.loadbalance.DiscoveryClientLoadBalancerFactory;
 import io.micronaut.http.client.loadbalance.ServiceInstanceListLoadBalancerFactory;
 import io.micronaut.runtime.server.EmbeddedServer;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 
-import javax.inject.Inject;
-import javax.inject.Singleton;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.util.*;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * <p>Abstraction over {@link LoadBalancer} lookup. The strategy is as follows:</p>
@@ -94,16 +99,16 @@ public class DefaultLoadBalancerResolver implements LoadBalancerResolver {
             // current server reference
             if (beanContext.containsBean(EmbeddedServer.class)) {
                 EmbeddedServer embeddedServer = beanContext.getBean(EmbeddedServer.class);
-                URL url = embeddedServer.getURL();
-                return Optional.of(LoadBalancer.fixed(url));
+                URI uri = embeddedServer.getURI();
+                return Optional.of(LoadBalancer.fixed(uri));
             } else {
                 return Optional.empty();
             }
         } else if (reference.indexOf('/') > -1) {
             try {
-                URL url = new URL(reference);
-                return Optional.of(LoadBalancer.fixed(url));
-            } catch (MalformedURLException e) {
+                URI uri = new URI(reference);
+                return Optional.of(LoadBalancer.fixed(uri));
+            } catch (URISyntaxException e) {
                 return Optional.empty();
             }
         } else {

@@ -38,7 +38,7 @@ import io.micronaut.context.annotation.*;
 
 @ListenerAdvice
 @Stub
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean  {
 
     @Executable
@@ -78,7 +78,7 @@ import io.micronaut.context.annotation.*;
 
 @ListenerAdvice
 @Stub
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 abstract class MyBean2 {
 
     @Executable
@@ -120,7 +120,7 @@ import io.micronaut.context.annotation.*;
 
 @ListenerAdvice
 @Stub
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 interface MyBean3  {
 
     @Executable
@@ -162,7 +162,7 @@ import io.micronaut.aop.introduction.*
 import io.micronaut.context.annotation.*
 
 @Stub
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 interface MyBean extends GenericInterface, SpecificInterface {
 
 }

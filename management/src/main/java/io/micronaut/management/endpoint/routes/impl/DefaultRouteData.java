@@ -21,8 +21,8 @@ import io.micronaut.management.endpoint.routes.RouteData;
 import io.micronaut.management.endpoint.routes.RoutesEndpoint;
 import io.micronaut.web.router.MethodBasedRoute;
 import io.micronaut.web.router.UriRoute;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;

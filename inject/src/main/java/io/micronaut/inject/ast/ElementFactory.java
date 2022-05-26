@@ -18,6 +18,8 @@ package io.micronaut.inject.ast;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.AnnotationMetadata;
 
+import java.util.Map;
+
 /**
  * A factory for creating elements.
  *
@@ -39,6 +41,53 @@ public interface ElementFactory<E, C extends E, M extends E, F extends E> {
     @NonNull
     ClassElement newClassElement(
             @NonNull C type,
+            @NonNull AnnotationMetadata annotationMetadata);
+
+    /**
+     * Builds a new class element for the given type.
+     *
+     * @param type               The type
+     * @param annotationMetadata The resolved annotation metadata
+     * @param resolvedGenerics The resolved generics
+     * @return The class element
+     * @since 3.0.0
+     */
+    @NonNull
+    ClassElement newClassElement(
+            @NonNull C type,
+            @NonNull AnnotationMetadata annotationMetadata,
+            @NonNull Map<String, ClassElement> resolvedGenerics);
+
+    /**
+     * Builds a new source class element for the given type. This method
+     * differs from {@link #newClassElement(Object, AnnotationMetadata)} in that
+     * it should only be called from elements that are known to originate from source code.
+     *
+     * @param type               The type
+     * @param annotationMetadata The resolved annotation metadata
+     * @return The class element
+     * @since 3.0.0
+     */
+    @NonNull
+    ClassElement newSourceClassElement(
+            @NonNull C type,
+            @NonNull AnnotationMetadata annotationMetadata);
+
+    /**
+     * Builds a new source method element for the given method. This method
+     * differs from {@link #newMethodElement(ClassElement, Object, AnnotationMetadata)} in that
+     * it should only be called from elements that are known to originate from source code.
+     *
+     * @param declaringClass     The declaring class
+     * @param method             The method
+     * @param annotationMetadata The resolved annotation metadata
+     * @return The class element
+     * @since 3.0.0
+     */
+    @NonNull
+    MethodElement newSourceMethodElement(
+            ClassElement declaringClass,
+            @NonNull M method,
             @NonNull AnnotationMetadata annotationMetadata);
 
     /**

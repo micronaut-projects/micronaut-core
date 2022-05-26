@@ -36,6 +36,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
 /**
@@ -62,7 +63,7 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
      */
     @Override
     public @NonNull ApplicationContext start() {
-        long start = System.currentTimeMillis();
+        long start = System.nanoTime();
         printBanner();
         ApplicationContext applicationContext = super.build();
 
@@ -79,8 +80,7 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
                     boolean keepAlive = false;
                     if (embeddedApplication instanceof Described) {
                         if (LOG.isInfoEnabled()) {
-                            long end = System.currentTimeMillis();
-                            long took = end - start;
+                            long took = elapsedMillis(start);
                             String desc = ((Described) embeddedApplication).getDescription();
                             LOG.info("Startup completed in {}ms. Server Running: {}", took, desc);
                         }
@@ -90,16 +90,14 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
 
                             final EmbeddedServer embeddedServer = (EmbeddedServer) embeddedApplication;
                             if (LOG.isInfoEnabled()) {
-                                long end = System.currentTimeMillis();
-                                long took = end - start;
+                                long took = elapsedMillis(start);
                                 URL url = embeddedServer.getURL();
                                 LOG.info("Startup completed in {}ms. Server Running: {}", took, url);
                             }
                             keepAlive = embeddedServer.isKeepAlive();
                         } else {
                             if (LOG.isInfoEnabled()) {
-                                long end = System.currentTimeMillis();
-                                long took = end - start;
+                                long took = elapsedMillis(start);
                                 LOG.info("Startup completed in {}ms.", took);
                             }
                             keepAlive = embeddedApplication.isServer();
@@ -134,10 +132,17 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
                             }
                         }, SHUTDOWN_MONITOR_THREAD).start();
 
-                        try {
-                            countDownLatch.await();
-                        } catch (InterruptedException e) {
-                            // ignore
+                        boolean interrupted = false;
+                        while (true) {
+                            try {
+                                countDownLatch.await();
+                                break;
+                            } catch (InterruptedException e) {
+                                interrupted = true;
+                            }
+                        }
+                        if (interrupted) {
+                            Thread.currentThread().interrupt();
                         }
                         if (LOG.isInfoEnabled()) {
                             LOG.info("Embedded Application shutting down");
@@ -161,6 +166,10 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
             handleStartupException(applicationContext.getEnvironment(), e);
             return null;
         }
+    }
+
+    private static long elapsedMillis(long startNanos) {
+        return TimeUnit.MILLISECONDS.convert(System.nanoTime() - startNanos, TimeUnit.NANOSECONDS);
     }
 
     @Override

@@ -15,9 +15,9 @@
  */
 package io.micronaut.validation.executable;
 
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.visitor.TypeElementVisitor;

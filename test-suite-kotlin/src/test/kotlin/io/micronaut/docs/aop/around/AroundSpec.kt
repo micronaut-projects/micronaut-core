@@ -1,8 +1,8 @@
 package io.micronaut.docs.aop.around
 
-import io.kotlintest.shouldBe
-import io.kotlintest.shouldThrow
-import io.kotlintest.specs.AnnotationSpec
+import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.matchers.shouldBe
+import io.kotest.core.spec.style.AnnotationSpec
 import io.micronaut.context.ApplicationContext
 
 class AroundSpec: AnnotationSpec() {

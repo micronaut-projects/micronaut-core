@@ -19,12 +19,24 @@ import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.http.HttpVersion;
-import io.micronaut.http.ssl.*;
+import io.micronaut.http.ssl.AbstractClientSslConfiguration;
+import io.micronaut.http.ssl.ClientAuthentication;
+import io.micronaut.http.ssl.SslBuilder;
+import io.micronaut.http.ssl.SslConfiguration;
+import io.micronaut.http.ssl.SslConfigurationException;
 import io.netty.handler.codec.http2.Http2SecurityUtil;
-import io.netty.handler.ssl.*;
+import io.netty.handler.ssl.ApplicationProtocolConfig;
+import io.netty.handler.ssl.ApplicationProtocolNames;
+import io.netty.handler.ssl.ClientAuth;
+import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.ssl.SslProvider;
+import io.netty.handler.ssl.SupportedCipherSuiteFilter;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
+import jakarta.inject.Singleton;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import javax.inject.Singleton;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.TrustManagerFactory;
@@ -42,6 +54,7 @@ import java.util.Optional;
 @Internal
 @BootstrapContextCompatible
 public class NettyClientSslBuilder extends SslBuilder<SslContext> {
+    private static final Logger LOG = LoggerFactory.getLogger(NettyClientSslBuilder.class);
 
     /**
      * @param resourceResolver The resource resolver
@@ -120,7 +133,15 @@ public class NettyClientSslBuilder extends SslBuilder<SslContext> {
             if (this.getTrustStore(ssl).isPresent()) {
                 return super.getTrustManagerFactory(ssl);
             } else {
-                return InsecureTrustManagerFactory.INSTANCE;
+                if (ssl instanceof AbstractClientSslConfiguration && ((AbstractClientSslConfiguration) ssl).isInsecureTrustAllCertificates()) {
+                    if (LOG.isWarnEnabled()) {
+                        LOG.warn("HTTP Client is configured to trust all certificates ('insecure-trust-all-certificates' is set to true). Trusting all certificates is not secure and should not be used in production.");
+                    }
+                    return InsecureTrustManagerFactory.INSTANCE;
+                } else {
+                    // netty will use the JDK trust store
+                    return null;
+                }
             }
         } catch (Exception ex) {
             throw new SslConfigurationException(ex);

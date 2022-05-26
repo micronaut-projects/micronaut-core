@@ -21,6 +21,8 @@ import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.DefaultBeanContext;
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -29,12 +31,10 @@ import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
-import io.micronaut.inject.qualifiers.InterceptorBindingQualifier;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
 import java.lang.reflect.Method;
 import java.util.Collection;
-import java.util.List;
 import java.util.Objects;
 
 /**
@@ -247,12 +247,13 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
             ExecutableMethod<T1, T1> interceptedMethod,
             T1 bean,
             InterceptorKind kind) {
-        final List<String> annotationNames = InterceptorBindingQualifier.resolveInterceptorValues(interceptedMethod.getAnnotationMetadata());
+        final AnnotationMetadata annotationMetadata = interceptedMethod.getAnnotationMetadata();
+        final Collection<AnnotationValue<?>> binding = resolveInterceptorValues(annotationMetadata, kind);
 
         final Collection<BeanRegistration<Interceptor<?, ?>>> resolved = ((DefaultBeanContext) beanContext).getBeanRegistrations(
                 resolutionContext,
                 Interceptor.ARGUMENT,
-                Qualifiers.byInterceptorBinding(annotationNames)
+                Qualifiers.byInterceptorBindingValues(binding)
         );
         final InterceptorRegistry interceptorRegistry = beanContext.getBean(InterceptorRegistry.ARGUMENT);
         final Interceptor[] resolvedInterceptors = interceptorRegistry

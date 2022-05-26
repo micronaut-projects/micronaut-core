@@ -16,9 +16,9 @@
 package io.micronaut.discovery;
 
 import io.micronaut.context.env.Environment;
-
 import io.micronaut.core.annotation.NonNull;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
+
 import java.util.Optional;
 import java.util.StringJoiner;
 

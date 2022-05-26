@@ -17,9 +17,14 @@ package io.micronaut.ast.groovy.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ElementModifier;
 import io.micronaut.inject.ast.PropertyElement;
 import org.codehaus.groovy.ast.AnnotatedNode;
+
+import java.util.Collections;
+import java.util.Set;
 
 /**
  * Implementation of {@link PropertyElement} for Groovy.
@@ -58,6 +63,15 @@ abstract class GroovyPropertyElement extends AbstractGroovyElement implements Pr
         this.readOnly = readOnly;
         this.nativeType = nativeType;
         this.declaringElement = declaringElement;
+    }
+
+    @Override
+    public Set<ElementModifier> getModifiers() {
+        if (isReadOnly()) {
+            return CollectionUtils.setOf(ElementModifier.FINAL, ElementModifier.PUBLIC);
+        } else {
+            return Collections.singleton(ElementModifier.PUBLIC);
+        }
     }
 
     @Override

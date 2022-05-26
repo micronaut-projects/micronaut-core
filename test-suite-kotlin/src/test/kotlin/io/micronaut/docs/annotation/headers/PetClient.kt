@@ -20,16 +20,20 @@ import io.micronaut.docs.annotation.PetOperations
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Header
 import io.micronaut.http.client.annotation.Client
-import io.reactivex.Single
+import org.reactivestreams.Publisher
+import io.micronaut.core.async.annotation.SingleResult
+import reactor.core.publisher.Mono
 
 // tag::class[]
 @Client("/pets")
 @Header(name = "X-Pet-Client", value = "\${pet.client.id}")
 interface PetClient : PetOperations {
 
-    override fun save(name: String, age: Int): Single<Pet>
+    @SingleResult
+    override fun save(name: String, age: Int): Publisher<Pet>
 
     @Get("/{name}")
-    operator fun get(name: String): Single<Pet>
+    @SingleResult
+    operator fun get(name: String): Publisher<Pet>
 }
 // end::class[]

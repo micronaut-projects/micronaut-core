@@ -2,8 +2,7 @@ package io.micronaut.validation.validator.constraints.custom;
 
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.validation.validator.constraints.ConstraintValidator;
-
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Factory
 class CustomConstraintsValidatorFactory {

@@ -48,6 +48,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Documented
 @Retention(RUNTIME)
 @Target({ElementType.TYPE, ElementType.ANNOTATION_TYPE})
+@Inherited
 public @interface Introspected {
 
     /**
@@ -59,6 +60,23 @@ public @interface Introspected {
      */
     Class<?>[] classes() default {};
 
+    /**
+     * <p>The default access type is {@link AccessKind#METHOD} which treats only public JavaBean getters or Java record components as properties. By specifying {@link AccessKind#FIELD}, public or package-protected fields will be used instead. </p>
+     *
+     *  <p>If both {@link AccessKind#FIELD} and {@link AccessKind#METHOD} are specified then the order as they appear in the annotation will be used to determine whether the field or method will be used in the case where both exist.</p>
+     *
+     * @return The access type. Defaults to {@link AccessKind#METHOD}
+     * @since 3.0
+     */
+    AccessKind[] accessKind() default { AccessKind.METHOD };
+
+    /**
+     * Allows specifying the visibility policy to use to control which fields and methods are included.
+     *
+     * @return The visibility policies
+     * @since 3.2.0
+     */
+    Visibility[] visibility() default  { Visibility.DEFAULT };
 
     /**
      * <p>By default {@link Introspected} applies to the class it is applied on. However if packages are specified
@@ -156,5 +174,40 @@ public @interface Introspected {
          * @return The member
          */
         String member() default "";
+    }
+
+    /**
+     * The access type for bean properties.
+     *
+     * @since 3.0.0
+     */
+    enum AccessKind {
+        /**
+         * Allows the use of public or package-protected fields to represent bean properties.
+         */
+        FIELD,
+        /**
+         * The default behaviour which is to favour public getters for bean properties.
+         */
+        METHOD
+    }
+
+    /**
+     * Visibility policy for bean properties and fields.
+     *
+     * @since 3.2.0
+     */
+    enum Visibility {
+
+        /**
+         * Only public methods and/or fields are included.
+         */
+        PUBLIC,
+
+        /**
+         * The default behaviour which in addition to public getters and setters will also include package protected fields if an {@link io.micronaut.core.annotation.Introspected.AccessKind} of {@link io.micronaut.core.annotation.Introspected.AccessKind#FIELD} is specified.
+         *
+         */
+        DEFAULT
     }
 }

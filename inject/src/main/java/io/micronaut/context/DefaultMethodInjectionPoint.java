@@ -17,6 +17,7 @@ package io.micronaut.context;
 
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -25,8 +26,6 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.MethodInjectionPoint;
 import io.micronaut.inject.annotation.AbstractEnvironmentAnnotationMetadata;
 import io.micronaut.core.annotation.Nullable;
-import javax.annotation.PostConstruct;
-import javax.annotation.PreDestroy;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Objects;
@@ -105,12 +104,12 @@ class DefaultMethodInjectionPoint<B, T> implements MethodInjectionPoint<B, T>, E
 
     @Override
     public boolean isPreDestroyMethod() {
-        return annotationMetadata.hasDeclaredAnnotation(PreDestroy.class);
+        return annotationMetadata.hasDeclaredAnnotation(AnnotationUtil.PRE_DESTROY);
     }
 
     @Override
     public boolean isPostConstructMethod() {
-        return annotationMetadata.hasDeclaredAnnotation(PostConstruct.class);
+        return annotationMetadata.hasDeclaredAnnotation(AnnotationUtil.POST_CONSTRUCT);
     }
 
     @Override
@@ -166,7 +165,13 @@ class DefaultMethodInjectionPoint<B, T> implements MethodInjectionPoint<B, T>, E
 
     private AnnotationMetadata initAnnotationMetadata(@Nullable AnnotationMetadata annotationMetadata) {
         if (annotationMetadata != AnnotationMetadata.EMPTY_METADATA) {
-            return new MethodAnnotationMetadata(annotationMetadata);
+            if (annotationMetadata != null) {
+                if (annotationMetadata.hasPropertyExpressions()) {
+                    return new MethodAnnotationMetadata(annotationMetadata);
+                } else {
+                    return annotationMetadata;
+                }
+            }
         }
         return AnnotationMetadata.EMPTY_METADATA;
     }

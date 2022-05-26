@@ -18,8 +18,7 @@ package io.micronaut.docs.respondingnotfound;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
-import io.reactivex.Maybe;
-
+import reactor.core.publisher.Mono;
 import java.util.Map;
 
 @Requires(property = "spec.name", value = "respondingnotfound")
@@ -33,8 +32,8 @@ public class BooksController {
     }
 
     @Get("/maybestock/{isbn}")
-    public Maybe<Map> maybestock(String isbn) {
-        return Maybe.empty(); //<2>
+    public Mono<Map> maybestock(String isbn) {
+        return Mono.empty(); //<2>
     }
 }
 //end::clazz[]

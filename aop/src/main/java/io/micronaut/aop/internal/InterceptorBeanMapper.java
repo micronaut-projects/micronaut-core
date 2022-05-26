@@ -21,29 +21,32 @@ import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.inject.annotation.TypedAnnotationTransformer;
+import io.micronaut.inject.annotation.TypedAnnotationMapper;
 import io.micronaut.inject.visitor.VisitorContext;
 
 import java.lang.annotation.Annotation;
 import java.util.Collections;
 import java.util.List;
 
+/**
+ * A {@link TypedAnnotationMapper} for the {@link InterceptorBean} annotation.
+ */
 @Internal
-public class InterceptorBeanMapper implements TypedAnnotationTransformer<InterceptorBean> {
-
-    @Override
-    public List<AnnotationValue<?>> transform(AnnotationValue<InterceptorBean> annotation, VisitorContext visitorContext) {
-        final AnnotationValueBuilder<Annotation> builder = AnnotationValue.builder(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS);
-        final AnnotationClassValue<?>[] values = annotation.annotationClassValues("value");
-        AnnotationValue[] bindings = new AnnotationValue[values.length];
-        for (int i = 0; i < values.length; i++) {
-            bindings[i] = AnnotationValue.builder(AnnotationUtil.ANN_INTERCEPTOR_BINDING).value(values[i].getName()).build();
-        }
-        return Collections.singletonList(builder.values(bindings).build());
-    }
+public class InterceptorBeanMapper implements TypedAnnotationMapper<InterceptorBean> {
 
     @Override
     public Class<InterceptorBean> annotationType() {
         return InterceptorBean.class;
+    }
+
+    @Override
+    public List<AnnotationValue<?>> map(AnnotationValue<InterceptorBean> annotation, VisitorContext visitorContext) {
+        final AnnotationValueBuilder<Annotation> builder = AnnotationValue.builder(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS);
+        final AnnotationClassValue<?>[] values = annotation.annotationClassValues("value");
+        AnnotationValue<?>[] bindings = new AnnotationValue[values.length];
+        for (int i = 0; i < values.length; i++) {
+            bindings[i] = AnnotationValue.builder(AnnotationUtil.ANN_INTERCEPTOR_BINDING).value(values[i].getName()).build();
+        }
+        return Collections.singletonList(builder.values(bindings).build());
     }
 }

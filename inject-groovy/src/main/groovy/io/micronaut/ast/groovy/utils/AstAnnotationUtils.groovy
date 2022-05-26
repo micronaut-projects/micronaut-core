@@ -22,6 +22,7 @@ import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.Internal
 import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
+import io.micronaut.inject.annotation.AnnotationMetadataSupport
 import org.codehaus.groovy.ast.AnnotatedNode
 import org.codehaus.groovy.ast.AnnotationNode
 import org.codehaus.groovy.ast.ClassNode
@@ -56,15 +57,25 @@ class AstAnnotationUtils {
     }
 
     /**
-     * Get the {@link AnnotationMetadata} for the given annotated node
+     * Get the {@link AnnotationMetadata} for the given method node node
      *
-     * @param sourceUnit the source unit
-     * @param parent the parent
      * @param annotatedNode The node
      * @return The metadata
      */
-    static AnnotationMetadata getAnnotationMetadata(SourceUnit sourceUnit, CompilationUnit compilationUnit, AnnotatedNode parent, AnnotatedNode annotatedNode) {
-        new GroovyAnnotationMetadataBuilder(sourceUnit, compilationUnit).buildForParent(parent, annotatedNode)
+    static AnnotationMetadata getMethodAnnotationMetadata(SourceUnit sourceUnit, CompilationUnit compilationUnit, MethodNode annotatedNode) {
+        return new GroovyAnnotationMetadataBuilder(sourceUnit, compilationUnit).buildOverridden(annotatedNode)
+    }
+
+    /**
+     * Get the {@link AnnotationMetadata} for the given annotated node
+     *
+     * @param sourceUnit the source unit
+     * @param parents the parents
+     * @param annotatedNode The node
+     * @return The metadata
+     */
+    static AnnotationMetadata getAnnotationMetadata(SourceUnit sourceUnit, CompilationUnit compilationUnit, List<AnnotatedNode> parents, AnnotatedNode annotatedNode) {
+        new GroovyAnnotationMetadataBuilder(sourceUnit, compilationUnit).buildForParents(parents, annotatedNode)
     }
 
 
@@ -95,6 +106,7 @@ class AstAnnotationUtils {
     @Internal
     static void invalidateCache() {
         annotationMetadataCache.clear()
+        AbstractAnnotationMetadataBuilder.clearCaches()
     }
 
     /**

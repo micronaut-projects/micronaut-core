@@ -17,12 +17,14 @@ package io.micronaut.aop.introduction.delegation;
 
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.ExecutableMethod;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Singleton
 public class DelegatingInterceptor implements MethodInterceptor<Delegating, Object> {
+    @Nullable
     @Override
     public Object intercept(MethodInvocationContext<Delegating, Object> context) {
         ExecutableMethod<Delegating, Object> executableMethod = context.getExecutableMethod();

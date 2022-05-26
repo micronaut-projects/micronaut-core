@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2022 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Nullable;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 /**
  * The default {@link SslConfiguration} used for HTTP clients.
@@ -29,7 +29,7 @@ import javax.inject.Inject;
  */
 @ConfigurationProperties(ClientSslConfiguration.PREFIX)
 @BootstrapContextCompatible
-public class ClientSslConfiguration extends SslConfiguration {
+public class ClientSslConfiguration extends AbstractClientSslConfiguration {
 
     /**
      * The prefix used to resolve this configuration.
@@ -52,7 +52,6 @@ public class ClientSslConfiguration extends SslConfiguration {
             SslConfiguration.TrustStoreConfiguration defaultTrustStoreConfiguration) {
         readExisting(defaultSslConfiguration, defaultKeyConfiguration, defaultKeyStoreConfiguration, defaultTrustStoreConfiguration);
         setEnabled(true);
-        setBuildSelfSigned(true);
     }
 
     /**

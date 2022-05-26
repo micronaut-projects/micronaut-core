@@ -19,7 +19,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -37,7 +37,7 @@ class JsonViewServerFilterSpec extends Specification {
 
     @Shared
     @AutoCleanup
-    RxHttpClient client = embeddedServer.getApplicationContext().createBean(RxHttpClient, embeddedServer.getURL())
+    HttpClient client = embeddedServer.getApplicationContext().createBean(HttpClient, embeddedServer.getURL())
 
 
     def "invoking /jsonview/none does not specify @JsonView, thus, all properties are returned"() {
@@ -114,5 +114,16 @@ class JsonViewServerFilterSpec extends Specification {
 
         then:
         rsp.body() == JsonViewController.TEST_MODEL
+    }
+
+    def "hidden properties on the post body to asBody are ignored"() {
+        when:
+        HttpResponse<TestModel> rsp = client.toBlocking().exchange(HttpRequest.POST('/jsonview/asBody', JsonViewController.TEST_MODEL), TestModel)
+
+        then:
+        rsp.body().firstName == JsonViewController.TEST_MODEL.firstName
+        rsp.body().lastName == JsonViewController.TEST_MODEL.lastName
+        rsp.body().birthdate == null
+        rsp.body().password == null
     }
 }

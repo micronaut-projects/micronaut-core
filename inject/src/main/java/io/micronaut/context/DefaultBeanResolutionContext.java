@@ -31,14 +31,21 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Internal
 public final class DefaultBeanResolutionContext extends AbstractBeanResolutionContext {
-    private final Map<BeanIdentifier, Object> beansInCreation = new ConcurrentHashMap<>(5);
+    private final Map<BeanIdentifier, BeanRegistration<?>> beansInCreation = new ConcurrentHashMap<>(5);
 
     /**
      * @param context        The bean context
      * @param rootDefinition The bean root definition
      */
-    public DefaultBeanResolutionContext(BeanContext context, BeanDefinition rootDefinition) {
-        super(context, rootDefinition);
+    public DefaultBeanResolutionContext(BeanContext context, BeanDefinition<?> rootDefinition) {
+        super((DefaultBeanContext) context, rootDefinition);
+    }
+
+    @Override
+    public BeanResolutionContext copy() {
+        DefaultBeanResolutionContext copy = new DefaultBeanResolutionContext(context, rootDefinition);
+        copy.copyStateFrom(this);
+        return copy;
     }
 
     @Override
@@ -47,8 +54,8 @@ public final class DefaultBeanResolutionContext extends AbstractBeanResolutionCo
     }
 
     @Override
-    public <T> void addInFlightBean(BeanIdentifier beanIdentifier, T instance) {
-        beansInCreation.put(beanIdentifier, instance);
+    public <T> void addInFlightBean(BeanIdentifier beanIdentifier, BeanRegistration<T> beanRegistration) {
+        beansInCreation.put(beanIdentifier, beanRegistration);
     }
 
     @Override
@@ -58,8 +65,8 @@ public final class DefaultBeanResolutionContext extends AbstractBeanResolutionCo
 
     @Nullable
     @Override
-    public <T> T getInFlightBean(BeanIdentifier beanIdentifier) {
+    public <T> BeanRegistration<T> getInFlightBean(BeanIdentifier beanIdentifier) {
         //noinspection unchecked
-        return (T) beansInCreation.get(beanIdentifier);
+        return (BeanRegistration<T>) beansInCreation.get(beanIdentifier);
     }
 }

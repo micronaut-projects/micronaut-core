@@ -17,13 +17,16 @@ package io.micronaut.inject.beans.visitor;
 
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.Executable;
+import io.micronaut.core.annotation.AccessorsStyle;
 import io.micronaut.core.annotation.AnnotationClassValue;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.*;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
@@ -35,6 +38,8 @@ import io.micronaut.core.annotation.Nullable;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 /**
  * A {@link TypeElementVisitor} that visits classes annotated with {@link Introspected} and produces
@@ -59,6 +64,8 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
     private static final AnnotationValue<Introspected.IndexedAnnotation> ANN_VALID = AnnotationValue.builder(Introspected.IndexedAnnotation.class)
             .member("annotation", new AnnotationClassValue<>(JAVAX_VALIDATION_VALID))
             .build();
+    private static final Introspected.AccessKind[] DEFAULT_ACCESS_KIND = { Introspected.AccessKind.METHOD };
+    private static final Introspected.Visibility[] DEFAULT_VISIBILITY = { Introspected.Visibility.DEFAULT };
 
     private Map<String, BeanIntrospectionWriter> writers = new LinkedHashMap<>(10);
     private List<AbstractIntrospection> abstractIntrospections = new ArrayList<>();
@@ -102,7 +109,13 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
     public void visitMethod(MethodElement element, VisitorContext context) {
         final ClassElement declaringType = element.getDeclaringType();
         final String methodName = element.getName();
-        if (declaringType.hasStereotype(ConfigurationReader.class) && methodName.startsWith("get") && !writers.containsKey(declaringType.getName())) {
+
+        final String[] readPrefixes = declaringType.getValue(AccessorsStyle.class, "readPrefixes", String[].class)
+                .orElse(new String[]{AccessorsStyle.DEFAULT_READ_PREFIX});
+        final String[] writePrefixes = declaringType.getValue(AccessorsStyle.class, "writePrefixes", String[].class)
+                .orElse(new String[]{AccessorsStyle.DEFAULT_WRITE_PREFIX});
+
+        if (declaringType.hasStereotype(ConfigurationReader.class) && NameUtils.isReaderName(methodName, readPrefixes) && !writers.containsKey(declaringType.getName())) {
             final boolean hasConstraints = element.hasStereotype(JAVAX_VALIDATION_CONSTRAINT) || element.hasStereotype(JAVAX_VALIDATION_VALID);
             if (hasConstraints) {
                 processIntrospected(declaringType, context, AnnotationValue.builder(Introspected.class).build());
@@ -110,16 +123,16 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
         }
 
         if (currentAbstractIntrospection != null) {
-            if (NameUtils.isGetterName(methodName) && element.getParameters().length == 0) {
-                final String propertyName = NameUtils.getPropertyNameForGetter(methodName);
+            if (NameUtils.isReaderName(methodName, readPrefixes) && element.getParameters().length == 0) {
+                final String propertyName = NameUtils.getPropertyNameForGetter(methodName, readPrefixes);
                 final AbstractPropertyElement propertyElement = currentAbstractIntrospection.properties.computeIfAbsent(propertyName, s -> new AbstractPropertyElement(
                         element.getDeclaringType(),
                         element.getReturnType(),
                         propertyName
                 ));
                 propertyElement.readMethod = element;
-            } else if (NameUtils.isSetterName(methodName) && element.getParameters().length == 1) {
-                final String propertyName = NameUtils.getPropertyNameForSetter(methodName);
+            } else if (NameUtils.isWriterName(methodName, writePrefixes) && element.getParameters().length == 1) {
+                final String propertyName = NameUtils.getPropertyNameForSetter(methodName, writePrefixes);
                 final AbstractPropertyElement propertyElement = currentAbstractIntrospection.properties.computeIfAbsent(propertyName, s -> new AbstractPropertyElement(
                         element.getDeclaringType(),
                         element.getParameters()[0].getType(),
@@ -164,6 +177,17 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
         final Set<AnnotationValue> indexedAnnotations;
 
         final Set<AnnotationValue> toIndex = CollectionUtils.setOf(introspected.get("indexed", AnnotationValue[].class, new AnnotationValue[0]));
+        Introspected.AccessKind[] accessKinds = introspected.enumValues("accessKind", Introspected.AccessKind.class);
+        Introspected.Visibility[] visibilities =
+                introspected.enumValues("visibility", Introspected.Visibility.class);
+        if (ArrayUtils.isEmpty(accessKinds)) {
+            accessKinds = DEFAULT_ACCESS_KIND;
+        }
+        if (ArrayUtils.isEmpty(visibilities)) {
+            visibilities = DEFAULT_VISIBILITY;
+        }
+        Introspected.AccessKind[] finalAccessKinds = accessKinds;
+        Introspected.Visibility[] finalVisibilities = visibilities;
 
         if (CollectionUtils.isEmpty(toIndex)) {
             indexedAnnotations = CollectionUtils.setOf(
@@ -184,17 +208,33 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             AtomicInteger index = new AtomicInteger(0);
             for (AnnotationClassValue aClass : classes) {
                 final Optional<ClassElement> classElement = context.getClassElement(aClass.getName());
+
+
                 classElement.ifPresent(ce -> {
                     if (ce.isPublic() && !isIntrospected(context, ce)) {
+                        final AnnotationMetadata typeMetadata = ce.getAnnotationMetadata();
+                        final AnnotationMetadata resolvedMetadata = typeMetadata == AnnotationMetadata.EMPTY_METADATA
+                                ? element.getAnnotationMetadata()
+                                : new AnnotationMetadataHierarchy(element.getAnnotationMetadata(), typeMetadata);
                         final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(
                                 element.getName(),
                                 index.getAndIncrement(),
                                 element,
                                 ce,
-                                metadata ? element.getAnnotationMetadata() : null
+                                metadata ? resolvedMetadata : null
                         );
 
-                        processElement(metadata, includes, excludes, excludedAnnotations, indexedAnnotations, ce, writer);
+                        processElement(
+                                metadata,
+                                includes,
+                                excludes,
+                                excludedAnnotations,
+                                indexedAnnotations,
+                                ce,
+                                writer,
+                                finalVisibilities,
+                                finalAccessKinds
+                        );
                     }
                 });
             }
@@ -218,7 +258,17 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                                 metadata ? element.getAnnotationMetadata() : null
                         );
 
-                        processElement(metadata, includes, excludes, excludedAnnotations, indexedAnnotations, classElement, writer);
+                        processElement(
+                                metadata,
+                                includes,
+                                excludes,
+                                excludedAnnotations,
+                                indexedAnnotations,
+                                classElement,
+                                writer,
+                                finalVisibilities,
+                                finalAccessKinds
+                        );
                     }
                 }
             }
@@ -229,7 +279,17 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                     metadata ? element.getAnnotationMetadata() : null
             );
 
-            processElement(metadata, includes, excludes, excludedAnnotations, indexedAnnotations, element, writer);
+            processElement(
+                    metadata,
+                    includes,
+                    excludes,
+                    excludedAnnotations,
+                    indexedAnnotations,
+                    element,
+                    writer,
+                    finalVisibilities,
+                    finalAccessKinds
+            );
         }
     }
 
@@ -282,7 +342,9 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             Set<String> excludedAnnotations,
             Set<AnnotationValue> indexedAnnotations,
             ClassElement ce,
-            BeanIntrospectionWriter writer) {
+            BeanIntrospectionWriter writer,
+            Introspected.Visibility[] visibilities,
+            Introspected.AccessKind...accessKinds) {
         Optional<MethodElement> constructorElement = ce.getPrimaryConstructor();
         if (ce.isAbstract() && !constructorElement.isPresent() && ce.hasStereotype(Introspected.class)) {
             currentAbstractIntrospection = new AbstractIntrospection(
@@ -295,7 +357,53 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             );
             abstractIntrospections.add(currentAbstractIntrospection);
         } else {
-            final List<PropertyElement> beanProperties = ce.getBeanProperties();
+            final List<Introspected.AccessKind> accessKindSet = Arrays.asList(accessKinds);
+            final Set<Introspected.Visibility> visibilitySet = CollectionUtils.setOf(visibilities);
+            List<PropertyElement> beanProperties = accessKindSet.contains(Introspected.AccessKind.METHOD) ? ce.getBeanProperties() : Collections.emptyList();
+
+            final List<FieldElement> beanFields;
+
+            if (accessKindSet.contains(Introspected.AccessKind.FIELD)) {
+                Predicate<String> nameFilter = null;
+                if (accessKindSet.iterator().next() == Introspected.AccessKind.METHOD) {
+                    // prioritize methods
+                    List<PropertyElement> finalBeanProperties = beanProperties;
+                    nameFilter = (name) -> {
+                        for (PropertyElement beanProperty : finalBeanProperties) {
+                            if (name.equals(beanProperty.getName())) {
+                                return false;
+                            }
+                        }
+                        return true;
+                    };
+                }
+                ElementQuery<FieldElement> query;
+                if (visibilitySet.contains(Introspected.Visibility.DEFAULT)) {
+                    query = ElementQuery.of(FieldElement.class)
+                            .onlyAccessible()
+                            .modifiers((modifiers) -> !modifiers.contains(ElementModifier.STATIC) && !modifiers.contains(ElementModifier.PROTECTED));
+
+                } else {
+                    query = ElementQuery.of(FieldElement.class)
+                            .modifiers((modifiers) ->
+                                   !modifiers.contains(ElementModifier.STATIC) &&
+                                   visibilitySet.stream().anyMatch(v ->
+                                           modifiers.contains(ElementModifier.valueOf(v.name()))));
+                }
+                if (nameFilter != null) {
+                    query = query.named(nameFilter);
+                }
+                beanFields = ce.getEnclosedElements(query);
+            } else {
+                beanFields = Collections.emptyList();
+            }
+
+            if (!beanFields.isEmpty() && !beanProperties.isEmpty()) {
+                // filter out properties that use field access
+                beanProperties = beanProperties.stream().filter(pe ->
+                                beanFields.stream().noneMatch(fieldElement -> fieldElement.getName().equals(pe.getName()))
+                            ).collect(Collectors.toList());
+            }
 
             final MethodElement constructor = constructorElement.orElse(null);
             process(
@@ -310,8 +418,11 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                     metadata
             );
 
+            for (FieldElement beanField : beanFields) {
+                writer.visitBeanField(beanField);
+            }
+
             ElementQuery<MethodElement> query = ElementQuery.of(MethodElement.class)
-                    .onlyConcrete()
                     .onlyAccessible()
                     .modifiers((modifiers) -> !modifiers.contains(ElementModifier.STATIC))
                     .annotated((am) -> am.hasStereotype(Executable.class));
@@ -331,7 +442,8 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             Set<String> excludes,
             Set<String> ignored,
             Set<AnnotationValue> indexedAnnotations,
-            boolean metadata) {
+            boolean metadata,
+            Introspected.AccessKind...accessKind) {
 
         if (constructorElement != null) {
             final ParameterElement[] parameters = constructorElement.getParameters();
@@ -421,7 +533,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                 indexedAnnotation.get("annotation", String.class).ifPresent(annotationName -> {
                     if (beanProperty.hasStereotype(annotationName)) {
                         writer.indexProperty(
-                                new AnnotationValue<>(annotationName),
+                                annotationName,
                                 name,
                                 indexedAnnotation.get("member", String.class)
                                         .flatMap(m -> beanProperty.getValue(annotationName, m, String.class)).orElse(null)
@@ -464,7 +576,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
     /**
      * Used to accumulate property elements for abstract types.
      */
-    private class AbstractPropertyElement implements PropertyElement {
+    private static class AbstractPropertyElement implements PropertyElement {
 
         private final ClassElement declaringType;
         private final ClassElement type;
@@ -516,11 +628,10 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             return true;
         }
 
-        @SuppressWarnings("ConstantConditions")
         @NonNull
         @Override
         public Object getNativeType() {
-            throw null;
+            return this;
         }
     }
 

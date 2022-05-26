@@ -21,14 +21,14 @@ import io.micronaut.ast.groovy.config.GroovyConfigurationMetadataBuilder
 import io.micronaut.ast.groovy.utils.AstAnnotationUtils
 import io.micronaut.ast.groovy.utils.AstMessageUtils
 import io.micronaut.ast.groovy.utils.InMemoryByteCodeGroovyClassLoader
+import io.micronaut.ast.groovy.utils.InMemoryClassWriterOutputVisitor
 import io.micronaut.ast.groovy.visitor.GroovyPackageElement
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.context.annotation.Configuration
 import io.micronaut.context.annotation.ConfigurationReader
 import io.micronaut.context.annotation.Context
 import io.micronaut.core.annotation.AnnotationMetadata
-import io.micronaut.core.annotation.Nullable
-import io.micronaut.inject.ast.Element
+
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder
 import io.micronaut.inject.writer.*
 import org.codehaus.groovy.ast.*
@@ -68,9 +68,18 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         ModuleNode moduleNode = source.getAST()
         Map<AnnotatedNode, BeanDefinitionVisitor> beanDefinitionWriters = [:]
         File classesDir = source.configuration.targetDirectory
-        DirectoryClassWriterOutputVisitor outputVisitor = new DirectoryClassWriterOutputVisitor(
-                classesDir
-        )
+        boolean defineClassesInMemory = source.classLoader instanceof InMemoryByteCodeGroovyClassLoader
+        ClassWriterOutputVisitor outputVisitor
+        if (defineClassesInMemory) {
+            outputVisitor = new InMemoryClassWriterOutputVisitor(
+                    source.classLoader as InMemoryByteCodeGroovyClassLoader
+            )
+
+        } else {
+            outputVisitor = new DirectoryClassWriterOutputVisitor(
+                    classesDir
+            )
+        }
         List<ClassNode> classes = moduleNode.getClasses()
         if (classes.size() == 1) {
             ClassNode classNode = classes[0]
@@ -115,71 +124,24 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             }
         }
 
-        boolean defineClassesInMemory = source.classLoader instanceof InMemoryByteCodeGroovyClassLoader
-        Map<String, ByteArrayOutputStream> classStreams = null
-
         for (entry in beanDefinitionWriters) {
             BeanDefinitionVisitor beanDefWriter = entry.value
             String beanTypeName = beanDefWriter.beanTypeName
             AnnotatedNode beanClassNode = entry.key
             try {
                 BeanDefinitionReferenceWriter beanReferenceWriter = new BeanDefinitionReferenceWriter(
-                        beanTypeName,
                         beanDefWriter
                 )
 
                 beanReferenceWriter.setRequiresMethodProcessing(beanDefWriter.requiresMethodProcessing())
-                beanReferenceWriter.setContextScope(AstAnnotationUtils.hasStereotype(source, unit, beanClassNode, Context))
+                beanReferenceWriter.setContextScope(beanDefWriter.getAnnotationMetadata().hasDeclaredAnnotation(Context))
                 beanDefWriter.visitBeanDefinitionEnd()
                 if (classesDir != null) {
                     beanReferenceWriter.accept(outputVisitor)
                     beanDefWriter.accept(outputVisitor)
                 } else if (source.source instanceof StringReaderSource && defineClassesInMemory) {
-                    if (classStreams == null) {
-                        classStreams = [:]
-                    }
-                    ClassWriterOutputVisitor visitor = new ClassWriterOutputVisitor() {
-                        @Override
-                        OutputStream visitClass(String classname, @Nullable Element originatingElement) throws IOException {
-                            ByteArrayOutputStream stream = new ByteArrayOutputStream()
-                            classStreams.put(classname, stream)
-                            return stream
-                        }
-
-                        @Override
-                        OutputStream visitClass(String classname, Element... originatingElements) throws IOException {
-                            ByteArrayOutputStream stream = new ByteArrayOutputStream()
-                            classStreams.put(classname, stream)
-                            return stream
-                        }
-
-                        @Override
-                        void visitServiceDescriptor(String type, String classname) {
-                            // no-op
-                        }
-
-                        @Override
-                        Optional<File> visitMetaInfFile(String path) throws IOException {
-                            return Optional.empty()
-                        }
-
-                        @Override
-                        Optional<GeneratedFile> visitGeneratedFile(String path) {
-                            return Optional.empty()
-                        }
-
-                        @Override
-                        Optional<GeneratedFile> visitMetaInfFile(String path, Element... originatingElements) {
-                            return Optional.empty()
-                        }
-
-                        @Override
-                        void finish() {
-                            // no-op
-                        }
-                    }
-                    beanReferenceWriter.accept(visitor)
-                    beanDefWriter.accept(visitor)
+                    beanReferenceWriter.accept(outputVisitor)
+                    beanDefWriter.accept(outputVisitor)
 
                 }
 
@@ -198,20 +160,6 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 AstMessageUtils.error(source, moduleNode, "Error generating META-INF/services files: $e.message")
                 if (e.message == null) {
                     e.printStackTrace(System.err)
-                }
-            }
-        }
-
-        if (classStreams != null) {
-            // for testing try to load them into current classloader
-            InMemoryByteCodeGroovyClassLoader classLoader = (InMemoryByteCodeGroovyClassLoader) source.classLoader
-
-            if (defineClassesInMemory) {
-
-                if (classLoader != null) {
-                    for (streamEntry in classStreams) {
-                        classLoader.addClass(streamEntry.key, streamEntry.value.toByteArray())
-                    }
                 }
             }
         }

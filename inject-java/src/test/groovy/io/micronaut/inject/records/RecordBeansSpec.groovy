@@ -20,14 +20,14 @@ package test;
 import io.micronaut.context.annotation.*;
 import io.micronaut.core.convert.ConversionService;
 import javax.validation.constraints.Min;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 import io.micronaut.context.BeanContext;
 
 @ConfigurationProperties("foo")
 record Test(
     @Min(20) int num, 
     String name, 
-    @Primary ConversionService conversionService,
+    @Inject ConversionService conversionService,
     @Inject BeanContext beanContext) {
 }
 ''')
@@ -63,12 +63,12 @@ record Test(
         BeanDefinition<?> definition = buildBeanDefinition('test.Test', '''
 package test;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 record Test(OtherBean otherBean) {
 
 }
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class OtherBean {
 
 }
@@ -94,7 +94,7 @@ record Test(OtherBean otherBean) {
 
 }
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class OtherBean {
 
 }

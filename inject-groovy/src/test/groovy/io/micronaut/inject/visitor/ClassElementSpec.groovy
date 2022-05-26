@@ -17,13 +17,19 @@ package io.micronaut.inject.visitor
 
 import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.ast.groovy.TypeElementVisitorStart
+import io.micronaut.context.exceptions.BeanContextException
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.ElementModifier
 import io.micronaut.inject.ast.ElementQuery
 import io.micronaut.inject.ast.EnumElement
+import io.micronaut.inject.ast.FieldElement
 import io.micronaut.inject.ast.MethodElement
+import io.micronaut.inject.ast.PackageElement
+import spock.lang.Issue
+import spock.lang.Unroll
 import spock.util.environment.RestoreSystemProperties
 
+import java.sql.SQLException
 import java.util.function.Supplier
 
 @RestoreSystemProperties
@@ -35,6 +41,116 @@ class ClassElementSpec extends AbstractBeanDefinitionSpec {
 
     def cleanup() {
         AllElementsVisitor.clearVisited()
+    }
+
+    @Unroll
+    void "test throws declarations on method with generics"() {
+        given:
+        def element = buildClassElement("""
+package throwstest;
+
+import io.micronaut.context.exceptions.BeanContextException;
+
+class Test extends Parent<BeanContextException> {}
+
+class Parent<T extends RuntimeException> {
+    void test() throws ${types.join(',')}{}
+}
+""")
+
+        MethodElement methodElement = element.getEnclosedElement(ElementQuery.ALL_METHODS)
+                .get()
+        expect:
+        methodElement.thrownTypes.size() == types.size()
+        methodElement.thrownTypes*.name == expected
+
+        where:
+        types                                          | expected
+        [SQLException.name]                            | [SQLException.name]
+        [SQLException.name, BeanContextException.name] | [SQLException.name, BeanContextException.name]
+        [SQLException.name, "T"]                       | [SQLException.name, BeanContextException.name]
+    }
+
+    @Unroll
+    void "test throws declarations on method"() {
+        given:
+        def element = buildClassElement("""
+package throwstest;
+
+class Test<T extends RuntimeException> {
+    void test() throws ${types.join(',')}{}
+}
+""")
+
+        MethodElement methodElement = element.getEnclosedElement(ElementQuery.ALL_METHODS)
+                .get()
+        expect:
+        methodElement.thrownTypes.size() == types.size()
+        methodElement.thrownTypes*.name == expected
+
+        where:
+        types                                          | expected
+        [SQLException.name]                            | [SQLException.name]
+        [SQLException.name, BeanContextException.name] | [SQLException.name, BeanContextException.name]
+        [SQLException.name, "T"]                       | [SQLException.name, RuntimeException.name]
+    }
+
+    void "test modifiers #modifiers"() {
+        given:
+        def element = buildClassElement("""
+package modtest;
+
+class Test {
+    ${modifiers*.toString().join(' ')} String test = "test";
+
+    ${modifiers*.toString().join(' ')} void test() {};
+}
+""")
+
+        expect:
+        element.getEnclosedElement(ElementQuery.ALL_FIELDS).get().modifiers == modifiers
+        element.getEnclosedElement(ElementQuery.ALL_METHODS).get().modifiers == modifiers
+
+        where:
+        modifiers << [
+                [ElementModifier.PUBLIC] as Set,
+                [ElementModifier.PUBLIC, ElementModifier.STATIC] as Set,
+                [ElementModifier.PUBLIC, ElementModifier.STATIC, ElementModifier.FINAL] as Set,
+        ]
+    }
+
+    void "test get package element"() {
+        given:
+        def element = buildClassElement('''
+package pkgeltest;
+
+class PckElementTest {
+
+}
+''')
+        PackageElement pe = element.getPackage()
+
+        expect:
+        pe.name == 'pkgeltest'
+        pe.simpleName == 'pkgeltest'
+        pe.getClass().name.contains("GroovyPackageElement")
+    }
+
+    void "test get full package element"() {
+        given:
+        def element = buildClassElement('''
+package abc.my.pkgeltest;
+
+class PckElementTest {
+
+}
+''')
+        PackageElement pe = element.getPackage()
+
+        expect:
+        pe.name == 'abc.my.pkgeltest'
+        pe.simpleName == 'pkgeltest'
+        pe.getClass().name.contains("GroovyPackageElement")
     }
 
     void 'test find matching methods on abstract class'() {
@@ -220,8 +336,8 @@ interface AnotherInterface {
     }
 
     void "test resolve generic type using getTypeArguments"() {
-        buildBeanDefinition('test.TestController', '''
-package test;
+        buildBeanDefinition('clselem1.TestController', '''
+package clselem1;
 
 import io.micronaut.http.annotation.*;
 import javax.inject.Inject;
@@ -245,8 +361,8 @@ public class TestController implements java.util.function.Supplier<String> {
     }
 
     void "test class is visited by custom visitor"() {
-        buildBeanDefinition('test.TestController', '''
-package test;
+        buildBeanDefinition('clselem2.TestController', '''
+package clselem2;
 
 import io.micronaut.http.annotation.*;
 import javax.inject.Inject;
@@ -272,8 +388,8 @@ public class TestController {
 
 
     void "test visit methods that take and return enums"() {
-        buildBeanDefinition('test.TestController', '''
-package test;
+        buildBeanDefinition('clselem3.TestController', '''
+package clselem3;
 
 import io.micronaut.http.annotation.*;
 import io.micronaut.http.*;
@@ -301,8 +417,8 @@ public class TestController {
     }
 
     void "test primitive types"() {
-        buildBeanDefinition('test.TestController', '''
-package test;
+        buildBeanDefinition('clselem4.TestController', '''
+package clselem4;
 
 import io.micronaut.http.annotation.*;
 import javax.inject.Inject;
@@ -327,8 +443,8 @@ public class TestController {
     }
 
     void "test generic types at type level"() {
-        buildBeanDefinition('test.TestController', '''
-package test;
+        buildBeanDefinition('clselem5.TestController', '''
+package clselem5;
 
 import io.micronaut.http.annotation.*;
 import javax.inject.Inject;
@@ -349,14 +465,14 @@ class Foo {}
         expect:
         AllElementsVisitor.VISITED_CLASS_ELEMENTS.size() == 1
         AllElementsVisitor.VISITED_METHOD_ELEMENTS.size() == 1
-        AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].returnType.name == 'test.Foo'
+        AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].returnType.name == 'clselem5.Foo'
         AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].parameters.size() == 1
-        AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].parameters[0].type.name == 'test.Foo'
+        AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].parameters[0].type.name == 'clselem5.Foo'
     }
 
     void "test array generic types at type level"() {
-        buildBeanDefinition('test.TestController', '''
-package test;
+        buildBeanDefinition('clselem6.TestController', '''
+package clselem6;
 
 import io.micronaut.http.annotation.*;
 import javax.inject.Inject;
@@ -377,16 +493,16 @@ class Foo {}
         expect:
         AllElementsVisitor.VISITED_CLASS_ELEMENTS.size() == 1
         AllElementsVisitor.VISITED_METHOD_ELEMENTS.size() == 1
-        AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].returnType.name == 'test.Foo'
+        AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].returnType.name == 'clselem6.Foo'
         AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].returnType.isArray()
         AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].parameters.size() == 1
-        AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].parameters[0].type.name == 'test.Foo'
+        AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].parameters[0].type.name == 'clselem6.Foo'
         AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].parameters[0].type.isArray()
     }
 
     void "test generic types at method level"() {
-        buildBeanDefinition('test.TestController', '''
-package test;
+        buildBeanDefinition('clselem7.TestController', '''
+package clselem7;
 
 import io.micronaut.http.annotation.*;
 import javax.inject.Inject;
@@ -407,14 +523,14 @@ class Foo {}
         expect:
         AllElementsVisitor.VISITED_CLASS_ELEMENTS.size() == 1
         AllElementsVisitor.VISITED_METHOD_ELEMENTS.size() == 1
-        AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].returnType.name == 'test.Foo'
+        AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].returnType.name == 'clselem7.Foo'
         AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].parameters.size() == 1
-        AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].parameters[0].type.name == 'test.Foo'
+        AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].parameters[0].type.name == 'clselem7.Foo'
     }
 
     void "test generic types at type level used as type arguments"() {
-        buildBeanDefinition('test.TestController', '''
-package test;
+        buildBeanDefinition('clselem8.TestController', '''
+package clselem8;
 
 import io.micronaut.http.annotation.*;
 import javax.inject.Inject;
@@ -437,9 +553,103 @@ class Foo {}
         AllElementsVisitor.VISITED_METHOD_ELEMENTS.size() == 1
         AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].returnType.name == 'java.util.List'
         AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].returnType.typeArguments.size() == 1
-        AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].returnType.typeArguments.get("E").name == 'test.Foo'
+        AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].returnType.typeArguments.get("E").name == 'clselem8.Foo'
         AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].parameters.size() == 1
         AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].parameters[0].type.name == 'java.util.Set'
-        AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].parameters[0].type.typeArguments.get("E").name == 'test.Foo'
+        AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].parameters[0].type.typeArguments.get("E").name == 'clselem8.Foo'
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/6430")
+    void "test property inheritance type annotation metadata"() {
+        given:
+        def classElement = buildClassElement("""
+package io.micronaut.inject.visitor
+
+@SomeAnn
+class DiscountEO {
+}
+abstract class TransactionPO {
+    DiscountEO discount
+}
+class InvoicePO extends TransactionPO {
+}
+""")
+
+        expect:
+        classElement.getBeanProperties().find { it.name == "discount" }.getType().hasAnnotation(SomeAnn)
+    }
+
+    void "test find enum fields using ElementQuery"() {
+        given:
+            ClassElement classElement = buildClassElement('''
+package elementquery;
+
+enum Test {
+
+    A, B, C;
+
+    public static final String publicStaticFinalField = "";
+    public static String publicStaticField;
+    public final String publicFinalField = "";
+    public String publicField;
+
+    protected static final String protectedStaticFinalField = "";
+    protected static String protectedStaticField;
+    protected final String protectedFinalField = "";
+    protected String protectedField;
+
+    static final String packagePrivateStaticFinalField = "";
+    static String packagePrivateStaticField;
+    final String packagePrivateFinalField = "";
+    String packagePrivateField;
+
+    private static final String privateStaticFinalField = "";
+    private static String privateStaticField;
+    private final String privateFinalField = "";
+    private String privateField;
+}
+''')
+        when:
+        List<FieldElement> allFields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS)
+        List<String> expected = [
+                'A',
+                'B',
+                'C',
+                'publicStaticFinalField',
+                'publicStaticField',
+                'publicFinalField',
+                'publicField',
+                'protectedStaticFinalField',
+                'protectedStaticField',
+                'protectedFinalField',
+                'protectedField',
+                'packagePrivateStaticFinalField',
+                'packagePrivateStaticField',
+                'packagePrivateFinalField',
+                'packagePrivateField',
+                'privateStaticFinalField',
+                'privateStaticField',
+                'privateFinalField',
+                'privateField',
+                'MIN_VALUE',
+                'MAX_VALUE',
+                'name',
+                'ordinal',
+        ]
+
+        then:
+        for (String name : allFields*.name) {
+            assert expected.contains(name)
+        }
+        allFields.size() == expected.size()
+
+        when:
+        allFields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS.includeEnumConstants())
+
+        then:
+        for (String name : allFields*.name) {
+            assert expected.contains(name)
+        }
+        allFields.size() == expected.size()
     }
 }

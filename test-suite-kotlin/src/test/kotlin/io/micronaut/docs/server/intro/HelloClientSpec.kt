@@ -5,7 +5,9 @@ import io.micronaut.context.annotation.Property
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
-import javax.inject.Inject
+import jakarta.inject.Inject
+import reactor.core.publisher.Mono
+
 // end::imports[]
 
 /**
@@ -22,7 +24,7 @@ class HelloClientSpec {
 
     @Test
     fun testHelloWorldResponse() {
-        assertEquals("Hello World", client.hello().blockingGet())// <3>
+        assertEquals("Hello World", Mono.from(client.hello()).block())// <3>
     }
 }
 // end::class[]

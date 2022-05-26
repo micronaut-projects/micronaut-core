@@ -17,7 +17,7 @@ package io.micronaut.docs.aop.validation;
 
 // tag::imports[]
 import io.micronaut.validation.Validated;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 import javax.validation.constraints.NotBlank;
 import java.util.*;
 // end::imports[]

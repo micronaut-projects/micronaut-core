@@ -57,6 +57,16 @@ class StatusRouteMatch<T, R> extends AbstractRouteMatch<T, R> {
     }
 
     @Override
+    public boolean isErrorRoute() {
+        return true;
+    }
+
+    @Override
+    public HttpStatus findStatus(HttpStatus defaultStatus) {
+        return super.findStatus(httpStatus);
+    }
+
+    @Override
     protected RouteMatch<R> newFulfilled(Map<String, Object> newVariables, List<Argument> requiredArguments) {
         return new StatusRouteMatch<T, R>(httpStatus, abstractRoute, conversionService) {
             @Override

@@ -15,16 +15,17 @@
  */
 package io.micronaut.http.netty.channel;
 
-import java.util.concurrent.Executor;
-import java.util.concurrent.ThreadFactory;
-
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.ArgumentUtils;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.ServerChannel;
 import io.netty.channel.socket.ServerSocketChannel;
-
-import io.micronaut.core.annotation.Nullable;
 import io.netty.channel.socket.SocketChannel;
+import io.netty.channel.unix.ServerDomainSocketChannel;
+
+import java.util.concurrent.Executor;
+import java.util.concurrent.ThreadFactory;
 
 /**
  * Factory for EventLoopGroup.
@@ -103,23 +104,22 @@ public interface EventLoopGroupFactory {
     }
 
     /**
-     * Creates a default EventLoopGroup.
-     *
-     * @param ioRatio The io ratio.
-     * @return An EventLoopGroup.
-     * @deprecated Use {@link #createEventLoopGroup(EventLoopGroupConfiguration, ThreadFactory)} instead
-     */
-    @Deprecated
-    default EventLoopGroup createEventLoopGroup(@Nullable Integer ioRatio) {
-        return createEventLoopGroup(0, (ThreadFactory) null, ioRatio);
-    }
-
-    /**
      * Returns the server channel class.
      *
      * @return A ServerChannelClass.
      */
     @NonNull Class<? extends ServerSocketChannel> serverSocketChannelClass();
+
+    /**
+     * Returns the domain socket server channel class.
+     *
+     * @return A ServerDomainSocketChannel class.
+     * @throws UnsupportedOperationException if domain sockets are not supported.
+     */
+    @NonNull
+    default Class<? extends ServerDomainSocketChannel> domainServerSocketChannelClass() throws UnsupportedOperationException {
+        throw new UnsupportedOperationException("Domain server socket channels not supported by this transport");
+    }
 
     /**
      * Returns the server channel class.
@@ -129,6 +129,17 @@ public interface EventLoopGroupFactory {
      */
     default @NonNull Class<? extends ServerSocketChannel> serverSocketChannelClass(@Nullable EventLoopGroupConfiguration configuration) {
         return serverSocketChannelClass();
+    }
+
+    /**
+     * Returns the domain socket server channel class.
+     *
+     * @param configuration The configuration
+     * @return A ServerDomainSocketChannel implementation.
+     * @throws UnsupportedOperationException if domain sockets are not supported.
+     */
+    default @NonNull Class<? extends ServerDomainSocketChannel> domainServerSocketChannelClass(@Nullable EventLoopGroupConfiguration configuration) {
+        return domainServerSocketChannelClass();
     }
 
     /**
@@ -142,6 +153,21 @@ public interface EventLoopGroupFactory {
             return serverSocketChannelClass(configuration).getDeclaredConstructor().newInstance();
         } catch (Exception e) {
             throw new RuntimeException("Cannot instantiate server socket channel instance");
+        }
+    }
+
+    /**
+     * Returns the domain socket server channel class.
+     *
+     * @param configuration The configuration
+     * @return A ServerDomainSocketChannel implementation.
+     * @throws UnsupportedOperationException if domain sockets are not supported.
+     */
+    default @NonNull ServerChannel domainServerSocketChannelInstance(@Nullable EventLoopGroupConfiguration configuration) {
+        try {
+            return domainServerSocketChannelClass(configuration).getDeclaredConstructor().newInstance();
+        } catch (ReflectiveOperationException e) {
+            throw new RuntimeException("Cannot instantiate server socket channel instance", e);
         }
     }
 

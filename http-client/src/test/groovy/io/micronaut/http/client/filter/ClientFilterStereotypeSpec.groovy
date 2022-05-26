@@ -17,6 +17,7 @@
 package io.micronaut.http.client.filter
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpMethod
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -30,19 +31,22 @@ import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.filter.ClientFilterChain
 import io.micronaut.http.filter.HttpClientFilter
 import io.micronaut.runtime.server.EmbeddedServer
-import io.reactivex.Flowable
+import jakarta.inject.Singleton
 import org.reactivestreams.Publisher
+import reactor.core.publisher.Flux
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
-
-import javax.inject.Singleton
 
 class ClientFilterStereotypeSpec extends Specification {
 
     @Shared
     @AutoCleanup
-    ApplicationContext ctx = ApplicationContext.run(EmbeddedServer).applicationContext
+    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec.name': 'ClientFilterStereotypeSpec'])
+
+    @Shared
+    @AutoCleanup
+    ApplicationContext ctx = embeddedServer.applicationContext
 
     void "test declarative client matching"() {
         when:
@@ -83,6 +87,7 @@ class ClientFilterStereotypeSpec extends Specification {
         clientBeans.annotatedClient.toBlocking().retrieve(HttpRequest.POST('/', '')) == "echo Intercepted Post URL"
     }
 
+    @Requires(property = 'spec.name', value = 'ClientFilterStereotypeSpec')
     @Singleton
     static class ClientBeans {
         HttpClient annotatedClient
@@ -97,6 +102,7 @@ class ClientFilterStereotypeSpec extends Specification {
         }
     }
 
+    @Requires(property = 'spec.name', value = 'ClientFilterStereotypeSpec')
     @Client("/filters/marked")
     @MarkerStereotypeAnnotation
     static interface MarkedClient {
@@ -107,6 +113,7 @@ class ClientFilterStereotypeSpec extends Specification {
         String echoPost()
     }
 
+    @Requires(property = 'spec.name', value = 'ClientFilterStereotypeSpec')
     @Client("/filters/marked")
     @AnotherMarkerStereotypeAnnotation
     @MarkerStereotypeAnnotation
@@ -118,6 +125,7 @@ class ClientFilterStereotypeSpec extends Specification {
         String echoPost()
     }
 
+    @Requires(property = 'spec.name', value = 'ClientFilterStereotypeSpec')
     @Client("/filters/marked")
     @IndirectMarkerStereotypeAnnotation
     static interface IndirectlyMarkedClient {
@@ -128,12 +136,14 @@ class ClientFilterStereotypeSpec extends Specification {
         String echoPost()
     }
 
+    @Requires(property = 'spec.name', value = 'ClientFilterStereotypeSpec')
     @Client("/filters/marked")
     static interface UnmarkedClient {
         @Get("/")
         String echo()
     }
 
+    @Requires(property = 'spec.name', value = 'ClientFilterStereotypeSpec')
     @Controller('/filters/')
     static class UriController {
 
@@ -148,6 +158,7 @@ class ClientFilterStereotypeSpec extends Specification {
         }
     }
 
+    @Requires(property = 'spec.name', value = 'ClientFilterStereotypeSpec')
     @MarkerStereotypeAnnotation
     @Singleton
     static class MarkerFilter implements HttpClientFilter {
@@ -159,13 +170,14 @@ class ClientFilterStereotypeSpec extends Specification {
 
         @Override
         Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> request, ClientFilterChain chain) {
-            return Flowable.fromPublisher(chain.proceed(request))
+            return Flux.from(chain.proceed(request))
                     .map({ HttpResponse response ->
                         HttpResponse.ok(response.body().toString() + " Intercepted")
                     })
         }
     }
 
+    @Requires(property = 'spec.name', value = 'ClientFilterStereotypeSpec')
     @AnotherMarkerStereotypeAnnotation
     @Singleton
     static class AnotherMarkerFilter implements HttpClientFilter {
@@ -177,13 +189,14 @@ class ClientFilterStereotypeSpec extends Specification {
 
         @Override
         Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> request, ClientFilterChain chain) {
-            return Flowable.fromPublisher(chain.proceed(request))
+            return Flux.from(chain.proceed(request))
                     .map({ HttpResponse response ->
                         HttpResponse.ok(response.body().toString() + " Twice")
                     })
         }
     }
 
+    @Requires(property = 'spec.name', value = 'ClientFilterStereotypeSpec')
     @MarkerStereotypeAnnotation(methods = HttpMethod.POST)
     @Singleton
     static class MarkerPostFilter implements HttpClientFilter {
@@ -195,13 +208,14 @@ class ClientFilterStereotypeSpec extends Specification {
 
         @Override
         Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> request, ClientFilterChain chain) {
-            return Flowable.fromPublisher(chain.proceed(request))
+            return Flux.from(chain.proceed(request))
                     .map({ HttpResponse response ->
                         HttpResponse.ok(response.body().toString() + " Post")
                     })
         }
     }
 
+    @Requires(property = 'spec.name', value = 'ClientFilterStereotypeSpec')
     @Singleton
     @Filter("/filters/marked")
     static class UrlFilter implements HttpClientFilter {
@@ -213,7 +227,7 @@ class ClientFilterStereotypeSpec extends Specification {
 
         @Override
         Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> request, ClientFilterChain chain) {
-            return Flowable.fromPublisher(chain.proceed(request))
+            return Flux.from(chain.proceed(request))
                     .map({ HttpResponse response ->
                         HttpResponse.ok(response.body().toString() + " URL")
                     })

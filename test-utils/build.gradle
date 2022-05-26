@@ -1,8 +1,8 @@
-ext {
-    snakeYamlVersion = '1.27'
+plugins {
+    id "io.micronaut.build.internal.convention-test-library"
 }
 
 dependencies {
-    api "org.codehaus.groovy:groovy:$groovyVersion"
-    testImplementation "org.yaml:snakeyaml:$snakeYamlVersion"
+    api libs.managed.groovy
+    testImplementation libs.managed.snakeyaml
 }

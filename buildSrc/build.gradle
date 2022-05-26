@@ -1,0 +1,14 @@
+plugins {
+    id 'groovy-gradle-plugin'
+}
+
+repositories {
+    gradlePluginPortal()
+}
+
+dependencies {
+    implementation "gradle.plugin.com.github.johnrengelman:shadow:7.1.2"
+    implementation "org.aim42:htmlSanityCheck:1.1.6"
+    implementation "io.micronaut.build.internal:micronaut-gradle-plugins:5.3.9"
+    implementation "org.tomlj:tomlj:1.0.0"
+}

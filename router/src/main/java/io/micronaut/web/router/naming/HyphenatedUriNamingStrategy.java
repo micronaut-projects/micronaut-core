@@ -16,6 +16,7 @@
 package io.micronaut.web.router.naming;
 
 import io.micronaut.context.annotation.Primary;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.conventions.TypeConvention;
 import io.micronaut.core.util.StringUtils;
@@ -23,9 +24,7 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.UriMapping;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.web.router.RouteBuilder;
-
-import io.micronaut.core.annotation.NonNull;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 /**
  * The default {@link io.micronaut.web.router.RouteBuilder.UriNamingStrategy} if none is provided by the application.

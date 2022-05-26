@@ -15,6 +15,9 @@
  */
 package io.micronaut.http.client
 
+import io.micronaut.core.async.annotation.SingleResult
+import io.micronaut.context.annotation.Property
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
@@ -22,11 +25,13 @@ import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.hateoas.JsonError
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
-import io.reactivex.Single
+import jakarta.inject.Inject
+import org.reactivestreams.Publisher
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 import spock.lang.Specification
 
-import javax.inject.Inject
-
+@Property(name = 'spec.name', value = 'ServerErrorSpec')
 @MicronautTest
 class ServerErrorSpec extends Specification {
 
@@ -35,79 +40,102 @@ class ServerErrorSpec extends Specification {
 
     void "test 500 error"() {
         when:
-        myClient.fiveHundred()
+        myClient.clientNonReactiveControllerWithServerError()
 
         then:
-        def e = thrown(HttpClientResponseException)
+        HttpClientResponseException e = thrown()
         e.message == "Bad things happening"
     }
 
     void "test 500 error - single"() {
         when:
-        myClient.fiveHundredSingle().blockingGet()
+        Mono.from(myClient.clientSingleResultControllerWithServerError()).block()
 
         then:
-        def e = thrown(HttpClientResponseException)
+        HttpClientResponseException e = thrown()
         e.message == "Bad things happening"
     }
 
     void "test exception error"() {
         when:
-        myClient.exception()
+        myClient.clientNonReactiveControllerError()
 
         then:
-        def e = thrown(HttpClientResponseException)
-        e.message == "Internal Server Error: Bad things happening"
+        HttpClientResponseException e = thrown()
+        e.response.getBody(Map).get()._embedded.errors[0].message == "Internal Server Error: Bad things happening"
     }
 
-    void "test exception error - single"() {
+    void "test exception error - mono"() {
         when:
-        myClient.exceptionSingle().blockingGet()
+        Mono.from(myClient.clientSingleResultControllerError()).block()
 
         then:
-        def e = thrown(HttpClientResponseException)
-        e.message == "Internal Server Error: Bad things happening"
+        HttpClientResponseException e = thrown()
+        e.response.getBody(Map).get()._embedded.errors[0].message == "Internal Server Error: Bad things happening"
     }
 
     void "test single error"() {
         when:
-        myClient.singleError()
+        myClient.clientNonReactiveControllerSingleResultError()
 
         then:
-        def e = thrown(HttpClientResponseException)
-        e.message == "Internal Server Error: Bad things happening"
+        HttpClientResponseException e = thrown()
+        e.response.getBody(Map).get()._embedded.errors[0].message == "Internal Server Error: Bad things happening"
     }
 
     void "test single error - single"() {
         when:
-        myClient.singleErrorSingle().blockingGet()
+        Mono.from(myClient.clientSingleResultControllerSingleResultError()).block()
 
         then:
-        def e = thrown(HttpClientResponseException)
-        e.message == "Internal Server Error: Bad things happening"
+        HttpClientResponseException e = thrown()
+        e.response.getBody(Map).get()._embedded.errors[0].message == "Internal Server Error: Bad things happening"
     }
 
+    void "test flowable error - flowable"() {
+        when:
+        HttpResponse<?> response = Flux.from(myClient.clientReactiveSequenceControllerReactiveSequenceError())
+                .onErrorResume(throwable -> {
+            if (throwable instanceof HttpClientResponseException) {
+                return Flux.just(HttpResponse.status(((HttpClientResponseException) throwable).status).body(throwable.message))
+            }
+            throw throwable
+        }).blockFirst()
+
+        then:
+        response.body.isPresent()
+        response.body.get() == "Internal Server Error"
+    }
+
+    @Requires(property = 'spec.name', value = 'ServerErrorSpec')
     @Client('/server-errors')
     static interface MyClient {
         @Get('/five-hundred')
-        HttpResponse fiveHundred()
+        HttpResponse clientNonReactiveControllerWithServerError()
 
         @Get('/five-hundred')
-        Single fiveHundredSingle()
+        @SingleResult
+        Publisher clientSingleResultControllerWithServerError()
 
         @Get('/exception')
-        HttpResponse exception()
+        HttpResponse clientNonReactiveControllerError()
 
         @Get('/exception')
-        Single exceptionSingle()
+        @SingleResult
+        Publisher clientSingleResultControllerError()
 
-        @Get('/single-error')
-        HttpResponse singleError()
+        @Get('/single-result-error')
+        HttpResponse clientNonReactiveControllerSingleResultError()
 
-        @Get('/single-error')
-        Single singleErrorSingle()
+        @Get('/single-result-error')
+        @SingleResult
+        Publisher clientSingleResultControllerSingleResultError()
+
+        @Get('/flowable-error')
+        Publisher clientReactiveSequenceControllerReactiveSequenceError()
     }
 
+    @Requires(property = 'spec.name', value = 'ServerErrorSpec')
     @Controller('/server-errors')
     static class ServerErrorController {
 
@@ -118,13 +146,19 @@ class ServerErrorSpec extends Specification {
         }
 
         @Get('/exception')
-        HttpResponse exception() {
+        HttpResponse error() {
             throw new RuntimeException("Bad things happening")
         }
 
-        @Get('/single-error')
-        Single singleError() {
-            Single.error(new RuntimeException("Bad things happening"))
+        @Get('/single-result-error')
+        @SingleResult
+        Publisher singleResultError() {
+            Mono.error(new RuntimeException("Bad things happening"))
+        }
+
+        @Get('/flowable-error')
+        Publisher reactiveSequenceError() {
+            Flux.error(new RuntimeException("Bad things happening"))
         }
     }
 }

@@ -16,13 +16,13 @@
 package io.micronaut.inject.provider;
 
 import io.micronaut.core.annotation.Nullable;
-import org.atinject.javaxtck.auto.Drivers;
-import org.atinject.javaxtck.auto.Seat;
-import org.atinject.javaxtck.auto.Tire;
+import org.atinject.jakartatck.auto.Drivers;
+import org.atinject.jakartatck.auto.Seat;
+import org.atinject.jakartatck.auto.Tire;
 
-import javax.inject.Named;
-import javax.inject.Provider;
-import javax.inject.Singleton;
+import jakarta.inject.Named;
+import jakarta.inject.Provider;
+import jakarta.inject.Singleton;
 
 @Singleton
 public class Seats {

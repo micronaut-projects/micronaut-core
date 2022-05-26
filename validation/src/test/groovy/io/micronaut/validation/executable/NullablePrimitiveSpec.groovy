@@ -118,7 +118,7 @@ class NullablePrimitiveSpec extends AbstractTypeElementSpec {
         buildTypeElement("""
             package test;
 
-            @javax.inject.Singleton
+            @jakarta.inject.Singleton
             class Foo {
                 void bar(${annotation} int n) {
                 }

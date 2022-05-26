@@ -1,7 +1,7 @@
 package io.micronaut.docs.config.builder
 
-import io.kotlintest.shouldBe
-import io.kotlintest.specs.StringSpec
+import io.kotest.matchers.shouldBe
+import io.kotest.core.spec.style.StringSpec
 import io.micronaut.context.ApplicationContext
 
 internal class VehicleSpec : StringSpec({

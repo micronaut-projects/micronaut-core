@@ -12,12 +12,11 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
+import jakarta.inject.Singleton
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 import spock.util.environment.RestoreSystemProperties
-
-import javax.inject.Singleton
 
 class ClientBootstrapSpec extends Specification {
 

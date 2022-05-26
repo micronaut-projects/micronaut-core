@@ -18,8 +18,12 @@ package io.micronaut.inject.ast;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.inject.ast.beans.BeanElementBuilder;
 
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -37,6 +41,38 @@ public interface MethodElement extends MemberElement {
     ClassElement getReturnType();
 
     /**
+     * @return The type arguments declared on this method.
+     */
+    default List<? extends GenericPlaceholderElement> getDeclaredTypeVariables() {
+        return Collections.emptyList();
+    }
+
+    /**
+     * <p>Returns the receiver type of this executable, or empty if the method has no receiver type.</p>
+     *
+     * <p>A MethodElement which is an instance method, or a constructor of an inner class, has a receiver type derived from the declaring type.</p>
+     *
+     * <p>A MethodElement which is a static method, or a constructor of a non-inner class, or an initializer (static or instance), has no receiver type.</p>
+     *
+     * @return The receiver type for the method if one exists.
+     * @since 3.1.0
+     */
+    default Optional<ClassElement> getReceiverType() {
+        return Optional.empty();
+    }
+
+    /**
+     * Returns the types declared in the {@code throws} declaration of a method.
+     *
+     * @return The {@code throws} types, if any. Never {@code null}.
+     * @since 3.1.0
+     */
+    @NonNull
+    default ClassElement[] getThrownTypes() {
+        return ClassElement.ZERO_CLASS_ELEMENTS;
+    }
+
+    /**
      * @return The method parameters
      */
     @NonNull ParameterElement[] getParameters();
@@ -48,6 +84,19 @@ public interface MethodElement extends MemberElement {
      * @since 2.3.0
      */
     @NonNull MethodElement withNewParameters(@NonNull ParameterElement...newParameters);
+
+    /**
+     * This method adds an associated bean using this method element as the originating element.
+     *
+     * <p>Note that this method can only be called on classes being directly compiled by Micronaut. If the ClassElement is
+     * loaded from pre-compiled code an {@link UnsupportedOperationException} will be thrown.</p>
+     * @param type The type of the bean
+     * @return A bean builder
+     */
+    default @NonNull
+    BeanElementBuilder addAssociatedBean(@NonNull ClassElement type) {
+        throw new UnsupportedOperationException("Only classes being processed from source code can define associated beans");
+    }
 
     /**
      * If {@link #isSuspend()} returns true this method exposes the continuation parameter in addition to the other parameters of the method.
@@ -104,6 +153,16 @@ public interface MethodElement extends MemberElement {
         String typeString = simple ? getReturnType().getSimpleName() : getReturnType().getName();
         String args = Arrays.stream(getParameters()).map(arg -> simple ? arg.getType().getSimpleName() : arg.getType().getName() + " " + arg.getName()).collect(Collectors.joining(","));
         return typeString + " " + getName() + "(" + args + ")";
+    }
+
+    /**
+     * Checks if this method element overrides another.
+     * @param overridden Possible overridden method
+     * @return true if this overrides passed method element
+     * @since 3.1
+     */
+    default boolean overrides(@NonNull MethodElement overridden) {
+        return false;
     }
 
     /**

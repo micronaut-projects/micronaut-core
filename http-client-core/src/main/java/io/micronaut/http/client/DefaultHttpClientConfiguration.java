@@ -18,11 +18,10 @@ package io.micronaut.http.client;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Primary;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.ssl.ClientSslConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
-
-import io.micronaut.core.annotation.Nullable;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 /**
  * The default configuration if no explicit configuration is specified for an HTTP client.

@@ -16,9 +16,14 @@
 package io.micronaut.http.client
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
+import io.micronaut.http.BasicAuth
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
 import io.micronaut.runtime.server.EmbeddedServer
-import io.reactivex.Flowable
+import org.reactivestreams.Publisher
+import reactor.core.publisher.Flux
 import spock.lang.Specification
 
 class BasicAuthSpec extends Specification {
@@ -36,13 +41,14 @@ class BasicAuthSpec extends Specification {
 
     void "test user in absolute URL"() {
         given:
-        EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
-        ApplicationContext ctx = server.getApplicationContext()
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
+                'spec.name': 'BasicAuthSpec'
+        ])
+        ApplicationContext ctx = server.applicationContext
+        HttpClient httpClient = ctx.createBean(HttpClient, new URL("http://sherlock:password@localhost:${server.port}"))
 
-        def httpClient = ctx.createBean(RxHttpClient, new URL("http://sherlock:password@localhost:${server.port}"))
-        def client = httpClient.retrieve("/basic-auth")
         when:
-        String resp = client.blockingFirst()
+        String resp = httpClient.toBlocking().retrieve("/basicauth")
 
         then:
         resp == "sherlock:password"
@@ -50,5 +56,16 @@ class BasicAuthSpec extends Specification {
         cleanup:
         httpClient.close()
         ctx.close()
+        server.close()
+    }
+
+    @Requires(property = 'spec.name', value = 'BasicAuthSpec')
+    @Controller("/basicauth")
+    static class BasicAuthController {
+
+        @Get
+        String index(BasicAuth basicAuth) {
+            basicAuth.getUsername() + ":" + basicAuth.getPassword()
+        }
     }
 }

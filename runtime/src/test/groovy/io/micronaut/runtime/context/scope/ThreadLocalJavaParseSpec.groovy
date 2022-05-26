@@ -15,9 +15,9 @@
  */
 package io.micronaut.runtime.context.scope
 
+import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.inject.BeanDefinition
-
-import javax.inject.Scope
+import jakarta.inject.Scope
 
 class ThreadLocalJavaParseSpec extends io.micronaut.annotation.processing.test.AbstractTypeElementSpec {
 
@@ -35,7 +35,7 @@ class ThreadLocalBean {
 ''')
 
         then:
-        beanDefinition.getAnnotationNameByStereotype(Scope).get() == ThreadLocal.name
+        beanDefinition.getAnnotationNameByStereotype(AnnotationUtil.SCOPE).get() == ThreadLocal.name
 
     }
 }

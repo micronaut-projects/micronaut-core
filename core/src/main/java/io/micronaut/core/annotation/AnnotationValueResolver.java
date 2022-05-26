@@ -129,6 +129,44 @@ public interface AnnotationValueResolver extends ValueResolver<CharSequence> {
     OptionalInt intValue(@NonNull String member);
 
     /**
+     * The byte value of the given member.
+     *
+     * @return An {@link Optional} of {@link Byte}
+     * @since 3.0.0
+     */
+    default Optional<Byte> byteValue() {
+        return byteValue(AnnotationMetadata.VALUE_MEMBER);
+    }
+
+    /**
+     * The byte value of the given member.
+     *
+     * @param member The annotation member
+     * @return An {@link Optional} of {@link Byte}
+     * @since 3.0.0
+     */
+    Optional<Byte> byteValue(@NonNull String member);
+
+    /**
+     * The char value of the given member.
+     *
+     * @return An {@link Optional} of {@link Character}
+     * @since 3.0.0
+     */
+    default Optional<Character> charValue() {
+        return charValue(AnnotationMetadata.VALUE_MEMBER);
+    }
+
+    /**
+     * The char value of the given member.
+     *
+     * @param member The annotation member
+     * @return An {@link Optional} of {@link Character}
+     * @since 3.0.0
+     */
+    Optional<Character> charValue(@NonNull String member);
+
+    /**
      * The integer value of the given member.
      *
      * @return An {@link OptionalInt}
@@ -146,12 +184,29 @@ public interface AnnotationValueResolver extends ValueResolver<CharSequence> {
     OptionalLong longValue(@NonNull String member);
 
     /**
-     * The integer value of the given member.
+     * The long value of the given member.
      *
      * @return An {@link OptionalLong}
      */
     default OptionalLong longValue() {
         return longValue(AnnotationMetadata.VALUE_MEMBER);
+    }
+
+    /**
+     * The short value of the given member.
+     *
+     * @param member The annotation member
+     * @return An {@link Optional} of {@link Short}
+     */
+    Optional<Short> shortValue(@NonNull String member);
+
+    /**
+     * The integer value of the given member.
+     *
+     * @return An {@link Optional} of
+     */
+    default Optional<Short> shortValue() {
+        return shortValue(AnnotationMetadata.VALUE_MEMBER);
     }
 
     /**
@@ -161,6 +216,25 @@ public interface AnnotationValueResolver extends ValueResolver<CharSequence> {
      * @return An {@link OptionalDouble}
      */
     OptionalDouble doubleValue(@NonNull String member);
+
+    /**
+     * The float value of the given member.
+     *
+     * @return An {@link Optional} of {@link Float}
+     * @since 3.0.0
+     */
+    default Optional<Float> floatValue() {
+        return floatValue(AnnotationMetadata.VALUE_MEMBER);
+    }
+
+    /**
+     * The double value of the given member.
+     *
+     * @param member The annotation member
+     * @return An {@link OptionalDouble}
+     * @since 3.0.0
+     */
+    Optional<Float> floatValue(@NonNull String member);
 
     /**
      * The double value of the given member.
@@ -205,22 +279,173 @@ public interface AnnotationValueResolver extends ValueResolver<CharSequence> {
         return booleanValue(AnnotationMetadata.VALUE_MEMBER);
     }
 
-
     /**
-     * The string value of the given member.
+     * The string values for the given member.
      *
      * @param member The annotation member
-     * @return An {@link OptionalInt}
+     * @return An array of {@link String}
      */
     @NonNull String[] stringValues(@NonNull String member);
 
     /**
-     * The double value of the given member.
+     * The string values for the given member.
      *
-     * @return An {@link OptionalInt}
+     * @return An array of {@link String}
      */
     default @NonNull String[] stringValues() {
         return stringValues(AnnotationMetadata.VALUE_MEMBER);
+    }
+
+    /**
+     * The boolean[] value for the given member.
+     *
+     * @param member The annotation member
+     * @return An array of {@code boolean}
+     * @since 3.0.0
+     */
+    @NonNull boolean[] booleanValues(@NonNull String member);
+
+    /**
+     * The boolean[] value for the given member.
+     *
+     * @return An array of {@code boolean}
+     * @since 3.0.0
+     */
+    default @NonNull boolean[] booleanValues() {
+        return booleanValues(AnnotationMetadata.VALUE_MEMBER);
+    }
+
+    /**
+     * The byte[] value for the given member.
+     *
+     * @param member The annotation member
+     * @return An array of {@code byte}
+     * @since 3.0.0
+     */
+    @NonNull byte[] byteValues(@NonNull String member);
+
+    /**
+     * The byte[] value for the given member.
+     *
+     * @return An array of {@code byte}
+     * @since 3.0.0
+     */
+    default @NonNull byte[] byteValues() {
+        return byteValues(AnnotationMetadata.VALUE_MEMBER);
+    }
+
+    /**
+     * The char[] value for the given member.
+     *
+     * @param member The annotation member
+     * @return An array of {@code char}
+     * @since 3.0.0
+     */
+    @NonNull char[] charValues(@NonNull String member);
+
+    /**
+     * The char[] value for the given member.
+     *
+     * @return An array of {@code char}
+     * @since 3.0.0
+     */
+    default @NonNull char[] charValues() {
+        return charValues(AnnotationMetadata.VALUE_MEMBER);
+    }
+
+    /**
+     * The int[] value for the given member.
+     *
+     * @param member The annotation member
+     * @return An array of {@code int}
+     * @since 3.0.0
+     */
+    @NonNull int[] intValues(@NonNull String member);
+
+    /**
+     * The int[] value for the given member.
+     *
+     * @return An array of {@code int}
+     * @since 3.0.0
+     */
+    default @NonNull int[] intValues() {
+        return intValues(AnnotationMetadata.VALUE_MEMBER);
+    }
+
+    /**
+     * The double[] value for the given member.
+     *
+     * @param member The annotation member
+     * @return An array of {@code double}
+     * @since 3.0.0
+     */
+    @NonNull double[] doubleValues(@NonNull String member);
+
+    /**
+     * The double[] value for the given member.
+     *
+     * @return An array of {@code double}
+     * @since 3.0.0
+     */
+    default @NonNull double[] doubleValues() {
+        return doubleValues(AnnotationMetadata.VALUE_MEMBER);
+    }
+
+    /**
+     * The long[] value for the given member.
+     *
+     * @param member The annotation member
+     * @return An array of {@code long}
+     * @since 3.0.0
+     */
+    @NonNull long[] longValues(@NonNull String member);
+
+    /**
+     * The long[] value for the given member.
+     *
+     * @return An array of {@code long}
+     * @since 3.0.0
+     */
+    default @NonNull long[] longValues() {
+        return longValues(AnnotationMetadata.VALUE_MEMBER);
+    }
+
+    /**
+     * The float[] value for the given member.
+     *
+     * @param member The annotation member
+     * @return An array of {@code float}
+     * @since 3.0.0
+     */
+    @NonNull float[] floatValues(@NonNull String member);
+
+    /**
+     * The float[] value for the given member.
+     *
+     * @return An array of {@code float}
+     * @since 3.0.0
+     */
+    default @NonNull float[] floatValues() {
+        return floatValues(AnnotationMetadata.VALUE_MEMBER);
+    }
+
+    /**
+     * The short[] value for the given member.
+     *
+     * @param member The annotation member
+     * @return An array of {@code short}
+     * @since 3.0.0
+     */
+    @NonNull short[] shortValues(@NonNull String member);
+
+    /**
+     * The short[] value for the given member.
+     *
+     * @return An array of {@code short}
+     * @since 3.0.0
+     */
+    default @NonNull short[] shortValues() {
+        return shortValues(AnnotationMetadata.VALUE_MEMBER);
     }
 
     /**

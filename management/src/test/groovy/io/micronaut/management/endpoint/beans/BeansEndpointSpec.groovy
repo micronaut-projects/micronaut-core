@@ -17,10 +17,13 @@ package io.micronaut.management.endpoint.beans
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
+import io.micronaut.http.HttpResponse
+import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.http.HttpStatus
+import io.micronaut.inject.writer.BeanDefinitionWriter
+import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Specification
-import io.micronaut.http.client.*
 
 class BeansEndpointSpec extends Specification {
 
@@ -31,19 +34,19 @@ class BeansEndpointSpec extends Specification {
     void "test beans endpoint"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['endpoints.beans.sensitive': false], Environment.TEST)
-        RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+        HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         when:
-        def response = rxClient.exchange("/beans", Map).blockingFirst()
+        HttpResponse<Map> response = rxClient.toBlocking().exchange("/beans", Map)
         Map result = response.body()
         Map<String, Map<String, Object>> beans = result.beans
 
         then:
         response.code() == HttpStatus.OK.code
-        beans["io.micronaut.management.endpoint.beans.\$BeansEndpointDefinition"].dependencies.contains("io.micronaut.context.BeanContext")
-        beans["io.micronaut.management.endpoint.beans.\$BeansEndpointDefinition"].dependencies.contains("io.micronaut.management.endpoint.beans.BeanDefinitionDataCollector")
-        beans["io.micronaut.management.endpoint.beans.\$BeansEndpointDefinition"].scope == "endpoint"
-        beans["io.micronaut.management.endpoint.beans.\$BeansEndpointDefinition"].type == "io.micronaut.management.endpoint.beans.BeansEndpoint"
+        beans["io.micronaut.management.endpoint.beans.\$BeansEndpoint" + BeanDefinitionWriter.CLASS_SUFFIX].dependencies.contains("io.micronaut.context.BeanContext")
+        beans["io.micronaut.management.endpoint.beans.\$BeansEndpoint" + BeanDefinitionWriter.CLASS_SUFFIX].dependencies.contains("io.micronaut.management.endpoint.beans.BeanDefinitionDataCollector")
+        beans["io.micronaut.management.endpoint.beans.\$BeansEndpoint" + BeanDefinitionWriter.CLASS_SUFFIX].scope == AnnotationUtil.SINGLETON
+        beans["io.micronaut.management.endpoint.beans.\$BeansEndpoint" + BeanDefinitionWriter.CLASS_SUFFIX].type == "io.micronaut.management.endpoint.beans.BeansEndpoint"
 
         cleanup:
         rxClient.close()

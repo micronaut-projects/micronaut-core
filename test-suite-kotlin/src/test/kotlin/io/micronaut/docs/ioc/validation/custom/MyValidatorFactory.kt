@@ -18,7 +18,7 @@ package io.micronaut.docs.ioc.validation.custom
 // tag::imports[]
 import io.micronaut.context.annotation.Factory
 import io.micronaut.validation.validator.constraints.ConstraintValidator
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 // end::imports[]
 
 // tag::class[]

@@ -132,7 +132,7 @@ interface MyInterface{
 
 
 @Stub
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 interface MyBean extends MyInterface {
 }
 

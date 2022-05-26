@@ -57,13 +57,14 @@ class ExecutorServiceConfigSpec extends Specification {
 
         when:
         ThreadPoolExecutor poolExecutor = ctx.getBean(ThreadPoolExecutor, Qualifiers.byName("one"))
-        ForkJoinPool forkJoinPool = ctx.getBean(ForkJoinPool)
+        ExecutorService forkJoinPool = ctx.getBean(ExecutorService, Qualifiers.byName("two"))
 
         then:
+        forkJoinPool instanceof ForkJoinPool
         executorServices.size() == 4
         poolExecutor.corePoolSize == 5
         ctx.getBean(ExecutorService.class, Qualifiers.byName(TaskExecutors.IO)) // the default IO executor
-        ctx.getBean(ScheduledExecutorService.class, Qualifiers.byName(TaskExecutors.SCHEDULED)) // the default IO executor
+        ctx.getBean(ExecutorService.class, Qualifiers.byName(TaskExecutors.SCHEDULED)) // the default IO executor
         forkJoinPool == ctx.getBean(ExecutorService.class, Qualifiers.byName("two"))
         poolExecutor == ctx.getBean(ExecutorService.class, Qualifiers.byName("one"))
 
@@ -109,13 +110,13 @@ class ExecutorServiceConfigSpec extends Specification {
         when:
         Collection<ExecutorService> executorServices = ctx.getBeansOfType(ExecutorService.class)
         ThreadPoolExecutor poolExecutor = ctx.getBean(ThreadPoolExecutor, Qualifiers.byName("one"))
-        ForkJoinPool forkJoinPool = ctx.getBean(ForkJoinPool)
+        ExecutorService forkJoinPool = ctx.getBean(ExecutorService, Qualifiers.byName("two"))
 
         then:
         executorServices.size() == 4
         poolExecutor.corePoolSize == 5
         ctx.getBean(ExecutorService.class, Qualifiers.byName(TaskExecutors.IO)) instanceof ThreadPoolExecutor
-        ctx.getBean(ScheduledExecutorService.class, Qualifiers.byName(TaskExecutors.SCHEDULED)) instanceof ScheduledExecutorService
+        ctx.getBean(ExecutorService.class, Qualifiers.byName(TaskExecutors.SCHEDULED)) instanceof ScheduledExecutorService
         forkJoinPool == ctx.getBean(ExecutorService.class, Qualifiers.byName("two"))
         poolExecutor == ctx.getBean(ExecutorService.class, Qualifiers.byName("one"))
 

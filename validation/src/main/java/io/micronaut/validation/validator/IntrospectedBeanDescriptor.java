@@ -21,7 +21,8 @@ import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanProperty;
 import io.micronaut.core.util.ArgumentUtils;
 
-import javax.validation.*;
+import javax.validation.Constraint;
+import javax.validation.Valid;
 import javax.validation.metadata.*;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.ElementType;

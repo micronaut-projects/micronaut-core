@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.failures.ctorcirculardependency;
 
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 public class C {
     @Inject

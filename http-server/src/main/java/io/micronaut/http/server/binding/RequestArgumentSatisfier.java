@@ -30,8 +30,8 @@ import io.micronaut.http.bind.binders.RequestBeanAnnotationBinder;
 import io.micronaut.web.router.NullArgument;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.UnresolvedArgument;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -117,8 +117,9 @@ public class RequestArgumentSatisfier {
 
                     if (bindingResult.isPresentAndSatisfied()) {
                         value = bindingResult.get();
+                    } else if (bindingResult.isSatisfied() && argument.isNullable()) {
+                        value = NullArgument.INSTANCE;
                     }
-
                 } else {
                     value = getValueForBlockingBodyArgumentBinder(request, argumentBinder, conversionContext);
                 }

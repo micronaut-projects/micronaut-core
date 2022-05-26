@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.field.nullableinjection
 
-import javax.inject.Inject
+import jakarta.inject.Inject
 
 class B {
     internal var a: A? = null

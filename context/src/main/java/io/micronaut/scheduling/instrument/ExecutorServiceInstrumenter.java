@@ -18,8 +18,8 @@ package io.micronaut.scheduling.instrument;
 import io.micronaut.context.event.BeanCreatedEvent;
 import io.micronaut.context.event.BeanCreatedEventListener;
 import io.micronaut.core.annotation.Internal;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;

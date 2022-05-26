@@ -9,7 +9,7 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.bind.binders.TypedRequestArgumentBinder
 import io.micronaut.jackson.serialize.JacksonObjectSerializer
 import java.util.Optional
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 @Singleton
 class ShoppingCartRequestArgumentBinder(private val objectSerializer: JacksonObjectSerializer) :

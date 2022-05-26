@@ -15,21 +15,23 @@
  */
 package io.micronaut.http.netty.channel;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.ServerChannel;
 import io.netty.channel.kqueue.KQueue;
 import io.netty.channel.kqueue.KQueueEventLoopGroup;
+import io.netty.channel.kqueue.KQueueServerDomainSocketChannel;
 import io.netty.channel.kqueue.KQueueServerSocketChannel;
 import io.netty.channel.kqueue.KQueueSocketChannel;
 import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.socket.SocketChannel;
-
-import javax.inject.Named;
-import javax.inject.Singleton;
+import io.netty.channel.unix.ServerDomainSocketChannel;
+import jakarta.inject.Named;
+import jakarta.inject.Singleton;
 
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadFactory;
@@ -88,8 +90,26 @@ public class KQueueEventLoopGroupFactory implements EventLoopGroupFactory {
     }
 
     @Override
+    public Class<? extends ServerDomainSocketChannel> domainServerSocketChannelClass() throws UnsupportedOperationException {
+        try {
+            return KQueueServerDomainSocketChannel.class;
+        } catch (NoClassDefFoundError e) {
+            throw new UnsupportedOperationException(e);
+        }
+    }
+
+    @Override
     public KQueueServerSocketChannel serverSocketChannelInstance(EventLoopGroupConfiguration configuration) {
         return new KQueueServerSocketChannel();
+    }
+
+    @Override
+    public ServerChannel domainServerSocketChannelInstance(@Nullable EventLoopGroupConfiguration configuration) {
+        try {
+            return new KQueueServerDomainSocketChannel();
+        } catch (NoClassDefFoundError e) {
+            throw new UnsupportedOperationException(e);
+        }
     }
 
     @NonNull

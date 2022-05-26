@@ -48,7 +48,7 @@ snippet::io.micronaut.docs.qualifiers.annotationmember.V6Engine[tags="class",ind
 
 snippet::io.micronaut.docs.qualifiers.annotationmember.V8Engine[tags="class",indent=0]
 
-<1> Here the `value` member is set to 8 for the `V6Engine` type
+<1> Here the `value` member is set to 8 for the `V8Engine` type
 <2> The class implements an `Engine` interface
 
 You can then use the `@Cylinders` qualifier on any injection point to select the correct bean to inject. For example:

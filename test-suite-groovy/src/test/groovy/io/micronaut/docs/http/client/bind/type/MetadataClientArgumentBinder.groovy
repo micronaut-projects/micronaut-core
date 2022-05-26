@@ -8,7 +8,7 @@ import io.micronaut.http.MutableHttpRequest
 import io.micronaut.http.client.bind.ClientRequestUriContext
 import io.micronaut.http.client.bind.TypedClientArgumentRequestBinder
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 @Singleton
 class MetadataClientArgumentBinder implements TypedClientArgumentRequestBinder<Metadata> {

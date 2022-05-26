@@ -17,7 +17,7 @@ package io.micronaut.inject.generics;
 
 import io.micronaut.core.convert.ConversionService;
 
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 public class WildCardInject {
     // tests injecting field

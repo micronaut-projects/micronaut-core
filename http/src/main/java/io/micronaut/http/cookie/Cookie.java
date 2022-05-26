@@ -171,8 +171,11 @@ public interface Cookie extends Comparable<Cookie>, Serializable {
         configuration.getCookieDomain().ifPresent(this::domain);
         configuration.getCookieMaxAge().ifPresent(this::maxAge);
         configuration.isCookieHttpOnly().ifPresent(this::httpOnly);
-        if (isSecure) {
-            configuration.isCookieSecure().ifPresent(this::secure);
+        final Optional<Boolean> secureConfiguration = configuration.isCookieSecure();
+        if (secureConfiguration.isPresent()) {
+            secure(secureConfiguration.get());
+        } else {
+            secure(isSecure);
         }
         configuration.getCookieSameSite().ifPresent(this::sameSite);
         return this;

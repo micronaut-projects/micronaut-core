@@ -16,14 +16,15 @@
 package io.micronaut.docs.client.filter;
 
 import io.micronaut.context.env.Environment;
-import io.micronaut.http.client.RxHttpClient;
+import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import javax.inject.Inject;
+import jakarta.inject.Inject;
+import reactor.core.publisher.Flux;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -32,12 +33,12 @@ public class GoogleAuthFilterSpec {
 
     @Inject
     @Client("/")
-    RxHttpClient client;
+    HttpClient client;
 
     @Test
     void testApplyGoogleAuthFilter() {
         HttpClientException e = Assertions.assertThrows(HttpClientException.class, () ->
-                client.exchange("/google-auth/api/test").blockingFirst()
+                client.toBlocking().exchange("/google-auth/api/test")
         );
         String message = e.getMessage();
         assertTrue(

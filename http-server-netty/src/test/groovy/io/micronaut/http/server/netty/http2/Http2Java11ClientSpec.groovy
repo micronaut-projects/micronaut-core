@@ -1,18 +1,14 @@
 package io.micronaut.http.server.netty.http2
 
 import io.micronaut.context.annotation.Property
-import io.micronaut.http.annotation.Body
-import io.micronaut.http.annotation.Consumes
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Get
-import io.micronaut.http.annotation.Put
+import io.micronaut.http.annotation.*
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
+import jakarta.inject.Inject
 import spock.lang.Issue
 import spock.lang.Requires
 import spock.lang.Specification
 
-import javax.inject.Inject
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
@@ -28,9 +24,9 @@ import static java.util.concurrent.CompletableFuture.supplyAsync
 
 @MicronautTest
 @Property(name = "micronaut.server.http-version", value = "2.0")
-@Property(name = "micronaut.ssl.enabled", value = "true")
-@Property(name = "micronaut.ssl.port", value = "-1")
-@Property(name = "micronaut.ssl.buildSelfSigned", value = "true")
+@Property(name = "micronaut.server.ssl.enabled", value = "true")
+@Property(name = "micronaut.server.ssl.port", value = "-1")
+@Property(name = "micronaut.server.ssl.buildSelfSigned", value = "true")
 @Property(name = "micronaut.server.netty.log-level", value = "TRACE")
 @Property(name = "micronaut.http.client.log-level", value = "TRACE")
 @Requires({ jvm.current.isJava11Compatible() })

@@ -21,6 +21,7 @@ import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
 import io.micronaut.core.value.OptionalValues;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.annotation.AnnotatedElementValidator;
@@ -35,16 +36,18 @@ import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.AbstractAnnotationValueVisitor8;
+import javax.lang.model.util.ElementFilter;
 import javax.lang.model.util.Elements;
+import javax.lang.model.util.Types;
 import javax.tools.Diagnostic;
 import java.lang.annotation.Annotation;
+import java.lang.annotation.Inherited;
 import java.lang.annotation.Repeatable;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.reflect.Array;
 import java.util.*;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * A {@link io.micronaut.core.annotation.AnnotationMetadata} for builder for Java to be used at compile time.
@@ -54,7 +57,7 @@ import java.util.stream.Stream;
  */
 public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<Element, AnnotationMirror> {
 
-    private static final Map<String, Map<Element, javax.lang.model.element.AnnotationValue>> ANNOTATION_DEFAULTS = new HashMap<>();
+    private static final Map<ExecutableElement, List<ExecutableElement>> OVERRIDDEN_METHOD_CACHE = new ConcurrentLinkedHashMap.Builder<ExecutableElement, List<ExecutableElement>>().maximumWeightedCapacity(100).build();
 
     private final Elements elementUtils;
     private final Messager messager;
@@ -164,6 +167,61 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     }
 
     @Override
+    protected boolean isInheritedAnnotation(@NonNull AnnotationMirror annotationMirror) {
+        final List<? extends AnnotationMirror> annotationMirrors = annotationMirror.getAnnotationType().asElement().getAnnotationMirrors();
+        for (AnnotationMirror mirror : annotationMirrors) {
+            if (getAnnotationTypeName(mirror).equals(Inherited.class.getName())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    protected boolean isInheritedAnnotationType(@NonNull Element annotationType) {
+        for (AnnotationMirror mirror : annotationType.getAnnotationMirrors()) {
+            if (getAnnotationTypeName(mirror).equals(Inherited.class.getName())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    protected Map<String, Element> getAnnotationMembers(String annotationType) {
+        final Element element = getAnnotationMirror(annotationType).orElse(null);
+        if (element != null && element.getKind() == ElementKind.ANNOTATION_TYPE) {
+            final List<? extends Element> elements = element.getEnclosedElements();
+            if (elements.isEmpty()) {
+                return Collections.emptyMap();
+            } else {
+                Map<String, Element> members = new LinkedHashMap<>(elements.size());
+                for (Element method : elements) {
+                    members.put(method.getSimpleName().toString(), method);
+                }
+                return Collections.unmodifiableMap(members);
+            }
+        }
+        return Collections.emptyMap();
+    }
+
+    @Override
+    protected boolean hasSimpleAnnotation(Element element, String simpleName) {
+        if (element != null) {
+            final List<? extends AnnotationMirror> mirrors = element.getAnnotationMirrors();
+            for (AnnotationMirror mirror : mirrors) {
+                final String s = mirror.getAnnotationType()
+                        .asElement()
+                        .getSimpleName().toString();
+                if (s.equalsIgnoreCase(simpleName)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    @Override
     protected boolean isMethodOrClassElement(Element element) {
         return element instanceof TypeElement || element instanceof ExecutableElement;
     }
@@ -190,6 +248,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
         List<AnnotationMirror> expanded = new ArrayList<>(annotationMirrors.size());
         for (AnnotationMirror annotation: annotationMirrors) {
             boolean repeatable = false;
+            boolean hasOtherMembers = false;
             for (Map.Entry<? extends ExecutableElement, ? extends AnnotationValue> entry: annotation.getElementValues().entrySet()) {
                 if (entry.getKey().getSimpleName().toString().equals("value")) {
                     Object value = entry.getValue().getValue();
@@ -205,13 +264,24 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
                             }
                         }
                     }
+                } else {
+                    hasOtherMembers = true;
                 }
             }
-            if (!repeatable) {
+            if (!repeatable || hasOtherMembers) {
                 expanded.add(annotation);
             }
         }
         return expanded;
+    }
+
+    @Override
+    protected boolean isExcludedAnnotation(@NonNull Element element, @NonNull String annotationName) {
+        if (annotationName.startsWith("java.lang.annotation") && element.getKind() == ElementKind.ANNOTATION_TYPE) {
+            return false;
+        } else {
+            return super.isExcludedAnnotation(element, annotationName);
+        }
     }
 
     @Override
@@ -225,6 +295,9 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
         if (element instanceof TypeElement) {
             List<Element> hierarchy = new ArrayList<>();
             hierarchy.add(element);
+            if (element.getKind() == ElementKind.ANNOTATION_TYPE) {
+                return hierarchy;
+            }
             populateTypeHierarchy(element, hierarchy);
             Collections.reverse(hierarchy);
             return hierarchy;
@@ -240,9 +313,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
             } else {
                 hierarchy = new ArrayList<>();
             }
-            if (hasAnnotation(executableElement, Override.class)) {
-                hierarchy.addAll(findOverriddenMethods(executableElement));
-            }
+            hierarchy.addAll(findOverriddenMethods(executableElement));
             hierarchy.add(element);
             return hierarchy;
         } else if (element instanceof VariableElement) {
@@ -251,11 +322,9 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
             Element enclosingElement = variable.getEnclosingElement();
             if (enclosingElement instanceof ExecutableElement) {
                 ExecutableElement executableElement = (ExecutableElement) enclosingElement;
-                if (hasAnnotation(executableElement, Override.class)) {
-                    int variableIdx = executableElement.getParameters().indexOf(variable);
-                    for (ExecutableElement overridden: findOverriddenMethods(executableElement)) {
-                        hierarchy.add(overridden.getParameters().get(variableIdx));
-                    }
+                int variableIdx = executableElement.getParameters().indexOf(variable);
+                for (ExecutableElement overridden: findOverriddenMethods(executableElement)) {
+                    hierarchy.add(overridden.getParameters().get(variableIdx));
                 }
             }
             hierarchy.add(variable);
@@ -373,31 +442,23 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
 
     @Override
     protected Map<? extends Element, ?> readAnnotationDefaultValues(String annotationTypeName, Element element) {
-        Map<String, Map<Element, AnnotationValue>> defaults = JavaAnnotationMetadataBuilder.ANNOTATION_DEFAULTS;
+        Map<Element, AnnotationValue> defaultValues = new LinkedHashMap<>();
         if (element instanceof TypeElement) {
             TypeElement annotationElement = (TypeElement) element;
-            String annotationName = annotationElement.getQualifiedName().toString();
-            if (!defaults.containsKey(annotationName)) {
-
-                Map<Element, AnnotationValue> defaultValues = new LinkedHashMap<>();
-                final List<? extends Element> allMembers = elementUtils.getAllMembers(annotationElement);
-
-                allMembers
-                        .stream()
-                        .filter(member -> member.getEnclosingElement().equals(annotationElement))
-                        .filter(ExecutableElement.class::isInstance)
-                        .map(ExecutableElement.class::cast)
-                        .filter(this::isValidDefaultValue)
-                        .forEach(executableElement -> {
-                                    final AnnotationValue defaultValue = executableElement.getDefaultValue();
-                                    defaultValues.put(executableElement, defaultValue);
-                                }
-                        );
-
-                defaults.put(annotationName, defaultValues);
-            }
+            final List<? extends Element> allMembers = elementUtils.getAllMembers(annotationElement);
+            allMembers
+                    .stream()
+                    .filter(member -> member.getEnclosingElement().equals(annotationElement))
+                    .filter(ExecutableElement.class::isInstance)
+                    .map(ExecutableElement.class::cast)
+                    .filter(this::isValidDefaultValue)
+                    .forEach(executableElement -> {
+                                final AnnotationValue defaultValue = executableElement.getDefaultValue();
+                                defaultValues.put(executableElement, defaultValue);
+                            }
+                    );
         }
-        return ANNOTATION_DEFAULTS.get(annotationTypeName);
+        return defaultValues;
     }
 
     private boolean isValidDefaultValue(ExecutableElement executableElement) {
@@ -423,21 +484,22 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     @Override
     protected String getElementName(Element element) {
         if (element instanceof TypeElement) {
-            return ((TypeElement) element).getQualifiedName().toString();
+            return elementUtils.getBinaryName(((TypeElement) element)).toString();
         }
         return element.getSimpleName().toString();
     }
 
     private void populateTypeHierarchy(Element element, List<Element> hierarchy) {
         final boolean isInterface = JavaModelUtils.resolveKind(element, ElementKind.INTERFACE).isPresent();
+        final Types typeUtils = modelUtils.getTypeUtils();
         if (isInterface) {
             TypeElement typeElement = (TypeElement) element;
             List<? extends TypeMirror> interfaces = typeElement.getInterfaces();
             for (TypeMirror anInterface : interfaces) {
-                if (anInterface instanceof DeclaredType) {
-                    Element interfaceElement = ((DeclaredType) anInterface).asElement();
-                    hierarchy.add(interfaceElement);
-                    populateTypeHierarchy(interfaceElement, hierarchy);
+                final Element e = typeUtils.asElement(anInterface);
+                if (e != null) {
+                    hierarchy.add(e);
+                    populateTypeHierarchy(e, hierarchy);
                 }
             }
         } else  {
@@ -468,53 +530,50 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
         }
     }
 
-    private List<ExecutableElement> findOverriddenMethods(ExecutableElement executableElement) {
-        List<ExecutableElement> overridden = new ArrayList<>();
-        Element enclosingElement = executableElement.getEnclosingElement();
-        if (enclosingElement instanceof TypeElement) {
-            TypeElement supertype = (TypeElement) enclosingElement;
-            while (supertype != null && !supertype.toString().equals(Object.class.getName())) {
-                Optional<ExecutableElement> result = findOverridden(executableElement, supertype);
-                if (result.isPresent()) {
-                    ExecutableElement overriddenMethod = result.get();
-                    overridden.add(overriddenMethod);
+    private List<ExecutableElement> findOverriddenMethods(ExecutableElement sourceMethod) {
+        return OVERRIDDEN_METHOD_CACHE.computeIfAbsent(sourceMethod, executableElement -> {
+            List<ExecutableElement> overridden = new ArrayList<>(3);
+            Element enclosingElement = executableElement.getEnclosingElement();
+            if (enclosingElement instanceof TypeElement) {
+                TypeElement declaringElement = (TypeElement) enclosingElement;
+                final Set<TypeElement> allInterfaces = modelUtils.getAllInterfaces(declaringElement);
+                for (TypeElement itfe : allInterfaces) {
+                    addOverriddenMethodIfNecessary(executableElement, overridden, declaringElement, itfe);
                 }
-                findOverriddenInterfaceMethod(executableElement, overridden, supertype);
-                TypeMirror superclass = supertype.getSuperclass();
-                if (superclass instanceof DeclaredType) {
-                    supertype = (TypeElement) ((DeclaredType) superclass).asElement();
-                } else {
-                    break;
+                final Types typeUtils = modelUtils.getTypeUtils();
+                TypeElement supertype = toTypeElement(declaringElement.getSuperclass(), typeUtils);
+                while (supertype != null && !supertype.toString().equals(Object.class.getName())) {
+                    addOverriddenMethodIfNecessary(executableElement, overridden, declaringElement, supertype);
+                    supertype = toTypeElement(supertype.getSuperclass(), typeUtils);
                 }
+
             }
-        }
-        return overridden;
+            return overridden;
+        });
+
     }
 
-    private void findOverriddenInterfaceMethod(ExecutableElement executableElement, List<ExecutableElement> overridden, TypeElement supertype) {
-        Optional<ExecutableElement> result;
-        List<? extends TypeMirror> interfaces = supertype.getInterfaces();
-
-        for (TypeMirror anInterface : interfaces) {
-            if (anInterface instanceof DeclaredType) {
-                DeclaredType iElement = (DeclaredType) anInterface;
-                TypeElement interfaceElement = (TypeElement) iElement.asElement();
-                result = findOverridden(executableElement, interfaceElement);
-                if (result.isPresent()) {
-                    overridden.add(result.get());
-                } else {
-                    findOverriddenInterfaceMethod(executableElement, overridden, interfaceElement);
-                }
+    private void addOverriddenMethodIfNecessary(ExecutableElement executableElement,
+                           List<ExecutableElement> overridden,
+                           TypeElement declaringElement,
+                           TypeElement supertype) {
+        final List<ExecutableElement> possibleMethods =
+                ElementFilter.methodsIn(supertype.getEnclosedElements());
+        for (ExecutableElement possibleMethod : possibleMethods) {
+            if (elementUtils.overrides(executableElement, possibleMethod, declaringElement)) {
+                overridden.add(possibleMethod);
             }
         }
     }
 
-    private Optional<ExecutableElement> findOverridden(ExecutableElement executableElement, TypeElement supertype) {
-        Stream<? extends Element> elements = supertype.getEnclosedElements().stream();
-        return elements.filter(el -> el.getKind() == ElementKind.METHOD && el.getEnclosingElement().equals(supertype))
-                .map(el -> (ExecutableElement) el)
-                .filter(method -> elementUtils.overrides(executableElement, method, (TypeElement) method.getEnclosingElement()))
-                .findFirst();
+    private TypeElement toTypeElement(TypeMirror mirror, Types typeUtils) {
+        if (mirror != null) {
+            final Element e = typeUtils.asElement(mirror);
+            if (e instanceof TypeElement) {
+                return (TypeElement) e;
+            }
+        }
+        return null;
     }
 
     /**
@@ -526,11 +585,23 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
      */
     @Override
     public boolean hasAnnotation(Element element, Class<? extends Annotation> ann) {
+        return hasAnnotation(element, ann.getName());
+    }
+
+    /**
+     * Checks if a method has an annotation.
+     *
+     * @param element The method
+     * @param ann    The annotation to look for
+     * @return Whether if the method has the annotation
+     */
+    @Override
+    public boolean hasAnnotation(Element element, String ann) {
         List<? extends AnnotationMirror> annotationMirrors = element.getAnnotationMirrors();
         if (CollectionUtils.isNotEmpty(annotationMirrors)) {
             for (AnnotationMirror annotationMirror : annotationMirrors) {
                 final DeclaredType annotationType = annotationMirror.getAnnotationType();
-                if (annotationType.toString().equals(ann.getName())) {
+                if (annotationType.toString().equals(ann)) {
                     return true;
                 }
             }
@@ -541,6 +612,14 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     @Override
     protected boolean hasAnnotations(Element element) {
         return CollectionUtils.isNotEmpty(element.getAnnotationMirrors());
+    }
+
+    /**
+     * Clears any caches from the last compilation round.
+     */
+    public static void clearCaches() {
+        OVERRIDDEN_METHOD_CACHE.clear();
+        AbstractAnnotationMetadataBuilder.clearCaches();
     }
 
     /**

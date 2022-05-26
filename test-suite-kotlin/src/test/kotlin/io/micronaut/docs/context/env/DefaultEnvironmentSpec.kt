@@ -1,6 +1,6 @@
 package io.micronaut.docs.context.env
 
-import io.kotlintest.specs.StringSpec
+import io.kotest.core.spec.style.StringSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
 import org.junit.Assert.assertFalse

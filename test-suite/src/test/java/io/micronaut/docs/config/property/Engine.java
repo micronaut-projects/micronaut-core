@@ -18,8 +18,8 @@ package io.micronaut.docs.config.property;
 // tag::imports[]
 import io.micronaut.context.annotation.Property;
 
-import javax.inject.Inject;
-import javax.inject.Singleton;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 // end::imports[]
 
 // tag::class[]

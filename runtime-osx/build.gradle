@@ -1,7 +1,10 @@
+plugins {
+    id "io.micronaut.build.internal.convention-library"
+}
+
 dependencies {
     annotationProcessor project(":inject-java")
 
     api project(":runtime")
-    implementation dependencyVersion("methvin.directory-watcher")
-    implementation dependencyVersion("jna")
+    implementation libs.managed.methvin.directoryWatcher
 }

@@ -16,13 +16,13 @@
 package io.micronaut.http.server.netty.binding
 
 import io.micronaut.context.annotation.Requires
+import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
+import io.micronaut.http.HttpStatus
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.server.netty.AbstractMicronautSpec
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.HttpStatus
-import io.micronaut.http.annotation.Get
-import io.micronaut.http.HttpRequest
 
 class RegexBindingSpec extends AbstractMicronautSpec {
 

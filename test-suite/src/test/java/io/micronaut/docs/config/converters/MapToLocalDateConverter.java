@@ -20,7 +20,7 @@ import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 import java.time.DateTimeException;
 import java.time.LocalDate;
 import java.util.Map;

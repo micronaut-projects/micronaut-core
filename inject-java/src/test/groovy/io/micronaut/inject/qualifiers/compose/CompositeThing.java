@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.qualifiers.compose;
 
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 import java.util.stream.Stream;
 
 @Composes(Thing.class)

@@ -21,9 +21,9 @@ import io.micronaut.context.annotation.Factory
 import io.micronaut.context.annotation.Provided
 import spock.lang.Specification
 
-import javax.inject.Inject
-import javax.inject.Provider
-import javax.inject.Singleton
+import jakarta.inject.Inject
+import jakarta.inject.Provider
+import jakarta.inject.Singleton
 
 /**
  * Created by graemerocher on 12/05/2017.
@@ -66,7 +66,7 @@ class ConstructorFactorySpec extends Specification {
     static class AImpl implements A {
         final C c
         final C c2
-        @Inject protected D d
+        protected D d
 
         AImpl(C c, C c2) {
             this.c = c

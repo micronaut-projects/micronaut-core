@@ -1,7 +1,7 @@
 package io.micronaut.docs.inject.generics
 
-import javax.inject.Inject
-import javax.inject.Singleton
+import jakarta.inject.Inject
+import jakarta.inject.Singleton
 
 // tag::constructor[]
 @Singleton

@@ -15,10 +15,9 @@
  */
 package io.micronaut.http.client.bind;
 
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
-import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Indexed;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.http.MutableHttpRequest;
 
@@ -30,10 +29,9 @@ import io.micronaut.http.MutableHttpRequest;
  * @author James Kleeh
  * @since 2.1.0
  */
-@Experimental
 @BootstrapContextCompatible
 @Indexed(ClientArgumentRequestBinder.class)
-public interface ClientArgumentRequestBinder<T> {
+public interface ClientArgumentRequestBinder<T> extends ClientRequestBinder {
 
     /**
      * Bind the given argument to the request. Argument binders

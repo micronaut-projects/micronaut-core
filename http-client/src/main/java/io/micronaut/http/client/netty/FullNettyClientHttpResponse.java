@@ -15,8 +15,8 @@
  */
 package io.micronaut.http.client.netty;
 
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.async.subscriber.Completable;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
@@ -85,8 +85,7 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
             FullHttpResponse fullHttpResponse,
             HttpStatus httpStatus,
             MediaTypeCodecRegistry mediaTypeCodecRegistry,
-            ByteBufferFactory<ByteBufAllocator,
-            ByteBuf> byteBufferFactory,
+            ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory,
             Argument<B> bodyType,
             boolean convertBody) {
 

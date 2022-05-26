@@ -290,6 +290,16 @@ public final class CronExpression {
         }
     }
 
+    /**
+     * @since 3.1.0
+     * Returns String expression.
+     * 
+     * @return The underlying cron expression as string.
+     */
+    public String getExpression() {
+        return expr;
+    }
+
     @Override
     public String toString() {
         return getClass().getSimpleName() + "<" + expr + ">";

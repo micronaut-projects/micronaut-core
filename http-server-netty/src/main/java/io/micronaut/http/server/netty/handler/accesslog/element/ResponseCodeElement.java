@@ -15,10 +15,10 @@
  */
 package io.micronaut.http.server.netty.handler.accesslog.element;
 
-import java.util.Set;
-
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpHeaders;
+
+import java.util.Set;
 
 /**
  * ResponseCodeElement LogElement. The response code.

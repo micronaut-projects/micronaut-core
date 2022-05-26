@@ -20,8 +20,7 @@ import io.micronaut.core.order.Ordered;
 import io.micronaut.core.util.locale.FixedLocaleResolver;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.server.HttpServerConfiguration;
-
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 /**
  * Generic implementation of {@link io.micronaut.core.util.LocaleResolver} for fixed locale resolution.

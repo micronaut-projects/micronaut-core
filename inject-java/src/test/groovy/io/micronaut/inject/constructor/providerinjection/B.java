@@ -15,8 +15,8 @@
  */
 package io.micronaut.inject.constructor.providerinjection;
 
-import javax.inject.Inject;
-import javax.inject.Provider;
+import jakarta.inject.Inject;
+import jakarta.inject.Provider;
 
 public class B {
     private Provider<A> a;

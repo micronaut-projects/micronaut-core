@@ -18,14 +18,14 @@ package io.micronaut.http.client;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.context.ClientContextPathProvider;
+import io.micronaut.http.ssl.AbstractClientSslConfiguration;
 import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
+import jakarta.inject.Inject;
 
-import io.micronaut.core.annotation.Nullable;
-
-import javax.inject.Inject;
 import java.net.URI;
 import java.time.Duration;
 import java.util.Collections;
@@ -259,7 +259,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
      * The default connection pool configuration.
      */
     @ConfigurationProperties("ssl")
-    public static class ServiceSslClientConfiguration extends SslConfiguration {
+    public static class ServiceSslClientConfiguration extends AbstractClientSslConfiguration {
 
         /**
          * Sets the key configuration.

@@ -261,7 +261,7 @@ interface MyConfig {
 ''')
         then:
         def e = thrown(RuntimeException)
-        e.message.contains('Only getter methods are allowed on @ConfigurationProperties interfaces: junk')
+        e.message.contains('Only getter methods are allowed on @ConfigurationProperties interfaces: junk. You can change the accessors using @AccessorsStyle annotation')
     }
 
     void "test getter that returns void method"() {

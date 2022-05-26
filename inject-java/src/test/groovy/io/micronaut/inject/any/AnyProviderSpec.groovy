@@ -30,6 +30,11 @@ class AnyProviderSpec extends Specification {
         )
 
         then:
+        beanContext.getBean(Object, Qualifiers.byName("poodle")) instanceof Poodle
+        beanContext.findBean(Object, Qualifiers.byName("poodle")).isPresent()
+        !beanContext.findBean(Object, Qualifiers.byName("doesn't exist")).isPresent()
+        beanContext.containsBean(Object, Qualifiers.byName("poodle"))
+        !beanContext.containsBean(Object, Qualifiers.byName("doesnt-exist"))
         owner.dog instanceof Dog
         dogBeanProvider.get(Qualifiers.byName("poodle")) instanceof Dog
         dogBeanProvider.stream().collect(Collectors.toList()).size() == 2
@@ -57,6 +62,7 @@ class AnyProviderSpec extends Specification {
         boolean called = false
         terrierProvider2.ifPresent({ Dog dog ->
             assert dog in Dog
+            assert dog instanceof Terrier
             called = true
         })
 

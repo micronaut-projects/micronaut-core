@@ -21,9 +21,8 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.logging.LogLevel;
 import io.micronaut.logging.LoggingSystem;
+import jakarta.inject.Singleton;
 import org.slf4j.LoggerFactory;
-
-import javax.inject.Singleton;
 
 /**
  * An implementation of {@link LoggingSystem} that works with logback.

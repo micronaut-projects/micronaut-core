@@ -29,7 +29,7 @@ import io.micronaut.http.netty.channel.converters.EpollChannelOptionFactory
 import io.micronaut.http.netty.channel.converters.KQueueChannelOptionFactory
 import io.micronaut.http.server.HttpServerConfiguration
 import io.micronaut.http.server.cors.CorsOriginConfiguration
-import io.micronaut.http.server.netty.NettyHttpServer
+import io.micronaut.http.server.netty.NettyEmbeddedServer
 import io.netty.bootstrap.ServerBootstrap
 import io.netty.channel.ChannelOption
 import io.netty.channel.epoll.Epoll
@@ -259,7 +259,7 @@ class NettyHttpServerConfigurationSpec extends Specification {
         eventLoopGroupFactory.serverSocketChannelClass() == EpollServerSocketChannel.class
 
         when:
-        NettyHttpServer server = beanContext.getBean(NettyHttpServer)
+        NettyEmbeddedServer server = beanContext.getBean(NettyEmbeddedServer)
         server.start()
 
         then:
@@ -321,7 +321,7 @@ class NettyHttpServerConfigurationSpec extends Specification {
         config.worker.shutdownTimeout == Duration.ofSeconds(2)
 
         then:
-        NettyHttpServer server = beanContext.getBean(NettyHttpServer)
+        NettyEmbeddedServer server = beanContext.getBean(NettyEmbeddedServer)
         server.start()
 
         then:
@@ -350,7 +350,7 @@ class NettyHttpServerConfigurationSpec extends Specification {
 
         when:
         NettyHttpServerConfiguration config = beanContext.getBean(NettyHttpServerConfiguration)
-        NettyHttpServer server = beanContext.getBean(NettyHttpServer)
+        NettyEmbeddedServer server = beanContext.getBean(NettyEmbeddedServer)
         server.start()
 
         then:
@@ -452,12 +452,45 @@ class NettyHttpServerConfigurationSpec extends Specification {
         beanContext.start()
 
         when:
-        NettyHttpServer server = beanContext.getBean(NettyHttpServer)
+        NettyEmbeddedServer server = beanContext.getBean(NettyEmbeddedServer)
         server.start()
 
         then:
         noExceptionThrown()
         server != null
+
+        cleanup:
+        beanContext.close()
+    }
+
+    void "test default keepAlive configuration"() {
+        given:
+        ApplicationContext beanContext = new DefaultApplicationContext("test")
+        beanContext.start()
+
+        when:
+        NettyHttpServerConfiguration config = beanContext.getBean(NettyHttpServerConfiguration)
+
+        then:
+        !config.keepAliveOnServerError
+
+        cleanup:
+        beanContext.close()
+    }
+
+    void "test keepAlive configuration set to true"() {
+        given:
+        ApplicationContext beanContext = new DefaultApplicationContext("test")
+        beanContext.environment.addPropertySource(PropertySource.of("test",
+          ['micronaut.server.netty.keepAliveOnServerError': true]
+        ))
+        beanContext.start()
+
+        when:
+        NettyHttpServerConfiguration config = beanContext.getBean(NettyHttpServerConfiguration)
+
+        then:
+        config.keepAliveOnServerError
 
         cleanup:
         beanContext.close()

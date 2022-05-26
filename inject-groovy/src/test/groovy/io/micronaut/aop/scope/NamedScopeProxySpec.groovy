@@ -8,9 +8,9 @@ import io.micronaut.runtime.context.scope.ScopedProxy
 import spock.lang.Issue
 import spock.lang.Specification
 
-import javax.inject.Inject
-import javax.inject.Named
-import javax.inject.Singleton
+import jakarta.inject.Inject
+import jakarta.inject.Named
+import jakarta.inject.Singleton
 import java.lang.annotation.Documented
 import java.lang.annotation.Retention
 

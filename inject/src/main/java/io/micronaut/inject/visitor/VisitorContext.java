@@ -262,4 +262,5 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     default void addGeneratedResource(String resource) {
         info("EXPERIMENTAL: Compile time resource contribution to the context is experimental", null);
     }
+
 }

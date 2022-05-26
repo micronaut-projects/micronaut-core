@@ -20,14 +20,22 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.ApplicationContextConfiguration
 import io.micronaut.context.exceptions.ConfigurationException
 import io.micronaut.core.naming.NameUtils
+import io.micronaut.core.version.SemanticVersion
 import spock.lang.Issue
+import spock.lang.Requires
 import spock.lang.Specification
+import spock.util.environment.Jvm
 import spock.util.environment.RestoreSystemProperties
 
 /**
  * Created by graemerocher on 12/06/2017.
  */
 @RestoreSystemProperties
+// fails due to https://issues.apache.org/jira/browse/GROOVY-10145
+@Requires({
+    SemanticVersion.isAtLeastMajorMinor(GroovySystem.version, 4, 0) ||
+            !Jvm.current.isJava16Compatible()
+})
 class DefaultEnvironmentSpec extends Specification {
 
     void "test environment system property resolve"() {
@@ -130,7 +138,9 @@ class DefaultEnvironmentSpec extends Specification {
 
         then: "should throw exception"
         def e = thrown(ConfigurationException)
-        e.message == "Unsupported properties file format: " + NameUtils.filename(unsupportedFile.absolutePath)
+        String extension = NameUtils.extension(unsupportedFile.absolutePath);
+        String fileName = NameUtils.filename(unsupportedFile.absolutePath);
+        e.message == "Unsupported properties file format while reading " + fileName + "." + extension + " from " + unsupportedFile.absolutePath
 
         when: "file from system property source loader does not override the key"
         System.setProperty("foo.baz", "10")
@@ -197,7 +207,9 @@ class DefaultEnvironmentSpec extends Specification {
 
         then: "should throw exception"
         def e = thrown(ConfigurationException)
-        e.message == "Unsupported properties file format: " + NameUtils.filename(unsupportedFile.absolutePath)
+        String extension = NameUtils.extension(unsupportedFile.absolutePath);
+        String fileName = NameUtils.filename(unsupportedFile.absolutePath);
+        e.message == "Unsupported properties file format while reading " + fileName + "." + extension + " from " + unsupportedFile.absolutePath
 
         when: "file from system property source loader does not override the key"
         System.setProperty("foo.baz", "10")
@@ -334,6 +346,7 @@ class DefaultEnvironmentSpec extends Specification {
     }
     // end::disableEnvDeduction[]
 
+    @RestoreSystemProperties
     void "test disable environment deduction via system property"() {
         when:
         System.setProperty(Environment.CLOUD_PLATFORM_PROPERTY, "GOOGLE_COMPUTE")

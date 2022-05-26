@@ -30,4 +30,16 @@ class SuspendClientSpec {
 
         Assertions.assertEquals(response.status, HttpStatus.NOT_FOUND)
     }
+
+    @Test
+    fun testNotFoundWithoutHttpResponseWrapper() {
+        val server = ApplicationContext.run(EmbeddedServer::class.java, mapOf("spec.name" to "SuspendClientSpec"))
+        val ctx = server.applicationContext
+        val response = runBlocking {
+            ctx.getBean(SuspendClient::class.java).notFoundWithoutHttpResponseWrapper()
+        }
+
+        Assertions.assertNull(response)
+    }
+
 }

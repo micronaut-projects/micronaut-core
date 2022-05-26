@@ -19,6 +19,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
+import java.lang.annotation.Inherited;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
@@ -34,5 +35,6 @@ import io.micronaut.core.bind.annotation.Bindable;
 @Retention(RUNTIME)
 @Target({ElementType.PARAMETER, ElementType.ANNOTATION_TYPE})
 @Bindable
+@Inherited
 public @interface RequestBean {
 }

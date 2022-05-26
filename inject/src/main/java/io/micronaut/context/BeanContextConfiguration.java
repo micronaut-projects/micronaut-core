@@ -15,10 +15,11 @@
  */
 package io.micronaut.context;
 
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.context.annotation.ConfigurationReader;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
 import java.util.Collections;
 import java.util.Set;
@@ -30,6 +31,14 @@ import java.util.Set;
  * @since 1.1
  */
 public interface BeanContextConfiguration {
+
+    /**
+     * @return If a {@link io.micronaut.context.exceptions.NoSuchBeanException} should be thrown on a missing {@link io.micronaut.context.BeanProvider} or {@link jakarta.inject.Provider}
+     * @since 3.0.0
+     */
+    default boolean isAllowEmptyProviders() {
+        return false;
+    }
 
     /**
      * The class loader to use.
@@ -45,7 +54,12 @@ public interface BeanContextConfiguration {
      * @since 2.0
      */
     default boolean isEagerInitSingletons() {
-        return getEagerInitAnnotated().contains(Singleton.class);
+        for (Class<? extends Annotation> ann: getEagerInitAnnotated()) {
+            if (ann == Singleton.class || ann.getName().equals(AnnotationUtil.SINGLETON)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

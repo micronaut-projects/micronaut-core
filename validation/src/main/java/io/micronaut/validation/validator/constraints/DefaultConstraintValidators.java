@@ -18,6 +18,8 @@ package io.micronaut.validation.validator.constraints;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.beans.BeanProperty;
 import io.micronaut.core.beans.BeanWrapper;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -29,11 +31,9 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.inject.qualifiers.TypeArgumentQualifier;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
-import javax.inject.Inject;
-import javax.inject.Singleton;
 import javax.validation.ValidationException;
 import javax.validation.constraints.*;
 import java.lang.annotation.Annotation;
@@ -45,7 +45,14 @@ import java.time.chrono.JapaneseDate;
 import java.time.chrono.MinguoDate;
 import java.time.chrono.ThaiBuddhistDate;
 import java.time.temporal.TemporalAccessor;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Date;
 import java.util.concurrent.atomic.DoubleAccumulator;
 import java.util.concurrent.atomic.DoubleAdder;
 
@@ -99,9 +106,9 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
             );
 
             if (value instanceof BigInteger) {
-                return ((BigInteger) value).compareTo(BigInteger.valueOf(max)) < 0;
+                return ((BigInteger) value).compareTo(BigInteger.valueOf(max)) <= 0;
             } else if (value instanceof BigDecimal) {
-                return ((BigDecimal) value).compareTo(BigDecimal.valueOf(max)) < 0;
+                return ((BigDecimal) value).compareTo(BigDecimal.valueOf(max)) <= 0;
             }
             return value.longValue() <= max;
         };
@@ -286,6 +293,16 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
             return comparable.compareTo(value) > 0;
         };
 
+    private final ConstraintValidator<Past, Date> pastDateConstraintValidator =
+            (value, annotationMetadata, context) -> {
+            if (value == null) {
+                // null is valid according to spec
+                return true;
+            }
+            Comparable comparable = Date.from(context.getClockProvider().getClock().instant());
+            return comparable.compareTo(value) > 0;
+        };
+
     private final ConstraintValidator<PastOrPresent, TemporalAccessor> pastOrPresentTemporalAccessorConstraintValidator =
             (value, annotationMetadata, context) -> {
             if (value == null) {
@@ -293,6 +310,16 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
                 return true;
             }
             Comparable comparable = getNow(value, context.getClockProvider().getClock());
+            return comparable.compareTo(value) >= 0;
+        };
+
+    private final ConstraintValidator<PastOrPresent, Date> pastOrPresentDateConstraintValidator =
+            (value, annotationMetadata, context) -> {
+            if (value == null) {
+                // null is valid according to spec
+                return true;
+            }
+            Comparable comparable = Date.from(context.getClockProvider().getClock().instant());
             return comparable.compareTo(value) >= 0;
         };
 
@@ -305,12 +332,30 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
             return comparable.compareTo(value) < 0;
         };
 
+    private final ConstraintValidator<Future, Date> futureDateConstraintValidator = (value, annotationMetadata, context) -> {
+            if (value == null) {
+                // null is valid according to spec
+                return true;
+            }
+            Comparable comparable = Date.from(context.getClockProvider().getClock().instant());
+            return comparable.compareTo(value) < 0;
+        };
+
     private final ConstraintValidator<FutureOrPresent, TemporalAccessor> futureOrPresentTemporalAccessorConstraintValidator = (value, annotationMetadata, context) -> {
             if (value == null) {
                 // null is valid according to spec
                 return true;
             }
             Comparable comparable = getNow(value, context.getClockProvider().getClock());
+            return comparable.compareTo(value) <= 0;
+        };
+
+    private final ConstraintValidator<FutureOrPresent, Date> futureOrPresentDateConstraintValidator = (value, annotationMetadata, context) -> {
+            if (value == null) {
+                // null is valid according to spec
+                return true;
+            }
+            Comparable comparable = Date.from(context.getClockProvider().getClock().instant());
             return comparable.compareTo(value) <= 0;
         };
 
@@ -814,12 +859,30 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
     }
 
     /**
+     * The {@link Past} validator for Date accessor.
+     *
+     * @return The validator
+     */
+    public ConstraintValidator<Past, Date> getPastDateConstraintValidator() {
+        return pastDateConstraintValidator;
+    }
+
+    /**
      * The {@link PastOrPresent} validator for temporal accessor.
      *
      * @return The validator
      */
     public ConstraintValidator<PastOrPresent, TemporalAccessor> getPastOrPresentTemporalAccessorConstraintValidator() {
         return pastOrPresentTemporalAccessorConstraintValidator;
+    }
+
+    /**
+     * The {@link PastOrPresent} validator for Date accessor.
+     *
+     * @return The validator
+     */
+    public ConstraintValidator<PastOrPresent, Date> getPastOrPresentDateConstraintValidator() {
+        return pastOrPresentDateConstraintValidator;
     }
 
     /**
@@ -832,12 +895,30 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
     }
 
     /**
+     * The {@link Future} validator for Date accessor.
+     *
+     * @return The validator
+     */
+    public ConstraintValidator<Future, Date> getFutureDateConstraintValidator() {
+        return futureDateConstraintValidator;
+    }
+
+    /**
      * The {@link FutureOrPresent} validator for temporal accessor.
      *
      * @return The validator
      */
     public ConstraintValidator<FutureOrPresent, TemporalAccessor> getFutureOrPresentTemporalAccessorConstraintValidator() {
         return futureOrPresentTemporalAccessorConstraintValidator;
+    }
+
+    /**
+     * The {@link FutureOrPresent} validator for Date accessor.
+     *
+     * @return The validator
+     */
+    public ConstraintValidator<FutureOrPresent, Date> getFutureOrPresentDateConstraintValidator() {
+        return futureOrPresentDateConstraintValidator;
     }
 
     /**

@@ -35,7 +35,7 @@ import io.micronaut.management.endpoint.annotation.Delete
 
 import io.micronaut.management.endpoint.annotation.Read
 
-import javax.annotation.PostConstruct
+import jakarta.annotation.PostConstruct
 
 @Requires(property = "spec.name", value = "MessageEndpointSpec")
 //tag::endpointClassBegin[]

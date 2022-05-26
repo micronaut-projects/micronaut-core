@@ -17,8 +17,8 @@ package io.micronaut.inject.named;
 
 import io.micronaut.context.annotation.Factory;
 
-import javax.inject.Named;
-import javax.inject.Singleton;
+import jakarta.inject.Named;
+import jakarta.inject.Singleton;
 
 @Factory
 public class NamedFunctionFactory {

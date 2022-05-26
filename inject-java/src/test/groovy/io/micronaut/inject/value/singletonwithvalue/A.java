@@ -18,8 +18,8 @@ package io.micronaut.inject.value.singletonwithvalue;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
 
-import javax.inject.Inject;
-import javax.inject.Singleton;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 import java.net.URL;
 import java.util.Optional;
 

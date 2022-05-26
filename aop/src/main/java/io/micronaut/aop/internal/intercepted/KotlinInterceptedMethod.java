@@ -15,15 +15,17 @@
  */
 package io.micronaut.aop.internal.intercepted;
 
-import io.micronaut.aop.InterceptedMethod;
 import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.aop.util.CompletableFutureContinuation;
+import io.micronaut.aop.util.DelegatingContextContinuation;
+import io.micronaut.aop.util.KotlinInterceptedMethodHelper;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.KotlinUtils;
 import kotlin.coroutines.Continuation;
+import kotlin.coroutines.CoroutineContext;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -37,17 +39,19 @@ import java.util.function.Consumer;
  */
 @Internal
 @Experimental
-final class KotlinInterceptedMethod implements InterceptedMethod {
+final class KotlinInterceptedMethod implements io.micronaut.aop.kotlin.KotlinInterceptedMethod {
 
     private final MethodInvocationContext<?, ?> context;
-    private final Continuation continuation;
+    private Continuation continuation;
     private final Consumer<Object> replaceContinuation;
     private final Argument<?> returnTypeValue;
     private final boolean isUnitValueType;
 
     private KotlinInterceptedMethod(MethodInvocationContext<?, ?> context,
-                                    Continuation continuation, Consumer<Object> replaceContinuation,
-                                    Argument<?> returnTypeValue, boolean isUnitValueType) {
+                                    Continuation<?> continuation,
+                                    Consumer<Object> replaceContinuation,
+                                    Argument<?> returnTypeValue,
+                                    boolean isUnitValueType) {
         this.context = context;
         this.continuation = continuation;
         this.returnTypeValue = returnTypeValue;
@@ -96,13 +100,8 @@ final class KotlinInterceptedMethod implements InterceptedMethod {
 
     @Override
     public CompletableFuture<Object> interceptResultAsCompletionStage() {
-        CompletableFutureContinuation completableFutureContinuation;
-        if (continuation instanceof CompletableFutureContinuation) {
-            completableFutureContinuation = (CompletableFutureContinuation) continuation;
-        } else {
-            completableFutureContinuation = new CompletableFutureContinuation(continuation);
-            replaceContinuation.accept(completableFutureContinuation);
-        }
+        CompletableFutureContinuation completableFutureContinuation = new CompletableFutureContinuation(continuation);
+        replaceContinuation.accept(completableFutureContinuation);
         Object result = context.proceed();
         replaceContinuation.accept(continuation);
         if (result != KotlinUtils.COROUTINE_SUSPENDED) {
@@ -113,13 +112,8 @@ final class KotlinInterceptedMethod implements InterceptedMethod {
 
     @Override
     public CompletableFuture<Object> interceptResultAsCompletionStage(Interceptor<?, ?> from) {
-        CompletableFutureContinuation completableFutureContinuation;
-        if (continuation instanceof CompletableFutureContinuation) {
-            completableFutureContinuation = (CompletableFutureContinuation) continuation;
-        } else {
-            completableFutureContinuation = new CompletableFutureContinuation(continuation);
-            replaceContinuation.accept(completableFutureContinuation);
-        }
+        CompletableFutureContinuation completableFutureContinuation = new CompletableFutureContinuation(continuation);
+        replaceContinuation.accept(completableFutureContinuation);
         Object result = context.proceed(from);
         replaceContinuation.accept(continuation);
         if (result != KotlinUtils.COROUTINE_SUSPENDED) {
@@ -146,28 +140,21 @@ final class KotlinInterceptedMethod implements InterceptedMethod {
         } else {
             throw new IllegalStateException("Cannot convert " + result + "  to 'java.util.concurrent.CompletionStage'");
         }
-        completionStageResult.whenComplete((value, throwable) -> {
-            if (throwable == null) {
-                if (value == null) {
-                    if (isUnitValueType) {
-                        value = kotlin.Unit.INSTANCE;
-                    } else {
-                        CompletableFutureContinuation.Companion.completeExceptionally(continuation, new IllegalStateException("Cannot complete Kotlin coroutine with null: " + returnTypeValue.getType()));
-                        return;
-                    }
-                }
-                CompletableFutureContinuation.Companion.completeSuccess(continuation, value);
-            } else {
-                CompletableFutureContinuation.Companion.completeExceptionally(continuation, (Throwable) throwable);
-            }
-        });
-        return KotlinUtils.COROUTINE_SUSPENDED;
+        return KotlinInterceptedMethodHelper.handleResult(completionStageResult, isUnitValueType, continuation);
     }
 
     @Override
     public <E extends Throwable> Object handleException(Exception exception) throws E {
-        CompletableFutureContinuation.Companion.completeExceptionally(continuation, exception);
-        return KotlinUtils.COROUTINE_SUSPENDED;
+        throw (E) exception;
     }
 
+    @Override
+    public CoroutineContext getCoroutineContext() {
+        return continuation.getContext();
+    }
+
+    @Override
+    public void updateCoroutineContext(CoroutineContext coroutineContext) {
+        continuation = new DelegatingContextContinuation(continuation, coroutineContext);
+    }
 }

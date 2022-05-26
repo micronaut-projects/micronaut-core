@@ -17,7 +17,8 @@ package io.micronaut.context.annotation;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
-import javax.inject.Scope;
+import jakarta.inject.Scope;
+
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 
@@ -32,4 +33,6 @@ import java.lang.annotation.Retention;
 @Scope
 @Bean
 public @interface Prototype {
+
+    String NAME = Prototype.class.getName();
 }

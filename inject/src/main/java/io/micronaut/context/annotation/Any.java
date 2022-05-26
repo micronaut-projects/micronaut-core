@@ -15,7 +15,8 @@
  */
 package io.micronaut.context.annotation;
 
-import javax.inject.Qualifier;
+import jakarta.inject.Qualifier;
+
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 

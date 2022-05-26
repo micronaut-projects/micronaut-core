@@ -17,35 +17,41 @@ package io.micronaut.ast.transform.test
 
 import groovy.transform.CompileStatic
 import io.micronaut.aop.internal.InterceptorRegistryBean
+import io.micronaut.ast.groovy.annotation.GroovyAnnotationMetadataBuilder
 import io.micronaut.ast.groovy.utils.AstAnnotationUtils
 import io.micronaut.ast.groovy.utils.ExtendedParameter
-import io.micronaut.ast.groovy.visitor.GroovyClassElement
+import io.micronaut.ast.groovy.utils.InMemoryByteCodeGroovyClassLoader
+import io.micronaut.ast.groovy.visitor.GroovyElementFactory
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.Qualifier
+import io.micronaut.context.event.ApplicationEventPublisherFactory
+import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.io.scan.ClassPathResourceLoader
+import io.micronaut.core.naming.NameUtils
+import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanDefinitionReference
+import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
+import io.micronaut.inject.annotation.AnnotationMetadataWriter
 import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.provider.BeanProviderDefinition
+import io.micronaut.inject.writer.BeanDefinitionReferenceWriter
 import io.micronaut.inject.writer.BeanDefinitionVisitor
+import io.micronaut.inject.writer.BeanDefinitionWriter
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.MethodNode
 import org.codehaus.groovy.ast.Parameter
-import org.codehaus.groovy.ast.builder.AstBuilder
-import io.micronaut.ast.groovy.annotation.GroovyAnnotationMetadataBuilder
-import io.micronaut.ast.groovy.utils.InMemoryByteCodeGroovyClassLoader
-import io.micronaut.core.annotation.AnnotationMetadata
-import io.micronaut.core.naming.NameUtils
-import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.annotation.AnnotationMetadataWriter
 import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.CompilerConfiguration
 import org.codehaus.groovy.control.ErrorCollector
 import org.codehaus.groovy.control.SourceUnit
+import org.intellij.lang.annotations.Language
 import spock.lang.Specification
 
+import java.util.stream.Collectors
 /**
  * @author graemerocher
  * @since 1.0
@@ -57,9 +63,8 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
      * @param source The source
      * @return The class element
      */
-    ClassElement buildClassElement(String source) {
-        def builder = new AstBuilder()
-        ASTNode[] nodes = builder.buildFromString(source)
+    ClassElement buildClassElement(@Language("groovy") String source) {
+        def nodes = new MicronautAstBuilder().compile(source)
         def lastNode = nodes ? nodes[-1] : null
         ClassNode cn = lastNode instanceof ClassNode ? lastNode : null
         if (cn != null) {
@@ -67,18 +72,65 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
             def sourceUnit = new SourceUnit("test", source, cc, new GroovyClassLoader(), new ErrorCollector(cc))
             def compilationUnit = new CompilationUnit()
             def metadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, cn)
-            return new GroovyClassElement(
-                    new GroovyVisitorContext(sourceUnit, compilationUnit ), cn, metadata
-            )
+            def elementFactory = new GroovyElementFactory(new GroovyVisitorContext(sourceUnit, compilationUnit))
+            return elementFactory.newClassElement(cn, metadata)
         } else {
             throw new IllegalArgumentException("No class found in passed source code")
         }
     }
 
+    ClassElement buildClassElement(String className, @Language("groovy") String source) {
+        ASTNode[] nodes = new MicronautAstBuilder().compile(source)
+        for (ASTNode node: nodes) {
+            if (node instanceof ClassNode) {
+                if (node.getName() == className) {
+                    def cc = new CompilerConfiguration()
+                    def sourceUnit = new SourceUnit("test", source, cc, new GroovyClassLoader(), new ErrorCollector(cc))
+                    def compilationUnit = new CompilationUnit()
+                    def metadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, node)
+                    def elementFactory = new GroovyElementFactory(new GroovyVisitorContext(sourceUnit, compilationUnit))
+                    return elementFactory.newClassElement(node, metadata)
+                }
+            }
+        }
+        throw new IllegalArgumentException("No class found in passed source code")
+    }
+
     @CompileStatic
-    BeanDefinition buildBeanDefinition(String className, String classStr) {
-        def beanDefName= '$' + NameUtils.getSimpleName(className) + 'Definition'
+    BeanDefinition buildBeanDefinition(String className, @Language("groovy") String classStr) {
+        def classSimpleName = NameUtils.getSimpleName(className)
+        def beanDefName= (classSimpleName.startsWith('$') ? '' : '$') + classSimpleName + BeanDefinitionWriter.CLASS_SUFFIX
         def packageName = NameUtils.getPackageName(className)
+        String beanFullName = "${packageName}.${beanDefName}"
+
+        def classLoader = new InMemoryByteCodeGroovyClassLoader()
+        classLoader.parseClass(classStr)
+        try {
+            return (BeanDefinition) classLoader.loadClass(beanFullName).newInstance()
+        } catch (ClassNotFoundException e) {
+            return null
+        }
+    }
+
+    @CompileStatic
+    BeanDefinitionReference buildBeanDefinitionReference(String className, @Language("groovy") String classStr) {
+        def classSimpleName = NameUtils.getSimpleName(className)
+        def beanDefName= (classSimpleName.startsWith('$') ? '' : '$') + classSimpleName + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionReferenceWriter.REF_SUFFIX
+        def packageName = NameUtils.getPackageName(className)
+        String beanFullName = "${packageName}.${beanDefName}"
+
+        def classLoader = new InMemoryByteCodeGroovyClassLoader()
+        classLoader.parseClass(classStr)
+        try {
+            return (BeanDefinitionReference) classLoader.loadClass(beanFullName).newInstance()
+        } catch (ClassNotFoundException e) {
+            return null
+        }
+    }
+
+    @CompileStatic
+    BeanDefinition buildBeanDefinition(String packageName, String className, @Language("groovy") String classStr) {
+        def beanDefName= (className.startsWith('$') ? '' : '$') + className + BeanDefinitionWriter.CLASS_SUFFIX
         String beanFullName = "${packageName}.${beanDefName}"
 
         def classLoader = new InMemoryByteCodeGroovyClassLoader()
@@ -96,8 +148,9 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
      * @param cls The class source
      * @return The bean definition
      */
-    protected BeanDefinition buildInterceptedBeanDefinition(String className, String cls) {
-        def beanDefName= '$$' + NameUtils.getSimpleName(className) + 'Definition' + BeanDefinitionVisitor.PROXY_SUFFIX + 'Definition'
+    protected BeanDefinition buildInterceptedBeanDefinition(String className, @Language("groovy") String cls) {
+        def classSimpleName = NameUtils.getSimpleName(className)
+        def beanDefName= (classSimpleName.startsWith('$') ? '' : '$') + classSimpleName + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionVisitor.PROXY_SUFFIX + BeanDefinitionWriter.CLASS_SUFFIX
         def packageName = NameUtils.getPackageName(className)
         String beanFullName = "${packageName}.${beanDefName}"
 
@@ -111,8 +164,9 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
      * @param cls The class source
      * @return The bean definition
      */
-    protected BeanDefinitionReference buildInterceptedBeanDefinitionReference(String className, String cls) {
-        def beanDefName= '$$' + NameUtils.getSimpleName(className) + 'Definition' + BeanDefinitionVisitor.PROXY_SUFFIX + 'DefinitionClass'
+    protected BeanDefinitionReference buildInterceptedBeanDefinitionReference(String className, @Language("groovy") String cls) {
+        def classSimpleName = NameUtils.getSimpleName(className)
+        def beanDefName= (classSimpleName.startsWith('$') ? '' : '$') + classSimpleName + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionVisitor.PROXY_SUFFIX + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionReferenceWriter.REF_SUFFIX
         def packageName = NameUtils.getPackageName(className)
         String beanFullName = "${packageName}.${beanDefName}"
 
@@ -120,42 +174,47 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
         return (BeanDefinitionReference)classLoader.loadClass(beanFullName).newInstance()
     }
 
-    InMemoryByteCodeGroovyClassLoader buildClassLoader(String classStr) {
-        def classLoader = new InMemoryByteCodeGroovyClassLoader()
+    InMemoryByteCodeGroovyClassLoader buildClassLoader(@Language("groovy") String classStr) {
+        def classLoader = new InMemoryByteCodeGroovyClassLoader(getClass().getClassLoader())
         classLoader.parseClass(classStr)
         return classLoader
     }
 
-    AnnotationMetadata buildTypeAnnotationMetadata(String cls, String source) {
-        ASTNode[] nodes = new AstBuilder().buildFromString(source)
+    AnnotationMetadata buildTypeAnnotationMetadata(String cls, @Language("groovy") String source) {
+        ASTNode[] nodes = new MicronautAstBuilder().compile(source)
 
         ClassNode element = nodes ? nodes.find { it instanceof ClassNode && it.name == cls } : null
         def sourceUnit = Mock(SourceUnit)
         sourceUnit.getErrorCollector() >> new ErrorCollector(new CompilerConfiguration())
         GroovyAnnotationMetadataBuilder builder = new GroovyAnnotationMetadataBuilder(sourceUnit, null)
         AnnotationMetadata metadata = element != null ? builder.build(element) : null
+        AbstractAnnotationMetadataBuilder.copyToRuntime()
         return metadata
     }
 
-    AnnotationMetadata buildMethodAnnotationMetadata(String cls, String source, String methodName) {
+    AnnotationMetadata buildMethodAnnotationMetadata(String cls, @Language("groovy") String source, String methodName) {
         ClassNode element = buildClassNode(source, cls)
         MethodNode method = element.getMethods(methodName)[0]
-        GroovyAnnotationMetadataBuilder builder = new GroovyAnnotationMetadataBuilder(null, null)
+        GroovyAnnotationMetadataBuilder builder = new GroovyAnnotationMetadataBuilder(Stub(SourceUnit) {
+            getErrorCollector() >> null
+        }, null)
         AnnotationMetadata metadata = method != null ? builder.build(method) : null
+        AbstractAnnotationMetadataBuilder.copyToRuntime()
         return metadata
     }
 
-    AnnotationMetadata buildFieldAnnotationMetadata(String cls, String source, String methodName, String fieldName) {
+    AnnotationMetadata buildFieldAnnotationMetadata(String cls, @Language("groovy") String source, String methodName, String fieldName) {
         ClassNode element = buildClassNode(source, cls)
         MethodNode method = element.getMethods(methodName)[0]
         Parameter parameter = Arrays.asList(method.getParameters()).find { it.name == fieldName }
         GroovyAnnotationMetadataBuilder builder = new GroovyAnnotationMetadataBuilder(null, null)
         AnnotationMetadata metadata = method != null ? builder.build(new ExtendedParameter(method, parameter)) : null
+        AbstractAnnotationMetadataBuilder.copyToRuntime()
         return metadata
     }
 
-    ClassNode buildClassNode(String source, String cls) {
-        ASTNode[] nodes = new AstBuilder().buildFromString(source)
+    ClassNode buildClassNode(String source, @Language("groovy") String cls) {
+        ASTNode[] nodes = new MicronautAstBuilder().compile(source)
 
         ClassNode element = nodes ? nodes.find { it instanceof ClassNode && it.name == cls } : null
         return element
@@ -187,7 +246,7 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
      *
      * @return the introspection if it is correct
      **/
-    protected BeanIntrospection buildBeanIntrospection(String className, String cls) {
+    protected BeanIntrospection buildBeanIntrospection(String className, @Language("groovy") String cls) {
         def beanDefName= '$' + NameUtils.getSimpleName(className) + '$Introspection'
         def packageName = NameUtils.getPackageName(className)
         String beanFullName = "${packageName}.${beanDefName}"
@@ -206,24 +265,24 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
         context.getBean(context.classLoader.loadClass(className), qualifier)
     }
 
-    protected ApplicationContext buildContext(String className, String cls) {
+    protected ApplicationContext buildContext(@Language("groovy") String cls, boolean includeAllBeans = false) {
         InMemoryByteCodeGroovyClassLoader classLoader = buildClassLoader(cls)
 
         return new DefaultApplicationContext(
                 ClassPathResourceLoader.defaultLoader(classLoader),"test") {
             @Override
             protected List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
-                def references = classLoader.generatedClasses.keySet().findAll {
-                    it.endsWith("DefinitionClass")
-                }.collect {
-                    classLoader.loadClass(it).newInstance()
-                }
-                return references + new InterceptorRegistryBean()
+                def references =  classLoader.generatedClasses.keySet()
+                    .stream()
+                    .filter({ name -> name.endsWith(BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionReferenceWriter.REF_SUFFIX) })
+                    .map({ name -> (BeanDefinitionReference) classLoader.loadClass(name).newInstance() })
+                    .collect(Collectors.toList())
+                return references + (includeAllBeans ? super.resolveBeanDefinitionReferences() : [
+                        new InterceptorRegistryBean(),
+                        new BeanProviderDefinition(),
+                        new ApplicationEventPublisherFactory<>()
+                ])
             }
         }.start()
-    }
-
-    protected ApplicationContext buildContext(String cls) {
-        buildContext(null, cls)
     }
 }

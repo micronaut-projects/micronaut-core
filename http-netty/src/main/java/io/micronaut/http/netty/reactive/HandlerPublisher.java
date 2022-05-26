@@ -15,8 +15,6 @@
  */
 package io.micronaut.http.netty.reactive;
 
-import static io.micronaut.http.netty.reactive.HandlerPublisher.State.*;
-
 import io.micronaut.core.annotation.Internal;
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
@@ -33,6 +31,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.LinkedList;
 import java.util.Queue;
 import java.util.concurrent.atomic.AtomicBoolean;
+
+import static io.micronaut.http.netty.reactive.HandlerPublisher.State.*;
 
 /**
  * Publisher for a Netty Handler.
@@ -90,7 +90,7 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements HotObse
 
     private volatile Subscriber<? super T> subscriber;
     private ChannelHandlerContext ctx;
-    private long outstandingDemand = 0;
+    private volatile long outstandingDemand = 0;
     private Throwable noSubscriberError;
 
     /**
@@ -118,10 +118,12 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements HotObse
             subscriber.onSubscribe(new Subscription() {
                 @Override
                 public void request(long n) {
+                    // no-op subscription
                 }
 
                 @Override
                 public void cancel() {
+                    // no-op subscription
                 }
             });
             subscriber.onError(new IllegalStateException("This publisher only supports one subscriber"));
@@ -236,6 +238,10 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements HotObse
                 subscriber.onSubscribe(new ChannelSubscription());
                 subscriber.onError(noSubscriberError);
                 break;
+            case DONE:
+                subscriber.onSubscribe(new ChannelSubscription());
+                subscriber.onComplete();
+                break;
             default:
                 // no-op
         }
@@ -300,6 +306,7 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements HotObse
             case DEMANDING:
             case IDLE:
                 cancelled();
+                // fall through
             case DRAINING:
                 state = DONE;
                 break;
@@ -313,40 +320,7 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements HotObse
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object message) {
         if (acceptInboundMessage(message)) {
-            switch (state) {
-                case IDLE:
-                    if (LOG.isTraceEnabled()) {
-                        Object msg = messageForTrace(message);
-                        LOG.trace("HandlerPublisher (state: IDLE) buffering message: {}", msg);
-                    }
-                    buffer.add(message);
-                    state = BUFFERING;
-                    break;
-                case NO_SUBSCRIBER:
-                case BUFFERING:
-                    if (LOG.isTraceEnabled()) {
-                        Object msg = messageForTrace(message);
-                        LOG.trace("HandlerPublisher (state: BUFFERING) buffering message: {}", msg);
-                    }
-                    buffer.add(message);
-                    break;
-                case DEMANDING:
-                    publishMessage(message);
-                    break;
-                case DRAINING:
-                case DONE:
-                    if (LOG.isTraceEnabled()) {
-                        Object msg = messageForTrace(message);
-                        LOG.trace("HandlerPublisher (state: DONE) releasing message: {}", msg);
-                    }
-                    ReferenceCountUtil.release(message);
-                    break;
-                case NO_CONTEXT:
-                case NO_SUBSCRIBER_OR_CONTEXT:
-                    throw new IllegalStateException("Message received before added to the channel context");
-                default:
-                    // no-op
-            }
+            publishMessageLater(message);
         } else {
             ctx.fireChannelRead(message);
         }
@@ -359,6 +333,46 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements HotObse
             msg = content.content().toString(StandardCharsets.UTF_8);
         }
         return msg;
+    }
+
+    private void publishMessageLater(Object message) {
+        ReferenceCountUtil.touch(message);
+        switch (state) {
+            case IDLE:
+                if (LOG.isTraceEnabled()) {
+                    Object msg = messageForTrace(message);
+                    LOG.trace("HandlerPublisher (state: IDLE) buffering message: {}", msg);
+                }
+                buffer.add(message);
+                state = BUFFERING;
+                break;
+            case NO_SUBSCRIBER:
+            case BUFFERING:
+                if (LOG.isTraceEnabled()) {
+                    Object msg = messageForTrace(message);
+                    LOG.trace("HandlerPublisher (state: BUFFERING) buffering message: {}", msg);
+                }
+                buffer.add(message);
+                break;
+            case DEMANDING:
+                state = BUFFERING;
+                buffer.add(message);
+                flushBuffer();
+                break;
+            case DRAINING:
+            case DONE:
+                if (LOG.isTraceEnabled()) {
+                    Object msg = messageForTrace(message);
+                    LOG.trace("HandlerPublisher (state: DONE) releasing message: {}", msg);
+                }
+                ReferenceCountUtil.release(message);
+                break;
+            case NO_CONTEXT:
+            case NO_SUBSCRIBER_OR_CONTEXT:
+                throw new IllegalStateException("Message received before added to the channel context");
+            default:
+                // no-op
+        }
     }
 
     private void publishMessage(Object message) {
@@ -375,6 +389,7 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements HotObse
                 LOG.trace("HandlerPublisher (state: {}) emitting next message: {}", state, messageForTrace(next));
             }
 
+            ReferenceCountUtil.touch(message, subscriber);
             subscriber.onNext(next);
             if (outstandingDemand < Long.MAX_VALUE) {
                 outstandingDemand--;
@@ -405,24 +420,7 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements HotObse
 
     private void complete() {
         if (completed.compareAndSet(false, true)) {
-            switch (state) {
-                case NO_SUBSCRIBER:
-                case BUFFERING:
-                    buffer.add(COMPLETE);
-                    state = DRAINING;
-                    break;
-                case DEMANDING:
-                case IDLE:
-                    subscriber.onComplete();
-                    state = DONE;
-                    break;
-                case NO_SUBSCRIBER_ERROR:
-                    // Ignore, we're already going to complete the stream with an error
-                    // when the subscriber subscribes.
-                    break;
-                default:
-                    // no-op
-            }
+            publishMessageLater(COMPLETE);
         }
     }
 
@@ -464,10 +462,32 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements HotObse
         }
     }
 
+    private void flushBuffer() {
+        while (!buffer.isEmpty() && outstandingDemand > 0) {
+            if (LOG.isTraceEnabled()) {
+                LOG.trace("HandlerPublisher (state: {}) release message from buffer to satisfy demand: {}", state, outstandingDemand);
+            }
+            publishMessage(buffer.remove());
+        }
+        if (buffer.isEmpty()) {
+            if (outstandingDemand > 0) {
+                if (state == BUFFERING) {
+                    state = DEMANDING;
+                } // otherwise we're draining
+                if (!completed.get()) {
+                    requestDemand();
+                }
+            } else if (state == BUFFERING) {
+                state = IDLE;
+            }
+        }
+    }
+
     /**
      * A channel subscrition.
      */
     private class ChannelSubscription implements Subscription {
+        private volatile boolean cancelled = false;
 
         @Override
         public void request(final long demand) {
@@ -477,25 +497,9 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements HotObse
         @Override
         public void cancel() {
             executor.execute(HandlerPublisher.this::receivedCancel);
-        }
-
-        private void flushBuffer() {
-            while (!buffer.isEmpty() && (outstandingDemand > 0 || outstandingDemand == Long.MAX_VALUE)) {
-                if (LOG.isTraceEnabled()) {
-                    LOG.trace("HandlerPublisher (state: {}) release message from buffer to satisfy demand: {}", state, outstandingDemand);
-                }
-                publishMessage(buffer.remove());
-            }
-            if (buffer.isEmpty()) {
-                if (outstandingDemand > 0) {
-                    if (state == BUFFERING) {
-                        state = DEMANDING;
-                    } // otherwise we're draining
-                    requestDemand();
-                } else if (state == BUFFERING) {
-                    state = IDLE;
-                }
-            }
+            // *immediately* stop forwarding messages. The downstream might discard them, and leak buffers!
+            cancelled = true;
+            outstandingDemand = 0;
         }
 
         private void illegalDemand() {
@@ -522,6 +526,11 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements HotObse
         }
 
         private void receivedDemand(long demand) {
+            // has this subscription been cancelled, since we were scheduled?
+            if (cancelled) {
+                return;
+            }
+
             switch (state) {
                 case BUFFERING:
                 case DRAINING:

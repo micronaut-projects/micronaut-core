@@ -15,9 +15,10 @@
  */
 package io.micronaut.context.annotation;
 
+import jakarta.inject.Singleton;
+
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
-import javax.inject.Singleton;
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

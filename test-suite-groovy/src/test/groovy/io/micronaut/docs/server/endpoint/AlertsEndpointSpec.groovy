@@ -5,19 +5,12 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.client.RxHttpClient;
+import io.micronaut.http.MediaType
+import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
-import io.micronaut.runtime.server.EmbeddedServer;
-import org.junit.Test;
-import spock.lang.Specification;
-
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
+import io.micronaut.runtime.server.EmbeddedServer
+import reactor.core.publisher.Flux
+import spock.lang.Specification
 
 class AlertsEndpointSpec extends Specification {
 
@@ -25,10 +18,10 @@ class AlertsEndpointSpec extends Specification {
         Map<String, Object> map = new HashMap<>()
         map.put("spec.name", AlertsEndpointSpec.simpleName)
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class, map)
-        RxHttpClient rxClient = server.getApplicationContext().createBean(RxHttpClient.class, server.getURL())
+        HttpClient client = server.getApplicationContext().createBean(HttpClient.class, server.getURL())
 
         when:
-        rxClient.exchange(HttpRequest.POST("/alerts", "First alert").contentType(MediaType.TEXT_PLAIN_TYPE), String.class).blockingFirst()
+        client.toBlocking().exchange(HttpRequest.POST("/alerts", "First alert").contentType(MediaType.TEXT_PLAIN_TYPE), String.class)
 
         then:
         def ex = thrown(HttpClientResponseException)
@@ -43,16 +36,16 @@ class AlertsEndpointSpec extends Specification {
         map.put("spec.name", AlertsEndpointSpec.class.getSimpleName());
         map.put("endpoints.alerts.add.sensitive", false);
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class, map);
-        RxHttpClient rxClient = server.getApplicationContext().createBean(RxHttpClient.class, server.getURL());
+        HttpClient client = server.getApplicationContext().createBean(HttpClient.class, server.getURL());
 
         when:
-        HttpResponse<?> response = rxClient.exchange(HttpRequest.POST("/alerts", "First alert").contentType(MediaType.TEXT_PLAIN_TYPE), String.class).blockingFirst();
+        HttpResponse<?> response = client.toBlocking().exchange(HttpRequest.POST("/alerts", "First alert").contentType(MediaType.TEXT_PLAIN_TYPE), String.class);
 
         then:
         response.status() == HttpStatus.OK
 
         when:
-        List<String> alerts = rxClient.retrieve(HttpRequest.GET("/alerts"), Argument.LIST_OF_STRING).blockingFirst();
+        List<String> alerts = client.toBlocking().retrieve(HttpRequest.GET("/alerts"), Argument.LIST_OF_STRING);
 
         then:
         alerts.get(0) == "First alert"
@@ -65,10 +58,10 @@ class AlertsEndpointSpec extends Specification {
         Map<String, Object> map = new HashMap<>()
         map.put("spec.name", AlertsEndpointSpec.class.getSimpleName())
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class, map)
-        RxHttpClient rxClient = server.getApplicationContext().createBean(RxHttpClient.class, server.getURL())
+        HttpClient client = server.getApplicationContext().createBean(HttpClient.class, server.getURL())
 
         when:
-        rxClient.exchange(HttpRequest.DELETE("/alerts"), String.class).blockingFirst()
+        client.toBlocking().exchange(HttpRequest.DELETE("/alerts"), String.class)
 
         then:
         def ex = thrown(HttpClientResponseException)

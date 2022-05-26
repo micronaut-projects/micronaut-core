@@ -29,6 +29,7 @@ import io.micronaut.http.filter.ServerFilterChain
 import io.micronaut.runtime.server.EmbeddedServer
 import org.reactivestreams.Publisher
 import spock.lang.AutoCleanup
+import spock.lang.Issue
 import spock.lang.Shared
 import spock.lang.Specification
 
@@ -78,6 +79,32 @@ class RequestAttributeSpec extends Specification {
         Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
             request.setAttribute("x-story-id", "ABC123")
             return chain.proceed(request)
+        }
+    }
+
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/6717')
+    def 'request attributes should not be forwarded'() {
+        given:
+        def client = context.getBean(ReceiveClient)
+
+        when:
+        def uri = client.get('foo')
+        then:
+        uri.path == '/request_attribute_not_forwarded'
+        uri.query == null
+    }
+
+    @Client('/request_attribute_not_forwarded')
+    static interface ReceiveClient {
+        @Get
+        URI get(@RequestAttribute("example") String value)
+    }
+
+    @Controller('/request_attribute_not_forwarded')
+    static class ReceiveController {
+        @Get
+        URI get(HttpRequest<?> request) {
+            return request.uri
         }
     }
 }

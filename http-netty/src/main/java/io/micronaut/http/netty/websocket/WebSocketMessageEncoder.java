@@ -27,8 +27,8 @@ import io.netty.buffer.UnpooledByteBufAllocator;
 import io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.nio.ByteBuffer;
 import java.util.Optional;
 
@@ -63,7 +63,7 @@ public class WebSocketMessageEncoder {
             String s = message.toString();
             return new TextWebSocketFrame(s);
         } else if (message instanceof ByteBuf) {
-            return new BinaryWebSocketFrame((ByteBuf) message);
+            return new BinaryWebSocketFrame(((ByteBuf) message).slice());
         } else if (message instanceof ByteBuffer) {
             return new BinaryWebSocketFrame(Unpooled.wrappedBuffer((ByteBuffer) message));
         } else {

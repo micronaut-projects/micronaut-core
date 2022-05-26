@@ -21,7 +21,13 @@ import io.micronaut.http.HttpResponseWrapper;
 import io.micronaut.http.netty.stream.DefaultStreamedHttpResponse;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.netty.buffer.ByteBuf;
-import io.netty.handler.codec.http.*;
+import io.netty.handler.codec.http.DefaultFullHttpResponse;
+import io.netty.handler.codec.http.DefaultHttpResponse;
+import io.netty.handler.codec.http.DefaultLastHttpContent;
+import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.HttpResponse;
+import io.netty.handler.codec.http.HttpResponseStatus;
+import io.netty.handler.codec.http.HttpVersion;
 
 import java.util.Objects;
 

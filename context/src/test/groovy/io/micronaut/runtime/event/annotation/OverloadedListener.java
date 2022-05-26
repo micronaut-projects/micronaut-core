@@ -18,7 +18,7 @@ package io.micronaut.runtime.event.annotation;
 import io.micronaut.context.event.ShutdownEvent;
 import io.micronaut.context.event.StartupEvent;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Singleton
 public class OverloadedListener {

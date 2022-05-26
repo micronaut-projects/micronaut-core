@@ -15,18 +15,24 @@
  */
 package io.micronaut.visitors;
 
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.visitor.*;
 
-import javax.inject.Inject;
 import java.util.ArrayList;
 import java.util.List;
 
-public class InjectVisitor implements TypeElementVisitor<Object, Inject> {
+public class InjectVisitor implements TypeElementVisitor<Object, Object> {
+
     public static List<String> VISITED_ELEMENTS = new ArrayList<>();
+
+    @Override
+    public String getElementType() {
+        return AnnotationUtil.INJECT;
+    }
 
     @Override
     public void visitClass(ClassElement element, VisitorContext context) {

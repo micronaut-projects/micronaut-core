@@ -17,7 +17,11 @@ package io.micronaut.http.server.netty.websocket.errors;
 
 import io.micronaut.websocket.CloseReason;
 import io.micronaut.websocket.WebSocketSession;
-import io.micronaut.websocket.annotation.*;
+import io.micronaut.websocket.annotation.ClientWebSocket;
+import io.micronaut.websocket.annotation.OnClose;
+import io.micronaut.websocket.annotation.OnError;
+import io.micronaut.websocket.annotation.OnMessage;
+import io.micronaut.websocket.annotation.OnOpen;
 
 @ClientWebSocket
 public abstract class ErrorsClient implements AutoCloseable {

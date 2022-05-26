@@ -22,7 +22,7 @@ import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Status
-import io.reactivex.Maybe
+import reactor.core.publisher.Mono
 
 import java.util.concurrent.CompletableFuture
 
@@ -64,8 +64,8 @@ class StatusController {
 
     @Status(HttpStatus.CREATED)
     @Get(value = "/maybeVoid")
-    Maybe<Void> maybeVoid() {
-        Maybe.empty()
+    Mono<Void> maybeVoid() {
+        Mono.empty()
     }
 
     @Status(HttpStatus.NOT_FOUND)

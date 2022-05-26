@@ -15,19 +15,21 @@
  */
 package io.micronaut.http.server.netty.binding
 
+import io.micronaut.core.async.annotation.SingleResult
 import groovy.transform.EqualsAndHashCode
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Body
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.client.multipart.MultipartBody
 import io.micronaut.http.server.netty.AbstractMicronautSpec
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Post
-import io.reactivex.Flowable
-import io.reactivex.Maybe
+import org.reactivestreams.Publisher
+import reactor.core.publisher.Flux
 import spock.lang.Issue
 
 /**
@@ -38,10 +40,10 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
 
     void "test simple string-based body parsing"() {
         when:
-        def response = rxClient.exchange(HttpRequest.POST('/form/simple', [
+        HttpResponse<?> response = Flux.from(rxClient.exchange(HttpRequest.POST('/form/simple', [
                 name:"Fred",
                 age:"10"
-        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String).blockingFirst()
+        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String)).blockFirst()
 
         then:
         response.status == HttpStatus.OK
@@ -51,11 +53,11 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
 
     void "test pojo body parsing"() {
         when:
-        def response = rxClient.exchange(HttpRequest.POST('/form/pojo', [
+        HttpResponse<?> response = Flux.from(rxClient.exchange(HttpRequest.POST('/form/pojo', [
                 name:"Fred",
                 age:"10",
                 something: "else"
-        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String).blockingFirst()
+        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String)).blockFirst()
 
         then:
         response.status == HttpStatus.OK
@@ -65,12 +67,12 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
 
     void "test simple string-based body parsing with missing data"() {
         when:
-        rxClient.exchange(HttpRequest.POST('/form/simple', [
+        Flux.from(rxClient.exchange(HttpRequest.POST('/form/simple', [
                 name:"Fred"
-        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String).blockingFirst()
+        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String)).blockFirst()
 
         then:
-        def e = thrown(HttpClientResponseException)
+        HttpClientResponseException e = thrown()
         e.response.status == HttpStatus.BAD_REQUEST
     }
 
@@ -87,8 +89,8 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
     void "test POST SAML form multipart form data"() {
         given:
         MultipartBody body = MultipartBody.builder().addPart("SAMLResponse", SAML_DATA).build()
-        String data = rxClient.retrieve(HttpRequest.POST("/form/saml/test/form-data", body)
-                .contentType(MediaType.MULTIPART_FORM_DATA_TYPE), String).blockingFirst()
+        String data = Flux.from(rxClient.retrieve(HttpRequest.POST("/form/saml/test/form-data", body)
+                .contentType(MediaType.MULTIPART_FORM_DATA_TYPE), String)).blockFirst()
 
         expect:
         data == SAML_DATA
@@ -129,10 +131,10 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
     @Issue("https://github.com/micronaut-projects/micronaut-core/issues/2263")
     void "test binding directly to a string"() {
         when:
-        def response = rxClient.exchange(HttpRequest.POST('/form/string', [
+        HttpResponse<String> response = Flux.from(rxClient.exchange(HttpRequest.POST('/form/string', [
                 name:"Fred",
                 age:"10"
-        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String).blockingFirst()
+        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String)).blockFirst()
 
         then:
         response.status == HttpStatus.OK
@@ -142,17 +144,17 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
 
     void "test binding directly to a reactive string"() {
         when:
-        def response = rxClient.exchange(HttpRequest.POST('/form/maybe-string', [
+        HttpResponse<String> response = Flux.from(rxClient.exchange(HttpRequest.POST('/form/maybe-string', [
                 name:"Fred",
                 age:"10"
-        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String).blockingFirst()
+        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String)).blockFirst()
 
         then:
         response.status == HttpStatus.OK
         response.body.isPresent()
         response.body.get() == "name=Fred&age=10"
     }
-    
+
     @Controller(value = '/form', consumes = MediaType.APPLICATION_FORM_URLENCODED)
     static class FormController {
 
@@ -162,8 +164,9 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
         }
 
         @Post('/maybe-string')
-        Maybe<String> string(@Body Flowable<String> string) {
-            string.reduce({ a, b -> a + b })
+        @SingleResult
+        Publisher<String> string(@Body Publisher<String> string) {
+            Flux.from(string).reduce({ a, b -> a + b })
         }
 
         @Post('/simple')
@@ -183,12 +186,11 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
         }
     }
 
-
     @Controller('/form/saml/test')
     static class MainController {
 
         @Post(consumes = MediaType.APPLICATION_FORM_URLENCODED)
-        public String process(String SAMLResponse) {
+        String process(String SAMLResponse) {
             System.out.println("Response: " + SAMLResponse)
             System.out.println("Response length: " + SAMLResponse.length())
             assert SAMLResponse == FormDataBindingSpec.SAML_DATA
@@ -197,7 +199,7 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
         }
 
         @Post(uri = "/form-data", consumes = MediaType.MULTIPART_FORM_DATA)
-        public String processFormData(String SAMLResponse) {
+        String processFormData(String SAMLResponse) {
             System.out.println("Response: " + SAMLResponse)
             System.out.println("Response length: " + SAMLResponse.length())
             assert SAMLResponse == FormDataBindingSpec.SAML_DATA
@@ -206,12 +208,12 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
         }
 
         @Post(uri = "/small-form", consumes = MediaType.APPLICATION_FORM_URLENCODED)
-        public String processTempFormData(String aaa0123456789, String bbb0123456789) {
+        String processTempFormData(String aaa0123456789, String bbb0123456789) {
             return aaa0123456789 + bbb0123456789
         }
 
         @Post(uri = "/small-form/pogo", consumes = MediaType.APPLICATION_FORM_URLENCODED)
-        public String processTempFormData(UrlEncodedPogo pogo) {
+        String processTempFormData(UrlEncodedPogo pogo) {
             return pogo.aaa0123456789 + pogo.bbb0123456789
         }
     }

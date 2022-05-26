@@ -17,7 +17,7 @@ package io.micronaut.inject.failures.ctorcirculardependency;
 
 import io.micronaut.context.annotation.Property;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 import java.util.Optional;
 
 @Singleton

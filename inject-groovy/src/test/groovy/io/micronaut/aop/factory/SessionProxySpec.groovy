@@ -19,6 +19,7 @@ import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.core.reflect.ReflectionUtils
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.writer.BeanDefinitionVisitor
+import io.micronaut.inject.writer.BeanDefinitionWriter
 import org.hibernate.Session
 import org.hibernate.SessionFactory
 
@@ -26,7 +27,7 @@ class SessionProxySpec extends AbstractBeanDefinitionSpec {
 
     void "test create session proxy"() {
         when:
-        BeanDefinition beanDefinition = buildBeanDefinition('test.$AbstractBean$CurrentSession0Definition' + BeanDefinitionVisitor.PROXY_SUFFIX, '''
+        BeanDefinition beanDefinition = buildBeanDefinition('test.$AbstractBean$CurrentSession0' + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionVisitor.PROXY_SUFFIX, '''
 package test;
 
 import io.micronaut.aop.introduction.*;
@@ -52,8 +53,10 @@ class AbstractBean {
         interfaces += Session.class
         for(i in interfaces) {
             for(m in i.declaredMethods) {
-                count++
-                assert clazz.getDeclaredMethod(m.name, m.parameterTypes)
+                if (!m.name.containsIgnoreCase("jacoco")) {
+                    count++
+                    assert clazz.getDeclaredMethod(m.name, m.parameterTypes)
+                }
             }
         }
 
@@ -67,7 +70,7 @@ class AbstractBean {
 
     void "test create session factory proxy"() {
         when:
-        BeanDefinition beanDefinition = buildBeanDefinition('test.$AbstractBean$SessionFactory0Definition' + BeanDefinitionVisitor.PROXY_SUFFIX, '''
+        BeanDefinition beanDefinition = buildBeanDefinition('test.$AbstractBean$SessionFactory0' + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionVisitor.PROXY_SUFFIX, '''
 package test;
 
 import io.micronaut.aop.introduction.*;
@@ -93,8 +96,10 @@ class AbstractBean {
         interfaces += SessionFactory.class
         for(i in interfaces) {
             for(m in i.declaredMethods) {
-                count++
-                assert clazz.getDeclaredMethod(m.name, m.parameterTypes)
+                if (!m.name.containsIgnoreCase("jacoco")) {
+                    count++
+                    assert clazz.getDeclaredMethod(m.name, m.parameterTypes)
+                }
             }
         }
 

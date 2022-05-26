@@ -20,7 +20,9 @@ import io.micronaut.core.util.functional.ThrowingSupplier;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.multipart.PartData;
 import io.micronaut.http.server.netty.HttpDataReference;
-import io.netty.buffer.*;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufInputStream;
+import io.netty.buffer.ByteBufUtil;
 
 import java.io.IOException;
 import java.io.InputStream;

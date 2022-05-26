@@ -15,7 +15,7 @@
  */
 package io.micronaut.docs.config.itfce
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 @Singleton
 class Vehicle(val engine: Engine)// <6>

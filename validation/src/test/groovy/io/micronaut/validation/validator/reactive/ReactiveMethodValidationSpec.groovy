@@ -4,12 +4,14 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Executable
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.validation.validator.Validator
-import io.reactivex.Single
+import jakarta.inject.Singleton
+import org.reactivestreams.Publisher
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
-
-import javax.inject.Singleton
+import io.micronaut.core.async.annotation.SingleResult
 import javax.validation.ConstraintViolationException
 import javax.validation.Valid
 import javax.validation.constraints.NotBlank
@@ -29,10 +31,10 @@ class ReactiveMethodValidationSpec extends Specification {
         BookService bookService = applicationContext.getBean(BookService)
 
         when:
-        bookService.rxReturnInvalid(Single.just(new Book("It"))).blockingGet()
+        Mono.from(bookService.rxReturnInvalid(Mono.just(new Book(title: "It")))).block()
 
         then:
-        def e = thrown(ConstraintViolationException)
+        ConstraintViolationException e = thrown()
         e.message == 'title: must not be blank'
         e.getConstraintViolations().first().propertyPath.toString() == 'title'
     }
@@ -93,7 +95,7 @@ class ReactiveMethodValidationSpec extends Specification {
         bookService.futureSimple(CompletableFuture.completedFuture("")).get()
 
         then:
-        def e = thrown(ExecutionException)
+        ExecutionException e = thrown()
 
         Pattern.matches('futureSimple.title\\[]<T .*String>: must not be blank', e.cause.message)
         e.cause.getConstraintViolations().first().propertyPath.toString().startsWith('futureSimple.title')
@@ -107,9 +109,10 @@ class ReactiveMethodValidationSpec extends Specification {
         bookService.futureValid(CompletableFuture.completedFuture(new Book(""))).get()
 
         then:
-        def e = thrown(ExecutionException)
+        ExecutionException e = thrown()
 
         Pattern.matches('futureValid.book\\[]<T .*Book>.title: must not be blank', e.cause.message);
         e.cause.getConstraintViolations().first().propertyPath.toString().startsWith('futureValid.book')
     }
 }
+

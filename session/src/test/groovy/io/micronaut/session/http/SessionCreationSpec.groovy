@@ -13,9 +13,9 @@ import io.micronaut.http.cookie.Cookie
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.session.Session
 import io.micronaut.session.SessionStore
-import io.reactivex.BackpressureStrategy
-import io.reactivex.Flowable
 import org.reactivestreams.Publisher
+import reactor.core.publisher.Flux
+import reactor.core.publisher.FluxSink
 import spock.lang.Specification
 
 class SessionCreationSpec extends Specification {
@@ -61,12 +61,12 @@ class SessionCreationSpec extends Specification {
 
         @Get(single = true)
         Publisher<MutableHttpResponse<?>> createSession(HttpRequest<?> request) {
-            return Flowable.create({ emitter ->
+            return Flux.create({ emitter ->
                 Session session = SessionForRequest.find(request).orElseGet(() -> SessionForRequest.create(sessionStore, request));
                 session.put("specName", "SessionCreationSpec")
-                emitter.onNext(HttpResponse.ok())
-                emitter.onComplete()
-            }, BackpressureStrategy.ERROR)
+                emitter.next(HttpResponse.ok())
+                emitter.complete()
+            }, FluxSink.OverflowStrategy.ERROR)
         }
 
     }

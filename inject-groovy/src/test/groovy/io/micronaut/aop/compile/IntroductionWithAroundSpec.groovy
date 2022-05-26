@@ -10,14 +10,14 @@ class IntroductionWithAroundSpec extends AbstractBeanDefinitionSpec {
 
     void "test that around advice is applied to introduction concrete methods"() {
         when:"An introduction advice type is compiled that includes a concrete method that is annotated with around advice"
-        BeanDefinition beanDefinition = buildBeanDefinition('test.MyBean' + BeanDefinitionVisitor.PROXY_SUFFIX, '''
-package test;
+        BeanDefinition beanDefinition = buildBeanDefinition('introaroundtest.MyBean' + BeanDefinitionVisitor.PROXY_SUFFIX, '''
+package introaroundtest;
 
 import io.micronaut.aop.introduction.*;
 import io.micronaut.context.annotation.*;
 import java.net.*;
 import javax.validation.constraints.*;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Stub
 @Singleton
@@ -46,4 +46,5 @@ abstract class MyBean {
         cleanup:
         context.close()
     }
+
 }

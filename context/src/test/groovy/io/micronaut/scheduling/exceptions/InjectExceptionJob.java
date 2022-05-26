@@ -18,8 +18,8 @@ package io.micronaut.scheduling.exceptions;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.scheduling.annotation.Scheduled;
 
-import javax.inject.Inject;
-import javax.inject.Singleton;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 
 @Singleton
 @Requires(property = "injection-exception.task.enabled", value = "true")

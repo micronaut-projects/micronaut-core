@@ -15,7 +15,8 @@
  */
 package io.micronaut.validation.validator;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
+
 import javax.validation.ClockProvider;
 import java.time.Clock;
 

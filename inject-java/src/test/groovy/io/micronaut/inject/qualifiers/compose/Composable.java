@@ -16,9 +16,9 @@
 package io.micronaut.inject.qualifiers.compose;
 
 import io.micronaut.context.annotation.DefaultScope;
+import jakarta.inject.Qualifier;
+import jakarta.inject.Singleton;
 
-import javax.inject.Qualifier;
-import javax.inject.Singleton;
 import java.lang.annotation.Retention;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;

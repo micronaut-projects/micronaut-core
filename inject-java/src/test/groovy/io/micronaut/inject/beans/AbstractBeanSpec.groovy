@@ -16,6 +16,7 @@
 package io.micronaut.inject.beans
 
 import io.micronaut.aop.Intercepted
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
@@ -26,6 +27,41 @@ import io.micronaut.inject.BeanDefinition
  */
 class AbstractBeanSpec extends AbstractTypeElementSpec {
 
+    void "test abstract beans not included in injected collections"() {
+        given:
+        ApplicationContext context = buildContext('test.Test', '''
+package test;
+
+import io.micronaut.context.annotation.*;
+import jakarta.inject.Inject;
+import java.util.List;
+
+class Test {
+    
+    @Inject
+    List<InterceptRule> list;
+}
+
+@jakarta.inject.Singleton
+abstract class AbstractBean implements InterceptRule {
+
+}
+@jakarta.inject.Singleton
+class ConcreteBean implements InterceptRule {
+
+}
+interface InterceptRule {}
+''')
+        def bean = getBean(context, 'test.Test')
+
+        expect:
+        bean.list.size() == 1
+        bean.list.first().getClass().name == 'test.ConcreteBean'
+
+        cleanup:
+        context.close()
+    }
+
     void "test that abstract bean definitions are built for abstract classes"() {
         when:
         BeanDefinition beanDefinition = buildBeanDefinition('test.AbstractBean', '''
@@ -33,7 +69,7 @@ package test;
 
 import io.micronaut.context.annotation.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 abstract class AbstractBean {
     @Value("server.host")
     String host;
@@ -106,7 +142,7 @@ abstract class AbstractBean {
         BeanDefinition beanDefinition = buildBeanDefinition('test.Bean', '''
 package test;
 
-@javax.inject.Named("a")
+@jakarta.inject.Named("a")
 class Bean {
 
 }
@@ -121,7 +157,7 @@ class Bean {
         BeanDefinition beanDefinition = buildBeanDefinition('test.Bean', '''
 package test;
 
-@javax.inject.Named("a")
+@jakarta.inject.Named("a")
 abstract class Bean {
 
 }

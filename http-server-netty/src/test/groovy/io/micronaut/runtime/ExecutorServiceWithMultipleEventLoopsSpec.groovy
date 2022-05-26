@@ -20,10 +20,10 @@ import io.micronaut.context.annotation.Context
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.scheduling.TaskExecutors
+import jakarta.inject.Inject
+import jakarta.inject.Named
 import spock.lang.Specification
 
-import javax.inject.Inject
-import javax.inject.Named
 import java.util.concurrent.ExecutorService
 
 class ExecutorServiceWithMultipleEventLoopsSpec extends Specification {

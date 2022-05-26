@@ -18,7 +18,7 @@ package io.micronaut.inject.factory.beanwithfactory;
 import io.micronaut.context.event.BeanInitializedEventListener;
 import io.micronaut.context.event.BeanInitializingEvent;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Singleton
 public class MyListener implements BeanInitializedEventListener<BFactory> {

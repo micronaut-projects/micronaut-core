@@ -63,7 +63,7 @@ class EnvironmentAwareArgument<T> extends DefaultArgument<T> implements Environm
     }
 
     private AnnotationMetadata initAnnotationMetadata(@Nullable AnnotationMetadata annotationMetadata) {
-        if (annotationMetadata instanceof DefaultAnnotationMetadata) {
+        if (annotationMetadata instanceof DefaultAnnotationMetadata && annotationMetadata.hasPropertyExpressions()) {
             return new ArgumentAnnotationMetadata((DefaultAnnotationMetadata) annotationMetadata);
         } else if (annotationMetadata != null) {
             return annotationMetadata;

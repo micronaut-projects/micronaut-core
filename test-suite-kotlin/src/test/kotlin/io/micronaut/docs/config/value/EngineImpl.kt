@@ -18,7 +18,7 @@ package io.micronaut.docs.config.value
 // tag::imports[]
 import io.micronaut.context.annotation.Value
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 // end::imports[]
 
 // tag::class[]

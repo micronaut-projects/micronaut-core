@@ -24,8 +24,8 @@ import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.session.Session;
 import io.micronaut.session.SessionSettings;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.util.Collections;
 import java.util.List;
 

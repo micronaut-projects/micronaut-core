@@ -18,8 +18,8 @@ package io.micronaut.docs.aop.scheduled;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.TaskScheduler;
 
-import javax.inject.Inject;
-import javax.inject.Named;
+import jakarta.inject.Inject;
+import jakarta.inject.Named;
 
 public class TaskSchedulerInjectExample {
     // tag::inject[]

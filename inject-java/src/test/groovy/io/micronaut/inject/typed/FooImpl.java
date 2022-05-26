@@ -2,7 +2,7 @@ package io.micronaut.inject.typed;
 
 import io.micronaut.context.annotation.Bean;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Bean(typed = Foo1.class)
 @Singleton

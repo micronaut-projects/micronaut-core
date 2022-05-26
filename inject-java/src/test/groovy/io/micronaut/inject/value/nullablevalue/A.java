@@ -19,8 +19,8 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
 
 import io.micronaut.core.annotation.Nullable;
-import javax.inject.Inject;
-import javax.inject.Singleton;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 
 @Requires(property = "spec.name", value = "NullableValueSpec")
 @Singleton

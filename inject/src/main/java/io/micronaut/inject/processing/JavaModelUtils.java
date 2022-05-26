@@ -16,6 +16,7 @@
 package io.micronaut.inject.processing;
 
 import io.micronaut.core.reflect.ReflectionUtils;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.TypedElement;
 import org.objectweb.asm.Type;
@@ -179,6 +180,54 @@ public class JavaModelUtils {
             }
         } catch (RuntimeException e) {
             return qualifiedName.toString();
+        }
+    }
+
+    /**
+     * Get the class name for the given type element without the package. Handles {@link NestingKind}.
+     *
+     * @param typeElement The type element
+     * @return The class name
+     */
+    public static String getClassNameWithoutPackage(TypeElement typeElement) {
+        NestingKind nestingKind;
+        try {
+            nestingKind = typeElement.getNestingKind();
+            if (nestingKind == NestingKind.MEMBER) {
+                TypeElement enclosingElement = typeElement;
+                StringBuilder builder = new StringBuilder();
+                while (nestingKind == NestingKind.MEMBER) {
+                    builder.insert(0, '$').insert(1, enclosingElement.getSimpleName());
+                    Element enclosing = enclosingElement.getEnclosingElement();
+
+                    if (enclosing instanceof TypeElement) {
+                        enclosingElement = (TypeElement) enclosing;
+                        nestingKind = enclosingElement.getNestingKind();
+                    } else {
+                        break;
+                    }
+                }
+                Name enclosingName = enclosingElement.getSimpleName();
+                return enclosingName.toString() + builder;
+            } else {
+                return typeElement.getSimpleName().toString();
+            }
+        } catch (RuntimeException e) {
+            return typeElement.getSimpleName().toString();
+        }
+    }
+
+    public static String getPackageName(TypeElement typeElement) {
+        Element enclosingElement = typeElement.getEnclosingElement();
+        while (enclosingElement != null && enclosingElement.getKind() != ElementKind.PACKAGE) {
+            enclosingElement = enclosingElement.getEnclosingElement();
+        }
+        if (enclosingElement == null) {
+            return StringUtils.EMPTY_STRING;
+        } else if (enclosingElement instanceof PackageElement) {
+            return ((PackageElement) enclosingElement).getQualifiedName().toString();
+        } else {
+            return enclosingElement.toString();
         }
     }
 

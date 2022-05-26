@@ -56,6 +56,7 @@ import java.lang.annotation.*;
 @Target({ElementType.FIELD, ElementType.PARAMETER, ElementType.TYPE, ElementType.METHOD, ElementType.ANNOTATION_TYPE}) // this can be either type or param
 @Repeatable(value = Headers.class)
 @Bindable
+@Inherited
 public @interface Header {
 
     /**

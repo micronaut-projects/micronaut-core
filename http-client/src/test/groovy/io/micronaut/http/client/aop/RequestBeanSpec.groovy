@@ -7,27 +7,20 @@ import io.micronaut.core.convert.ArgumentConversionContext
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MutableHttpResponse
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Filter
-import io.micronaut.http.annotation.Get
-import io.micronaut.http.annotation.Header
-import io.micronaut.http.annotation.PathVariable
-import io.micronaut.http.annotation.QueryValue
-import io.micronaut.http.annotation.RequestBean
+import io.micronaut.http.annotation.*
 import io.micronaut.http.bind.binders.TypedRequestArgumentBinder
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
-import io.micronaut.http.filter.HttpServerFilter
 import io.micronaut.http.filter.OncePerRequestHttpServerFilter
 import io.micronaut.http.filter.ServerFilterChain
 import io.micronaut.runtime.server.EmbeddedServer
+import jakarta.inject.Singleton
 import org.reactivestreams.Publisher
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
 import javax.annotation.Nullable
-import javax.inject.Singleton
 import javax.validation.Valid
 import javax.validation.constraints.Pattern
 
@@ -48,85 +41,88 @@ class RequestBeanSpec extends Specification {
         bean.path = "request-bean"
 
         when:
-            ClientRequestBean resp = client.getBean(bean)
+        ClientRequestBean resp = client.getBean(bean)
+
         then:
-            resp == bean
+        resp == bean
     }
 
     void "test @QueryValue is injected to Bean"() {
         expect:
-            client.getQueryValue("Riverside") == "Riverside"
+        client.getQueryValue("Riverside") == "Riverside"
     }
 
     void "test @QueryValue have empty Optional Value"() {
         expect:
-            !client.getOptionalValue()
+        !client.getOptionalValue()
     }
 
     void "test @QueryValue has value in Optional"() {
         expect:
-            client.getOptionalValue("hello value")
+        client.getOptionalValue("hello value")
     }
 
     void "test validated value returns bad request when invalid"() {
         when:
-            client.getValidatedValue("third")
+        client.getValidatedValue("third")
+
         then:
-            def ex = thrown(HttpClientResponseException)
-            ex.message.contains("Field must have value first or second.")
+        def ex = thrown(HttpClientResponseException)
+        ex.response.getBody(Map).get()._embedded.errors[0].message.contains("Field must have value first or second.")
     }
 
     void "test validated value returns ok when valid"() {
         expect:
-            client.getValidatedValue("second") == "second"
+        client.getValidatedValue("second") == "second"
     }
 
     void "test @PathVariable is injected in to Bean"() {
         expect:
-            client.getPathVariable("v1beta") == "v1beta"
+        client.getPathVariable("v1beta") == "v1beta"
     }
 
     void "test @Header is injected in to Bean"() {
         expect:
-            client.getHeader("127.0.0.1") == "127.0.0.1"
+        client.getHeader("127.0.0.1") == "127.0.0.1"
     }
 
     void "test HttpRequest is injected in to Bean"() {
         expect:
-            client.getInjectedHttpRequest() == "/request/bean/httpRequest"
+        client.getInjectedHttpRequest() == "/request/bean/httpRequest"
     }
 
     void "test Typed Value is injected in to Bean"() {
         expect:
-            client.getInjectedTypedValue() == "Type Test Value"
+        client.getInjectedTypedValue() == "Type Test Value"
     }
 
     void "test Immutable injections works"() {
         expect:
-            client.getImmutableBean("I am immutable! Muahahah") == "I am immutable! Muahahah"
+        client.getImmutableBean("I am immutable! Muahahah") == "I am immutable! Muahahah"
     }
 
     void "test Immutable Bean gets injected HttpRequest"() {
         expect:
-            client.getImmutableBeanInjectedHttpRequest() == "/request/bean/immutable/request/path"
+        client.getImmutableBeanInjectedHttpRequest() == "/request/bean/immutable/request/path"
     }
 
     void "test Immutable validated parameter"() {
         when:
-            client.getImmutableBeanValidatedValue("third")
+        client.getImmutableBeanValidatedValue("third")
+
         then:
-            def ex = thrown(HttpClientResponseException)
-            ex.message.contains("Field must have value first or second.")
+        def ex = thrown(HttpClientResponseException)
+        ex.response.getBody(Map).get()._embedded.errors[0].message.contains("Field must have value first or second.")
     }
 
     void "test Immutable Bean gets injected Typed Value"() {
         expect:
-            client.getImmutableInjectedTypedValue() == "Type Test Value"
+        client.getImmutableInjectedTypedValue() == "Type Test Value"
     }
 
     void "test Extending Bean has super values"() {
         expect:
-            client.getExtendingBeanValues("I am not super!", "I am super!") == "Extending: 'I am not super!', Super: 'I am super!'"
+        client.getExtendingBeanValues("I am not super!", "I am super!") == "Extending: 'I am not super!', Super: 'I am super!'"
     }
 
     /**
@@ -134,15 +130,16 @@ class RequestBeanSpec extends Specification {
      */
     void "test Filter values are respected"() {
         expect:
-            client.getFilterValue() == "Filter Test Value"
+        client.getFilterValue() == "Filter Test Value"
     }
 
     void "test unsatisfied non-nullable value returns bad request"() {
         when:
-            client.getUnsatisfiedValue()
+        client.getUnsatisfiedValue()
+
         then:
-            def ex = thrown(HttpClientResponseException)
-            ex.message.contains("Required argument [String value] not specified")
+        def ex = thrown(HttpClientResponseException)
+        ex.response.getBody(Map).get()._embedded.errors[0].message.contains("Required argument [String value] not specified")
     }
 
     @Controller('/request/bean')

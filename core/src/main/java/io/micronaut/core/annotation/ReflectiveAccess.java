@@ -21,15 +21,14 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Descriptive annotation that can be used to declare a field, method, constructor etc for reflective access.
+ * Descriptive annotation that can be used to declare a field, method, constructor and types for reflective access.
  *
  * @author graemerocher
  * @since 1.1
  */
-@Target({ElementType.FIELD, ElementType.METHOD, ElementType.CONSTRUCTOR})
+@Target({ElementType.FIELD, ElementType.METHOD, ElementType.CONSTRUCTOR, ElementType.TYPE, ElementType.ANNOTATION_TYPE})
 @Retention(RetentionPolicy.RUNTIME)
 @Experimental
 public @interface ReflectiveAccess {
-
 
 }

@@ -26,7 +26,7 @@ package test;
 
 import io.micronaut.context.annotation.*;
 import io.micronaut.core.annotation.*;
-import javax.inject.*;
+import jakarta.inject.*;
 
 @Singleton
 class MyBean extends MyBase {
@@ -60,7 +60,7 @@ package test;
 
 import io.micronaut.context.annotation.*;
 import io.micronaut.core.annotation.*;
-import javax.inject.*;
+import jakarta.inject.*;
 
 @Singleton
 class MyBean extends MyBase {
@@ -92,7 +92,7 @@ package test;
 
 import io.micronaut.context.annotation.*;
 import io.micronaut.core.annotation.*;
-import javax.inject.*;
+import jakarta.inject.*;
 
 @Singleton
 class MyBean extends MyBase {
@@ -130,7 +130,7 @@ package test;
 import io.micronaut.context.annotation.*;
 import io.micronaut.core.annotation.*;
 import io.micronaut.aop.simple.*;
-import javax.inject.*;
+import jakarta.inject.*;
 
 @Singleton
 class MyBean extends MyBase {
@@ -167,7 +167,7 @@ package test;
 
 import io.micronaut.context.annotation.*;
 import io.micronaut.core.annotation.*;
-import javax.inject.*;
+import jakarta.inject.*;
 import io.micronaut.core.convert.*;
 @Singleton
 class MyBean extends MyBase {
@@ -218,7 +218,7 @@ interface MyInterface{
 
 
 @Stub
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 interface MyBean extends MyInterface {
 }
 
@@ -256,7 +256,7 @@ interface MyInterface {
 
 
 @Stub
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 abstract class MyBean implements MyInterface {
 }
 
@@ -294,7 +294,7 @@ interface MyInterface {
 
 
 @Stub
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 abstract class MyBean extends MyParentBean {
 }
 

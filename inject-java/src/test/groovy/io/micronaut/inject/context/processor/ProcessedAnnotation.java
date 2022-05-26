@@ -17,8 +17,8 @@ package io.micronaut.inject.context.processor;
 
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.DefaultScope;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

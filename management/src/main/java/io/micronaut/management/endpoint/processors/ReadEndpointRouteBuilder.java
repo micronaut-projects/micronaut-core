@@ -22,8 +22,8 @@ import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.management.endpoint.EndpointDefaultConfiguration;
 import io.micronaut.management.endpoint.annotation.Read;
 import io.micronaut.web.router.UriRoute;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
 
 /**

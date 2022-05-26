@@ -18,7 +18,7 @@ package io.micronaut.docs.events.factory;
 import io.micronaut.context.event.BeanInitializedEventListener;
 import io.micronaut.context.event.BeanInitializingEvent;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 // tag::class[]
 @Singleton

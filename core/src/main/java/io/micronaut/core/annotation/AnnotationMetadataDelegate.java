@@ -29,6 +29,21 @@ import java.util.*;
  * @since 1.0
  */
 public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, AnnotationMetadata {
+    @Override
+    default Set<String> getStereotypeAnnotationNames() {
+        return getAnnotationMetadata().getStereotypeAnnotationNames();
+    }
+
+    @Override
+    default Set<String> getDeclaredStereotypeAnnotationNames() {
+        return getAnnotationMetadata().getDeclaredStereotypeAnnotationNames();
+    }
+
+    @NonNull
+    @Override
+    default AnnotationMetadata getDeclaredMetadata() {
+        return getAnnotationMetadata().getDeclaredMetadata();
+    }
 
     @Override
     default boolean hasSimpleAnnotation(@Nullable String annotation) {
@@ -141,6 +156,18 @@ public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, 
     @NonNull
     @Override
     default String[] stringValues(@NonNull Class<? extends Annotation> annotation) {
+        return getAnnotationMetadata().stringValues(annotation, AnnotationMetadata.VALUE_MEMBER);
+    }
+
+    @NonNull
+    @Override
+    default String[] stringValues(@NonNull String annotation, @NonNull String member) {
+        return getAnnotationMetadata().stringValues(annotation, member);
+    }
+
+    @NonNull
+    @Override
+    default String[] stringValues(@NonNull String annotation) {
         return getAnnotationMetadata().stringValues(annotation, AnnotationMetadata.VALUE_MEMBER);
     }
 
@@ -338,6 +365,11 @@ public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, 
 
     @Override
     default @NonNull List<Class<? extends Annotation>> getAnnotationTypesByStereotype(@NonNull Class<? extends Annotation> stereotype) {
+        return getAnnotationMetadata().getAnnotationTypesByStereotype(stereotype);
+    }
+
+    @Override
+    default @NonNull List<Class<? extends Annotation>> getAnnotationTypesByStereotype(@NonNull String stereotype) {
         return getAnnotationMetadata().getAnnotationTypesByStereotype(stereotype);
     }
 
@@ -566,6 +598,18 @@ public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, 
         return getAnnotationMetadata().synthesize(annotationClass);
     }
 
+    @Nullable
+    @Override
+    default <T extends Annotation> T synthesize(@NonNull Class<T> annotationClass, @NonNull String sourceAnnotation) {
+        return getAnnotationMetadata().synthesize(annotationClass, sourceAnnotation);
+    }
+
+    @Nullable
+    @Override
+    default <T extends Annotation> T synthesizeDeclared(@NonNull Class<T> annotationClass, @NonNull String sourceAnnotation) {
+        return getAnnotationMetadata().synthesizeDeclared(annotationClass, sourceAnnotation);
+    }
+
     @Override
     default @NonNull Annotation[] synthesizeAll() {
         return getAnnotationMetadata().synthesizeAll();
@@ -586,4 +630,23 @@ public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, 
         return getAnnotationMetadata().getDeclaredAnnotationValuesByType(annotationType);
     }
 
+    @Override
+    default boolean isRepeatableAnnotation(Class<? extends Annotation> annotation) {
+        return getAnnotationMetadata().isRepeatableAnnotation(annotation);
+    }
+
+    @Override
+    default boolean isRepeatableAnnotation(String annotation) {
+        return getAnnotationMetadata().isRepeatableAnnotation(annotation);
+    }
+
+    @Override
+    default Optional<String> findRepeatableAnnotation(Class<? extends Annotation> annotation) {
+        return getAnnotationMetadata().findRepeatableAnnotation(annotation);
+    }
+
+    @Override
+    default Optional<String> findRepeatableAnnotation(String annotation) {
+        return getAnnotationMetadata().findRepeatableAnnotation(annotation);
+    }
 }

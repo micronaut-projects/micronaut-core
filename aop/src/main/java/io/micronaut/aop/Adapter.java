@@ -18,10 +18,11 @@ package io.micronaut.aop;
 import io.micronaut.context.annotation.DefaultScope;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.core.annotation.Internal;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
+import java.lang.annotation.Inherited;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
@@ -56,6 +57,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Target({ElementType.ANNOTATION_TYPE, ElementType.METHOD})
 @DefaultScope(Singleton.class)
 @Executable
+@Inherited
 public @interface Adapter {
 
     /**

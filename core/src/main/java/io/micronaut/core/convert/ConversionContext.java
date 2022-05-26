@@ -44,32 +44,32 @@ public interface ConversionContext extends AnnotationMetadataProvider, TypeVaria
     /**
      * Constant for Boolean argument.
      */
-    ArgumentConversionContext<Boolean> BOOLEAN = ConversionContext.of(Argument.BOOLEAN);
+    ArgumentConversionContext<Boolean> BOOLEAN = ImmutableArgumentConversionContext.of(Argument.BOOLEAN);
 
     /**
      * Constant for Integer argument.
      */
-    ArgumentConversionContext<Integer> INT = ConversionContext.of(Argument.INT);
+    ArgumentConversionContext<Integer> INT = ImmutableArgumentConversionContext.of(Argument.INT);
 
     /**
      * Constant for Long argument.
      */
-    ArgumentConversionContext<Long> LONG = ConversionContext.of(Argument.LONG);
+    ArgumentConversionContext<Long> LONG = ImmutableArgumentConversionContext.of(Argument.LONG);
 
     /**
      * Constant for String argument.
      */
-    ArgumentConversionContext<String> STRING = ConversionContext.of(Argument.STRING);
+    ArgumentConversionContext<String> STRING = ImmutableArgumentConversionContext.of(Argument.STRING);
 
     /**
      * Constant for List<String> argument.
      */
-    ArgumentConversionContext<List<String>> LIST_OF_STRING = ConversionContext.of(Argument.LIST_OF_STRING);
+    ArgumentConversionContext<List<String>> LIST_OF_STRING = ImmutableArgumentConversionContext.of(Argument.LIST_OF_STRING);
 
     /**
      * Constant for List<String> argument.
      */
-    ArgumentConversionContext<Map> MAP = ConversionContext.of(Argument.of(Map.class));
+    ArgumentConversionContext<Map> MAP = ImmutableArgumentConversionContext.of(Argument.of(Map.class));
 
     /**
      * In the case where the type to be converted contains generic type arguments this map will return
@@ -168,7 +168,10 @@ public interface ConversionContext extends AnnotationMetadataProvider, TypeVaria
     }
 
     /**
-     * Create a simple {@link ConversionContext} for the given generic type variables.
+     * Create a new simple {@link ConversionContext} for the given generic type variables.
+     *
+     * <p>NOTE: The instance returned by this method is NOT thread safe and should be shared
+     * via static state or between threads. Consider using {@link io.micronaut.core.convert.ImmutableArgumentConversionContext} for this case.</p>
      *
      * @param <T>      type Generic
      * @param argument The argument
@@ -180,6 +183,9 @@ public interface ConversionContext extends AnnotationMetadataProvider, TypeVaria
 
     /**
      * Create a simple {@link ConversionContext} for the given generic type variables.
+     *
+     * <p>NOTE: The instance returned by this method is NOT thread safe and should be shared
+     * via static state or between threads. Consider using {@link io.micronaut.core.convert.ImmutableArgumentConversionContext} for this case.</p>
      *
      * @param <T>      type Generic
      * @param argument The argument
@@ -193,6 +199,9 @@ public interface ConversionContext extends AnnotationMetadataProvider, TypeVaria
     /**
      * Create a simple {@link ConversionContext} for the given generic type variables.
      *
+     * <p>NOTE: The instance returned by this method is NOT thread safe and should be shared
+     * via static state or between threads. Consider using {@link io.micronaut.core.convert.ImmutableArgumentConversionContext} for this case.</p>
+     *
      * @param <T>      type Generic
      * @param argument The argument
      * @param locale   The locale
@@ -204,6 +213,9 @@ public interface ConversionContext extends AnnotationMetadataProvider, TypeVaria
 
     /**
      * Create a simple {@link ConversionContext} for the given generic type variables.
+     *
+     * <p>NOTE: The instance returned by this method is NOT thread safe and should be shared
+     * via static state or between threads. Consider using {@link io.micronaut.core.convert.ImmutableArgumentConversionContext} for this case.</p>
      *
      * @param <T>      type Generic
      * @param argument The argument

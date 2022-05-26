@@ -17,7 +17,7 @@ package io.micronaut.docs.aop.scheduled
 
 import io.micronaut.scheduling.annotation.Scheduled
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 @Singleton
 class ScheduledExample {

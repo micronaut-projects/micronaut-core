@@ -55,7 +55,11 @@ class GroovyEnumElement extends GroovyClassElement implements EnumElement {
     @Override
     public List<String> values() {
         ClassNode cn = (ClassNode) getNativeType();
-        List<String> values = cn.getFields().stream().filter(fn -> fn.getType().equals(cn)).map(FieldNode::getName).collect(Collectors.toList());
+        List<String> values = cn.getFields().stream()
+                .filter((fn -> !fn.getName().equals("MAX_VALUE") && !fn.getName().equals("MIN_VALUE")))
+                .filter(fn -> fn.getType().equals(cn))
+                .map(FieldNode::getName)
+                .collect(Collectors.toList());
         return Collections.unmodifiableList(values);
     }
 

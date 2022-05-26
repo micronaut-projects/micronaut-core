@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2021 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,28 +15,30 @@
  */
 package io.micronaut.annotation.processing.visitor;
 
+import io.micronaut.core.annotation.AccessorsStyle;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ElementQuery;
+import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
-
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.PrimitiveElement;
 
-import javax.lang.model.element.*;
+import javax.lang.model.element.Element;
+import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.DeclaredType;
+import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.type.WildcardType;
-
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * A method element returning data from a {@link ExecutableElement}.
@@ -50,7 +52,7 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
     protected final JavaClassElement declaringClass;
     protected final ExecutableElement executableElement;
     protected final JavaVisitorContext visitorContext;
-    private JavaClassElement resolvedDeclaringClass;
+    private ClassElement resolvedDeclaringClass;
     private ParameterElement[] parameters;
     private ParameterElement continuationParameter;
     private ClassElement genericReturnType;
@@ -74,8 +76,50 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
     }
 
     @Override
+    public Optional<ClassElement> getReceiverType() {
+        final TypeMirror receiverType = executableElement.getReceiverType();
+        if (receiverType != null) {
+            if (receiverType.getKind() != TypeKind.NONE) {
+                final ClassElement classElement = mirrorToClassElement(receiverType,
+                                                                       visitorContext,
+                                                                       declaringClass.getGenericTypeInfo());
+                return Optional.of(classElement);
+            }
+        }
+        return Optional.empty();
+    }
+
+    @Override
+    @NonNull
+    public ClassElement[] getThrownTypes() {
+        final List<? extends TypeMirror> thrownTypes = executableElement.getThrownTypes();
+        if (!thrownTypes.isEmpty()) {
+            return thrownTypes.stream()
+                    .map(tm -> mirrorToClassElement(
+                            tm,
+                            visitorContext,
+                            declaringClass.getGenericTypeInfo()
+                    )).toArray(ClassElement[]::new);
+        }
+
+        return ClassElement.ZERO_CLASS_ELEMENTS;
+    }
+
+    @Override
     public boolean isDefault() {
         return executableElement.isDefault();
+    }
+
+    @Override
+    public boolean overrides(MethodElement methodElement) {
+        if (methodElement instanceof JavaMethodElement) {
+            return visitorContext.getElements().overrides(
+                    executableElement,
+                    ((JavaMethodElement) methodElement).executableElement,
+                    declaringClass.classElement
+            );
+        }
+        return false;
     }
 
     @NonNull
@@ -94,6 +138,13 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
             this.returnType = returnType(Collections.emptyMap());
         }
         return this.returnType;
+    }
+
+    @Override
+    public List<? extends GenericPlaceholderElement> getDeclaredTypeVariables() {
+        return executableElement.getTypeParameters().stream()
+                .map(tpe -> (GenericPlaceholderElement) mirrorToClassElement(tpe.asType(), visitorContext))
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -118,7 +169,8 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
                     this.continuationParameter = newParameterElement(variableElement, AnnotationMetadata.EMPTY_METADATA);
                     continue;
                 }
-                AnnotationMetadata annotationMetadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(variableElement);
+                AnnotationMetadata annotationMetadata = visitorContext.getAnnotationUtils()
+                        .getAnnotationMetadata(getFieldElementForWriter(), variableElement);
                 JavaParameterElement javaParameterElement = newParameterElement(variableElement, annotationMetadata);
                 if (annotationMetadata.hasDeclaredAnnotation("org.jetbrains.annotations.Nullable")) {
                     javaParameterElement.annotate("javax.annotation.Nullable").getAnnotationMetadata();
@@ -171,12 +223,7 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
                 if (declaringClass.getName().equals(te.getQualifiedName().toString())) {
                     resolvedDeclaringClass = declaringClass;
                 } else {
-                    resolvedDeclaringClass = new JavaClassElement(
-                            te,
-                            visitorContext.getAnnotationUtils().getAnnotationMetadata(te),
-                            visitorContext,
-                            declaringClass.getGenericTypeInfo()
-                    );
+                    resolvedDeclaringClass = mirrorToClassElement(te.asType(), visitorContext, declaringClass.getGenericTypeInfo());
                 }
             } else {
                 return declaringClass;
@@ -199,8 +246,10 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
         VariableElement varElement = CollectionUtils.last(executableElement.getParameters());
         if (isSuspend(varElement)) {
             DeclaredType dType = (DeclaredType) varElement.asType();
-            WildcardType wType = (WildcardType) dType.getTypeArguments().iterator().next();
-            TypeMirror tm = wType.getSuperBound();
+            TypeMirror tm = dType.getTypeArguments().iterator().next();
+            if (tm.getKind() == TypeKind.WILDCARD) {
+                tm = ((WildcardType) tm).getSuperBound();
+            }
             // check Void
             if ((tm instanceof DeclaredType) && sameType("kotlin.Unit", (DeclaredType) tm)) {
                 return PrimitiveElement.VOID;
@@ -225,4 +274,27 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
         return false;
     }
 
+    private Element getFieldElementForWriter() {
+        String[] writerPrefixes = getAnnotationMetadata()
+                .getValue(AccessorsStyle.class, "writePrefixes", String[].class)
+                .orElse(new String[]{AccessorsStyle.DEFAULT_WRITE_PREFIX});
+
+        final String methodName = getName();
+        if (!NameUtils.isWriterName(methodName, writerPrefixes) || executableElement.getParameters().size() != 1) {
+            return null;    // not a writer
+        }
+
+        Element classElement = executableElement.getEnclosingElement();
+        if (!(classElement instanceof TypeElement)) {
+            return null;    // not within a class
+        }
+
+        final String fieldName = NameUtils.getPropertyNameForSetter(methodName, writerPrefixes);
+
+        // Return the field corresponding to this writer.
+        return (Element) getDeclaringType()
+                .getEnclosedElement(ElementQuery.ALL_FIELDS.named(fieldName::equals))
+                .map(io.micronaut.inject.ast.Element::getNativeType)
+                .orElse(null);
+    }
 }

@@ -16,6 +16,7 @@
 package io.micronaut.http.client
 
 import io.micronaut.context.annotation.Property
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
@@ -23,15 +24,15 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.ContentLengthExceededException
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
+import jakarta.inject.Inject
 import spock.lang.Specification
-
-import javax.inject.Inject
 
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
 @MicronautTest
+@Property(name = "spec.name", value = 'MaxResponseSizeSpec' )
 @Property(name = "micronaut.http.client.maxContentLength", value = '1kb' )
 class MaxResponseSizeSpec extends Specification {
 
@@ -48,6 +49,7 @@ class MaxResponseSizeSpec extends Specification {
         e.message == 'The received length exceeds the maximum allowed content length [1024]'
     }
 
+    @Requires(property = "spec.name", value = 'MaxResponseSizeSpec' )
     @Controller("/max")
     static class GetController {
 

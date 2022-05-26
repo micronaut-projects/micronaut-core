@@ -27,13 +27,18 @@ import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.multipart.MultipartBody;
-import io.micronaut.http.server.netty.*;
+import io.micronaut.http.server.netty.DefaultHttpContentProcessor;
+import io.micronaut.http.server.netty.HttpContentProcessor;
+import io.micronaut.http.server.netty.HttpContentSubscriberFactory;
+import io.micronaut.http.server.netty.NettyHttpRequest;
+import io.micronaut.http.server.netty.NettyHttpServer;
 import io.micronaut.web.router.qualifier.ConsumesMediaTypeQualifier;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.buffer.EmptyByteBuf;
 import io.netty.handler.codec.http.multipart.Attribute;
 import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.handler.codec.http.multipart.HttpData;
+import io.netty.util.ReferenceCountUtil;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -125,13 +130,10 @@ public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinde
                                 } else if (data instanceof Attribute) {
                                     subscriber.onNext(new NettyCompletedAttribute((Attribute) data, false));
                                 }
-
-                                //If the user didn't release the data, we should
-                                if (data.refCnt() > 0) {
-                                    data.release();
-                                }
                             }
                         }
+
+                        ReferenceCountUtil.release(message);
 
                         if (partsRequested.get() > 0) {
                             s.request(1);

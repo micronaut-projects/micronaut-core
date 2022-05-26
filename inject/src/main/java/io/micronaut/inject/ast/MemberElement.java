@@ -15,6 +15,11 @@
  */
 package io.micronaut.inject.ast;
 
+import java.util.Collections;
+import java.util.Set;
+
+import io.micronaut.core.annotation.NonNull;
+
 /**
  * A member element is an element that is contained within a {@link ClassElement}.
  * The {@link #getDeclaringType()} method returns the class that declares the element.
@@ -38,5 +43,48 @@ public interface MemberElement extends Element {
      */
     default ClassElement getOwningType() {
         return getDeclaringType();
+    }
+
+    /**
+     * @return The {@link ElementModifier} types for this class element
+     * @since 3.0.0
+     */
+    default Set<ElementModifier> getModifiers() {
+        return Collections.emptySet();
+    }
+
+    /**
+     * Returns whether this member element will require reflection to invoke or retrieve at runtime.
+     *
+     * <p>This method uses {@link #getOwningType()} as the calling type for this method.</p>
+     *
+     * @return Will return {@code true} if reflection is required.
+     * @since 3.4.0
+     */
+    default boolean isReflectionRequired() {
+        return isReflectionRequired(getOwningType());
+    }
+
+    /**
+     * Returns whether this member element will require reflection to invoke or retrieve at runtime.
+     *
+     * @param callingType The calling type
+     * @return Will return {@code true} if reflection is required.
+     * @since 3.4.0
+     */
+    default boolean isReflectionRequired(@NonNull ClassElement callingType) {
+        if (isPublic()) {
+            return false;
+        } else {
+            if (isPackagePrivate() || isProtected()) {
+                // the declaring type might be a super class in which
+                // case if the super class is in a different package then
+                // the method or field is not visible and hence reflection is required
+                final ClassElement declaringType = getDeclaringType();
+                return !declaringType.getPackageName().equals(callingType.getPackageName());
+            } else {
+                return true;
+            }
+        }
     }
 }

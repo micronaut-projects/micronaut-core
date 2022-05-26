@@ -4,7 +4,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Parameter;
 
-import javax.inject.Provider;
+import jakarta.inject.Provider;
 
 @EachBean(BeanNumber.class)
 public class EachBeanProvider {

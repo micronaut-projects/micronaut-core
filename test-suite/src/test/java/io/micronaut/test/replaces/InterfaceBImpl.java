@@ -15,7 +15,7 @@
  */
 package io.micronaut.test.replaces;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Singleton
 public class InterfaceBImpl implements InterfaceB {

@@ -20,8 +20,8 @@ import io.micronaut.context.ExecutionHandleLocator
 import io.micronaut.core.convert.ConversionService
 import io.micronaut.web.router.GroovyRouteBuilder
 
-import javax.inject.Inject
-import javax.inject.Singleton
+import jakarta.inject.Inject
+import jakarta.inject.Singleton
 // end::imports[]
 
 // tag::class[]

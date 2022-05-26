@@ -19,7 +19,9 @@ import io.micronaut.core.reflect.ReflectionUtils;
 
 import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
-import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -32,8 +34,10 @@ import java.util.Map;
 public class AnnotationValueBuilder<T extends Annotation> {
 
     private final String annotationName;
-    private final Map<CharSequence, Object> values = new HashMap<>(5);
+    private final Map<CharSequence, Object> values = new LinkedHashMap<>(5);
     private final RetentionPolicy retentionPolicy;
+    private final List<AnnotationValue<?>> stereotypes = new ArrayList<>();
+    private final Map<String, Object> defaultValues = new LinkedHashMap<>();
 
     /**
      * Default constructor.
@@ -87,8 +91,37 @@ public class AnnotationValueBuilder<T extends Annotation> {
      */
     @NonNull
     public AnnotationValue<T> build() {
-        return new AnnotationValue<>(annotationName, values, retentionPolicy);
+        return new AnnotationValue<>(annotationName, values, defaultValues, retentionPolicy, stereotypes);
     }
+
+    /**
+     * Adds a stereotype of the annotation.
+     *
+     * @param annotation The stereotype
+     * @return This builder
+     */
+    @NonNull
+    public AnnotationValueBuilder<T> stereotype(AnnotationValue<?> annotation) {
+        if (annotation != null) {
+            stereotypes.add(annotation);
+        }
+        return this;
+    }
+
+    /**
+     * Sets the default values of the annotation.
+     *
+     * @param defaultValues The default values
+     * @return This builder
+     */
+    @NonNull
+    public AnnotationValueBuilder<T> defaultValues(Map<String, Object> defaultValues) {
+        if (defaultValues != null) {
+            this.defaultValues.putAll(defaultValues);
+        }
+        return this;
+    }
+
 
     /**
      * Sets the value member to the given integer value.
@@ -165,6 +198,42 @@ public class AnnotationValueBuilder<T extends Annotation> {
     @NonNull
     public AnnotationValueBuilder<T> value(boolean bool) {
         return member(AnnotationMetadata.VALUE_MEMBER, bool);
+    }
+
+    /**
+     * Sets the value member to the given char value.
+     *
+     * @param character The char
+     * @return This builder
+     * @since 3.0.0
+     */
+    @NonNull
+    public AnnotationValueBuilder<T> value(char character) {
+        return member(AnnotationMetadata.VALUE_MEMBER, character);
+    }
+
+    /**
+     * Sets the value member to the given double value.
+     *
+     * @param number The double
+     * @return This builder
+     * @since 3.0.0
+     */
+    @NonNull
+    public AnnotationValueBuilder<T> value(double number) {
+        return member(AnnotationMetadata.VALUE_MEMBER, number);
+    }
+
+    /**
+     * Sets the value member to the given float value.
+     *
+     * @param f The float
+     * @return This builder
+     * @since 3.0.0
+     */
+    @NonNull
+    public AnnotationValueBuilder<T> value(float f) {
+        return member(AnnotationMetadata.VALUE_MEMBER, f);
     }
 
     /**
@@ -245,7 +314,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
     }
 
     /**
-     * Sets the value member to the given integer value.
+     * Sets the given member to the given integer value.
      *
      * @param name The name of the member
      * @param i The integer
@@ -258,7 +327,105 @@ public class AnnotationValueBuilder<T extends Annotation> {
     }
 
     /**
-     * Sets the value member to the given integer[] value.
+     * Sets the given member to the given byte value.
+     *
+     * @param name The name of the member
+     * @param b The byte
+     * @return This builder
+     * @since 3.0.0
+     */
+    @NonNull
+    public AnnotationValueBuilder<T> member(@NonNull String name, byte b) {
+        values.put(name, b);
+        return this;
+    }
+
+    /**
+     * Sets the given member to the given char value.
+     *
+     * @param name The name of the member
+     * @param c The char
+     * @return This builder
+     * @since 3.0.0
+     */
+    @NonNull
+    public AnnotationValueBuilder<T> member(@NonNull String name, char c) {
+        values.put(name, c);
+        return this;
+    }
+
+    /**
+     * Sets the given member to the given char[] value.
+     *
+     * @param name The name of the member
+     * @param chars The chars
+     * @return This builder
+     * @since 3.0.0
+     */
+    @NonNull
+    public AnnotationValueBuilder<T> member(@NonNull String name, char... chars) {
+        values.put(name, chars);
+        return this;
+    }
+
+    /**
+     * Sets the given member to the given double value.
+     *
+     * @param name The name of the member
+     * @param d The double
+     * @return This builder
+     * @since 3.0.0
+     */
+    @NonNull
+    public AnnotationValueBuilder<T> member(@NonNull String name, double d) {
+        values.put(name, d);
+        return this;
+    }
+
+    /**
+     * Sets the given member to the given double[] value.
+     *
+     * @param name The name of the member
+     * @param doubles The double[]
+     * @return This builder
+     * @since 3.0.0
+     */
+    @NonNull
+    public AnnotationValueBuilder<T> member(@NonNull String name, double... doubles) {
+        values.put(name, doubles);
+        return this;
+    }
+
+    /**
+     * Sets the given member to the given float value.
+     *
+     * @param name The name of the member
+     * @param f The float
+     * @return This builder
+     * @since 3.0.0
+     */
+    @NonNull
+    public AnnotationValueBuilder<T> member(@NonNull String name, float f) {
+        values.put(name, f);
+        return this;
+    }
+
+    /**
+     * Sets the given member to the given float[] value.
+     *
+     * @param name The name of the member
+     * @param floats The float[]
+     * @return This builder
+     * @since 3.0.0
+     */
+    @NonNull
+    public AnnotationValueBuilder<T> member(@NonNull String name, float... floats) {
+        values.put(name, floats);
+        return this;
+    }
+
+    /**
+     * Sets the given member to the given integer[] value.
      *
      * @param name The name of the member
      * @param ints The integer[]
@@ -273,7 +440,23 @@ public class AnnotationValueBuilder<T extends Annotation> {
     }
 
     /**
-     * Sets the value member to the given long value.
+     * Sets the given member to the given byte[] value.
+     *
+     * @param name The name of the member
+     * @param bytes The byte[]
+     * @return This builder
+     * @since 3.0.0
+     */
+    @NonNull
+    public AnnotationValueBuilder<T> member(@NonNull String name, @Nullable byte... bytes) {
+        if (bytes != null) {
+            values.put(name, bytes);
+        }
+        return this;
+    }
+
+    /**
+     * Sets the given member to the given long value.
      *
      * @param name The name of the member
      * @param i The long
@@ -286,7 +469,33 @@ public class AnnotationValueBuilder<T extends Annotation> {
     }
 
     /**
-     * Sets the value member to the given long[] value.
+     * Sets the given member to the given short value.
+     *
+     * @param name The name of the member
+     * @param i The short
+     * @return This builder
+     */
+    @NonNull
+    public AnnotationValueBuilder<T> member(@NonNull String name, short i) {
+        values.put(name, i);
+        return this;
+    }
+
+    /**
+     * Sets the given member to the given short[] value.
+     *
+     * @param name The name of the member
+     * @param shorts The short[]
+     * @return This builder
+     */
+    @NonNull
+    public AnnotationValueBuilder<T> member(@NonNull String name, short... shorts) {
+        values.put(name, shorts);
+        return this;
+    }
+
+    /**
+     * Sets the given member to the given long[] value.
      *
      * @param name The name of the member
      * @param longs The long[]
@@ -301,7 +510,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
     }
 
     /**
-     * Sets the value member to the given string value.
+     * Sets the given member to the given string value.
      *
      * @param name The name of the member
      * @param str The string
@@ -316,7 +525,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
     }
 
     /**
-     * Sets the value member to the given String[] values.
+     * Sets the given member to the given String[] values.
      *
      * @param name The name of the member
      * @param strings The String[]
@@ -331,7 +540,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
     }
 
     /**
-     * Sets the value member to the given boolean value.
+     * Sets the given member to the given boolean value.
      *
      * @param name The name of the member
      * @param bool The boolean
@@ -344,7 +553,21 @@ public class AnnotationValueBuilder<T extends Annotation> {
     }
 
     /**
-     * Sets the value member to the given enum object.
+     * Sets the given member to the given boolean value array.
+     *
+     * @param name The name of the member
+     * @param booleans The booleans
+     * @return This builder
+     * @since 3.0.0
+     */
+    @NonNull
+    public AnnotationValueBuilder<T> member(@NonNull String name, boolean... booleans) {
+        values.put(name, booleans);
+        return this;
+    }
+
+    /**
+     * Sets the given member to the given enum object.
      *
      * @param name The name of the member
      * @param enumObj The enum
@@ -359,7 +582,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
     }
 
     /**
-     * Sets the value member to the given enum objects.
+     * Sets the given member to the given enum objects.
      *
      * @param name The name of the member
      * @param enumObjs The enum[]
@@ -374,7 +597,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
     }
 
     /**
-     * Sets the value member to the given type object.
+     * Sets the given member to the given type object.
      *
      * @param name The name of the member
      * @param type The type
@@ -389,7 +612,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
     }
 
     /**
-     * Sets the value member to the given type objects.
+     * Sets the given member to the given type objects.
      *
      * @param name The name of the member
      * @param types The type[]
@@ -398,7 +621,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
     @NonNull
     public AnnotationValueBuilder<T> member(@NonNull String name, @Nullable Class<?>... types) {
         if (types != null) {
-            AnnotationClassValue[] classValues = new AnnotationClassValue[types.length];
+            AnnotationClassValue<?>[] classValues = new AnnotationClassValue[types.length];
             for (int i = 0; i < types.length; i++) {
                 Class<?> type = types[i];
                 classValues[i] = new AnnotationClassValue<>(type);
@@ -409,7 +632,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
     }
 
     /**
-     * Sets the value member to the given annotation value.
+     * Sets the given member to the given annotation value.
      *
      * @param name The name of the member
      * @param annotation The annotation
@@ -424,7 +647,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
     }
 
     /**
-     * Sets the value member to the given annotation values.
+     * Sets the given member to the given annotation values.
      *
      * @param name The name of the member
      * @param annotations The annotation[]
@@ -439,7 +662,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
     }
 
     /**
-     * Sets the value member to the given annotation class values.
+     * Sets the given member to the given annotation class values.
      *
      * @param name The name of the member
      * @param classValues The annotation[]
@@ -479,6 +702,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
                                     clazz.isEnum() ||
                                     clazz == Class.class ||
                                     clazz == String.class ||
+                                    clazz == Enum.class ||
                                     clazz == AnnotationClassValue.class ||
                                     clazz == AnnotationValue.class
                             );

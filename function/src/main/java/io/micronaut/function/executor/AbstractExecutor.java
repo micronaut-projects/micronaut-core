@@ -20,14 +20,13 @@ import io.micronaut.context.ApplicationContextBuilder;
 import io.micronaut.context.ApplicationContextProvider;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.function.LocalFunctionRegistry;
 import io.micronaut.inject.ExecutableMethod;
+import jakarta.annotation.PreDestroy;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
-
-import javax.annotation.PreDestroy;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.Optional;

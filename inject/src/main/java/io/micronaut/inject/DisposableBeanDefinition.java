@@ -18,31 +18,35 @@ package io.micronaut.inject;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.DefaultBeanResolutionContext;
+import io.micronaut.core.annotation.Internal;
 
 /**
- * A bean definition that provides disposing hooks normally in the form of {@link javax.annotation.PreDestroy}
+ * A bean definition that provides disposing hooks normally in the form of {@link jakarta.annotation.PreDestroy}
  * annotated methods.
  *
  * @param <T> The bean definition type
  * @author Graeme Rocher
- * @see javax.annotation.PreDestroy
+ * @see jakarta.annotation.PreDestroy
  * @since 1.0
  */
+@Internal
 public interface DisposableBeanDefinition<T> extends BeanDefinition<T> {
 
     /**
-     * Disposes of the bean definition by executing all {@link javax.annotation.PreDestroy} hooks.
+     * Disposes of the bean definition by executing all {@link jakarta.annotation.PreDestroy} hooks.
      *
      * @param context The bean context
      * @param bean    The bean
      * @return The bean instance
      */
     default T dispose(BeanContext context, T bean) {
-        return dispose(new DefaultBeanResolutionContext(context, this), context, bean);
+        try (DefaultBeanResolutionContext rc = new DefaultBeanResolutionContext(context, this)) {
+            return dispose(rc, context, bean);
+        }
     }
 
     /**
-     * Disposes of the bean definition by executing all {@link javax.annotation.PreDestroy} hooks.
+     * Disposes of the bean definition by executing all {@link jakarta.annotation.PreDestroy} hooks.
      *
      * @param resolutionContext The bean resolution context
      * @param context           The bean context

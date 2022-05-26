@@ -15,51 +15,37 @@
  */
 package io.micronaut.runtime.context.scope;
 
-import io.micronaut.context.BeanResolutionContext;
-import io.micronaut.context.LifeCycle;
-import io.micronaut.context.scope.CustomScope;
-import io.micronaut.inject.BeanDefinition;
+import io.micronaut.context.scope.AbstractConcurrentCustomScope;
+import io.micronaut.context.scope.CreatedBean;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.BeanIdentifier;
+import jakarta.inject.Singleton;
 
-import javax.inject.Provider;
-import javax.inject.Singleton;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
 
 /**
- * A {@link CustomScope} that stores values in thread local storage.
+ * A {@link io.micronaut.context.scope.CustomScope} that stores values in thread local storage.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 @Singleton
-class ThreadLocalCustomScope implements CustomScope<ThreadLocal>, LifeCycle<ThreadLocalCustomScope> {
+final class ThreadLocalCustomScope extends AbstractConcurrentCustomScope<ThreadLocal> {
 
-    private final java.lang.ThreadLocal<Map<String, Object>> threadScope = java.lang.ThreadLocal.withInitial(HashMap::new);
+    private final java.lang.ThreadLocal<Map<BeanIdentifier, CreatedBean<?>>> threadScope = java.lang.ThreadLocal.withInitial(HashMap::new);
 
-    @Override
-    public Class<ThreadLocal> annotationType() {
-        return ThreadLocal.class;
+    /**
+     * Default constructor.
+     */
+    protected ThreadLocalCustomScope() {
+        super(ThreadLocal.class);
     }
 
+    @NonNull
     @Override
-    public <T> T get(BeanResolutionContext resolutionContext, BeanDefinition<T> beanDefinition, BeanIdentifier identifier, Provider<T> provider) {
-        Map<String, Object> values = threadScope.get();
-        String key = identifier.toString();
-        T bean = (T) values.get(key);
-        if (bean == null) {
-            bean = provider.get();
-            values.put(key, bean);
-        }
-        return bean;
-    }
-
-    @Override
-    public <T> Optional<T> remove(BeanIdentifier identifier) {
-        Map<String, Object> values = threadScope.get();
-        T previous = (T) values.remove(identifier.toString());
-        return previous != null ? Optional.of(previous) : Optional.empty();
+    protected Map<BeanIdentifier, CreatedBean<?>> getScopeMap(boolean forCreation) {
+        return threadScope.get();
     }
 
     @Override
@@ -73,8 +59,7 @@ class ThreadLocalCustomScope implements CustomScope<ThreadLocal>, LifeCycle<Thre
     }
 
     @Override
-    public ThreadLocalCustomScope stop() {
+    public void close() {
         threadScope.remove();
-        return this;
     }
 }

@@ -17,7 +17,7 @@ package io.micronaut.docs.ioc.scopes
 
 // tag::imports[]
 import io.micronaut.context.annotation.Requires
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 import kotlin.annotation.AnnotationRetention.RUNTIME
 // end::imports[]
 

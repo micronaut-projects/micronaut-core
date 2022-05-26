@@ -20,7 +20,7 @@ When the `management` dependency is added to your project, the following built-i
 | `/loggers`
 |Returns information about available loggers and permits changing the configured log level (see <<loggersEndpoint, LoggersEndpoint>>)
 
-|api:configuration.metrics.management.endpoint.MetricsEndpoint[]
+| <<metricsEndpoint,MetricsEndpoint>>
 | `/metrics`
 |Return the <<metricsEndpoint,application metrics>>. Requires the `micrometer-core` configuration on the classpath.
 
@@ -31,10 +31,6 @@ When the `management` dependency is added to your project, the following built-i
 |api:management.endpoint.routes.RoutesEndpoint[]
 | `/routes`
 |Returns information about URIs available to be called for your application (see <<routesEndpoint, RoutesEndpoint>>)
-
-|api:management.endpoint.env.EnvironmentEndpoint[]
-| `/env`
-|Returns information about the environment and its property sources (see <<environmentEndpoint, EnvironmentEndpoint>>)
 
 |api:management.endpoint.threads.ThreadDumpEndpoint[]
 | `/threaddump`
@@ -48,7 +44,11 @@ In addition, the following built-in endpoint(s) are provided by the `management`
 |===
 |Endpoint|URI|Description
 
-|api:management.endpoint.caches.CachesEndpoint[]
+|api:management.endpoint.env.EnvironmentEndpoint[]
+| `/env`
+|Returns information about the environment and its property sources (see <<environmentEndpoint, EnvironmentEndpoint>>)
+
+|<<cachesEndpoint, CachesEndpoint>>
 | `/caches`
 |Returns information about the caches and permits invalidating them (see <<cachesEndpoint, CachesEndpoint>>)
 

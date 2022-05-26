@@ -16,9 +16,9 @@
 package io.micronaut.management.endpoint.threads.impl;
 
 import io.micronaut.management.endpoint.threads.ThreadInfoMapper;
+import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
 
-import javax.inject.Singleton;
 import java.lang.management.ThreadInfo;
 
 /**

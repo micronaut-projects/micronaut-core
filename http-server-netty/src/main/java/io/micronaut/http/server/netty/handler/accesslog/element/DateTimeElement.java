@@ -15,15 +15,15 @@
  */
 package io.micronaut.http.server.netty.handler.accesslog.element;
 
+import io.netty.channel.socket.SocketChannel;
+import io.netty.handler.codec.http.HttpHeaders;
+
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Locale;
 import java.util.Set;
-
-import io.netty.channel.socket.SocketChannel;
-import io.netty.handler.codec.http.HttpHeaders;
 
 /**
  * DateTimeElement LogElement.

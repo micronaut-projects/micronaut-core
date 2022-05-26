@@ -10,7 +10,7 @@ dependency::micronaut-inject-java[scope="annotationProcessor", version="{version
 
 NOTE: For Kotlin, add the `micronaut-inject-java` dependency in `kapt` scope, and for Groovy add `micronaut-inject-groovy` in `compileOnly` scope.
 
-dependency::micronaut-core[scope="runtime", version="{version}"]
+dependency::micronaut-core[scope="runtimeOnly", version="{version}"]
 
 Once your build is configured you have a few ways to generate introspection data.
 
@@ -29,6 +29,72 @@ snippet::io.micronaut.docs.ioc.beans.IntrospectionSpec[tags="usage", indent=0]
 <3> A api:core.beans.BeanProperty[] can be retrieved from the introspection
 <4> Use the `set` method to set the property value
 <5> Use the `get` method to retrieve the property value
+
+===== Use `@Introspected` with `@AccessorsStyle`
+
+It is possible to use <<configurationPropertiesAccessorsStyle, the `@AccessorsStyle` annotation>> with `@Introspected`:
+
+[source, java]
+----
+import io.micronaut.core.annotation.AccessorsStyle;
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+@AccessorsStyle(readPrefixes = "", writePrefixes = "") // <1>
+public class Person {
+
+    private String name;
+    private int age;
+
+    public Person(String name, int age) {
+        this.name = name;
+        this.age = age;
+    }
+
+    public String name() { // <2>
+        return name;
+    }
+
+    public void name(String name) { // <2>
+        this.name = name;
+    }
+
+    public int age() { // <2>
+        return age;
+    }
+
+    public void age(int age) { // <2>
+        this.age = age;
+    }
+}
+----
+<1> Annotate the class with `@AccessorsStyle` to define empty read and write prefixes for getters and setters.
+<2> Define the getters and setters without a prefix.
+
+Now it is possible to retrieve the compile time generated introspection using the api:core.beans.BeanIntrospection[] API:
+
+[source, java]
+----
+BeanIntrospection<Person> introspection = BeanIntrospection.getIntrospection(Person.class);
+Person person = introspection.instantiate("John", 42);
+
+Assertions.assertEquals("John", person.name());
+Assertions.assertEquals(42, person.age());
+----
+
+
+==== Bean Fields
+
+By default Java introspections treat only JavaBean getters/setters or Java 16 record components as bean properties. You can however define classes with public or package protected fields in Java using the `accessKind` member of the ann:core.annotation.Introspected[] annotation:
+
+snippet::io.micronaut.docs.ioc.beans.User[tags="class", indent=0]
+
+<1> Final fields are treated like read-only properties
+<2> Mutable fields are treated like read-write properties
+
+NOTE: The `accessKind` accepts an array so it is possible to allow for both types of accessors but prefer one or the other depending on the order they appear in the annotation. The first one in the list has priority.
+
+IMPORTANT: Introspections on fields are not possible in Kotlin because it is not possible to declare fields directly.
 
 ==== Constructor Methods
 

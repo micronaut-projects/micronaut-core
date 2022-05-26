@@ -115,6 +115,21 @@ public interface BeanLocator {
      * Finds a Bean for the given type and qualifier.
      *
      * @param beanType  The bean type
+     * @param <T>       The bean type parameter
+     * @return An instance of {@link Optional} that is either empty or containing the specified bean
+     * @throws io.micronaut.context.exceptions.NonUniqueBeanException When multiple possible bean definitions exist
+     *                                                                for the given type
+     * @see io.micronaut.inject.qualifiers.Qualifiers
+     * @since 3.0.0
+     */
+    default @NonNull <T> Optional<T> findBean(@NonNull Argument<T> beanType) {
+        return findBean(beanType, null);
+    }
+
+    /**
+     * Finds a Bean for the given type and qualifier.
+     *
+     * @param beanType  The bean type
      * @param qualifier The qualifier
      * @param <T>       The bean type parameter
      * @return An instance of {@link Optional} that is either empty or containing the specified bean
@@ -224,6 +239,19 @@ public interface BeanLocator {
      * @return The proxied instance
      */
     @NonNull <T> T getProxyTargetBean(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier);
+
+    /**
+     * Resolves the proxy target for a given bean type. If the bean has no proxy then the original bean is returned.
+     *
+     * @param beanType  The bean type
+     * @param qualifier The bean qualifier
+     * @param <T>       The generic type
+     * @return The proxied instance
+     * @since 3.0.0
+     */
+    default @NonNull <T> T getProxyTargetBean(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+        return getProxyTargetBean(Objects.requireNonNull(beanType, "Bean type cannot be null").getType(), qualifier);
+    }
 
     /**
      * Obtain a stream of beans of the given type.

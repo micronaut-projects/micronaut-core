@@ -6,7 +6,7 @@ import io.micronaut.context.annotation.Any
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Test
-import javax.inject.Inject
+import jakarta.inject.Inject
 // end::imports[]
 
 @MicronautTest

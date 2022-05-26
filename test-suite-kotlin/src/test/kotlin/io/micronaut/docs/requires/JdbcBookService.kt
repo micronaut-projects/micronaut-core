@@ -18,7 +18,7 @@ package io.micronaut.docs.requires
 import io.micronaut.context.annotation.Requirements
 import io.micronaut.context.annotation.Requires
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 import javax.sql.DataSource
 import java.sql.SQLException
 

@@ -15,19 +15,17 @@
  */
 package io.micronaut.runtime.http.scope
 
-import io.micronaut.context.annotation.Bean
-import io.micronaut.context.annotation.Factory
 import io.micronaut.context.event.ApplicationEventListener
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.context.ServerRequestContext
 import io.micronaut.http.context.event.HttpRequestTerminatedEvent
 import io.micronaut.http.server.netty.AbstractMicronautSpec
+import jakarta.annotation.PreDestroy
+import jakarta.inject.Inject
+import jakarta.inject.Singleton
 import spock.util.concurrent.PollingConditions
-
-import javax.annotation.PreDestroy
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * @author Marcel Overdijk
@@ -35,13 +33,30 @@ import javax.inject.Singleton
  */
 class RequestScopeSpec extends AbstractMicronautSpec {
 
+    def setupSpec() {
+        ServerRequestContext.set(null);
+    }
+
+    void 'test request scope no request'() {
+        when:
+        RequestBean requestBean = applicationContext.getBean(RequestBean)
+        requestBean.count()
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message == 'No request present'
+
+        cleanup:
+        RequestBean.BEANS_CREATED.clear()
+    }
+
     void "test @Request bean created per request"() {
         given:
         PollingConditions conditions = new PollingConditions(delay: 0.5, timeout: 3)
         ReqTerminatedListener listener = applicationContext.getBean(ReqTerminatedListener)
 
         when:
-        def result = rxClient.retrieve(HttpRequest.GET("/test-request-scope"), String).blockingFirst()
+        def result = rxClient.toBlocking().retrieve(HttpRequest.GET("/test-request-scope"), String)
 
         then:
         result == "message count 1, count within request 1"
@@ -57,7 +72,7 @@ class RequestScopeSpec extends AbstractMicronautSpec {
         RequestBean.BEANS_CREATED.clear()
         RequestScopeFactoryBean.BEANS_CREATED.clear()
         listener.callCount = 0
-        result = rxClient.retrieve(HttpRequest.GET("/test-request-scope"), String).blockingFirst()
+        result = rxClient.toBlocking().retrieve(HttpRequest.GET("/test-request-scope"), String)
 
         then:
         result == "message count 2, count within request 1"
@@ -73,7 +88,7 @@ class RequestScopeSpec extends AbstractMicronautSpec {
         RequestBean.BEANS_CREATED.clear()
         RequestScopeFactoryBean.BEANS_CREATED.clear()
         listener.callCount = 0
-        result = rxClient.retrieve(HttpRequest.GET("/test-request-scope"), String).blockingFirst()
+        result = rxClient.toBlocking().retrieve(HttpRequest.GET("/test-request-scope"), String)
 
         then:
         result == "message count 3, count within request 1"
@@ -88,7 +103,7 @@ class RequestScopeSpec extends AbstractMicronautSpec {
 
     void "test request scope bean that injects the request"() {
         when:
-        String result = rxClient.retrieve(HttpRequest.GET("/test-request-aware"), String).blockingFirst()
+        String result = rxClient.toBlocking().retrieve(HttpRequest.GET("/test-request-aware"), String)
 
         then:
         result == "OK"

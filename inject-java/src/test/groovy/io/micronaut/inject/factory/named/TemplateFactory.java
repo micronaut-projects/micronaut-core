@@ -18,7 +18,7 @@ package io.micronaut.inject.factory.named;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Prototype;
 
-import javax.inject.Named;
+import jakarta.inject.Named;
 
 @Factory
 public class TemplateFactory {

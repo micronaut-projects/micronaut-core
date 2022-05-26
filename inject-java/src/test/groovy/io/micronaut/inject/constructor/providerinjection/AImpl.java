@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.constructor.providerinjection;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Singleton
 public class AImpl implements A {

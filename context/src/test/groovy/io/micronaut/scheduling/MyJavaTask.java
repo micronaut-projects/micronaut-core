@@ -19,7 +19,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.scheduling.annotation.Scheduled;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**

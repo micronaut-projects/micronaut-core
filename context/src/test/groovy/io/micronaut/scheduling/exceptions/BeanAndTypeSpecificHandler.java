@@ -18,7 +18,7 @@ package io.micronaut.scheduling.exceptions;
 import io.micronaut.core.reflect.exception.InstantiationException;
 import io.micronaut.scheduling.TaskExceptionHandler;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Singleton
 public class BeanAndTypeSpecificHandler implements TaskExceptionHandler<ThrowsExceptionJob1, InstantiationException> {

@@ -4,7 +4,7 @@ package io.micronaut.docs.config.env
 import io.micronaut.context.annotation.Factory
 import io.micronaut.core.annotation.Order
 import java.time.Duration
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 @Factory
 class RateLimitsFactory {

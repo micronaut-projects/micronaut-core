@@ -18,6 +18,7 @@ package io.micronaut.inject.injectionpoint;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.annotation.Prototype;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.InjectionPoint;
 
 @Prototype
@@ -32,6 +33,7 @@ public class SomeInterceptor implements MethodInterceptor<Object, Object> {
                 .orElse("no value");
     }
 
+    @Nullable
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
         return name;

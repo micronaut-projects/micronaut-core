@@ -15,8 +15,8 @@
  */
 package io.micronaut.docs.qualifiers.annotation
 
-import javax.inject.Inject
-import javax.inject.Singleton
+import jakarta.inject.Inject
+import jakarta.inject.Singleton
 
 // tag::class[]
 @Singleton

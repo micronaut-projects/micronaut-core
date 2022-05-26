@@ -44,6 +44,11 @@ public enum HttpAttributes implements CharSequence {
     ROUTE_MATCH(Constants.PREFIX + ".route.match"),
 
     /**
+     * Attribute used to store the object that represents the Route metadata.
+     */
+    ROUTE_INFO(Constants.PREFIX + ".route.info"),
+
+    /**
      * Attribute used to store the URI template defined by the route.
      */
     URI_TEMPLATE(Constants.PREFIX + ".route.template"),
@@ -67,6 +72,11 @@ public enum HttpAttributes implements CharSequence {
      * Attribute used to store the MethodInvocationContext by declarative client.
      */
     INVOCATION_CONTEXT(Constants.PREFIX + ".invocationContext"),
+
+    /**
+     * Attribute used to store the cause of an error response.
+     */
+    EXCEPTION(Constants.PREFIX + ".exception"),
 
     /**
      * Attribute used to store a client Certificate (mutual authentication).

@@ -1,12 +1,6 @@
 package io.micronaut.http.server.netty
 
-import io.netty.handler.codec.http.DefaultHttpHeaders
-import io.netty.handler.codec.http.DefaultHttpResponse
-import io.netty.handler.codec.http.HttpHeaderNames
-import io.netty.handler.codec.http.HttpHeaders
-import io.netty.handler.codec.http.HttpResponse
-import io.netty.handler.codec.http.HttpResponseStatus
-import io.netty.handler.codec.http.HttpVersion
+import io.netty.handler.codec.http.*
 import spock.lang.Specification
 import spock.lang.Unroll
 

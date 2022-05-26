@@ -28,6 +28,8 @@ import io.micronaut.inject.annotation.AnnotatedElementValidator;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.inject.visitor.TypeElementVisitor;
+
 import javax.annotation.processing.Filer;
 import javax.annotation.processing.Messager;
 import javax.annotation.processing.ProcessingEnvironment;
@@ -99,7 +101,11 @@ public class AnnotationUtils {
         while (i.hasNext()) {
             final ServiceDefinition<AnnotatedElementValidator> validator = i.next();
             if (validator.isPresent()) {
-                elementValidator = validator.load();
+                try {
+                    elementValidator = validator.load();
+                } catch (Throwable e) {
+                    // probably missing required dependencies to load the validator
+                }
                 break;
             }
         }
@@ -222,6 +228,20 @@ public class AnnotationUtils {
     }
 
     /**
+     * Get the annotation metadata for the given element and the given parents.
+     * This method is used for cases when you need to combine annotation metadata for
+     * two elements, for example a JavaBean property where the field and the method metadata
+     * need to be combined.
+     *
+     * @param parents The parents
+     * @param element The element
+     * @return The {@link AnnotationMetadata}
+     */
+    public AnnotationMetadata getAnnotationMetadata(List<Element> parents, Element element) {
+        return newAnnotationBuilder().buildForParents(parents, element);
+    }
+
+    /**
      * Check whether the method is annotated.
      *
      * @param declaringType The declaring type
@@ -271,7 +291,8 @@ public class AnnotationUtils {
                 modelUtils,
                 genericUtils,
                 filer,
-                visitorAttributes
+                visitorAttributes,
+                TypeElementVisitor.VisitorKind.ISOLATING
         );
     }
 

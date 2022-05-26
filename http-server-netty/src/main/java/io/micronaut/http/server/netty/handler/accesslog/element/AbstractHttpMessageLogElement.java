@@ -15,11 +15,11 @@
  */
 package io.micronaut.http.server.netty.handler.accesslog.element;
 
-import java.util.Set;
-
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.http.HttpHeaders;
+
+import java.util.Set;
 
 /**
  * LogElement for ON_REQUEST_HEADERS and ON_RESPONSE_HEADERS events.

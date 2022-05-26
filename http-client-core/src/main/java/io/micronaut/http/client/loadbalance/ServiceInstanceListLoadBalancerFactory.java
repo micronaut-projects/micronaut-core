@@ -18,8 +18,7 @@ package io.micronaut.http.client.loadbalance;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.discovery.ServiceInstanceList;
 import io.micronaut.http.client.LoadBalancer;
-
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 /**
  * The default {@link LoadBalancer} factory for creating {@link LoadBalancer} instances from

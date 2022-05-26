@@ -18,7 +18,7 @@ package io.micronaut.docs.replaces
 import io.micronaut.context.annotation.Factory
 import io.micronaut.docs.requires.Book
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 // tag::class[]
 @Factory

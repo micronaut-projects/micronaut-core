@@ -1,7 +1,7 @@
 package io.micronaut.docs.client.filter
 
-import io.kotlintest.shouldBe
-import io.kotlintest.specs.StringSpec
+import io.kotest.matchers.shouldBe
+import io.kotest.core.spec.style.StringSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.http.annotation.Controller

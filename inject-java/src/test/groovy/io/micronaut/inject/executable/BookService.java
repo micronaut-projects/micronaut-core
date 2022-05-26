@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.executable;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Singleton
 public class BookService {}

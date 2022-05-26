@@ -18,9 +18,8 @@ package io.micronaut.scheduling.executor;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.scheduling.TaskExecutors;
-
-import javax.inject.Named;
-import javax.inject.Singleton;
+import jakarta.inject.Named;
+import jakarta.inject.Singleton;
 
 /**
  * A default executor service for scheduling adhoc tasks via

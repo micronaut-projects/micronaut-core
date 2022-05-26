@@ -21,6 +21,7 @@ import io.micronaut.ast.groovy.utils.AstMessageUtils
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.ast.groovy.visitor.LoadedVisitor
 import io.micronaut.context.annotation.Requires
+import io.micronaut.context.env.CachedEnvironment
 import io.micronaut.core.io.service.ServiceDefinition
 import io.micronaut.core.io.service.SoftServiceLoader
 import io.micronaut.core.order.OrderUtil
@@ -51,7 +52,7 @@ class TypeElementVisitorStart implements ASTTransformation, CompilationUnitAware
 
     @Override
     void visit(ASTNode[] nodes, SourceUnit source) {
-        Map<String, LoadedVisitor> loadedVisitors = TypeElementVisitorTransform.loadedVisitors
+        Map<String, LoadedVisitor> loadedVisitors = TypeElementVisitorTransform.loadedVisitors.get()
 
         if (loadedVisitors == null) {
             loadedVisitors = [:]
@@ -108,7 +109,7 @@ class TypeElementVisitorStart implements ASTTransformation, CompilationUnitAware
             }
         }
 
-        def val = System.getProperty(ELEMENT_VISITORS_PROPERTY)
+        def val = CachedEnvironment.getProperty(ELEMENT_VISITORS_PROPERTY)
         if (val) {
             for (v in val.split(",")) {
                 def visitor = InstantiationUtils.tryInstantiate(v, source.classLoader).orElse(null)
@@ -119,7 +120,7 @@ class TypeElementVisitorStart implements ASTTransformation, CompilationUnitAware
             }
         }
 
-        TypeElementVisitorTransform.loadedVisitors = loadedVisitors
+        TypeElementVisitorTransform.loadedVisitors.set(loadedVisitors)
     }
 
     @Override

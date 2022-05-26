@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.client.retry
 
+import io.micronaut.context.annotation.Requires
+import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
@@ -22,7 +24,8 @@ import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.retry.annotation.Retryable
 import io.micronaut.runtime.server.EmbeddedServer
-import io.reactivex.Single
+import org.reactivestreams.Publisher
+import reactor.core.publisher.Mono
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -31,10 +34,13 @@ class HttpClientJsonRetrySpec extends Specification {
 
     @Shared
     @AutoCleanup
-    ApplicationContext context = ApplicationContext.run()
+    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+            'spec.name': 'HttpClientJsonRetrySpec'
+    ])
 
     @Shared
-    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+    @AutoCleanup
+    ApplicationContext context = embeddedServer.applicationContext
 
     void "test simple blocking retry"() {
         given:
@@ -53,8 +59,8 @@ class HttpClientJsonRetrySpec extends Specification {
         countClient.getCount()
 
         then:"The original exception is thrown"
-        def e = thrown(HttpClientResponseException)
-        e.message == "Internal Server Error: Bad count"
+        HttpClientResponseException e = thrown()
+        e.response.getBody(Map).get()._embedded.errors[0].message == "Internal Server Error: Bad count"
     }
 
     void "test simply retry with rxjava"() {
@@ -65,7 +71,7 @@ class HttpClientJsonRetrySpec extends Specification {
         controller.count = 0
 
         when:"A method is annotated retry"
-        Count result = countClient.getCountSingle().blockingGet()
+        Count result = Mono.from(countClient.getCountSingle()).block()
 
         then:"It executes until successful"
         result.number
@@ -73,22 +79,23 @@ class HttpClientJsonRetrySpec extends Specification {
         when:"The threshold can never be met"
         controller.countThreshold = 10
         controller.count = 0
-        def single = countClient.getCountSingle()
-        single.blockingGet()
+        Publisher<Integer> single = countClient.getCountSingle()
+        Mono.from(single).block()
 
         then:"The original exception is thrown"
-        def e = thrown(HttpClientResponseException)
-        e.message == "Internal Server Error: Bad count"
+        HttpClientResponseException e = thrown()
+        e.response.getBody(Map).get()._embedded.errors[0].message == "Internal Server Error: Bad count"
 
     }
 
-
+    @Requires(property = 'spec.name', value = 'HttpClientJsonRetrySpec')
     @Client("/json-retry-test")
     @Retryable(attempts = '5', delay = '5ms')
     static interface CountClient extends CountService {
 
     }
 
+    @Requires(property = 'spec.name', value = 'HttpClientJsonRetrySpec')
     @Controller("/json-retry-test")
     static class CountController implements CountService {
         int count = 0
@@ -105,8 +112,9 @@ class HttpClientJsonRetrySpec extends Specification {
         }
 
         @Override
-        Single<Count> getCountSingle() {
-            Single.fromCallable({->
+        @SingleResult
+        Publisher<Count> getCountSingle() {
+            Mono.fromCallable({->
                 countRx++
                 if(countRx < countThreshold) {
                     throw new IllegalStateException("Bad count")
@@ -127,6 +135,7 @@ class HttpClientJsonRetrySpec extends Specification {
         Count getCount()
 
         @Get('/rx-count')
-        Single<Count> getCountSingle()
+        @SingleResult
+        Publisher<Count> getCountSingle()
     }
 }

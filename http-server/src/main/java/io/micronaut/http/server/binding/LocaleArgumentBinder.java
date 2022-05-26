@@ -20,8 +20,8 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.bind.binders.TypedRequestArgumentBinder;
 import io.micronaut.http.server.util.locale.HttpLocaleResolver;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.util.Locale;
 import java.util.Optional;
 

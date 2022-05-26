@@ -19,7 +19,7 @@ import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
 import spock.lang.Specification
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 import java.util.concurrent.ConcurrentLinkedQueue
 
 /**

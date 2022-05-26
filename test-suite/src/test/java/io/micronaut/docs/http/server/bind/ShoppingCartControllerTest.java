@@ -11,6 +11,7 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
@@ -46,7 +47,10 @@ public class ShoppingCartControllerTest {
         HttpClientResponseException responseException = assertThrows(HttpClientResponseException.class,
                 () -> client.toBlocking().exchange(request));
 
-        assertEquals("Required ShoppingCart [sessionId] not specified", responseException.getMessage());
+        Map<String, Object> embedded = (Map<String, Object>) responseException.getResponse().getBody(Map.class).get().get("_embedded");
+        Object message = ((Map<String, Object>) ((List) embedded.get("errors")).get(0)).get("message");
+
+        assertEquals("Required ShoppingCart [sessionId] not specified", message);
 
     }
 

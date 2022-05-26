@@ -20,10 +20,11 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.client.RxHttpClient;
+import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.junit.Test;
+import reactor.core.publisher.Flux;
 
 import java.util.Date;
 import java.util.HashMap;
@@ -36,9 +37,9 @@ public class CurrentDateEndpointSpec {
     @Test
     public void testReadCustomDateEndpoint() {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class);
-        RxHttpClient rxClient = server.getApplicationContext().createBean(RxHttpClient.class, server.getURL());
+        HttpClient rxClient = server.getApplicationContext().createBean(HttpClient.class, server.getURL());
 
-        HttpResponse<String> response = rxClient.exchange("/date", String.class).blockingFirst();
+        HttpResponse<String> response = rxClient.toBlocking().exchange("/date", String.class);
 
         assertEquals(HttpStatus.OK.getCode(), response.code());
 
@@ -48,9 +49,9 @@ public class CurrentDateEndpointSpec {
     @Test
     public void testReadCustomDateEndpointWithArgument() {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class);
-        RxHttpClient rxClient = server.getApplicationContext().createBean(RxHttpClient.class, server.getURL());
+        HttpClient rxClient = server.getApplicationContext().createBean(HttpClient.class, server.getURL());
 
-        HttpResponse<String> response = rxClient.exchange("/date/current_date_is", String.class).blockingFirst();
+        HttpResponse<String> response = rxClient.toBlocking().exchange("/date/current_date_is", String.class);
 
         assertEquals(HttpStatus.OK.getCode(), response.code());
         assertTrue(response.body().startsWith("current_date_is: "));
@@ -62,9 +63,9 @@ public class CurrentDateEndpointSpec {
     @Test
     public void testReadWithProduces() {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class);
-        RxHttpClient rxClient = server.getApplicationContext().createBean(RxHttpClient.class, server.getURL());
+        HttpClient rxClient = server.getApplicationContext().createBean(HttpClient.class, server.getURL());
 
-        HttpResponse<String> response = rxClient.exchange("/date/current_date_is", String.class).blockingFirst();
+        HttpResponse<String> response = rxClient.toBlocking().exchange("/date/current_date_is", String.class);
 
         assertEquals(MediaType.TEXT_PLAIN_TYPE, response.getContentType().get());
 
@@ -74,19 +75,19 @@ public class CurrentDateEndpointSpec {
     @Test
     public void testWriteCustomDateEndpoint() {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class);
-        RxHttpClient rxClient = server.getApplicationContext().createBean(RxHttpClient.class, server.getURL());
+        HttpClient rxClient = server.getApplicationContext().createBean(HttpClient.class, server.getURL());
         Date originalDate, resetDate;
         Map<String, Object> map = new HashMap<>();
 
-        HttpResponse<String> response = rxClient.exchange("/date", String.class).blockingFirst();
+        HttpResponse<String> response = rxClient.toBlocking().exchange("/date", String.class);
         originalDate = new Date(Long.parseLong(response.body()));
 
-        response = rxClient.exchange(HttpRequest.POST("/date", map), String.class).blockingFirst();
+        response = rxClient.toBlocking().exchange(HttpRequest.POST("/date", map), String.class);
 
         assertEquals(HttpStatus.OK.getCode(), response.code());
         assertEquals("Current date reset", response.body());
 
-        response = rxClient.exchange("/date", String.class).blockingFirst();
+        response = rxClient.toBlocking().exchange("/date", String.class);
         resetDate = new Date(Long.parseLong(response.body()));
 
         assert resetDate.getTime() > originalDate.getTime();
@@ -99,10 +100,10 @@ public class CurrentDateEndpointSpec {
         Map<String, Object> map = new HashMap<>();
         map.put("custom.date.enabled", false);
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class, map);
-        RxHttpClient rxClient = server.getApplicationContext().createBean(RxHttpClient.class, server.getURL());
+        HttpClient rxClient = server.getApplicationContext().createBean(HttpClient.class, server.getURL());
 
         try {
-            rxClient.exchange("/date", String.class).blockingFirst();
+            rxClient.toBlocking().exchange("/date", String.class);
         } catch (HttpClientResponseException ex) {
             assertEquals(HttpStatus.NOT_FOUND.getCode(), ex.getResponse().code());
         }

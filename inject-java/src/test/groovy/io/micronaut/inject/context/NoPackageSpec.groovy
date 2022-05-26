@@ -10,7 +10,7 @@ class NoPackageSpec extends AbstractTypeElementSpec {
 
 import io.micronaut.context.annotation.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Bean {
 
 }

@@ -92,6 +92,14 @@ public interface TypeInformation<T> extends TypeVariableResolver, AnnotationMeta
     }
 
     /**
+     * Returns the wrapped type in the case where {@link #isWrapperType()} returns true.
+     * @return The wrapped type
+     */
+    default Argument<?> getWrappedType() {
+        return RuntimeTypeInformation.getWrappedType(this);
+    }
+
+    /**
      * @return Is the return the return type a reactive completable type.
      * @since 2.0.0
      */
@@ -120,7 +128,8 @@ public interface TypeInformation<T> extends TypeVariableResolver, AnnotationMeta
      * @return Whether this is a container type.
      */
     default boolean isContainerType() {
-        return DefaultArgument.CONTAINER_TYPES.contains(getType());
+        final Class<T> type = getType();
+        return Map.class == type ||  DefaultArgument.CONTAINER_TYPES.contains(type);
     }
 
     /**
@@ -241,5 +250,14 @@ public interface TypeInformation<T> extends TypeVariableResolver, AnnotationMeta
      */
     default @NonNull String getSimpleName() {
         return getType().getSimpleName();
+    }
+
+    default boolean isProvider() {
+        for (String type: DefaultArgument.PROVIDER_TYPES) {
+            if (getType().getName().equals(type)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

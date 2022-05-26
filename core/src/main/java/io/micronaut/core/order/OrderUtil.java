@@ -16,6 +16,7 @@
 package io.micronaut.core.order;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Order;
 
 import java.util.Arrays;
@@ -127,6 +128,16 @@ public class OrderUtil {
         if (o instanceof Ordered) {
             return getOrder((Ordered) o);
         }
+        return getOrder(annotationMetadata);
+    }
+
+    /**
+     * Get the order for the given annotation metadata.
+     * @param annotationMetadata The metadata
+     * @return The order
+     * @since 3.0.0
+     */
+    public static int getOrder(@NonNull AnnotationMetadata annotationMetadata) {
         return annotationMetadata.intValue(Order.class).orElse(0);
     }
 

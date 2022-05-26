@@ -16,7 +16,7 @@
 package io.micronaut.docs.qualifiers.annotation;
 
 // tag::imports[]
-import javax.inject.Qualifier;
+import jakarta.inject.Qualifier;
 import java.lang.annotation.Retention;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;

@@ -22,19 +22,20 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ElementModifier;
+import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import org.codehaus.groovy.ast.ClassNode;
+import org.codehaus.groovy.ast.GenericsType;
 import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.Parameter;
-import org.codehaus.groovy.control.SourceUnit;
 
 import io.micronaut.core.annotation.NonNull;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
+
+import java.util.*;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * A method element returning data from a {@link MethodNode}.
@@ -44,7 +45,6 @@ import java.util.function.Function;
  */
 public class GroovyMethodElement extends AbstractGroovyElement implements MethodElement {
 
-    private final SourceUnit sourceUnit;
     private final MethodNode methodNode;
     private final GroovyClassElement declaringClass;
     private Map<String, ClassNode> genericsSpec = null;
@@ -60,8 +60,26 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
     GroovyMethodElement(GroovyClassElement declaringClass, GroovyVisitorContext visitorContext, MethodNode methodNode, AnnotationMetadata annotationMetadata) {
         super(visitorContext, methodNode, annotationMetadata);
         this.methodNode = methodNode;
-        this.sourceUnit = visitorContext.getSourceUnit();
         this.declaringClass = declaringClass;
+    }
+
+    @Override
+    public ClassElement[] getThrownTypes() {
+        final ClassNode[] exceptions = methodNode.getExceptions();
+        if (ArrayUtils.isNotEmpty(exceptions)) {
+            return Arrays.stream(exceptions)
+                    .map(cn -> getGenericElement(cn, visitorContext.getElementFactory().newClassElement(
+                            cn,
+                            AnnotationMetadata.EMPTY_METADATA,
+                            Collections.emptyMap()
+                    ))).toArray(ClassElement[]::new);
+        }
+        return ClassElement.ZERO_CLASS_ELEMENTS;
+    }
+
+    @Override
+    public Set<ElementModifier> getModifiers() {
+        return resolveModifiers(this.methodNode);
     }
 
     @Override
@@ -180,10 +198,11 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
 
     @Override
     public MethodElement withNewParameters(ParameterElement... newParameters) {
+        final ParameterElement[] existing = getParameters();
         return new GroovyMethodElement(declaringClass, visitorContext, methodNode, getAnnotationMetadata()) {
             @Override
             public ParameterElement[] getParameters() {
-                return ArrayUtils.concat(super.getParameters(), newParameters);
+                return ArrayUtils.concat(existing, newParameters);
             }
         };
     }
@@ -191,7 +210,6 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
     @Override
     public ClassElement getDeclaringType() {
         if (this.declaringElement == null) {
-
             this.declaringElement = visitorContext.getElementFactory().newClassElement(
                     methodNode.getDeclaringClass(),
                     AstAnnotationUtils.getAnnotationMetadata(
@@ -207,5 +225,15 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
     @Override
     public ClassElement getOwningType() {
         return declaringClass;
+    }
+
+    @Override
+    public List<? extends GenericPlaceholderElement> getDeclaredTypeVariables() {
+        GenericsType[] genericsTypes = methodNode.getGenericsTypes();
+        return genericsTypes == null ?
+                Collections.emptyList() :
+                Arrays.stream(genericsTypes)
+                        .map(gt -> (GenericPlaceholderElement) visitorContext.getElementFactory().newClassElement(gt.getType(), AnnotationMetadata.EMPTY_METADATA))
+                        .collect(Collectors.toList());
     }
 }

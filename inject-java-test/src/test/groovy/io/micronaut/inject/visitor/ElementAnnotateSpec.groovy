@@ -52,7 +52,7 @@ interface MyInterface{
         def definition = buildBeanDefinition('test.TestListener', '''
 package test;
 import io.micronaut.context.annotation.*;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Singleton
 class TestListener {
@@ -110,6 +110,35 @@ class Test {
         expect:
         introspection.getRequiredProperty("name", String).stringValue("foo.bar.Ann", 'foo')
             .get() == 'bar'
+    }
+
+    void "test annotation bean introspection properties of inner classes"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Outer$Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+class Outer {
+    @Introspected
+    static class Test {
+        private String name;
+        
+        public String getName() { 
+            return name;
+        }
+        
+        public void setName(String name) {
+            this.name = name;
+        }
+    }
+}
+
+''')
+
+        expect:
+        introspection.getRequiredProperty("name", String).stringValue("foo.bar.Ann", 'foo')
+                .get() == 'bar'
     }
 
     @Override

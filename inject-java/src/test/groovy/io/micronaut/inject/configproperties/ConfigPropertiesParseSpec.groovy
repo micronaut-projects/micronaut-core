@@ -1,6 +1,7 @@
 package io.micronaut.inject.configproperties
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.BeanContext
 import io.micronaut.context.annotation.ConfigurationReader
 import io.micronaut.context.annotation.Property
 import io.micronaut.core.convert.format.ReadableBytes
@@ -840,7 +841,7 @@ package test;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.EachProperty;
 
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 import java.util.List;
 
 @ConfigurationProperties("parent")
@@ -870,5 +871,40 @@ class Parent {
         beanDefinition != null
         beanDefinition.getAnnotationMetadata().stringValue(ConfigurationReader.class, "prefix").get() == "parent.children[*]"
         beanDefinition.getRequiredMethod("getPropA").getAnnotationMetadata().getAnnotationValuesByType(Property.class).get(0).stringValue("name").get() == "parent.children[*].prop-a"
+    }
+
+    void "test config props with post construct first in file"() {
+        given:
+        BeanContext context = buildContext("test.EntityProperties", """
+package test;
+
+import io.micronaut.context.annotation.ConfigurationProperties;
+import jakarta.annotation.PostConstruct;
+
+@ConfigurationProperties("app.entity")
+public class EntityProperties {
+
+    private String prop;
+    
+    @PostConstruct
+    public void init() {
+        System.out.println("prop = " + prop);
+    }
+    
+    public String getProp() {
+        return prop;
+    }
+    
+    public void setProp(String prop) {
+        this.prop = prop;
+    }
+}
+""")
+
+        when:
+        context.getBean(context.classLoader.loadClass("test.EntityProperties"))
+
+        then:
+        noExceptionThrown()
     }
 }

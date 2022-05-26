@@ -15,22 +15,21 @@
  */
 package io.micronaut.http.server.netty.stream
 
-import io.micronaut.core.io.buffer.ByteBuffer
-import io.micronaut.http.annotation.Produces
-import io.reactivex.Flowable
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
-import io.micronaut.http.client.RxStreamingHttpClient
+import io.micronaut.http.client.StreamingHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
-import io.reactivex.Single
+import org.reactivestreams.Publisher
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 import spock.lang.AutoCleanup
-import spock.lang.Ignore
 import spock.lang.Shared
 import spock.lang.Specification
+import io.micronaut.core.async.annotation.SingleResult
 
 /**
  * @author graemerocher
@@ -42,9 +41,9 @@ class JsonStreamSpec extends Specification {
 
     void "test json stream response content type"() {
         given:
-        RxStreamingHttpClient streamingHttpClient = embeddedServer.applicationContext.createBean(RxStreamingHttpClient, embeddedServer.getURL())
+        StreamingHttpClient streamingHttpClient = embeddedServer.applicationContext.createBean(StreamingHttpClient, embeddedServer.getURL())
 
-        HttpResponse response = streamingHttpClient.exchangeStream(HttpRequest.GET('/json/stream')).blockingFirst()
+        HttpResponse response = Flux.from(streamingHttpClient.exchangeStream(HttpRequest.GET('/json/stream'))).blockFirst()
 
         expect:
         response.contentType.isPresent()
@@ -55,10 +54,10 @@ class JsonStreamSpec extends Specification {
 
     void "test json stream response content type with a response return"() {
         given:
-        RxStreamingHttpClient streamingHttpClient = embeddedServer.applicationContext.createBean(RxStreamingHttpClient, embeddedServer.getURL())
+        StreamingHttpClient streamingHttpClient = embeddedServer.applicationContext.createBean(StreamingHttpClient, embeddedServer.getURL())
 
-        HttpResponse response = streamingHttpClient.exchangeStream(HttpRequest.GET('/json/stream/custom')).blockingFirst()
-        List<Book> books = streamingHttpClient.jsonStream(HttpRequest.GET('/json/stream/custom'), Book).toList().blockingGet()
+        HttpResponse response = Flux.from(streamingHttpClient.exchangeStream(HttpRequest.GET('/json/stream/custom'))).blockFirst()
+        List<Book> books = Flux.from(streamingHttpClient.jsonStream(HttpRequest.GET('/json/stream/custom'), Book)).collectList().block()
 
         expect:
         response.contentType.isPresent()
@@ -72,10 +71,10 @@ class JsonStreamSpec extends Specification {
 
     void "test json stream response content type with a response return single body"() {
         given:
-        RxStreamingHttpClient streamingHttpClient = embeddedServer.applicationContext.createBean(RxStreamingHttpClient, embeddedServer.getURL())
+        StreamingHttpClient streamingHttpClient = embeddedServer.applicationContext.createBean(StreamingHttpClient, embeddedServer.getURL())
 
-        HttpResponse response = streamingHttpClient.exchangeStream(HttpRequest.GET('/json/stream/single')).blockingFirst()
-        Book book = streamingHttpClient.jsonStream(HttpRequest.GET('/json/stream/single'), Book).blockingFirst()
+        HttpResponse response = Flux.from(streamingHttpClient.exchangeStream(HttpRequest.GET('/json/stream/single'))).blockFirst()
+        Book book = Flux.from(streamingHttpClient.jsonStream(HttpRequest.GET('/json/stream/single'), Book)).blockFirst()
 
         expect:
         response.contentType.isPresent()
@@ -88,36 +87,37 @@ class JsonStreamSpec extends Specification {
 
     void "test an empty json stream"() {
         given:
-        RxStreamingHttpClient client = embeddedServer.applicationContext.createBean(RxStreamingHttpClient, embeddedServer.getURL())
+        StreamingHttpClient client = embeddedServer.applicationContext.createBean(StreamingHttpClient, embeddedServer.getURL())
 
         when:
-        def books = client.jsonStream(HttpRequest.GET("/json/stream/empty"), Book)
+        List<Book> books = Flux.from(client.jsonStream(HttpRequest.GET("/json/stream/empty"), Book)).collectList().block()
 
         then:
-        books.blockingIterable().iterator().toList() == []
+        books == []
     }
 
     @Controller("/json/stream")
     static class StreamController {
 
         @Get(produces = MediaType.APPLICATION_JSON_STREAM)
-        Flowable<Book> stream() {
-            return Flowable.just(new Book(title: "The Stand"), new Book(title: "The Shining"))
+        Flux<Book> stream() {
+            return Flux.just(new Book(title: "The Stand"), new Book(title: "The Shining"))
         }
 
         @Get(uri = "/custom", produces = MediaType.APPLICATION_JSON_STREAM)
-        HttpResponse<Flowable<Book>> streamResponse() {
-            return HttpResponse.ok(Flowable.just(new Book(title: "The Stand"), new Book(title: "The Shining"))).header("X-MyHeader", "42")
+        HttpResponse<Flux<Book>> streamResponse() {
+            return HttpResponse.ok(Flux.just(new Book(title: "The Stand"), new Book(title: "The Shining"))).header("X-MyHeader", "42")
         }
 
         @Get(uri = "/single", produces = MediaType.APPLICATION_JSON_STREAM)
-        HttpResponse<Single<Book>> streamSingleResponse() {
-            return HttpResponse.ok(Single.just(new Book(title: "The Stand"))).header("X-MyHeader", "42")
+        @SingleResult
+        Publisher<HttpResponse<Book>> streamSingleResponse() {
+            return Mono.just(HttpResponse.ok(new Book(title: "The Stand")).header("X-MyHeader", "42"))
         }
 
         @Get(uri = "/empty", produces = MediaType.APPLICATION_JSON_STREAM)
-        Flowable<Book> emptyStream() {
-            return Flowable.empty()
+        Publisher<Book> emptyStream() {
+            return Flux.empty()
         }
 
     }

@@ -1,6 +1,6 @@
 package io.micronaut.runtime.event
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 @Singleton
 class EventListenerImpl implements EventListenerContract {

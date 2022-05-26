@@ -7,7 +7,7 @@ import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import io.micronaut.validation.validator.Validator
 import spock.lang.Specification
 
-import javax.inject.Inject
+import jakarta.inject.Inject
 import javax.validation.ConstraintViolationException
 // end::imports[]
 

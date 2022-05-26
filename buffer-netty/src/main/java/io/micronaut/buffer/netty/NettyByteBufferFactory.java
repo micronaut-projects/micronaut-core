@@ -23,8 +23,7 @@ import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.Unpooled;
-
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 /**
  * A {@link ByteBufferFactory} implementation for Netty.

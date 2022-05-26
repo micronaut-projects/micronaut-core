@@ -111,14 +111,4 @@ public interface Route {
         return Collections.emptyList();
     }
 
-    /**
-     * Accept all {@link MediaType} references.
-     *
-     * @return A new route with the media type applied
-     * @deprecated Use {@link #consumesAll()} instead.
-     */
-    @Deprecated
-    default Route acceptAll() {
-        return consumesAll();
-    }
 }

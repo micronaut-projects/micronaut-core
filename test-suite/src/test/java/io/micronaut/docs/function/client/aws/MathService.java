@@ -17,7 +17,7 @@ package io.micronaut.docs.function.client.aws;
 
 import io.micronaut.context.annotation.Value;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Singleton
 public class MathService {

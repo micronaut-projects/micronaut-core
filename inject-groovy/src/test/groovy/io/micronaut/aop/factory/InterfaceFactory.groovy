@@ -20,7 +20,7 @@ import io.micronaut.context.annotation.Factory
 import io.micronaut.context.annotation.Primary
 import io.micronaut.context.annotation.Prototype
 
-import javax.inject.Named
+import jakarta.inject.Named
 
 /**
  * @author Graeme Rocher

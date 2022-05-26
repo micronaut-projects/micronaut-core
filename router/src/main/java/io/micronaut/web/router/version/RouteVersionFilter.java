@@ -15,25 +15,25 @@
  */
 package io.micronaut.web.router.version;
 
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.version.annotation.Version;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.web.router.UriRouteMatch;
 import io.micronaut.web.router.version.resolution.RequestVersionResolver;
+import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import io.micronaut.core.annotation.Nullable;
-import javax.inject.Singleton;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Predicate;
 
 /**
- * Implementation of {@link RouteMatchFilter} responsible for filtering route matches on {@link Version}.
+ * Implementation of {@link io.micronaut.web.router.filter.RouteMatchFilter} responsible for filtering route matches on {@link Version}.
  *
  * @author Bogdan Oros
  * @since 1.1.0
@@ -108,7 +108,7 @@ public class RouteVersionFilter implements VersionRouteMatchFilter {
         }
         return true;
     }
-    
+
     /**
      *
      * @param request HTTP Request

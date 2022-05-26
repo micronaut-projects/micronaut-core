@@ -17,6 +17,7 @@ package io.micronaut.core.convert;
 
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.convert.converters.MultiValuesConverterFactory;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.convert.format.Format;
 import io.micronaut.core.convert.format.FormattingTypeConverter;
@@ -180,28 +181,23 @@ public class DefaultConversionService implements ConversionService<DefaultConver
      */
     @SuppressWarnings({"OptionalIsPresent", "unchecked"})
     protected void registerDefaultConverters() {
-
+        // primitive array to wrapper array
+        @SuppressWarnings("rawtypes")
+        Function primitiveArrayToWrapperArray = ArrayUtils::toWrapperArray;
+        addConverter(double[].class, Double[].class, primitiveArrayToWrapperArray);
+        addConverter(byte[].class, Byte[].class, primitiveArrayToWrapperArray);
+        addConverter(short[].class, Short[].class, primitiveArrayToWrapperArray);
+        addConverter(boolean[].class, Boolean[].class, primitiveArrayToWrapperArray);
+        addConverter(int[].class, Integer[].class, primitiveArrayToWrapperArray);
+        addConverter(float[].class, Float[].class, primitiveArrayToWrapperArray);
+        addConverter(double[].class, Double[].class, primitiveArrayToWrapperArray);
+        addConverter(char[].class, Character[].class, primitiveArrayToWrapperArray);
         // wrapper to primitive array converters
-        addConverter(Double[].class, double[].class, (object, targetType, context) -> {
-            double[] doubles = new double[object.length];
-            for (int i = 0; i < object.length; i++) {
-                Double aDouble = object[i];
-                if (aDouble != null) {
-                    doubles[i] = aDouble;
-                }
-            }
-            return Optional.of(doubles);
-        });
-        addConverter(Integer[].class, int[].class, (object, targetType, context) -> {
-            int[] integers = new int[object.length];
-            for (int i = 0; i < object.length; i++) {
-                Integer o = object[i];
-                if (o != null) {
-                    integers[i] = o;
-                }
-            }
-            return Optional.of(integers);
-        });
+        Function<Object[], Object> wrapperArrayToPrimitiveArray = ArrayUtils::toPrimitiveArray;
+        //noinspection rawtypes
+        addConverter(Double[].class, double[].class, (Function) wrapperArrayToPrimitiveArray);
+        //noinspection rawtypes
+        addConverter(Integer[].class, int[].class, (Function) wrapperArrayToPrimitiveArray);
 
         // Object -> List
         addConverter(Object.class, List.class, (object, targetType, context) -> {
@@ -548,7 +544,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         });
 
         // String -> Locale
-        addConverter(CharSequence.class, Locale.class, (object) -> StringUtils.parseLocale(object.toString()));
+        addConverter(CharSequence.class, Locale.class, object -> StringUtils.parseLocale(object.toString()));
 
         // String -> UUID
         addConverter(CharSequence.class, UUID.class, (CharSequence object, Class<UUID> targetType, ConversionContext context) -> {
@@ -645,9 +641,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         });
 
         // String -> Char Array
-        addConverter(String.class, char[].class, (String object, Class<char[]> targetType, ConversionContext context) -> {
-            return Optional.of(object.toCharArray());
-        });
+        addConverter(String.class, char[].class, (String object, Class<char[]> targetType, ConversionContext context) -> Optional.of(object.toCharArray()));
 
         // Object[] -> String[]
         addConverter(Object[].class, String[].class, (Object[] object, Class<String[]> targetType, ConversionContext context) -> {
@@ -915,6 +909,21 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             return Optional.of(result);
         });
 
+        // ConvertibleMultiValues -> [?]
+        addConverter(io.micronaut.core.convert.value.ConvertibleMultiValues.class, Iterable.class,
+                new MultiValuesConverterFactory.MultiValuesToIterableConverter(this));
+        addConverter(io.micronaut.core.convert.value.ConvertibleMultiValues.class, Map.class,
+                new MultiValuesConverterFactory.MultiValuesToMapConverter(this));
+        addConverter(io.micronaut.core.convert.value.ConvertibleMultiValues.class, Object.class,
+                new MultiValuesConverterFactory.MultiValuesToObjectConverter(this));
+
+        // [?] -> ConvertibleMultiValues
+        addConverter(Iterable.class, io.micronaut.core.convert.value.ConvertibleMultiValues.class,
+                new MultiValuesConverterFactory.IterableToMultiValuesConverter(this));
+        addConverter(Map.class, io.micronaut.core.convert.value.ConvertibleMultiValues.class,
+                new MultiValuesConverterFactory.MapToMultiValuesConverter(this));
+        addConverter(Object.class, io.micronaut.core.convert.value.ConvertibleMultiValues.class,
+                new MultiValuesConverterFactory.ObjectToMultiValuesConverter(this));
     }
 
     /**

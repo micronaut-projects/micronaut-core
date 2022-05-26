@@ -23,9 +23,10 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.context.scope.Refreshable
 import io.micronaut.runtime.server.EmbeddedServer
+import reactor.core.publisher.Flux
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 import spock.util.environment.RestoreSystemProperties
@@ -41,10 +42,10 @@ class RefreshEndpointSpec extends Specification {
         given:
         System.setProperty("foo.bar", "test")
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['endpoints.refresh.sensitive': false], Environment.TEST)
-        RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+        HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         when:
-        def response = rxClient.exchange("/refreshTest", String).blockingFirst()
+        def response = rxClient.toBlocking().exchange("/refreshTest", String)
 
         then:
         response.code() == HttpStatus.OK.code
@@ -52,7 +53,7 @@ class RefreshEndpointSpec extends Specification {
 
         when:
         System.setProperty("foo.bar", "changed")
-        response = rxClient.exchange(HttpRequest.POST("/refresh", new byte[0]), String).blockingFirst()
+        response = rxClient.toBlocking().exchange(HttpRequest.POST("/refresh", new byte[0]), String)
 
 
         then:
@@ -65,7 +66,7 @@ class RefreshEndpointSpec extends Specification {
 
         then:
         conditions.eventually {
-            def res = rxClient.exchange("/refreshTest", String).blockingFirst()
+            def res = rxClient.exchange("/refreshTest", String).blockFirst()
             res.code() == HttpStatus.OK.code
             res.body() == 'changed changed'
 
@@ -80,30 +81,30 @@ class RefreshEndpointSpec extends Specification {
         given:
         System.setProperty("foo.bar", "test")
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['endpoints.refresh.sensitive': false], Environment.TEST)
-        RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+        HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         when:
-        def response = rxClient.exchange("/refreshTest/external", String).blockingFirst()
+        def response = rxClient.toBlocking().exchange("/refreshTest/external", String)
 
         then:
         response.code() == HttpStatus.OK.code
         String firstResponse = response.body()
 
         when: "/refresh is called"
-        response = rxClient.exchange(HttpRequest.POST("/refresh", new byte[0]), String).blockingFirst()
+        response = rxClient.exchange(HttpRequest.POST("/refresh", new byte[0]), String).blockFirst()
 
         then:
         response.code() == HttpStatus.OK.code
 
         when:
-        response = rxClient.exchange("/refreshTest/external", String).blockingFirst()
+        response = rxClient.toBlocking().exchange("/refreshTest/external", String)
 
         then: "subsequent response does not change"
         response.code() == HttpStatus.OK.code
         response.body() == firstResponse
 
         when: "/refresh is called with `all` body parameter"
-        response = rxClient.exchange(HttpRequest.POST("/refresh", '{"force": true}'), String).blockingFirst()
+        response = rxClient.toBlocking().exchange(HttpRequest.POST("/refresh", '{"force": true}'), String)
 
         then:
         response.code() == HttpStatus.OK.code
@@ -113,7 +114,7 @@ class RefreshEndpointSpec extends Specification {
 
         then: "Response is now different"
         conditions.eventually {
-            def res = rxClient.exchange("/refreshTest/external", String).blockingFirst()
+            def res = rxClient.exchange("/refreshTest/external", String).blockFirst()
             res.code() == HttpStatus.OK.code
             res.body() != firstResponse
         }

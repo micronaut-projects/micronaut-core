@@ -22,8 +22,8 @@ import io.micronaut.http.annotation.Get;
 import io.micronaut.http.sse.Event;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
-import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
 // end::imports[]
 
 // tag::class[]
@@ -34,14 +34,13 @@ public class HeadlineController {
     @Get(produces = MediaType.TEXT_EVENT_STREAM)
     public Publisher<Event<Headline>> index() { // <1>
         String[] versions = {"1.0", "2.0"}; // <2>
-
-        return Flowable.generate(() -> 0, (i, emitter) -> { // <3>
+        return Flux.generate(() -> 0, (i, emitter) -> { // <3>
             if (i < versions.length) {
-                emitter.onNext( // <4>
+                emitter.next( // <4>
                     Event.of(new Headline("Micronaut " + versions[i] + " Released", "Come and get it"))
                 );
             } else {
-                emitter.onComplete(); // <5>
+                emitter.complete(); // <5>
             }
             return ++i;
         });

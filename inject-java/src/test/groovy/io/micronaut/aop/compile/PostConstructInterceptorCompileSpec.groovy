@@ -14,7 +14,7 @@ package annbinding1;
 
 import java.lang.annotation.*;
 import io.micronaut.aop.*;
-import javax.inject.*;
+import jakarta.inject.*;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import javax.annotation.*;
 
@@ -30,6 +30,7 @@ class MyBean {
 
     @PostConstruct
     void init() {
+        System.out.println("INVOKED POST CONSTRUCT");
         this.invoked++;
     }
 }
@@ -112,8 +113,8 @@ class AnotherInterceptor implements Interceptor {
         def instance = getBean(context, 'annbinding1.MyBean')
 
         then:"The interceptors that apply to post construction are invoked"
+        (proxyTarget ? instance.interceptedTarget() : instance).invoked == 1
         interceptor.invoked == 1
-        proxyTarget ? instance.interceptedTarget().invoked : instance.invoked == 1
         constructorInterceptor.invoked == 1
         anotherInterceptor.invoked == 0
         destroyInterceptor.invoked == 0
@@ -161,7 +162,7 @@ package annbinding1;
 
 import java.lang.annotation.*;
 import io.micronaut.aop.*;
-import javax.inject.*;
+import jakarta.inject.*;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import javax.annotation.*;
 

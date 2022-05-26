@@ -34,7 +34,7 @@ package test;
 
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Executable
 @Singleton
@@ -73,20 +73,7 @@ abstract class GenericController<T> {
         definition.getExecutableMethods().any { it.methodName == "getPath" }
         definition.getExecutableMethods().any { it.methodName == "save" && it.argumentTypes == [String] as Class[] }
         definition.getExecutableMethods().any { it.methodName == "save" && it.argumentTypes.length == 0 }
-
-        when:
-        definition.getClass().getClassLoader().loadClass('test.$StatusControllerDefinition$$exec1')
-        definition.getClass().getClassLoader().loadClass('test.$StatusControllerDefinition$$exec2')
-        definition.getClass().getClassLoader().loadClass('test.$StatusControllerDefinition$$exec3')
-
-        then:
-        noExceptionThrown()
-
-        when: //there should only be 2 executable methods
-        definition.getClass().getClassLoader().loadClass('test.$StatusControllerDefinition$$exec4')
-
-        then:
-        thrown(ClassNotFoundException)
+        definition.getExecutableMethods().size() == 3
     }
 
     void "test with multiple generics"() {
@@ -95,7 +82,7 @@ package test;
 
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 abstract class GenericController<T, ID extends Serializable> {
 
@@ -126,20 +113,7 @@ class StatusController extends GenericController<String, Integer> {
         definition.getExecutableMethods().any { it.methodName == "create" && it.argumentTypes == [Integer] as Class[] }
         definition.getExecutableMethods().any { it.methodName == "save" && it.argumentTypes == [String] as Class[] }
         definition.getExecutableMethods().any { it.methodName == "find" && it.argumentTypes == [Integer] as Class[] }
-
-        when:
-        definition.getClass().getClassLoader().loadClass('test.$StatusControllerDefinition$$exec1')
-        definition.getClass().getClassLoader().loadClass('test.$StatusControllerDefinition$$exec2')
-        definition.getClass().getClassLoader().loadClass('test.$StatusControllerDefinition$$exec3')
-
-        then:
-        noExceptionThrown()
-
-        when: //there should only be 2 executable methods
-        definition.getClass().getClassLoader().loadClass('test.$StatusControllerDefinition$$exec4')
-
-        then:
-        thrown(ClassNotFoundException)
+        definition.getExecutableMethods().size() == 3
     }
 
     void "test multiple inheritance"() {
@@ -148,7 +122,7 @@ package test;
 
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 interface X {
 
@@ -172,6 +146,33 @@ class Z extends Y {
     public void test() {
         
     }
+}
+""")
+        expect:
+        definition != null
+        definition.executableMethods.size() == 1
+    }
+
+    void "test inherited from interface"() {
+        BeanDefinition definition = buildBeanDefinition("test.Test", """
+package test
+
+import io.micronaut.inject.annotation.*
+import io.micronaut.context.annotation.*
+import jakarta.inject.Singleton
+
+interface Parent<X> {
+    @Executable
+    void test(X x);
+}
+
+@Singleton
+class Test implements Parent<String> {
+
+   @Override
+   public void test(String str) {
+            
+   }
 }
 """)
         expect:

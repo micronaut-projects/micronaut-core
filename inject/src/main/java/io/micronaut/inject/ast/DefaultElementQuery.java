@@ -15,50 +15,84 @@
  */
 package io.micronaut.inject.ast;
 
+import io.micronaut.context.annotation.Bean;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import java.util.function.Predicate;
 
 @Internal
 final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, ElementQuery.Result<T> {
+    private static final ClassElement ONLY_ACCESSIBLE_MARKER = ClassElement.of(DefaultElementQuery.class);
     private final Class<T> elementType;
-    private final boolean onlyAccessible;
+    private final ClassElement onlyAccessibleType;
     private final boolean onlyDeclared;
     private final boolean onlyAbstract;
     private final boolean onlyConcrete;
+    private final boolean onlyInjected;
     private final List<Predicate<String>> namePredicates;
     private final List<Predicate<AnnotationMetadata>> annotationPredicates;
     private final List<Predicate<Set<ElementModifier>>> modifiersPredicates;
     private final List<Predicate<T>> elementPredicates;
+    private final List<Predicate<ClassElement>> typePredicates;
     private final boolean onlyInstance;
+    private final boolean includeEnumConstants;
+    private final boolean includeOverriddenMethods;
+    private final boolean includeHiddenElements;
 
     DefaultElementQuery(Class<T> elementType) {
-        this(elementType, false, false, false, false, false, null, null, null, null);
+        this(elementType, null, false, false, false, false, false, false, false, false, null, null, null, null, null);
     }
 
+    @SuppressWarnings("checkstyle:ParameterNumber")
     DefaultElementQuery(
             Class<T> elementType,
-            boolean onlyAccessible,
+            ClassElement onlyAccessibleType,
             boolean onlyDeclared,
-            boolean onlyAbstract, boolean onlyConcrete, boolean onlyInstance, List<Predicate<AnnotationMetadata>> annotationPredicates, List<Predicate<Set<ElementModifier>>> modifiersPredicates, List<Predicate<T>> elementPredicates, List<Predicate<String>> namePredicates) {
+            boolean onlyAbstract,
+            boolean onlyConcrete,
+            boolean onlyInjected,
+            boolean onlyInstance,
+            boolean includeEnumConstants,
+            boolean includeOverriddenMethods,
+            boolean includeHiddenElements,
+            List<Predicate<AnnotationMetadata>> annotationPredicates,
+            List<Predicate<Set<ElementModifier>>> modifiersPredicates,
+            List<Predicate<T>> elementPredicates,
+            List<Predicate<String>> namePredicates, List<Predicate<ClassElement>> typePredicates) {
         this.elementType = elementType;
-        this.onlyAccessible = onlyAccessible;
+        this.onlyAccessibleType = onlyAccessibleType;
         this.onlyDeclared = onlyDeclared;
         this.onlyAbstract = onlyAbstract;
         this.onlyConcrete = onlyConcrete;
+        this.onlyInjected = onlyInjected;
         this.namePredicates = namePredicates;
         this.annotationPredicates = annotationPredicates;
         this.modifiersPredicates = modifiersPredicates;
         this.elementPredicates = elementPredicates;
         this.onlyInstance = onlyInstance;
+        this.includeEnumConstants = includeEnumConstants;
+        this.includeOverriddenMethods = includeOverriddenMethods;
+        this.includeHiddenElements = includeHiddenElements;
+        this.typePredicates = typePredicates;
     }
 
     @Override
     public boolean isOnlyAbstract() {
         return onlyAbstract;
+    }
+
+    @Override
+    public boolean isOnlyInjected() {
+        return onlyInjected;
     }
 
     @Override
@@ -73,7 +107,15 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
 
     @Override
     public boolean isOnlyAccessible() {
-        return onlyAccessible;
+        return onlyAccessibleType != null;
+    }
+
+    @Override
+    public Optional<ClassElement> getOnlyAccessibleFromType() {
+        if (onlyAccessibleType != ONLY_ACCESSIBLE_MARKER) {
+            return Optional.ofNullable(onlyAccessibleType);
+        }
+        return Optional.empty();
     }
 
     @Override
@@ -87,11 +129,35 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
     }
 
     @Override
+    public boolean isIncludeEnumConstants() {
+        return includeEnumConstants;
+    }
+
+    @Override
+    public boolean isIncludeOverriddenMethods() {
+        return includeOverriddenMethods;
+    }
+
+    @Override
+    public boolean isIncludeHiddenElements() {
+        return includeHiddenElements;
+    }
+
+    @Override
     public List<Predicate<String>> getNamePredicates() {
         if (namePredicates == null) {
             return Collections.emptyList();
         }
         return Collections.unmodifiableList(namePredicates);
+    }
+
+    @NonNull
+    @Override
+    public List<Predicate<ClassElement>> getTypePredicates() {
+        if (typePredicates == null) {
+            return Collections.emptyList();
+        }
+        return Collections.unmodifiableList(typePredicates);
     }
 
     @Override
@@ -122,49 +188,164 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
     @Override
     public ElementQuery<T> onlyDeclared() {
         return new DefaultElementQuery<>(
-                elementType, onlyAccessible,
+                elementType, onlyAccessibleType,
                 true,
-                onlyAbstract, onlyConcrete, onlyInstance, annotationPredicates, modifiersPredicates, elementPredicates, namePredicates
-        );
+                onlyAbstract, onlyConcrete,
+                onlyInjected,
+                onlyInstance,
+                includeEnumConstants,
+                includeOverriddenMethods,
+                includeHiddenElements,
+                annotationPredicates, modifiersPredicates, elementPredicates, namePredicates,
+                typePredicates);
+    }
+
+    @Override
+    public ElementQuery<T> onlyInjected() {
+        final List<Predicate<AnnotationMetadata>> annotationPredicates = this.annotationPredicates != null ? new ArrayList<>(this.annotationPredicates) : new ArrayList<>(1);
+        annotationPredicates.add((metadata) ->
+                metadata.hasDeclaredAnnotation(AnnotationUtil.INJECT) ||
+                (metadata.hasDeclaredStereotype(AnnotationUtil.QUALIFIER) && !metadata.hasDeclaredAnnotation(Bean.class)) ||
+                metadata.hasDeclaredAnnotation(AnnotationUtil.PRE_DESTROY) ||
+                metadata.hasDeclaredAnnotation(AnnotationUtil.POST_CONSTRUCT));
+        return new DefaultElementQuery<>(
+                elementType, onlyAccessibleType,
+                onlyDeclared,
+                onlyAbstract,
+                onlyConcrete,
+                true,
+                onlyInstance,
+                includeEnumConstants,
+                includeOverriddenMethods,
+                includeHiddenElements,
+                annotationPredicates, modifiersPredicates, elementPredicates, namePredicates,
+                typePredicates);
     }
 
     @NonNull
     @Override
     public ElementQuery<T> onlyConcrete() {
         return new DefaultElementQuery<>(
-                elementType, onlyAccessible,
+                elementType, onlyAccessibleType,
                 onlyDeclared,
-                onlyAbstract, true, onlyInstance, annotationPredicates, modifiersPredicates, elementPredicates, namePredicates
-        );
+                onlyAbstract, true,
+                onlyInjected,
+                onlyInstance,
+                includeEnumConstants,
+                includeOverriddenMethods,
+                includeHiddenElements,
+                annotationPredicates, modifiersPredicates, elementPredicates, namePredicates,
+                typePredicates);
     }
 
     @NonNull
     @Override
     public ElementQuery<T> onlyAbstract() {
         return new DefaultElementQuery<>(
-                elementType, onlyAccessible,
+                elementType, onlyAccessibleType,
                 onlyDeclared,
-                true, onlyConcrete, onlyInstance, annotationPredicates, modifiersPredicates, elementPredicates, namePredicates
-        );
+                true, onlyConcrete,
+                onlyInjected,
+                onlyInstance,
+                includeEnumConstants,
+                includeOverriddenMethods,
+                includeHiddenElements,
+                annotationPredicates, modifiersPredicates, elementPredicates, namePredicates,
+                typePredicates);
     }
 
     @NonNull
     @Override
     public ElementQuery<T> onlyAccessible() {
         return new DefaultElementQuery<>(
-                elementType, true,
+                elementType,
+                ONLY_ACCESSIBLE_MARKER,
                 onlyDeclared,
-                onlyAbstract, onlyConcrete, onlyInstance, annotationPredicates, modifiersPredicates, elementPredicates, namePredicates
-        );
+                onlyAbstract, onlyConcrete,
+                onlyInjected,
+                onlyInstance,
+                includeEnumConstants,
+                includeOverriddenMethods,
+                includeHiddenElements,
+                annotationPredicates, modifiersPredicates, elementPredicates, namePredicates,
+                typePredicates);
+    }
+
+    @NonNull
+    @Override
+    public ElementQuery<T> onlyAccessible(ClassElement fromType) {
+        return new DefaultElementQuery<>(
+                elementType,
+                fromType,
+                onlyDeclared,
+                onlyAbstract, onlyConcrete,
+                onlyInjected,
+                onlyInstance,
+                includeEnumConstants,
+                includeOverriddenMethods,
+                includeHiddenElements,
+                annotationPredicates, modifiersPredicates, elementPredicates, namePredicates,
+                typePredicates);
     }
 
     @Override
     public ElementQuery<T> onlyInstance() {
         return new DefaultElementQuery<>(
-                elementType, onlyAccessible,
+                elementType, onlyAccessibleType,
                 onlyDeclared,
-                onlyAbstract, onlyConcrete, true, annotationPredicates, modifiersPredicates, elementPredicates, namePredicates
-        );
+                onlyAbstract, onlyConcrete,
+                onlyInjected,
+                true,
+                includeEnumConstants,
+                includeOverriddenMethods,
+                includeHiddenElements,
+                annotationPredicates, modifiersPredicates, elementPredicates, namePredicates,
+                typePredicates);
+    }
+
+    @Override
+    public ElementQuery<T> includeEnumConstants() {
+        return new DefaultElementQuery<>(
+                elementType, onlyAccessibleType,
+                onlyDeclared,
+                onlyAbstract, onlyConcrete,
+                onlyInjected,
+                onlyInstance,
+                true,
+                includeOverriddenMethods,
+                includeHiddenElements,
+                annotationPredicates, modifiersPredicates, elementPredicates, namePredicates,
+                typePredicates);
+    }
+
+    @Override
+    public ElementQuery<T> includeOverriddenMethods() {
+        return new DefaultElementQuery<>(
+                elementType, onlyAccessibleType,
+                onlyDeclared,
+                onlyAbstract, onlyConcrete,
+                onlyInjected,
+                onlyInstance,
+                includeEnumConstants,
+                true,
+                includeHiddenElements,
+                annotationPredicates, modifiersPredicates, elementPredicates, namePredicates,
+                typePredicates);
+    }
+
+    @Override
+    public ElementQuery<T> includeHiddenElements() {
+        return new DefaultElementQuery<>(
+                elementType, onlyAccessibleType,
+                onlyDeclared,
+                onlyAbstract, onlyConcrete,
+                onlyInjected,
+                onlyInstance,
+                includeEnumConstants,
+                includeOverriddenMethods,
+                true,
+                annotationPredicates, modifiersPredicates, elementPredicates, namePredicates,
+                typePredicates);
     }
 
     @NonNull
@@ -179,10 +360,50 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
             namePredicates = Collections.singletonList(predicate);
         }
         return new DefaultElementQuery<>(
-                elementType, onlyAccessible,
+                elementType,
+                onlyAccessibleType,
                 onlyDeclared,
-                onlyAbstract, onlyConcrete, onlyInstance, annotationPredicates, modifiersPredicates, elementPredicates, namePredicates
-        );
+                onlyAbstract,
+                onlyConcrete,
+                onlyInjected,
+                onlyInstance,
+                includeEnumConstants,
+                includeOverriddenMethods,
+                includeHiddenElements,
+                annotationPredicates,
+                modifiersPredicates,
+                elementPredicates,
+                namePredicates,
+                typePredicates);
+    }
+
+    @NonNull
+    @Override
+    public ElementQuery<T> typed(@NonNull Predicate<ClassElement> predicate) {
+        Objects.requireNonNull(predicate, "Predicate cannot be null");
+        List<Predicate<ClassElement>> typePredicates;
+        if (this.typePredicates != null) {
+            typePredicates = new ArrayList<>(this.typePredicates);
+            typePredicates.add(predicate);
+        } else {
+            typePredicates = Collections.singletonList(predicate);
+        }
+        return new DefaultElementQuery<>(
+                elementType,
+                onlyAccessibleType,
+                onlyDeclared,
+                onlyAbstract,
+                onlyConcrete,
+                onlyInjected,
+                onlyInstance,
+                includeEnumConstants,
+                includeOverriddenMethods,
+                includeHiddenElements,
+                annotationPredicates,
+                modifiersPredicates,
+                elementPredicates,
+                namePredicates,
+                typePredicates);
     }
 
     @NonNull
@@ -197,10 +418,16 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
             annotationPredicates = Collections.singletonList(predicate);
         }
         return new DefaultElementQuery<>(
-                elementType, onlyAccessible,
+                elementType, onlyAccessibleType,
                 onlyDeclared,
-                onlyAbstract, onlyConcrete, onlyInstance, annotationPredicates, modifiersPredicates, elementPredicates, namePredicates
-        );
+                onlyAbstract, onlyConcrete,
+                onlyInjected,
+                onlyInstance,
+                includeEnumConstants,
+                includeOverriddenMethods,
+                includeHiddenElements,
+                annotationPredicates, modifiersPredicates, elementPredicates, namePredicates,
+                typePredicates);
     }
 
     @NonNull
@@ -215,9 +442,15 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
             modifierPredicates = Collections.singletonList(predicate);
         }
         return new DefaultElementQuery<>(
-                elementType, onlyAccessible,
-                onlyDeclared, onlyAbstract, onlyConcrete, onlyInstance, annotationPredicates, modifierPredicates, elementPredicates, namePredicates
-        );
+                elementType, onlyAccessibleType,
+                onlyDeclared, onlyAbstract, onlyConcrete,
+                onlyInjected,
+                onlyInstance,
+                includeEnumConstants,
+                includeOverriddenMethods,
+                includeHiddenElements,
+                annotationPredicates, modifierPredicates, elementPredicates, namePredicates,
+                typePredicates);
     }
 
     @NonNull
@@ -232,9 +465,14 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
             elementPredicates = Collections.singletonList(predicate);
         }
         return new DefaultElementQuery<>(
-                elementType, onlyAccessible,
-                onlyDeclared, onlyAbstract, onlyConcrete, onlyInstance, annotationPredicates, modifiersPredicates, elementPredicates, namePredicates
-        );
+                elementType, onlyAccessibleType,
+                onlyDeclared, onlyAbstract, onlyConcrete,
+                onlyInjected,
+                onlyInstance, includeEnumConstants,
+                includeOverriddenMethods,
+                includeHiddenElements,
+                annotationPredicates, modifiersPredicates, elementPredicates, namePredicates,
+                typePredicates);
     }
 
     @NonNull

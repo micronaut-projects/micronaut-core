@@ -20,6 +20,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Type;
 import io.micronaut.runtime.context.scope.refresh.RefreshInterceptor;
+import jakarta.inject.Scope;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -27,7 +28,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
 /**
- * <p>A custom {@link javax.inject.Scope} that allows target beans to be refreshed.</p>
+ * <p>A custom scope that allows target beans to be refreshed.</p>
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -38,6 +39,7 @@ import java.lang.annotation.Target;
 @Target({ElementType.TYPE, ElementType.METHOD})
 @Type(RefreshInterceptor.class)
 @Bean
+@Scope
 public @interface Refreshable {
 
     /**

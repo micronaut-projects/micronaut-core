@@ -21,8 +21,8 @@ import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.inject.qualifiers.Qualifiers;
+import jakarta.inject.Inject;
 
-import javax.inject.Inject;
 import java.util.concurrent.*;
 
 /**
@@ -36,16 +36,6 @@ public class ExecutorFactory {
 
     private final BeanLocator beanLocator;
     private final ThreadFactory threadFactory;
-
-    /**
-     * @param threadFactory The factory to create new threads
-     * @deprecated Use {@link #ExecutorFactory(BeanLocator, ThreadFactory)} instead
-     */
-    @Deprecated
-    public ExecutorFactory(ThreadFactory threadFactory) {
-        this.threadFactory = threadFactory;
-        this.beanLocator = null;
-    }
 
     /**
      *
@@ -99,7 +89,7 @@ public class ExecutorFactory {
         return executorConfiguration
                 .getThreadFactoryClass()
                 .flatMap(InstantiationUtils::tryInstantiate)
-                .map(tf -> (ThreadFactory) tf)
+                .map(ThreadFactory.class::cast)
                 .orElseGet(() -> {
                     if (beanLocator != null) {
                         if (executorConfiguration.getName() == null) {

@@ -30,17 +30,22 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.ast.ElementModifier;
 import io.micronaut.inject.ast.MemberElement;
 import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.ClassNode;
+import org.codehaus.groovy.ast.MethodNode;
+import org.codehaus.groovy.ast.FieldNode;
 import org.codehaus.groovy.ast.GenericsType;
 import org.codehaus.groovy.control.CompilationUnit;
 import org.codehaus.groovy.control.SourceUnit;
 
 import io.micronaut.core.annotation.NonNull;
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Modifier;
 import java.util.*;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 /**
  * Abstract Groovy element.
@@ -95,15 +100,61 @@ public abstract class AbstractGroovyElement implements AnnotationMetadataDelegat
                     this.annotationMetadata,
                     av
             );
-            String declaringTypeName = this instanceof MemberElement ? ((MemberElement) this).getOwningType().getName() : getName();
-            AbstractAnnotationMetadataBuilder.addMutatedMetadata(
-                    declaringTypeName,
-                    annotatedNode,
-                    this.annotationMetadata
-            );
-            AstAnnotationUtils.invalidateCache(annotatedNode);
+            updateAnnotationCaches();
         }
         return this;
+    }
+
+    @Override
+    public <T extends Annotation> Element annotate(AnnotationValue<T> annotationValue) {
+        ArgumentUtils.requireNonNull("annotationValue", annotationValue);
+        this.annotationMetadata = new GroovyAnnotationMetadataBuilder(sourceUnit, compilationUnit).annotate(
+                this.annotationMetadata,
+                annotationValue
+        );
+        updateAnnotationCaches();
+        return this;
+    }
+
+    @Override
+    public Element removeAnnotation(@NonNull String annotationType) {
+        ArgumentUtils.requireNonNull("annotationType", annotationType);
+        this.annotationMetadata = new GroovyAnnotationMetadataBuilder(sourceUnit, compilationUnit).removeAnnotation(
+                this.annotationMetadata, annotationType
+        );
+        updateAnnotationCaches();
+        return this;
+    }
+
+    @Override
+    public <T extends Annotation> Element removeAnnotationIf(@NonNull Predicate<AnnotationValue<T>> predicate) {
+        ArgumentUtils.requireNonNull("predicate", predicate);
+        this.annotationMetadata = new GroovyAnnotationMetadataBuilder(sourceUnit, compilationUnit).removeAnnotationIf(
+                this.annotationMetadata, predicate
+        );
+        updateAnnotationCaches();
+        return this;
+
+    }
+
+    @Override
+    public Element removeStereotype(@NonNull String annotationType) {
+        ArgumentUtils.requireNonNull("annotationType", annotationType);
+        this.annotationMetadata = new GroovyAnnotationMetadataBuilder(sourceUnit, compilationUnit).removeStereotype(
+                this.annotationMetadata, annotationType
+        );
+        updateAnnotationCaches();
+        return this;
+    }
+
+    private void updateAnnotationCaches() {
+        String declaringTypeName = this instanceof MemberElement ? ((MemberElement) this).getOwningType().getName() : getName();
+        AbstractAnnotationMetadataBuilder.addMutatedMetadata(
+                declaringTypeName,
+                annotatedNode,
+                this.annotationMetadata
+        );
+        AstAnnotationUtils.invalidateCache(annotatedNode);
     }
 
     /**
@@ -297,6 +348,70 @@ public abstract class AbstractGroovyElement implements AnnotationMetadataDelegat
             annotationMetadata = AnnotationMetadata.EMPTY_METADATA;
         }
         return annotationMetadata;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        AbstractGroovyElement that = (AbstractGroovyElement) o;
+        return annotatedNode.equals(that.annotatedNode);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(annotatedNode);
+    }
+
+    /**
+     * Resolve modifiers for a method node.
+     * @param methodNode The method node
+     * @return The modifiers
+     */
+    protected Set<ElementModifier> resolveModifiers(MethodNode methodNode) {
+        return resolveModifiers(methodNode.getModifiers());
+    }
+
+    /**
+     * Resolve modifiers for a field node.
+     * @param fieldNode The field node
+     * @return The modifiers
+     */
+    protected Set<ElementModifier> resolveModifiers(FieldNode fieldNode) {
+        return resolveModifiers(fieldNode.getModifiers());
+    }
+
+    /**
+     * Resolve modifiers for a class node.
+     * @param classNode The class node
+     * @return The modifiers
+     */
+    protected Set<ElementModifier> resolveModifiers(ClassNode classNode) {
+        return resolveModifiers(classNode.getModifiers());
+    }
+
+    private Set<ElementModifier> resolveModifiers(int mod) {
+        Set<ElementModifier> modifiers = new HashSet<>(5);
+        if (Modifier.isPrivate(mod)) {
+            modifiers.add(ElementModifier.PRIVATE);
+        } else if (Modifier.isProtected(mod)) {
+            modifiers.add(ElementModifier.PROTECTED);
+        } else if (Modifier.isPublic(mod)) {
+            modifiers.add(ElementModifier.PUBLIC);
+        }
+        if (Modifier.isAbstract(mod)) {
+            modifiers.add(ElementModifier.ABSTRACT);
+        } else if (Modifier.isStatic(mod)) {
+            modifiers.add(ElementModifier.STATIC);
+        }
+        if (Modifier.isFinal(mod)) {
+            modifiers.add(ElementModifier.FINAL);
+        }
+        return modifiers;
     }
 }
 

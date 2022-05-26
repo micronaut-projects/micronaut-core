@@ -15,8 +15,8 @@
  */
 package io.micronaut.http.netty.websocket;
 
-import io.netty.channel.group.ChannelGroup;
 import io.netty.channel.Channel;
+import io.netty.channel.group.ChannelGroup;
 
 /**
  * Defines a ChannelGroup repository to handle WebSockets.

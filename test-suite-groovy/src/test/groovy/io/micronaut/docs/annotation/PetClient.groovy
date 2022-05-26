@@ -17,7 +17,8 @@ package io.micronaut.docs.annotation
 
 // tag::imports[]
 import io.micronaut.http.client.annotation.Client
-import io.reactivex.Single
+import org.reactivestreams.Publisher
+import io.micronaut.core.async.annotation.SingleResult
 // end::imports[]
 
 // tag::class[]
@@ -25,6 +26,7 @@ import io.reactivex.Single
 interface PetClient extends PetOperations { // <2>
 
     @Override
-    Single<Pet> save(String name, int age) // <3>
+    @SingleResult
+    Publisher<Pet> save(String name, int age) // <3>
 }
 // end::class[]

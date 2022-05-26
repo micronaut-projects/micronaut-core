@@ -19,6 +19,7 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.junit.Assert;
 import org.junit.Test;
+import reactor.core.publisher.Mono;
 
 import java.util.Map;
 
@@ -31,7 +32,7 @@ public class RequestAttributeSpec {
             StoryClient client = embeddedServer.getApplicationContext().getBean(StoryClient.class);
             StoryClientFilter filter = embeddedServer.getApplicationContext().getBean(StoryClientFilter.class);
 
-            Story story = client.getById("jan2019").blockingGet();
+            Story story = Mono.from(client.getById("jan2019")).block();
 
             Assert.assertNotNull(story);
 

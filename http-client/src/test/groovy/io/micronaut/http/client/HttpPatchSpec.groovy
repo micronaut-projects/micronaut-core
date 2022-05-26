@@ -16,6 +16,8 @@
 package io.micronaut.http.client
 
 import groovy.transform.EqualsAndHashCode
+import io.micronaut.context.annotation.Property
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -27,15 +29,15 @@ import io.micronaut.http.annotation.Header
 import io.micronaut.http.annotation.Patch
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
-import io.reactivex.Flowable
+import jakarta.inject.Inject
+import reactor.core.publisher.Flux
 import spock.lang.Specification
-
-import javax.inject.Inject
 
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
+@Property(name = 'spec.name', value = 'HttpPatchSpec')
 @MicronautTest
 class HttpPatchSpec extends Specification {
 
@@ -51,14 +53,14 @@ class HttpPatchSpec extends Specification {
         def book = new Book(title: "The Stand", pages: 1000)
 
         when:
-        Flowable<HttpResponse<Book>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<Book>> flowable = Flux.from(client.exchange(
                 HttpRequest.PATCH("/patch/simple", book)
                         .accept(MediaType.APPLICATION_JSON_TYPE)
                         .header("X-My-Header", "Foo"),
 
                 Book
         ))
-        HttpResponse<Book> response = flowable.blockingFirst()
+        HttpResponse<Book> response = flowable.blockFirst()
         Optional<Book> body = response.getBody()
 
         then:
@@ -74,14 +76,14 @@ class HttpPatchSpec extends Specification {
         given:
         def book = new Book(title: "The Stand",pages: 1000)
         when:
-        Flowable<HttpResponse<Book>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<Book>> flowable = Flux.from(client.exchange(
                 HttpRequest.PATCH("/patch/title/{title}", book)
                         .accept(MediaType.APPLICATION_JSON_TYPE)
                         .header("X-My-Header", "Foo"),
 
                 Book
         ))
-        HttpResponse<Book> response = flowable.blockingFirst()
+        HttpResponse<Book> response = flowable.blockFirst()
         Optional<Book> body = response.getBody()
 
         then:
@@ -98,7 +100,7 @@ class HttpPatchSpec extends Specification {
         given:
         def book = new Book(title: "The Stand", pages: 1000)
         when:
-        Flowable<HttpResponse<Book>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<Book>> flowable = Flux.from(client.exchange(
                 HttpRequest.PATCH("/patch/form", book)
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE)
                         .accept(MediaType.APPLICATION_JSON_TYPE)
@@ -106,7 +108,7 @@ class HttpPatchSpec extends Specification {
 
                 Book
         ))
-        HttpResponse<Book> response = flowable.blockingFirst()
+        HttpResponse<Book> response = flowable.blockFirst()
         Optional<Book> body = response.getBody()
 
         then:
@@ -151,6 +153,16 @@ class HttpPatchSpec extends Specification {
         val == "multiple mappings"
     }
 
+
+    void "test http patch with empty body"() {
+        when:
+        def res = client.toBlocking().exchange(HttpRequest.PATCH('/patch/emptyBody', null));
+
+        then:
+        res.status == HttpStatus.NO_CONTENT
+    }
+
+    @Requires(property = 'spec.name', value = 'HttpPatchSpec')
     @Controller('/patch')
     static class PostController {
 
@@ -186,6 +198,11 @@ class HttpPatchSpec extends Specification {
         String multipleMappings() {
             return "multiple mappings"
         }
+
+        @Patch(uri = "/emptyBody")
+        HttpResponse emptyBody() {
+            HttpResponse.noContent()
+        }
     }
 
     @EqualsAndHashCode
@@ -195,6 +212,7 @@ class HttpPatchSpec extends Specification {
         Integer pages
     }
 
+    @Requires(property = 'spec.name', value = 'HttpPatchSpec')
     @Client("/patch")
     static interface MyPatchClient {
 

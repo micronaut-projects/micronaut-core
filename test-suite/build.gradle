@@ -9,6 +9,19 @@ buildscript {
     }
 }
 
+plugins {
+    id "io.micronaut.build.internal.convention-test-library"
+    id 'io.micronaut.build.internal.functional-test'
+    id 'java-test-fixtures'
+}
+
+micronautBuild {
+    core {
+        usesMicronautTestJunit()
+        usesMicronautTestSpock()
+    }
+}
+
 apply from: "${rootProject.projectDir}/gradle/geb.gradle"
 apply from: "${rootProject.projectDir}/gradle/webdriverbinaries.gradle"
 
@@ -16,63 +29,71 @@ dependencies {
     annotationProcessor project(":inject-java")
     api project(":inject")
 
-    testImplementation dependencyModuleVersion("netty", "netty-codec-http")
+    testImplementation project(":context")
+    testImplementation libs.managed.netty.codec.http
     testImplementation project(":http-server-netty")
     testImplementation project(":http-client")
     testImplementation project(":validation")
     testImplementation project(":inject-groovy")
     testImplementation project(":inject-java")
     testImplementation project(":inject-java-test")
-    testImplementation project(":tracing")
     testImplementation project(":management")
     testImplementation project(":runtime")
     testImplementation project(":inject")
     testImplementation project(":function-client")
     testImplementation project(":function-web")
     testImplementation project(":session")
-    testImplementation dependencyModuleVersion("micronaut.test", "micronaut-test-junit5"), {
-        exclude module:'micronaut-runtime'
-        exclude module:'micronaut-inject'
-    }
+
     // Adding these for now since micronaut-test isnt resolving correctly ... probably need to upgrade gradle there too
-    testImplementation("org.junit.jupiter:junit-jupiter-api:$junitVersion")
+    testImplementation libs.junit.jupiter.api
 
-    testImplementation dependencyModuleVersion("micronaut.test", "micronaut-test-spock"), {
-        exclude module:'micronaut-runtime'
-        exclude module:'micronaut-inject'
+    testImplementation libs.managed.jcache
+    testImplementation(platform(libs.boms.micronaut.tracing))
+    testImplementation(libs.micronaut.tracing.jaeger) {
+        exclude module: 'micronaut-bom'
+        exclude module: 'micronaut-http-client'
+        exclude module: 'micronaut-inject'
+        exclude module: 'micronaut-runtime'
     }
-
-    testImplementation dependencyVersion("jcache")
-    testImplementation dependencyVersion("jaeger")
-    testImplementation dependencyModuleVersion("groovy", "groovy-json")
+    testImplementation libs.managed.groovy.json
     // tag::testcontainers-dependencies[]
-    testImplementation "org.testcontainers:spock:1.15.1"
+    testImplementation libs.testcontainers.spock
     // end::testcontainers-dependencies[]
-    testImplementation 'org.awaitility:awaitility:4.0.3'
+    testImplementation libs.awaitility
 
     testAnnotationProcessor project(":test-suite-helper")
     testAnnotationProcessor project(":inject-java")
     testAnnotationProcessor project(":test-suite")
 
-    testRuntimeOnly dependencyVersion("tomcatJdbc")
-    testRuntimeOnly dependencyVersion("h2")
-    testRuntimeOnly "org.junit.vintage:junit-vintage-engine:$junitVersion"
-    testRuntimeOnly "ch.qos.logback:logback-classic:1.2.3"
-    testRuntimeOnly group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.920'
+    testRuntimeOnly(platform(libs.boms.micronaut.aws))
+    testRuntimeOnly libs.managed.h2
+    testRuntimeOnly libs.junit.vintage
+    testRuntimeOnly libs.managed.logback
+    testRuntimeOnly libs.aws.java.sdk.lambda
 
     // needed for HTTP/2 tests
-    testImplementation 'io.netty:netty-tcnative:2.0.36.Final'
-    testImplementation 'io.netty:netty-tcnative-boringssl-static:2.0.35.Final'
-    testImplementation "io.netty:netty-tcnative-boringssl-static:2.0.35.Final:${Os.isFamily(Os.FAMILY_MAC) ? 'osx-x86_64' : 'linux-x86_64'}"
-    testImplementation 'org.zalando:logbook-netty:2.4.1'
-    testImplementation "ch.qos.logback:logback-classic:1.2.3"
+    testImplementation platform(libs.boms.netty)
+    testImplementation libs.netty.tcnative
+    testImplementation libs.netty.tcnative.boringssl
+    testImplementation(libs.netty.tcnative.boringssl) {
+        artifact {
+            classifier = Os.isFamily(Os.FAMILY_MAC) ? (Os.isArch("aarch64") ? "osx-aarch_64" : "osx-x86_64") : 'linux-x86_64'
+        }
+    }
+    testImplementation libs.logbook.netty
+    testImplementation libs.managed.logback
 
     if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_15)) {
-        testImplementation('org.bouncycastle:bcpkix-jdk15on:1.65')
+        testImplementation libs.bcpkix
     }
+
+    testImplementation libs.managed.reactor
+
+    testFixturesApi libs.managed.spock
+    testFixturesApi libs.managed.groovy
 }
 
-//tasks.withType(Test) {
+//tasks.withType(Test).configureEach {
 //    useJUnitPlatform()
 //
 //    jvmArgs('-Dio.netty.leakDetection.level=paranoid')

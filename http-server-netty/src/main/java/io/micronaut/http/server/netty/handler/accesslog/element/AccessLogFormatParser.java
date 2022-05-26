@@ -15,6 +15,14 @@
  */
 package io.micronaut.http.server.netty.handler.accesslog.element;
 
+import io.micronaut.core.io.service.ServiceDefinition;
+import io.micronaut.core.io.service.SoftServiceLoader;
+import io.micronaut.core.order.OrderUtil;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.socket.SocketChannel;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.List;
@@ -23,15 +31,6 @@ import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
-
-import io.micronaut.core.order.OrderUtil;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import io.micronaut.core.io.service.ServiceDefinition;
-import io.micronaut.core.io.service.SoftServiceLoader;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.socket.SocketChannel;
 
 /**
  * The access log format parser.

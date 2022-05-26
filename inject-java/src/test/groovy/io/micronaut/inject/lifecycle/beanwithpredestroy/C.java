@@ -15,8 +15,8 @@
  */
 package io.micronaut.inject.lifecycle.beanwithpredestroy;
 
-import javax.annotation.PreDestroy;
-import javax.inject.Singleton;
+import jakarta.annotation.PreDestroy;
+import jakarta.inject.Singleton;
 
 @Singleton
 public class C implements AutoCloseable {

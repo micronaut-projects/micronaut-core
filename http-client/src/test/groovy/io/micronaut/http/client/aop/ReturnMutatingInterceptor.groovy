@@ -2,8 +2,7 @@ package io.micronaut.http.client.aop
 
 import io.micronaut.aop.MethodInterceptor
 import io.micronaut.aop.MethodInvocationContext
-
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 @Singleton
 class ReturnMutatingInterceptor implements MethodInterceptor<Object, String> {

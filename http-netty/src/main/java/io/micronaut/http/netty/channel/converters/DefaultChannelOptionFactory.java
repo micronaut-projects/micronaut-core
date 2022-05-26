@@ -15,11 +15,6 @@
  */
 package io.micronaut.http.netty.channel.converters;
 
-import java.lang.reflect.Field;
-import java.util.Optional;
-
-import javax.inject.Singleton;
-
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.Internal;
@@ -27,6 +22,10 @@ import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.netty.channel.ChannelOption;
+import jakarta.inject.Singleton;
+
+import java.lang.reflect.Field;
+import java.util.Optional;
 
 /**
  * Creates channel options.

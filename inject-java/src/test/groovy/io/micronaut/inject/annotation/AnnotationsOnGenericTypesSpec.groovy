@@ -8,7 +8,7 @@ import io.micronaut.inject.FieldInjectionPoint
 import io.micronaut.inject.MethodInjectionPoint
 import spock.lang.Requires
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 import javax.validation.Valid
 import javax.validation.constraints.Min
 
@@ -21,7 +21,7 @@ class AnnotationsOnGenericTypesSpec extends AbstractTypeElementSpec {
 package io.micronaut.inject.annotationgenerics;
 
 import io.micronaut.context.annotation.Executable;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 import java.util.List;
 import java.util.List;
 import javax.validation.constraints.Min;
@@ -49,7 +49,7 @@ class Test {
 package io.micronaut.inject.annotationgenerics;
 
 import io.micronaut.context.annotation.Executable;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 import java.util.List;
 import java.util.List;
 import javax.validation.Valid;
@@ -63,7 +63,7 @@ class Test {
     }
 }
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Foo {
 
 }
@@ -83,7 +83,7 @@ class Foo {
 package io.micronaut.inject.annotationgenerics;
 
 import io.micronaut.context.annotation.Executable;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 import java.util.List;
 import java.util.List;
 import javax.validation.Valid;
@@ -97,7 +97,7 @@ class Test {
     }
 }
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Foo {
 
 }
@@ -118,7 +118,7 @@ class Foo {
 package io.micronaut.inject.annotationgenerics2;
 
 import io.micronaut.context.annotation.Executable;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 import java.util.List;
 import java.util.List;
 import javax.validation.constraints.Min;
@@ -146,7 +146,7 @@ class Test {
 package io.micronaut.inject.annotationgenerics2;
 
 import io.micronaut.context.annotation.*;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 import java.util.List;
 import java.util.List;
 import javax.validation.constraints.Min;
@@ -172,7 +172,7 @@ class Test {
 package io.micronaut.inject.annotationgenerics2;
 
 import io.micronaut.context.annotation.*;
-import javax.inject.*;
+import jakarta.inject.*;
 import java.util.List;
 import java.util.List;
 import javax.validation.constraints.Min;

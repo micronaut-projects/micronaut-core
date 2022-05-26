@@ -17,6 +17,7 @@ package io.micronaut.context.exceptions;
 
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.core.type.Argument;
+import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.FieldInjectionPoint;
 import io.micronaut.inject.MethodInjectionPoint;
 
@@ -47,6 +48,16 @@ public class CircularDependencyException extends DependencyInjectionException {
     }
 
     /**
+     * @param resolutionContext   The resolution context
+     * @param declaringType       The declaring type
+     * @param fieldName           The field name
+     * @param message             The message
+     */
+    public CircularDependencyException(BeanResolutionContext resolutionContext, BeanDefinition declaringType, String fieldName, String message) {
+        super(resolutionContext, declaringType, fieldName, message, true);
+    }
+
+    /**
      * @param resolutionContext    The resolution context
      * @param methodInjectionPoint The method injection point
      * @param argument             The argument
@@ -54,5 +65,16 @@ public class CircularDependencyException extends DependencyInjectionException {
      */
     public CircularDependencyException(BeanResolutionContext resolutionContext, MethodInjectionPoint methodInjectionPoint, Argument argument, String message) {
         super(resolutionContext, methodInjectionPoint, argument, message, true);
+    }
+
+    /**
+     * @param resolutionContext    The resolution context
+     * @param declaringType        The declaring type
+     * @param methodName           The method name
+     * @param argument             The argument
+     * @param message              The message
+     */
+    public CircularDependencyException(BeanResolutionContext resolutionContext, BeanDefinition declaringType, String methodName, Argument argument, String message) {
+        super(resolutionContext, declaringType, methodName, argument, message, true);
     }
 }

@@ -15,31 +15,48 @@
  */
 package io.micronaut.annotation.processing;
 
-import io.micronaut.annotation.processing.visitor.JavaClassElement;
-import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.Generated;
-import io.micronaut.core.util.StringUtils;
-import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
-import io.micronaut.inject.configuration.ConfigurationMetadataWriter;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedOptions;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
-import java.io.IOException;
-import java.util.*;
+import javax.lang.model.type.DeclaredType;
+import javax.lang.model.type.TypeMirror;
+
+import io.micronaut.annotation.processing.visitor.JavaClassElement;
+import io.micronaut.context.ApplicationContextConfigurer;
+import io.micronaut.context.annotation.ContextConfigurer;
+import io.micronaut.context.visitor.ContextConfigurerVisitor;
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Generated;
+import io.micronaut.core.util.StringUtils;
 
 /**
  * A separate aggregating annotation processor responsible for creating META-INF/services entries.
  *
  * @author graemerocher
  * @since 2.0.0
+ * @deprecated No longer needed and will be removed in a future release
  */
 @SupportedOptions({
         AbstractInjectAnnotationProcessor.MICRONAUT_PROCESSING_INCREMENTAL,
         AbstractInjectAnnotationProcessor.MICRONAUT_PROCESSING_ANNOTATIONS
 })
+@Deprecated
 public class ServiceDescriptionProcessor extends AbstractInjectAnnotationProcessor {
+    private static final Set<String> SUPPORTED_ANNOTATIONS = Collections.emptySet();
+    private static final Set<String> SUPPORTED_SERVICE_TYPES = Collections.singleton(
+            ApplicationContextConfigurer.class.getName()
+    );
 
     private final Map<String, Set<String>> serviceDescriptors = new HashMap<>();
 
@@ -50,7 +67,7 @@ public class ServiceDescriptionProcessor extends AbstractInjectAnnotationProcess
 
     @Override
     public Set<String> getSupportedAnnotationTypes() {
-        return Collections.singleton("io.micronaut.core.annotation.Generated");
+        return SUPPORTED_ANNOTATIONS;
     }
 
     @Override
@@ -62,18 +79,10 @@ public class ServiceDescriptionProcessor extends AbstractInjectAnnotationProcess
                 if (element instanceof TypeElement) {
                     TypeElement typeElement = (TypeElement) element;
                     String name = typeElement.getQualifiedName().toString();
-                    Generated generated = element.getAnnotation(Generated.class);
-                    if (generated != null) {
-                        String serviceName = generated.service();
-                        if (StringUtils.isNotEmpty(serviceName)) {
-                            serviceDescriptors.computeIfAbsent(serviceName, s1 -> new HashSet<>())
-                                    .add(name);
-                            originatingElements.add(new JavaClassElement(typeElement, AnnotationMetadata.EMPTY_METADATA, null));
-                        }
+                    if (!processGeneratedAnnotation(originatingElements, element, typeElement, name)) {
+                        processContextConfigurerAnnotation(originatingElements, element, typeElement);
                     }
-
                 }
-
             }
         }
         if (roundEnv.processingOver() && !serviceDescriptors.isEmpty()) {
@@ -81,34 +90,49 @@ public class ServiceDescriptionProcessor extends AbstractInjectAnnotationProcess
                     serviceDescriptors,
                     originatingElements.toArray(io.micronaut.inject.ast.Element.EMPTY_ELEMENT_ARRAY)
             );
-
-            writeConfigurationMetadata();
         }
         return true;
     }
 
-    private void writeConfigurationMetadata() {
-        ConfigurationMetadataBuilder.getConfigurationMetadataBuilder().ifPresent(metadataBuilder -> {
-            try {
-                if (metadataBuilder.hasMetadata()) {
-                    ServiceLoader<ConfigurationMetadataWriter> writers = ServiceLoader.load(ConfigurationMetadataWriter.class, getClass().getClassLoader());
-
-                    try {
-                        for (ConfigurationMetadataWriter writer : writers) {
-                            try {
-                                writer.write(metadataBuilder, classWriterOutputVisitor);
-                            } catch (IOException e) {
-                                warning("Error occurred writing configuration metadata: %s", e.getMessage());
-                            }
-                        }
-                    } catch (ServiceConfigurationError e) {
-                        warning("Unable to load ConfigurationMetadataWriter due to : %s", e.getMessage());
+    private void processContextConfigurerAnnotation(List<io.micronaut.inject.ast.Element> originatingElements,
+                                                    Element element,
+                                                    TypeElement typeElement) {
+        AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(element);
+        Optional<AnnotationValue<ContextConfigurer>> ann = annotationMetadata.findAnnotation(ContextConfigurer.class);
+        if (ann.isPresent()) {
+            JavaClassElement javaClassElement = javaVisitorContext.getElementFactory()
+                    .newClassElement(typeElement, annotationMetadata);
+            ContextConfigurerVisitor.assertNoConstructorForContextAnnotation(javaClassElement);
+            List<? extends TypeMirror> interfaces = typeElement.getInterfaces();
+            for (TypeMirror interfaceType : interfaces) {
+                if (interfaceType instanceof DeclaredType) {
+                    String serviceName = modelUtils.resolveTypeName(interfaceType);
+                    String serviceImpl = modelUtils.resolveTypeName(element.asType());
+                    if (SUPPORTED_SERVICE_TYPES.contains(serviceName)) {
+                        serviceDescriptors.computeIfAbsent(serviceName, s1 -> new HashSet<>())
+                                .add(serviceImpl);
+                        originatingElements.add(new JavaClassElement(typeElement, AnnotationMetadata.EMPTY_METADATA, null));
                     }
                 }
-            } finally {
-                ConfigurationMetadataBuilder.setConfigurationMetadataBuilder(null);
             }
-        });
+        }
+        AnnotationUtils.invalidateCache();
+    }
 
+    private boolean processGeneratedAnnotation(List<io.micronaut.inject.ast.Element> originatingElements,
+                                               Element element,
+                                               TypeElement typeElement,
+                                               String name) {
+        Generated generated = element.getAnnotation(Generated.class);
+        if (generated != null) {
+            String serviceName = generated.service();
+            if (StringUtils.isNotEmpty(serviceName)) {
+                serviceDescriptors.computeIfAbsent(serviceName, s1 -> new HashSet<>())
+                        .add(name);
+                originatingElements.add(new JavaClassElement(typeElement, AnnotationMetadata.EMPTY_METADATA, null));
+            }
+            return true;
+        }
+        return false;
     }
 }

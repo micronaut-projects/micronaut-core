@@ -22,6 +22,9 @@ import io.micronaut.http.HttpRequest;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Contains methods to obtain {@link Error} and {@link Throwable} from an {@link HttpRequest}.
+ */
 public interface ErrorContext {
 
     /**

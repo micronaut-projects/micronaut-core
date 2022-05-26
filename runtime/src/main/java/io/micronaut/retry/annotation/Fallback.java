@@ -15,13 +15,13 @@
  */
 package io.micronaut.retry.annotation;
 
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Secondary;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * A {@link Secondary} {@link javax.inject.Scope} for types that should be used as a fallback.

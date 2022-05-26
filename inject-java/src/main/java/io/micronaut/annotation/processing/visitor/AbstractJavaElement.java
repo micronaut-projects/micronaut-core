@@ -20,23 +20,24 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
-import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.MemberElement;
-
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.inject.ast.ParameterElement;
-import io.micronaut.inject.ast.PrimitiveElement;
+import io.micronaut.inject.ast.*;
 
 import javax.lang.model.element.*;
+import javax.lang.model.element.Element;
 import javax.lang.model.type.*;
 import java.lang.annotation.Annotation;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static javax.lang.model.element.Modifier.*;
 
@@ -79,23 +80,100 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
                 .newAnnotationBuilder()
                 .annotate(annotationMetadata, av);
 
-        String declaringTypeName;
-        if (this instanceof MemberElement) {
-            declaringTypeName = ((MemberElement) this).getOwningType().getName();
-        } else if (this instanceof ParameterElement) {
-            TypeElement typeElement = visitorContext.getModelUtils().classElementFor((Element) this.getNativeType());
-            if (typeElement == null) {
-                declaringTypeName = getName();
-            } else {
-                declaringTypeName = typeElement.getQualifiedName().toString();
-            }
-        } else {
-            declaringTypeName = getName();
-        }
+        updateMetadataCaches();
+        return this;
+    }
 
+    @Override
+    public <T extends Annotation> io.micronaut.inject.ast.Element annotate(AnnotationValue<T> annotationValue) {
+        ArgumentUtils.requireNonNull("annotationValue", annotationValue);
+
+        AnnotationUtils annotationUtils = visitorContext
+                .getAnnotationUtils();
+        this.annotationMetadata = annotationUtils
+                .newAnnotationBuilder()
+                .annotate(annotationMetadata, annotationValue);
+
+        updateMetadataCaches();
+        return this;
+    }
+
+    @Override
+    public io.micronaut.inject.ast.Element removeAnnotation(@NonNull String annotationType) {
+        ArgumentUtils.requireNonNull("annotationType", annotationType);
+        try {
+            AnnotationUtils annotationUtils = visitorContext
+                    .getAnnotationUtils();
+            this.annotationMetadata = annotationUtils
+                    .newAnnotationBuilder()
+                    .removeAnnotation(annotationMetadata, annotationType);
+            return this;
+        } finally {
+            updateMetadataCaches();
+        }
+    }
+
+    @Override
+    public <T extends Annotation> io.micronaut.inject.ast.Element removeAnnotationIf(@NonNull Predicate<AnnotationValue<T>> predicate) {
+        //noinspection ConstantConditions
+        if (predicate != null) {
+            try {
+                AnnotationUtils annotationUtils = visitorContext
+                        .getAnnotationUtils();
+                this.annotationMetadata = annotationUtils
+                        .newAnnotationBuilder()
+                        .removeAnnotationIf(annotationMetadata, predicate);
+                return this;
+            } finally {
+                updateMetadataCaches();
+            }
+        }
+        return this;
+    }
+
+    @Override
+    public io.micronaut.inject.ast.Element removeStereotype(@NonNull String annotationType) {
+        ArgumentUtils.requireNonNull("annotationType", annotationType);
+        try {
+            AnnotationUtils annotationUtils = visitorContext
+                    .getAnnotationUtils();
+            this.annotationMetadata = annotationUtils
+                    .newAnnotationBuilder()
+                    .removeStereotype(annotationMetadata, annotationType);
+            return this;
+        } finally {
+            updateMetadataCaches();
+        }
+    }
+
+    private void updateMetadataCaches() {
+        String declaringTypeName = resolveDeclaringTypeName();
         AbstractAnnotationMetadataBuilder.addMutatedMetadata(declaringTypeName, element, annotationMetadata);
         AnnotationUtils.invalidateMetadata(element);
-        return this;
+    }
+
+    private String resolveDeclaringTypeName() {
+        String declaringTypeName;
+        if (this instanceof MemberElement) {
+            final ClassElement owningType = ((MemberElement) this).getOwningType();
+            final Element nativeType = (Element) owningType.getNativeType();
+            declaringTypeName = resolveCanonicalName(nativeType);
+        } else {
+            final Element nativeType = (Element) this.getNativeType();
+            declaringTypeName = resolveCanonicalName(nativeType);
+        }
+        return declaringTypeName;
+    }
+
+    private String resolveCanonicalName(Element nativeType) {
+        String declaringTypeName;
+        TypeElement typeElement = visitorContext.getModelUtils().classElementFor(nativeType);
+        if (typeElement == null) {
+            declaringTypeName = getName();
+        } else {
+            declaringTypeName = typeElement.getQualifiedName().toString();
+        }
+        return declaringTypeName;
     }
 
     @Override
@@ -109,6 +187,14 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
     @Override
     public String getName() {
         return element.getSimpleName().toString();
+    }
+
+    @Override
+    public Set<ElementModifier> getModifiers() {
+        return this.element
+                .getModifiers().stream()
+                .map(m -> ElementModifier.valueOf(m.name()))
+                .collect(Collectors.toSet());
     }
 
     @Override
@@ -207,6 +293,25 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
      * @return The class element
      */
     protected @NonNull ClassElement mirrorToClassElement(TypeMirror returnType, JavaVisitorContext visitorContext, Map<String, Map<String, TypeMirror>> genericsInfo, boolean includeTypeAnnotations) {
+        return mirrorToClassElement(returnType, visitorContext, genericsInfo, includeTypeAnnotations, returnType instanceof TypeVariable);
+    }
+
+    /**
+     * Obtain the ClassElement for the given mirror.
+     *
+     * @param returnType The return type
+     * @param visitorContext The visitor context
+     * @param genericsInfo The generic information.
+     * @param includeTypeAnnotations Whether to include type level annotations in the metadata for the element
+     * @param isTypeVariable is the type a type variable
+     * @return The class element
+     */
+    protected @NonNull ClassElement mirrorToClassElement(
+            TypeMirror returnType,
+            JavaVisitorContext visitorContext,
+            Map<String, Map<String, TypeMirror>> genericsInfo,
+            boolean includeTypeAnnotations,
+            boolean isTypeVariable) {
         if (genericsInfo == null) {
             genericsInfo = Collections.emptyMap();
         }
@@ -247,7 +352,9 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
                                 typeElement,
                                 newAnnotationMetadata,
                                 visitorContext,
-                                genericsInfo
+                                typeArguments,
+                                genericsInfo,
+                                isTypeVariable
                         );
                     }
                 }
@@ -256,26 +363,86 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
             }
         } else if (returnType instanceof TypeVariable) {
             TypeVariable tv = (TypeVariable) returnType;
-            TypeMirror upperBound = tv.getUpperBound();
-            Map<String, TypeMirror> boundGenerics = resolveBoundGenerics(visitorContext, genericsInfo);
-
-            TypeMirror bound = boundGenerics.get(tv.toString());
-            if (bound != null && bound != tv) {
-                return mirrorToClassElement(bound, visitorContext, genericsInfo, includeTypeAnnotations);
-            } else {
-                return mirrorToClassElement(upperBound, visitorContext, genericsInfo, includeTypeAnnotations);
-            }
+            return resolveTypeVariable(
+                    visitorContext,
+                    genericsInfo,
+                    includeTypeAnnotations,
+                    tv,
+                    tv
+            );
 
         } else if (returnType instanceof ArrayType) {
             ArrayType at = (ArrayType) returnType;
             TypeMirror componentType = at.getComponentType();
-            ClassElement arrayType = mirrorToClassElement(componentType, visitorContext, genericsInfo, includeTypeAnnotations);
+            ClassElement arrayType;
+            if (componentType instanceof TypeVariable && componentType.getKind() == TypeKind.TYPEVAR) {
+                TypeVariable tv = (TypeVariable) componentType;
+                arrayType = resolveTypeVariable(visitorContext, genericsInfo, includeTypeAnnotations, tv, at);
+            } else {
+                arrayType = mirrorToClassElement(componentType, visitorContext, genericsInfo, includeTypeAnnotations);
+            }
             return arrayType.toArray();
         } else if (returnType instanceof PrimitiveType) {
             PrimitiveType pt = (PrimitiveType) returnType;
             return PrimitiveElement.valueOf(pt.getKind().name());
+        } else if (returnType instanceof WildcardType) {
+            WildcardType wt = (WildcardType) returnType;
+            Map<String, Map<String, TypeMirror>> finalGenericsInfo = genericsInfo;
+            TypeMirror superBound = wt.getSuperBound();
+            Stream<? extends TypeMirror> lowerBounds;
+            if (superBound instanceof UnionType) {
+                lowerBounds = ((UnionType) superBound).getAlternatives().stream();
+            } else if (superBound == null) {
+                lowerBounds = Stream.empty();
+            } else {
+                lowerBounds = Stream.of(superBound);
+            }
+            TypeMirror extendsBound = wt.getExtendsBound();
+            Stream<? extends TypeMirror> upperBounds;
+            if (extendsBound instanceof IntersectionType) {
+                upperBounds = ((IntersectionType) extendsBound).getBounds().stream();
+            } else if (extendsBound == null) {
+                upperBounds = Stream.of(visitorContext.getElements().getTypeElement("java.lang.Object").asType());
+            } else {
+                upperBounds = Stream.of(extendsBound);
+            }
+            return new JavaWildcardElement(
+                    wt,
+                    upperBounds
+                            .map(tm -> (JavaClassElement) mirrorToClassElement(tm, visitorContext, finalGenericsInfo, includeTypeAnnotations))
+                            .collect(Collectors.toList()),
+                    lowerBounds
+                            .map(tm -> (JavaClassElement) mirrorToClassElement(tm, visitorContext, finalGenericsInfo, includeTypeAnnotations))
+                            .collect(Collectors.toList())
+            );
         }
         return PrimitiveElement.VOID;
+    }
+
+    private ClassElement resolveTypeVariable(JavaVisitorContext visitorContext,
+                                         Map<String, Map<String, TypeMirror>> genericsInfo,
+                                         boolean includeTypeAnnotations,
+                                         TypeVariable tv,
+                                         TypeMirror declaration) {
+        TypeMirror upperBound = tv.getUpperBound();
+        Map<String, TypeMirror> boundGenerics = resolveBoundGenerics(visitorContext, genericsInfo);
+
+        TypeMirror bound = boundGenerics.get(tv.toString());
+        if (bound != null && bound != declaration) {
+            return mirrorToClassElement(bound, visitorContext, genericsInfo, includeTypeAnnotations, true);
+        } else {
+            // type variable is still free.
+            List<? extends TypeMirror> boundsUnresolved = upperBound instanceof IntersectionType ?
+                    ((IntersectionType) upperBound).getBounds() :
+                    Collections.singletonList(upperBound);
+            List<JavaClassElement> bounds = boundsUnresolved.stream()
+                    .map(tm -> (JavaClassElement) mirrorToClassElement(tm,
+                                                                       visitorContext,
+                                                                       genericsInfo,
+                                                                       includeTypeAnnotations))
+                    .collect(Collectors.toList());
+            return new JavaGenericPlaceholderElement(tv, bounds, 0);
+        }
     }
 
     private Map<String, TypeMirror> resolveBoundGenerics(JavaVisitorContext visitorContext, Map<String, Map<String, TypeMirror>> genericsInfo) {
@@ -293,5 +460,22 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
 
     private boolean hasModifier(Modifier modifier) {
         return element.getModifiers().contains(modifier);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        AbstractJavaElement that = (AbstractJavaElement) o;
+        return element.equals(that.element);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(element);
     }
 }

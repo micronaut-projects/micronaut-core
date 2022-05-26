@@ -16,7 +16,7 @@
 package io.micronaut.docs.inject.intro
 
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 /**
  * @author Graeme Rocher

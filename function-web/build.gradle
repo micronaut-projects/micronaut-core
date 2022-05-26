@@ -1,8 +1,14 @@
+plugins {
+    id "io.micronaut.build.internal.convention-library"
+}
+
 dependencies {
     annotationProcessor project(":inject-java")
     api project(":function")
     api project(":router")
     api project(":http-server")
+
+    testImplementation libs.managed.reactor
 
     testImplementation project(":http-client")
     testImplementation project(":inject")

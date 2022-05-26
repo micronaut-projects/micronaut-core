@@ -124,6 +124,7 @@ class FieldPropertyInject {
     String str
 
     @Property(name = "my.int")
+    @jakarta.inject.Inject
     int integer
 
     @Property(name = "my.nullable")

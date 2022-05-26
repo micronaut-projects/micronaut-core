@@ -40,4 +40,49 @@ class ClasspathResourceLoaderSpec extends Specification {
         "classpath:/foo" | "classpath:/bar.txt"
         "classpath:foo"  | "classpath:/bar.txt"
     }
+
+    void "test resolving a classpath resource with a relative path"() {
+        given:
+        ClassPathResourceLoader loader = new DefaultClassPathResourceLoader(getClass().getClassLoader(), base, true)
+
+        expect:
+        loader.getResource(resource).isPresent() == present
+        loader.getResourceAsStream(resource).map({ InputStream io -> io.close(); io })
+                .isPresent() == present
+        loader.getResources(resource).findFirst().isPresent() == present
+
+        where:
+        base            | resource                                        | present
+        "classpath:foo" | "classpath:foo/../other/shouldNotAccess.txt"    | false
+        "classpath:foo" | "classpath:../foo/bar.txt"                      | true
+        "classpath:foo" | "classpath:../other/../foo/bar.txt"             | true
+        "classpath:foo" | "classpath:../foo/../other/shouldNotAccess.txt" | false
+        "classpath:foo" | "classpath:../other/shouldNotAccess.txt"        | false
+        "classpath:foo" | "classpath:foo/../../other/shouldNotAccess.txt" | false
+    }
+
+    void "test resolving a classpath resource with a relative path - check base path false"() {
+        given:
+        ClassPathResourceLoader loader = new DefaultClassPathResourceLoader(getClass().getClassLoader(), base, false)
+
+        expect:
+        loader.getResource(resource).isPresent() == present
+        loader.getResourceAsStream(resource).map({ InputStream io -> io.close(); io })
+                .isPresent() == present
+        loader.getResources(resource).findFirst().isPresent() == present
+
+        where:
+        base            | resource                                                  | present
+        "classpath:foo" | "classpath:/other/../../other/shouldNotAccess.txt"        | false
+        "classpath:foo" | "classpath:other/../../other/shouldNotAccess.txt"         | false
+        "classpath:foo" | "classpath:other\\..\\..\\..\\other\\shouldNotAccess.txt" | false
+        "classpath:foo" | "classpath:../foo/bar.txt"                                | false
+        "classpath:foo" | "classpath:bar.txt"                                       | true
+        "classpath:foo" | "classpath:bar/../other/shouldNotAccess.txt"              | false
+        "classpath:foo" | "classpath:bar/..\\other/shouldNotAccess.txt"             | false
+        "classpath:foo" | "classpath:../other/../foo/bar.txt"                       | false
+        "classpath:foo" | "classpath:../foo/../other/shouldNotAccess.txt"           | false
+        "classpath:foo" | "classpath:../other/shouldNotAccess.txt"                  | false
+        "classpath:foo" | "classpath:foo/../../other/shouldNotAccess.txt"           | false
+    }
 }

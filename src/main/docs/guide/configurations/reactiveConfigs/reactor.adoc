@@ -1,9 +1,9 @@
 To add support for Reactor, add the following module:
 
-dependency:io.micronaut.reactor:micronaut-reactor[scope="compile"]
+dependency:micronaut-reactor[scope="compile", groupId="io.micronaut.reactor"]
 
 To use the Reactor HTTP client, add the following dependency:
 
-dependency:io.micronaut.reactor:micronaut-reactor-http-client[scope="compile"]
+dependency:micronaut-reactor-http-client[scope="compile", groupId="io.micronaut.reactor"]
 
 For more information see the documentation for https://micronaut-projects.github.io/micronaut-reactor/latest/guide/[Micronaut Reactor].

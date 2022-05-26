@@ -18,11 +18,11 @@ package io.micronaut.inject.constructor
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.exceptions.DependencyInjectionException
+import io.micronaut.core.annotation.Nullable
 import spock.lang.Specification
 
-import javax.annotation.Nullable
-import javax.inject.Inject
-import javax.inject.Provider
+import jakarta.inject.Inject
+import jakarta.inject.Provider
 
 class ConstructorNullableSpec extends Specification {
 

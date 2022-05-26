@@ -15,13 +15,13 @@
  */
 package io.micronaut.http.server.netty.handler.accesslog.element;
 
+import io.netty.channel.socket.SocketChannel;
+import io.netty.handler.codec.http.HttpHeaders;
+
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-
-import io.netty.channel.socket.SocketChannel;
-import io.netty.handler.codec.http.HttpHeaders;
 
 /**
  * ElapseTimeElement LogElement. Time spent to complete the request.

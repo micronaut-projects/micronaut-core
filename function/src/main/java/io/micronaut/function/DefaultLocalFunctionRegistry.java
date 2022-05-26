@@ -16,6 +16,7 @@
 package io.micronaut.function;
 
 import io.micronaut.context.processor.ExecutableMethodProcessor;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.MediaType;
@@ -23,11 +24,16 @@ import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 
-import javax.inject.Inject;
-import javax.inject.Singleton;
 import java.net.URI;
-import java.util.*;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -172,12 +178,12 @@ public class DefaultLocalFunctionRegistry implements ExecutableMethodProcessor<F
     }
 
     @Override
-    public Optional<MediaTypeCodec> findCodec(MediaType mediaType) {
+    public Optional<MediaTypeCodec> findCodec(@Nullable MediaType mediaType) {
         return decoderRegistry.findCodec(mediaType);
     }
 
     @Override
-    public Optional<MediaTypeCodec> findCodec(MediaType mediaType, Class<?> type) {
+    public Optional<MediaTypeCodec> findCodec(@Nullable MediaType mediaType, Class<?> type) {
         return decoderRegistry.findCodec(mediaType, type);
     }
 

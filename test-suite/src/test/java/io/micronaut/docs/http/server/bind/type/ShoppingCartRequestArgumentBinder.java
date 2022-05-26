@@ -8,7 +8,7 @@ import io.micronaut.http.bind.binders.TypedRequestArgumentBinder;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.jackson.serialize.JacksonObjectSerializer;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 import java.util.Optional;
 
 @Singleton

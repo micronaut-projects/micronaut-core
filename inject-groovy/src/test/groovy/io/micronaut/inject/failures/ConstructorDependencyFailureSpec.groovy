@@ -20,7 +20,7 @@ import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.exceptions.DependencyInjectionException
 import spock.lang.Specification
 
-import javax.inject.Inject
+import jakarta.inject.Inject
 
 /**
  * Created by graemerocher on 12/05/2017.

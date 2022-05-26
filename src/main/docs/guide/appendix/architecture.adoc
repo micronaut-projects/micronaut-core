@@ -1,0 +1,5 @@
+The following documentation describes Micronaut's architecture and is designed for those who are looking for information on the internal workings of Micronaut and how it is architected. This is not intended as end-user developer documentation, but for those interested in the inner workings of Micronaut.
+
+This documentation is divided into sections that describe the compiler, introspections, application container, dependency injection and so on.
+
+WARNING: Since this documentation covers the internal workings of Micronaut, many APIs referenced and described are regarded as internal, non-public API and are annotated as such with the ann:core.annotation.Internal[]. Internal APIs can change between patch releases of Micronaut and are not covered by Micronaut's semantic versioning release policy.

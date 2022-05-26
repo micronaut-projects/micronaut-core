@@ -15,11 +15,11 @@
  */
 package io.micronaut.http.server.util.locale;
 
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.context.annotation.Primary;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.HttpRequest;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.Optional;

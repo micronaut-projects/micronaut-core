@@ -18,18 +18,24 @@ package io.micronaut.validation.validator;
 import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.MessageSource;
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.Toggleable;
 import io.micronaut.validation.validator.constraints.ConstraintValidatorRegistry;
 import io.micronaut.validation.validator.constraints.DefaultConstraintValidators;
 import io.micronaut.validation.validator.extractors.DefaultValueExtractors;
 import io.micronaut.validation.validator.extractors.ValueExtractorRegistry;
 import io.micronaut.validation.validator.messages.DefaultValidationMessages;
+import jakarta.inject.Inject;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
-import javax.inject.Inject;
-import javax.validation.*;
+import javax.validation.ClockProvider;
+import javax.validation.ConstraintValidatorFactory;
+import javax.validation.MessageInterpolator;
+import javax.validation.ParameterNameProvider;
+import javax.validation.Path;
+import javax.validation.TraversableResolver;
 import javax.validation.Validator;
+import javax.validation.ValidatorContext;
 import javax.validation.valueextraction.ValueExtractor;
 import java.lang.annotation.ElementType;
 

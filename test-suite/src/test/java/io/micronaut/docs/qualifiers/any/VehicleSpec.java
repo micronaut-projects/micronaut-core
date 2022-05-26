@@ -7,7 +7,7 @@ import org.junit.jupiter.api.Test;
 
 // tag::imports[]
 import io.micronaut.context.annotation.Any;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 // end::imports[]
 
 @MicronautTest

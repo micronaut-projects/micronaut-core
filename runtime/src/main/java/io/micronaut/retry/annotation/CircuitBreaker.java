@@ -15,8 +15,6 @@
  */
 package io.micronaut.retry.annotation;
 
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
 import io.micronaut.context.annotation.AliasFor;
 
 import javax.validation.constraints.Digits;
@@ -24,6 +22,8 @@ import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * Variation of {@link Retryable} that implements the Circuit Breaker pattern. Has higher overhead than

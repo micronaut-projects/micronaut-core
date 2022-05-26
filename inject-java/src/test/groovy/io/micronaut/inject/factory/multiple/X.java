@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.factory.multiple;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Singleton
 public class X {

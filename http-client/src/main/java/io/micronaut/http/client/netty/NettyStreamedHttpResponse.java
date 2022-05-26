@@ -15,13 +15,15 @@
  */
 package io.micronaut.http.client.netty;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
-import io.micronaut.http.*;
+import io.micronaut.http.HttpStatus;
+import io.micronaut.http.MutableHttpHeaders;
+import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
 import io.micronaut.http.netty.NettyHttpHeaders;

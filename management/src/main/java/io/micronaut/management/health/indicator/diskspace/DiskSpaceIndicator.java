@@ -20,8 +20,8 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.health.HealthStatus;
 import io.micronaut.management.endpoint.health.HealthEndpoint;
 import io.micronaut.management.health.indicator.AbstractHealthIndicator;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.io.File;
 import java.util.LinkedHashMap;
 import java.util.Map;

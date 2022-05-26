@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.failures.ctordependencyfailure;
 
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 public class B {
     private final A a;

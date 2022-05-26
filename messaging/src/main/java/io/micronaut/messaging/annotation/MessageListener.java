@@ -17,9 +17,8 @@ package io.micronaut.messaging.annotation;
 
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.DefaultScope;
-import io.micronaut.context.annotation.Executable;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -38,7 +37,6 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Retention(RUNTIME)
 @Target({ElementType.ANNOTATION_TYPE, ElementType.TYPE})
 @Bean
-@Executable(processOnStartup = true)
 @DefaultScope(Singleton.class)
 public @interface MessageListener {
 }

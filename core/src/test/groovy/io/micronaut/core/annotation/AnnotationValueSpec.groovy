@@ -4,6 +4,15 @@ import spock.lang.Specification
 
 class AnnotationValueSpec extends Specification {
 
+    void "test toString()"() {
+        given:
+        def av = AnnotationValue.builder("test.Foo")
+            .value(10).build()
+
+        expect:
+        av.toString() == "@test.Foo(value=10)"
+    }
+
     void "test get properties"() {
         given:
         def av = AnnotationValue.builder("test.Foo")
@@ -145,4 +154,19 @@ class AnnotationValueSpec extends Specification {
         av.isFalse("five")
         av.isFalse("six")
     }
+
+    void "test getAnnotation()"() {
+        given:
+        def innerAv = AnnotationValue.builder(Bar.class).build()
+        def av = AnnotationValue.builder("test.Foo")
+                .member("bar", innerAv)
+                .member("bars", innerAv, innerAv)
+                .build()
+
+        expect:
+        av.getAnnotation("bar", Bar.class).get() == innerAv
+        av.getAnnotation("bars", Bar.class).get() == innerAv
+    }
 }
+
+@interface Bar {}

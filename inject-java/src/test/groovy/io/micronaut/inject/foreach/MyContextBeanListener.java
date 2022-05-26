@@ -3,7 +3,7 @@ package io.micronaut.inject.foreach;
 import io.micronaut.context.event.BeanCreatedEvent;
 import io.micronaut.context.event.BeanCreatedEventListener;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 import java.util.HashSet;
 import java.util.Set;
 

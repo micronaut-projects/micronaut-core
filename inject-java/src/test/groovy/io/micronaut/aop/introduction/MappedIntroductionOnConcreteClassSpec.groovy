@@ -28,7 +28,7 @@ class MappedIntroductionOnConcreteClassSpec extends AbstractTypeElementSpec {
 package test;
 
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @io.micronaut.aop.introduction.ListenerAdviceMarker
 @Singleton

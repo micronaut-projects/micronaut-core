@@ -17,7 +17,7 @@ package io.micronaut.inject.qualifiers.primary;
 
 import io.micronaut.context.annotation.Primary;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Primary
 @Singleton

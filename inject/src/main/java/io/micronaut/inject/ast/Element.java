@@ -17,14 +17,19 @@ package io.micronaut.inject.ast;
 
 import io.micronaut.core.annotation.AnnotatedElement;
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.naming.Described;
 import io.micronaut.core.util.ArgumentUtils;
 
 import io.micronaut.core.annotation.NonNull;
 import java.lang.annotation.Annotation;
+import java.util.Collections;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 /**
  * Stores data about a compile time element. The underlying object can be a class, field, or method.
@@ -41,7 +46,7 @@ public interface Element extends AnnotationMetadataDelegate, AnnotatedElement, D
     Element[] EMPTY_ELEMENT_ARRAY = new Element[0];
 
     /**
-     * @return The name of the element.
+     * @return The name of the element. For a type this represents the binary name.
      */
     @Override
     @NonNull String getName();
@@ -73,6 +78,14 @@ public interface Element extends AnnotationMetadataDelegate, AnnotatedElement, D
     @NonNull Object getNativeType();
 
     /**
+     * @return The {@link ElementModifier} types for this class element
+     * @since 3.0.0
+     */
+    default Set<ElementModifier> getModifiers() {
+        return Collections.emptySet();
+    }
+
+    /**
      * Annotate this element with the given annotation type. If the annotation is already present then
      * any values populated by the builder will be merged/overridden with the existing values.
      *
@@ -84,6 +97,66 @@ public interface Element extends AnnotationMetadataDelegate, AnnotatedElement, D
     @NonNull
     default <T extends Annotation> Element annotate(@NonNull String annotationType, @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
         throw new UnsupportedOperationException("Element of type [" + getClass() + "] does not support adding annotations at compilation time");
+    }
+
+    /**
+     * Removes an annotation of the given type from the element.
+     *
+     * <p>If the annotation features any stereotypes these will also be removed unless there are other
+     * annotations that reference the stereotype to be removed.</p>
+     *
+     * <p>In the case of repeatable annotations this method will remove all repeated annotations, effectively
+     * clearing out all declared repeated annotations of the given type.</p>
+     *
+     * @param annotationType The annotation type
+     * @return This element
+     * @since 3.0.0
+     */
+    default  Element removeAnnotation(@NonNull String annotationType) {
+        throw new UnsupportedOperationException("Element of type [" + getClass() + "] does not support removing annotations at compilation time");
+    }
+
+    /**
+     * @see #removeAnnotation(String)
+     * @param annotationType The annotation type
+     * @param <T> The annotation generic type
+     * @return This element
+     * @since 3.0.0
+     */
+    default <T extends Annotation> Element removeAnnotation(@NonNull Class<T> annotationType) {
+        return removeAnnotation(Objects.requireNonNull(annotationType).getName());
+    }
+
+    /**
+     * Removes all annotations that pass the given predicate.
+     * @param predicate The predicate
+     * @param <T> The annotation generic type
+     * @return This element
+     * @since 3.0.0
+     */
+    default <T extends Annotation> Element removeAnnotationIf(@NonNull Predicate<AnnotationValue<T>> predicate) {
+        throw new UnsupportedOperationException("Element of type [" + getClass() + "] does not support removing annotations at compilation time");
+    }
+
+    /**
+     * Removes a stereotype of the given name from the element.
+     * @param annotationType The annotation type
+     * @return This element
+     * @since 3.0.0
+     */
+    default  Element removeStereotype(@NonNull String annotationType) {
+        throw new UnsupportedOperationException("Element of type [" + getClass() + "] does not support removing annotations at compilation time");
+    }
+
+    /**
+     * Removes a stereotype annotation of the given type from the element.
+     * @param annotationType The annotation type
+     * @param <T> The annotation generic type
+     * @return This element
+     * @since 3.0.0
+     */
+    default <T extends Annotation> Element removeStereotype(@NonNull Class<T> annotationType) {
+        return removeStereotype(Objects.requireNonNull(annotationType).getName());
     }
 
     /**
@@ -105,7 +178,7 @@ public interface Element extends AnnotationMetadataDelegate, AnnotatedElement, D
      * @param annotationType The annotation type
      * @param consumer A function that receives the {@link AnnotationValueBuilder}
      * @param <T> The annotation generic type
-     * @return The {@link AnnotationValueBuilder}
+     * @return This element
      */
     @NonNull
     default <T extends Annotation> Element annotate(@NonNull Class<T> annotationType, @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
@@ -120,12 +193,26 @@ public interface Element extends AnnotationMetadataDelegate, AnnotatedElement, D
      *
      * @param annotationType The annotation type
      * @param <T> The annotation generic type
-     * @return The {@link AnnotationValueBuilder}
+     * @return This element
      */
     @NonNull
     default <T extends Annotation> Element annotate(@NonNull Class<T> annotationType) {
         ArgumentUtils.requireNonNull("annotationType", annotationType);
         return annotate(annotationType.getName(), annotationValueBuilder -> { });
+    }
+
+    /**
+     * Annotate this element with the given annotation type. If the annotation is already present then
+     * any values populated by the builder will be merged/overridden with the existing values.
+     *
+     * @param annotationValue The annotation type
+     * @param <T> The annotation generic type
+     * @return This element
+     * @since 3.0.0
+     */
+    @NonNull
+    default <T extends Annotation> Element annotate(@NonNull AnnotationValue<T> annotationValue) {
+        throw new UnsupportedOperationException("Element of type [" + getClass() + "] does not support adding annotations at compilation time");
     }
 
     /**

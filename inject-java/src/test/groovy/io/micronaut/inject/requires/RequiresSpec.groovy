@@ -1,18 +1,59 @@
 package io.micronaut.inject.requires
 
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.condition.OperatingSystem
 import io.micronaut.context.env.PropertySource
+import io.micronaut.context.exceptions.NoSuchBeanException
 import io.micronaut.core.annotation.AnnotationMetadata
-import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanDefinitionReference
 import spock.util.environment.RestoreSystemProperties
 
 class RequiresSpec extends AbstractTypeElementSpec{
+
+    void "test requires java sdk - success"() {
+        given:
+        ApplicationContext context = buildContext( '''
+package test;
+
+import io.micronaut.context.annotation.*;
+
+@Requires(sdk=Requires.Sdk.JAVA, value="8")
+@jakarta.inject.Singleton
+class MyBean {
+}
+''')
+        expect:"the bean exists"
+        getBean(context, 'test.MyBean')
+
+        cleanup:
+        context.close()
+    }
+
+    void "test requires java sdk - failure"() {
+        given:
+        ApplicationContext context = buildContext( '''
+package test;
+
+import io.micronaut.context.annotation.*;
+
+@Requires(sdk=Requires.Sdk.JAVA, version="800")
+@jakarta.inject.Singleton
+class MyBean {
+}
+''')
+        when:"the bean doesn't exist"
+        getBean(context, 'test.MyBean')
+
+        then:
+        thrown(NoSuchBeanException)
+
+        cleanup:
+        context.close()
+    }
 
     void "test requires property not equals"() {
         when:
@@ -22,14 +63,14 @@ package test;
 import io.micronaut.context.annotation.*;
 
 @Requires(property="foo", notEquals="bar")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 }
 ''')
 
         ApplicationContext applicationContext = ApplicationContext.builder().build()
         applicationContext.environment.addPropertySource(PropertySource.of("foo":"test"))
-        applicationContext.environment.start()
+        applicationContext.start()
 
         then:
         beanDefinition.isEnabled(applicationContext)
@@ -38,7 +79,7 @@ class MyBean {
         applicationContext.close()
         applicationContext = ApplicationContext.builder().build()
         applicationContext.environment.addPropertySource(PropertySource.of("foo":"bar"))
-        applicationContext.environment.start()
+        applicationContext.start()
 
         then:
         !beanDefinition.isEnabled(applicationContext)
@@ -46,7 +87,7 @@ class MyBean {
         when:
         applicationContext.close()
         applicationContext = ApplicationContext.builder().build()
-        applicationContext.environment.start()
+        applicationContext.start()
 
         then:
         beanDefinition.isEnabled(applicationContext)
@@ -63,7 +104,7 @@ package test;
 import io.micronaut.context.annotation.*;
 
 @Requires(classes=String.class)
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 }
 ''')
@@ -80,7 +121,7 @@ package test;
 import io.micronaut.context.annotation.*;
 
 @Requires(classes=String.class)
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 }
 ''')
@@ -98,7 +139,7 @@ import io.micronaut.context.annotation.*;
 import io.micronaut.inject.requires.*;
 
 @MetaRequires
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 }
 ''')
@@ -116,7 +157,7 @@ import io.micronaut.context.annotation.*;
 import io.micronaut.inject.requires.*;
 
 @MetaRequires
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 }
 ''')
@@ -124,7 +165,7 @@ class MyBean {
         def context = ApplicationContext
                 .builder('foo.bar':"test")
                 .build()
-        context.environment.start()
+        context.start()
 
         context.registerSingleton(String.class, "foo")
 
@@ -143,7 +184,7 @@ package test;
 import io.micronaut.context.annotation.*;
 
 @Requires(missingBeans=String.class)
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 }
 ''')
@@ -160,13 +201,14 @@ package test;
 import io.micronaut.context.annotation.*;
 
 @Requires(missingBeans=String.class)
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 }
 ''')
 
         def context = new DefaultBeanContext()
         context.registerSingleton(String.class, "foo")
+        context.start()
 
         then:
         !beanDefinition.isEnabled(context)
@@ -183,7 +225,7 @@ package test;
 import io.micronaut.context.annotation.*;
 
 @Requires(beans=String.class)
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 }
 ''')
@@ -200,13 +242,14 @@ package test;
 import io.micronaut.context.annotation.*;
 
 @Requires(beans=String.class)
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 }
 ''')
 
         def context = new DefaultBeanContext()
         context.registerSingleton(String.class, "foo")
+        context.start()
 
         then:
         beanDefinition.isEnabled(context)
@@ -225,13 +268,14 @@ import io.micronaut.inject.requires.*;
 import io.micronaut.context.annotation.*;
 
 @Requires(beans=Outer.Inner.class)
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 }
 ''')
 
         def context = new DefaultBeanContext()
         context.registerSingleton(new Outer.Inner())
+        context.start()
 
         then:
         beanDefinition.isEnabled(context)
@@ -248,12 +292,13 @@ package test;
 import io.micronaut.context.annotation.*;
 
 @Requires(env="foo")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 }
 ''')
 
         def context = ApplicationContext.builder("foo").build()
+        context.start()
 
         then:
         beanDefinition.isEnabled(context)
@@ -270,12 +315,13 @@ package test;
 import io.micronaut.context.annotation.*;
 
 @Requires(env="foo")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 }
 ''')
 
         def context = ApplicationContext.builder().build()
+        context.start()
 
         then:
         !beanDefinition.isEnabled(context)
@@ -292,12 +338,13 @@ package test;
 import io.micronaut.context.annotation.*;
 
 @Requires(notEnv="foo")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 }
 ''')
 
         def context = ApplicationContext.builder("foo").build()
+        context.start()
 
         then:
         !beanDefinition.isEnabled(context)
@@ -314,12 +361,13 @@ package test;
 import io.micronaut.context.annotation.*;
 
 @Requires(notEnv={"foo", "bar"})
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 }
 ''')
 
         def context = ApplicationContext.builder("foo").build()
+        context.start()
 
         then:
         !beanDefinition.isEnabled(context)
@@ -336,12 +384,13 @@ package test;
 import io.micronaut.context.annotation.*;
 
 @Requires(notEnv="foo")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 }
 ''')
 
         def context = ApplicationContext.builder().build()
+        context.start()
 
         then:
         beanDefinition.isEnabled(context)
@@ -358,12 +407,13 @@ package test;
 import io.micronaut.context.annotation.*;
 
 @Requires(notEnv={"foo", "bar"})
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 }
 ''')
 
         def context = ApplicationContext.builder().build()
+        context.start()
 
         then:
         beanDefinition.isEnabled(context)
@@ -380,7 +430,7 @@ package test;
 import io.micronaut.context.annotation.*;
 
 @Requires(property="foo.bar")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 }
 ''')
@@ -389,8 +439,7 @@ class MyBean {
                 .builder('foo.bar':true)
                 .build()
 
-        context.environment.start()
-
+        context.start()
 
         then:
         beanDefinition.isEnabled(context)
@@ -410,7 +459,7 @@ package test;
 import io.micronaut.context.annotation.*;
 
 @Requires(property="mybean.foo.bar")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 }
 ''')
@@ -419,8 +468,7 @@ class MyBean {
                 .builder()
                 .build()
 
-        context.environment.start()
-
+        context.start()
 
         then:
         !beanDefinition.isEnabled(context)
@@ -437,7 +485,7 @@ package test;
 import io.micronaut.context.annotation.*;
 
 @Requires(property="foo.bar", value="test")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 }
 ''')
@@ -446,7 +494,7 @@ class MyBean {
                 .builder('foo.bar':"test")
                 .build()
 
-        context.environment.start()
+        context.start()
 
         then:
         beanDefinition.isEnabled(context)
@@ -463,7 +511,7 @@ package test;
 import io.micronaut.context.annotation.*;
 
 @Requires(property="foo.bar", value="test")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 }
 ''')
@@ -472,7 +520,7 @@ class MyBean {
                 .builder()
                 .build()
 
-        context.environment.start()
+        context.start()
 
 
         then:
@@ -490,7 +538,7 @@ package test;
 import io.micronaut.context.annotation.*;
 
 @Requires(property="foo.bar", value="test")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 }
 ''')
@@ -499,8 +547,7 @@ class MyBean {
                 .builder('foo.bar':"blah")
                 .build()
 
-        context.environment.start()
-
+        context.start()
 
         then:
         !beanDefinition.isEnabled(context)
@@ -519,7 +566,7 @@ package test;
 import io.micronaut.context.annotation.*;
 
 @Requires(property="foo.bar", pattern="\\\\d+")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 }
 ''')
@@ -528,7 +575,7 @@ class MyBean {
                 .builder('foo.bar':"10")
                 .build()
 
-        context.environment.start()
+        context.start()
 
         then:
         beanDefinition.isEnabled(context)
@@ -545,7 +592,7 @@ package test;
 import io.micronaut.context.annotation.*;
 
 @Requires(property="foo.bar", pattern="\\\\d+")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 }
 ''')
@@ -554,8 +601,7 @@ class MyBean {
                 .builder()
                 .build()
 
-        context.environment.start()
-
+        context.start()
 
         then:
         !beanDefinition.isEnabled(context)
@@ -572,7 +618,7 @@ package test;
 import io.micronaut.context.annotation.*;
 
 @Requires(property="foo.bar", pattern="\\\\d+")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 }
 ''')
@@ -581,8 +627,7 @@ class MyBean {
                 .builder('foo.bar':"blah")
                 .build()
 
-        context.environment.start()
-
+        context.start()
 
         then:
         !beanDefinition.isEnabled(context)
@@ -599,7 +644,7 @@ package test;
 import io.micronaut.context.annotation.*;
 
 @Requires(os = {Requires.Family.WINDOWS, Requires.Family.MAC_OS})
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 }
 ''')
@@ -608,7 +653,7 @@ class MyBean {
                 .builder()
                 .build()
 
-        context.environment.start()
+        context.start()
 
         then:
         !beanDefinition.isEnabled(context)
@@ -620,7 +665,7 @@ class MyBean {
                 .builder()
                 .build()
 
-        context.environment.start()
+        context.start()
 
         then:
         beanDefinition.isEnabled(context)
@@ -638,7 +683,7 @@ package test;
 import io.micronaut.context.annotation.*;
 
 @Requires(notOs = {Requires.Family.WINDOWS, Requires.Family.MAC_OS})
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 }
 ''')
@@ -647,7 +692,7 @@ class MyBean {
                 .builder()
                 .build()
 
-        context.environment.start()
+        context.start()
 
         then:
         !beanDefinition.isEnabled(context)
@@ -659,7 +704,7 @@ class MyBean {
                 .builder()
                 .build()
 
-        context.environment.start()
+        context.start()
 
         then:
         beanDefinition.isEnabled(context)

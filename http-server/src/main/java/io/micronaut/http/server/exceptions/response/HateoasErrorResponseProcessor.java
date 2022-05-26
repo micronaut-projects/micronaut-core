@@ -17,14 +17,16 @@ package io.micronaut.http.server.exceptions.response;
 
 import io.micronaut.context.annotation.Secondary;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.http.HttpMethod;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.http.hateoas.Link;
 import io.micronaut.http.hateoas.Resource;
-import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.jackson.JacksonConfiguration;
+import io.micronaut.json.JsonConfiguration;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -40,13 +42,26 @@ public class HateoasErrorResponseProcessor implements ErrorResponseProcessor<Jso
 
     private final boolean alwaysSerializeErrorsAsList;
 
-    public HateoasErrorResponseProcessor(JacksonConfiguration jacksonConfiguration) {
+    public HateoasErrorResponseProcessor(JsonConfiguration jacksonConfiguration) {
         this.alwaysSerializeErrorsAsList = jacksonConfiguration.isAlwaysSerializeErrorsAsList();
+    }
+
+    /**
+     * Constructor for binary compatibility. Equivalent to
+     * {@link HateoasErrorResponseProcessor#HateoasErrorResponseProcessor(JsonConfiguration)}
+     *
+     * @param jacksonConfiguration the configuration to use for processing.
+     */
+    public HateoasErrorResponseProcessor(JacksonConfiguration jacksonConfiguration) {
+        this((JsonConfiguration) jacksonConfiguration);
     }
 
     @Override
     @NonNull
     public MutableHttpResponse<JsonError> processResponse(@NonNull ErrorContext errorContext, @NonNull MutableHttpResponse<?> response) {
+        if (errorContext.getRequest().getMethod() == HttpMethod.HEAD) {
+            return (MutableHttpResponse<JsonError>) response;
+        }
         JsonError error;
         if (!errorContext.hasErrors()) {
             error = new JsonError(response.getStatus().getReason());

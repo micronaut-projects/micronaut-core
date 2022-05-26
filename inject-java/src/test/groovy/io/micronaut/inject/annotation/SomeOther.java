@@ -17,7 +17,7 @@ package io.micronaut.inject.annotation;
 
 import io.micronaut.aop.Around;
 
-import javax.inject.Scope;
+import jakarta.inject.Scope;
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

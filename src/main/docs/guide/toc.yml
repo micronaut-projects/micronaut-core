@@ -1,10 +1,10 @@
 introduction:
   title: Introduction
   whatsNew: What's New?
-  upgrading: Upgrading to Micronaut 2.x
+  upgrading: Upgrading to Micronaut 3.x
 quickStart:
   title: Quick Start
-  buildCLI: Build/Install the CLI
+  buildCLI: Install the CLI
   creatingServer: Creating a Server Application
   ideSetup:
     title: Setting up an IDE
@@ -38,6 +38,7 @@ ioc:
   introspection: Bean Introspection
   beanValidation: Bean Validation
   annotationMetadata: Bean Annotation Metadata
+  beanImport: Importing Beans from Libraries
   springBeans: Micronaut Beans And Spring
   android: Android Support
 config:
@@ -51,6 +52,7 @@ config:
   eachBean: Using @EachBean to Drive Configuration
   immutableConfig: Immutable Configuration
   # validation: Validating Configuration
+  bootstrap: Bootstrap Configuration
   jmx:
     title: JMX Support
 aop:
@@ -88,7 +90,9 @@ httpServer:
     bodyAnnotation: Using the @Body Annotation
     reactiveResponses: Reactive Responses
   jsonBinding: JSON Binding with Jackson
-  datavalidation: Data Validation
+  datavalidation:
+    title: Data Validation
+    validationGroups: Validation Groups
   staticResources: Serving Static Resources
   errorHandling:
     title: Error Handling
@@ -116,12 +120,17 @@ httpServer:
   serverEvents: Server Events
   serverConfiguration:
     title: Configuring the HTTP Server
-    threadPools: Configuring Server Thread Pools
+    threadPools:
+      title: Configuring Server Thread Pools
+      blockingOperations: Blocking Operations
+      atBlocking: '@Blocking'
     nettyPipeline: Configuring the Netty Pipeline
+    listener: Advanced Listener Configuration
     cors: Configuring CORS
     https: Securing the Server with HTTPS
     dualProtocol: Enabling HTTP and HTTPS
     accessLogger: Enabling Access Logger
+    secondaryServers: Starting Secondary Servers
   views:
     title: Server Side View Rendering
   openapi: OpenAPI / Swagger Support
@@ -149,6 +158,7 @@ httpClient:
     clientFallback: Client Fallbacks
     netflixHystrix: Netflix Hystrix Support
   clientFilter: HTTP Client Filters
+  clientHttp2: HTTP/2 Support
   clientSample: HTTP Client Sample
 cloud:
   title: Cloud Native Features
@@ -160,6 +170,8 @@ cloud:
     distributedConfigurationSpringCloud: Spring Cloud Config Support
     distributedConfigurationAwsParameterStore: AWS Parameter Store Support
     distributedConfigurationOracleCloudVault: Oracle Cloud Vault Support
+    distributedConfigurationPubSub: Google Cloud Pub/Sub Support
+    distributedConfigurationKubernetes: Kubernetes Support
   serviceDiscovery:
     title: Service Discovery
     serviceDiscoveryConsul: Consul Support
@@ -170,10 +182,7 @@ cloud:
   clientSideLoadBalancing:
     title: Client Side Load Balancing
     netflixRibbon: Netflix Ribbon Support
-  distributedTracing:
-    title: Distributed Tracing
-    zipkin: Tracing with Zipkin
-    jaeger: Tracing with Jaeger
+  distributedTracing: Distributed Tracing
 serverlessFunctions:
   title: Serverless Functions
   awsLambda: AWS Lambda
@@ -193,8 +202,9 @@ configurations:
   title: Configurations
   reactiveConfigs:
     title: Configurations for Reactive Programming
-    rxjava3: RxJava 3 Support
     reactor: Reactor Support
+    rxjava3: RxJava 3 Support
+    rxjava2: RxJava 2 Support
     rxjava1: RxJava 1 Support
   dataAccess:
     title: Configurations for Data Access
@@ -207,6 +217,12 @@ configurations:
     cassandraSupport: Configuring Cassandra
     liquibaseSupport: Configuring Liquibase
     flywaySupport: Configuring Flyway
+logging:
+  title: Logging
+  loggingMessages: Logging Messages
+  loggingConfiguration: Configuration
+  logback: Logback
+  loggingSystem: Logging System
 languageSupport:
   title: Language Support
   java:
@@ -224,6 +240,8 @@ languageSupport:
     openandaop: Kotlin and AOP Advice
     kotlinretainparamnames: Kotlin and Retaining Parameter Names
     coroutines: Coroutines Support
+    coroutineTracingContextPropagation: Coroutine Tracing Context Propagation
+    kotlinContextPropagation: Reactive Context Propagation
   graal:
     title: Micronaut for GraalVM
     graalServices: Microservices as GraalVM native images
@@ -270,8 +288,18 @@ cli:
 i18n:
   title: Internationalization
   bundle: Resource Bundles
+  localizedMessageSource: Localized Message Source
 appendix:
   title: Appendices
+  architecture:
+    title: Micronaut Architecture
+    compilerArch: Compiler
+    annotationArch: Annotation Metadata
+    introspectionArch: Bean Introspections
+    iocArch: Bean Definitions
+    aopArch: AOP Proxies
+    containerArch: Application Context
+    httpServerArch: HTTP Server
   faq: Frequently Asked Questions (FAQ)
   usingsnapshots: Using Snapshots
   problems: Common Problems

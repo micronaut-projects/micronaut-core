@@ -35,7 +35,7 @@ import java.util.EventListener;
 public interface BeanCreatedEventListener<T> extends EventListener {
 
     /**
-     * Fired when a bean is created and all {@link javax.annotation.PostConstruct} initialization hooks have been
+     * Fired when a bean is created and all {@link jakarta.annotation.PostConstruct} initialization hooks have been
      * called.
      *
      * @param event The bean created event

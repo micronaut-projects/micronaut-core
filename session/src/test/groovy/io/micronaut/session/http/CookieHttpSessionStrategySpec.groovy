@@ -15,12 +15,6 @@
  */
 package io.micronaut.session.http
 
-import io.netty.channel.ChannelHandlerContext
-import io.netty.handler.codec.http.DefaultFullHttpRequest
-import io.netty.handler.codec.http.HttpMethod
-import io.netty.handler.codec.http.HttpVersion
-import io.netty.handler.codec.http.cookie.CookieEncoder
-import io.netty.handler.codec.http.cookie.ServerCookieEncoder
 import io.micronaut.core.convert.ConversionService
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
@@ -31,6 +25,12 @@ import io.micronaut.http.netty.cookies.NettyCookie
 import io.micronaut.http.server.HttpServerConfiguration
 import io.micronaut.http.server.netty.NettyHttpRequest
 import io.micronaut.session.Session
+import io.netty.channel.ChannelHandlerContext
+import io.netty.handler.codec.http.DefaultFullHttpRequest
+import io.netty.handler.codec.http.HttpMethod
+import io.netty.handler.codec.http.HttpVersion
+import io.netty.handler.codec.http.cookie.CookieEncoder
+import io.netty.handler.codec.http.cookie.ServerCookieEncoder
 import spock.lang.Specification
 
 import java.util.regex.Pattern

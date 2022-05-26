@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.configurations.requirescondition2
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 /**
  * Created by graemerocher on 20/05/2017.

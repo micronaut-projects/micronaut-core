@@ -21,15 +21,14 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.filter.OncePerRequestHttpServerFilter;
-import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.bind.binders.AnnotatedRequestArgumentBinder;
 import io.micronaut.http.bind.binders.TypedRequestArgumentBinder;
+import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.session.Session;
 import io.micronaut.session.annotation.SessionValue;
 import io.micronaut.session.http.HttpSessionFilter;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.util.Optional;
 
 /**
@@ -55,7 +54,7 @@ public class OptionalSessionValueArgumentBinder implements TypedRequestArgumentB
     @Override
     public ArgumentBinder.BindingResult<Optional> bind(ArgumentConversionContext<Optional> context, HttpRequest<?> source) {
         MutableConvertibleValues<Object> attrs = source.getAttributes();
-        if (!attrs.contains(OncePerRequestHttpServerFilter.getKey(HttpSessionFilter.class))) {
+        if (!attrs.contains(HttpSessionFilter.class.getName())) {
             // the filter hasn't been executed but the argument is not satisfied
             return ArgumentBinder.BindingResult.UNSATISFIED;
         }

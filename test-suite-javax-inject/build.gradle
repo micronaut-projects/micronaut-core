@@ -1,0 +1,11 @@
+plugins {
+    id "io.micronaut.build.internal.convention-test-library"
+}
+
+dependencies {
+    testAnnotationProcessor project(":inject-java")
+    testCompileOnly project(":inject-groovy")
+    testImplementation project(":context")
+    testImplementation project(":inject")
+    testImplementation libs.javax.inject
+}

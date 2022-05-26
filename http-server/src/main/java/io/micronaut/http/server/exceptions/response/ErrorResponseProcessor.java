@@ -34,6 +34,9 @@ public interface ErrorResponseProcessor<T> {
      * method should return the response that was passed in {@param baseResponse},
      * however that isn't required.
      *
+     * Error response processors should not set the body or content type if
+     * the request method is HEAD.
+     *
      * @param errorContext The error context
      * @param baseResponse The base response to retrieve information or
      *                     mutate

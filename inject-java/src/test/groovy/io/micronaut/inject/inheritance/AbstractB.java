@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.inheritance;
 
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 public abstract class AbstractB {
     // inject via field

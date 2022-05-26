@@ -27,7 +27,7 @@ class AnnotationMapperSpec extends AbstractTypeElementSpec {
         def metadata = buildMethodAnnotationMetadata('''
 package test;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
     @io.micronaut.inject.annotation.CustomCreator
@@ -58,7 +58,7 @@ class Test {
         def definition = buildBeanDefinition('test.Test', '''
 package test;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
 
@@ -85,7 +85,7 @@ class Test {
         def metadata = buildMethodAnnotationMetadata('''
 package test;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
     @io.micronaut.inject.annotation.CustomGet

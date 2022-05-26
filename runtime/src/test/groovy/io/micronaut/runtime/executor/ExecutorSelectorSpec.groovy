@@ -15,18 +15,18 @@
  */
 package io.micronaut.runtime.executor
 
-import io.micronaut.scheduling.executor.ThreadSelection
-import io.micronaut.core.annotation.Blocking
-import io.reactivex.Single
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Executable
+import io.micronaut.core.annotation.Blocking
 import io.micronaut.core.annotation.NonBlocking
 import io.micronaut.inject.ExecutableMethod
 import io.micronaut.scheduling.executor.ExecutorSelector
+import io.micronaut.scheduling.executor.ThreadSelection
+import jakarta.inject.Singleton
+import reactor.core.publisher.Mono
 import spock.lang.Specification
 import spock.lang.Unroll
 
-import javax.inject.Singleton
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
 import java.util.concurrent.ExecutorService
@@ -78,10 +78,10 @@ class MyService {
 
     }
 
-    Single someReactiveMethod() {}
+    Mono someReactiveMethod() {}
 
     @Blocking
-    Single someBlockingReactiveMethod() {}
+    Mono someBlockingReactiveMethod() {}
 
     CompletableFuture someFutureMethod() {}
 

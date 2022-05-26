@@ -26,8 +26,8 @@ import io.micronaut.core.io.file.DefaultFileSystemResourceLoader;
 import io.micronaut.core.io.file.FileSystemResourceLoader;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.io.scan.DefaultClassPathResourceLoader;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.util.List;
 
 /**

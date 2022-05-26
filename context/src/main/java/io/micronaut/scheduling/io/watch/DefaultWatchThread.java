@@ -22,13 +22,13 @@ import io.micronaut.context.env.Environment;
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.scheduling.io.watch.event.FileChangedEvent;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
+import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import io.micronaut.core.annotation.NonNull;
-import javax.annotation.PostConstruct;
-import javax.annotation.PreDestroy;
-import javax.inject.Singleton;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.*;

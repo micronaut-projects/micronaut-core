@@ -28,4 +28,14 @@ class InjectCollectionBeanSpec extends Specification {
         ctx.getBean(ThingThatNeedsMySetOfStrings).strings.size() == 1
         ctx.getBean(ThingThatNeedsMySetOfStrings).strings == ctx.getBean(ThingThatNeedsMySetOfStrings).otherStrings
     }
+
+    void "test resolve iterable bean"() {
+        when:
+        def ctx = BeanContext.run()
+        ctx.getBean(MyIterable)
+        ctx.getBean(ThingThatNeedsMyIterable)
+
+        then:
+        noExceptionThrown()
+    }
 }

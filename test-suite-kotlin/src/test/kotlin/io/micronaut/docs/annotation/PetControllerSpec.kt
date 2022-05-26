@@ -1,17 +1,14 @@
 package io.micronaut.docs.annotation
 
-import io.kotlintest.shouldBe
-import io.kotlintest.specs.StringSpec
+import io.kotest.matchers.shouldBe
+import io.kotest.core.spec.style.StringSpec
 import io.micronaut.context.ApplicationContext
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
-import org.junit.Rule
-import org.junit.Test
-import org.junit.rules.ExpectedException
+import reactor.core.publisher.Mono
 
 import javax.validation.ConstraintViolationException
 
-import org.junit.Assert.assertEquals
 import java.lang.Exception
 
 class PetControllerSpec: StringSpec() {
@@ -21,7 +18,7 @@ class PetControllerSpec: StringSpec() {
     )
 
     val client = autoClose(
-            embeddedServer.applicationContext.createBean(RxHttpClient::class.java, embeddedServer.url)
+            embeddedServer.applicationContext.createBean(HttpClient::class.java, embeddedServer.url)
     )
 
     init {
@@ -29,7 +26,7 @@ class PetControllerSpec: StringSpec() {
             val client = embeddedServer.applicationContext.getBean(PetClient::class.java)
 
             // tag::post[]
-            val pet = client.save("Dino", 10).blockingGet()
+            val pet = Mono.from(client.save("Dino", 10)).block()
 
             pet.name shouldBe "Dino"
             pet.age.toLong() shouldBe 10
@@ -41,7 +38,7 @@ class PetControllerSpec: StringSpec() {
 
             // tag::error[]
             try {
-                client.save("Fred", -1).blockingGet()
+                Mono.from(client.save("Fred", -1)).block()
             } catch (e: Exception) {
                 e.javaClass shouldBe ConstraintViolationException::class.java
                 e.message shouldBe "save.age: must be greater than or equal to 1"

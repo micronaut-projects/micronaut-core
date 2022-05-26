@@ -16,10 +16,10 @@
 package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.http.netty.stream.StreamedHttpMessage;
 import io.micronaut.core.async.processor.SingleThreadedBufferingProcessor;
 import io.micronaut.core.async.subscriber.SingleThreadedBufferingSubscriber;
 import io.micronaut.http.exceptions.ContentLengthExceededException;
+import io.micronaut.http.netty.stream.StreamedHttpMessage;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.channel.ChannelHandlerContext;
@@ -66,9 +66,10 @@ public class DefaultHttpContentProcessor extends SingleThreadedBufferingProcesso
 
     @Override
     public final void subscribe(Subscriber<? super ByteBufHolder> downstreamSubscriber) {
+        super.subscribe(downstreamSubscriber);
+        //ensures the subscriber is present before subscribing to the message
         StreamedHttpMessage message = (StreamedHttpMessage) nettyHttpRequest.getNativeRequest();
         message.subscribe(this);
-        super.subscribe(downstreamSubscriber);
     }
 
     @Override

@@ -20,10 +20,9 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.DefaultScope;
-import io.micronaut.context.annotation.Executable;
 import io.micronaut.http.MediaType;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -31,9 +30,6 @@ import java.lang.annotation.Target;
 
 /**
  * <p>Indicates that the role of a class is a controller within an application.</p>
- * <p>
- * <p>By default all public methods of a controller are considered {@link Executable} and
- * the necessary classes generated to perform the invocation.</p>
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -42,7 +38,6 @@ import java.lang.annotation.Target;
 @Retention(RUNTIME)
 @Target({ElementType.TYPE, ElementType.ANNOTATION_TYPE})
 @Bean
-@Executable
 @DefaultScope(Singleton.class)
 public @interface Controller {
 

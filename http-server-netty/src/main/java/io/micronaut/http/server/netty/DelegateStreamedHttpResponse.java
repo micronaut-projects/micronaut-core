@@ -37,7 +37,8 @@ final class DelegateStreamedHttpResponse extends DelegateHttpResponse implements
      * @param response The {@link HttpResponse}
      * @param stream The {@link Publisher} for {@link HttpContent}
      */
-    DelegateStreamedHttpResponse(HttpResponse response, Publisher<HttpContent> stream) {
+    DelegateStreamedHttpResponse(HttpResponse response,
+                                 Publisher<HttpContent> stream) {
         super(response);
         this.stream = stream;
     }
@@ -46,4 +47,5 @@ final class DelegateStreamedHttpResponse extends DelegateHttpResponse implements
     public void subscribe(Subscriber<? super HttpContent> subscriber) {
         stream.subscribe(subscriber);
     }
+
 }

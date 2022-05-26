@@ -15,16 +15,15 @@
  */
 package io.micronaut.http.server.netty.types.stream;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.netty.AbstractNettyHttpRequest;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.types.NettyCustomizableResponseType;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.DefaultHttpResponse;
-import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpChunkedInput;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
@@ -42,6 +41,7 @@ import java.io.InputStream;
  * @author James Kleeh
  * @since 2.5.0
  */
+@Internal
 public interface NettyStreamedCustomizableResponseType extends NettyCustomizableResponseType {
 
     Logger LOG = LoggerFactory.getLogger(NettyStreamedCustomizableResponseType.class);
@@ -51,18 +51,14 @@ public interface NettyStreamedCustomizableResponseType extends NettyCustomizable
     @Override
     default void write(HttpRequest<?> request, MutableHttpResponse<?> response, ChannelHandlerContext context) {
         if (response instanceof NettyMutableHttpResponse) {
-            FullHttpResponse nettyResponse = ((NettyMutableHttpResponse) response).getNativeResponse();
+            NettyMutableHttpResponse nettyResponse = ((NettyMutableHttpResponse) response);
 
             // Write the request data
-            final DefaultHttpResponse finalResponse = new DefaultHttpResponse(nettyResponse.protocolVersion(), nettyResponse.status(), nettyResponse.headers());
+            final DefaultHttpResponse finalResponse = new DefaultHttpResponse(nettyResponse.getNettyHttpVersion(), nettyResponse.getNettyHttpStatus(), nettyResponse.getNettyHeaders());
             final io.micronaut.http.HttpVersion httpVersion = request.getHttpVersion();
             final boolean isHttp2 = httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0;
-            if (isHttp2 && request instanceof NettyHttpRequest) {
-                final io.netty.handler.codec.http.HttpHeaders nativeHeaders = ((NettyHttpRequest<?>) request).getNativeRequest().headers();
-                final String streamId = nativeHeaders.get(AbstractNettyHttpRequest.STREAM_ID);
-                if (streamId != null) {
-                    finalResponse.headers().set(AbstractNettyHttpRequest.STREAM_ID, streamId);
-                }
+            if (request instanceof NettyHttpRequest) {
+                ((NettyHttpRequest<?>) request).prepareHttp2ResponseIfNecessary(finalResponse);
             }
             InputStream inputStream = getInputStream();
             //  can be null if the stream was closed

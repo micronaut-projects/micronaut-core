@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2022 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,14 +15,13 @@
  */
 package io.micronaut.http.server.netty.handler.accesslog.element;
 
-import java.util.List;
-
-import org.slf4j.Logger;
-
 import io.micronaut.http.server.netty.handler.accesslog.element.AccessLogFormatParser.IndexedLogElement;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.http.HttpHeaders;
+import org.slf4j.Logger;
+
+import java.util.List;
 
 /**
  * An Access log instance.

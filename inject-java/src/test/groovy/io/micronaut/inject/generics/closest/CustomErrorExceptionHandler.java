@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.generics.closest;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Singleton
 public class CustomErrorExceptionHandler implements ExceptionHandler<CustomError, String> {

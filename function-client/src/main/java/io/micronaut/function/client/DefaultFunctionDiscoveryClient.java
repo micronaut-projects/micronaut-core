@@ -21,10 +21,10 @@ import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.function.LocalFunctionRegistry;
 import io.micronaut.function.client.exceptions.FunctionNotFoundException;
 import io.micronaut.health.HealthStatus;
-import io.reactivex.Flowable;
+import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
 
-import javax.inject.Singleton;
 import java.net.URI;
 import java.util.Collection;
 import java.util.HashMap;
@@ -69,17 +69,17 @@ public class DefaultFunctionDiscoveryClient implements FunctionDiscoveryClient {
         if (functionDefinitionMap.containsKey(functionName)) {
             return Publishers.just(functionDefinitionMap.get(functionName));
         } else {
-            Flowable<ServiceInstance> serviceInstanceLocator = Flowable.fromPublisher(discoveryClient.getServiceIds())
-                .flatMap(Flowable::fromIterable)
+            Flux<ServiceInstance> serviceInstanceLocator = Flux.from(discoveryClient.getServiceIds())
+                .flatMap(Flux::fromIterable)
                 .flatMap(discoveryClient::getInstances)
-                .flatMap(Flowable::fromIterable)
+                .flatMap(Flux::fromIterable)
                 .filter(instance -> {
                         boolean isAvailable = instance.getHealthStatus().equals(HealthStatus.UP);
                         return isAvailable && instance.getMetadata().names().stream()
                             .anyMatch(k -> k.equals(LocalFunctionRegistry.FUNCTION_PREFIX + functionName));
                     }
 
-                ).switchIfEmpty(Flowable.error(new FunctionNotFoundException(functionName)));
+                ).switchIfEmpty(Flux.error(new FunctionNotFoundException(functionName)));
             return serviceInstanceLocator.map(instance -> {
                 Optional<String> uri = instance.getMetadata().get(LocalFunctionRegistry.FUNCTION_PREFIX + functionName, String.class);
                 if (uri.isPresent()) {

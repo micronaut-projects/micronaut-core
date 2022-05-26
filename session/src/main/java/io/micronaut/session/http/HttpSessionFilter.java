@@ -22,7 +22,7 @@ import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Filter;
-import io.micronaut.http.filter.OncePerRequestHttpServerFilter;
+import io.micronaut.http.filter.HttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
 import io.micronaut.http.filter.ServerFilterPhase;
 import io.micronaut.http.server.exceptions.InternalServerException;
@@ -30,8 +30,8 @@ import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.session.Session;
 import io.micronaut.session.SessionStore;
 import io.micronaut.session.annotation.SessionValue;
-import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
 
 import java.util.List;
 import java.util.Optional;
@@ -44,7 +44,7 @@ import java.util.Optional;
  * @since 1.0
  */
 @Filter("/**")
-public class HttpSessionFilter extends OncePerRequestHttpServerFilter {
+public class HttpSessionFilter implements HttpServerFilter {
 
     /**
      * The order of the filter.
@@ -79,14 +79,15 @@ public class HttpSessionFilter extends OncePerRequestHttpServerFilter {
     }
 
     @Override
-    protected Publisher<MutableHttpResponse<?>> doFilterOnce(HttpRequest<?> request, ServerFilterChain chain) {
+    public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
+        request.setAttribute(HttpSessionFilter.class.getName(), true);
         for (HttpSessionIdResolver resolver : resolvers) {
             List<String> ids = resolver.resolveIds(request);
             if (CollectionUtils.isNotEmpty(ids)) {
                 String id = ids.get(0);
                 Publisher<Optional<Session>> sessionLookup = Publishers.fromCompletableFuture(() -> sessionStore.findSession(id));
-                Flowable<MutableHttpResponse<?>> storeSessionInAttributes = Flowable
-                    .fromPublisher(sessionLookup)
+                Flux<MutableHttpResponse<?>> storeSessionInAttributes = Flux
+                    .from(sessionLookup)
                     .switchMap(session -> {
                         session.ifPresent(entries -> request.getAttributes().put(SESSION_ATTRIBUTE, entries));
                         return chain.proceed(request);
@@ -98,7 +99,7 @@ public class HttpSessionFilter extends OncePerRequestHttpServerFilter {
     }
 
     private Publisher<MutableHttpResponse<?>> encodeSessionId(HttpRequest<?> request, Publisher<MutableHttpResponse<?>> responsePublisher) {
-        Flowable<SessionAndResponse> responseFlowable = Flowable.fromPublisher(responsePublisher)
+        Flux<SessionAndResponse> responseFlowable = Flux.from(responsePublisher)
             .switchMap(response -> {
 
                 Optional<MethodExecutionHandle> routeMatch = request.getAttribute(HttpAttributes.ROUTE_MATCH, MethodExecutionHandle.class);
@@ -131,18 +132,17 @@ public class HttpSessionFilter extends OncePerRequestHttpServerFilter {
                     }
 
                     if (session.isNew() || session.isModified()) {
-                        return Flowable
-                            .fromPublisher(Publishers.fromCompletableFuture(() -> sessionStore.save(session)))
+                        return Flux.from(Publishers.fromCompletableFuture(() -> sessionStore.save(session)))
                             .map(s -> new SessionAndResponse(Optional.of(s), response));
                     }
                 } else if (sessionAttr != null) {
                     Session newSession = sessionStore.newSession();
                     newSession.put(sessionAttr, body.get());
-                    return Flowable
-                            .fromPublisher(Publishers.fromCompletableFuture(() -> sessionStore.save(newSession)))
+                    return Flux
+                            .from(Publishers.fromCompletableFuture(() -> sessionStore.save(newSession)))
                             .map(s -> new SessionAndResponse(Optional.of(s), response));
                 }
-                return Flowable.just(new SessionAndResponse(opt, response));
+                return Flux.just(new SessionAndResponse(opt, response));
             });
 
         return responseFlowable.map(sessionAndResponse -> {

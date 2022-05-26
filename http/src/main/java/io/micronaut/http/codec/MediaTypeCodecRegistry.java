@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.codec;
 
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.MediaType;
 
 import java.util.Collection;
@@ -34,7 +35,7 @@ public interface MediaTypeCodecRegistry {
      * @param mediaType The {@link MediaType}
      * @return The codec
      */
-    Optional<MediaTypeCodec> findCodec(MediaType mediaType);
+    Optional<MediaTypeCodec> findCodec(@Nullable MediaType mediaType);
 
     /**
      * Find a codec for the given media type and target type.
@@ -43,7 +44,7 @@ public interface MediaTypeCodecRegistry {
      * @param type      The type
      * @return The codec
      */
-    Optional<MediaTypeCodec> findCodec(MediaType mediaType, Class<?> type);
+    Optional<MediaTypeCodec> findCodec(@Nullable MediaType mediaType, Class<?> type);
 
     /**
      * @return The available codecs

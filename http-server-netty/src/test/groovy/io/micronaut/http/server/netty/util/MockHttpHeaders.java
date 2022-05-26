@@ -15,12 +15,18 @@
  */
 package io.micronaut.http.server.netty.util;
 
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.MutableHttpHeaders;
 
-import io.micronaut.core.annotation.Nullable;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 public class MockHttpHeaders implements MutableHttpHeaders {

@@ -36,13 +36,6 @@ import java.util.function.Predicate;
 public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest>, RouteInfo<R> {
 
     /**
-     * The declaring type of the route.
-     *
-     * @return The declaring type
-     */
-    Class<?> getDeclaringType();
-
-    /**
      * @return The variable values following a successful match.
      */
     Map<String, Object> getVariableValues();
@@ -202,4 +195,5 @@ public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest>, Rout
         Object val = getVariableValues().get(name);
         return val != null && !(val instanceof UnresolvedArgument);
     }
+
 }

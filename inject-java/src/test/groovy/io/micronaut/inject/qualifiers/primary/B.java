@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.qualifiers.primary;
 
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 import java.util.List;
 
 public class B {

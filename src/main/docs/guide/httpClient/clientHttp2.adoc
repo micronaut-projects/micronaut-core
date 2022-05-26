@@ -1,0 +1,20 @@
+By default, Micronaut's HTTP client is configured to support HTTP 1.1. To enable support for HTTP/2, set the supported HTTP version in configuration:
+
+.Enabling HTTP/2 in Clients
+[source,yaml]
+----
+micronaut:
+  http:
+    client:
+      http-version: 2.0
+----
+
+Or by specifying the HTTP version to use when injecting the client:
+
+.Injecting a HTTP/2 Client
+[source,java]
+----
+@Inject
+@Client(httpVersion=HttpVersion.HTTP_2_0)
+ReactorHttpClient client;
+----

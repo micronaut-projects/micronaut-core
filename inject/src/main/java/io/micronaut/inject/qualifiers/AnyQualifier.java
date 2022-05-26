@@ -31,7 +31,7 @@ import java.util.stream.Stream;
 @Internal
 public final class AnyQualifier<T> implements Qualifier<T> {
     @SuppressWarnings("rawtypes")
-    static final AnyQualifier INSTANCE = new AnyQualifier();
+    public static final AnyQualifier INSTANCE = new AnyQualifier();
 
     private AnyQualifier() {
     }
@@ -49,5 +49,10 @@ public final class AnyQualifier<T> implements Qualifier<T> {
     @Override
     public <BT extends BeanType<T>> Optional<BT> qualify(Class<T> beanType, Stream<BT> candidates) {
         return candidates.findFirst();
+    }
+
+    @Override
+    public String toString() {
+        return "@Any";
     }
 }

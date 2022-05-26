@@ -19,7 +19,7 @@ import groovy.sql.Sql
 import io.micronaut.context.annotation.Requires
 import io.micronaut.docs.requires.Book
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 import javax.sql.DataSource
 import java.sql.SQLException
 

@@ -17,8 +17,8 @@ package io.micronaut.aop;
 
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.DefaultScope;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.lang.annotation.*;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;

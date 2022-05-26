@@ -16,19 +16,34 @@
 package io.micronaut.http.netty.stream;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.netty.AbstractNettyHttpRequest;
 import io.micronaut.http.netty.reactive.HandlerPublisher;
 import io.micronaut.http.netty.reactive.HandlerSubscriber;
-import io.netty.channel.*;
-import io.netty.handler.codec.http.*;
+import io.netty.channel.ChannelDuplexHandler;
+import io.netty.channel.ChannelFutureListener;
+import io.netty.channel.ChannelHandler;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelPipeline;
+import io.netty.channel.ChannelPromise;
+import io.netty.handler.codec.http.DefaultHttpResponse;
+import io.netty.handler.codec.http.FullHttpMessage;
+import io.netty.handler.codec.http.FullHttpRequest;
+import io.netty.handler.codec.http.HttpContent;
+import io.netty.handler.codec.http.HttpMessage;
+import io.netty.handler.codec.http.HttpResponseStatus;
+import io.netty.handler.codec.http.HttpVersion;
+import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.util.ReferenceCountUtil;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.publisher.Flux;
 
 import java.util.LinkedList;
 import java.util.Queue;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Base class for Http Streams handlers.
@@ -75,6 +90,12 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
      * doesn't, then we need to write one ourselves.
      */
     private boolean sendLastHttpContent;
+
+    /**
+     * Whether a {@link StreamedHttpMessage} is currently being written, and further messages should be held back until
+     * complete. Used for HTTP pipelining.
+     */
+    private boolean outgoingInFlight;
 
     /**
      * @param inClass  The in class
@@ -188,11 +209,15 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
             final In inMsg = inClass.cast(msg);
 
             if (inMsg instanceof FullHttpMessage) {
-
-                // Forward as is
-                ctx.fireChannelRead(inMsg);
+                FullHttpMessage fullMessage = (FullHttpMessage) inMsg;
+                if (!(fullMessage instanceof FullHttpRequest) || fullMessage.content().readableBytes() == 0) {
+                    // Forward as is
+                    ctx.fireChannelRead(inMsg);
+                } else {
+                    // create streamed message with just the data from the request
+                    ctx.fireChannelRead(createStreamedMessage(inMsg, Flux.just(fullMessage)));
+                }
                 consumedInMessage(ctx);
-
             } else if (!hasBody(inMsg)) {
 
                 // Wrap in empty message
@@ -277,9 +302,8 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
             if (LOG.isTraceEnabled()) {
                 LOG.trace("Calling ctx.read() for cancelled subscription");
             }
+            ctx.read();
             if (isClient()) {
-                ctx.read();
-            } else {
                 ctx.fireChannelWritabilityChanged();
             }
         }
@@ -291,8 +315,8 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
             if (bodyPublisher != null) {
                 ctx.fireChannelRead(content);
                 if (content instanceof LastHttpContent) {
-                    removeHandlerIfActive(ctx, HANDLER_BODY_PUBLISHER);
                     currentlyStreamedMessage = null;
+                    removeHandlerIfActive(ctx, HANDLER_BODY_PUBLISHER);
                     consumedInMessage(ctx);
                 }
             } else {
@@ -307,6 +331,7 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
                 }
                 currentlyStreamedMessage = null;
             }
+            ctx.read();
         }
     }
 
@@ -314,7 +339,6 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
     public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
         if (ignoreBodyRead) {
             ctx.read();
-            ignoreBodyRead = false;
         } else {
             ctx.fireChannelReadComplete();
         }
@@ -324,15 +348,9 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
     public void write(final ChannelHandlerContext ctx, Object msg, final ChannelPromise promise) throws Exception {
         if (isValidOutMessage(msg)) {
 
-            Outgoing<Out> out = new Outgoing<>(outClass.cast(msg), promise);
             receivedOutMessage(ctx);
-
-            if (outgoing.isEmpty()) {
-                outgoing.add(out);
-                flushNext(ctx);
-            } else {
-                outgoing.add(out);
-            }
+            outgoing.add(new Outgoing<>((Out) msg, promise));
+            proceedWriteOutgoing(ctx);
 
         } else if (msg instanceof LastHttpContent) {
 
@@ -344,34 +362,63 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
         }
     }
 
+    @Override
+    public void channelWritabilityChanged(ChannelHandlerContext ctx) {
+        proceedWriteOutgoing(ctx);
+    }
+
+    private void proceedWriteOutgoing(ChannelHandlerContext ctx) {
+        while (!outgoingInFlight && ctx.channel().isWritable() && !outgoing.isEmpty()) {
+            Outgoing<Out> out = outgoing.remove();
+            unbufferedWrite(ctx, out.message, out.promise);
+        }
+    }
+
     /**
      * @param ctx The channel handler context
-     * @param out The output stream
+     * @param message The message
+     * @param promise The promise
      */
-    protected void unbufferedWrite(final ChannelHandlerContext ctx, final Outgoing<Out> out) {
+    protected void unbufferedWrite(final ChannelHandlerContext ctx, final Out message, ChannelPromise promise) {
 
-        if (out.message instanceof FullHttpMessage) {
+        if (message instanceof FullHttpMessage) {
             // Forward as is
-            ctx.writeAndFlush(out.message, out.promise);
-            out.promise.addListener(channelFuture -> executeInEventLoop(ctx, () -> {
-                sentOutMessage(ctx);
-                outgoing.remove();
-                flushNext(ctx);
-            }));
+            ctx.writeAndFlush(message, promise);
+            sentOutMessage(ctx);
+        } else if (message instanceof StreamedHttpMessage) {
+            outgoingInFlight = true;
 
-        } else if (out.message instanceof StreamedHttpMessage) {
-
-            StreamedHttpMessage streamed = (StreamedHttpMessage) out.message;
+            StreamedHttpMessage streamed = (StreamedHttpMessage) message;
             HandlerSubscriber<HttpContent> subscriber = new HandlerSubscriber<HttpContent>(ctx.executor()) {
+                AtomicBoolean messageWritten = new AtomicBoolean();
+
+                @Override
+                public void onNext(HttpContent httpContent) {
+                    if (messageWritten.compareAndSet(false, true)) {
+                        ChannelPromise messageWritePromise = ctx.newPromise();
+                        //if oncomplete gets called before the message is written the promise
+                        //set to lastWriteFuture shouldn't complete until the first content is written
+                        lastWriteFuture = messageWritePromise;
+                        ctx.writeAndFlush(message).addListener(f -> super.onNext(httpContent, messageWritePromise));
+                    } else {
+                        super.onNext(httpContent);
+                    }
+                }
+
                 @Override
                 protected void error(Throwable error) {
                     try {
-
                         if (LOG.isErrorEnabled()) {
                             LOG.error("Error occurred writing stream response: " + error.getMessage(), error);
                         }
-                        ctx.writeAndFlush(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR))
-                           .addListener(ChannelFutureListener.CLOSE);
+                        HttpResponseStatus responseStatus;
+                        if (error instanceof HttpStatusException) {
+                            responseStatus = HttpResponseStatus.valueOf(((HttpStatusException) error).getStatus().getCode(), error.getMessage());
+                        } else {
+                            responseStatus = HttpResponseStatus.INTERNAL_SERVER_ERROR;
+                        }
+                        ctx.writeAndFlush(new DefaultHttpResponse(HttpVersion.HTTP_1_1, responseStatus))
+                                .addListener(ChannelFutureListener.CLOSE);
                     } finally {
                         ctx.read();
                     }
@@ -379,14 +426,23 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
 
                 @Override
                 protected void complete() {
-                    executeInEventLoop(ctx, () -> completeBody(ctx));
+                    if (messageWritten.compareAndSet(false, true)) {
+                        ctx.writeAndFlush(message).addListener(future -> doOnComplete());
+                    } else {
+                        doOnComplete();
+                    }
+                }
+
+                private void doOnComplete() {
+                    if (ctx.executor().inEventLoop()) {
+                        completeBody(ctx, promise);
+                    } else {
+                        ctx.executor().execute(() -> completeBody(ctx, promise));
+                    }
                 }
             };
 
             sendLastHttpContent = true;
-
-            // DON'T pass the promise through, create a new promise instead.
-            ctx.writeAndFlush(out.message);
 
             ctx.pipeline().addAfter(ctx.name(), ctx.name() + "-body-subscriber", subscriber);
             subscribeSubscriberToStream(streamed, subscriber);
@@ -394,24 +450,22 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
 
     }
 
-    private void completeBody(final ChannelHandlerContext ctx) {
+    private void completeBody(final ChannelHandlerContext ctx, ChannelPromise promise) {
         removeHandlerIfActive(ctx, ctx.name() + "-body-subscriber");
 
         if (sendLastHttpContent) {
-            ChannelPromise promise = outgoing.peek().promise;
-            ctx.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT, promise).addListener(
-                channelFuture -> executeInEventLoop(ctx, () -> {
-                    outgoing.remove();
-                    sentOutMessage(ctx);
-                    flushNext(ctx);
-                })
-            );
-            ctx.read();
+            ctx.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT, promise).addListener((f) -> {
+                sentOutMessage(ctx);
+                ctx.read();
+                outgoingInFlight = false;
+                proceedWriteOutgoing(ctx);
+            });
         } else {
-            outgoing.remove().promise.setSuccess();
+            promise.setSuccess();
             sentOutMessage(ctx);
-            flushNext(ctx);
             ctx.read();
+            outgoingInFlight = false;
+            proceedWriteOutgoing(ctx);
         }
     }
 
@@ -428,22 +482,6 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
             if (handler != null) {
                 pipeline.remove(name);
             }
-        }
-    }
-
-    private void flushNext(ChannelHandlerContext ctx) {
-        if (!outgoing.isEmpty()) {
-            unbufferedWrite(ctx, outgoing.element());
-        } else {
-            ctx.fireChannelWritabilityChanged();
-        }
-    }
-
-    private void executeInEventLoop(ChannelHandlerContext ctx, Runnable runnable) {
-        if (ctx.executor().inEventLoop()) {
-            runnable.run();
-        } else {
-            ctx.executor().execute(runnable);
         }
     }
 
@@ -465,6 +503,8 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
 
     /**
      * The outgoing class.
+     *
+     * @param <O> The message type
      */
     static class Outgoing<O extends HttpMessage> {
         final O message;

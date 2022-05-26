@@ -20,6 +20,7 @@ import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.context.exceptions.DisabledBeanException;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
@@ -27,7 +28,6 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ParametrizedBeanFactory;
 
-import javax.inject.Qualifier;
 import java.lang.annotation.Annotation;
 import java.util.Arrays;
 import java.util.Collections;
@@ -130,7 +130,7 @@ public abstract class AbstractParametrizedBeanDefinition<T> extends AbstractBean
     private Argument[] resolveRequiredArguments() {
         return Arrays.stream(getConstructor().getArguments())
             .filter(arg -> {
-                Optional<Class<? extends Annotation>> qualifierType = arg.getAnnotationMetadata().getAnnotationTypeByStereotype(Qualifier.class);
+                Optional<Class<? extends Annotation>> qualifierType = arg.getAnnotationMetadata().getAnnotationTypeByStereotype(AnnotationUtil.QUALIFIER);
                 return qualifierType.isPresent() && qualifierType.get() == Parameter.class;
             })
             .toArray(Argument[]::new);

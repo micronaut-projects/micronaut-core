@@ -31,16 +31,22 @@ import javax.inject.Provider;
  * @since 3.0.0
  */
 @Internal
-final class JavaxProviderBeanDefinition extends AbstractProviderDefinition<Provider<Object>> {
+public final class JavaxProviderBeanDefinition extends AbstractProviderDefinition<Provider<Object>> {
+
     @Override
     public boolean isEnabled(BeanContext context, BeanResolutionContext resolutionContext) {
-        return JavaxProviderBeanDefinitionReference.isTypePresent();
+        return isTypePresent();
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     @Override
     public Class<Provider<Object>> getBeanType() {
         return (Class) Provider.class;
+    }
+
+    @Override
+    public boolean isPresent() {
+        return isTypePresent();
     }
 
     @Override
@@ -64,6 +70,15 @@ final class JavaxProviderBeanDefinition extends AbstractProviderDefinition<Provi
             };
         } else {
             return () -> ((DefaultBeanContext) context).getBean(resolutionContext, argument, qualifier);
+        }
+    }
+
+    private static boolean isTypePresent() {
+        try {
+            return Provider.class.isInterface();
+        } catch (Throwable e) {
+            // class not present
+            return false;
         }
     }
 }

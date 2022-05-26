@@ -15,8 +15,9 @@
  */
 package io.micronaut.retry;
 
-import io.micronaut.retry.annotation.RetryPredicate;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.retry.annotation.RetryPredicate;
+
 import java.time.Duration;
 import java.util.Optional;
 import java.util.OptionalDouble;
@@ -74,6 +75,11 @@ public interface RetryState {
     default RetryPredicate getRetryPredicate() {
         throw new UnsupportedOperationException("Retry predicate not supported on this type");
     }
+
+    /**
+     * @return The captured exception type (default to {@link RuntimeException}
+     */
+    Class<? extends Throwable> getCapturedException();
 
     /**
      * Opens the retry state.

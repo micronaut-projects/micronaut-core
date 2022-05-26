@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.failures.ctorexception;
 
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 public class B {
     @Inject

@@ -23,7 +23,7 @@ import io.micronaut.http.server.exceptions.ExceptionHandler;
 import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Requires(property = "spec.name", value = "ExceptionHandlerSpec")
 //tag::clazz[]

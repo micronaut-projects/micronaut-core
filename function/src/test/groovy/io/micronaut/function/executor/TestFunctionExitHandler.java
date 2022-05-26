@@ -15,7 +15,7 @@
  */
 package io.micronaut.function.executor;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Singleton
 public class TestFunctionExitHandler implements FunctionExitHandler {

@@ -292,7 +292,6 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      */
     static <T> MutableHttpRequest<T> POST(String uri, T body) {
         Objects.requireNonNull(uri, "Argument [uri] is required");
-        Objects.requireNonNull(body, "Argument [body] cannot be null");
         return HttpRequestFactory.INSTANCE.post(uri, body);
     }
 
@@ -320,8 +319,6 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      */
     static <T> MutableHttpRequest<T> PUT(String uri, T body) {
         Objects.requireNonNull(uri, "Argument [uri] is required");
-        Objects.requireNonNull(body, "Argument [body] cannot be null");
-
         return HttpRequestFactory.INSTANCE.put(uri, body);
     }
 
@@ -349,7 +346,6 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      */
     static <T> MutableHttpRequest<T> PATCH(String uri, T body) {
         Objects.requireNonNull(uri, "Argument [uri] is required");
-        Objects.requireNonNull(body, "Argument [body] cannot be null");
         return HttpRequestFactory.INSTANCE.patch(uri, body);
     }
 

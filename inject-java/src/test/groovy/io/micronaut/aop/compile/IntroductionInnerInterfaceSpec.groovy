@@ -14,7 +14,7 @@ class IntroductionInnerInterfaceSpec extends AbstractTypeElementSpec {
         def context = buildContext(clsName, '''
 package inneritfce;
 
-import javax.inject.*;
+import jakarta.inject.*;
 import io.micronaut.aop.introduction.*;
 
 @Singleton

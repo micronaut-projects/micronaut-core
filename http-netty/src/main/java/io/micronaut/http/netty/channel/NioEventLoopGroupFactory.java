@@ -15,18 +15,19 @@
  */
 package io.micronaut.http.netty.channel;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.channel.unix.ServerDomainSocketChannel;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadFactory;
 
@@ -74,6 +75,11 @@ public class NioEventLoopGroupFactory implements EventLoopGroupFactory {
     @Override
     public Class<? extends ServerSocketChannel> serverSocketChannelClass() {
         return NioServerSocketChannel.class;
+    }
+
+    @Override
+    public Class<? extends ServerDomainSocketChannel> domainServerSocketChannelClass() throws UnsupportedOperationException {
+        throw new UnsupportedOperationException("UNIX domain sockets are not supported by the NIO implementation right now, please switch to epoll or kqueue");
     }
 
     @Override

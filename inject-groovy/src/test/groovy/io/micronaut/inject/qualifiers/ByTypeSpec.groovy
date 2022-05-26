@@ -20,7 +20,7 @@ import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.annotation.Type
 import spock.lang.Specification
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 /**
  * @author Graeme Rocher

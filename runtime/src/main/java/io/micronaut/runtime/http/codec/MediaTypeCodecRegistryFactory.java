@@ -20,8 +20,8 @@ import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.util.List;
 
 /**

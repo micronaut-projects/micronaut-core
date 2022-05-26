@@ -24,12 +24,13 @@ import io.micronaut.context.env.Environment
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.validation.validator.Validator
 import io.micronaut.validation.validator.constraints.ConstraintValidator
+import jakarta.inject.Singleton
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
-
-import javax.inject.Singleton
+import javax.validation.ConstraintViolationException
 import javax.validation.Valid
+import javax.validation.constraints.NotNull
 
 class PojoValidatorSpec extends Specification {
 
@@ -69,6 +70,27 @@ class PojoValidatorSpec extends Specification {
         violations[0].getPropertyPath().toString() == "performSearch.search"
         violations[0].message == "Both name and lastName can't be null"
     }
+
+    void "test custom constraint validator on a nested Pojo"() {
+        given:
+        SearchAny search = new SearchAny(new Search())
+
+        when:
+        def constraintViolations = validator.validate(search)
+
+        then:
+        constraintViolations.size() == 1
+        constraintViolations.first().message == "Both name and lastName can't be null"
+    }
+
+    void "test custom constraint validator on pojo method argument"() {
+        when:
+        applicationContext.getBean(SearchAny2).validate(new Search())
+
+        then:
+        def ex = thrown(ConstraintViolationException)
+        ex.constraintViolations.size() == 1
+    }
 }
 
 @Singleton
@@ -76,7 +98,6 @@ class SearchService {
     @Executable
     String performSearch(@Valid Search search) {
         return "Not found"
-    }
 }
 
 @Introspected
@@ -84,6 +105,23 @@ class SearchService {
 class Search {
     String name
     String lastName
+}
+
+@Introspected
+class SearchAny {
+    @Valid
+    List<Search> searches;
+    SearchAny(Search... searches) {
+        this.searches = searches;
+    }
+}
+
+@Singleton
+class SearchAny2 {
+
+    void validate(@NotNull @Valid Search search) {
+
+    }
 }
 
 @Factory

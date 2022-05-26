@@ -25,10 +25,10 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.conventions.StringConvention;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent;
+import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.inject.Singleton;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -80,9 +80,14 @@ final class PropertiesLoggingLevelsConfigurer implements ApplicationEventListene
     }
 
     private void configureLogLevels() {
-        Map<String, Object> properties = new HashMap<>(environment.getProperties(LOGGER_LEVELS_PROPERTY_PREFIX));
         // Using raw keys here allows configuring log levels for camelCase package names in application.yml
-        properties.putAll(environment.getProperties(LOGGER_LEVELS_PROPERTY_PREFIX, StringConvention.RAW));
+        final Map<String, Object> rawProperties = environment.getProperties(LOGGER_LEVELS_PROPERTY_PREFIX, StringConvention.RAW);
+        // Adding the generated properties allows environment variables and system properties to override names in application.yaml
+        final Map<String, Object> generatedProperties = environment.getProperties(LOGGER_LEVELS_PROPERTY_PREFIX);
+
+        final Map<String, Object> properties = new HashMap<>(generatedProperties.size() + rawProperties.size(), 1f);
+        properties.putAll(rawProperties);
+        properties.putAll(generatedProperties);
         properties.forEach(this::configureLogLevelForPrefix);
     }
 

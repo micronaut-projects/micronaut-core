@@ -16,18 +16,24 @@
 package io.micronaut.http.server.netty.multipart;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.naming.NameUtils;
+import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.multipart.CompletedFileUpload;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.handler.codec.http.multipart.FileUpload;
+import io.netty.util.ResourceLeakDetector;
+import io.netty.util.ResourceLeakDetectorFactory;
+import io.netty.util.ResourceLeakTracker;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 /**
  * A Netty implementation of {@link CompletedFileUpload}.
@@ -37,9 +43,14 @@ import java.util.Optional;
  */
 @Internal
 public class NettyCompletedFileUpload implements CompletedFileUpload {
+    //to avoid initializing Netty at build time
+    private static final Supplier<ResourceLeakDetector<NettyCompletedFileUpload>> RESOURCE_LEAK_DETECTOR = SupplierUtil.memoized(() ->
+            ResourceLeakDetectorFactory.instance().newResourceLeakDetector(NettyCompletedFileUpload.class));
 
     private final FileUpload fileUpload;
     private final boolean controlRelease;
+
+    private final ResourceLeakTracker<NettyCompletedFileUpload> tracker;
 
     /**
      * @param fileUpload The file upload
@@ -57,6 +68,9 @@ public class NettyCompletedFileUpload implements CompletedFileUpload {
         this.controlRelease = controlRelease;
         if (controlRelease) {
             fileUpload.retain();
+            tracker = RESOURCE_LEAK_DETECTOR.get().track(this);
+        } else {
+            tracker = null;
         }
     }
 
@@ -104,9 +118,7 @@ public class NettyCompletedFileUpload implements CompletedFileUpload {
         try {
             return ByteBufUtil.getBytes(byteBuf);
         } finally {
-            if (controlRelease) {
-                byteBuf.release();
-            }
+            discard();
         }
     }
 
@@ -128,15 +140,13 @@ public class NettyCompletedFileUpload implements CompletedFileUpload {
         try {
             return byteBuf.nioBuffer();
         } finally {
-            if (controlRelease) {
-                byteBuf.release();
-            }
+            discard();
         }
     }
 
     @Override
     public Optional<MediaType> getContentType() {
-        return Optional.of(MediaType.of(fileUpload.getContentType()));
+        return Optional.of(new MediaType(fileUpload.getContentType(), NameUtils.extension(fileUpload.getFilename())));
     }
 
     @Override
@@ -165,7 +175,12 @@ public class NettyCompletedFileUpload implements CompletedFileUpload {
     }
 
     @Override
-    public void discard() {
-        fileUpload.release();
+    public final void discard() {
+        if (controlRelease) {
+            fileUpload.release();
+        }
+        if (tracker != null) {
+            tracker.close(this);
+        }
     }
 }

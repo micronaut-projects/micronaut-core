@@ -15,9 +15,11 @@
  */
 package io.micronaut.aop.introduction
 
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.aop.Intercepted
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
+import io.micronaut.inject.BeanDefinition
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -25,7 +27,8 @@ import spock.lang.Unroll
  * @author Graeme Rocher
  * @since 1.0
  */
-class InterfaceIntroductionAdviceSpec extends Specification {
+class InterfaceIntroductionAdviceSpec extends AbstractTypeElementSpec {
+
     @Unroll
     void "test AOP method invocation @Named bean for method #method"() {
         given:
@@ -41,5 +44,35 @@ class InterfaceIntroductionAdviceSpec extends Specification {
         'test'                 | ['test']     | "changed"                   // test for single string arg
         'test'                 | ['test', 10] | "changed"    // test for multiple args, one primitive
         'testGenericsFromType' | ['test', 10] | "changed"    // test for multiple args, one primitive
+    }
+
+    void "test injecting an introduction advice with generics"() {
+        BeanContext beanContext = new DefaultBeanContext().start()
+
+        when:
+        InjectParentInterface foo = beanContext.getBean(InjectParentInterface)
+
+        then:
+        noExceptionThrown()
+
+        cleanup:
+        beanContext.close()
+    }
+
+    void "test typeArgumentsMap are created for introduction advice"() {
+        def definition = buildBeanDefinition("test.Test\$Intercepted", """
+package test;
+
+import java.util.List;
+import io.micronaut.aop.introduction.ParentInterface;
+import io.micronaut.aop.introduction.Stub;
+
+@Stub
+interface Test extends ParentInterface<List<String>> {
+}
+""")
+
+        expect:
+        !definition.getTypeArguments(ParentInterface).isEmpty()
     }
 }

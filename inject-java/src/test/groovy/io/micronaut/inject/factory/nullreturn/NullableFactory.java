@@ -23,8 +23,8 @@ import io.micronaut.context.condition.ConditionContext;
 import io.micronaut.context.exceptions.DisabledBeanException;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 
-import javax.inject.Named;
-import javax.inject.Singleton;
+import jakarta.inject.Named;
+import jakarta.inject.Singleton;
 
 @Factory
 public class NullableFactory {

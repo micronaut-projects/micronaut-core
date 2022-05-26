@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.qualifiers.compose;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Singleton
 public class ThirdThing implements Thing {

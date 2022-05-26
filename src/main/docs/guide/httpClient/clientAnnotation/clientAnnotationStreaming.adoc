@@ -1,21 +1,21 @@
-The ann:http.client.Client[] annotation can also handle streaming HTTP responses.
+The ann:http.client.annotation.Client[] annotation can also handle streaming HTTP responses.
 
 === Streaming JSON with @Client
 
-For example, to write a client that streams data from the controller defined in the <<clientStreaming, JSON Streaming>> section of the documentation, you can define a client that returns an unbound rs:Publisher[] such as a RxJava rx:Flowable[] or Reactor `Flux`:
+For example, to write a client that streams data from the controller defined in the <<clientStreaming, JSON Streaming>> section of the documentation, you can define a client that returns an unbound rs:Publisher[] such as Reactor's reactor:Flux[] or a RxJava's rx:Flowable[]:
 
 snippet::io.micronaut.docs.streaming.HeadlineClient[tags="imports, class, endclass", indent=0, title="HeadlineClient.java"]
 
 <1> The `@Get` method processes responses of type `APPLICATION_JSON_STREAM`
-<2> The return type is rx:Flowable[]
+<2> The return type is `Publisher`
 
 The following example shows how the previously defined `HeadlineClient` can be invoked from a test:
 
 snippet::io.micronaut.docs.streaming.HeadlineControllerSpec[tags="streamingClient", indent=0, title="Streaming HeadlineClient"]
 
 <1> The client is retrieved from the api:context.ApplicationContext[]
-<2> The `firstElement` method returns the first emitted item from the rx:Flowable[] as a rx:Maybe[].
-<3> The `blockingGet()` method retrieves the result in the test.
+<2> The `next` method emits the first element emmited by the reactor:Flux[] into a reactor:Mono[].
+<3> The `block()` method retrieves the result in the test.
 
 === Streaming Clients and Response Types
 
@@ -41,15 +41,15 @@ The reason for this is simple; a sequence of JSON object is not, in fact, valid 
 
 Micronaut's client does however support streaming of both individual JSON objects via `application/x-json-stream` and also JSON arrays defined with `application/json`.
 
-If the server returns `application/json` and a non-single rs:Publisher[] is returned (such as a rx:Flowable[] or a Reactor `Flux`), the client streams the array elements as they become available.
+If the server returns `application/json` and a non-single rs:Publisher[] is returned (such as a Reactor's reactor:Flux[] or a RxJava's rx:Flowable[]), the client streams the array elements as they become available.
 
 === Streaming Clients and Read Timeout
 
 When streaming responses from servers, the underlying HTTP client will not apply the default `readTimeout` setting (which defaults to 10 seconds) of the api:http.client.HttpClientConfiguration[] since the delay between reads for streaming responses may differ from normal reads.
 
-Instead, the `read-idle-timeout` setting (which defaults to 60 seconds) dictates when to close a connection after it becomes idle.
+Instead, the `read-idle-timeout` setting (which defaults to 5 minutes) dictates when to close a connection after it becomes idle.
 
-If you stream data from a server that defines a longer delay than 60 seconds between items, you should adjust `readIdleTimeout`. The following configuration in `application.yml` demonstrates how:
+If you stream data from a server that defines a longer delay than 5 minutes between items, you should adjust `readIdleTimeout`. The following configuration in `application.yml` demonstrates how:
 
 .Adjusting the readIdleTimeout
 [source,yaml]
@@ -57,10 +57,10 @@ If you stream data from a server that defines a longer delay than 60 seconds bet
 micronaut:
   http:
     client:
-      read-idle-timeout: 5m
+      read-idle-timeout: 10m
 ----
 
-The above example sets the `readIdleTimeout` to five minutes.
+The above example sets the `readIdleTimeout` to ten minutes.
 
 === Streaming Server Sent Events
 
@@ -70,7 +70,7 @@ You can use this client to stream SSE events from any server that emits them.
 
 NOTE: Although SSE streams are typically consumed by a browser `EventSource`, there are cases where you may wish to consume an SSE stream via api:http.client.sse.SseClient[], such as in unit tests or when a Micronaut service acts as a gateway for another service.
 
-The ann:http.client.Client[] annotation also supports consuming SSE streams. For example, consider the following controller method that produces a stream of SSE events:
+The ann:http.client.annotation.Client[] annotation also supports consuming SSE streams. For example, consider the following controller method that produces a stream of SSE events:
 
 snippet::io.micronaut.docs.sse.HeadlineController[tags="streaming", indent=0, title="SSE Controller"]
 
@@ -85,4 +85,4 @@ To define a client that consumes the events, define a method that processes `Med
 
 snippet::io.micronaut.docs.sse.HeadlineClient[tags="class", indent=0, title="SSE Client"]
 
-The generic type of the `Flux` or `Flowable` can be either an api:http.sse.Event[], in which case you will receive the full event object, or a POJO, in which case you will receive only the data contained within the event converted from JSON.
+The generic type of the `Flux` can be either an api:http.sse.Event[], in which case you will receive the full event object, or a POJO, in which case you will receive only the data contained within the event converted from JSON.

@@ -21,7 +21,7 @@ import io.micronaut.runtime.event.annotation.EventListener
 import io.micronaut.scheduling.annotation.Async
 import java.util.concurrent.atomic.AtomicInteger
 // end::imports[]
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 // tag::class[]
 @Singleton

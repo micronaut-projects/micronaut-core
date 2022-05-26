@@ -25,8 +25,8 @@ import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.convert.format.Format;
 import io.micronaut.core.util.StringUtils;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
@@ -91,23 +91,23 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
                     try {
                         switch (type) {
                             case 's':
-                                return Optional.of(Duration.ofSeconds(Integer.valueOf(amount)));
+                                return Optional.of(Duration.ofSeconds(Integer.parseInt(amount)));
                             case 'm':
                                 String ms = matcher.group(MILLIS);
                                 if (StringUtils.hasText(ms)) {
-                                    return Optional.of(Duration.ofMillis(Integer.valueOf(amount)));
+                                    return Optional.of(Duration.ofMillis(Integer.parseInt(amount)));
                                 } else {
-                                    return Optional.of(Duration.ofMinutes(Integer.valueOf(amount)));
+                                    return Optional.of(Duration.ofMinutes(Integer.parseInt(amount)));
                                 }
                             case 'h':
-                                return Optional.of(Duration.ofHours(Integer.valueOf(amount)));
+                                return Optional.of(Duration.ofHours(Integer.parseInt(amount)));
                             case 'd':
-                                return Optional.of(Duration.ofDays(Integer.valueOf(amount)));
+                                return Optional.of(Duration.ofDays(Integer.parseInt(amount)));
                             default:
                                 final String seq = g2 + matcher.group(3);
                                 switch (seq) {
                                     case "ns":
-                                        return Optional.of(Duration.ofNanos(Integer.valueOf(amount)));
+                                        return Optional.of(Duration.ofNanos(Integer.parseInt(amount)));
                                     default:
                                         context.reject(
                                                 value,

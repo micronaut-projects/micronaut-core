@@ -15,8 +15,8 @@
  */
 package io.micronaut.http.client.netty;
 
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
@@ -38,14 +38,22 @@ import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.uri.UriBuilder;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
-import io.netty.handler.codec.http.*;
+import io.netty.handler.codec.http.DefaultFullHttpRequest;
+import io.netty.handler.codec.http.EmptyHttpHeaders;
+import io.netty.handler.codec.http.FullHttpRequest;
+import io.netty.handler.codec.http.HttpContent;
+import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.HttpVersion;
+import io.netty.handler.codec.http.QueryStringDecoder;
 import io.netty.handler.codec.http.cookie.ClientCookieEncoder;
 import org.reactivestreams.Publisher;
 
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.Charset;
-import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -64,6 +72,7 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHttpReque
     private final MutableConvertibleValues<Object> attributes = new MutableConvertibleValuesMap<>();
     private final HttpMethod httpMethod;
     private final String httpMethodName;
+    private final Map<String, String> cookies = new LinkedHashMap<>(1);
     private URI uri;
     private Object body;
     private NettyHttpParameters httpParameters;
@@ -115,7 +124,14 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHttpReque
         if (cookie instanceof NettyCookie) {
             NettyCookie nettyCookie = (NettyCookie) cookie;
             String value = ClientCookieEncoder.LAX.encode(nettyCookie.getNettyCookie());
-            headers.add(HttpHeaderNames.COOKIE, value);
+            cookies.put(cookie.getName(), value);
+            String headerValue;
+            if (cookies.size() > 1) {
+                headerValue = String.join(";", cookies.values());
+            } else {
+                headerValue = value;
+            }
+            headers.set(HttpHeaderNames.COOKIE, headerValue);
         } else {
             throw new IllegalArgumentException("Argument is not a Netty compatible Cookie");
         }
@@ -125,17 +141,16 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHttpReque
     @Override
     public MutableHttpRequest<B> cookies(Set<Cookie> cookies) {
         if (cookies.size() > 1) {
-            Set<String> values = new HashSet<>(cookies.size());
             for (Cookie cookie: cookies) {
                 if (cookie instanceof NettyCookie) {
                     NettyCookie nettyCookie = (NettyCookie) cookie;
                     String value = ClientCookieEncoder.LAX.encode(nettyCookie.getNettyCookie());
-                    values.add(value);
+                    this.cookies.put(cookie.getName(), value);
                 } else {
                     throw new IllegalArgumentException("Argument is not a Netty compatible Cookie");
                 }
             }
-            headers.add(HttpHeaderNames.COOKIE, String.join(";", values));
+            headers.set(HttpHeaderNames.COOKIE, String.join(";", this.cookies.values()));
         } else if (!cookies.isEmpty()) {
             cookie(cookies.iterator().next());
         }

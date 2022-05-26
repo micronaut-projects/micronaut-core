@@ -1,6 +1,6 @@
 ==== How does Micronaut manage to run on GraalVM?
 
-Micronaut features a Dependency Injection and Aspect-Oriented Programming runtime that uses no reflection. This makes it easier for Micronaut applications to run on GraalVM since there are https://github.com/oracle/graal/blob/master/substratevm/LIMITATIONS.md[limitations] particularly around https://github.com/oracle/graal/blob/master/substratevm/REFLECTION.md[reflection] on SubstrateVM.
+Micronaut features a Dependency Injection and Aspect-Oriented Programming runtime that uses no reflection. This makes it easier for Micronaut applications to run on GraalVM since there are https://github.com/oracle/graal/blob/master/docs/reference-manual/native-image/Limitations.md[limitations] particularly around https://github.com/oracle/graal/blob/master/docs/reference-manual/native-image/Reflection.md[reflection] in Native Images.
 
 ==== How can I make a Micronaut application that uses picocli run on GraalVM?
 

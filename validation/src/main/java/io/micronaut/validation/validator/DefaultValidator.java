@@ -15,7 +15,6 @@
  */
 package io.micronaut.validation.validator;
 
-import io.micronaut.core.annotation.*;
 import io.micronaut.aop.Intercepted;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.ExecutionHandleLocator;
@@ -25,6 +24,13 @@ import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.exceptions.BeanInstantiationException;
+import io.micronaut.core.annotation.AnnotatedElement;
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationMetadataProvider;
+import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanIntrospector;
@@ -44,13 +50,28 @@ import io.micronaut.validation.validator.constraints.ConstraintValidator;
 import io.micronaut.validation.validator.constraints.ConstraintValidatorContext;
 import io.micronaut.validation.validator.constraints.ConstraintValidatorRegistry;
 import io.micronaut.validation.validator.extractors.ValueExtractorRegistry;
-import io.reactivex.Flowable;
+import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
 
-import javax.inject.Singleton;
-import javax.validation.*;
+import javax.validation.ClockProvider;
+import javax.validation.Constraint;
+import javax.validation.ConstraintViolation;
+import javax.validation.ConstraintViolationException;
+import javax.validation.ElementKind;
+import javax.validation.Path;
+import javax.validation.TraversableResolver;
+import javax.validation.Valid;
+import javax.validation.ValidationException;
 import javax.validation.groups.Default;
-import javax.validation.metadata.*;
+import javax.validation.metadata.BeanDescriptor;
+import javax.validation.metadata.ConstraintDescriptor;
+import javax.validation.metadata.ConstructorDescriptor;
+import javax.validation.metadata.ElementDescriptor;
+import javax.validation.metadata.MethodDescriptor;
+import javax.validation.metadata.MethodType;
+import javax.validation.metadata.PropertyDescriptor;
+import javax.validation.metadata.Scope;
 import javax.validation.valueextraction.ValueExtractor;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.ElementType;
@@ -73,7 +94,7 @@ import java.util.stream.Collectors;
 public class DefaultValidator implements
         Validator, ExecutableMethodValidator, ReactiveValidator, AnnotatedElementValidator, BeanDefinitionValidator {
 
-    private static final List<Class> DEFAULT_GROUPS = Collections.singletonList(Default.class);
+    private static final List<Class<?>> DEFAULT_GROUPS = Collections.singletonList(Default.class);
     private final ConstraintValidatorRegistry constraintValidatorRegistry;
     private final ClockProvider clockProvider;
     private final ValueExtractorRegistry valueExtractorRegistry;
@@ -232,7 +253,6 @@ public class DefaultValidator implements
         Path.Node node = context.addPropertyNode(element.getName());
         validateElement(context, overallViolations, element, null, element, element, type, value, node);
 
-        //noinspection unchecked
         return Collections.unmodifiableSet(overallViolations.stream()
                 .map(ConstraintViolation::getMessage).collect(Collectors.toSet()));
     }
@@ -481,13 +501,13 @@ public class DefaultValidator implements
     @Override
     public <T> Publisher<T> validatePublisher(@NonNull Publisher<T> publisher, Class<?>... groups) {
         ArgumentUtils.requireNonNull("publisher", publisher);
-        final Flowable<T> flowable = Publishers.convertPublisher(publisher, Flowable.class);
-        return flowable.flatMap(object -> {
+        final Publisher<T> reactiveSequence = Publishers.convertPublisher(publisher, Publisher.class);
+        return Flux.from(reactiveSequence).flatMap(object -> {
             final Set<ConstraintViolation<Object>> constraintViolations = validate(object, groups);
             if (!constraintViolations.isEmpty()) {
-                return Flowable.error(new ConstraintViolationException(constraintViolations));
+                return Flux.error(new ConstraintViolationException(constraintViolations));
             }
-            return Flowable.just(object);
+            return Flux.just(object);
         });
     }
 
@@ -632,10 +652,10 @@ public class DefaultValidator implements
             Class<?> parameterType,
             Object parameterValue
     ) {
-        final Flowable<Object> publisher = Publishers.convertPublisher(parameterValue, Flowable.class);
+        final Publisher<Object> publisher = Publishers.convertPublisher(parameterValue, Publisher.class);
         PathImpl copiedPath = new PathImpl(context.currentPath);
 
-        final Flowable<Object> finalFlowable = publisher.flatMap(value -> {
+        final Flux<Object> finalFlowable = Flux.from(publisher).flatMap(value -> {
             DefaultConstraintValidatorContext newContext =
                     new DefaultConstraintValidatorContext(object, copiedPath);
             Set newViolations = new HashSet();
@@ -645,7 +665,7 @@ public class DefaultValidator implements
 
             if (typeParameters.length == 0) {
                 // No validation if no parameters
-                return Flowable.just(value);
+                return Flux.just(value);
             }
             Argument<Object> valueArgument = typeParameters[0];
 
@@ -663,10 +683,10 @@ public class DefaultValidator implements
             }
 
             if (!newViolations.isEmpty()) {
-                return Flowable.error(new ConstraintViolationException(newViolations));
+                return Flux.error(new ConstraintViolationException(newViolations));
             }
 
-            return Flowable.just(value);
+            return Flux.just(value);
         });
 
         argumentValues[argumentIndex] = Publishers.convertPublisher(finalFlowable, parameterType);
@@ -783,6 +803,7 @@ public class DefaultValidator implements
                 .findConstraintValidator(pojoConstraint, parameterType).orElse(null);
 
         if (constraintValidator != null) {
+            final String currentMessageTemplate = context.getMessageTemplate().orElse(null);
             if (!constraintValidator.isValid(parameterValue, constraintAnnotation, context)) {
                 BeanIntrospection<Object> beanIntrospection = getBeanIntrospection(parameterValue);
                 if (beanIntrospection == null) {
@@ -805,6 +826,7 @@ public class DefaultValidator implements
                         new DefaultConstraintDescriptor(beanAnnotationMetadata, pojoConstraint, annotationValue),
                         argumentValues));
             }
+            context.messageTemplate(currentMessageTemplate);
         }
     }
 
@@ -1189,10 +1211,13 @@ public class DefaultValidator implements
         final List<Class<? extends Annotation>> constraintTypes =
                 annotationMetadata.getAnnotationTypesByStereotype(Constraint.class);
 
+        final String currentMessageTemplate = context.getMessageTemplate().orElse(null);
+
         for (Class<? extends Annotation> constraintType : constraintTypes) {
             valueConstraintOnElement(context, overallViolations, rootBean, rootBeanClass, object, annotatedElement,
                     elementType, elementValue, executableParameterValues, constraintType);
         }
+        context.messageTemplate(currentMessageTemplate);
     }
 
     @SuppressWarnings("unchecked")
@@ -1283,7 +1308,7 @@ public class DefaultValidator implements
     }
 
     private <T> void failOnError(@NonNull BeanResolutionContext resolutionContext,
-                                 Set<ConstraintViolation<T>> errors, Class<?> beanType
+                Set<ConstraintViolation<T>> errors, Class<?> beanType
     ) {
         if (!errors.isEmpty()) {
             StringBuilder builder = new StringBuilder()
@@ -1320,7 +1345,7 @@ public class DefaultValidator implements
     private final class DefaultConstraintValidatorContext implements ConstraintValidatorContext {
         final Set<Object> validatedObjects = new HashSet<>(20);
         final PathImpl currentPath;
-        final List<Class> groups;
+        final List<Class<?>> groups;
         String messageTemplate = null;
 
         private <T> DefaultConstraintValidatorContext(T object, Class<?>... groups) {
@@ -1332,7 +1357,13 @@ public class DefaultValidator implements
                 validatedObjects.add(object);
             }
             if (ArrayUtils.isNotEmpty(groups)) {
-                this.groups = Arrays.asList(groups);
+                sanityCheckGroups(groups);
+
+                List<Class<?>> groupList = new ArrayList<>();
+                for (Class<?> group: groups) {
+                    addInheritedGroups(group, groupList);
+                }
+                this.groups = Collections.unmodifiableList(groupList);
             } else {
                 this.groups = DEFAULT_GROUPS;
             }
@@ -1342,6 +1373,30 @@ public class DefaultValidator implements
 
         private DefaultConstraintValidatorContext(Class<?>... groups) {
             this(null, groups);
+        }
+
+        private void sanityCheckGroups(Class<?>[] groups) {
+            ArgumentUtils.requireNonNull("groups", groups);
+
+            for (Class<?> clazz : groups) {
+                if (clazz == null) {
+                    throw new IllegalArgumentException("Validation groups must be non-null");
+                }
+                if (!clazz.isInterface()) {
+                    throw new IllegalArgumentException(
+                        "Validation groups must be interfaces. " + clazz.getName() + " is not.");
+                }
+            }
+        }
+
+        private void addInheritedGroups(Class<?> group, List<Class<?>> groups) {
+            if (!groups.contains(group)) {
+                groups.add(group);
+            }
+
+            for (Class<?> inheritedGroup : group.getInterfaces()) {
+                addInheritedGroups(inheritedGroup, groups);
+            }
         }
 
         @NonNull
@@ -1871,6 +1926,15 @@ public class DefaultValidator implements
         @Override
         public <U> U unwrap(Class<U> type) {
             throw new UnsupportedOperationException("Unwrapping is unsupported by this implementation");
+        }
+
+        @Override
+        public String toString() {
+            return "DefaultConstraintViolation{" +
+                    "rootBean=" + rootBeanClass +
+                    ", invalidValue=" + invalidValue +
+                    ", path=" + path +
+                    '}';
         }
     }
 

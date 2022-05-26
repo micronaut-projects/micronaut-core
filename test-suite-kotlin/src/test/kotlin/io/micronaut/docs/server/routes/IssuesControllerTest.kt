@@ -1,12 +1,12 @@
 package io.micronaut.docs.server.routes
 
 // tag::imports[]
-import io.kotlintest.shouldBe
-import io.kotlintest.shouldNotBe
-import io.kotlintest.shouldThrow
-import io.kotlintest.specs.StringSpec
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
+import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.core.spec.style.StringSpec
 import io.micronaut.context.ApplicationContext
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 // end::imports[]
@@ -20,7 +20,7 @@ class IssuesControllerTest: StringSpec() {
 
     val client = autoClose( // <2>
         embeddedServer.applicationContext.createBean(
-            RxHttpClient::class.java,
+            HttpClient::class.java,
             embeddedServer.url) // <1>
     )
 

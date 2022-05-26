@@ -19,7 +19,11 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.HttpRequestWrapper;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.netty.buffer.ByteBuf;
-import io.netty.handler.codec.http.*;
+import io.netty.handler.codec.http.DefaultFullHttpRequest;
+import io.netty.handler.codec.http.FullHttpRequest;
+import io.netty.handler.codec.http.HttpMethod;
+import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.HttpVersion;
 
 import java.util.Objects;
 

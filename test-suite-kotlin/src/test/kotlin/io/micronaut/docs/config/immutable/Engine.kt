@@ -15,8 +15,9 @@
  */
 package io.micronaut.docs.config.immutable
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
+// tag::class[]
 @Singleton
 class Engine(val config: EngineConfig)// <1>
 {
@@ -27,3 +28,4 @@ class Engine(val config: EngineConfig)// <1>
         return  "${config.manufacturer} Engine Starting V${config.cylinders} [rodLength=${config.crankShaft.getRodLength().orElse(6.0)}]"
     }
 }
+// end::class[]

@@ -15,21 +15,22 @@
  */
 package io.micronaut.http.server.netty.binders;
 
-import io.micronaut.context.BeanProvider;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.context.BeanLocator;
-import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.BeanProvider;
 import io.micronaut.context.event.BeanCreatedEvent;
 import io.micronaut.context.event.BeanCreatedEventListener;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.HttpContentProcessorResolver;
 import io.micronaut.http.server.netty.multipart.MultipartBodyArgumentBinder;
-import io.reactivex.Flowable;
+import io.micronaut.scheduling.TaskExecutors;
+import jakarta.inject.Named;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
+import java.util.concurrent.ExecutorService;
 
 /**
  * A binder registrar that requests Netty related binders.
@@ -39,12 +40,13 @@ import javax.inject.Singleton;
  */
 @Singleton
 @Internal
-@Requires(classes = Flowable.class)
 class NettyBinderRegistrar implements BeanCreatedEventListener<RequestBinderRegistry> {
+
     private final ConversionService<?> conversionService;
     private final HttpContentProcessorResolver httpContentProcessorResolver;
     private final BeanLocator beanLocator;
     private final BeanProvider<HttpServerConfiguration> httpServerConfiguration;
+    private final BeanProvider<ExecutorService> executorService;
 
     /**
      * Default constructor.
@@ -53,40 +55,24 @@ class NettyBinderRegistrar implements BeanCreatedEventListener<RequestBinderRegi
      * @param httpContentProcessorResolver The processor resolver
      * @param beanLocator                  The bean locator
      * @param httpServerConfiguration      The server config
+     * @param executorService              The executor to offload blocking operations
      */
     NettyBinderRegistrar(
             @Nullable ConversionService<?> conversionService,
             HttpContentProcessorResolver httpContentProcessorResolver,
             BeanLocator beanLocator,
-            BeanProvider<HttpServerConfiguration> httpServerConfiguration) {
+            BeanProvider<HttpServerConfiguration> httpServerConfiguration,
+            @Named(TaskExecutors.IO) BeanProvider<ExecutorService> executorService) {
         this.conversionService = conversionService == null ? ConversionService.SHARED : conversionService;
         this.httpContentProcessorResolver = httpContentProcessorResolver;
         this.beanLocator = beanLocator;
         this.httpServerConfiguration = httpServerConfiguration;
+        this.executorService = executorService;
     }
 
     @Override
     public RequestBinderRegistry onCreated(BeanCreatedEvent<RequestBinderRegistry> event) {
         RequestBinderRegistry registry = event.getBean();
-        registry.addRequestArgumentBinder(
-                new BasicAuthArgumentBinder()
-        );
-        registry.addRequestArgumentBinder(new MaybeBodyBinder(
-                conversionService,
-                httpContentProcessorResolver
-        ));
-        registry.addRequestArgumentBinder(new ObservableBodyBinder(
-                conversionService,
-                httpContentProcessorResolver
-        ));
-        registry.addRequestArgumentBinder(new PublisherBodyBinder(
-                conversionService,
-                httpContentProcessorResolver
-        ));
-        registry.addRequestArgumentBinder(new SingleBodyBinder(
-                conversionService,
-                httpContentProcessorResolver
-        ));
         registry.addRequestArgumentBinder(new CompletableFutureBodyBinder(
                 httpContentProcessorResolver,
                 conversionService
@@ -96,7 +82,8 @@ class NettyBinderRegistrar implements BeanCreatedEventListener<RequestBinderRegi
                 httpServerConfiguration
         ));
         registry.addRequestArgumentBinder(new InputStreamBodyBinder(
-                httpContentProcessorResolver
+                httpContentProcessorResolver,
+                executorService.get()
         ));
         return registry;
     }

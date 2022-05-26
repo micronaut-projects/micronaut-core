@@ -22,10 +22,10 @@
 package io.micronaut.validation.validator.constraints;
 
 import io.micronaut.core.annotation.AnnotationValue;
-
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
+
 import javax.validation.constraints.Email;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;

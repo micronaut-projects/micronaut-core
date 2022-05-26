@@ -20,7 +20,8 @@ import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.convert.format.MapFormat;
 
-import javax.inject.Singleton;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 import java.util.List;
 import java.util.Map;
 
@@ -40,6 +41,7 @@ public class FieldPropertyInject {
     Map<String, List<String>> multiMap;
 
     @Property(name = "my.string")
+    @Inject
     String str;
 
     @Property(name = "my.int")

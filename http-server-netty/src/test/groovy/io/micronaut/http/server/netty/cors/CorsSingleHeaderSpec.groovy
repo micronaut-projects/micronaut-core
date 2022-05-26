@@ -4,9 +4,11 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpMethod
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
+import reactor.core.publisher.Flux
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -29,22 +31,20 @@ class CorsSingleHeaderSpec extends Specification {
     void 'test CORS single header config works where single-header=#singleHeader'() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, getProperties(singleHeader))
-        RxHttpClient client = embeddedServer.getApplicationContext().createBean(RxHttpClient, embeddedServer.getURL())
+        HttpClient client = embeddedServer.getApplicationContext().createBean(HttpClient, embeddedServer.getURL())
 
-        def optionsResponse = client.exchange(
+        HttpResponse optionsResponse = Flux.from(client.exchange(
                 HttpRequest.OPTIONS('/test/arbitrary')
                         .header(ORIGIN, 'foo.com')
                         .header(ACCESS_CONTROL_REQUEST_METHOD, HttpMethod.GET)
                         .header(ACCESS_CONTROL_REQUEST_HEADERS, "${HttpHeaders.CONTENT_TYPE},${HttpHeaders.ACCEPT}")
-        ).blockingFirst()
+        )).blockFirst()
         Set<String> optionsHeaderNames = optionsResponse.headers.names()
 
-        def response = client.exchange(
+        HttpResponse response = Flux.from(client.exchange(
                 HttpRequest.GET('/test/arbitrary')
                         .header(ORIGIN, 'foo.com')
-        ).blockingFirst()
-
-
+        )).blockFirst()
 
         expect:
         optionsResponse.status == HttpStatus.OK

@@ -28,6 +28,7 @@ import io.micronaut.core.annotation.Nullable;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.Future;
 
 /**
  * <p>The core BeanContext abstraction which allows for dependency injection of classes annotated with
@@ -44,9 +45,51 @@ public interface BeanContext extends
         ExecutionHandleLocator,
         BeanLocator,
         BeanDefinitionRegistry,
-        ApplicationEventPublisher,
+        ApplicationEventPublisher<Object>,
         AnnotationMetadataResolver,
         MutableAttributeHolder {
+
+    /**
+     * Obtains the configuration for this context.
+     * @return The {@link io.micronaut.context.BeanContextConfiguration}
+     * @since 3.0.0
+     */
+    @NonNull BeanContextConfiguration getContextConfiguration();
+
+    /**
+     * Obtain an {@link io.micronaut.context.event.ApplicationEventPublisher} for the given even type.
+     * @param eventType The event type
+     * @param <E> The event generic type
+     * @return The event publisher, never {@code null}
+     */
+    @SuppressWarnings("unchecked")
+    default @NonNull <E> ApplicationEventPublisher<E> getEventPublisher(@NonNull Class<E> eventType) {
+        Objects.requireNonNull(eventType, "Event type cannot be null");
+        return getBean(Argument.of(ApplicationEventPublisher.class, eventType));
+    }
+
+    /**
+     * Publish the given event. The event will be published synchronously and only return once all listeners have consumed the event.
+     *
+     * @deprecated Preferred way is to use event typed {@code ApplicationEventPublisher<MyEventType>}
+     * @param event The event to publish
+     */
+    @Override
+    @Deprecated
+    void publishEvent(Object event);
+
+    /**
+     * Publish the given event. The event will be published asynchronously. A future is returned that can be used to check whether the event completed successfully or not.
+     *
+     * @deprecated Preferred way is to use event typed {@code ApplicationEventPublisher<MyEventType>}
+     * @param event The event to publish
+     * @return A future that completes when the event is published
+     */
+    @Override
+    @Deprecated
+    default Future<Void> publishEventAsync(Object event) {
+        return ApplicationEventPublisher.super.publishEventAsync(event);
+    }
 
     /**
      * Inject an existing instance.
@@ -205,6 +248,16 @@ public interface BeanContext extends
     <T> T destroyBean(@NonNull T bean);
 
     /**
+     * Destroys the given bean.
+     *
+     * @param beanRegistration The bean registration
+     * @param <T>  The bean type
+     * @since 3.5.0
+     */
+    @NonNull
+    <T> void destroyBean(@NonNull BeanRegistration<T> beanRegistration);
+
+    /**
      * <p>Refresh the state of the given registered bean applying dependency injection and configuration wiring again.</p>
      * <p>
      * <p>Note that if the bean was produced by a {@link io.micronaut.context.annotation.Factory} then this method will
@@ -216,6 +269,21 @@ public interface BeanContext extends
      */
     @NonNull
     <T> Optional<T> refreshBean(@Nullable BeanIdentifier identifier);
+
+    /**
+     * <p>Refresh the state of the given registered bean applying dependency injection and configuration wiring again.</p>
+     * <p>
+     * <p>Note that if the bean was produced by a {@link io.micronaut.context.annotation.Factory} then this method will
+     * refresh the factory too</p>
+     * <p>
+     * This methods skips an additional resolution of the {@link BeanRegistration}.
+     *
+     * @param beanRegistration The {@link BeanRegistration}
+     * @param <T>              The concrete class
+     * @since 3.5.0
+     */
+    @NonNull
+    <T> void refreshBean(@NonNull BeanRegistration<T> beanRegistration);
 
     /**
      * @return The class loader used by this context

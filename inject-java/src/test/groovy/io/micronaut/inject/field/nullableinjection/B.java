@@ -16,7 +16,7 @@
 package io.micronaut.inject.field.nullableinjection;
 
 import io.micronaut.core.annotation.Nullable;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 public class B {
 

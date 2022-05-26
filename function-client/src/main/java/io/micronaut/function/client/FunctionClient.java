@@ -15,16 +15,16 @@
  */
 package io.micronaut.function.client;
 
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
 import io.micronaut.aop.Introduction;
 import io.micronaut.context.annotation.Type;
 import io.micronaut.function.client.aop.FunctionClientAdvice;
 import io.micronaut.retry.annotation.Recoverable;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * The {@link FunctionClient} annotation allows applying introduction advise to an interface such that methods

@@ -22,6 +22,7 @@ import io.netty.handler.codec.http.multipart.FileUpload;
 
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * An input stream for a netty file upload that allows
@@ -36,6 +37,7 @@ class NettyFileUploadInputStream extends FileInputStream {
     @NonNull
     private final FileUpload file;
     private final boolean releaseOnClose;
+    private final AtomicBoolean closed = new AtomicBoolean();
 
     /**
      * @param file The netty file upload
@@ -50,9 +52,12 @@ class NettyFileUploadInputStream extends FileInputStream {
 
     @Override
     public void close() throws IOException {
-        super.close();
-        if (releaseOnClose) {
-            file.release();
+        try {
+            super.close();
+        } finally {
+            if (releaseOnClose && closed.compareAndSet(false, true)) {
+                file.release();
+            }
         }
     }
 }

@@ -54,6 +54,44 @@ public interface AnnotationSource {
     }
 
     /**
+     * Synthesizes a new annotation for the given annotation type using the member values of the given source annotation.
+     *
+     * <p>This method allows supporting synthesizing annotations that have been renamed, for example a {@code jakarta.inject.Named} annotation an be synthesized from the metadata of the a {@code javax.inject.Named} annotation.</p>
+     *
+     * @param annotationClass The annotation class
+     * @param sourceAnnotation The source annotation that provides the member values
+     * @param <T>             The annotation generic type
+     * @return The annotation or null if it doesn't exist
+     * @since 3.0.0
+     */
+    default @Nullable <T extends Annotation> T synthesize(
+            @NonNull Class<T> annotationClass,
+            @NonNull String sourceAnnotation) {
+        ArgumentUtils.requireNonNull("annotationClass", annotationClass);
+        ArgumentUtils.requireNonNull("sourceAnnotation", sourceAnnotation);
+        return null;
+    }
+
+    /**
+     * Synthesizes a new annotation declared for the given annotation type using the member values of the given source annotation.
+     *
+     * <p>This method allows supporting synthesizing annotations that have been renamed, for example a {@code jakarta.inject.Named} annotation an be synthesized from the metadata of the a {@code javax.inject.Named} annotation.</p>
+     *
+     * @param annotationClass The annotation class
+     * @param sourceAnnotation The source annotation that provides the member values
+     * @param <T>             The annotation generic type
+     * @return The annotation or null if it doesn't exist
+     * @since 3.0.0
+     */
+    default @Nullable <T extends Annotation> T synthesizeDeclared(
+            @NonNull Class<T> annotationClass,
+            @NonNull String sourceAnnotation) {
+        ArgumentUtils.requireNonNull("annotationClass", annotationClass);
+        ArgumentUtils.requireNonNull("sourceAnnotation", sourceAnnotation);
+        return null;
+    }
+
+    /**
      * Synthesizes a new annotation from the metadata for the given annotation type. This method works
      * by creating a runtime proxy of the annotation interface and should be avoided in favour of
      * direct use of the annotation metadata and only used for unique cases that require integrating third party libraries.
@@ -237,6 +275,28 @@ public interface AnnotationSource {
      */
     default boolean isDeclaredAnnotationPresent(@NonNull Class<? extends Annotation> annotationClass) {
         ArgumentUtils.requireNonNull("annotationClass", annotationClass);
+        return false;
+    }
+
+    /**
+     * Return whether an annotation is present.
+     *
+     * @param annotationName The annotation name
+     * @return True if it is
+     */
+    default boolean isAnnotationPresent(@NonNull String annotationName) {
+        ArgumentUtils.requireNonNull("annotationClass", annotationName);
+        return false;
+    }
+
+    /**
+     * Variation of {@link #isAnnotationPresent(String)} for declared annotations.
+     *
+     * @param annotationName The annotation name
+     * @return True if it is
+     */
+    default boolean isDeclaredAnnotationPresent(@NonNull String annotationName) {
+        ArgumentUtils.requireNonNull("annotationClass", annotationName);
         return false;
     }
 }

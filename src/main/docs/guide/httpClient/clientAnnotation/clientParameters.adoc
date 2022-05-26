@@ -34,7 +34,7 @@ For example, the following defines a URI template, and the `name` parameter is u
 [source,java]
 ----
 @Post("/{name}")
-Single<Pet> save(
+Mono<Pet> save(
     @NotBlank String name, // <1>
     @Body @Valid Pet pet) // <2>
 ----
@@ -76,6 +76,43 @@ The following table summarizes the parameter annotations and their purpose, and 
 
 IMPORTANT: Always use ann:http.annotation.Produces[] or ann:http.annotation.Consumes[] instead of supplying a header for `Content-Type` or `Accept`.
 
+== Query values formatting
+
+The link:{api}/io/micronaut/core/convert/format/Format.html[Format] annotation can be used together with `@QueryValue` annotation to format query values.
+
+The supported values are: `"csv"`, `"ssv"`, `"pipes"`, `"multi"` and `"deep-object"`, where the meaning is similar to https://swagger.io/docs/specification/serialization/[Open API v3] query parameter's `style` attribute.
+
+The format can only be applied to `java.lang.Iterable`, `java.util.Map` or POJO with link:{api}/io/micronaut/core/annotation/Introspected.html[Introspected] annotation. Examples of how different values will be formatted are given in the table below:
+
+|===
+| Format | Iterable example | Map or POJO example
+
+| Original value
+| `["Mike", "Adam", "Kate"]`
+| `{"name": "Mike", "age": 30"}`
+
+| `"CSV"`
+| `"param=Mike,Adam,Kate"`
+| `"param=name,Mike,age,30"`
+
+| `"SSV"`
+| `"param=Mike Adam Kate"`
+| `"param=name Mike age 30"`
+
+| `"PIPES"`
+| `"param=Mike\|Adam\|Kate"`
+| `"param=name\|Mike\|age\|30"`
+
+| `"MULTI"`
+| `"param=Mike&param=Adam&param=Kate"`
+| `"name=Mike&age=30"`
+
+| `"DEEP_OBJECT"`
+| `"param[0]=Mike&param[1]=Adam&param[2]=Kate"`
+| `"param[name]=Mike&param[age]=30"`
+
+|===
+
 ==== Type-Based Binding Parameters
 
 Some parameters are recognized by their type instead of their annotation. The following table summarizes these parameter types and their purpose, and provides an example:
@@ -84,16 +121,30 @@ Some parameters are recognized by their type instead of their annotation. The fo
 |Type |Description |Example
 
 |api:http.BasicAuth[]
-|Binds Basic Authorization credentials
+|Sets the `Authorization` header
 |`BasicAuth basicAuth`
+
+|api:http.HttpHeaders[]
+|Adds multiple headers to the request
+|`HttpHeaders headers`
+
+|api:http.Cookies[]
+|Adds multiple cookies to the request
+|`Cookies cookies`
+
+|api:http.Cookie[]
+|Adds a cookie to the request
+|`Cookie cookie`
+
+|link:{jdkapi}/java/util/Locale.html[Locale]
+|Sets the `Accept-Language` header. Annotate with ann:http.annotation.QueryValue[] or ann:http.annotation.PathVariable[] to populate a URI variable.
+|`Locale locale`
 
 |===
 
 ==== Custom Binding
 
 The api:http.client.bind.ClientArgumentRequestBinder[] API binds client arguments to the request. Custom binder classes registered as beans are automatically used during the binding process. Annotation-based binders are searched for first, with type-based binders being searched if a binder was not found.
-
-IMPORTANT: This is an experimental feature in 2.1 and subject to change! One limitation of binding is that binders may not manipulate or set the request URI because it can be a combination of many arguments.
 
 ===== Binding By Annotation
 
@@ -126,3 +177,26 @@ Without any additional code, the client attempts to convert the metadata to a st
 The following binder handles arguments passed to clients of type `Metadata` and mutate the request to contain the desired headers.
 
 snippet::io.micronaut.docs.http.client.bind.type.MetadataClientArgumentBinder[tags="clazz", indent=0, title="Typed Argument Binder"]
+
+=== Binding On Method
+
+It is also possible to create a binder, that would change the request with an annotation on the method. For example:
+
+snippet::io.micronaut.docs.http.client.bind.method.NameAuthorizedClient[tags="clazz", indent=0, title="Client With Annotated Method"]
+
+<1> The `@NameAuthorization` is annotating a method
+
+The annotation is defined as:
+
+snippet::io.micronaut.docs.http.client.bind.method.NameAuthorization[tags="clazz", indent=0, title="Annotation Definition"]
+
+<1> It is defined to be used on methods
+
+The following binder specifies the behaviour:
+
+snippet::io.micronaut.docs.http.client.bind.method.NameAuthorizationBinder[tags="clazz", indent=0, title="Annotation Definition"]
+
+<1> The `@Singleton` annotation registers it in Micronaut context
+<2> It implements the `AnnotatedClientRequestBinder<NameAuthorization>`
+<3> The custom `bind` method is used to implement the behaviour of the binder
+

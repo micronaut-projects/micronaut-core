@@ -20,8 +20,8 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.reflect.ClassUtils;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;

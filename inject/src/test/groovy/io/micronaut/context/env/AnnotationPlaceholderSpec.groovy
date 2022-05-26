@@ -3,7 +3,7 @@ package io.micronaut.context.env
 import io.micronaut.context.ApplicationContext
 import io.micronaut.inject.BeanDefinition
 import spock.lang.Specification
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 class AnnotationPlaceholderSpec extends Specification {
 

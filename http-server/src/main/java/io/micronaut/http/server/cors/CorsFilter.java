@@ -15,20 +15,10 @@
  */
 package io.micronaut.http.server.cors;
 
-import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS;
-import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS;
-import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS;
-import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN;
-import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS;
-import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_MAX_AGE;
-import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS;
-import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD;
-import static io.micronaut.http.HttpHeaders.ORIGIN;
-import static io.micronaut.http.HttpHeaders.VARY;
-
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
+import io.micronaut.core.convert.ImmutableArgumentConversionContext;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
@@ -50,6 +40,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import static io.micronaut.http.HttpHeaders.*;
+
 /**
  * Responsible for handling CORS requests and responses.
  *
@@ -60,7 +52,7 @@ import java.util.stream.Collectors;
 @Filter("/**")
 public class CorsFilter implements HttpServerFilter {
 
-    private static final ArgumentConversionContext<HttpMethod> CONVERSION_CONTEXT_HTTP_METHOD = ConversionContext.of(HttpMethod.class);
+    private static final ArgumentConversionContext<HttpMethod> CONVERSION_CONTEXT_HTTP_METHOD = ImmutableArgumentConversionContext.of(HttpMethod.class);
 
     protected final HttpServerConfiguration.CorsConfiguration corsConfiguration;
 
@@ -79,9 +71,8 @@ public class CorsFilter implements HttpServerFilter {
             if (response != null) {
                 return Publishers.just(response);
             } else {
-                return Publishers.map(chain.proceed(request), mutableHttpResponse -> {
+                return Publishers.then(chain.proceed(request), mutableHttpResponse -> {
                     handleResponse(request, mutableHttpResponse);
-                    return mutableHttpResponse;
                 });
             }
         } else {

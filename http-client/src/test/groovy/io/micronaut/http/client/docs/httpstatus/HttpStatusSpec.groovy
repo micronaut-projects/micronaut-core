@@ -16,24 +16,14 @@
 package io.micronaut.http.client.docs.httpstatus
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.annotation.Requires
 import io.micronaut.context.env.Environment
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
-import io.micronaut.http.MediaType
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Get
-import io.micronaut.http.annotation.Status
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
-import spock.lang.AutoCleanup
-import spock.lang.Issue
-import spock.lang.PendingFeature
-import spock.lang.Shared
-import spock.lang.Specification
-import spock.lang.Unroll
+import spock.lang.*
 
 class HttpStatusSpec extends Specification {
 
@@ -45,7 +35,7 @@ class HttpStatusSpec extends Specification {
 
     @AutoCleanup
     @Shared
-    RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+    HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
     @Unroll("#description")
     void "verify default HTTP status and @Status override"() {

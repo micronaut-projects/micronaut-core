@@ -26,8 +26,8 @@ import io.micronaut.web.router.UriRoute;
 import io.micronaut.websocket.annotation.OnMessage;
 import io.micronaut.websocket.annotation.OnOpen;
 import io.micronaut.websocket.annotation.ServerWebSocket;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.util.HashSet;
 import java.util.Set;
 

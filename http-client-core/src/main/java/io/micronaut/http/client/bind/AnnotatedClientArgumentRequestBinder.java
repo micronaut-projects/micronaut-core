@@ -16,7 +16,6 @@
 package io.micronaut.http.client.bind;
 
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Experimental;
 
 import java.lang.annotation.Annotation;
 
@@ -28,7 +27,6 @@ import java.lang.annotation.Annotation;
  * @author James Kleeh
  * @since 2.1.0
  */
-@Experimental
 public interface AnnotatedClientArgumentRequestBinder<A extends Annotation> extends ClientArgumentRequestBinder<Object> {
 
     /**

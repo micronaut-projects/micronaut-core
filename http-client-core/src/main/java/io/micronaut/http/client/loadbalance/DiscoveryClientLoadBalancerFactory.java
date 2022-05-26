@@ -17,8 +17,7 @@ package io.micronaut.http.client.loadbalance;
 
 import io.micronaut.discovery.DiscoveryClient;
 import io.micronaut.http.client.LoadBalancer;
-
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 /**
  * A factory class that can be replaced at runtime for creating {@link LoadBalancer} instances that load balance

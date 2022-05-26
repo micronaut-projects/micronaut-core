@@ -2,20 +2,20 @@ package io.micronaut.docs.server.sse
 
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.client.annotation.Client
-import io.micronaut.http.client.sse.RxSseClient
+import io.micronaut.http.client.sse.SseClient
 import io.micronaut.http.sse.Event
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
-import javax.inject.Inject
+import jakarta.inject.Inject
 
 @MicronautTest
 class HeadlineControllerSpec extends Specification {
 
     @Inject
     @Client('/')
-    RxSseClient client
+    SseClient client
 
     void "test consume event stream object"() {
         given:

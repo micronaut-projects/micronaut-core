@@ -1,26 +1,34 @@
+plugins {
+    id "io.micronaut.build.internal.convention-library"
+}
+
 dependencies {
     annotationProcessor project(":inject-java")
     annotationProcessor project(":graal")
 
     api project(":router")
     api project(":runtime")
-    compileOnly dependencyModuleVersion("micronaut.sql", "micronaut-jdbc"), {
+    compileOnly(libs.managed.micronaut.sql.jdbc) {
         exclude module:'micronaut-inject'
         exclude module:'micronaut-bom'
     }
+
+    implementation libs.managed.reactor
 
     testImplementation project(":http-client")
     testImplementation project(":inject-groovy")
     testImplementation project(":http-server-netty")
-    testImplementation dependencyModuleVersion("micronaut.sql", "micronaut-jdbc-tomcat"), {
+    testImplementation(libs.managed.micronaut.sql.jdbc.tomcat) {
         exclude module:'micronaut-inject'
         exclude module:'micronaut-bom'
     }
-    testImplementation dependencyModuleVersion("groovy", "groovy-json")
-    testImplementation dependencyVersion("h2")
-    testImplementation "mysql:mysql-connector-java:8.0.23"
+    testImplementation libs.managed.groovy.json
 
-    compileOnly "ch.qos.logback:logback-classic:1.2.3"
-    compileOnly "org.apache.logging.log4j:log4j-core:2.14.1"
+    testRuntimeOnly(platform(libs.boms.micronaut.sql))
+    testRuntimeOnly libs.managed.h2
+    testRuntimeOnly libs.mysql.driver
+
+    compileOnly libs.managed.logback
+    compileOnly libs.log4j
+
 }
-

@@ -18,10 +18,10 @@ package io.micronaut.management.health.indicator;
 import io.micronaut.core.async.publisher.AsyncSingleResultPublisher;
 import io.micronaut.health.HealthStatus;
 import io.micronaut.scheduling.TaskExecutors;
+import jakarta.inject.Inject;
+import jakarta.inject.Named;
 import org.reactivestreams.Publisher;
 
-import javax.inject.Inject;
-import javax.inject.Named;
 import java.util.concurrent.ExecutorService;
 
 /**

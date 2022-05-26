@@ -22,7 +22,7 @@ import io.micronaut.context.annotation.Factory
 import javax.cache.CacheManager
 import javax.cache.Caching
 import javax.cache.configuration.MutableConfiguration
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 // end::imports[]
 
 // tag::class[]

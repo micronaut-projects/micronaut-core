@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.client
 
+import io.micronaut.context.annotation.Property
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
@@ -24,15 +26,15 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Delete
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
-import io.reactivex.Flowable
+import jakarta.inject.Inject
+import reactor.core.publisher.Flux
 import spock.lang.Specification
-
-import javax.inject.Inject
 
 /**
  * @author graemerocher
  * @since 1.0
  */
+@Property(name = 'spec.name', value = 'HttpDeleteSpec')
 @MicronautTest
 class HttpDeleteSpec extends Specification {
 
@@ -45,7 +47,7 @@ class HttpDeleteSpec extends Specification {
 
     void "test http delete"() {
         when:
-        def res = Flowable.fromPublisher(client.exchange(HttpRequest.DELETE('/delete/simple'))).blockingFirst()
+        HttpResponse<?> res = client.toBlocking().exchange(HttpRequest.DELETE('/delete/simple'))
 
         then:
         res.status == HttpStatus.NO_CONTENT
@@ -53,7 +55,7 @@ class HttpDeleteSpec extends Specification {
 
     void "test http delete with blocking client"() {
         when:
-        def res = Flowable.fromPublisher(client.exchange(HttpRequest.DELETE('/delete/simple'))).blockingFirst()
+        HttpResponse<?> res = client.toBlocking().exchange(HttpRequest.DELETE('/delete/simple'))
 
         then:
         res.status == HttpStatus.NO_CONTENT
@@ -61,10 +63,11 @@ class HttpDeleteSpec extends Specification {
 
     void "test http delete with body"() {
         when:
-        def res = Flowable.fromPublisher(client.exchange(
+        HttpResponse<?> res = Flux.from(client.exchange(
                 HttpRequest.DELETE('/delete/body', 'test')
-                           .contentType(MediaType.TEXT_PLAIN) , String)).blockingFirst()
-        def body = res.body
+                           .contentType(MediaType.TEXT_PLAIN) , String)).blockFirst()
+        Optional<String> body = res.body
+
         then:
         res.status == HttpStatus.ACCEPTED
         body.isPresent()
@@ -97,6 +100,7 @@ class HttpDeleteSpec extends Specification {
         val == "ok"
     }
 
+    @Requires(property = 'spec.name', value = 'HttpDeleteSpec')
     @Controller("/delete")
     static class DeleteController {
 
@@ -123,6 +127,7 @@ class HttpDeleteSpec extends Specification {
         }
     }
 
+    @Requires(property = 'spec.name', value = 'HttpDeleteSpec')
     @Client("/delete")
     static interface MyDeleteClient {
 

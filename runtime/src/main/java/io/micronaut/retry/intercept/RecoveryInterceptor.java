@@ -29,12 +29,12 @@ import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.retry.annotation.Fallback;
 import io.micronaut.retry.annotation.Recoverable;
 import io.micronaut.retry.exception.FallbackException;
-import io.reactivex.Flowable;
+import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.publisher.Flux;
 
-import javax.inject.Singleton;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -103,7 +103,7 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
 
     @SuppressWarnings("unchecked")
     private Publisher<?> fallbackForReactiveType(MethodInvocationContext<Object, Object> context, Publisher<?> publisher) {
-        return Flowable.fromPublisher(publisher).onErrorResumeNext(throwable -> {
+        return Flux.from(publisher).onErrorResume(throwable -> {
             Optional<? extends MethodExecutionHandle<?, Object>> fallbackMethod = findFallbackMethod(context);
             if (fallbackMethod.isPresent()) {
                 MethodExecutionHandle<?, Object> fallbackHandle = fallbackMethod.get();
@@ -115,16 +115,16 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
                 try {
                     fallbackResult = fallbackHandle.invoke(context.getParameterValues());
                 } catch (Exception e) {
-                    return Flowable.error(throwable);
+                    return Flux.error(throwable);
                 }
                 if (fallbackResult == null) {
-                    return Flowable.error(new FallbackException("Fallback handler [" + fallbackHandle + "] returned null value"));
+                    return Flux.error(new FallbackException("Fallback handler [" + fallbackHandle + "] returned null value"));
                 } else {
                     return ConversionService.SHARED.convert(fallbackResult, Publisher.class)
                         .orElseThrow(() -> new FallbackException("Unsupported Reactive type: " + fallbackResult));
                 }
             }
-            return Flowable.error(throwable);
+            return Flux.error(throwable);
         });
     }
 

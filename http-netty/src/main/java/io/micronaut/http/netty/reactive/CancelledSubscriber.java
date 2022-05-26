@@ -40,6 +40,7 @@ public final class CancelledSubscriber<T> implements Subscriber<T> {
 
     @Override
     public void onNext(T t) {
+        // ignore message
     }
 
     @Override
@@ -51,5 +52,6 @@ public final class CancelledSubscriber<T> implements Subscriber<T> {
 
     @Override
     public void onComplete() {
+        // ignore
     }
 }

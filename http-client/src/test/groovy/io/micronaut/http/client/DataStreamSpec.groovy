@@ -15,10 +15,17 @@
  */
 package io.micronaut.http.client
 
+import io.micronaut.context.annotation.Property
+import io.micronaut.context.annotation.Requires
+import io.micronaut.core.io.buffer.ByteBuffer
 import io.micronaut.core.io.buffer.ByteBufferFactory
+import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
+import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Body
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.multipart.MultipartBody
@@ -26,22 +33,17 @@ import io.micronaut.http.codec.CodecException
 import io.micronaut.http.multipart.PartData
 import io.micronaut.http.multipart.StreamingFileUpload
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
-import io.reactivex.Flowable
-import io.reactivex.Single
-import io.micronaut.core.io.buffer.ByteBuffer
-import io.micronaut.http.HttpRequest
-import io.micronaut.http.MediaType
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Get
+import jakarta.inject.Inject
 import org.reactivestreams.Publisher
 import org.reactivestreams.Subscriber
 import org.reactivestreams.Subscription
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 import spock.lang.Issue
 import spock.lang.Retry
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
-import javax.inject.Inject
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -49,12 +51,13 @@ import java.util.concurrent.atomic.AtomicInteger
  * @author graemerocher
  * @since 1.0
  */
+@Property(name = 'spec.name', value = 'DataStreamSpec')
 @MicronautTest
 class DataStreamSpec extends Specification {
 
     @Inject
     @Client("/")
-    RxStreamingHttpClient client
+    StreamingHttpClient client
 
     @Inject
     ByteBufferFactory bufferFactory
@@ -66,7 +69,7 @@ class DataStreamSpec extends Specification {
                 '/datastream/books'
         )).map({buf ->
             buf.toByteArray()}
-        ).toList().blockingGet()
+        ).collectList().block()
 
         then:
         arrays.size() == 2
@@ -135,7 +138,9 @@ class DataStreamSpec extends Specification {
         when:
         List<byte[]> arrays = client.exchangeStream(HttpRequest.GET(
                 '/datastream/books'
-        )).map { res -> res.body.get().toByteArray() }.blockingIterable().toList()
+        )).map(res -> res.body.get().toByteArray())
+                .collectList()
+                .block()
 
         then:
         arrays.size() == 2
@@ -146,9 +151,9 @@ class DataStreamSpec extends Specification {
     void "test streaming body codec exception"() {
         when:
         Publisher<String> bodyPublisher = client.retrieve(HttpRequest.POST(
-                '/datastream/books', Flowable.just(new Book(title: 'The Shining'))
+                '/datastream/books', Flux.just(new Book(title: 'The Shining'))
         ).contentType("custom/content"))
-        String body = Flowable.fromPublisher(bodyPublisher).toList().map({list -> list.join('')}).blockingGet()
+        String body = Flux.from(bodyPublisher).collectList().map({list -> list.join('')}).block()
 
         then:
         def ex = thrown(CodecException)
@@ -162,13 +167,12 @@ class DataStreamSpec extends Specification {
 
         when:
         Publisher<String> bodyPublisher = client.retrieve(HttpRequest.POST(
-                '/datastream/books', Flowable.just(buffer)
+                '/datastream/books', Flux.just(buffer)
         ).contentType("custom/content"))
-        String body = Flowable.fromPublisher(bodyPublisher).toList().map({list -> list.join('')}).blockingGet()
+        String body = Flux.from(bodyPublisher).collectList().map({list -> list.join('')}).block()
 
         then:
         body == 'The Shining'
-
     }
 
     void "test reading a byte array"() {
@@ -226,16 +230,17 @@ class DataStreamSpec extends Specification {
         String title
     }
 
+    @Requires(property = 'spec.name', value = 'DataStreamSpec')
     @Controller("/datastream")
     static class BookController {
 
         @Inject
         @Client("/")
-        RxStreamingHttpClient client
+        StreamingHttpClient client
 
         @Get(uri = "/books", produces = MediaType.APPLICATION_JSON_STREAM)
         Publisher<byte[]> list() {
-            return Flowable.just("The Stand".getBytes(StandardCharsets.UTF_8), "The Shining".getBytes(StandardCharsets.UTF_8))
+            return Flux.just("The Stand".getBytes(StandardCharsets.UTF_8), "The Shining".getBytes(StandardCharsets.UTF_8))
         }
 
         @Post(uri = "/books", consumes = "custom/content", produces = MediaType.TEXT_PLAIN)
@@ -255,17 +260,17 @@ class DataStreamSpec extends Specification {
         }
 
         @Get("/direct")
-        Flowable<byte[]> direct() {
+        Flux<byte[]> direct() {
             client.dataStream(HttpRequest.GET(
                     '/datastream/bigdata'
             )).map(buffer -> buffer.toByteArray())
         }
 
         @Post(uri = "/upload", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
-        Single<HttpResponse<String>> test(StreamingFileUpload data) {
+        Mono<HttpResponse<String>> test(StreamingFileUpload data) {
             AtomicInteger bytes = new AtomicInteger()
 
-            Single.<HttpResponse<String>>create { emitter ->
+            Mono.<HttpResponse<String>>create { emitter ->
                 data.subscribe(new Subscriber<PartData>() {
                     private Subscription s
 
@@ -283,12 +288,12 @@ class DataStreamSpec extends Specification {
 
                     @Override
                     void onError(Throwable t) {
-                        emitter.onError(t)
+                        emitter.error(t)
                     }
 
                     @Override
                     void onComplete() {
-                        emitter.onSuccess(HttpResponse.ok("Read ${bytes.get()} bytes".toString()))
+                        emitter.success(HttpResponse.ok("Read ${bytes.get()} bytes".toString()))
                     }
                 })
             }

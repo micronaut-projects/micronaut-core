@@ -23,13 +23,51 @@ import io.micronaut.context.event.StartupEvent
 import io.micronaut.core.reflect.ReflectionUtils
 import io.micronaut.inject.AdvisedBeanType
 import io.micronaut.inject.BeanDefinition
-import org.atinject.javaxtck.auto.events.EventHandlerMultipleArguments
-import org.atinject.javaxtck.auto.events.Metadata
-import org.atinject.javaxtck.auto.events.SomeEvent
+import org.atinject.jakartatck.auto.events.EventHandlerMultipleArguments
+import org.atinject.jakartatck.auto.events.Metadata
+import org.atinject.jakartatck.auto.events.SomeEvent
 
 import java.nio.charset.StandardCharsets
 
 class MethodAdapterSpec extends AbstractTypeElementSpec {
+
+    void 'test method adapter with failing requirements is not present'() {
+        given:
+        def context = buildContext('''
+package issue5640;
+
+import io.micronaut.aop.Adapter;
+import java.lang.annotation.*;
+import io.micronaut.context.annotation.Requires;
+import static java.lang.annotation.ElementType.*;
+import static java.lang.annotation.RetentionPolicy.*;
+import jakarta.inject.Singleton;
+import static java.nio.charset.StandardCharsets.US_ASCII;
+
+@Singleton
+@Requires(property="not.present")
+class AsciiParser {
+    @Parse
+    public String parseAsAscii(byte[] value) {
+        return new String(value, US_ASCII);
+    }
+}
+
+@Retention(RUNTIME)
+@Target({ANNOTATION_TYPE, METHOD})
+@Adapter(Parser.class)
+@interface Parse {}
+
+interface Parser {
+    String parse(byte[] value);
+}
+''')
+        def adaptedType = context.classLoader.loadClass('issue5640.Parser')
+
+        expect:
+        !context.containsBean(adaptedType)
+        context.getBeansOfType(adaptedType).isEmpty()
+    }
 
     void 'test method adapter with byte[] argument'() {
         given:
@@ -40,7 +78,7 @@ import io.micronaut.aop.Adapter;
 import java.lang.annotation.*;
 import static java.lang.annotation.ElementType.*;
 import static java.lang.annotation.RetentionPolicy.*;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 import static java.nio.charset.StandardCharsets.US_ASCII;
 
 @Singleton
@@ -78,7 +116,7 @@ import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 import io.micronaut.context.event.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 @io.micronaut.context.annotation.Requires(property="foo.bar")
 class Test {
 
@@ -102,8 +140,7 @@ package adapteroverloading;
 
 import io.micronaut.context.event.*;
 import io.micronaut.scheduling.annotation.Async;
-import io.reactivex.Completable;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 import java.util.concurrent.CompletableFuture;
 import io.micronaut.runtime.event.annotation.*;
 
@@ -152,8 +189,7 @@ package adapteraround;
 
 import io.micronaut.context.event.StartupEvent;
 import io.micronaut.scheduling.annotation.Async;
-import io.reactivex.Completable;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 import java.util.concurrent.CompletableFuture;
 import io.micronaut.runtime.event.annotation.*;
 
@@ -194,7 +230,7 @@ import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 import io.micronaut.context.event.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
     @Adapter(ApplicationEventListener.class)
@@ -222,7 +258,7 @@ import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 import io.micronaut.context.event.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test implements TestContract {
 
     @Override
@@ -255,7 +291,7 @@ import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 import io.micronaut.context.event.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
     @Adapter(Foo.class)
@@ -284,7 +320,7 @@ import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 import io.micronaut.context.event.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
     @Adapter(Foo.class)
@@ -310,7 +346,7 @@ import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 import io.micronaut.context.event.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
     @Adapter(ApplicationEventListener.class)
@@ -328,10 +364,10 @@ class Test {
 
     void  "test method adapter argument order"() {
         when:"An adapter method is parsed"
-        BeanDefinition definition = buildBeanDefinition('org.atinject.javaxtck.auto.events.EventListener$EventHandlerMultipleArguments$onEvent1$Intercepted','''\
-package org.atinject.javaxtck.auto.events;
+        BeanDefinition definition = buildBeanDefinition('org.atinject.jakartatck.auto.events.EventListener$EventHandlerMultipleArguments$onEvent1$Intercepted','''\
+package org.atinject.jakartatck.auto.events;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class EventListener {
 
     @EventHandler

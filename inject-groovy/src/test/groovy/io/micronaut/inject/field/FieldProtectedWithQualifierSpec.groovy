@@ -20,9 +20,9 @@ import io.micronaut.context.DefaultBeanContext
 import io.micronaut.inject.qualifiers.One
 import spock.lang.Specification
 
-import javax.inject.Inject
-import javax.inject.Named
-import javax.inject.Singleton
+import jakarta.inject.Inject
+import jakarta.inject.Named
+import jakarta.inject.Singleton
 
 /**
  * Created by graemerocher on 15/05/2017.

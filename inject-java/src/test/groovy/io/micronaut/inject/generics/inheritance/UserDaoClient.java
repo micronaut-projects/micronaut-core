@@ -1,6 +1,6 @@
 package io.micronaut.inject.generics.inheritance;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Singleton
 public class UserDaoClient extends DaoClient<User>{

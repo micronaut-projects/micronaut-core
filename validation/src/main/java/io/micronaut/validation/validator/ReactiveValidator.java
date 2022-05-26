@@ -15,9 +15,9 @@
  */
 package io.micronaut.validation.validator;
 
+import io.micronaut.core.annotation.NonNull;
 import org.reactivestreams.Publisher;
 
-import io.micronaut.core.annotation.NonNull;
 import java.util.concurrent.CompletionStage;
 
 /**

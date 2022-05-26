@@ -22,7 +22,7 @@ import io.micronaut.context.annotation.Property
 import io.micronaut.context.exceptions.CircularDependencyException
 import spock.lang.Specification
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 class ConstructorCircularDependencyFailureSpec extends Specification {
 

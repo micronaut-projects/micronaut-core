@@ -1,6 +1,10 @@
+plugins {
+    id "io.micronaut.build.internal.convention-test-library"
+}
+
 dependencies {
-    api dependencyModuleVersion("groovy", "groovy")
-    api(dependencyVersion("spock")) {
+    api libs.managed.groovy
+    api(libs.managed.spock) {
         exclude module:'groovy-all'
     }
     api project(":inject")

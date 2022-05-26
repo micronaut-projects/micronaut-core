@@ -19,8 +19,8 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Value
 import spock.lang.Specification
 
-import javax.inject.Inject
-import javax.inject.Singleton
+import jakarta.inject.Inject
+import jakarta.inject.Singleton
 
 /**
  * Created by graemerocher on 13/06/2017.

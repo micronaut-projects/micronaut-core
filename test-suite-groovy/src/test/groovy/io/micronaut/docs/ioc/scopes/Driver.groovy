@@ -18,7 +18,7 @@ package io.micronaut.docs.ioc.scopes
 // tag::imports[]
 import io.micronaut.context.annotation.Requires
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 import java.lang.annotation.Documented
 import java.lang.annotation.Retention
 

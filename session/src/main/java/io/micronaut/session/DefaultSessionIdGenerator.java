@@ -16,8 +16,8 @@
 package io.micronaut.session;
 
 import io.micronaut.context.annotation.Primary;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.util.UUID;
 
 /**

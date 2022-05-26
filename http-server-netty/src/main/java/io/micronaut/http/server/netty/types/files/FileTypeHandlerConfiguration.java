@@ -16,7 +16,6 @@
 package io.micronaut.http.server.netty.types.files;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
-
 import io.micronaut.core.annotation.NonNull;
 
 /**
@@ -26,6 +25,7 @@ import io.micronaut.core.annotation.NonNull;
  * @since 1.0
  */
 @ConfigurationProperties("netty.responses.file")
+@Deprecated
 public class FileTypeHandlerConfiguration {
 
     /**
@@ -72,6 +72,7 @@ public class FileTypeHandlerConfiguration {
      * Configuration for the Cache-Control header.
      */
     @ConfigurationProperties("cache-control")
+    @Deprecated
     public static class CacheControlConfiguration {
 
         private static final boolean DEFAULT_PUBLIC_CACHE = false;

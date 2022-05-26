@@ -15,6 +15,8 @@
  */
 package io.micronaut.context.annotation;
 
+import io.micronaut.core.annotation.AccessorsStyle;
+
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 import java.lang.annotation.Documented;
@@ -48,8 +50,9 @@ public @interface ConfigurationBuilder {
      * operations with the word "with" by setting the value of this attribute to "with" you can process methods such
      * as {@code withDebug(true)}</p>
      *
-     * @return The write prefix to use
+     * @return The write prefixes to use
      */
+    @AliasFor(annotation = AccessorsStyle.class, member = "writePrefixes")
     String[] prefixes() default "set";
 
     /**

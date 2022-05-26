@@ -35,9 +35,9 @@ class MessageControllerSpec extends Specification{
 
     void "test message response"() {
         expect:
-        client
-            .toBlocking()
-            .retrieve("/request/hello?name=John") == "Hello John!!" // <2>
+        client.toBlocking().retrieve("/request/hello?name=John") == "Hello John!!"
+        client.toBlocking().retrieve("/request/hello-static?name=John") == "Hello John!!"
+        client.toBlocking().retrieve("/request/hello-reactor?name=John") == "Hello John!!"
     }
 
 }

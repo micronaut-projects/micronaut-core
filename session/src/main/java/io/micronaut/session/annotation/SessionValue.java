@@ -15,15 +15,16 @@
  */
 package io.micronaut.session.annotation;
 
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
 import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.core.bind.annotation.Bindable;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
+import java.lang.annotation.Inherited;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * Used to bind value from a {@link io.micronaut.session.Session}.
@@ -35,6 +36,7 @@ import java.lang.annotation.Target;
 @Retention(RUNTIME)
 @Target({ElementType.PARAMETER, ElementType.METHOD})
 @Bindable
+@Inherited
 public @interface SessionValue {
 
     /**

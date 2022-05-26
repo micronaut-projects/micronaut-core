@@ -15,8 +15,8 @@
  */
 package io.micronaut.inject.method.arrayinjection;
 
-import javax.inject.Inject;
-import javax.inject.Singleton;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 import java.util.Arrays;
 import java.util.List;
 

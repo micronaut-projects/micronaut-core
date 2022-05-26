@@ -16,6 +16,7 @@
 package io.micronaut.inject.writer;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.util.Toggleable;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ast.*;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
@@ -36,7 +37,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface BeanDefinitionVisitor extends OriginatingElements {
+public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
 
     /**
      * The suffix use for generated AOP intercepted types.
@@ -45,11 +46,10 @@ public interface BeanDefinitionVisitor extends OriginatingElements {
 
     /**
      * @return The element where the bean definition originated from.
-     * @deprecated Use {@link #getOriginatingElements()} instead
      */
-    @Deprecated
     @Nullable
     Element getOriginatingElement();
+
 
     /**
      * Visits the constructor used to create the bean definition.
@@ -234,9 +234,9 @@ public interface BeanDefinitionVisitor extends OriginatingElements {
      * @param declaringBean  The declaring bean of the method. Note this may differ from {@link MethodElement#getDeclaringType()} in the case of the method coming from a super class or interface.
      * @param methodElement  The method element
      * @param visitorContext The visitor context
-     * @return The {@link ExecutableMethodWriter}.
+     * @return The index of a new method
      */
-    ExecutableMethodWriter visitExecutableMethod(TypedElement declaringBean,
+    int visitExecutableMethod(TypedElement declaringBean,
                                                  MethodElement methodElement,
                                                  VisitorContext visitorContext);
 
@@ -250,6 +250,20 @@ public interface BeanDefinitionVisitor extends OriginatingElements {
     void visitFieldInjectionPoint(TypedElement declaringType,
                                   FieldElement fieldElement,
                                   boolean requiresReflection);
+
+    /**
+     * Visits an annotation injection point.
+     *
+     * @param annotationMemberBeanType     The type of the injected bean
+     * @param annotationMemberProperty       Required property of the injected bean
+     * @param requiredValue      Required value of the bean property for the bean to be loaded
+     * @param notEqualsValue      The bean property value which should not be equal to present value for the bean to
+     *                           be loaded
+     */
+    void visitAnnotationMemberPropertyInjectionPoint(TypedElement annotationMemberBeanType,
+                                                     String annotationMemberProperty,
+                                                     @Nullable String requiredValue,
+                                                     @Nullable String notEqualsValue);
 
     /**
      * Visits a field injection point.
@@ -293,7 +307,7 @@ public interface BeanDefinitionVisitor extends OriginatingElements {
             ClassElement type,
             String field,
             AnnotationMetadata annotationMetadata,
-            ConfigurationMetadataBuilder metadataBuilder,
+            ConfigurationMetadataBuilder<?> metadataBuilder,
             boolean isInterface);
 
     /**
@@ -310,7 +324,7 @@ public interface BeanDefinitionVisitor extends OriginatingElements {
             ClassElement type,
             String methodName,
             AnnotationMetadata annotationMetadata,
-            ConfigurationMetadataBuilder metadataBuilder,
+            ConfigurationMetadataBuilder<?> metadataBuilder,
             boolean isInterface);
 
     /**
@@ -379,4 +393,12 @@ public interface BeanDefinitionVisitor extends OriginatingElements {
      * @param typeArguments The type arguments
      */
     void visitTypeArguments(Map<String, Map<String, ClassElement>> typeArguments);
+
+    /**
+     * @return The generic type arguments for the bean type.
+     * @since 3.0.0
+     */
+    default @NonNull ClassElement[] getTypeArguments() {
+        return new ClassElement[0];
+    }
 }

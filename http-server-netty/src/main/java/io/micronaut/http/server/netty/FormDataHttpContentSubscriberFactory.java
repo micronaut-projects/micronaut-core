@@ -18,8 +18,7 @@ package io.micronaut.http.server.netty;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
-
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 /**
  * Builds a {@link org.reactivestreams.Subscriber} for {@link MediaType#APPLICATION_FORM_URLENCODED}.

@@ -5,16 +5,17 @@ import io.micronaut.aop.Around
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.inject.ProxyBeanDefinition
 import io.micronaut.inject.writer.BeanDefinitionVisitor
+import io.micronaut.inject.writer.BeanDefinitionWriter
 
 import java.time.LocalDate
 
 class ValidatedParseSpec extends AbstractBeanDefinitionSpec {
     void "test constraints on beans make them @Validated"() {
         given:
-        def definition = buildBeanDefinition('test.$TestDefinition' + BeanDefinitionVisitor.PROXY_SUFFIX,'''
-package test;
+        def definition = buildBeanDefinition('validateparse1.$Test' + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionVisitor.PROXY_SUFFIX,'''
+package validateparse1;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
     @io.micronaut.context.annotation.Executable
@@ -37,8 +38,8 @@ class Test {
 
     void "test annotation default values on a groovy property"() {
         given:
-        BeanIntrospection beanIntrospection = buildBeanIntrospection('test.Test','''
-package test;
+        BeanIntrospection beanIntrospection = buildBeanIntrospection('validateparse2.Test','''
+package validateparse2;
 
 import io.micronaut.core.annotation.Introspected
 import javax.validation.Constraint
@@ -65,13 +66,13 @@ class Test {
 
         expect:
         beanIntrospection.getProperty("webs").isPresent()
-        beanIntrospection.getRequiredProperty("webs", List).annotationMetadata.getDefaultValue("test.ValidURLs", "message", String).get() == "invalid url"
+        beanIntrospection.getRequiredProperty("webs", List).annotationMetadata.getDefaultValue("validateparse2.ValidURLs", "message", String).get() == "invalid url"
     }
 
     void "test constraints on a declarative client makes it @Validated"() {
         given:
-        def definition = buildBeanDefinition('test.ExchangeRates' + BeanDefinitionVisitor.PROXY_SUFFIX,'''
-package test
+        def definition = buildBeanDefinition('validateparse3.ExchangeRates' + BeanDefinitionVisitor.PROXY_SUFFIX,'''
+package validateparse3
 
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.annotation.Client

@@ -15,7 +15,8 @@
  */
 package io.micronaut.http.client.retry
 
-import io.reactivex.Single
+import io.micronaut.context.annotation.Requires
+import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
@@ -23,6 +24,8 @@ import io.micronaut.http.client.annotation.Client
 import io.micronaut.retry.annotation.Fallback
 import io.micronaut.retry.annotation.Retryable
 import io.micronaut.runtime.server.EmbeddedServer
+import org.reactivestreams.Publisher
+import reactor.core.publisher.Mono
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -32,12 +35,16 @@ import spock.lang.Specification
  * @since 1.0
  */
 class HttpClientRetryWithFallbackSpec extends Specification{
-    @Shared
-    @AutoCleanup
-    ApplicationContext context = ApplicationContext.run()
 
     @Shared
-    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+    @AutoCleanup
+    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+            'spec.name': 'HttpClientRetryWithFallbackSpec'
+    ])
+
+    @Shared
+    @AutoCleanup
+    ApplicationContext context = embeddedServer.applicationContext
 
     void "test simple blocking retry"() {
         given:
@@ -68,7 +75,7 @@ class HttpClientRetryWithFallbackSpec extends Specification{
         controller.count = 0
 
         when:"A method is annotated retry"
-        int result = countClient.getCountSingle().blockingGet()
+        int result = Mono.from(countClient.getCountSingle()).block()
 
         then:"It executes until successful"
         result == 3
@@ -76,20 +83,20 @@ class HttpClientRetryWithFallbackSpec extends Specification{
         when:"The threshold can never be met"
         controller.countThreshold = Integer.MAX_VALUE
         controller.count = 0
-        def single = countClient.getCountSingle()
-
+        Publisher<Integer> single = countClient.getCountSingle()
 
         then:"The original exception is thrown"
-        single.blockingGet() == 9999
-
+        Mono.from(single).block() == 9999
     }
 
+    @Requires(property = 'spec.name', value = 'HttpClientRetryWithFallbackSpec')
     @Client("/retry-fallback")
     @Retryable(attempts = '5', delay = '5ms')
     static interface CountClient extends CountService {
 
     }
 
+    @Requires(property = 'spec.name', value = 'HttpClientRetryWithFallbackSpec')
     @Fallback
     static class CountClientFallback implements CountService {
 
@@ -99,11 +106,13 @@ class HttpClientRetryWithFallbackSpec extends Specification{
         }
 
         @Override
-        Single<Integer> getCountSingle() {
-            return Single.just(9999)
+        @SingleResult
+        Publisher<Integer> getCountSingle() {
+            return Mono.just(9999)
         }
     }
 
+    @Requires(property = 'spec.name', value = 'HttpClientRetryWithFallbackSpec')
     @Controller("/retry-fallback")
     static class CountController implements CountService {
         int count = 0
@@ -120,8 +129,9 @@ class HttpClientRetryWithFallbackSpec extends Specification{
         }
 
         @Override
-        Single<Integer> getCountSingle() {
-            Single.fromCallable({->
+        @SingleResult
+        Publisher<Integer> getCountSingle() {
+            Mono.fromCallable({->
                 countRx++
                 if(countRx < countThreshold) {
                     throw new IllegalStateException("Bad count")
@@ -137,7 +147,8 @@ class HttpClientRetryWithFallbackSpec extends Specification{
         @Get('/count')
         int getCount()
 
-        @Get('/rx-count')
-        Single<Integer> getCountSingle()
+        @Get('/reactive-count')
+        @SingleResult
+        Publisher<Integer> getCountSingle()
     }
 }

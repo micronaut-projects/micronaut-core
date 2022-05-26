@@ -20,7 +20,11 @@ import io.micronaut.docs.annotation.PetOperations
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Header
 import io.micronaut.http.client.annotation.Client
-import io.reactivex.Single
+import org.reactivestreams.Publisher
+import reactor.core.publisher.Mono
+import io.micronaut.core.async.annotation.SingleResult
+import javax.validation.constraints.Min
+import javax.validation.constraints.NotBlank
 
 // tag::class[]
 @Client("/pets")
@@ -28,9 +32,11 @@ import io.reactivex.Single
 interface PetClient extends PetOperations {
 
     @Override
-    Single<Pet> save(String name, int age)
+    @SingleResult
+    Publisher<Pet> save(@NotBlank String name, @Min(1L) int age)
 
     @Get("/{name}")
-    Single<Pet> get(String name)
+    @SingleResult
+    Publisher<Pet> get(String name)
 }
 // end::class[]

@@ -18,11 +18,13 @@ package io.micronaut.aop.introduction;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 
-import javax.inject.Singleton;
+import io.micronaut.core.annotation.Nullable;
+import jakarta.inject.Singleton;
 
 @Singleton
 public class NotImplementedAdvice implements MethodInterceptor<Object, Object> {
     public static boolean invoked = false;
+    @Nullable
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
         invoked = true;

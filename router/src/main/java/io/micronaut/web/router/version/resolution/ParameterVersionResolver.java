@@ -18,8 +18,8 @@ package io.micronaut.web.router.version.resolution;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.web.router.version.RoutesVersioningConfiguration;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;

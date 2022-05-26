@@ -18,8 +18,8 @@ class IntroductionVisitorSpec extends AbstractBeanDefinitionSpec {
     }
 
     void "test that it is possible to visit introduction advice that extend from existing interfaces"() {
-        def definition = buildBeanDefinition('test.MyInterface' + BeanDefinitionVisitor.PROXY_SUFFIX, '''
-package test;
+        def definition = buildBeanDefinition('introv1.MyInterface' + BeanDefinitionVisitor.PROXY_SUFFIX, '''
+package introv1;
 
 import io.micronaut.aop.introduction.Stub;
 import io.micronaut.inject.visitor.InterfaceWithGenerics;
@@ -33,46 +33,46 @@ class Foo {}
 ''')
         def visitedElements = IntroductionVisitor.VISITED_METHOD_ELEMENTS
         expect:
-        visitedElements.find { it.name == 'deleteAll'}.parameters[0].genericType.getFirstTypeArgument().get().name == 'test.Foo'
+        visitedElements.find { it.name == 'deleteAll'}.parameters[0].genericType.getFirstTypeArgument().get().name == 'introv1.Foo'
         IntroductionVisitor.VISITED_CLASS_ELEMENTS.size() == 1
         visitedElements.size() == 5
         visitedElements[1].name == 'save'
-        visitedElements[1].genericReturnType.name == 'test.Foo'
-        visitedElements[1].parameters[0].genericType.name == 'test.Foo'
+        visitedElements[1].genericReturnType.name == 'introv1.Foo'
+        visitedElements[1].parameters[0].genericType.name == 'introv1.Foo'
         visitedElements[2].parameters[0].genericType.name == Iterable.name
         visitedElements[2].parameters[0].genericType.getFirstTypeArgument().isPresent()
-        visitedElements[2].parameters[0].genericType.getFirstTypeArgument().get().name == 'test.Foo'
-        visitedElements[2].genericReturnType.getFirstTypeArgument().get().name == 'test.Foo'
+        visitedElements[2].parameters[0].genericType.getFirstTypeArgument().get().name == 'introv1.Foo'
+        visitedElements[2].genericReturnType.getFirstTypeArgument().get().name == 'introv1.Foo'
 
         and:
         ClassElement classElement = IntroductionVisitor.VISITED_CLASS_ELEMENTS[0]
         classElement.getTypeArguments(InterfaceWithGenerics).size() == 2
-        classElement.getTypeArguments(InterfaceWithGenerics).get("ET").name == 'test.Foo'
+        classElement.getTypeArguments(InterfaceWithGenerics).get("ET").name == 'introv1.Foo'
         classElement.getTypeArguments(InterfaceWithGenerics).get("ID").name == Long.name
 
         and:
         def saveMethod = definition.findPossibleMethods("save").findFirst().get()
-        saveMethod.getReturnType().type.name == 'test.Foo'
-        saveMethod.getArguments()[0].type.name == 'test.Foo'
+        saveMethod.getReturnType().type.name == 'introv1.Foo'
+        saveMethod.getArguments()[0].type.name == 'introv1.Foo'
         def saveAllMethod = definition.findPossibleMethods("saveAll").findFirst().get()
-        saveAllMethod.getArguments()[0].getFirstTypeVariable().get().type.name == 'test.Foo'
-        saveAllMethod.getReturnType().getFirstTypeVariable().get().type.name == 'test.Foo'
+        saveAllMethod.getArguments()[0].getFirstTypeVariable().get().type.name == 'introv1.Foo'
+        saveAllMethod.getReturnType().getFirstTypeVariable().get().type.name == 'introv1.Foo'
 
 
         and:"A return type that has type arguments has the correct types"
         def findMethod = definition.findPossibleMethods("find").findFirst().get()
-        findMethod.getReturnType().getFirstTypeVariable().get().type.name == 'test.Foo'
+        findMethod.getReturnType().getFirstTypeVariable().get().type.name == 'introv1.Foo'
         findMethod.getArguments()[0].type == Long
 
         and:"A method that uses wild card types that extend generic types has the correct types"
         def deleteMethod = definition.findPossibleMethods("deleteAll").findFirst().get()
         deleteMethod.arguments[0].type == Iterable
-        deleteMethod.arguments[0].firstTypeVariable.get().type.name == 'test.Foo'
+        deleteMethod.arguments[0].firstTypeVariable.get().type.name == 'introv1.Foo'
     }
 
     void "test that it is possible to visit introduction advice that extend from existing interfaces with inheritance"() {
-        def definition = buildBeanDefinition('test.MyInterface' + BeanDefinitionVisitor.PROXY_SUFFIX, '''
-package test;
+        def definition = buildBeanDefinition('introv2.MyInterface' + BeanDefinitionVisitor.PROXY_SUFFIX, '''
+package introv2;
 
 import io.micronaut.aop.introduction.Stub;
 import io.micronaut.inject.visitor.InterfaceWithGenerics;
@@ -89,36 +89,36 @@ class Foo {}
         IntroductionVisitor.VISITED_CLASS_ELEMENTS.size() == 1
         IntroductionVisitor.VISITED_METHOD_ELEMENTS.size() == 5
         IntroductionVisitor.VISITED_METHOD_ELEMENTS[1].name == 'save'
-        IntroductionVisitor.VISITED_METHOD_ELEMENTS[1].genericReturnType.name == 'test.Foo'
-        IntroductionVisitor.VISITED_METHOD_ELEMENTS[1].parameters[0].genericType.name == 'test.Foo'
+        IntroductionVisitor.VISITED_METHOD_ELEMENTS[1].genericReturnType.name == 'introv2.Foo'
+        IntroductionVisitor.VISITED_METHOD_ELEMENTS[1].parameters[0].genericType.name == 'introv2.Foo'
         IntroductionVisitor.VISITED_METHOD_ELEMENTS[2].parameters[0].genericType.name == Iterable.name
         IntroductionVisitor.VISITED_METHOD_ELEMENTS[2].parameters[0].genericType.getFirstTypeArgument().isPresent()
-        IntroductionVisitor.VISITED_METHOD_ELEMENTS[2].parameters[0].genericType.getFirstTypeArgument().get().name == 'test.Foo'
-        IntroductionVisitor.VISITED_METHOD_ELEMENTS[2].genericReturnType.getFirstTypeArgument().get().name == 'test.Foo'
+        IntroductionVisitor.VISITED_METHOD_ELEMENTS[2].parameters[0].genericType.getFirstTypeArgument().get().name == 'introv2.Foo'
+        IntroductionVisitor.VISITED_METHOD_ELEMENTS[2].genericReturnType.getFirstTypeArgument().get().name == 'introv2.Foo'
 
         and:
         ClassElement classElement = IntroductionVisitor.VISITED_CLASS_ELEMENTS[0]
         classElement.getTypeArguments(InterfaceWithGenerics).size() == 2
-        classElement.getTypeArguments(InterfaceWithGenerics).get("ET").name == 'test.Foo'
+        classElement.getTypeArguments(InterfaceWithGenerics).get("ET").name == 'introv2.Foo'
         classElement.getTypeArguments(InterfaceWithGenerics).get("ID").name == Long.name
 
         and:
         def saveMethod = definition.findPossibleMethods("save").findFirst().get()
-        saveMethod.getReturnType().type.name == 'test.Foo'
-        saveMethod.getArguments()[0].type.name == 'test.Foo'
+        saveMethod.getReturnType().type.name == 'introv2.Foo'
+        saveMethod.getArguments()[0].type.name == 'introv2.Foo'
         def saveAllMethod = definition.findPossibleMethods("saveAll").findFirst().get()
-        saveAllMethod.getArguments()[0].getFirstTypeVariable().get().type.name == 'test.Foo'
-        saveAllMethod.getReturnType().getFirstTypeVariable().get().type.name == 'test.Foo'
+        saveAllMethod.getArguments()[0].getFirstTypeVariable().get().type.name == 'introv2.Foo'
+        saveAllMethod.getReturnType().getFirstTypeVariable().get().type.name == 'introv2.Foo'
 
 
         and:"A return type that has type arguments has the correct types"
         def findMethod = definition.findPossibleMethods("find").findFirst().get()
-        findMethod.getReturnType().getFirstTypeVariable().get().type.name == 'test.Foo'
+        findMethod.getReturnType().getFirstTypeVariable().get().type.name == 'introv2.Foo'
         findMethod.getArguments()[0].type == Long
 
         and:"A method that uses wild card types that extend generic types has the correct types"
         def deleteMethod = definition.findPossibleMethods("deleteAll").findFirst().get()
         deleteMethod.arguments[0].type == Iterable
-        deleteMethod.arguments[0].firstTypeVariable.get().type.name == 'test.Foo'
+        deleteMethod.arguments[0].firstTypeVariable.get().type.name == 'introv2.Foo'
     }
 }

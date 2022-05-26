@@ -15,10 +15,10 @@
  */
 package io.micronaut.http.server.netty.handler.accesslog.element;
 
+import io.netty.handler.codec.http.HttpHeaders;
+
 import java.util.Map.Entry;
 import java.util.StringJoiner;
-
-import io.netty.handler.codec.http.HttpHeaders;
 
 /**
  * HeadersElement LogElement. All http headers.

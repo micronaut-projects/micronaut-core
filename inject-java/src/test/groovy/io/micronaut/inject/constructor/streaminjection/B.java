@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.constructor.streaminjection;
 
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;

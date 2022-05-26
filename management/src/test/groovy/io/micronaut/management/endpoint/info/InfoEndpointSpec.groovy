@@ -21,22 +21,22 @@ import io.micronaut.context.env.MapPropertySource
 import io.micronaut.context.env.PropertySource
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
-import io.reactivex.Flowable
+import jakarta.inject.Singleton
 import org.reactivestreams.Publisher
+import reactor.core.publisher.Flux
 import spock.lang.Specification
-import javax.inject.Singleton
 
 class InfoEndpointSpec extends Specification {
 
     void "test the info endpoint returns expected result"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['endpoints.info.sensitive': false, 'info.test': 'foo'], Environment.TEST)
-        RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+        HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         when:
-        def response = rxClient.exchange(HttpRequest.GET("/info"), Map).blockingFirst()
+        def response = rxClient.exchange(HttpRequest.GET("/info"), Map).blockFirst()
 
         then:
         response.code() == HttpStatus.OK.code
@@ -51,10 +51,10 @@ class InfoEndpointSpec extends Specification {
     void "test ordering of info sources"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['endpoints.info.sensitive': false, 'info.ordered': 'second'], Environment.TEST)
-        RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+        HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         when:
-        def response = rxClient.exchange(HttpRequest.GET("/info"), Map).blockingFirst()
+        def response = rxClient.exchange(HttpRequest.GET("/info"), Map).blockFirst()
 
         then:
         response.code() == HttpStatus.OK.code
@@ -68,10 +68,10 @@ class InfoEndpointSpec extends Specification {
     void "test info sources"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['endpoints.info.sensitive': false], Environment.TEST)
-        RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+        HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         when:
-        def response = rxClient.exchange(HttpRequest.GET("/info"), Map).blockingFirst()
+        def response = rxClient.exchange(HttpRequest.GET("/info"), Map).blockFirst()
 
         then: "git info is returned"
         response.code() == HttpStatus.OK.code
@@ -94,10 +94,10 @@ class InfoEndpointSpec extends Specification {
     void "test the git endpoint with alternate location"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['endpoints.info.sensitive': false, 'endpoints.info.git.location': 'othergit.properties'], Environment.TEST)
-        RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+        HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         when:
-        def response = rxClient.exchange(HttpRequest.GET("/info"), Map).blockingFirst()
+        def response = rxClient.exchange(HttpRequest.GET("/info"), Map).blockFirst()
 
         then:
         response.code() == HttpStatus.OK.code
@@ -114,7 +114,7 @@ class InfoEndpointSpec extends Specification {
 
         @Override
         Publisher<PropertySource> getSource() {
-            return Flowable.just(new MapPropertySource("foo", [ordered: 'first']))
+            return Flux.just(new MapPropertySource("foo", [ordered: 'first']))
         }
 
         @Override

@@ -1,6 +1,6 @@
 package io.micronaut.inject.provider;
 
-import javax.inject.Named;
+import jakarta.inject.Named;
 
 @Named("two")
 public class BeanTwo implements BeanNumber {

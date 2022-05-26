@@ -27,7 +27,7 @@ class MixedCasePropertySpec extends AbstractTypeElementSpec {
 package test;
 
 import io.micronaut.context.annotation.Property;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Singleton
 class MyService {
@@ -48,7 +48,7 @@ class MyService {
 package test;
 
 import io.micronaut.context.annotation.Value;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Singleton
 class MyService {
@@ -70,7 +70,7 @@ class MyService {
 package test;
 
 import io.micronaut.context.annotation.Value;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Singleton
 class MyService {
@@ -132,7 +132,7 @@ package test;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.context.annotation.Value;
-import javax.inject.Named;
+import jakarta.inject.Named;
 
 @Controller()
 class VehicleController {
@@ -161,7 +161,7 @@ interface Engine {
 package test;
 
 import io.micronaut.context.annotation.Value;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Singleton
 class MyService {
@@ -182,7 +182,7 @@ class MyService {
 package test;
 
 import io.micronaut.context.annotation.Value;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Singleton
 class MyService {
@@ -204,7 +204,7 @@ class MyService {
 package test;
 
 import io.micronaut.context.annotation.Value;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Singleton
 class MyService {
@@ -225,7 +225,7 @@ class MyService {
 package test;
 
 import io.micronaut.context.annotation.Value;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Singleton
 class MyService {
@@ -247,7 +247,7 @@ class MyService {
 package test;
 
 import io.micronaut.context.annotation.Value;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Singleton
 class MyService {
@@ -269,7 +269,7 @@ class MyService {
 package test;
 
 import io.micronaut.context.annotation.Value;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Singleton
 class MyService {
@@ -290,7 +290,7 @@ class MyService {
 package test;
 
 import io.micronaut.context.annotation.Value;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Singleton
 class MyService {
@@ -312,7 +312,7 @@ class MyService {
 package test;
 
 import io.micronaut.context.annotation.Value;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Singleton
 class MyService {

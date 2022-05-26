@@ -31,9 +31,9 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 @Internal
-class AnnotationStereotypeQualifier<T> implements Qualifier<T> {
+final class AnnotationStereotypeQualifier<T> implements Qualifier<T> {
 
-    private final Class<? extends Annotation> stereotype;
+    final Class<? extends Annotation> stereotype;
 
     /**
      * @param stereotype The stereotype
@@ -57,15 +57,14 @@ class AnnotationStereotypeQualifier<T> implements Qualifier<T> {
         if (this == o) {
             return true;
         }
-        if (o == null || getClass() != o.getClass()) {
+        if (o == null) {
             return false;
         }
-        AnnotationStereotypeQualifier<?> that = (AnnotationStereotypeQualifier<?>) o;
-        return Objects.equals(stereotype, that.stereotype);
+        return QualifierUtils.annotationQualifiersEquals(this, o);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(stereotype);
+        return Objects.hash(stereotype.getName());
     }
 }

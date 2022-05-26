@@ -16,13 +16,18 @@
 package io.micronaut.http.server.netty.websocket;
 
 // tag::imports[]
+
+import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.websocket.WebSocketSession;
-import io.micronaut.websocket.annotation.*;
-import io.reactivex.Single;
+import io.micronaut.websocket.annotation.ClientWebSocket;
+import io.micronaut.websocket.annotation.OnMessage;
+import io.micronaut.websocket.annotation.OnOpen;
+import org.reactivestreams.Publisher;
+import reactor.core.publisher.Mono;
+
 import java.util.Collection;
 import java.util.concurrent.ConcurrentLinkedQueue;
-// end::imports[]
 import java.util.concurrent.Future;
 
 // tag::class[]
@@ -34,6 +39,7 @@ public abstract class ChatClientWebSocket implements AutoCloseable { // <2>
     private String topic;
     private String username;
     private Collection<String> replies = new ConcurrentLinkedQueue<>();
+    private String subProtocol;
 
     @OnOpen
     public void onOpen(String topic, String username, WebSocketSession session, HttpRequest request) { // <3>
@@ -41,6 +47,7 @@ public abstract class ChatClientWebSocket implements AutoCloseable { // <2>
         this.username = username;
         this.session = session;
         this.request = request;
+        this.subProtocol = session.getSubprotocol().orElse(null);
     }
 
     public String getTopic() {
@@ -74,6 +81,10 @@ public abstract class ChatClientWebSocket implements AutoCloseable { // <2>
 
     public abstract Future<String> sendAsync(String message);
 
-    public abstract Single<String> sendRx(String message);
+    @SingleResult
+    public abstract Publisher<String> sendRx(String message);
 
+    public String getSubProtocol() {
+        return subProtocol;
+    }
 }

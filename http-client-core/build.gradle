@@ -1,13 +1,18 @@
-dependencies {
-    annotationProcessor project(":inject-java")
-    api dependencyVersion("rxjava2")
-    api project(":runtime")
-    api project(":websocket")
-
-    compileOnly "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion"
+plugins {
+    id "io.micronaut.build.internal.convention-library"
 }
 
-//tasks.withType(Test) {
+dependencies {
+    annotationProcessor project(":inject-java")
+
+    implementation libs.managed.reactor
+
+    api project(":runtime")
+
+    compileOnly libs.kotlin.stdlib
+}
+
+//tasks.withType(Test).configureEach {
 //    testLogging {
 //        showStandardStreams = true
 //        exceptionFormat = 'full'

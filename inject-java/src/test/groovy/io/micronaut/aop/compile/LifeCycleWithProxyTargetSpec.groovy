@@ -2,12 +2,13 @@ package io.micronaut.aop.compile
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
+import io.micronaut.inject.writer.BeanDefinitionWriter
 
 class LifeCycleWithProxyTargetSpec extends AbstractTypeElementSpec {
 
     void "test that a proxy target AOP definition lifecycle hooks are invoked - annotation at class level"() {
         when:
-        BeanDefinition beanDefinition = buildBeanDefinition('test.$MyBeanDefinition$Intercepted', '''
+        BeanDefinition beanDefinition = buildBeanDefinition('test.$MyBean' + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionWriter.PROXY_SUFFIX, '''
 package test;
 
 import io.micronaut.aop.proxytarget.*;
@@ -15,17 +16,17 @@ import io.micronaut.context.annotation.*;
 import io.micronaut.core.convert.*;
 
 @Mutating("someVal")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 
-    @javax.inject.Inject public ConversionService conversionService;
+    @jakarta.inject.Inject public ConversionService conversionService;
     public int count = 0;
     
     public String someMethod() {
         return "good";
     }
     
-    @javax.annotation.PostConstruct
+    @jakarta.annotation.PostConstruct
     void created() {
         count++;
     }
@@ -47,16 +48,16 @@ class MyBean {
 
     void "test that a proxy target AOP definition lifecycle hooks are invoked - annotation at method level with hooks last"() {
         when:
-        BeanDefinition beanDefinition = buildBeanDefinition('test.$MyBeanDefinition$Intercepted', '''
+        BeanDefinition beanDefinition = buildBeanDefinition('test.$MyBean' + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionWriter.PROXY_SUFFIX, '''
 package test;
 
 import io.micronaut.aop.proxytarget.*;
 import io.micronaut.core.convert.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 
-    @javax.inject.Inject public ConversionService conversionService;
+    @jakarta.inject.Inject public ConversionService conversionService;
 
     public int count = 0;
     
@@ -65,7 +66,7 @@ class MyBean {
         return "good";
     }
 
-    @javax.annotation.PostConstruct
+    @jakarta.annotation.PostConstruct
     void created() {
         count++;
     }
@@ -86,20 +87,20 @@ class MyBean {
 
     void "test that a proxy target AOP definition lifecycle hooks are invoked - annotation at method level"() {
         when:
-        BeanDefinition beanDefinition = buildBeanDefinition('test.$MyBeanDefinition$Intercepted', '''
+        BeanDefinition beanDefinition = buildBeanDefinition('test.$MyBean' + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionWriter.PROXY_SUFFIX, '''
 package test;
 
 import io.micronaut.aop.proxytarget.*;
 import io.micronaut.context.annotation.*;
 import io.micronaut.core.convert.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean {
 
-    @javax.inject.Inject public ConversionService conversionService;
+    @jakarta.inject.Inject public ConversionService conversionService;
     public int count = 0;
     
-    @javax.annotation.PostConstruct
+    @jakarta.annotation.PostConstruct
     void created() {
         count++;
     }

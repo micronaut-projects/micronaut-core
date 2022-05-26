@@ -20,7 +20,7 @@ import io.micronaut.context.env.Environment;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
-import io.micronaut.http.client.RxHttpClient;
+import io.micronaut.http.client.HttpClient;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -34,7 +34,7 @@ public class PrimarySpec {
 
     private static EmbeddedServer embeddedServer;
 
-    private static RxHttpClient rxClient;
+    private static HttpClient client;
 
 
     @BeforeClass
@@ -43,12 +43,12 @@ public class PrimarySpec {
             put("spec.name", "primaryspec");
             put("spec.lang", "java");
         }}, Environment.TEST);
-        rxClient = embeddedServer.getApplicationContext().createBean(RxHttpClient.class, embeddedServer.getURL());
+        client = embeddedServer.getApplicationContext().createBean(HttpClient.class, embeddedServer.getURL());
     }
     @AfterClass
     public static void teardown(){
-        if(rxClient != null){
-            rxClient.close();
+        if(client != null){
+            client.close();
         }
         if(embeddedServer != null){
             embeddedServer.close();
@@ -59,7 +59,7 @@ public class PrimarySpec {
     public void testPrimaryAnnotatedBeanIsInjectedWhenMultipleOptionsExist() {
         assertEquals(embeddedServer.getApplicationContext().getBeansOfType(ColorPicker.class).size(), 2);
 
-        HttpResponse<String> rsp = rxClient.toBlocking().exchange(HttpRequest.GET("/testPrimary"), String.class);
+        HttpResponse<String> rsp = client.toBlocking().exchange(HttpRequest.GET("/testPrimary"), String.class);
 
         assertEquals(rsp.status(), HttpStatus.OK);
         assertEquals(rsp.body(), "green");

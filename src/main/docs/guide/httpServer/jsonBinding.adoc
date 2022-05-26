@@ -1,6 +1,6 @@
-:jackson-annotations: http://fasterxml.github.io/jackson-annotations/javadoc/2.9/
-:jackson-databind: http://fasterxml.github.io/jackson-databind/javadoc/2.9/
-:jackson-core: http://fasterxml.github.io/jackson-core/javadoc/2.9/
+:jackson-annotations: https://fasterxml.github.io/jackson-annotations/javadoc/2.9/
+:jackson-databind: https://fasterxml.github.io/jackson-databind/javadoc/2.9/
+:jackson-core: https://fasterxml.github.io/jackson-core/javadoc/2.9/
 
 The most common data interchange format nowadays is JSON.
 
@@ -10,11 +10,11 @@ To do so in a non-blocking manner, Micronaut builds on the https://github.com/Fa
 
 == Binding using Reactive Frameworks
 
-From a developer perspective however, you can generally just work with Plain Old Java Objects (POJOs) and can optionally use a Reactive framework such as RxJava or Reactor. The following is an example of a controller that reads and saves an incoming POJO in a non-blocking way from JSON:
+From a developer perspective however, you can generally just work with Plain Old Java Objects (POJOs) and can optionally use a Reactive framework such as https://github.com/ReactiveX/RxJava[RxJava] or https://projectreactor.io[Project Reactor]. The following is an example of a controller that reads and saves an incoming POJO in a non-blocking way from JSON:
 
-snippet::io.micronaut.docs.server.json.PersonController[tags="class,single,endclass", indent=0, title="Using RxJava 2 to Read the JSON"]
+snippet::io.micronaut.docs.server.json.PersonController[tags="class,single,endclass", indent=0, title="Using Reactive Streams to Read the JSON"]
 
-<1> The method receives an RxJava rx:Single[] which emits the POJO once the JSON has been read
+<1> The method receives a `Publisher` which emits the POJO once the JSON has been read
 <2> The `map` method stores the instance in a `Map`
 <3> An api:http.HttpResponse[] is returned
 
@@ -76,6 +76,7 @@ All features can be configured with their name as the key and a boolean to indic
 |mapper | Map | link:{jackson-databind}com/fasterxml/jackson/databind/MapperFeature.html[MapperFeature]
 |parser | Map | link:{jackson-core}com/fasterxml/jackson/core/JsonParser.Feature.html[JsonParser.Feature]
 |generator | Map | link:{jackson-core}com/fasterxml/jackson/core/JsonGenerator.Feature.html[JsonGenerator.Feature]
+|factory | Map | link:{jackson-core}com/fasterxml/jackson/core/JsonFactory.Feature.html[JsonFactory.Feature]
 |======
 
 Example:
@@ -90,6 +91,11 @@ jackson:
     useBigIntegerForInts: true
     failOnUnknownProperties: false
 ----
+
+=== Further customising `JsonFactory`
+
+There may be situations where you wish to customise the `JsonFactory` used by the `ObjectMapper` beyond the configuration of features (for example to allow custom character escaping).
+This can be achieved by providing your own `JsonFactory` bean, or by providing a `BeanCreatedEventListener<JsonFactory>` which configures the default bean on startup.
 
 === Support for `@JsonView`
 
@@ -111,3 +117,17 @@ In addition to configuration, beans can be registered to customize Jackson. All 
 === Service Loader
 
 Any modules registered via the service loader are also added to the default object mapper.
+
+=== Number Precision
+
+During JSON parsing, the framework may convert any incoming data to an intermediate object model. By default, this model uses `BigInteger`, `long` and `double` for numeric values. This means some information that could be represented by `BigDecimal` may be lost. For example, numbers with many decimal places that cannot be represented by `double` may be truncated, even if the target type for deserialization uses `BigDecimal`. Metadata on the number of trailing zeroes (`BigDecimal.precision()`), e.g. the difference between `0.12` and `0.120`, is also discarded.
+
+If you need full accuracy for number types, use the following configuration:
+
+[source,yaml]
+----
+jackson:
+  deserialization:
+    useBigIntegerForInts: true
+    useBigDecimalForFloats: true
+----

@@ -15,8 +15,8 @@
  */
 package io.micronaut.inject.qualifiers.composite;
 
-import javax.inject.Singleton;
-import javax.inject.Named;
+import jakarta.inject.Singleton;
+import jakarta.inject.Named;
 
 @Singleton
 @Named("thread")

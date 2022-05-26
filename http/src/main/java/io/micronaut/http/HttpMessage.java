@@ -119,7 +119,6 @@ public interface HttpMessage<B> extends MutableAttributeHolder {
      * @return The content type
      */
     default @NonNull Optional<MediaType> getContentType() {
-        return getHeaders()
-            .contentType();
+        return getHeaders().contentType();
     }
 }

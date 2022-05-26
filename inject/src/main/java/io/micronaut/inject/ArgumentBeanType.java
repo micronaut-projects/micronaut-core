@@ -46,6 +46,11 @@ public final class ArgumentBeanType<T> implements BeanType<T>, Argument<T> {
     }
 
     @Override
+    public boolean isContainerType() {
+        return BeanType.super.isContainerType();
+    }
+
+    @Override
     public String getName() {
         return argument.getName();
     }
@@ -66,7 +71,7 @@ public final class ArgumentBeanType<T> implements BeanType<T>, Argument<T> {
     }
 
     @Override
-    public boolean equalsType(Argument<?> other) {
+    public boolean equalsType(@Nullable Argument<?> other) {
         return argument.equals(other);
     }
 

@@ -7,11 +7,11 @@ import io.micronaut.context.env.Environment
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.validation.validator.Validator
 import io.micronaut.validation.validator.constraints.ConstraintValidator
+import jakarta.inject.Singleton
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
-import javax.inject.Singleton
 import javax.validation.constraints.NotEmpty
 import javax.validation.constraints.NotNull
 import java.util.regex.Pattern

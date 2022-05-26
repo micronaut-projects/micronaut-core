@@ -1,12 +1,13 @@
 package io.micronaut.inject.visitor.beans
 
 import io.micronaut.core.annotation.Introspected
+import io.micronaut.core.annotation.ReflectiveAccess
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.beans.BeanIntrospector
 import spock.lang.PendingFeature
 import spock.lang.Specification
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 import javax.persistence.Entity
 import javax.persistence.Id
 import javax.persistence.Version
@@ -42,6 +43,7 @@ class BeanIntrospectorSpec extends Specification {
         BeanIntrospection<TestEntity> introspection = BeanIntrospection.getIntrospection(TestEntity)
 
         expect:
+        introspection.hasAnnotation(ReflectiveAccess)
         introspection.getProperty("id").get().hasAnnotation(Id)
         !introspection.getProperty("id").get().hasAnnotation(Entity)
         !introspection.getProperty("id").get().hasStereotype(Entity)

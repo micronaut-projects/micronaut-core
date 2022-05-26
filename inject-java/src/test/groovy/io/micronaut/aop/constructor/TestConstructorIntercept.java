@@ -2,7 +2,7 @@ package io.micronaut.aop.constructor;
 
 import io.micronaut.context.env.Environment;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Singleton
 @TestConstructorAnn

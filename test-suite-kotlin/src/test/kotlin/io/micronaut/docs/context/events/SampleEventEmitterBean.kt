@@ -17,14 +17,14 @@ package io.micronaut.docs.context.events
 
 // tag::class[]
 import io.micronaut.context.event.ApplicationEventPublisher
-import javax.inject.Inject
-import javax.inject.Singleton
+import jakarta.inject.Inject
+import jakarta.inject.Singleton
 
 @Singleton
 class SampleEventEmitterBean {
 
     @Inject
-    internal var eventPublisher: ApplicationEventPublisher? = null
+    internal var eventPublisher: ApplicationEventPublisher<SampleEvent>? = null
 
     fun publishSampleEvent() {
         eventPublisher!!.publishEvent(SampleEvent())

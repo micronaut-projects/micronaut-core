@@ -30,11 +30,11 @@ class PropertyElementSpec extends AbstractBeanDefinitionSpec {
     }
 
     void "test simple bean properties"() {
-        buildBeanDefinition('test.TestController', '''
-package test;
+        buildBeanDefinition('propelem1.TestController', '''
+package propelem1;
 
 import io.micronaut.http.annotation.*;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 @Controller("/test")
 public class TestController {
@@ -75,11 +75,11 @@ public class TestController {
     }
 
     void "test simple bean properties with generics"() {
-        buildBeanDefinition('test.TestController', '''
-package test;
+        buildBeanDefinition('propelem2.TestController', '''
+package propelem2;
 
 import io.micronaut.http.annotation.*;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 @Controller("/test")
 public class TestController<T extends CharSequence> {
@@ -113,11 +113,11 @@ public class TestController<T extends CharSequence> {
 
 
     void "test simple bean properties with generics on property"() {
-        buildBeanDefinition('test.TestController', '''
-package test;
+        buildBeanDefinition('propelem3.TestController', '''
+package propelem3;
 
 import io.micronaut.http.annotation.*;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 @Controller("/test")
 public class TestController {
@@ -143,13 +143,13 @@ class Response<T> {
         AllElementsVisitor.VISITED_CLASS_ELEMENTS.size() == 1
         AllElementsVisitor.VISITED_CLASS_ELEMENTS[0].beanProperties.size() == 1
         AllElementsVisitor.VISITED_CLASS_ELEMENTS[0].beanProperties[0].name == 'age'
-        AllElementsVisitor.VISITED_CLASS_ELEMENTS[0].beanProperties[0].type.name == 'test.Response'
+        AllElementsVisitor.VISITED_CLASS_ELEMENTS[0].beanProperties[0].type.name == 'propelem3.Response'
         AllElementsVisitor.VISITED_CLASS_ELEMENTS[0].beanProperties[0].isReadOnly()
         AllElementsVisitor.VISITED_CLASS_ELEMENTS[0].beanProperties[0].type.typeArguments.size() == 1
         AllElementsVisitor.VISITED_CLASS_ELEMENTS[0].beanProperties[0].type.typeArguments.values().first().name == 'java.lang.Integer'
         AllElementsVisitor.VISITED_METHOD_ELEMENTS.size() == 2
         AllElementsVisitor.VISITED_METHOD_ELEMENTS[1].name == 'update'
-        AllElementsVisitor.VISITED_METHOD_ELEMENTS[1].returnType.name == 'test.Response'
+        AllElementsVisitor.VISITED_METHOD_ELEMENTS[1].returnType.name == 'propelem3.Response'
         AllElementsVisitor.VISITED_METHOD_ELEMENTS[1].returnType.typeArguments.size() == 1
         AllElementsVisitor.VISITED_METHOD_ELEMENTS[1].returnType.typeArguments.values().first().name == 'java.lang.Integer'
         AllElementsVisitor.VISITED_METHOD_ELEMENTS[1].returnType.beanProperties.size() == 1

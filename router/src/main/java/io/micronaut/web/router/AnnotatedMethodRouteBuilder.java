@@ -30,8 +30,8 @@ import io.micronaut.http.annotation.*;
 import io.micronaut.http.uri.UriTemplate;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
 import java.util.*;
 import java.util.function.Consumer;

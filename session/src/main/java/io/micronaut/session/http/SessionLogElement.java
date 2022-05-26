@@ -15,17 +15,16 @@
  */
 package io.micronaut.session.http;
 
+import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.handler.accesslog.element.ConstantElement;
 import io.micronaut.http.server.netty.handler.accesslog.element.LogElement;
-
-import java.util.Set;
-
-import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.session.Session;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.util.Attribute;
 import io.netty.util.AttributeKey;
+
+import java.util.Set;
 
 /**
  * SessionLogElement LogElement. The session.

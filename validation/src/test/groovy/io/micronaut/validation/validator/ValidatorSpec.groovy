@@ -6,13 +6,13 @@ import io.micronaut.context.annotation.Prototype
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.beans.BeanIntrospector
 import io.micronaut.validation.validator.resolver.CompositeTraversableResolver
-import spock.lang.Ignore
+import jakarta.inject.Singleton
 import spock.lang.AutoCleanup
+import spock.lang.Ignore
 import spock.lang.Shared
 import spock.lang.Specification
-
-import javax.inject.Singleton
 import javax.validation.Path
+import javax.validation.ElementKind
 import javax.validation.Valid
 import javax.validation.ValidatorFactory
 import javax.validation.constraints.*
@@ -722,6 +722,111 @@ class ValidatorSpec extends Specification {
         !beanDescriptor.isBeanConstrained()
         beanDescriptor.getConstrainedProperties().size() == 0
     }
+
+    void "test cascade to container of non-introspected class" () {
+        when:
+        Bee notIntrospected = new Bee(name: "")
+        HiveOfBeeList beeHive = new HiveOfBeeList(bees: [notIntrospected])
+        def violations = validator.validate(beeHive)
+
+        then:
+        violations.size() == 1
+        !violations[0].constraintDescriptor
+        violations[0].message == "Cannot validate io.micronaut.validation.validator.Bee. No bean introspection present. " +
+                "Please add @Introspected to the class and ensure Micronaut annotation processing is enabled"
+
+        when:
+        beeHive = new HiveOfBeeList(bees: [null])
+        violations = validator.validate(beeHive)
+
+        then:
+        violations.size() == 1
+        !violations[0].constraintDescriptor
+        violations[0].message == "Cannot validate io.micronaut.validation.validator.Bee. No bean introspection present. " +
+                "Please add @Introspected to the class and ensure Micronaut annotation processing is enabled"
+    }
+
+    void "test cascade to map of non-introspected value class" () {
+        when:
+        Bee notIntrospected = new Bee(name: "")
+        HiveOfBeeMap beeHive = new HiveOfBeeMap(bees: ["blank" : notIntrospected])
+        def violations = validator.validate(beeHive)
+
+        then:
+        violations.size() == 1
+        !violations[0].constraintDescriptor
+        violations[0].message == "Cannot validate io.micronaut.validation.validator.Bee. No bean introspection present. " +
+                "Please add @Introspected to the class and ensure Micronaut annotation processing is enabled"
+
+        when:
+        Map<String, Bee> map = [:]
+        map.put("blank", null)
+        beeHive = new HiveOfBeeMap(bees: map)
+        violations = validator.validate(beeHive)
+
+        then:
+        violations.size() == 1
+        !violations[0].constraintDescriptor
+        violations[0].message == "Cannot validate io.micronaut.validation.validator.Bee. No bean introspection present. " +
+                "Please add @Introspected to the class and ensure Micronaut annotation processing is enabled"
+    }
+
+    @Ignore("FIXME: https://github.com/micronaut-projects/micronaut-core/issues/4410")
+    void "test element validation in String collection" () {
+        when:
+        ListOfStrings strings = new ListOfStrings(strings: ["", null, "a string that's too long"])
+        def violations = validator.validate(strings)
+
+        then:
+        // should be: two for violating element size, and one null string violation
+        violations.size() == 3
+        violations[0].constraintDescriptor
+        violations[0].constraintDescriptor.annotation instanceof Size
+        violations[1].constraintDescriptor
+        violations[1].constraintDescriptor.annotation instanceof NotNull
+        violations[2].constraintDescriptor
+        violations[2].constraintDescriptor.annotation instanceof Size
+    }
+
+    void "test cascade to bean - enum"() {
+        given:
+        EnumList b = new EnumList(
+                enums: [null]
+        )
+
+        def violations = validator.validate(b)
+
+        expect:
+        violations.size() == 1
+        violations.first().message == "must not be null"
+    }
+
+    void "test helpful toString() message for constraintViolation"() {
+        given:
+        BookService bookService = applicationContext.getBean(BookService)
+        def constraintViolations = validator.forExecutables().validateParameters(
+                bookService,
+                BookService.getDeclaredMethod("saveBook", String, int.class),
+                ["", 50] as Object[]
+        ).toList().sort({ it.propertyPath.toString() })
+
+        expect:
+        constraintViolations.size() == 2
+        constraintViolations[0].toString() == 'DefaultConstraintViolation{rootBean=class io.micronaut.validation.validator.$BookService$Definition$Intercepted, invalidValue=50, path=saveBook.pages}'
+        constraintViolations[1].toString() == 'DefaultConstraintViolation{rootBean=class io.micronaut.validation.validator.$BookService$Definition$Intercepted, invalidValue=, path=saveBook.title}'
+    }
+}
+
+@Introspected
+class HiveOfBeeMap {
+    @Valid
+    Map<String, Bee> bees
+}
+
+@Introspected
+class HiveOfBeeList {
+    @Valid
+    List<Bee> bees
 }
 
 // not introspected, expect validation failure

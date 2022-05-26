@@ -44,6 +44,7 @@ class AnnotationRetryStateBuilder implements RetryStateBuilder {
     private static final String INCLUDES = "includes";
     private static final String EXCLUDES = "excludes";
     private static final String PREDICATE = "predicate";
+    private static final String CAPTUREDEXCEPTION = "capturedException";
     private static final int DEFAULT_RETRY_ATTEMPTS = 3;
 
     private final AnnotationMetadata annotationMetadata;
@@ -66,13 +67,16 @@ class AnnotationRetryStateBuilder implements RetryStateBuilder {
         Class<? extends RetryPredicate> predicateClass = retry.get(PREDICATE, Class.class)
                                                               .orElse(DefaultRetryPredicate.class);
         RetryPredicate predicate = createPredicate(predicateClass, retry);
+        Class<? extends Throwable> capturedException = retry.get(CAPTUREDEXCEPTION, Class.class)
+                                                            .orElse(RuntimeException.class);
 
         return new SimpleRetry(
             attempts,
             retry.get(MULTIPLIER, Double.class).orElse(0d),
             delay,
             retry.get(MAX_DELAY, Duration.class).orElse(null),
-            predicate
+            predicate,
+            capturedException
         );
     }
 

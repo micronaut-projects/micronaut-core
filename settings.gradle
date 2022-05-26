@@ -1,8 +1,27 @@
+pluginManagement {
+    plugins {
+//        id 'io.micronaut.application' version getProperty("micronautGradlePluginVersion")
+//        id 'io.micronaut.library' version getProperty("micronautGradlePluginVersion")
+        id "org.jetbrains.kotlin.jvm" version getProperty("kotlinVersion")
+        id "org.jetbrains.kotlin.kapt" version getProperty("kotlinVersion")
+        id "org.jetbrains.kotlin.plugin.allopen" version getProperty("kotlinVersion")
+        id "org.jetbrains.kotlin.plugin.jpa" version getProperty("kotlinVersion")
+    }
+    repositories {
+        gradlePluginPortal()
+        mavenCentral()
+    }
+}
+
+plugins {
+
+    id 'io.micronaut.build.shared.settings' version '5.3.9'
+}
+
 rootProject.name = 'micronaut'
 
 include "aop"
 include "bom"
-include "bom-check"
 include "parent"
 include "buffer-netty"
 include "core"
@@ -18,25 +37,31 @@ include "http-client"
 include "http-netty"
 include "http-server"
 include "http-server-netty"
+include "http-validation"
 include "inject"
 include "inject-groovy"
 include "inject-groovy-test"
 include "inject-java"
 include "inject-java-test"
+include 'inject-kotlin-test'
 include "inject-test-utils"
+include "jackson-core"
+include "jackson-databind"
+include "json-core"
 include "management"
 include "messaging"
 include "router"
 include "runtime"
 include "runtime-osx"
 include "session"
-include "tracing"
 include "validation"
 include "websocket"
 
 // test suites
 include "test-suite"
 include "test-suite-helper"
+include "test-suite-javax-inject"
+include "test-suite-jakarta-inject-bean-import"
 include "test-suite-kotlin"
 include "test-suite-groovy"
 include "test-utils"

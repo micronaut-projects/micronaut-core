@@ -21,6 +21,7 @@ import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
@@ -33,7 +34,6 @@ import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.management.endpoint.annotation.Selector;
 import io.micronaut.web.router.DefaultRouteBuilder;
 
-import io.micronaut.core.annotation.Nullable;
 import java.lang.annotation.Annotation;
 import java.util.Map;
 import java.util.Optional;

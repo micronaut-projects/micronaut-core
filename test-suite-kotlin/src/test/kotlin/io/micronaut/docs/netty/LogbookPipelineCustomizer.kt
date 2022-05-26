@@ -9,7 +9,7 @@ import io.netty.channel.ChannelPipeline
 import org.zalando.logbook.Logbook
 import org.zalando.logbook.netty.LogbookClientHandler
 import org.zalando.logbook.netty.LogbookServerHandler
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 // end::imports[]
 
 // tag::class[]

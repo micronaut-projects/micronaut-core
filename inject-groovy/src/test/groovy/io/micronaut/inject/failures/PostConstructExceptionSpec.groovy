@@ -20,7 +20,7 @@ import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.exceptions.BeanInstantiationException
 import spock.lang.Specification
 
-import javax.annotation.PostConstruct
+import jakarta.annotation.PostConstruct
 import javax.inject.Inject
 import javax.inject.Singleton
 

@@ -1,7 +1,7 @@
 package io.micronaut.docs.aop.lifecycle;
 
 // tag::imports[]
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 import java.util.*;
 // end::imports[]
 

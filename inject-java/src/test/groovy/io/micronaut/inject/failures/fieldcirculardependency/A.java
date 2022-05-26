@@ -17,7 +17,7 @@ package io.micronaut.inject.failures.fieldcirculardependency;
 
 import io.micronaut.context.annotation.Requires;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Requires(property = "spec.name", value = "FieldCircularDependencyFailureSpec")
 @Singleton

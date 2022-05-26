@@ -19,10 +19,10 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.session.Session;
 import io.micronaut.session.SessionSettings;
+import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.inject.Singleton;
 import javax.validation.constraints.NotNull;
 import java.util.Base64;
 

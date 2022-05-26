@@ -44,8 +44,11 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
 
     private final ClassLoader classLoader;
     private final String basePath;
+    private final URL baseURL;
     private final Map<String, Boolean> isDirectoryCache = new ConcurrentLinkedHashMap.Builder<String, Boolean>()
             .maximumWeightedCapacity(50).build();
+    private final boolean missingPath;
+    private final boolean checkBase;
 
     /**
      * Default constructor.
@@ -63,8 +66,22 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
      * @param basePath    The path to look for resources under
      */
     public DefaultClassPathResourceLoader(ClassLoader classLoader, String basePath) {
+        this(classLoader, basePath, false);
+    }
+
+    /**
+     * Use when resources should have a standard base path.
+     *
+     * @param classLoader The class loader for loading resources
+     * @param basePath    The path to look for resources under
+     * @param checkBase   If set to {@code true} an extended check for the base path is performed otherwise paths with relative URLs like {@code ../} are prohibited.
+     */
+    public DefaultClassPathResourceLoader(ClassLoader classLoader, String basePath, boolean checkBase) {
         this.classLoader = classLoader;
         this.basePath = normalize(basePath);
+        this.baseURL = checkBase && basePath != null ? classLoader.getResource(normalize(basePath)) : null;
+        this.missingPath = checkBase && basePath != null && baseURL == null;
+        this.checkBase = checkBase;
     }
 
     /**
@@ -75,49 +92,61 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
      */
     @Override
     public Optional<InputStream> getResourceAsStream(String path) {
+        if (missingPath) {
+            return Optional.empty();
+        } else if (isProhibitedRelativePath(path)) {
+            return Optional.empty();
+        }
+
         URL url = classLoader.getResource(prefixPath(path));
         if (url != null) {
-            try {
-                URI uri = url.toURI();
-                if (uri.getScheme().equals("jar")) {
-                    synchronized (DefaultClassPathResourceLoader.class) {
-                        FileSystem fileSystem = null;
-                        try {
+            if (startsWithBase(url)) {
+                try {
+                    URI uri = url.toURI();
+                    if (uri.getScheme().equals("jar")) {
+                        synchronized (DefaultClassPathResourceLoader.class) {
+                            FileSystem fileSystem = null;
                             try {
-                                fileSystem = FileSystems.getFileSystem(uri);
-                            } catch (FileSystemNotFoundException e) {
-                                //no-op
-                            }
-                            if (fileSystem == null || !fileSystem.isOpen()) {
-                                fileSystem = FileSystems.newFileSystem(uri, Collections.emptyMap(), classLoader);
-                            }
-                            Path pathObject = fileSystem.getPath(path);
-                            if (Files.isDirectory(pathObject)) {
-                                return Optional.empty();
-                            }
-                            return Optional.of(new ByteArrayInputStream(Files.readAllBytes(pathObject)));
-                        } finally {
-                            if (fileSystem != null && fileSystem.isOpen()) {
                                 try {
-                                    fileSystem.close();
-                                } catch (IOException e) {
-                                    if (LOG.isDebugEnabled()) {
-                                        LOG.debug("Error shutting down JAR file system [" + fileSystem + "]: " + e.getMessage(), e);
+                                    fileSystem = FileSystems.getFileSystem(uri);
+                                } catch (FileSystemNotFoundException e) {
+                                    //no-op
+                                }
+                                if (fileSystem == null || !fileSystem.isOpen()) {
+                                    try {
+                                        fileSystem = FileSystems.newFileSystem(uri, Collections.emptyMap(), classLoader);
+                                    } catch (FileSystemAlreadyExistsException e) {
+                                        fileSystem = FileSystems.getFileSystem(uri);
+                                    }
+                                }
+                                Path pathObject = fileSystem.getPath(path);
+                                if (Files.isDirectory(pathObject)) {
+                                    return Optional.empty();
+                                }
+                                return Optional.of(new ByteArrayInputStream(Files.readAllBytes(pathObject)));
+                            } finally {
+                                if (fileSystem != null && fileSystem.isOpen()) {
+                                    try {
+                                        fileSystem.close();
+                                    } catch (IOException e) {
+                                        if (LOG.isDebugEnabled()) {
+                                            LOG.debug("Error shutting down JAR file system [" + fileSystem + "]: " + e.getMessage(), e);
+                                        }
                                     }
                                 }
                             }
                         }
+                    } else if (uri.getScheme().equals("file")) {
+                        Path pathObject = Paths.get(uri);
+                        if (Files.isDirectory(pathObject)) {
+                            return Optional.empty();
+                        }
+                        return Optional.of(Files.newInputStream(pathObject));
                     }
-                } else if (uri.getScheme().equals("file")) {
-                    Path pathObject = Paths.get(uri);
-                    if (Files.isDirectory(pathObject)) {
-                        return Optional.empty();
+                } catch (URISyntaxException | IOException | ProviderNotFoundException e) {
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Error establishing whether path is a directory: " + e.getMessage(), e);
                     }
-                    return Optional.of(Files.newInputStream(pathObject));
-                }
-            } catch (URISyntaxException | IOException | ProviderNotFoundException e) {
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Error establishing whether path is a directory: " + e.getMessage(), e);
                 }
             }
         }
@@ -125,7 +154,27 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
         if (path.indexOf('.') == -1) {
             return Optional.empty();
         }
-        return Optional.ofNullable(classLoader.getResourceAsStream(prefixPath(path)));
+        final URL u = getResource(path).orElse(null);
+        if (u != null) {
+            try {
+                return Optional.of(u.openStream());
+            } catch (IOException e) {
+                // fallback to empty
+            }
+        }
+        return Optional.empty();
+    }
+
+    private boolean startsWithBase(URL url) {
+        if (checkBase) {
+            if (baseURL == null) {
+                return true;
+            } else {
+                return url.toExternalForm().startsWith(baseURL.toExternalForm());
+            }
+        } else {
+            return true;
+        }
     }
 
     /**
@@ -136,13 +185,25 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
      */
     @Override
     public Optional<URL> getResource(String path) {
+        if (missingPath) {
+            return Optional.empty();
+        } else if (isProhibitedRelativePath(path)) {
+            return Optional.empty();
+        }
+
         boolean isDirectory = isDirectory(path);
 
         if (!isDirectory) {
             URL url = classLoader.getResource(prefixPath(path));
-            return Optional.ofNullable(url);
+            if (url != null && startsWithBase(url)) {
+                return Optional.of(url);
+            }
         }
         return Optional.empty();
+    }
+
+    private boolean isProhibitedRelativePath(String path) {
+        return !checkBase && path.replace('\\', '/').contains("../");
     }
 
     /**
@@ -153,6 +214,12 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
      */
     @Override
     public Stream<URL> getResources(String path) {
+        if (missingPath) {
+            return Stream.empty();
+        } else if (isProhibitedRelativePath(path)) {
+            return Stream.empty();
+        }
+
         Enumeration<URL> all;
         try {
             all = classLoader.getResources(prefixPath(path));
@@ -162,7 +229,9 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
         Stream.Builder<URL> builder = Stream.builder();
         while (all.hasMoreElements()) {
             URL url = all.nextElement();
-            builder.accept(url);
+            if (startsWithBase(url)) {
+                builder.accept(url);
+            }
         }
         return builder.build();
     }
@@ -177,7 +246,7 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
 
     /**
      * @param basePath The path to load resources
-     * @return The resouce loader
+     * @return The resource loader
      */
     @Override
     public ResourceLoader forBase(String basePath) {

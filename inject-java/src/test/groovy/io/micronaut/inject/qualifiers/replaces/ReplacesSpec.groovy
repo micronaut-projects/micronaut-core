@@ -56,12 +56,29 @@ class ReplacesSpec extends Specification {
 
         expect:
         context.containsBean(E1Replacement)
-        context.containsBean(E2)
+        context.containsBean(E2Replacement)
+        context.containsBean(E3)
         context.containsBean(E)
-        context.getBeansOfType(E).size() == 2
+        context.getBeansOfType(E).size() == 3
         context.getBeansOfType(E).contains(context.getBean(E1Replacement))
-        context.getBeansOfType(E).contains(context.getBean(E2))
-//        !context.containsBean(E1)
+        context.getBeansOfType(E).contains(context.getBean(E2Replacement))
+        context.getBeansOfType(E).contains(context.getBean(E3))
+    }
+
+    void "test that qualified beans can be replaced"() {
+        given:
+        BeanContext context = BeanContext.run()
+
+        expect:
+        context.containsBean(G1QualifierReplacement)
+        context.containsBean(G2QualifierReplacement)
+        context.containsBean(G3Qualifier)
+
+        context.containsBean(G)
+        context.getBeansOfType(G).size() == 3
+        context.getBeansOfType(G).contains(context.getBean(G1QualifierReplacement))
+        context.getBeansOfType(G).contains(context.getBean(G2QualifierReplacement))
+        context.getBeansOfType(G).contains(context.getBean(G3Qualifier))
     }
 
     void "test that introduction advice can be replaced with inheritance"() {
@@ -149,6 +166,20 @@ class ReplacesSpec extends Specification {
 
         then:
         f.getId() == "replaces"
+
+        cleanup:
+        ctx.close()
+    }
+
+    void "test replacing a chain of factory methods"() {
+        given:
+        def ctx = ApplicationContext.run("factory-replacement-chain")
+
+        when:
+        D d = ctx.getBean(D)
+
+        then:
+        d instanceof D3
 
         cleanup:
         ctx.close()

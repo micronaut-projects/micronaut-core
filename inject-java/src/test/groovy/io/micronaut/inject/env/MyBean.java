@@ -18,7 +18,7 @@ package io.micronaut.inject.env;
 import io.micronaut.context.annotation.Prototype;
 import io.micronaut.context.annotation.Value;
 
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 @Prototype
 public class MyBean {

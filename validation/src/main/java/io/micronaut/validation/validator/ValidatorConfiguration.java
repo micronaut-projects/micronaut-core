@@ -17,10 +17,10 @@ package io.micronaut.validation.validator;
 
 import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.MessageSource;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.validation.validator.constraints.ConstraintValidatorRegistry;
 import io.micronaut.validation.validator.extractors.ValueExtractorRegistry;
 
-import io.micronaut.core.annotation.NonNull;
 import javax.validation.ClockProvider;
 import javax.validation.TraversableResolver;
 

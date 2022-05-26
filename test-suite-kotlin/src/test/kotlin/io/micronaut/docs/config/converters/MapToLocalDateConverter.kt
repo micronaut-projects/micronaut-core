@@ -22,7 +22,7 @@ import io.micronaut.core.convert.TypeConverter
 import java.time.DateTimeException
 import java.time.LocalDate
 import java.util.Optional
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 // end::imports[]
 
 // tag::class[]

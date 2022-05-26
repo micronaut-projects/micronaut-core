@@ -15,11 +15,9 @@
  */
 package io.micronaut.http.client.convert;
 
-import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.core.convert.TypeConverter;
-
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Factory
 public class TypeConverters {

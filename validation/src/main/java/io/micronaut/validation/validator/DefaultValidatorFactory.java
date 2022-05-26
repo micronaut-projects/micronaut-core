@@ -17,9 +17,15 @@ package io.micronaut.validation.validator;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
-import javax.validation.*;
+import javax.validation.ClockProvider;
+import javax.validation.ConstraintValidatorFactory;
+import javax.validation.MessageInterpolator;
+import javax.validation.ParameterNameProvider;
+import javax.validation.TraversableResolver;
+import javax.validation.ValidatorContext;
+import javax.validation.ValidatorFactory;
 
 /**
  * Default validator factory implementation.

@@ -2,7 +2,7 @@ The application environment is modelled by the api:context.env.Environment[] int
 
 snippet::io.micronaut.docs.context.env.EnvironmentSpec[tags="env",indent=0,title="Initializing the Environment"]
 
-The active environment names allow loading different configuration files depending on the environment, and also using the ann:.context.annotation.Requires[] annotation to conditionally load beans or bean ann:.context.annotation.Configuration[] packages.
+The active environment names allow loading different configuration files depending on the environment, and also using the ann:context.annotation.Requires[] annotation to conditionally load beans or bean ann:context.annotation.Configuration[] packages.
 
 In addition, Micronaut attempts to detect the current environments. For example within a Spock or JUnit test the api:context.env.Environment#TEST[] environment is automatically active.
 

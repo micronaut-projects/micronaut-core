@@ -1,7 +1,7 @@
 package io.micronaut.docs.aop.introduction
 
-import io.kotlintest.shouldBe
-import io.kotlintest.specs.AnnotationSpec
+import io.kotest.matchers.shouldBe
+import io.kotest.core.spec.style.AnnotationSpec
 import io.micronaut.context.ApplicationContext
 
 class IntroductionSpec: AnnotationSpec() {

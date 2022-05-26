@@ -16,7 +16,6 @@
 package io.micronaut.management.endpoint
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.exceptions.NoSuchBeanException
 import spock.lang.Specification
 
 class EndpointsFilterRequiresSpec extends Specification {

@@ -18,7 +18,7 @@ package io.micronaut.docs.http.server.netty.websocket
 import io.micronaut.websocket.annotation.ClientWebSocket
 import io.micronaut.websocket.annotation.OnMessage
 import io.micronaut.websocket.annotation.OnOpen
-import io.reactivex.Single
+import reactor.core.publisher.Mono
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.Future
 
@@ -52,5 +52,5 @@ abstract class PojoChatClientWebSocket : AutoCloseable {
 
     abstract fun sendAsync(message: Message): Future<Message>
 
-    abstract fun sendRx(message: Message): Single<Message>
+    abstract fun sendRx(message: Message): Mono<Message>
 }

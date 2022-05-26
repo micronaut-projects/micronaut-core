@@ -15,11 +15,11 @@
  */
 package io.micronaut.http.netty.channel;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.context.annotation.ConfigurationInject;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.util.StringUtils;
 

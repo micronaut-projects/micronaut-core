@@ -19,8 +19,8 @@ import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.Qualifier
 import spock.lang.Specification
 
-import javax.inject.Named
-import javax.inject.Singleton
+import jakarta.inject.Named
+import jakarta.inject.Singleton
 
 class CompositeSpec extends Specification {
 
