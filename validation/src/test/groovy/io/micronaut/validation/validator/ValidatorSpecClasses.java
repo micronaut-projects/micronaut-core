@@ -2,8 +2,8 @@ package io.micronaut.validation.validator;
 
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.core.annotation.Introspected;
+import jakarta.inject.Singleton;
 
-import javax.inject.Singleton;
 import javax.validation.Valid;
 import javax.validation.constraints.Min;
 import javax.validation.constraints.NotBlank;

@@ -68,7 +68,7 @@ package test;
 import java.util.List;
 import javax.validation.constraints.NotBlank;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
     @io.micronaut.context.annotation.Executable
     public void setList(List<@NotBlank String> list) {
@@ -102,7 +102,7 @@ import javax.validation.constraints.Min;
 import javax.validation.constraints.NotNull;
 import io.micronaut.context.annotation.Executable;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
     @Executable

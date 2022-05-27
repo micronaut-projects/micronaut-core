@@ -28,6 +28,7 @@ import jakarta.inject.Singleton
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
+import javax.validation.Valid
 import javax.validation.ConstraintViolationException
 import javax.validation.Valid
 import javax.validation.constraints.NotNull
@@ -98,6 +99,7 @@ class SearchService {
     @Executable
     String performSearch(@Valid Search search) {
         return "Not found"
+    }
 }
 
 @Introspected

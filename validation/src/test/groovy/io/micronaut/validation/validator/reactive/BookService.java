@@ -1,9 +1,8 @@
 package io.micronaut.validation.validator.reactive;
 
 import io.micronaut.context.annotation.Executable;
-import io.reactivex.Single;
-
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
+import reactor.core.publisher.Mono;
 import javax.validation.Valid;
 import javax.validation.constraints.NotBlank;
 import java.util.concurrent.CompletableFuture;
@@ -22,17 +21,17 @@ class BookService {
     }
 
     @Executable
-    Single<@Valid Book> rxSimple(Single<@NotBlank String> title) {
+    Mono<@Valid Book> rxSimple(Mono<@NotBlank String> title) {
         return title.map(Book::new);
     }
 
     @Executable
-    Single<@Valid Book> rxValid(Single<@Valid Book> book) {
+    Mono<@Valid Book> rxValid(Mono<@Valid Book> book) {
         return book;
     }
 
     @Executable
-    Single<@Valid Book> rxReturnInvalid(Single<@Valid Book> book) {
+    Mono<@Valid Book> rxReturnInvalid(Mono<@Valid Book> book) {
         return book.map(b -> new Book(""));
     }
 

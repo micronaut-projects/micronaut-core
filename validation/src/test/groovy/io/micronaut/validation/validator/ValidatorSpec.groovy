@@ -12,7 +12,6 @@ import spock.lang.Ignore
 import spock.lang.Shared
 import spock.lang.Specification
 import javax.validation.Path
-import javax.validation.ElementKind
 import javax.validation.Valid
 import javax.validation.ValidatorFactory
 import javax.validation.constraints.*
@@ -769,23 +768,6 @@ class ValidatorSpec extends Specification {
         !violations[0].constraintDescriptor
         violations[0].message == "Cannot validate io.micronaut.validation.validator.Bee. No bean introspection present. " +
                 "Please add @Introspected to the class and ensure Micronaut annotation processing is enabled"
-    }
-
-    @Ignore("FIXME: https://github.com/micronaut-projects/micronaut-core/issues/4410")
-    void "test element validation in String collection" () {
-        when:
-        ListOfStrings strings = new ListOfStrings(strings: ["", null, "a string that's too long"])
-        def violations = validator.validate(strings)
-
-        then:
-        // should be: two for violating element size, and one null string violation
-        violations.size() == 3
-        violations[0].constraintDescriptor
-        violations[0].constraintDescriptor.annotation instanceof Size
-        violations[1].constraintDescriptor
-        violations[1].constraintDescriptor.annotation instanceof NotNull
-        violations[2].constraintDescriptor
-        violations[2].constraintDescriptor.annotation instanceof Size
     }
 
     void "test cascade to bean - enum"() {

@@ -47,11 +47,11 @@ class ReactiveMethodValidationSpec extends Specification {
         var validator = applicationContext.getBean(Validator)
         var violations = validator.forExecutables().validateParameters(
                 bookService,
-                BookService.class.getDeclaredMethod("rxSimple", Single<String>),
-                [Single.just("")] as Object[]
+                BookService.class.getDeclaredMethod("rxSimple", Mono<String>),
+                [Mono.just("")] as Object[]
         )
 
-        bookService.rxSimple(Single.just("")).blockingGet()
+        bookService.rxSimple(Mono.just("")).blockingGet()
 
         then:
         def e = thrown(ConstraintViolationException)
@@ -67,11 +67,10 @@ class ReactiveMethodValidationSpec extends Specification {
         BookService bookService = applicationContext.getBean(BookService)
 
         when:
-        def book = bookService.rxValid(Single.just(new Book("It"))).blockingGet()
+        def book = bookService.rxValid(Mono.just(new Book("It"))).block()
 
         then:
         book.title == 'It'
-
     }
 
     void "test reactive validation with invalid argument"() {
@@ -79,7 +78,7 @@ class ReactiveMethodValidationSpec extends Specification {
         BookService bookService = applicationContext.getBean(BookService)
 
         when:
-        bookService.rxValid(Single.just(new Book(""))).blockingGet()
+        bookService.rxValid(Mono.just(new Book(""))).block()
 
         then:
         def e = thrown(ConstraintViolationException)
@@ -92,13 +91,13 @@ class ReactiveMethodValidationSpec extends Specification {
         BookService bookService = applicationContext.getBean(BookService)
 
         when:
-        bookService.futureSimple(CompletableFuture.completedFuture("")).get()
+        bookService.futureSimple(CompletableFuture.completedFuture("")).toCompletableFuture().get()
 
         then:
-        ExecutionException e = thrown()
+        ConstraintViolationException e = thrown()
 
         Pattern.matches('futureSimple.title\\[]<T .*String>: must not be blank', e.cause.message)
-        e.cause.getConstraintViolations().first().propertyPath.toString().startsWith('futureSimple.title')
+        e.getConstraintViolations().first().propertyPath.toString().startsWith('futureSimple.title')
     }
 
     void "test future validation with invalid argument"() {
@@ -109,10 +108,10 @@ class ReactiveMethodValidationSpec extends Specification {
         bookService.futureValid(CompletableFuture.completedFuture(new Book(""))).get()
 
         then:
-        ExecutionException e = thrown()
+        ConstraintViolationException e = thrown()
 
         Pattern.matches('futureValid.book\\[]<T .*Book>.title: must not be blank', e.cause.message);
-        e.cause.getConstraintViolations().first().propertyPath.toString().startsWith('futureValid.book')
+        e.getConstraintViolations().first().propertyPath.toString().startsWith('futureValid.book')
     }
 }
 
