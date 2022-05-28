@@ -207,7 +207,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                 .stream()
                 .filter(tev -> tev.getClass().isAnnotationPresent(SupportedOptions.class))
                 .map(TypeElementVisitor::getClass)
-                .map(cls -> cls.getAnnotation(SupportedOptions.class))
+                .map(cls -> (SupportedOptions) cls.getAnnotation(SupportedOptions.class))
                 .flatMap((SupportedOptions supportedOptions) -> Arrays.stream(supportedOptions.value()));
         return Stream.of(baseOption, visitorsAnnotationsOptions, visitorsOptions)
                 .flatMap(Stream::sequential)

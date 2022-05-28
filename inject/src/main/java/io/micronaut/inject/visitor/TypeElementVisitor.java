@@ -23,6 +23,7 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.Toggleable;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
+import io.micronaut.inject.ast.EnumConstantElement;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
 
@@ -76,6 +77,18 @@ public interface TypeElementVisitor<C, E> extends Ordered, Toggleable {
      * @param context The visitor context
      */
     default void visitField(FieldElement element, VisitorContext context) {
+        // no-op
+    }
+
+    /**
+     * Executed when a enum constant is encountered that matches the <E> generic.
+     *
+     * @param element The element
+     * @param context The visitor context
+     *
+     * @since 3.6.0
+     */
+    default void visitEnumConstant(EnumConstantElement element, VisitorContext context) {
         // no-op
     }
 

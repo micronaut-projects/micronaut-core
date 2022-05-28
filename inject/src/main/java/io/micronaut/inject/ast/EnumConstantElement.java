@@ -15,32 +15,19 @@
  */
 package io.micronaut.inject.ast;
 
-import java.util.Collections;
-import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
- * Models an enum type.
+ * Stores data about an element that references a enum constant.
  *
- * @author graemerocher
- * @since 1.0
+ * @since 3.6.0
  */
-public interface EnumElement extends ClassElement {
+public interface EnumConstantElement extends TypedElement, MemberElement {
 
-    /**
-     * The values that make up this enum.
-     *
-     * @return The values
-     */
-    List<String> values();
-
-    /**
-     * The enum constant elements that make up this enum.
-     *
-     * @return The enum constant elements
-     *
-     * @since 3.6.0
-     */
-    default List<EnumConstantElement> elements() {
-        return Collections.emptyList();
-    }
+    Set<ElementModifier> ENUM_CONSTANT_MODIFIERS = new HashSet<ElementModifier>() {{
+        add(ElementModifier.PUBLIC);
+        add(ElementModifier.STATIC);
+        add(ElementModifier.FINAL);
+    }};
 }
