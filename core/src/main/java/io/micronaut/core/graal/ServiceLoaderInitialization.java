@@ -20,8 +20,9 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
-import java.nio.file.Files;
+import java.nio.file.*;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -84,12 +85,25 @@ final class ServiceLoaderFeature implements Feature {
             while (micronautResources.hasMoreElements()) {
                 Set<String> servicePaths = new HashSet<>();
                 URL url = micronautResources.nextElement();
+                URI uri = url.toURI();
+                boolean isFileScheme = "file".equals(uri.getScheme());
+                if (isFileScheme) {
+                    Path p = Paths.get(uri);
+                    // strip the META-INF/micronaut part
+                    uri = p.getParent().getParent().toUri();
+                }
                 IOUtils.eachFile(
-                        url,
+                        uri,
                         path,
                         servicePath -> {
                             if (Files.isDirectory(servicePath)) {
-                                final String serviceName = servicePath.toString();
+                                String serviceName = servicePath.toString();
+                                if (isFileScheme) {
+                                    int i = serviceName.indexOf(path);
+                                    if (i > -1) {
+                                        serviceName = serviceName.substring(i);
+                                    }
+                                }
                                 if (serviceName.startsWith(path)) {
                                     servicePaths.add(serviceName);
                                 }
@@ -99,7 +113,7 @@ final class ServiceLoaderFeature implements Feature {
 
                 for (String servicePath : servicePaths) {
                     IOUtils.eachFile(
-                            url,
+                            uri,
                             servicePath,
                             serviceTypePath -> {
                                 if (Files.isRegularFile(serviceTypePath)) {
@@ -114,7 +128,7 @@ final class ServiceLoaderFeature implements Feature {
                 }
             }
 
-        } catch (IOException e) {
+        } catch (IOException | URISyntaxException e) {
             // ignore
         }
         return staticServiceDefinitions;
