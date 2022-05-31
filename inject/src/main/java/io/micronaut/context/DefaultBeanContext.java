@@ -2399,7 +2399,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                                                               @NonNull BeanDefinition<T> beanDefinition) {
         Map<String, Object> convertedValues;
         if (argumentValues == null) {
-            convertedValues = Collections.emptyMap();
+            convertedValues = requiredArguments.length == 0 ? Collections.emptyMap() : new LinkedHashMap<>();
             argumentValues = Collections.emptyMap();
         } else {
             convertedValues = new LinkedHashMap<>();
