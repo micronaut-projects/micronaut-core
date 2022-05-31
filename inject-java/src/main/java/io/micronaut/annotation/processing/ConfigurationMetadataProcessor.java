@@ -34,7 +34,7 @@ import java.util.Set;
  * Handles Configuration metadata generation.
  *
  * @author graemerocher
- * @since 3.6.0
+ * @since 3.5.1
  */
 public class ConfigurationMetadataProcessor extends AbstractInjectAnnotationProcessor {
 
