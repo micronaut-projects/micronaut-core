@@ -31,6 +31,8 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -479,6 +481,18 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
             this.transformer = transformer;
         }
 
+        private static URI normalizeFilePath(String path, URI uri) {
+            Path p = Paths.get(uri);
+            if (p.endsWith(path)) {
+                Path subpath = Paths.get(path);
+                for (int i = 0; i < subpath.getNameCount(); i++) {
+                     p = p.getParent();
+                }
+                uri = p.toUri();
+            }
+            return uri;
+        }
+
         @Override
         protected void compute() {
             try {
@@ -499,10 +513,13 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
                 }
 
                 for (URI uri : uniqueURIs) {
-                    String uriStr = uri.toString();
+                    String scheme = uri.getScheme();
+                    if ("file".equals(scheme)) {
+                        uri = normalizeFilePath(path, uri);
+                    }
                     // on GraalVM there are spurious extra resources that end with # and then a number
                     // we ignore this extra ones
-                    if (!(uriStr.startsWith("resource:") && uriStr.contains("#"))) {
+                    if (!("resource".equals(scheme) && uri.toString().contains("#"))) {
                         final MicronautMetaServicesLoader<S> task = new MicronautMetaServicesLoader<>(uri, path, transformer);
                         tasks.add(task);
                         task.fork();
