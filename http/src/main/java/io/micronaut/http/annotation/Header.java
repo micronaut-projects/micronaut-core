@@ -30,8 +30,8 @@ import java.lang.annotation.*;
  * <p></p>
  *
  * <pre class="code">
- * &#064;Header(name="X-Username",value='Freddy'),
- * &#064;Header(name="X-MyParam",value='${foo.bar}')
+ * &#064;Header(name = "X-Username", value = "Freddy"),
+ * &#064;Header(name = "X-MyParam", value = "${foo.bar}")
  * &#064;Client('/users')
  * interface UserClient {
  *

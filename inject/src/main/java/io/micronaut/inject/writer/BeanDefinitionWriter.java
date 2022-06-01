@@ -3530,7 +3530,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             final Element originatingElement = getOriginatingElements()[0];
             final boolean isFactoryMethod = (originatingElement instanceof MethodElement && !(originatingElement instanceof ConstructorElement));
             final boolean isProxyTarget = annotationMetadata.booleanValue(AnnotationUtil.ANN_AROUND, "proxyTarget").orElse(false) || isFactoryMethod;
-            // for beans that are @Around(proxyTarget=false) only the generated AOP impl should be intercepted
+            // for beans that are @Around(proxyTarget = false) only the generated AOP impl should be intercepted
             final boolean isAopType = StringUtils.isNotEmpty(interceptedType);
             final boolean isConstructorInterceptionCandidate = (isProxyTarget && !isAopType) || (isAopType && !isProxyTarget);
             final boolean hasAroundConstruct;

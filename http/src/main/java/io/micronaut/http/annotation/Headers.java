@@ -27,8 +27,8 @@ import java.lang.annotation.Target;
  * Example usage:
  * <pre><code>
  *{@literal @}Headers({
- *     {@literal @}Header(name="Content-type",value="application/octet-stream"),
- *     {@literal @}Header(name="Content-length",value="2048")
+ *     {@literal @}Header(name = "Content-type", value = "application/octet-stream"),
+ *     {@literal @}Header(name = "Content-length", value = "2048")
  * })
  * </code></pre>
  *
@@ -46,8 +46,8 @@ public @interface Headers {
      * Example usage:
      * <pre><code>
      *{@literal @}Headers({
-     *     {@literal @}Header(name="Content-type",value="application/octet-stream"),
-     *     {@literal @}Header(name="Content-length",value="2048")
+     *     {@literal @}Header(name = "Content-type", value = "application/octet-stream"),
+     *     {@literal @}Header(name = "Content-length", value = "2048")
      * })
      * </code></pre>
      * @return The headers

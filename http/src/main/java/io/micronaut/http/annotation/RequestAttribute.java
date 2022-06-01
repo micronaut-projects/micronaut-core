@@ -35,15 +35,15 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  * <p></p>
  *
  * <pre class="code">
- * &#064;RequestAttribute(name="X-Username",value='Freddy'),
- * &#064;RequestAttribute(name="X-MyParam",value='${foo.bar}')
+ * &#064;RequestAttribute(name = "X-Username", value = "Freddy"),
+ * &#064;RequestAttribute(name = "X-MyParam", value = "${foo.bar}")
  * &#064;Client('/users')
  * interface UserClient {
  *
  * }
  * </pre>
  *
- * <p>When declared as a binding annotation the <code>&#064;RequestAttribute</code> annotation is declared on each parameter to be bound:</p>
+ * <p>When declared as a binding annotation the {@code &#064;RequestAttribute} annotation is declared on each parameter to be bound:</p>
  *
  * <pre class="code">
  * &#064;Get('/user')

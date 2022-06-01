@@ -34,7 +34,7 @@ public class MyConfig {
     List<URL> urlList;
     List<URL> urlList2;
     List<URL> emptyList;
-    Map<String,Integer> flags;
+    Map<String, Integer> flags;
     Optional<URL> url;
     Optional<URL> anotherUrl = Optional.empty();
     Inner inner;

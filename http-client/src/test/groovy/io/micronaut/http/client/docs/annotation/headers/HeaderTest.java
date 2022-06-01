@@ -30,7 +30,7 @@ public class HeaderTest {
     @Test
     public void testSenderHeaders() throws Exception {
 
-        Map<String,Object> config =Collections.singletonMap(
+        Map<String, Object> config = Collections.singletonMap(
                 "pet.client.id", "11"
         );
 

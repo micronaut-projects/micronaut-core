@@ -17,7 +17,7 @@ class ProductInterceptors(private val productService: ProductService) {
             val parameterValues = context.parameterValues // <2>
             val parameterValue = parameterValues[0]
             require(!(parameterValue == null || parameterValues[0].toString().isEmpty())) { "Invalid product name" }
-            val productName = parameterValues[0].toString().toUpperCase()
+            val productName = parameterValues[0].toString().uppercase()
             parameterValues[0] = productName
             val product = context.proceed() // <3>
             productService.addProduct(product)

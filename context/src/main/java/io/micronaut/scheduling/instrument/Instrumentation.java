@@ -52,8 +52,8 @@ public interface Instrumentation extends AutoCloseable {
 
     /**
      * Return an instance which guarantees that cleanup will be forced to the instrumenter upon closing. The returned
-     * instance will always invoke {@link #close(boolean)} with {@code cleanup=true}
-     * even if {@link #close(boolean)} gets called with {@code cleanup=false}
+     * instance will always invoke {@link #close(boolean)} with {@code cleanup = true}
+     * even if {@link #close(boolean)} gets called with {@code cleanup = false}
      *
      * @return a new instance which forces cleanup upon leaving the protected block.
      */

@@ -107,7 +107,7 @@ public class HttpResponseEncoder extends MessageToMessageEncoder<MutableHttpResp
 
             MediaTypeCodec defaultCodec = new TextPlainCodec(serverConfiguration.getDefaultCharset());
 
-            response = encodeBodyWithCodec(response, body, defaultCodec, responseMediaType,  context);
+            response = encodeBodyWithCodec(response, body, defaultCodec, responseMediaType, context);
         }
 
         if (response instanceof NettyMutableHttpResponse) {
