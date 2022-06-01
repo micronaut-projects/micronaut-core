@@ -75,12 +75,12 @@ public class NettyCompletedFileUpload implements CompletedFileUpload {
     }
 
     /**
-     * Gets the content of this part as a <tt>InputStream</tt>.
+     * Gets the content of this part as a {@code InputStream}.
      *
      * <p>The contents of the file will be released when the stream is closed.
      * This method should only be called <strong>once</strong></p>
      *
-     * @return The content of this part as a <tt>InputStream</tt>
+     * @return The content of this part as a {@code InputStream}
      * @throws IOException If an error occurs in retrieving the content
      */
     @Override
@@ -101,12 +101,12 @@ public class NettyCompletedFileUpload implements CompletedFileUpload {
     }
 
     /**
-     * Gets the content of this part as a <tt>byte[]</tt>.
+     * Gets the content of this part as a {@code byte[]}.
      *
      * <p>Because the contents of the file are released after being retrieved,
      * this method can only be called <strong>once</strong></p>
      *
-     * @return The content of this part as a <tt>byte[]</tt>
+     * @return The content of this part as a {@code byte[]}
      * @throws IOException If an error occurs in retrieving the content
      */
     @Override
@@ -123,12 +123,12 @@ public class NettyCompletedFileUpload implements CompletedFileUpload {
     }
 
     /**
-     * Gets the content of this part as a <tt>ByteBuffer</tt>.
+     * Gets the content of this part as a {@code ByteBuffer}.
      *
      * <p>Because the contents of the file are released after being retrieved,
      * this method can only be called <strong>once</strong></p>
      *
-     * @return The content of this part as a <tt>ByteBuffer</tt>
+     * @return The content of this part as a {@code ByteBuffer}
      * @throws IOException If an error occurs in retrieving the content
      */
     @Override

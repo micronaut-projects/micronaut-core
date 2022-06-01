@@ -111,7 +111,7 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
     Argument<Object> OBJECT_ARGUMENT = of(Object.class);
 
     /**
-     * Constant for List<String> argument.
+     * Constant for {@code List<String>} argument.
      */
     Argument<List<String>> LIST_OF_STRING = Argument.listOf(String.class);
 

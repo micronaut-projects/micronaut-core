@@ -47,8 +47,8 @@ import java.util.Set;
  * <p>Users of Micronaut should in general avoid the methods of the {@link java.lang.reflect.AnnotatedElement}
  * interface and use this interface instead to obtain maximum efficiency</p>
  * <p>
- * <p>Core framework types such as <tt>io.micronaut.inject.BeanDefinition</tt> and
- * <tt>io.micronaut.inject.ExecutableMethod</tt> implement this interface</p>
+ * <p>Core framework types such as {@code io.micronaut.inject.BeanDefinition} and
+ * {@code io.micronaut.inject.ExecutableMethod} implement this interface</p>
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -60,7 +60,7 @@ public interface AnnotationMetadata extends AnnotationSource {
     AnnotationMetadata EMPTY_METADATA = new EmptyAnnotationMetadata();
 
     /**
-     * The default <tt>value()</tt> member.
+     * The default {@code value()} member.
      */
     String VALUE_MEMBER = "value";
 

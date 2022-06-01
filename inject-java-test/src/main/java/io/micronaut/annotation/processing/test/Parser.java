@@ -30,8 +30,10 @@ import static java.lang.Boolean.TRUE;
 public final class Parser {
 
     /**
-     * Parses {@code sources} into {@linkplain CompilationUnitTree compilation units}. This method
+     * Parses {@code sources} into {@linkplain CompilationUnitTree} compilation units. This method
      * <b>does not</b> compile the sources.
+     *
+     * @param sources
      */
     public static Iterable<? extends Element> parse(JavaFileObject... sources) {
         JavaParser javaParser = new JavaParser();
@@ -43,7 +45,7 @@ public final class Parser {
     }
 
     /**
-     * Parses {@code sources} into {@linkplain CompilationUnitTree compilation units}. This method
+     * Parses {@code sources} into {@linkplain CompilationUnitTree} compilation units. This method
      * <b>does not</b> compile the sources.
      */
     public static Iterable<? extends Element> parseLines(String className, String... lines) {
@@ -51,7 +53,7 @@ public final class Parser {
     }
 
     /**
-     * Parses {@code sources} into {@linkplain CompilationUnitTree compilation units}. This method
+     * Parses {@code sources} into {@linkplain CompilationUnitTree} compilation units. This method
      * <b>does not</b> compile the sources.
      */
     public static Iterable<? extends JavaFileObject> generate(String className, String code) {
@@ -59,7 +61,7 @@ public final class Parser {
     }
 
     /**
-     * Parses {@code sources} into {@linkplain CompilationUnitTree compilation units}. This method
+     * Parses {@code sources} into {@linkplain CompilationUnitTree} compilation units. This method
      * <b>does not</b> compile the sources.
      *
      * @param sources The sources

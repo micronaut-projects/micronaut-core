@@ -208,7 +208,7 @@ public class ClassUtils {
     }
 
     /**
-     * Return whether the given class is a common type found in <tt>java.lang</tt> such as String or a primitive type.
+     * Return whether the given class is a common type found in {@code java.lang} such as String or a primitive type.
      *
      * @param type The type
      * @return True if it is
@@ -219,7 +219,7 @@ public class ClassUtils {
     }
 
     /**
-     * Return whether the given class is a common type found in <tt>java.lang</tt> such as String or a primitive type.
+     * Return whether the given class is a common type found in {@code java.lang} such as String or a primitive type.
      *
      * @param typeName The type name
      * @return True if it is

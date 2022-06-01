@@ -787,7 +787,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
 
         /**
          * @param portInHost True if the host header supports a port
-         *                   appended with {@code :}. Default value ({@value #DEFAULT_PORT_IN_HOST}).
+         *                   appended with {@code :}. Default value ({@link #DEFAULT_PORT_IN_HOST}).
          */
         public void setPortInHost(boolean portInHost) {
             this.portInHost = portInHost;
