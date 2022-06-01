@@ -20,9 +20,9 @@ import io.micronaut.core.annotation.Experimental;
 
 /**
  * Instrumentation represents an ongoing instrumentation with a given context of {@link InvocationInstrumenter} if any.
- * <p/>
+ * <p>
  * To force cleanup after the invocation, use the instance returned by {@link #forceCleanup()} instead, such as:
- * <p/>
+ * <p>
  * <pre>
  * try (Instrumentation ignored = instrumenter.newInstrumentation().forceCleanup()) {
  *     ...

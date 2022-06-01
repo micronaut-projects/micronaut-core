@@ -41,55 +41,56 @@ import java.util.regex.Pattern;
  * A cron expressions consists of 5 or 6 mandatory fields (seconds may be omitted) separated by space. <br>
  * These are:
  * <p>
- * <table cellspacing="8">
+ * <table>
+ *     <caption>Cron expressions</caption>
  * <tr>
- * <th align="left">Field</th>
- * <th align="left">&nbsp;</th>
- * <th align="left">Allowable values</th>
- * <th align="left">&nbsp;</th>
- * <th align="left">Special Characters</th>
+ * <th>Field</th>
+ * <th>&nbsp;</th>
+ * <th>Allowable values</th>
+ * <th>&nbsp;</th>
+ * <th>Special Characters</th>
  * </tr>
  * <tr>
- * <td align="left"><code>Seconds (may be omitted)</code></td>
- * <td align="left">&nbsp;</td>
- * <td align="left"><code>0-59</code></td>
- * <td align="left">&nbsp;</td>
- * <td align="left"><code>, - * /</code></td>
+ * <td>{@code Seconds (may be omitted)}</td>
+ * <td>&nbsp;</td>
+ * <td>{@code 0-59}</td>
+ * <td>&nbsp;</td>
+ * <td>{@code , - * /}</td>
  * </tr>
  * <tr>
- * <td align="left"><code>Minutes</code></td>
- * <td align="left">&nbsp;</td>
- * <td align="left"><code>0-59</code></td>
- * <td align="left">&nbsp;</td>
- * <td align="left"><code>, - * /</code></td>
+ * <td>{@code Minutes}</td>
+ * <td>&nbsp;</td>
+ * <td>{@code 0-59}</td>
+ * <td>&nbsp;</td>
+ * <td>{@code , - * /}</td>
  * </tr>
  * <tr>
- * <td align="left"><code>Hours</code></td>
- * <td align="left">&nbsp;</td>
- * <td align="left"><code>0-23</code></td>
- * <td align="left">&nbsp;</td>
- * <td align="left"><code>, - * /</code></td>
+ * <td>{@code Hours}</td>
+ * <td>&nbsp;</td>
+ * <td>{@code 0-23}</td>
+ * <td>&nbsp;</td>
+ * <td>{@code , - * /}</td>
  * </tr>
  * <tr>
- * <td align="left"><code>Day of month</code></td>
- * <td align="left">&nbsp;</td>
- * <td align="left"><code>1-31</code></td>
- * <td align="left">&nbsp;</td>
- * <td align="left"><code>, - * ? / L W</code></td>
+ * <td>{@code Day of month}</td>
+ * <td>&nbsp;</td>
+ * <td>{@code 1-31}</td>
+ * <td>&nbsp;</td>
+ * <td>{@code , - * ? / L W}</td>
  * </tr>
  * <tr>
- * <td align="left"><code>Month</code></td>
- * <td align="left">&nbsp;</td>
- * <td align="left"><code>1-12 or JAN-DEC (note: english abbreviations)</code></td>
- * <td align="left">&nbsp;</td>
- * <td align="left"><code>, - * /</code></td>
+ * <td>{@code Month}</td>
+ * <td>&nbsp;</td>
+ * <td>{@code 1-12 or JAN-DEC (note: english abbreviations)}</td>
+ * <td>&nbsp;</td>
+ * <td>{@code , - * /}</td>
  * </tr>
  * <tr>
- * <td align="left"><code>Day of week</code></td>
- * <td align="left">&nbsp;</td>
- * <td align="left"><code>1-7 or MON-SUN (note: english abbreviations)</code></td>
- * <td align="left">&nbsp;</td>
- * <td align="left"><code>, - * ? / L #</code></td>
+ * <td>{@code Day of week}</td>
+ * <td>&nbsp;</td>
+ * <td>{@code 1-7 or MON-SUN (note: english abbreviations)}</td>
+ * <td>&nbsp;</td>
+ * <td>{@code , - * ? / L #}</td>
  * </tr>
  * </table>
  * <p>

@@ -511,7 +511,7 @@ public class NameUtils {
      * <ul>
      * <li>If the first or only character is Upper Case, it is made Lower Case
      * <li>UNLESS the second character is also Upper Case, when the String is
-     * returned unchanged <eul>.
+     * returned unchanged.
      * </ul>
      *
      * @param name The String to decapitalize

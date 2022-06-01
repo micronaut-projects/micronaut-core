@@ -272,7 +272,7 @@ public final class StringUtils {
      * delimiter characters. Each of those characters can be used to separate
      * tokens. A delimiter is always a single character; for multi-character
      * delimiters, consider using <code>delimitedListToStringArray</code>
-     * <p/>
+     * <p>
      * <p>Copied from the Spring Framework while retaining all license, copyright and author information.
      *
      * @param str        the String to tokenize
@@ -292,7 +292,7 @@ public final class StringUtils {
      * delimiter characters. Each of those characters can be used to separate
      * tokens. A delimiter is always a single character; for multi-character
      * delimiters, consider using <code>delimitedListToStringArray</code>
-     * <p/>
+     * <p>
      * <p>Copied from the Spring Framework while retaining all license, copyright and author information.
      *
      * @param str               the String to tokenize
