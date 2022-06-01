@@ -169,7 +169,7 @@ public class JavaParser implements Closeable {
     }
 
     /**
-     * Parses {@code sources} into {@code CompilationUnitTree} units. This method
+     * Parses {@code sources} into {@code com.sun.source.tree.CompilationUnitTree} units. This method
      * <b>does not</b> compile the sources.
      *
      * @param sources The sources
@@ -219,7 +219,7 @@ public class JavaParser implements Closeable {
     }
 
     /**
-     * Parses {@code sources} into {@code CompilationUnitTree} units. This method
+     * Parses {@code sources} into {@code com.sun.source.tree.CompilationUnitTree} units. This method
      * <b>does not</b> compile the sources.
      *
      * @param className The class name
@@ -250,7 +250,7 @@ public class JavaParser implements Closeable {
     }
 
     /**
-     * Parses {@code sources} into {@code CompilationUnitTree} units. This method
+     * Parses {@code sources} into {@code com.sun.source.tree.CompilationUnitTree} units. This method
      * <b>does not</b> compile the sources.
      *
      * @param sources The sources
