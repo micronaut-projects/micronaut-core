@@ -129,7 +129,7 @@ import java.util.regex.Pattern;
  * <p>
  * <b>Dependencies between fields</b> Fields are always evaluated independently, but the expression doesn't match until
  * the constraints of each field are met. Overlap of intervals are not allowed. That is: for
- * Day-of-week field &quot;FRI-MON&quot; is invalid,but &quot;FRI-SUN,MON&quot; is valid
+ * Day-of-week field &quot;FRI-MON&quot; is invalid, but &quot;FRI-SUN,MON&quot; is valid
  */
 public final class CronExpression {
 
@@ -327,7 +327,7 @@ public final class CronExpression {
                                 + "   (?:(?<all>\\*)|(?<ignore>\\?)|(?<last>L))  # global flag (L, ?, *)\n"
                                 + " | (?<start>[0-9]{1,2}|[a-z]{3,3})              # or start number or symbol\n"
                                 + "      (?:                                        # start of group 2\n"
-                                + "         (?<mod>L|W)                             # modifier (L,W)\n"
+                                + "         (?<mod>L|W)                             # modifier (L, W)\n"
                                 + "       | -(?<end>[0-9]{1,2}|[a-z]{3,3})        # or end nummer or symbol (in range)\n"
                                 + "      )?                                         # end of group 2\n"
                                 + ")                                              # end of group 1\n"

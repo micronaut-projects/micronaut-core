@@ -30,7 +30,7 @@ import reactor.core.publisher.Mono;
  */
 // tag::class[]
 @Client("/pets")
-@Header(name="X-Pet-Client", value="${pet.client.id}")
+@Header(name = "X-Pet-Client", value = "${pet.client.id}")
 public interface PetClient extends PetOperations {
 
     @Override
