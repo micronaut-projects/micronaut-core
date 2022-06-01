@@ -21,6 +21,7 @@ import java.util.List;
 
 import io.micronaut.ast.groovy.utils.AstAnnotationUtils;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.EnumConstantElement;
 import io.micronaut.inject.ast.EnumElement;
 
@@ -95,6 +96,11 @@ class GroovyEnumElement extends GroovyClassElement implements EnumElement {
 
         values = Collections.unmodifiableList(values);
         enumConstants = Collections.unmodifiableList(enumConstants);
+    }
+
+    @Override
+    public ClassElement withArrayDimensions(int arrayDimensions) {
+        return new GroovyEnumElement(visitorContext, classNode, getAnnotationMetadata(), arrayDimensions);
     }
 
 }
