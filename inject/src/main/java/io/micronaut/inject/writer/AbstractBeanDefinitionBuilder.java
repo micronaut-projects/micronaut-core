@@ -329,7 +329,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
                 if (this.typeArguments == null) {
                     this.typeArguments = new LinkedHashMap<>();
                 }
-                this.typeArguments.put(type.getName(), typeArguments);
+                this.typeArguments.put(type.getName(), resolvedTypes);
             }
         }
         return this;
