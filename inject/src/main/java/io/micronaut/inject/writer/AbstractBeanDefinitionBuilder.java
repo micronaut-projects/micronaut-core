@@ -260,7 +260,12 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         return beanType;
     }
 
-    private BeanParameterElement[] initBeanParameters(ParameterElement[] constructorParameters) {
+    /**
+     * Initialize the bean parameters.
+     * @param constructorParameters The parameters to use.
+     * @return The initialized parameters
+     */
+    protected final BeanParameterElement[] initBeanParameters(@NonNull ParameterElement[] constructorParameters) {
         if (ArrayUtils.isNotEmpty(constructorParameters)) {
             return Arrays.stream(constructorParameters)
                     .map(InternalBeanParameter::new)
@@ -389,9 +394,17 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
     @Override
     public BeanElementBuilder withParameters(Consumer<BeanParameterElement[]> parameters) {
         if (parameters != null && this.constructorElement != null) {
-            parameters.accept(constructorElement.getParameters());
+            parameters.accept(getParameters());
         }
         return this;
+    }
+
+    /**
+     * @return The bean creation parameters.
+     */
+    @NonNull
+    protected BeanParameterElement[] getParameters() {
+        return constructorElement.getParameters();
     }
 
     @NonNull
