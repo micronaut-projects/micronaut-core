@@ -135,6 +135,8 @@ import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import static io.micronaut.http.HttpAttributes.AVAILABLE_HTTP_METHODS;
+
 /**
  * Internal implementation of the {@link io.netty.channel.ChannelInboundHandler} for Micronaut.
  *
@@ -344,6 +346,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     .collect(Collectors.toList());
             if (!anyUriRoutes.isEmpty()) {
                 setRouteAttributes(request, anyUriRoutes.get(0));
+                request.setAttribute(AVAILABLE_HTTP_METHODS, anyUriRoutes.stream().map(UriRouteMatch::getHttpMethod).collect(Collectors.toList()));
             }
         }
 
