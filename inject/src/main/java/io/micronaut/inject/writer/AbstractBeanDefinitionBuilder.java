@@ -588,6 +588,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
      * Build the bean definition writer.
      * @return The writer, possibly null if it wasn't possible to build it
      */
+    @SuppressWarnings({"ConstantConditions", "java:S2583"})
     @Nullable
     public BeanClassWriter build() {
         BeanClassWriter beanWriter = buildBeanClassWriter();
