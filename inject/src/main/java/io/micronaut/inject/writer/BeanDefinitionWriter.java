@@ -845,6 +845,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
      * @param factoryClass  The factory class
      * @param factoryMethod The factory method
      */
+    @Override
     public void visitBeanFactoryMethod(ClassElement factoryClass,
                                        MethodElement factoryMethod) {
         if (constructor != null) {
@@ -866,6 +867,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
      * @param factoryMethod The factory method
      * @param parameters    The parameters
      */
+    @Override
     public void visitBeanFactoryMethod(ClassElement factoryClass,
                                        MethodElement factoryMethod,
                                        ParameterElement[] parameters) {
@@ -887,6 +889,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
      * @param factoryClass The factory class
      * @param factoryField The factory field
      */
+    @Override
     public void visitBeanFactoryField(ClassElement factoryClass, FieldElement factoryField) {
         if (constructor != null) {
             throw new IllegalStateException("Only a single call to visitBeanFactoryMethod(..) is permitted");

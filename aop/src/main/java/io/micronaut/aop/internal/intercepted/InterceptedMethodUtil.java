@@ -15,6 +15,7 @@
  */
 package io.micronaut.aop.internal.intercepted;
 
+import io.micronaut.aop.Around;
 import io.micronaut.aop.InterceptedMethod;
 import io.micronaut.aop.InterceptorBinding;
 import io.micronaut.aop.InterceptorKind;
@@ -91,5 +92,47 @@ public final class InterceptedMethodUtil {
                     .toArray(io.micronaut.core.annotation.AnnotationValue[]::new);
         }
         return AnnotationUtil.ZERO_ANNOTATION_VALUES;
+    }
+
+    /**
+     * Does the given metadata have AOP advice declared.
+     * @param annotationMetadata The annotation metadata
+     * @return True if it does
+     */
+    public static boolean hasAroundStereotype(AnnotationMetadata annotationMetadata) {
+        if (annotationMetadata == null) {
+            return false;
+        }
+        if (annotationMetadata.hasStereotype(Around.class)) {
+            return true;
+        } else if (annotationMetadata.hasStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS)) {
+            return annotationMetadata.getAnnotationValuesByType(InterceptorBinding.class)
+                    .stream().anyMatch(av ->
+                            av.enumValue("kind", InterceptorKind.class).orElse(InterceptorKind.AROUND) == InterceptorKind.AROUND
+                    );
+        }
+
+        return false;
+    }
+
+    /**
+     * Does the given metadata have declared AOP advice.
+     * @param annotationMetadata The annotation metadata
+     * @return True if it does
+     */
+    public static boolean hasDeclaredAroundAdvice(AnnotationMetadata annotationMetadata) {
+        if (annotationMetadata == null) {
+            return false;
+        }
+        if (annotationMetadata.hasDeclaredStereotype(Around.class)) {
+            return true;
+        } else if (annotationMetadata.hasDeclaredStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS)) {
+            return annotationMetadata.getDeclaredAnnotationValuesByType(InterceptorBinding.class)
+                    .stream().anyMatch(av ->
+                            av.enumValue("kind", InterceptorKind.class).orElse(InterceptorKind.AROUND) == InterceptorKind.AROUND
+                    );
+        }
+
+        return false;
     }
 }
