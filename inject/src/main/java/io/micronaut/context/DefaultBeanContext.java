@@ -2399,7 +2399,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                                                               @NonNull BeanDefinition<T> beanDefinition) {
         Map<String, Object> convertedValues;
         if (argumentValues == null) {
-            convertedValues = Collections.emptyMap();
+            convertedValues = requiredArguments.length == 0 ? Collections.emptyMap() : new LinkedHashMap<>();
             argumentValues = Collections.emptyMap();
         } else {
             convertedValues = new LinkedHashMap<>();
@@ -2596,10 +2596,11 @@ public class DefaultBeanContext implements InitializableBeanContext {
     }
 
     private <T> boolean qualifiedByQualifier(BeanType<T> definitionToBeReplaced,
-                                             Class replacedBeanType,
+                                             Class<T> replacedBeanType,
                                              AnnotationClassValue<?> qualifier) {
-        final Class<? extends Annotation> qualifierClass = (Class<? extends Annotation>) qualifier.getType().get();
-        if (!qualifierClass.isAssignableFrom(Annotation.class)) {
+        @SuppressWarnings("unchecked") final Class<? extends Annotation> qualifierClass =
+                (Class<? extends Annotation>) qualifier.getType().orElse(null);
+        if (qualifierClass != null && !qualifierClass.isAssignableFrom(Annotation.class)) {
             return Qualifiers.<T>byStereotype(qualifierClass).qualify(replacedBeanType, Stream.of(definitionToBeReplaced))
                 .isPresent();
         } else {
