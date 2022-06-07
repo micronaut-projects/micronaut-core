@@ -77,16 +77,21 @@ public class IOUtils {
     public static void eachFile(@NonNull URI uri, String path, @NonNull Consumer<Path> consumer) {
         Path myPath;
         try {
+            String scheme = uri.getScheme();
             FileSystem fileSystem = null;
+
             try {
-                if ("jar".equals(uri.getScheme())) {
+                if ("jar".equals(scheme)) {
                     try {
                         fileSystem = FileSystems.getFileSystem(uri);
                     } catch (FileSystemNotFoundException e) {
                         fileSystem = FileSystems.newFileSystem(uri, Collections.emptyMap());
                     }
                     myPath = fileSystem.getPath(path);
+                } else if ("file".equals(scheme)) {
+                    myPath = Paths.get(uri).resolve(path);
                 } else {
+                    // graal resource: case
                     myPath = Paths.get(uri);
                 }
             } catch (FileSystemNotFoundException e) {

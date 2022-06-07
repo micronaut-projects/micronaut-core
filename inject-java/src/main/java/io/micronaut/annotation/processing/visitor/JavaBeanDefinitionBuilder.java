@@ -25,6 +25,7 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.beans.BeanParameterElement;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
@@ -35,6 +36,7 @@ import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 
 /**
@@ -90,12 +92,13 @@ class JavaBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
                 final BeanDefinitionWriter writer = super.createBeanDefinitionWriter();
                 final JavaElementFactory elementFactory = ((JavaVisitorContext) visitorContext).getElementFactory();
                 final VariableElement variableElement = (VariableElement) producerField.getNativeType();
+                ClassElement resolvedParent = resolveParentType(parentType, elementFactory);
                 writer.visitBeanFactoryField(
-                        parentType,
+                        resolvedParent,
                         elementFactory.newFieldElement(
-                                parentType,
+                                resolvedParent,
                                 variableElement,
-                                new AnnotationMetadataHierarchy(parentType.getDeclaredMetadata(), producerField.getDeclaredMetadata())
+                                new AnnotationMetadataHierarchy(resolvedParent.getDeclaredMetadata(), producerField.getDeclaredMetadata())
                         )
                 );
                 return writer;
@@ -117,6 +120,7 @@ class JavaBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
                 JavaBeanDefinitionBuilder.this.metadataBuilder,
                 (JavaVisitorContext) JavaBeanDefinitionBuilder.this.visitorContext
         ) {
+            BeanParameterElement[] parameters;
             @Override
             public Element getProducingElement() {
                 return producerMethod;
@@ -128,20 +132,31 @@ class JavaBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
             }
 
             @Override
+            protected BeanParameterElement[] getParameters() {
+                if (parameters == null) {
+                    parameters = initBeanParameters(producerMethod.getParameters());
+                }
+                return parameters;
+            }
+
+            @Override
             protected BeanDefinitionWriter createBeanDefinitionWriter() {
                 final BeanDefinitionWriter writer = super.createBeanDefinitionWriter();
                 final JavaElementFactory elementFactory = ((JavaVisitorContext) visitorContext).getElementFactory();
                 final ExecutableElement variableElement = (ExecutableElement) producerMethod.getNativeType();
+                ClassElement resolvedParent = resolveParentType(parentType, elementFactory);
                 writer.visitBeanFactoryMethod(
-                        parentType,
+                        resolvedParent,
                         elementFactory.newMethodElement(
-                                parentType,
+                                resolvedParent,
                                 variableElement,
-                                new AnnotationMetadataHierarchy(parentType.getDeclaredMetadata(), producerMethod.getDeclaredMetadata())
-                        )
+                                new AnnotationMetadataHierarchy(resolvedParent.getDeclaredMetadata(), producerMethod.getDeclaredMetadata())
+                        ),
+                        getParameters()
                 );
                 return writer;
             }
+
         };
     }
 
@@ -200,5 +215,14 @@ class JavaBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
         annotationUtils
                 .newAnnotationBuilder()
                 .removeAnnotation(annotationMetadata, annotationType);
+    }
+
+    private ClassElement resolveParentType(ClassElement parentType, JavaElementFactory elementFactory) {
+        Object nativeType = parentType.getNativeType();
+        ClassElement resolvedParent = parentType;
+        if (nativeType instanceof TypeElement) {
+            resolvedParent = elementFactory.newClassElement((TypeElement) nativeType, this.getAnnotationMetadata());
+        }
+        return resolvedParent;
     }
 }

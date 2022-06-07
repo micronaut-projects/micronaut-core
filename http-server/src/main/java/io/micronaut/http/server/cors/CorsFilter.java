@@ -33,6 +33,7 @@ import io.micronaut.http.filter.ServerFilterPhase;
 import io.micronaut.http.server.HttpServerConfiguration;
 import org.reactivestreams.Publisher;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -40,6 +41,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import static io.micronaut.http.HttpAttributes.AVAILABLE_HTTP_METHODS;
 import static io.micronaut.http.HttpHeaders.*;
 
 /**
@@ -142,15 +144,17 @@ public class CorsFilter implements HttpServerFilter {
                 HttpMethod requestMethod = request.getMethod();
 
                 List<HttpMethod> allowedMethods = config.getAllowedMethods();
+                HttpMethod methodToMatch = preflight ? headers.getFirst(ACCESS_CONTROL_REQUEST_METHOD, CONVERSION_CONTEXT_HTTP_METHOD).orElse(requestMethod) : requestMethod;
 
                 if (!isAnyMethod(allowedMethods)) {
-                    HttpMethod methodToMatch = preflight ? headers.getFirst(ACCESS_CONTROL_REQUEST_METHOD, CONVERSION_CONTEXT_HTTP_METHOD).orElse(requestMethod) : requestMethod;
                     if (allowedMethods.stream().noneMatch(method -> method.equals(methodToMatch))) {
                         return Optional.of(HttpResponse.status(HttpStatus.FORBIDDEN));
                     }
                 }
 
-                if (preflight) {
+                Optional<? extends ArrayList<HttpMethod>> availableHttpMethods = (Optional<? extends ArrayList<HttpMethod>>) request.getAttribute(AVAILABLE_HTTP_METHODS, new ArrayList<HttpMethod>().getClass());
+
+                if (preflight && availableHttpMethods.isPresent() && availableHttpMethods.get().stream().anyMatch(method -> method.equals(methodToMatch))) {
                     Optional<List<String>> accessControlHeaders = headers.get(ACCESS_CONTROL_REQUEST_HEADERS, ConversionContext.LIST_OF_STRING);
 
                     List<String> allowedHeaders = config.getAllowedHeaders();
