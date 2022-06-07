@@ -17,6 +17,7 @@ package io.micronaut.inject.ast.beans;
 
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.MethodElement;
 
@@ -30,6 +31,22 @@ import java.util.function.Consumer;
  * @since 3.0.0
  */
 public interface BeanMethodElement extends MethodElement {
+
+    /**
+     * Intercept the method.
+     * @param annotationValue The annotation to intercept
+     * @return This bean method
+     * @since 3.5.2
+     */
+    default @NonNull BeanMethodElement intercept(AnnotationValue<?>... annotationValue) {
+        if (annotationValue != null) {
+            for (AnnotationValue<?> value : annotationValue) {
+                annotate(value);
+            }
+        }
+        return this;
+    }
+
     /**
      * Make the method executable.
      *

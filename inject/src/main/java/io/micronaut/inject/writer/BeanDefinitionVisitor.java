@@ -52,6 +52,25 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
 
 
     /**
+     * <p>In the case where the produced class is produced by a factory method annotated with
+     * {@link io.micronaut.context.annotation.Bean} this method should be called.</p>
+     *
+     * @param factoryClass  The factory class
+     * @param factoryMethod The factory method
+     */
+    void visitBeanFactoryMethod(ClassElement factoryClass,
+                                MethodElement factoryMethod);
+
+    /**
+     * <p>In the case where the produced class is produced by a factory field annotated with
+     * {@link io.micronaut.context.annotation.Bean} this method should be called.</p>
+     *
+     * @param factoryClass The factory class
+     * @param factoryField The factory field
+     */
+    void visitBeanFactoryField(ClassElement factoryClass, FieldElement factoryField);
+
+    /**
      * Visits the constructor used to create the bean definition.
      *
      * @param constructor        The method element that represents the constructor

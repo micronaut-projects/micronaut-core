@@ -389,6 +389,16 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     }
 
     @Override
+    public void visitBeanFactoryMethod(ClassElement factoryClass, MethodElement factoryMethod) {
+        proxyBeanDefinitionWriter.visitBeanFactoryMethod(factoryClass, factoryMethod);
+    }
+
+    @Override
+    public void visitBeanFactoryField(ClassElement factoryClass, FieldElement factoryField) {
+        proxyBeanDefinitionWriter.visitBeanFactoryField(factoryClass, factoryField);
+    }
+
+    @Override
     public boolean isSingleton() {
         return proxyBeanDefinitionWriter.isSingleton();
     }
