@@ -49,6 +49,7 @@ import io.micronaut.inject.ast.beans.BeanMethodElement;
 import io.micronaut.inject.ast.beans.BeanParameterElement;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.visitor.VisitorContext;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
 import java.lang.annotation.Annotation;
@@ -589,6 +590,61 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
      */
     @Nullable
     public BeanClassWriter build() {
+        BeanClassWriter beanWriter = buildBeanClassWriter();
+        if (beanWriter == null) {
+            return null;
+        } else {
+            BeanDefinitionVisitor parentVisitor = beanWriter.getBeanDefinitionVisitor();
+            AnnotationMetadata annotationMetadata = getAnnotationMetadata();
+            if (isIntercepted() && parentVisitor instanceof BeanDefinitionWriter) {
+                return new BeanClassWriter() {
+                    @Override
+                    public BeanDefinitionVisitor getBeanDefinitionVisitor() {
+                        return parentVisitor;
+                    }
+
+                    @Override
+                    public void accept(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {
+                        BeanDefinitionWriter beanDefinitionWriter = (BeanDefinitionWriter) parentVisitor;
+                        BeanDefinitionVisitor aopProxyWriter = AbstractBeanDefinitionBuilder.this.createAopWriter(beanDefinitionWriter, annotationMetadata);
+
+                        if (configureBeanVisitor(aopProxyWriter)) {
+                            return;
+                        }
+
+                        visitInterceptedMethods(
+                                createAroundMethodVisitor(aopProxyWriter)
+                        );
+
+                        finalizeAndWriteBean(classWriterOutputVisitor, aopProxyWriter);
+                        beanWriter.accept(classWriterOutputVisitor);
+                    }
+                };
+            } else {
+                return beanWriter;
+            }
+        }
+    }
+
+    /**
+     * Creates the around method visitor.
+     * @param aopProxyWriter The AOP writer
+     * @return The visitor
+     */
+    @NonNull
+    protected abstract BiConsumer<TypedElement, MethodElement> createAroundMethodVisitor(BeanDefinitionVisitor aopProxyWriter);
+
+    /**
+     * Creates the AOP writer.
+     * @param beanDefinitionWriter The bean definition writer
+     * @param annotationMetadata The annotation metadata
+     * @return The AOP writer
+     */
+    @NonNull
+    protected abstract BeanDefinitionVisitor createAopWriter(BeanDefinitionWriter beanDefinitionWriter, AnnotationMetadata annotationMetadata);
+
+    @NonNull
+    private BeanClassWriter buildBeanClassWriter() {
         final BeanDefinitionVisitor beanDefinitionWriter = createBeanDefinitionWriter();
         return new BeanClassWriter() {
             @Override

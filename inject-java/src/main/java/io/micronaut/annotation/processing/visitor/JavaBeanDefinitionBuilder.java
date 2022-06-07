@@ -29,23 +29,21 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.ast.beans.BeanParameterElement;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
-import io.micronaut.inject.writer.BeanClassWriter;
 import io.micronaut.inject.writer.BeanDefinitionVisitor;
 import io.micronaut.inject.writer.BeanDefinitionWriter;
-import io.micronaut.inject.writer.ClassWriterOutputVisitor;
-
-import java.io.IOException;
-import java.lang.annotation.Annotation;
-import java.util.function.Consumer;
-import java.util.function.Predicate;
 
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
+import java.lang.annotation.Annotation;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 /**
  * Java implementation of {@link AbstractBeanDefinitionBuilder}.
@@ -115,56 +113,30 @@ class JavaBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
     }
 
     @Override
-    public BeanClassWriter build() {
-        BeanClassWriter beanWriter = super.build();
-        if (beanWriter == null) {
-            return null;
-        }
-        BeanDefinitionVisitor parentVisitor = beanWriter.getBeanDefinitionVisitor();
-        AnnotationMetadata annotationMetadata = getAnnotationMetadata();
-        if (isIntercepted() && parentVisitor instanceof BeanDefinitionWriter) {
-            return new BeanClassWriter() {
-                @Override
-                public BeanDefinitionVisitor getBeanDefinitionVisitor() {
-                    return parentVisitor;
-                }
+    protected BeanDefinitionVisitor createAopWriter(BeanDefinitionWriter beanDefinitionWriter, AnnotationMetadata annotationMetadata) {
+        AnnotationValue<?>[] interceptorTypes =
+                InterceptedMethodUtil.resolveInterceptorBinding(annotationMetadata, InterceptorKind.AROUND);
+        BeanDefinitionVisitor aopProxyWriter = new AopProxyWriter(
+                beanDefinitionWriter,
+                annotationMetadata.getValues(Around.class, Boolean.class),
+                ConfigurationMetadataBuilder.getConfigurationMetadataBuilder().orElse(null),
+                visitorContext,
+                interceptorTypes
+        );
+        return aopProxyWriter;
+    }
 
-                @Override
-                public void accept(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {
-                    io.micronaut.core.annotation.AnnotationValue<?>[] interceptorTypes =
-                            InterceptedMethodUtil.resolveInterceptorBinding(annotationMetadata, InterceptorKind.AROUND);
-
-                    BeanDefinitionWriter beanDefinitionWriter = (BeanDefinitionWriter) parentVisitor;
-                    AopProxyWriter aopProxyWriter = new AopProxyWriter(
-                            beanDefinitionWriter,
-                            annotationMetadata.getValues(Around.class, Boolean.class),
-                            ConfigurationMetadataBuilder.getConfigurationMetadataBuilder().orElse(null),
-                            visitorContext,
-                            interceptorTypes
-                    );
-
-                    if (configureBeanVisitor(aopProxyWriter)) {
-                        return;
-                    }
-
-                    visitInterceptedMethods(
-                            (bean, method) -> {
-                                io.micronaut.core.annotation.AnnotationValue<?>[] newTypes =
-                                        InterceptedMethodUtil.resolveInterceptorBinding(method.getAnnotationMetadata(), InterceptorKind.AROUND);
-                                aopProxyWriter.visitInterceptorBinding(newTypes);
-                                aopProxyWriter.visitAroundMethod(
-                                        bean, method
-                                );
-                            }
-                    );
-
-                    finalizeAndWriteBean(classWriterOutputVisitor, aopProxyWriter);
-                    beanWriter.accept(classWriterOutputVisitor);
-                }
-            };
-        } else {
-            return beanWriter;
-        }
+    @Override
+    protected BiConsumer<TypedElement, MethodElement> createAroundMethodVisitor(BeanDefinitionVisitor aopWriter) {
+        AopProxyWriter aopProxyWriter = (AopProxyWriter) aopWriter;
+        return (bean, method) -> {
+            AnnotationValue<?>[] newTypes =
+                    InterceptedMethodUtil.resolveInterceptorBinding(method.getAnnotationMetadata(), InterceptorKind.AROUND);
+            aopProxyWriter.visitInterceptorBinding(newTypes);
+            aopProxyWriter.visitAroundMethod(
+                    bean, method
+            );
+        };
     }
 
     @Override
