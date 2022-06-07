@@ -15,7 +15,6 @@
  */
 package io.micronaut.inject.writer;
 
-import io.micronaut.context.annotation.Bean;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.util.Toggleable;
 import io.micronaut.inject.BeanDefinition;
@@ -64,7 +63,7 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
 
     /**
      * <p>In the case where the produced class is produced by a factory method annotated with
-     * {@link Bean} this method should be called.</p>
+     * {@link io.micronaut.context.annotation.Bean} this method should be called.</p>
      *
      * @param factoryClass  The factory class
      * @param factoryMethod The factory method
