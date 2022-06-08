@@ -20,7 +20,9 @@ public class ApplyAopToTypeVisitor implements TypeElementVisitor<Object, Object>
             context.getClassElement(ApplyAopToMe.class)
                     .ifPresent((applyAopToMe) -> element
                             .addAssociatedBean(applyAopToMe)
-                            .intercept(av));
+                            .intercept(av)
+                            .inject()
+                    );
         }
     }
 

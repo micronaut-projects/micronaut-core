@@ -219,12 +219,12 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
                 .onlyInjected();
         Set<FieldElement> accessibleFields = new HashSet<>();
         this.beanType.getEnclosedElements(baseQuery.modifiers(PUBLIC_FILTER))
-                .forEach((fieldElement) -> {
+                .forEach(fieldElement -> {
                     accessibleFields.add(fieldElement);
                     new InternalBeanElementField(fieldElement, false).inject();
                 });
         this.beanType.getEnclosedElements(baseQuery.modifiers(NON_PUBLIC_FILTER))
-                .forEach((fieldElement) -> {
+                .forEach(fieldElement -> {
                     if (!accessibleFields.contains(fieldElement)) {
                         new InternalBeanElementField(fieldElement, true).inject();
                     }
@@ -238,12 +238,12 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
                 .onlyInjected();
         Set<MethodElement> accessibleMethods = new HashSet<>();
         this.beanType.getEnclosedElements(baseQuery.modifiers(PUBLIC_FILTER))
-                .forEach((methodElement) -> {
+                .forEach(methodElement -> {
                      accessibleMethods.add(methodElement);
                     handleMethod(methodElement, false);
                 });
         this.beanType.getEnclosedElements(baseQuery.modifiers(NON_PUBLIC_FILTER))
-                .forEach((methodElement) -> {
+                .forEach(methodElement -> {
                     if (!accessibleMethods.contains(methodElement)) {
                         handleMethod(methodElement, true);
                     }
@@ -596,7 +596,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
             return null;
         } else {
             BeanDefinitionVisitor parentVisitor = beanWriter.getBeanDefinitionVisitor();
-            AnnotationMetadata annotationMetadata = getAnnotationMetadata();
+            AnnotationMetadata thisAnnotationMetadata = getAnnotationMetadata();
             if (isIntercepted() && parentVisitor instanceof BeanDefinitionWriter) {
                 return new BeanClassWriter() {
                     @Override
@@ -607,11 +607,14 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
                     @Override
                     public void accept(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {
                         BeanDefinitionWriter beanDefinitionWriter = (BeanDefinitionWriter) parentVisitor;
-                        BeanDefinitionVisitor aopProxyWriter = AbstractBeanDefinitionBuilder.this.createAopWriter(beanDefinitionWriter, annotationMetadata);
+                        BeanDefinitionVisitor aopProxyWriter = AbstractBeanDefinitionBuilder.this.createAopWriter(beanDefinitionWriter, thisAnnotationMetadata);
+
 
                         if (configureBeanVisitor(aopProxyWriter)) {
                             return;
                         }
+
+                        configureInjectionPoints(aopProxyWriter);
 
                         visitInterceptedMethods(
                                 createAroundMethodVisitor(aopProxyWriter)
@@ -659,63 +662,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
                     return;
                 }
 
-                Map<ClassElement, List<MemberElement>> sortedInjections = new LinkedHashMap<>();
-                List<MemberElement> allInjected = new ArrayList<>();
-                allInjected.addAll(injectedFields);
-                allInjected.addAll(injectedMethods);
-                allInjected.sort(SORTER);
-                for (MemberElement memberElement : allInjected) {
-                    final List<MemberElement> list = sortedInjections
-                            .computeIfAbsent(memberElement.getDeclaringType(),
-                                    classElement -> new ArrayList<>()
-                            );
-                    list.add(memberElement);
-                }
-                for (List<MemberElement> members : sortedInjections.values()) {
-                    members.sort((o1, o2) -> {
-                        if (o1 instanceof FieldElement && o2 instanceof MethodElement) {
-                            return 1;
-                        } else if (o1 instanceof MethodElement && o1 instanceof FieldElement) {
-                            return -1;
-                        }
-                        return 0;
-                    });
-                }
-
-                for (List<MemberElement> list : sortedInjections.values()) {
-                    for (MemberElement memberElement : list) {
-                        if (memberElement instanceof FieldElement) {
-                            InternalBeanElementField ibf = (InternalBeanElementField) memberElement;
-                            ibf.<InternalBeanElementField>with((element) ->
-                                    visitField(beanDefinitionWriter, element, element)
-                            );
-
-                        } else {
-                            InternalBeanElementMethod ibm = (InternalBeanElementMethod) memberElement;
-                            ibm.<InternalBeanElementMethod>with((element) ->
-                                    beanDefinitionWriter.visitMethodInjectionPoint(
-                                            ibm.getDeclaringType(),
-                                            ibm,
-                                            ibm.isReflectionRequired(),
-                                            visitorContext
-                                    )
-                            );
-
-                        }
-                    }
-                }
-
-
-                for (BeanMethodElement executableMethod : executableMethods) {
-                    beanDefinitionWriter.visitExecutableMethod(
-                            beanType,
-                            executableMethod,
-                            visitorContext
-                    );
-                    if (executableMethod.getAnnotationMetadata().isTrue(Executable.class, "processOnStartup")) {
-                        beanDefinitionWriter.setRequiresMethodProcessing(true);
-                    }
-                }
+                configureInjectionPoints(beanDefinitionWriter);
 
                 for (BeanMethodElement postConstructMethod : postConstructMethods) {
                     if (postConstructMethod.getDeclaringType().equals(beanType)) {
@@ -742,6 +689,66 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
                 finalizeAndWriteBean(classWriterOutputVisitor, beanDefinitionWriter);
             }
         };
+    }
+
+    private void configureInjectionPoints(BeanDefinitionVisitor beanDefinitionWriter) {
+        Map<ClassElement, List<MemberElement>> sortedInjections = new LinkedHashMap<>();
+        List<MemberElement> allInjected = new ArrayList<>();
+        allInjected.addAll(injectedFields);
+        allInjected.addAll(injectedMethods);
+        allInjected.sort(SORTER);
+        for (MemberElement memberElement : allInjected) {
+            final List<MemberElement> list = sortedInjections
+                    .computeIfAbsent(memberElement.getDeclaringType(),
+                            classElement -> new ArrayList<>()
+                    );
+            list.add(memberElement);
+        }
+        for (List<MemberElement> members : sortedInjections.values()) {
+            members.sort((o1, o2) -> {
+                if (o1 instanceof FieldElement && o2 instanceof MethodElement) {
+                    return 1;
+                } else if (o1 instanceof MethodElement && o1 instanceof FieldElement) {
+                    return -1;
+                }
+                return 0;
+            });
+        }
+
+        for (List<MemberElement> list : sortedInjections.values()) {
+            for (MemberElement memberElement : list) {
+                if (memberElement instanceof FieldElement) {
+                    InternalBeanElementField ibf = (InternalBeanElementField) memberElement;
+                    ibf.<InternalBeanElementField>with(element ->
+                            visitField(beanDefinitionWriter, element, element)
+                    );
+
+                } else {
+                    InternalBeanElementMethod ibm = (InternalBeanElementMethod) memberElement;
+                    ibm.<InternalBeanElementMethod>with(element ->
+                            beanDefinitionWriter.visitMethodInjectionPoint(
+                                    ibm.getDeclaringType(),
+                                    ibm,
+                                    ibm.isReflectionRequired(),
+                                    visitorContext
+                            )
+                    );
+
+                }
+            }
+        }
+
+
+        for (BeanMethodElement executableMethod : executableMethods) {
+            beanDefinitionWriter.visitExecutableMethod(
+                    beanType,
+                    executableMethod,
+                    visitorContext
+            );
+            if (executableMethod.getAnnotationMetadata().isTrue(Executable.class, "processOnStartup")) {
+                beanDefinitionWriter.setRequiresMethodProcessing(true);
+            }
+        }
     }
 
     /**

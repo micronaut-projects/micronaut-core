@@ -36,6 +36,10 @@ class Test {
     public String hello(String name) {
         return applyAopToMe.hello(name);
     }
+    
+   public String plain(String name) {
+        return applyAopToMe.plain(name);
+    }
 }
 
 @InterceptorBean(Mutating.class)
@@ -63,6 +67,7 @@ class MutatingInterceptor implements MethodInterceptor<Object, Object> {
 
         expect:
         test.hello("john") == "Hello changed"
+        test.plain("john") == "Hello changed"
 
         cleanup:
         context.close()

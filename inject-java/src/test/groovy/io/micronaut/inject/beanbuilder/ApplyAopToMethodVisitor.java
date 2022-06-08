@@ -23,6 +23,7 @@ public class ApplyAopToMethodVisitor implements TypeElementVisitor<Object, Objec
             context.getClassElement(ApplyAopToMe.class)
                     .ifPresent((applyAopToMe) -> element
                             .addAssociatedBean(applyAopToMe)
+                            .inject()
                             .withMethods(ElementQuery.ALL_METHODS.named(n -> n.equals("hello")), method ->
                                 method.intercept(av)
                             ));
