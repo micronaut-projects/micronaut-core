@@ -737,9 +737,11 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     @NonNull
     @Override
     public ClassElement[] getTypeArguments() {
-        final Map<String, ClassElement> args = this.typeArguments.get(this.getBeanTypeName());
-        if (CollectionUtils.isNotEmpty(args)) {
-            return args.values().toArray(new ClassElement[0]);
+        if (hasTypeArguments()) {
+            final Map<String, ClassElement> args = this.typeArguments.get(this.getBeanTypeName());
+            if (CollectionUtils.isNotEmpty(args)) {
+                return args.values().toArray(ClassElement.ZERO_CLASS_ELEMENTS);
+            }
         }
         return BeanDefinitionVisitor.super.getTypeArguments();
     }
