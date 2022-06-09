@@ -49,7 +49,6 @@ import io.micronaut.inject.ast.beans.BeanMethodElement;
 import io.micronaut.inject.ast.beans.BeanParameterElement;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.visitor.VisitorContext;
-import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
 import java.lang.annotation.Annotation;

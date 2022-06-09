@@ -690,7 +690,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         private void visitIntroductionAdviceInterface(TypeElement classElement, AnnotationMetadata typeAnnotationMetadata, AopProxyWriter aopProxyWriter) {
             ClassElement introductionType = elementFactory.newClassElement(classElement, typeAnnotationMetadata);
             final AnnotationMetadata resolvedTypeMetadata = annotationUtils.getAnnotationMetadata(classElement);
-            final boolean isAopProxyType = InterceptedMethodUtil.hasDeclaredAroundAdvice(resolvedTypeMetadata);
+            final boolean resolvedTypeMetadataIsAopProxyType = InterceptedMethodUtil.hasDeclaredAroundAdvice(resolvedTypeMetadata);
             final boolean isConfigProps = typeAnnotationMetadata.hasAnnotation(ANN_CONFIGURATION_ADVICE);
             if (isConfigProps) {
                 metadataBuilder.visitProperties(
@@ -703,7 +703,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 @Override
                 protected boolean isAcceptableMethod(ExecutableElement executableElement) {
                     return super.isAcceptableMethod(executableElement)
-                            || isAopProxyType
+                            || resolvedTypeMetadataIsAopProxyType
                             || hasMethodLevelAdvice(executableElement);
                 }
 
