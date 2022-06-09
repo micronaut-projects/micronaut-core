@@ -116,14 +116,13 @@ class JavaBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
     protected BeanDefinitionVisitor createAopWriter(BeanDefinitionWriter beanDefinitionWriter, AnnotationMetadata annotationMetadata) {
         AnnotationValue<?>[] interceptorTypes =
                 InterceptedMethodUtil.resolveInterceptorBinding(annotationMetadata, InterceptorKind.AROUND);
-        BeanDefinitionVisitor aopProxyWriter = new AopProxyWriter(
+        return new AopProxyWriter(
                 beanDefinitionWriter,
                 annotationMetadata.getValues(Around.class, Boolean.class),
                 ConfigurationMetadataBuilder.getConfigurationMetadataBuilder().orElse(null),
                 visitorContext,
                 interceptorTypes
         );
-        return aopProxyWriter;
     }
 
     @Override
