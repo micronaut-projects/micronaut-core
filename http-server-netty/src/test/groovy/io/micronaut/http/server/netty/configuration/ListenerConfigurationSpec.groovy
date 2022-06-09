@@ -1,6 +1,7 @@
 package io.micronaut.http.server.netty.configuration
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.annotation.NonNull
 import io.micronaut.core.io.socket.SocketUtils
 import io.micronaut.http.server.netty.NettyEmbeddedServer
 import io.micronaut.runtime.server.EmbeddedServer
@@ -21,7 +22,6 @@ import io.netty.handler.codec.http.HttpObjectAggregator
 import io.netty.handler.codec.http.HttpResponseStatus
 import io.netty.handler.codec.http.HttpVersion
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory
-import org.jetbrains.annotations.NotNull
 import spock.lang.IgnoreIf
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
@@ -176,13 +176,13 @@ class ListenerConfigurationSpec extends Specification {
                 .channel(EpollDomainSocketChannel)
                 .handler(new ChannelInitializer<Channel>() {
                     @Override
-                    protected void initChannel(@NotNull Channel ch) throws Exception {
+                    protected void initChannel(@NonNull Channel ch) throws Exception {
                         ch.pipeline()
                                 .addLast(new HttpClientCodec())
                                 .addLast(new HttpObjectAggregator(1024))
                                 .addLast(new ChannelInboundHandlerAdapter() {
                                     @Override
-                                    void channelRead(@NotNull ChannelHandlerContext ctx, @NotNull Object msg) throws Exception {
+                                    void channelRead(@NonNull ChannelHandlerContext ctx, @NonNull Object msg) throws Exception {
                                         responses.add(msg)
                                     }
                                 })
