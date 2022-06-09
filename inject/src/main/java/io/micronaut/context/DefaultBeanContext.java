@@ -2428,7 +2428,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
             return convertedValues;
         } else {
             return Collections.emptyMap();
-        }        
+        }
     }
 
     /**
@@ -3809,6 +3809,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
      *
      * @param <T> The bean type
      */
+    @SuppressWarnings("java:S1948")
     static final class BeanKey<T> implements BeanIdentifier {
         final Argument<T> beanType;
         private final Qualifier<T> qualifier;
