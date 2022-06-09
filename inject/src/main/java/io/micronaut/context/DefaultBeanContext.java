@@ -2399,31 +2399,35 @@ public class DefaultBeanContext implements InitializableBeanContext {
                                                               @NonNull BeanDefinition<T> beanDefinition) {
         Map<String, Object> convertedValues;
         if (argumentValues == null) {
-            convertedValues = requiredArguments.length == 0 ? Collections.emptyMap() : new LinkedHashMap<>();
+            convertedValues = requiredArguments.length == 0 ? null : new LinkedHashMap<>();
             argumentValues = Collections.emptyMap();
         } else {
             convertedValues = new LinkedHashMap<>();
         }
-        for (Argument<?> requiredArgument : requiredArguments) {
-            String argumentName = requiredArgument.getName();
-            Object val = argumentValues.get(argumentName);
-            if (val == null) {
-                if (!requiredArgument.isDeclaredNullable()) {
-                    throw new BeanInstantiationException(resolutionContext, "Missing bean argument [" + requiredArgument + "] for type: " + beanDefinition.getBeanType().getName() + ". Required arguments: " + ArrayUtils.toString(requiredArguments));
-                }
-            } else {
-                Object convertedValue;
-                if (requiredArgument.getType().isInstance(val)) {
-                    convertedValue = val;
+        if (convertedValues != null) {
+            for (Argument<?> requiredArgument : requiredArguments) {
+                String argumentName = requiredArgument.getName();
+                Object val = argumentValues.get(argumentName);
+                if (val == null) {
+                    if (!requiredArgument.isDeclaredNullable()) {
+                        throw new BeanInstantiationException(resolutionContext, "Missing bean argument [" + requiredArgument + "] for type: " + beanDefinition.getBeanType().getName() + ". Required arguments: " + ArrayUtils.toString(requiredArguments));
+                    }
                 } else {
-                    convertedValue = ConversionService.SHARED.convert(val, requiredArgument).orElseThrow(() ->
-                            new BeanInstantiationException(resolutionContext, "Invalid bean argument [" + requiredArgument + "]. Cannot convert object [" + val + "] to required type: " + requiredArgument.getType())
-                    );
+                    Object convertedValue;
+                    if (requiredArgument.getType().isInstance(val)) {
+                        convertedValue = val;
+                    } else {
+                        convertedValue = ConversionService.SHARED.convert(val, requiredArgument).orElseThrow(() ->
+                                new BeanInstantiationException(resolutionContext, "Invalid bean argument [" + requiredArgument + "]. Cannot convert object [" + val + "] to required type: " + requiredArgument.getType())
+                        );
+                    }
+                    convertedValues.put(argumentName, convertedValue);
                 }
-                convertedValues.put(argumentName, convertedValue);
             }
-        }
-        return convertedValues;
+            return convertedValues;
+        } else {
+            return Collections.emptyMap();
+        }        
     }
 
     /**
