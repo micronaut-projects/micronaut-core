@@ -114,7 +114,7 @@ public final class InterceptedMethodUtil {
      * @param annotationMetadata The annotation metadata
      * @return True if it does
      */
-    public static boolean hasDeclaredAroundAdvice(AnnotationMetadata annotationMetadata) {
+    public static boolean hasDeclaredAroundAdvice(@Nullable AnnotationMetadata annotationMetadata) {
         return hasAround(annotationMetadata,
                 annMetadata -> annMetadata.hasDeclaredStereotype(Around.class),
                 annMetdata -> annMetdata.getDeclaredAnnotationValuesByType(InterceptorBinding.class));
