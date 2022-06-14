@@ -177,7 +177,7 @@ public class DefaultInterceptorRegistry implements InterceptorRegistry {
                             return false;
                         } else {
                             // multiple binding case.
-                            boolean isApplicationByBinding = true;
+                            boolean isApplicationByBinding = false;
                             // loop through the bindings on the interceptor and make sure that
                             // the binding on the injection point matches up
                             for (AnnotationValue<?> annotationValue : applicableBindings) {
@@ -213,7 +213,7 @@ public class DefaultInterceptorRegistry implements InterceptorRegistry {
                                         }
                                     }
                                     isApplicationByBinding = interceptorApplicable;
-                                    if (!isApplicationByBinding) {
+                                    if (isApplicationByBinding) {
                                         break;
                                     }
                                 }

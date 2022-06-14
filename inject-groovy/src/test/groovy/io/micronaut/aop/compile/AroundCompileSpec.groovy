@@ -523,11 +523,13 @@ import io.micronaut.aop.simple.*;
 class MyBean {
 
     @TestAnn
+    @TestAnn3
     void test() {
         
     }
     
     @TestAnn2
+    @TestAnn3
     void test2() {
         
     }
@@ -546,6 +548,11 @@ class MyBean {
 @interface TestAnn2 {
 }
 
+@Retention(RUNTIME)
+@Target([ElementType.METHOD, ElementType.TYPE])
+@Around
+@interface TestAnn3 {
+}
 
 @InterceptorBean([ TestAnn.class, TestAnn2.class ])
 class TestInterceptor implements Interceptor {
