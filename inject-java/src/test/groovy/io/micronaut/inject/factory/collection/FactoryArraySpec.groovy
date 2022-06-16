@@ -25,9 +25,17 @@ class Catalogue {
     @Inject
     List<Product> all;
 
+    @All
+    @Inject
+    Product[] allAsArray;
+
     @WishList
     @Inject
     Set<Product> wishlist;
+
+    @WishList
+    @Inject
+    Product[] wishlistAsArray;
 
     @Any
     @Inject
@@ -73,15 +81,19 @@ class Product {
 ''')
         when:
         def productClass = context.classLoader.loadClass('test.Product')
+        def productArrayClass = Class.forName('[Ltest.Product;', true, context.classLoader)
         def shopClass = context.classLoader.loadClass('test.Shop')
         def bean = getBean(context, 'test.Catalogue')
 
         then:
+        context.getBeanDefinitions(productClass).size() == 2
         context.getBeanDefinitions(shopClass).size() == 1
         context.getBeanDefinitions(shopClass, Qualifiers.byStereotype("test.WishList")).size() == 0
         bean.wishlist.size() == 2
         bean.wishlist.find { it.name == 'four' }
+        bean.wishlistAsArray.length == 2
         bean.all.size() == 3
+        bean.allAsArray.length == 3
         bean.provider.stream().count() == 5
         context.containsBean(productClass)
 
@@ -98,10 +110,10 @@ class Product {
         thrown(NonUniqueBeanException)
 
         when:"The container type is looked up"
-        List beans = context.getBean(Argument.listOf(productClass), Qualifiers.byStereotype("test.WishList"))
+        Object[] beans = context.getBean(Argument.of(productArrayClass), Qualifiers.byStereotype("test.WishList"))
 
         then:"The beans are correct"
-        beans.size() == 2
+        beans.length == 2
         beans.find { it.name == 'four' }
 
         cleanup:
@@ -125,9 +137,17 @@ class Catalogue {
     @Inject
     List<Product> all;
 
+    @All
+    @Inject
+    Product[] allAsArray;
+
     @WishList
     @Inject
     Set<Product> wishlist;
+
+    @WishList
+    @Inject
+    Product[] wishlistAsArray;
 
     @Any
     @Inject
@@ -173,12 +193,15 @@ class Product {
 ''')
         when:
         def productClass = context.classLoader.loadClass('test.Product')
+        def productArrayClass = Class.forName('[Ltest.Product;', true, context.classLoader)
         def bean = getBean(context, 'test.Catalogue')
 
         then:
         bean.wishlist.size() == 2
         bean.wishlist.find { it.name == 'four' }
+        bean.wishlistAsArray.length == 2
         bean.all.size() == 3
+        bean.allAsArray.length == 3
         bean.provider.stream().count() == 5
         context.containsBean(productClass)
 
@@ -195,13 +218,13 @@ class Product {
         thrown(NonUniqueBeanException)
 
         when:"The container type is looked up"
-        List beans = context.getBean(Argument.listOf(productClass), Qualifiers.byStereotype("test.WishList"))
+        Object[] beans = context.getBean(Argument.of(productArrayClass), Qualifiers.byStereotype("test.WishList"))
 
         then:"The beans are correct"
-        beans.size() == 2
+        beans.length == 2
         beans.find { it.name == 'four' }
-        beans.is(context.getBean(Argument.listOf(productClass), Qualifiers.byStereotype("test.WishList")))
-        beans.containsAll(bean.wishlist)
+        beans.is(context.getBean(Argument.of(productArrayClass), Qualifiers.byStereotype("test.WishList")))
+        Arrays.asList(beans).containsAll(bean.wishlist)
 
         cleanup:
         context.close()
