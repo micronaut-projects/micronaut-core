@@ -172,7 +172,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     @Override
     public void pushDependentBeans(List<BeanRegistration<?>> dependentBeans) {
         if (this.dependentBeans != null && !this.dependentBeans.isEmpty()) {
-            throw new IllegalStateException("Found existing dependent beans!");
+            throw new IllegalStateException("Found existing dependent beans! " + dependentBeans);
         }
         this.dependentBeans = dependentBeans;
     }
