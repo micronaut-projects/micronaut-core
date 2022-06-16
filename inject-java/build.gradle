@@ -48,6 +48,7 @@ dependencies {
         exclude module: 'micronaut-inject'
         exclude module: 'micronaut-runtime'
     }
+    testImplementation libs.javax.inject
 
     testRuntimeOnly libs.javax.el.impl
     testRuntimeOnly libs.javax.el

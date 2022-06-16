@@ -10,13 +10,13 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.stream.Collectors
 import java.util.stream.IntStream
 
-class ProviderInjectionSpec extends Specification {
+class JavaxProviderInjectionSpec extends Specification {
     @AutoCleanup
     ApplicationContext context = ApplicationContext.run()
 
     void 'test proper provider lookup'() {
         when:
-            Injectee bean = context.getBean(Injectee)
+            JavaxProviderInjectee bean = context.getBean(JavaxProviderInjectee)
         then:
             bean.showWhatIsInjected() == "first 1, second 10, third null"
             bean.showWhatIsInjected() == "first 2, second 20, third null"
@@ -25,7 +25,7 @@ class ProviderInjectionSpec extends Specification {
 
     void 'test concurrency'() {
         when:
-            Injectee bean = context.getBean(Injectee)
+            JavaxProviderInjectee bean = context.getBean(JavaxProviderInjectee)
         then:
             ForkJoinPool.commonPool()
                     .invokeAll(
@@ -55,7 +55,7 @@ class ProviderInjectionSpec extends Specification {
                             IntStream.range(0, 1000)
                                     .mapToObj(
                                             idx -> () -> {
-                                                def bean = context.getBean(Injectee)
+                                                def bean = context.getBean(JavaxProviderInjectee)
                                                 bean.showWhatIsInjected()
                                                 return true
                                             })
@@ -76,13 +76,13 @@ class ProviderInjectionSpec extends Specification {
 
     void 'test concurrency3'() {
         when:
-            Injectee bean1 = context.getBean(Injectee)
+            JavaxProviderInjectee bean1 = context.getBean(JavaxProviderInjectee)
             ForkJoinPool.commonPool()
                     .invokeAll(
                             IntStream.range(0, 1000)
                                     .mapToObj(
                                             idx -> () -> {
-                                                def bean2 = context.getBean(Injectee)
+                                                def bean2 = context.getBean(JavaxProviderInjectee)
                                                 assert bean1 == bean2
                                                 bean2.showWhatIsInjected()
                                                 return true

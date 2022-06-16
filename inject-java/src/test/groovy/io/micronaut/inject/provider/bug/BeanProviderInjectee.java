@@ -1,22 +1,22 @@
 package io.micronaut.inject.provider.bug;
 
+import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Nullable;
 import jakarta.inject.Inject;
-import jakarta.inject.Provider;
 import jakarta.inject.Singleton;
 
 @Singleton
-public class Injectee {
+public class BeanProviderInjectee {
 
-  private final Provider<Injectable> first;
-  private final Provider<Injectable> second;
-  private final Provider<Injectable> third;
+  private final BeanProvider<Injectable> first;
+  private final BeanProvider<Injectable> second;
+  private final BeanProvider<Injectable> third;
 
   @Inject
-  public Injectee(
-      @First @Nullable Provider<Injectable> first,
-      @Nullable @Second Provider<Injectable> second,
-      @Third @Nullable Provider<Injectable> third) {
+  public BeanProviderInjectee(
+      @First @Nullable BeanProvider<Injectable> first,
+      @Nullable @Second BeanProvider<Injectable> second,
+      @Third @Nullable BeanProvider<Injectable> third) {
     this.first = first;
     this.second = second;
     this.third = third;
@@ -31,7 +31,7 @@ public class Injectee {
         + getValue(third);
   }
 
-  private String getValue(Provider<Injectable> injectable) {
+  private String getValue(BeanProvider<Injectable> injectable) {
     if (injectable == null) {
       return null;
     }
