@@ -45,6 +45,7 @@ public interface BeanContext extends
         ExecutionHandleLocator,
         BeanLocator,
         BeanDefinitionRegistry,
+        BeanDefinitionReferenceRegistry,
         ApplicationEventPublisher<Object>,
         AnnotationMetadataResolver,
         MutableAttributeHolder {

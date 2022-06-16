@@ -215,7 +215,8 @@ public class DefaultBeanContext implements InitializableBeanContext {
             ApplicationContext.class,
             PropertyResolver.class,
             ValueResolver.class,
-            PropertyPlaceholderResolver.class
+            PropertyPlaceholderResolver.class,
+            BeanDefinitionReferenceRegistry.class
     );
     private final Set<Class> indexedTypes = CollectionUtils.setOf(
             ResourceLoader.class,
@@ -1540,6 +1541,18 @@ public class DefaultBeanContext implements InitializableBeanContext {
         return Collections.emptyList();
     }
 
+    @SuppressWarnings("unchecked")
+    @Override
+    public <B> BeanContext registerBeanReference(BeanDefinitionReference<B> reference) {
+        Objects.requireNonNull(reference, "Bean reference cannot be null");
+        this.beanDefinitionsClasses.add(reference);
+        beanCandidateCache.entrySet().removeIf(entry -> entry.getKey().isAssignableFrom(reference.getBeanType()));
+        beanConcreteCandidateCache.entrySet().removeIf(entry -> entry.getKey().beanType.isAssignableFrom(reference.getBeanType()));
+        singletonBeanRegistrations.entrySet().removeIf(entry -> entry.getKey().beanType.isAssignableFrom(reference.getBeanType()));
+        containsBeanCache.entrySet().removeIf(entry -> entry.getKey().beanType.isAssignableFrom(reference.getBeanType()));
+        return this;
+    }
+
     /**
      * Get a bean of the given type.
      *
@@ -1877,7 +1890,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
             @NonNull List<BeanDefinitionReference> parallelBeans) {
 
         if (CollectionUtils.isNotEmpty(contextScopeBeans)) {
-            final Collection<BeanDefinition> contextBeans = new ArrayList<>(contextScopeBeans.size());
+            final List<BeanDefinition> contextBeans = new ArrayList<>(contextScopeBeans.size());
 
             for (BeanDefinitionReference contextScopeBean : contextScopeBeans) {
                 try {
@@ -1888,7 +1901,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
             }
             filterProxiedTypes((Collection) contextBeans, true, false, null);
             filterReplacedBeans(null, (Collection) contextBeans);
-
+            OrderUtil.sort(contextBeans);
             for (BeanDefinition contextScopeDefinition : contextBeans) {
                 try {
                     loadContextScopeBean(contextScopeDefinition);
@@ -3298,8 +3311,8 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
         }
 
-        beanDefinitionReferences = null;
-        beanConfigurationsList = null;
+        this.beanDefinitionReferences = null;
+        this.beanConfigurationsList = null;
 
         initializeEventListeners();
         initializeContext(contextScopeBeans, processedBeans, parallelBeans);
