@@ -15,83 +15,70 @@
  */
 package io.micronaut.context;
 
-import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.inject.BeanContextConditional;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
 import io.micronaut.inject.BeanFactory;
 
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
 /**
  * Allow the construction for bean definitions programmatically that can be registered
- * via {@link BeanDefinitionReferenceRegistry} at runtime.
+ * via {@link BeanDefinitionRegistry} at runtime.
+ *
+ * <p>This differs from {@link BeanDefinitionRegistry#registerSingleton(Object)} in that
+ * beans registered this way can be created lazily or not at all and participate
+ * more completely in the life cycle of the {@link BeanContext} (for examples event listeners like {@link io.micronaut.context.event.BeanCreatedEventListener} will be fired).</p>
+ *
+ * <p></p>
  *
  * @param <T> The bean type
- * @since 3.5.2
+ * @since 3.6.0
  * @author graemerocher
+ * @see BeanDefinitionRegistry#registerBeanDefinition(RuntimeBeanDefinition)
  */
-public final class RuntimeBeanDefinition<T> extends AbstractBeanContextConditional implements BeanDefinitionReference<T>, BeanDefinition<T>, BeanFactory<T> {
-    private static final AtomicInteger REF_COUNT = new AtomicInteger(0);
-    private final Class<T> beanType;
-    private final Supplier<T> supplier;
-    private final AnnotationMetadata annotationMetadata;
-    private final String beanName;
+@Experimental
+public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, BeanDefinition<T>, BeanFactory<T>, BeanContextConditional {
 
-    RuntimeBeanDefinition(
-        @NonNull Class<T> beanType,
-        @NonNull Supplier<T> supplier,
-        @Nullable AnnotationMetadata annotationMetadata) {
-        Objects.requireNonNull(beanType, "Bean type cannot be null");
-        Objects.requireNonNull(supplier, "Bean supplier cannot be null");
-
-        this.beanType = beanType;
-        this.supplier = supplier;
-        this.beanName = generateBeanName(beanType);
-        this.annotationMetadata = annotationMetadata == null ? AnnotationMetadata.EMPTY_METADATA : annotationMetadata;
-    }
-
-    private String generateBeanName(Class<T> beanType) {
-        return beanType.getName() + "$DynamicDefinition" + REF_COUNT.incrementAndGet();
+    @Override
+    @NonNull
+    default AnnotationMetadata getAnnotationMetadata() {
+        return AnnotationMetadata.EMPTY_METADATA;
     }
 
     @Override
-    public String getBeanDefinitionName() {
-        return beanName;
-    }
-
-    @Override
-    public AnnotationMetadata getAnnotationMetadata() {
-        return annotationMetadata;
-    }
-
-    @Override
-    public BeanDefinition<T> load() {
-        return this;
-    }
-
-    @Override
-    public boolean isPresent() {
+    default boolean isEnabled(BeanContext context, BeanResolutionContext resolutionContext) {
         return true;
     }
 
     @Override
-    public Class<T> getBeanType() {
-        return beanType;
+    default BeanDefinition<T> load() {
+        return this;
     }
 
     @Override
-    public boolean isSingleton() {
+    default String getBeanDefinitionName() {
+        return DefaultRuntimeBeanDefinition.generateBeanName(getBeanType());
+    }
+
+    @Override
+    default BeanDefinition<T> load(BeanContext context) {
+        return this;
+    }
+
+    @Override
+    default boolean isPresent() {
+        return true;
+    }
+
+    @Override
+    default boolean isSingleton() {
         return BeanDefinitionReference.super.isSingleton();
-    }
-
-    @Override
-    public T build(BeanResolutionContext resolutionContext, BeanContext context, BeanDefinition<T> definition) throws BeanInstantiationException {
-        return supplier.get();
     }
 
     /**
@@ -99,10 +86,10 @@ public final class RuntimeBeanDefinition<T> extends AbstractBeanContextCondition
      * @param bean The bean
      * @return The {@link BeanDefinitionReference}
      * @param <B> The bean type
-     * @since 3.5.2
+     * @since 3.6.0
      */
     @NonNull
-    public static <B> RuntimeBeanDefinition<B> of(@NonNull B bean) {
+    static <B> RuntimeBeanDefinition<B> of(@NonNull B bean) {
         Objects.requireNonNull(bean, "Bean cannot be null");
         @SuppressWarnings("unchecked") Class<B> t = (Class<B>) bean.getClass();
         return of(t, () -> bean);
@@ -114,13 +101,44 @@ public final class RuntimeBeanDefinition<T> extends AbstractBeanContextCondition
      * @param annotationMetadata The annotation metadata for the bean
      * @return The {@link BeanDefinitionReference}
      * @param <B> The bean type
-     * @since 3.5.2
+     * @since 3.6.0
      */
     @NonNull
-    public static <B> RuntimeBeanDefinition<B> of(@NonNull B bean, AnnotationMetadata annotationMetadata) {
+    static <B> RuntimeBeanDefinition<B> of(@NonNull B bean, @Nullable AnnotationMetadata annotationMetadata) {
         Objects.requireNonNull(bean, "Bean cannot be null");
         @SuppressWarnings("unchecked") Class<B> t = (Class<B>) bean.getClass();
         return of(t, () -> bean, annotationMetadata);
+    }
+
+    /**
+     * Creates a new reference for the given object with empty annotation metadata.
+     * @param bean The bean
+     * @param qualifier The qualifier
+     * @param annotationMetadata The annotation metadata for the bean
+     * @return The {@link BeanDefinitionReference}
+     * @param <B> The bean type
+     * @since 3.6.0
+     */
+    @NonNull
+    static <B> RuntimeBeanDefinition<B> of(@NonNull B bean, @Nullable Qualifier<B> qualifier, @Nullable AnnotationMetadata annotationMetadata) {
+        Objects.requireNonNull(bean, "Bean cannot be null");
+        @SuppressWarnings("unchecked") Class<B> t = (Class<B>) bean.getClass();
+        return of(t, () -> bean, qualifier, annotationMetadata);
+    }
+
+    /**
+     * Creates a new reference for the given object with empty annotation metadata.
+     * @param bean The bean
+     * @param qualifier The qualifier
+     * @return The {@link BeanDefinitionReference}
+     * @param <B> The bean type
+     * @since 3.6.0
+     */
+    @NonNull
+    static <B> RuntimeBeanDefinition<B> of(@NonNull B bean, @Nullable Qualifier<B> qualifier) {
+        Objects.requireNonNull(bean, "Bean cannot be null");
+        @SuppressWarnings("unchecked") Class<B> t = (Class<B>) bean.getClass();
+        return of(t, () -> bean, qualifier, null);
     }
 
     /**
@@ -129,11 +147,13 @@ public final class RuntimeBeanDefinition<T> extends AbstractBeanContextCondition
      * @param beanSupplier The bean supplier
      * @return The {@link RuntimeBeanDefinition}
      * @param <B> The bean type
-     * @since 3.5.2
+     * @since 3.6.0
      */
     @NonNull
-    public static <B> RuntimeBeanDefinition<B> of(Class<B> beanType, @NonNull Supplier<B> beanSupplier) {
-        return of(beanType, beanSupplier, null);
+    static <B> RuntimeBeanDefinition<B> of(
+        Class<B> beanType,
+        @NonNull Supplier<B> beanSupplier) {
+        return of(beanType, beanSupplier, null, null);
     }
 
     /**
@@ -143,10 +163,54 @@ public final class RuntimeBeanDefinition<T> extends AbstractBeanContextCondition
      * @param annotationMetadata The annotation metadata for the bean
      * @return The {@link RuntimeBeanDefinition}
      * @param <B> The bean type
-     * @since 3.5.2
+     * @since 3.6.0
      */
     @NonNull
-    public static <B> RuntimeBeanDefinition<B> of(@NonNull Class<B> beanType, @NonNull Supplier<B> beanSupplier, @Nullable AnnotationMetadata annotationMetadata) {
-        return new RuntimeBeanDefinition<>(beanType, beanSupplier, null);
+    static <B> RuntimeBeanDefinition<B> of(
+        @NonNull Class<B> beanType,
+        @NonNull Supplier<B> beanSupplier,
+        @Nullable AnnotationMetadata annotationMetadata) {
+        return of(beanType, beanSupplier, null, annotationMetadata);
+    }
+
+    /**
+     * Creates a new reference for the given object with empty annotation metadata.
+     * @param beanType The bean type
+     * @param beanSupplier The bean supplier
+     * @param qualifier   The qualifier
+     * @return The {@link RuntimeBeanDefinition}
+     * @param <B> The bean type
+     * @since 3.6.0
+     */
+    @NonNull
+    static <B> RuntimeBeanDefinition<B> of(
+        @NonNull Class<B> beanType,
+        @NonNull Supplier<B> beanSupplier,
+        @Nullable Qualifier<B> qualifier) {
+        return of(beanType, beanSupplier, qualifier, null);
+    }
+
+    /**
+     * Creates a new reference for the given object with empty annotation metadata.
+     * @param beanType The bean type
+     * @param beanSupplier The bean supplier
+     * @param qualifier   The qualifier
+     * @param annotationMetadata The annotation metadata for the bean
+     * @return The {@link RuntimeBeanDefinition}
+     * @param <B> The bean type
+     * @since 3.6.0
+     */
+    @NonNull
+    static <B> RuntimeBeanDefinition<B> of(
+        @NonNull Class<B> beanType,
+        @NonNull Supplier<B> beanSupplier,
+        @Nullable Qualifier<B> qualifier,
+        @Nullable AnnotationMetadata annotationMetadata) {
+        return new DefaultRuntimeBeanDefinition<>(
+            beanType,
+            beanSupplier,
+            qualifier,
+            annotationMetadata
+        );
     }
 }

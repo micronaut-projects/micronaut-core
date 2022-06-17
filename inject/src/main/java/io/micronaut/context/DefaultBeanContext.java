@@ -215,8 +215,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
             ApplicationContext.class,
             PropertyResolver.class,
             ValueResolver.class,
-            PropertyPlaceholderResolver.class,
-            BeanDefinitionReferenceRegistry.class
+            PropertyPlaceholderResolver.class
     );
     private final Set<Class> indexedTypes = CollectionUtils.setOf(
             ResourceLoader.class,
@@ -1543,13 +1542,13 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
     @SuppressWarnings("unchecked")
     @Override
-    public <B> BeanContext registerBeanReference(BeanDefinitionReference<B> reference) {
-        Objects.requireNonNull(reference, "Bean reference cannot be null");
-        this.beanDefinitionsClasses.add(reference);
-        beanCandidateCache.entrySet().removeIf(entry -> entry.getKey().isAssignableFrom(reference.getBeanType()));
-        beanConcreteCandidateCache.entrySet().removeIf(entry -> entry.getKey().beanType.isAssignableFrom(reference.getBeanType()));
-        singletonBeanRegistrations.entrySet().removeIf(entry -> entry.getKey().beanType.isAssignableFrom(reference.getBeanType()));
-        containsBeanCache.entrySet().removeIf(entry -> entry.getKey().beanType.isAssignableFrom(reference.getBeanType()));
+    public <B> BeanContext registerBeanDefinition(RuntimeBeanDefinition<B> definition) {
+        Objects.requireNonNull(definition, "Bean definition cannot be null");
+        this.beanDefinitionsClasses.add(definition);
+        beanCandidateCache.entrySet().removeIf(entry -> entry.getKey().isAssignableFrom(definition.getBeanType()));
+        beanConcreteCandidateCache.entrySet().removeIf(entry -> entry.getKey().beanType.isAssignableFrom(definition.getBeanType()));
+        singletonBeanRegistrations.entrySet().removeIf(entry -> entry.getKey().beanType.isAssignableFrom(definition.getBeanType()));
+        containsBeanCache.entrySet().removeIf(entry -> entry.getKey().beanType.isAssignableFrom(definition.getBeanType()));
         return this;
     }
 
