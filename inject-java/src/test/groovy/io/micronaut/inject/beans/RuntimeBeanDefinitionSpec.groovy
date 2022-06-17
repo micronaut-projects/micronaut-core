@@ -3,6 +3,7 @@ package io.micronaut.inject.beans
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.BeanContext
 import io.micronaut.context.RuntimeBeanDefinition
+import io.micronaut.context.annotation.Prototype
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.type.Argument
 import io.micronaut.inject.qualifiers.Qualifiers
@@ -38,10 +39,14 @@ class RuntimeBeanDefinitionSpec extends AbstractTypeElementSpec {
         def bean = RuntimeBeanDefinition
                                     .builder(Argument.of(Supplier, String), () -> () -> "Foo")
                                     .qualifier(Qualifiers.byName("foo"))
+                                    .scope(Prototype)
                                     .build()
 
         expect:
         bean.beanType == Supplier
+        bean.scopeName.isPresent()
+        bean.scope.isPresent()
+        bean.scope.get() == Prototype
         bean.typeArguments.size() == 1
         bean.typeParameters.size() == 1
         bean.annotationMetadata == AnnotationMetadata.EMPTY_METADATA

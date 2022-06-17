@@ -24,9 +24,11 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.qualifiers.PrimaryQualifier;
 
+import java.lang.annotation.Annotation;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
@@ -45,13 +47,15 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
     private final String beanName;
     private final Qualifier<T> qualifier;
     private final boolean isSingleton;
+    private final Class<? extends Annotation> scope;
 
     DefaultRuntimeBeanDefinition(
         @NonNull Argument<T> beanType,
         @NonNull Supplier<T> supplier,
         @Nullable Qualifier<T> qualifier,
         @Nullable AnnotationMetadata annotationMetadata,
-        boolean isSingleton) {
+        boolean isSingleton,
+        @Nullable Class<? extends Annotation> scope) {
         Objects.requireNonNull(beanType, "Bean type cannot be null");
         Objects.requireNonNull(supplier, "Bean supplier cannot be null");
 
@@ -61,6 +65,22 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
         this.qualifier = qualifier;
         this.annotationMetadata = annotationMetadata == null ? AnnotationMetadata.EMPTY_METADATA : annotationMetadata;
         this.isSingleton = isSingleton;
+        this.scope = scope;
+    }
+
+    @Override
+    public Optional<Class<? extends Annotation>> getScope() {
+        return Optional.ofNullable(scope);
+    }
+
+    @Override
+    public Optional<String> getScopeName() {
+        return getScope().map(Class::getName);
+    }
+
+    @Override
+    public Argument<T> asArgument() {
+        return beanType;
     }
 
     @Override
@@ -151,6 +171,7 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
         private Qualifier<B> qualifier;
         private boolean singleton;
         private AnnotationMetadata annotationMetadata;
+        private Class<? extends Annotation> scope;
 
         RuntimeBeanBuilder(Argument<B> beanType, Supplier<B> supplier) {
             this.beanType = Objects.requireNonNull(beanType, "Bean type cannot be null");
@@ -160,6 +181,15 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
         @Override
         public Builder<B> qualifier(Qualifier<B> qualifier) {
             this.qualifier = qualifier;
+            return this;
+        }
+
+        @Override
+        public Builder<B> scope(Class<? extends Annotation> scope) {
+            this.scope = scope;
+            if (scope != null && scope.getSimpleName().equals("Singleton")) {
+                this.singleton = true;
+            }
             return this;
         }
 
@@ -182,7 +212,8 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
                 supplier,
                 qualifier,
                 annotationMetadata,
-                singleton
+                singleton,
+                scope
             );
         }
     }

@@ -25,6 +25,7 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
 import io.micronaut.inject.BeanFactory;
 
+import java.lang.annotation.Annotation;
 import java.util.Objects;
 import java.util.function.Supplier;
 
@@ -172,6 +173,13 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, Be
          * @return This builder
          */
         Builder<B> qualifier(@Nullable Qualifier<B> qualifier);
+
+        /**
+         * The scope to use.
+         * @param scope The scope
+         * @return This builder
+         */
+        Builder<B> scope(@Nullable Class<? extends Annotation> scope);
 
         /**
          * Is the bean singleton.
