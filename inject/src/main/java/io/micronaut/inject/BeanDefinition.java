@@ -105,6 +105,9 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
             Class<?> beanClass = beanType.getType();
             if (len == 0) {
                 if (isContainerType()) {
+                    if (getBeanType().isAssignableFrom(beanClass)) {
+                        return true;
+                    }
                     final Optional<Argument<?>> containerElement = getContainerElement();
                     if (containerElement.isPresent()) {
                         final Class<?> t = containerElement.get().getType();
