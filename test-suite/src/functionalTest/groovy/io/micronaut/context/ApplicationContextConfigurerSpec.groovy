@@ -67,9 +67,6 @@ class Application {
         hasServiceFileFor(ApplicationContextConfigurer) {
             withImplementations 'demo.app.Application$Configurer'
         }
-        hasServiceFileFor(BeanDefinitionReference) {
-            withImplementations 'demo.app.$Application$Definition$Reference'
-        }
 
         when:
         def ctx = loadContext "demo.app.Application"

@@ -76,7 +76,7 @@ import java.util.stream.Collectors;
  * @since 1.0
  */
 @Internal
-public abstract class AbstractClassFileWriter implements Opcodes, OriginatingElements {
+public abstract class AbstractClassFileWriter implements Opcodes, OriginatingElements, ClassOutputWriter {
 
     protected static final Type TYPE_ARGUMENT = Type.getType(Argument.class);
     protected static final Type TYPE_ARGUMENT_ARRAY = Type.getType(Argument[].class);
@@ -720,14 +720,6 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
             return null;
         }
     }
-
-    /**
-     * Accept a ClassWriterOutputVisitor to write this writer to disk.
-     *
-     * @param classWriterOutputVisitor The {@link ClassWriterOutputVisitor}
-     * @throws IOException if there is an error writing to disk
-     */
-    public abstract void accept(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException;
 
     /**
      * Implements a method called "getInterceptedType" for the given type and class writer.

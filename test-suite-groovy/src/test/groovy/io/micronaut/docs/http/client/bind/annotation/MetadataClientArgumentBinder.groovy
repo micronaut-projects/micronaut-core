@@ -8,7 +8,6 @@ import io.micronaut.core.util.StringUtils
 import io.micronaut.http.MutableHttpRequest
 import io.micronaut.http.client.bind.AnnotatedClientArgumentRequestBinder
 import io.micronaut.http.client.bind.ClientRequestUriContext
-import org.jetbrains.annotations.NotNull
 
 import jakarta.inject.Singleton
 
@@ -18,10 +17,10 @@ class MetadataClientArgumentBinder implements AnnotatedClientArgumentRequestBind
     final Class<Metadata> annotationType = Metadata
 
     @Override
-    void bind(@NotNull ArgumentConversionContext<Object> context,
+    void bind(@NonNull ArgumentConversionContext<Object> context,
               @NonNull ClientRequestUriContext uriContext,
-              @NotNull Object value,
-              @NotNull MutableHttpRequest<?> request) {
+              @NonNull Object value,
+              @NonNull MutableHttpRequest<?> request) {
         if (value instanceof Map) {
             for (entry in value.entrySet()) {
                 String key = NameUtils.hyphenate(StringUtils.capitalize(entry.key as String), false)

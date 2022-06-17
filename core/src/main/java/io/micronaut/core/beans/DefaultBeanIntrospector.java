@@ -15,21 +15,22 @@
  */
 package io.micronaut.core.beans;
 
-import io.micronaut.core.beans.exceptions.IntrospectionException;
-import io.micronaut.core.io.service.ServiceDefinition;
-import io.micronaut.core.io.service.SoftServiceLoader;
-import io.micronaut.core.reflect.ClassUtils;
-import io.micronaut.core.util.ArgumentUtils;
-import org.slf4j.Logger;
-
-import io.micronaut.core.annotation.NonNull;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.beans.exceptions.IntrospectionException;
+import io.micronaut.core.io.service.SoftServiceLoader;
+import io.micronaut.core.reflect.ClassUtils;
+import io.micronaut.core.util.ArgumentUtils;
+import org.slf4j.Logger;
 
 /**
  * Default implementation of the {@link BeanIntrospector} interface that uses service loader to discovery introspections.
@@ -80,20 +81,22 @@ class DefaultBeanIntrospector implements BeanIntrospector {
 
     @NonNull
     @Override
+    @SuppressWarnings("java:S1181")
     public <T> Optional<BeanIntrospection<T>> findIntrospection(@NonNull Class<T> beanType) {
         ArgumentUtils.requireNonNull("beanType", beanType);
-        final BeanIntrospectionReference reference = getIntrospections().get(beanType.getName());
+        @SuppressWarnings("unchecked") final BeanIntrospectionReference<T> reference =
+                (BeanIntrospectionReference<T>) getIntrospections().get(beanType.getName());
         try {
             if (reference != null) {
-                return Optional.of(reference).map((Function<BeanIntrospectionReference, BeanIntrospection<T>>) ref -> {
+                return Optional.of(reference).map((Function<BeanIntrospectionReference<T>, BeanIntrospection<T>>) ref -> {
                     if (LOG.isDebugEnabled()) {
-                        LOG.debug("Found BeanIntrospection for type: " + ref.getBeanType());
+                        LOG.debug("Found BeanIntrospection for type: {},", ref.getBeanType());
                     }
                     return ref.load();
                 });
             } else {
                 if (LOG.isDebugEnabled()) {
-                    LOG.debug("No BeanIntrospection found for bean type: " + beanType);
+                    LOG.debug("No BeanIntrospection found for bean type: {}", beanType);
                 }
                 return Optional.empty();
             }
@@ -103,29 +106,30 @@ class DefaultBeanIntrospector implements BeanIntrospector {
     }
 
     private Map<String, BeanIntrospectionReference<Object>> getIntrospections() {
-        Map<String, BeanIntrospectionReference<Object>> introspectionMap = this.introspectionMap;
-        if (introspectionMap == null) {
+        Map<String, BeanIntrospectionReference<Object>> resolvedIntrospectionMap = this.introspectionMap;
+        if (resolvedIntrospectionMap == null) {
             synchronized (this) { // double check
-                introspectionMap = this.introspectionMap;
-                if (introspectionMap == null) {
-                    introspectionMap = new HashMap<>(30);
-                    final SoftServiceLoader<BeanIntrospectionReference> services = SoftServiceLoader.load(BeanIntrospectionReference.class, classLoader);
-
-                    for (ServiceDefinition<BeanIntrospectionReference> definition : services) {
-                        if (definition.isPresent()) {
-                            final BeanIntrospectionReference ref = definition.load();
-                            introspectionMap.put(ref.getName(), ref);
-                        } else {
-                            if (LOG.isDebugEnabled()) {
-                                LOG.debug("BeanIntrospection {} not loaded since associated bean is not present on the classpath", definition.getName());
-                            }
-                        }
+                resolvedIntrospectionMap = this.introspectionMap;
+                if (resolvedIntrospectionMap == null) {
+                    resolvedIntrospectionMap = new HashMap<>(30);
+                    @SuppressWarnings("unchecked") final SoftServiceLoader<BeanIntrospectionReference<Object>> services = loadReferences();
+                    List<BeanIntrospectionReference<Object>> beanIntrospectionReferences = new ArrayList<>(300);
+                    services.collectAll(
+                            beanIntrospectionReferences,
+                            BeanIntrospectionReference::isPresent
+                    );
+                    for (BeanIntrospectionReference<Object> reference : beanIntrospectionReferences) {
+                        resolvedIntrospectionMap.put(reference.getName(), reference);
                     }
-
-                    this.introspectionMap = introspectionMap;
+                    this.introspectionMap = resolvedIntrospectionMap;
                 }
             }
         }
-        return introspectionMap;
+        return resolvedIntrospectionMap;
+    }
+
+    @SuppressWarnings("java:S3740")
+    private SoftServiceLoader loadReferences() {
+        return SoftServiceLoader.load(BeanIntrospectionReference.class, classLoader);
     }
 }

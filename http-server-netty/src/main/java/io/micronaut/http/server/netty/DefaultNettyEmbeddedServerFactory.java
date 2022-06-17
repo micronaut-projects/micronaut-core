@@ -57,11 +57,11 @@ import io.micronaut.web.router.resource.StaticResourceResolver;
 import io.micronaut.websocket.context.WebSocketBeanRegistry;
 import io.netty.channel.ChannelOutboundHandler;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.ServerChannel;
 import io.netty.channel.socket.ServerSocketChannel;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
-import org.jetbrains.annotations.NotNull;
 
 /**
  * Default implementation of {@link io.micronaut.http.server.netty.NettyEmbeddedServerFactory}.
@@ -148,7 +148,7 @@ public class DefaultNettyEmbeddedServerFactory
         return buildInternal(configuration, true, null);
     }
 
-    @NotNull
+    @NonNull
     private NettyEmbeddedServer buildInternal(@NonNull NettyHttpServerConfiguration configuration,
                                               boolean isDefaultServer,
                                               @Nullable ServerSslConfiguration sslConfiguration) {
@@ -283,6 +283,11 @@ public class DefaultNettyEmbeddedServerFactory
     @Override
     public ServerSocketChannel getServerSocketChannelInstance(EventLoopGroupConfiguration workerConfig) {
         return eventLoopGroupFactory.serverSocketChannelInstance(workerConfig);
+    }
+
+    @Override
+    public ServerChannel getDomainServerChannelInstance(EventLoopGroupConfiguration workerConfig) {
+        return eventLoopGroupFactory.domainServerSocketChannelInstance(workerConfig);
     }
 
     @SuppressWarnings("unchecked")

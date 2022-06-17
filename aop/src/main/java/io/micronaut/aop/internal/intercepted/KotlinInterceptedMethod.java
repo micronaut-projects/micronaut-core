@@ -19,6 +19,7 @@ import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.aop.util.CompletableFutureContinuation;
 import io.micronaut.aop.util.DelegatingContextContinuation;
+import io.micronaut.aop.util.KotlinInterceptedMethodHelper;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
@@ -27,7 +28,6 @@ import kotlin.coroutines.Continuation;
 import kotlin.coroutines.CoroutineContext;
 
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Consumer;
 
@@ -140,26 +140,12 @@ final class KotlinInterceptedMethod implements io.micronaut.aop.kotlin.KotlinInt
         } else {
             throw new IllegalStateException("Cannot convert " + result + "  to 'java.util.concurrent.CompletionStage'");
         }
-        completionStageResult.whenComplete((value, throwable) -> {
-            if (throwable == null) {
-                if (value == null && isUnitValueType) {
-                    value = kotlin.Unit.INSTANCE;
-                }
-                CompletableFutureContinuation.Companion.completeSuccess(continuation, value);
-            } else {
-                if (throwable instanceof CompletionException) {
-                    throwable = ((CompletionException) throwable).getCause();
-                }
-                CompletableFutureContinuation.Companion.completeExceptionally(continuation, (Throwable) throwable);
-            }
-        });
-        return KotlinUtils.COROUTINE_SUSPENDED;
+        return KotlinInterceptedMethodHelper.handleResult(completionStageResult, isUnitValueType, continuation);
     }
 
     @Override
     public <E extends Throwable> Object handleException(Exception exception) throws E {
-        CompletableFutureContinuation.Companion.completeExceptionally(continuation, exception);
-        return KotlinUtils.COROUTINE_SUSPENDED;
+        throw (E) exception;
     }
 
     @Override

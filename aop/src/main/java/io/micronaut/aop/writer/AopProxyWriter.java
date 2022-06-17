@@ -127,6 +127,11 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             Qualifier.class
     ));
 
+    public static final Method METHOD_HAS_CACHED_INTERCEPTED_METHOD = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(
+            InterceptedProxy.class,
+            "hasCachedInterceptedTarget"
+    ));
+
     public static final Type FIELD_TYPE_INTERCEPTORS = Type.getType(Interceptor[][].class);
     public static final Type TYPE_INTERCEPTOR_CHAIN = Type.getType(InterceptorChain.class);
     public static final Type TYPE_METHOD_INTERCEPTOR_CHAIN = Type.getType(MethodInterceptorChain.class);
@@ -386,6 +391,21 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     @Deprecated
     public Element getOriginatingElement() {
         return proxyBeanDefinitionWriter.getOriginatingElement();
+    }
+
+    @Override
+    public void visitBeanFactoryMethod(ClassElement factoryClass, MethodElement factoryMethod) {
+        proxyBeanDefinitionWriter.visitBeanFactoryMethod(factoryClass, factoryMethod);
+    }
+
+    @Override
+    public void visitBeanFactoryMethod(ClassElement factoryClass, MethodElement factoryMethod, ParameterElement[] parameters) {
+        proxyBeanDefinitionWriter.visitBeanFactoryMethod(factoryClass, factoryMethod, parameters);
+    }
+
+    @Override
+    public void visitBeanFactoryField(ClassElement factoryClass, FieldElement factoryField) {
+        proxyBeanDefinitionWriter.visitBeanFactoryField(factoryClass, factoryField);
     }
 
     @Override
@@ -931,6 +951,11 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
             // Write the Object interceptedTarget() method
             writeInterceptedTargetMethod(proxyClassWriter, targetType);
+
+            if (!lazy || cacheLazyTarget) {
+                // Write `boolean hasCachedInterceptedTarget()`
+                writeHasCachedInterceptedTargetMethod(proxyClassWriter, targetType);
+            }
 
             // Write the swap method
             // e. T swap(T newInstance);
@@ -1561,6 +1586,21 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
         interceptedTargetVisitor.visitMaxs(1, 2);
         interceptedTargetVisitor.visitEnd();
+    }
+
+    private void writeHasCachedInterceptedTargetMethod(ClassWriter proxyClassWriter, Type targetType) {
+        GeneratorAdapter methodVisitor = startPublicMethod(proxyClassWriter, METHOD_HAS_CACHED_INTERCEPTED_METHOD);
+        methodVisitor.loadThis();
+        methodVisitor.getField(proxyType, FIELD_TARGET, targetType);
+        Label notNull = new Label();
+        methodVisitor.ifNonNull(notNull);
+        methodVisitor.push(false);
+        methodVisitor.returnValue();
+        methodVisitor.visitLabel(notNull);
+        methodVisitor.push(true);
+        methodVisitor.returnValue();
+        methodVisitor.visitMaxs(1, 2);
+        methodVisitor.visitEnd();
     }
 
     private void pushResolveInterceptorsCall(GeneratorAdapter proxyConstructorGenerator, int i, boolean isIntroduction) {

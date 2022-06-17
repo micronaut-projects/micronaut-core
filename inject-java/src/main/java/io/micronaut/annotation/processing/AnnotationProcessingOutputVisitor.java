@@ -134,6 +134,25 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
         return unwrapFilterOutputStream(os);
     }
 
+    @Override
+    @SuppressWarnings("java:S1075")
+    public void visitServiceDescriptor(String type, String classname, io.micronaut.inject.ast.Element originatingElement) {
+        final String path = "META-INF/micronaut/" + type + "/" + classname;
+        try {
+            final FileObject fileObject = filer.createResource(
+                    StandardLocation.CLASS_OUTPUT,
+                    "",
+                    path,
+                    (Element) originatingElement.getNativeType()
+            );
+            try (Writer w = fileObject.openWriter()) {
+                w.write("");
+            }
+        } catch (IOException e) {
+            throw new ClassGenerationException("Unable to generate Bean entry at path: " + path, e);
+        }
+    }
+
     private OutputStream unwrapFilterOutputStream(OutputStream os) {
         // https://bugs.openjdk.java.net/browse/JDK-8255729
         // FilterOutputStream and JavacFiler$FilerOutputStream is always using write(int) and killing performance, unwrap if possible

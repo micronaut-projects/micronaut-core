@@ -154,6 +154,19 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
     }
 
     /**
+     * Does this process have any visitors.
+     * @return True if visitors are present.
+     */
+    protected boolean hasVisitors() {
+        for (TypeElementVisitor<?, ?> typeElementVisitor : typeElementVisitors) {
+            if (typeElementVisitor.getVisitorKind() == getVisitorKind()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * @return The loaded visitors.
      */
     protected List<LoadedVisitor> getLoadedVisitors() {
@@ -209,14 +222,18 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
             TypeElement groovyObjectTypeElement = elementUtils.getTypeElement("groovy.lang.GroovyObject");
             TypeMirror groovyObjectType = groovyObjectTypeElement != null ? groovyObjectTypeElement.asType() : null;
+            
+            Set<TypeElement> elements = new LinkedHashSet<>();
 
-            List<TypeElement> elements = roundEnv.getRootElements()
-                    .stream()
-                    .filter(element -> JavaModelUtils.isClassOrInterface(element) || JavaModelUtils.isEnum(element) || JavaModelUtils.isRecord(element))
-                    .filter(element -> element.getAnnotation(Generated.class) == null)
-                    .map(modelUtils::classElementFor)
-                    .filter(typeElement -> typeElement == null || (groovyObjectType == null || !typeUtils.isAssignable(typeElement.asType(), groovyObjectType)))
-                    .collect(Collectors.toList());
+            for (TypeElement annotation : annotations) {
+                final Set<? extends Element> annotatedElements = roundEnv.getElementsAnnotatedWith(annotation);
+                includeElements(elements, annotatedElements, groovyObjectType);
+            }
+
+            // This call to getRootElements() should be removed in Micronaut 4. It should not be possible
+            // to process elements without at least one annotation present and this call breaks that assumption.
+            final Set<? extends Element> rootElements = roundEnv.getRootElements();
+            includeElements(elements, rootElements, groovyObjectType);
 
             if (!elements.isEmpty()) {
 
@@ -262,6 +279,19 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
             writeBeanDefinitionsToMetaInf();
         }
         return false;
+    }
+
+    private void includeElements(Set<TypeElement> target,
+                                 Set<? extends Element> annotatedElements, TypeMirror groovyObjectType) {
+        annotatedElements
+                .stream()
+                .filter(element -> JavaModelUtils.isClassOrInterface(element) || JavaModelUtils.isEnum(element) || JavaModelUtils.isRecord(element))
+                .map(modelUtils::classElementFor)
+                .filter(Objects::nonNull)
+                .filter(element -> element.getAnnotation(Generated.class) == null)
+                .filter(typeElement -> groovyObjectType == null || !typeUtils.isAssignable(typeElement.asType(),
+                                                                                           groovyObjectType))
+                .forEach(target::add);
     }
 
     /**

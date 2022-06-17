@@ -54,7 +54,7 @@ public @interface Replaces {
      *
      * @return The qualifier
      */
-    Class<? extends Annotation>[] qualifier() default {};
+    Class<? extends Annotation> qualifier() default Annotation.class;
 
     /**
      * The name of the qualifiers of the bean that should be replaced.

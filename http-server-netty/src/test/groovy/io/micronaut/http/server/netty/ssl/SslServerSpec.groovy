@@ -1,6 +1,7 @@
 package io.micronaut.http.server.netty.ssl
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.annotation.NonNull
 import io.micronaut.runtime.server.EmbeddedServer
 import io.netty.bootstrap.Bootstrap
 import io.netty.channel.ChannelHandlerContext
@@ -15,9 +16,11 @@ import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler
 import io.netty.handler.ssl.SslContextBuilder
 import io.netty.handler.ssl.SupportedCipherSuiteFilter
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory
-import org.jetbrains.annotations.NotNull
 import spock.lang.Specification
 
+import javax.net.ssl.SSLContext
+import javax.net.ssl.SSLParameters
+import javax.net.ssl.SSLSocket
 import java.util.concurrent.CompletableFuture
 
 class SslServerSpec extends Specification {
@@ -51,7 +54,7 @@ class SslServerSpec extends Specification {
                 .option(ChannelOption.AUTO_READ, true)
                 .handler(new ChannelInitializer<SocketChannel>() {
                     @Override
-                    protected void initChannel(@NotNull SocketChannel ch) throws Exception {
+                    protected void initChannel(@NonNull SocketChannel ch) throws Exception {
                         ch.pipeline()
                                 .addLast(sslContext.newHandler(ch.alloc(), embeddedServer.host, embeddedServer.port))
                                 .addLast(new ApplicationProtocolNegotiationHandler('fallback') {
@@ -76,6 +79,41 @@ class SslServerSpec extends Specification {
 
         cleanup:
         channel.close()
+        embeddedServer.close()
+
+    }
+
+    def 'tls 1.3 for self-signed cert'() {
+        given:
+        def app = ApplicationContext.run([
+                "micronaut.ssl.enabled": true,
+                "micronaut.server.ssl.buildSelfSigned": true,
+                "micronaut.server.ssl.port": -1,
+                "micronaut.server.ssl.protocols": 'TLSv1.3',
+        ])
+        def embeddedServer = app.getBean(EmbeddedServer)
+        embeddedServer.start()
+
+        def context = SSLContext.getInstance("TLS")
+        context.init(null, InsecureTrustManagerFactory.INSTANCE.trustManagers, null)
+
+        when:
+        try (Socket connection = context.socketFactory.createSocket(embeddedServer.host, embeddedServer.port)) {
+            ((SSLSocket) connection).setEnabledCipherSuites(
+                    new String[] { "TLS_AES_256_GCM_SHA384" })
+            ((SSLSocket) connection).setEnabledProtocols(
+                    new String[] { "TLSv1.3" })
+
+            SSLParameters sslParams = new SSLParameters()
+            sslParams.setEndpointIdentificationAlgorithm("HTTPS")
+            ((SSLSocket) connection).setSSLParameters(sslParams)
+
+            connection.getOutputStream().write(1)
+        }
+        then:
+        noExceptionThrown()
+
+        cleanup:
         embeddedServer.close()
 
     }
