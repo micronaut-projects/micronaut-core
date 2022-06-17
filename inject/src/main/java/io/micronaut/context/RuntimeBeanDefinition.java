@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanContextConditional;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
@@ -82,7 +83,8 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, Be
     }
 
     /**
-     * Creates a new reference for the given object with empty annotation metadata.
+     * Creates a new effectively singleton bean definition that references the given bean.
+     *
      * @param bean The bean
      * @return The {@link BeanDefinitionReference}
      * @param <B> The bean type
@@ -92,125 +94,104 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, Be
     static <B> RuntimeBeanDefinition<B> of(@NonNull B bean) {
         Objects.requireNonNull(bean, "Bean cannot be null");
         @SuppressWarnings("unchecked") Class<B> t = (Class<B>) bean.getClass();
-        return of(t, () -> bean);
+        return builder(t, () -> bean).singleton(true).build();
     }
 
     /**
-     * Creates a new reference for the given object with empty annotation metadata.
-     * @param bean The bean
-     * @param annotationMetadata The annotation metadata for the bean
-     * @return The {@link BeanDefinitionReference}
-     * @param <B> The bean type
-     * @since 3.6.0
-     */
-    @NonNull
-    static <B> RuntimeBeanDefinition<B> of(@NonNull B bean, @Nullable AnnotationMetadata annotationMetadata) {
-        Objects.requireNonNull(bean, "Bean cannot be null");
-        @SuppressWarnings("unchecked") Class<B> t = (Class<B>) bean.getClass();
-        return of(t, () -> bean, annotationMetadata);
-    }
-
-    /**
-     * Creates a new reference for the given object with empty annotation metadata.
-     * @param bean The bean
-     * @param qualifier The qualifier
-     * @param annotationMetadata The annotation metadata for the bean
-     * @return The {@link BeanDefinitionReference}
-     * @param <B> The bean type
-     * @since 3.6.0
-     */
-    @NonNull
-    static <B> RuntimeBeanDefinition<B> of(@NonNull B bean, @Nullable Qualifier<B> qualifier, @Nullable AnnotationMetadata annotationMetadata) {
-        Objects.requireNonNull(bean, "Bean cannot be null");
-        @SuppressWarnings("unchecked") Class<B> t = (Class<B>) bean.getClass();
-        return of(t, () -> bean, qualifier, annotationMetadata);
-    }
-
-    /**
-     * Creates a new reference for the given object with empty annotation metadata.
-     * @param bean The bean
-     * @param qualifier The qualifier
-     * @return The {@link BeanDefinitionReference}
-     * @param <B> The bean type
-     * @since 3.6.0
-     */
-    @NonNull
-    static <B> RuntimeBeanDefinition<B> of(@NonNull B bean, @Nullable Qualifier<B> qualifier) {
-        Objects.requireNonNull(bean, "Bean cannot be null");
-        @SuppressWarnings("unchecked") Class<B> t = (Class<B>) bean.getClass();
-        return of(t, () -> bean, qualifier, null);
-    }
-
-    /**
-     * Creates a new reference for the given object with empty annotation metadata.
+     * Creates a new bean definition that will resolve the bean from the given supplier.
+     *
+     * <p>The bean is by default not singleton and the supplier will be invoked for each injection point.</p>
      * @param beanType The bean type
      * @param beanSupplier The bean supplier
-     * @return The {@link RuntimeBeanDefinition}
+     * @return The {@link BeanDefinitionReference}
      * @param <B> The bean type
      * @since 3.6.0
      */
     @NonNull
     static <B> RuntimeBeanDefinition<B> of(
-        Class<B> beanType,
+        @NonNull Class<B> beanType,
         @NonNull Supplier<B> beanSupplier) {
-        return of(beanType, beanSupplier, null, null);
+        return builder(beanType, beanSupplier).build();
     }
 
     /**
-     * Creates a new reference for the given object with empty annotation metadata.
-     * @param beanType The bean type
-     * @param beanSupplier The bean supplier
-     * @param annotationMetadata The annotation metadata for the bean
-     * @return The {@link RuntimeBeanDefinition}
+     * A new builder for constructing and configuring runtime created beans.
+     * @param bean The bean to use
+     * @return The builder
      * @param <B> The bean type
-     * @since 3.6.0
      */
     @NonNull
-    static <B> RuntimeBeanDefinition<B> of(
-        @NonNull Class<B> beanType,
-        @NonNull Supplier<B> beanSupplier,
-        @Nullable AnnotationMetadata annotationMetadata) {
-        return of(beanType, beanSupplier, null, annotationMetadata);
-    }
-
-    /**
-     * Creates a new reference for the given object with empty annotation metadata.
-     * @param beanType The bean type
-     * @param beanSupplier The bean supplier
-     * @param qualifier   The qualifier
-     * @return The {@link RuntimeBeanDefinition}
-     * @param <B> The bean type
-     * @since 3.6.0
-     */
-    @NonNull
-    static <B> RuntimeBeanDefinition<B> of(
-        @NonNull Class<B> beanType,
-        @NonNull Supplier<B> beanSupplier,
-        @Nullable Qualifier<B> qualifier) {
-        return of(beanType, beanSupplier, qualifier, null);
-    }
-
-    /**
-     * Creates a new reference for the given object with empty annotation metadata.
-     * @param beanType The bean type
-     * @param beanSupplier The bean supplier
-     * @param qualifier   The qualifier
-     * @param annotationMetadata The annotation metadata for the bean
-     * @return The {@link RuntimeBeanDefinition}
-     * @param <B> The bean type
-     * @since 3.6.0
-     */
-    @NonNull
-    static <B> RuntimeBeanDefinition<B> of(
-        @NonNull Class<B> beanType,
-        @NonNull Supplier<B> beanSupplier,
-        @Nullable Qualifier<B> qualifier,
-        @Nullable AnnotationMetadata annotationMetadata) {
-        return new DefaultRuntimeBeanDefinition<>(
+    static <B> Builder<B> builder(@NonNull B bean) {
+        Objects.requireNonNull(bean, "Bean cannot be null");
+        @SuppressWarnings("unchecked")
+        Argument<B> beanType = (Argument<B>) Argument.of(bean.getClass());
+        return new DefaultRuntimeBeanDefinition.RuntimeBeanBuilder<>(
             beanType,
-            beanSupplier,
-            qualifier,
-            annotationMetadata
+            () -> bean
+        ).singleton(true);
+    }
+
+    /**
+     * A new builder for constructing and configuring runtime created beans.
+     * @param beanType The bean type
+     * @param beanSupplier The bean supplier
+     * @return The builder
+     * @param <B> The bean type
+     */
+    @NonNull
+    static <B> Builder<B> builder(@NonNull Class<B> beanType, @NonNull Supplier<B> beanSupplier) {
+        return new DefaultRuntimeBeanDefinition.RuntimeBeanBuilder<>(
+            Argument.of(beanType),
+            beanSupplier
         );
+    }
+
+    /**
+     * A new builder for constructing and configuring runtime created beans.
+     * @param beanType The bean type
+     * @param beanSupplier The bean supplier
+     * @return The builder
+     * @param <B> The bean type
+     */
+    @NonNull
+    static <B> Builder<B> builder(@NonNull Argument<B> beanType, @NonNull Supplier<B> beanSupplier) {
+        return new DefaultRuntimeBeanDefinition.RuntimeBeanBuilder<>(
+            beanType,
+            beanSupplier
+        );
+    }
+
+    /**
+     * A builder for constructing {@link RuntimeBeanDefinition} instances.
+     * @param <B> The bean type
+     */
+    interface Builder<B> {
+        /**
+         * The qualifier to use.
+         * @param qualifier The qualifier
+         * @return This builder
+         */
+        Builder<B> qualifier(@Nullable Qualifier<B> qualifier);
+
+        /**
+         * Is the bean singleton.
+         * @param isSingleton True if it is singleton
+         * @return This builder
+         */
+        Builder<B> singleton(boolean isSingleton);
+
+        /**
+         * The annotation metadata for the bean.
+         * @param annotationMetadata The annotation metadata
+         * @return This builder
+         */
+        Builder<B> annotationMetadata(@Nullable AnnotationMetadata annotationMetadata);
+
+        /**
+         * Builds the runtime bean.
+         * @return The runtime bean
+         */
+        @NonNull
+        RuntimeBeanDefinition<B> build();
     }
 }

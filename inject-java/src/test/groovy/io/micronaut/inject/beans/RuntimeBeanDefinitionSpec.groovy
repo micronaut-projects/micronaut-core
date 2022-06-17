@@ -1,8 +1,76 @@
 package io.micronaut.inject.beans
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.context.BeanContext
+import io.micronaut.context.RuntimeBeanDefinition
+import io.micronaut.core.annotation.AnnotationMetadata
+import io.micronaut.core.type.Argument
+import io.micronaut.inject.qualifiers.Qualifiers
+import spock.lang.Shared
+
+import java.util.function.Supplier
 
 class RuntimeBeanDefinitionSpec extends AbstractTypeElementSpec {
+
+    @Shared def sharedContext = BeanContext.build()
+
+    void 'test simple runtime bean definition'() {
+        given:
+
+        def bean = RuntimeBeanDefinition.of(new Foo())
+
+        expect:
+        bean.beanType == Foo
+        bean.typeParameters.length == 0
+        bean.typeArguments.size() == 0
+        bean.annotationMetadata == AnnotationMetadata.EMPTY_METADATA
+        bean.load().is(bean)
+        bean.load(sharedContext).is(bean)
+        bean.isEnabled(sharedContext)
+        bean.declaredQualifier == null
+        bean.beanDefinitionName
+        bean.isPresent()
+        bean.singleton
+    }
+
+    void 'test simple runtime bean definition with qualifier'() {
+        given:
+        def bean = RuntimeBeanDefinition
+                                    .builder(Argument.of(Supplier, String), () -> () -> "Foo")
+                                    .qualifier(Qualifiers.byName("foo"))
+                                    .build()
+
+        expect:
+        bean.beanType == Supplier
+        bean.typeArguments.size() == 1
+        bean.typeParameters.size() == 1
+        bean.annotationMetadata == AnnotationMetadata.EMPTY_METADATA
+        bean.load().is(bean)
+        bean.load(sharedContext).is(bean)
+        bean.isEnabled(sharedContext)
+        bean.declaredQualifier == Qualifiers.byName("foo")
+        bean.beanDefinitionName
+        bean.isPresent()
+        !bean.singleton
+    }
+
+    void 'test from supplier runtime bean definition with qualifier'() {
+        given:
+        def bean = RuntimeBeanDefinition.builder(Foo.class,() -> new Foo())
+                                .qualifier(Qualifiers.byName("foo"))
+                                .build()
+
+        expect:
+        bean.beanType == Foo
+        bean.annotationMetadata == AnnotationMetadata.EMPTY_METADATA
+        bean.load().is(bean)
+        bean.load(null).is(bean)
+        bean.isEnabled(sharedContext)
+        bean.declaredQualifier == Qualifiers.byName("foo")
+        bean.beanDefinitionName
+        bean.isPresent()
+        !bean.singleton
+    }
 
     void "test dynamic bean definition registration"() {
         given:
@@ -40,9 +108,10 @@ class RegistrarA {
             throw new IllegalStateException("RegistrarC should not have been executed yet");
         }
         registry.registerBeanDefinition(
-          RuntimeBeanDefinition.of(
-                  Bar.class, () -> new Bar("primary"), PrimaryQualifier.instance()
-          )
+          RuntimeBeanDefinition.builder(
+                  Bar.class, () -> new Bar("primary")
+          ).qualifier(PrimaryQualifier.instance())
+          .build()
         );
     }
 }
@@ -61,9 +130,10 @@ class RegistrarB {
         }
 
         registry.registerBeanDefinition(
-          RuntimeBeanDefinition.of(
-                  Bar.class, () -> new Bar("another"), Qualifiers.byName("another")
-          )
+          RuntimeBeanDefinition.builder(
+                  Bar.class, () -> new Bar("another")
+          ).qualifier(Qualifiers.byName("another"))
+          .build()
         );
     }
 }
@@ -81,7 +151,7 @@ class RegistrarC {
         executed = true;
         registry.registerBeanDefinition(
           RuntimeBeanDefinition.of(
-                  Stuff.class, () -> new Stuff()
+                  new Stuff()
           )
         );
     }
@@ -108,5 +178,7 @@ class Stuff {}
         cleanup:
         context.close()
     }
+
+    class Foo {}
 
 }

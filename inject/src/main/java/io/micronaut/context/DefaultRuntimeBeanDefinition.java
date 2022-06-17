@@ -20,9 +20,12 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.qualifiers.PrimaryQualifier;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
@@ -36,25 +39,28 @@ import java.util.function.Supplier;
 @Experimental
 final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextConditional implements RuntimeBeanDefinition<T> {
     private static final AtomicInteger REF_COUNT = new AtomicInteger(0);
-    private final Class<T> beanType;
+    private final Argument<T> beanType;
     private final Supplier<T> supplier;
     private final AnnotationMetadata annotationMetadata;
     private final String beanName;
     private final Qualifier<T> qualifier;
+    private final boolean isSingleton;
 
     DefaultRuntimeBeanDefinition(
-        @NonNull Class<T> beanType,
+        @NonNull Argument<T> beanType,
         @NonNull Supplier<T> supplier,
         @Nullable Qualifier<T> qualifier,
-        @Nullable AnnotationMetadata annotationMetadata) {
+        @Nullable AnnotationMetadata annotationMetadata,
+        boolean isSingleton) {
         Objects.requireNonNull(beanType, "Bean type cannot be null");
         Objects.requireNonNull(supplier, "Bean supplier cannot be null");
 
         this.beanType = beanType;
         this.supplier = supplier;
-        this.beanName = generateBeanName(beanType);
+        this.beanName = generateBeanName(beanType.getType());
         this.qualifier = qualifier;
         this.annotationMetadata = annotationMetadata == null ? AnnotationMetadata.EMPTY_METADATA : annotationMetadata;
+        this.isSingleton = isSingleton;
     }
 
     @Override
@@ -108,17 +114,77 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
 
     @Override
     public Class<T> getBeanType() {
-        return beanType;
+        return beanType.getType();
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public List<Argument<?>> getTypeArguments() {
+        return Arrays.asList(beanType.getTypeParameters());
+    }
+
+    @Override
+    public Class<?>[] getTypeParameters() {
+        return getTypeArguments()
+            .stream()
+            .map(Argument::getType)
+            .toArray(Class[]::new);
     }
 
     @Override
     public boolean isSingleton() {
-        return RuntimeBeanDefinition.super.isSingleton();
+        return isSingleton;
     }
 
     @Override
     public T build(BeanResolutionContext resolutionContext, BeanContext context, BeanDefinition<T> definition) throws BeanInstantiationException {
         return supplier.get();
+    }
+
+    /**
+     * Implementation of {@link RuntimeBeanDefinition.Builder}.
+     * @param <B> The bean
+     */
+    static final class RuntimeBeanBuilder<B> implements RuntimeBeanDefinition.Builder<B> {
+        private final Argument<B> beanType;
+        private final Supplier<B> supplier;
+        private Qualifier<B> qualifier;
+        private boolean singleton;
+        private AnnotationMetadata annotationMetadata;
+
+        RuntimeBeanBuilder(Argument<B> beanType, Supplier<B> supplier) {
+            this.beanType = Objects.requireNonNull(beanType, "Bean type cannot be null");
+            this.supplier = Objects.requireNonNull(supplier, "Bean supplier cannot be null");
+        }
+
+        @Override
+        public Builder<B> qualifier(Qualifier<B> qualifier) {
+            this.qualifier = qualifier;
+            return this;
+        }
+
+        @Override
+        public Builder<B> singleton(boolean isSingleton) {
+            this.singleton = true;
+            return this;
+        }
+
+        @Override
+        public Builder<B> annotationMetadata(AnnotationMetadata annotationMetadata) {
+            this.annotationMetadata = annotationMetadata;
+            return this;
+        }
+
+        @Override
+        public RuntimeBeanDefinition<B> build() {
+            return new DefaultRuntimeBeanDefinition<>(
+                beanType,
+                supplier,
+                qualifier,
+                annotationMetadata,
+                singleton
+            );
+        }
     }
 }
 
