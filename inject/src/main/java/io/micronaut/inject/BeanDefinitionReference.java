@@ -20,6 +20,7 @@ import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.DefaultScope;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.Internal;
 import jakarta.inject.Singleton;
 
 /**
@@ -44,6 +45,7 @@ import jakarta.inject.Singleton;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 public interface BeanDefinitionReference<T> extends BeanType<T> {
 
     /**
