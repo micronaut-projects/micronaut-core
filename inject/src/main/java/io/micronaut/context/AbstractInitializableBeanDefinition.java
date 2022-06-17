@@ -242,9 +242,13 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
             if (containerElement != null) {
                 return containerElement;
             }
-            final List<Argument<?>> iterableArguments = getTypeArguments(Iterable.class);
-            if (!iterableArguments.isEmpty()) {
-                containerElement = Optional.of(iterableArguments.iterator().next());
+            if (getBeanType().isArray()) {
+                containerElement = Optional.of(Argument.of(getBeanType().getComponentType()));
+            } else {
+                final List<Argument<?>> iterableArguments = getTypeArguments(Iterable.class);
+                if (!iterableArguments.isEmpty()) {
+                    containerElement = Optional.of(iterableArguments.iterator().next());
+                }
             }
             return containerElement;
         }

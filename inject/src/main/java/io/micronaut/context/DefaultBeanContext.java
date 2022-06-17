@@ -114,6 +114,7 @@ import org.slf4j.LoggerFactory;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -3497,19 +3498,25 @@ public class DefaultBeanContext implements InitializableBeanContext {
         }
 
         if (beanRegistration != null) {
-            if (candidate.isContainerType() && beanRegistration.bean instanceof Iterable) {
-                Iterable<Object> iterable = (Iterable<Object>) beanRegistration.bean;
-                int i = 0;
-                for (Object o : iterable) {
-                    if (o == null || !beanType.isInstance(o)) {
-                        continue;
-                    }
-                    beansOfTypeList.add(BeanRegistration.of(
+            if (candidate.isContainerType()) {
+                Object container = beanRegistration.bean;
+                if (container instanceof Object[]) {
+                    container = Arrays.asList((Object[]) container);
+                }
+                if (container instanceof Iterable) {
+                    Iterable<Object> iterable = (Iterable<Object>) container;
+                    int i = 0;
+                    for (Object o : iterable) {
+                        if (o == null || !beanType.isInstance(o)) {
+                            continue;
+                        }
+                        beansOfTypeList.add(BeanRegistration.of(
                             this,
                             new BeanKey<>(beanType, Qualifiers.byQualifiers(Qualifiers.byName(String.valueOf(i++)), qualifier)),
                             candidate,
                             (T) o
-                    ));
+                        ));
+                    }
                 }
             } else {
                 beansOfTypeList.add(beanRegistration);

@@ -4042,7 +4042,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     private boolean isContainerType() {
-        return DefaultArgument.CONTAINER_TYPES.stream().map(Class::getName).anyMatch(c -> c.equals(beanFullClassName));
+        return beanTypeElement.isArray() || DefaultArgument.CONTAINER_TYPES.stream().map(Class::getName).anyMatch(c -> c.equals(beanFullClassName));
     }
 
     private boolean isConfigurationProperties(AnnotationMetadata annotationMetadata) {
@@ -4198,8 +4198,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         if (superType == TYPE_ABSTRACT_BEAN_DEFINITION || isSuperFactory) {
             for (Type typeParameter : typeParameters) {
 
-                ArrayAwareSignatureWriter ppsv = (ArrayAwareSignatureWriter)
-                        psv.visitTypeArgument('=');
+                SignatureVisitor ppsv = psv.visitTypeArgument('=');
                 visitTypeParameter(typeParameter, ppsv);
             }
         }
@@ -4209,6 +4208,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     private void visitTypeParameter(Type typeParameter, SignatureVisitor ppsv) {
         final boolean isArray = typeParameter.getSort() == Type.ARRAY;
+        boolean isPrimitiveArray = false;
         if (isArray) {
             for (int i = 0; i < typeParameter.getDimensions(); i++) {
                 ppsv.visitArrayType();
@@ -4222,11 +4222,12 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             } else {
                 // primitive
                 ppsv.visitBaseType(elementType.getInternalName().charAt(0));
+                isPrimitiveArray = true;
             }
         } else {
             ppsv.visitClassType(typeParameter.getInternalName());
         }
-        if (isArray) {
+        if (isPrimitiveArray && ppsv instanceof ArrayAwareSignatureWriter) {
             ((ArrayAwareSignatureWriter) ppsv).visitEndArray();
         } else {
             ppsv.visitEnd();
