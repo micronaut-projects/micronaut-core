@@ -63,10 +63,13 @@ class RuntimeBeanDefinitionSpec extends AbstractTypeElementSpec {
         given:
         def bean = RuntimeBeanDefinition.builder(Foo.class,() -> new Foo())
                                 .qualifier(Qualifiers.byName("foo"))
+                                .exposedTypes(IFoo)
                                 .build()
 
         expect:
         bean.beanType == Foo
+        bean.exposedTypes.size() == 1
+        bean.exposedTypes.contains(IFoo)
         bean.annotationMetadata == AnnotationMetadata.EMPTY_METADATA
         bean.load().is(bean)
         bean.load(null).is(bean)
@@ -184,6 +187,7 @@ class Stuff {}
         context.close()
     }
 
-    class Foo {}
+    class Foo implements IFoo {}
 
+    interface IFoo {}
 }

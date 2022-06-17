@@ -20,7 +20,10 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.qualifiers.PrimaryQualifier;
 
@@ -29,6 +32,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
@@ -48,6 +52,7 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
     private final Qualifier<T> qualifier;
     private final boolean isSingleton;
     private final Class<? extends Annotation> scope;
+    private final Class<?>[] exposedTypes;
 
     DefaultRuntimeBeanDefinition(
         @NonNull Argument<T> beanType,
@@ -55,7 +60,8 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
         @Nullable Qualifier<T> qualifier,
         @Nullable AnnotationMetadata annotationMetadata,
         boolean isSingleton,
-        @Nullable Class<? extends Annotation> scope) {
+        @Nullable Class<? extends Annotation> scope,
+        Class<?>[] exposedTypes) {
         Objects.requireNonNull(beanType, "Bean type cannot be null");
         Objects.requireNonNull(supplier, "Bean supplier cannot be null");
 
@@ -66,6 +72,16 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
         this.annotationMetadata = annotationMetadata == null ? AnnotationMetadata.EMPTY_METADATA : annotationMetadata;
         this.isSingleton = isSingleton;
         this.scope = scope;
+        this.exposedTypes = exposedTypes;
+    }
+
+    @Override
+    public Set<Class<?>> getExposedTypes() {
+        if (ArrayUtils.isNotEmpty(exposedTypes)) {
+            return CollectionUtils.setOf(exposedTypes);
+        } else {
+            return RuntimeBeanDefinition.super.getExposedTypes();
+        }
     }
 
     @Override
@@ -172,6 +188,7 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
         private boolean singleton;
         private AnnotationMetadata annotationMetadata;
         private Class<? extends Annotation> scope;
+        private Class<?>[] exposedTypes = ReflectionUtils.EMPTY_CLASS_ARRAY;
 
         RuntimeBeanBuilder(Argument<B> beanType, Supplier<B> supplier) {
             this.beanType = Objects.requireNonNull(beanType, "Bean type cannot be null");
@@ -200,6 +217,17 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
         }
 
         @Override
+        public Builder<B> exposedTypes(Class<?>... types) {
+            for (Class<?> type : types) {
+                if (!type.isAssignableFrom(beanType.getType())) {
+                    throw new IllegalArgumentException("Bean type doesn't implement: " + type.getName());
+                }
+            }
+            this.exposedTypes = types;
+            return this;
+        }
+
+        @Override
         public Builder<B> annotationMetadata(AnnotationMetadata annotationMetadata) {
             this.annotationMetadata = annotationMetadata;
             return this;
@@ -213,7 +241,8 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
                 qualifier,
                 annotationMetadata,
                 singleton,
-                scope
+                scope,
+                exposedTypes
             );
         }
     }

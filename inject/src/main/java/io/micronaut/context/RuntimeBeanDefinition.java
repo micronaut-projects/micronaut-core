@@ -15,6 +15,7 @@
  */
 package io.micronaut.context;
 
+import io.micronaut.context.annotation.Context;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
@@ -37,7 +38,8 @@ import java.util.function.Supplier;
  * beans registered this way can be created lazily or not at all and participate
  * more completely in the life cycle of the {@link BeanContext} (for examples event listeners like {@link io.micronaut.context.event.BeanCreatedEventListener} will be fired).</p>
  *
- * <p></p>
+ * <p>Note that it is generally not recommended to use this approach and build time bean computation is preferred. This type is
+ * designed to support a few limited use cases where runtime bean registration is required.</p>
  *
  * @param <T> The bean type
  * @since 3.6.0
@@ -56,6 +58,11 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, Be
     @Override
     default boolean isEnabled(BeanContext context, BeanResolutionContext resolutionContext) {
         return true;
+    }
+
+    @Override
+    default boolean isContextScope() {
+        return getAnnotationMetadata().hasDeclaredAnnotation(Context.class);
     }
 
     @Override
@@ -187,6 +194,13 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, Be
          * @return This builder
          */
         Builder<B> singleton(boolean isSingleton);
+
+        /**
+         * Limit the exposed types of this bean.
+         * @param types The exposed types
+         * @return This builder
+         */
+        Builder<B> exposedTypes(Class<?>...types);
 
         /**
          * The annotation metadata for the bean.
