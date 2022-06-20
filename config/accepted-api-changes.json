@@ -178,5 +178,10 @@
     "type": "io.micronaut.inject.ast.beans.BeanElementBuilder",
     "member": "Method io.micronaut.inject.ast.beans.BeanElementBuilder.intercept(io.micronaut.core.annotation.AnnotationValue[])",
     "reason": "New New internal default method default method"
+  },
+  {
+    "type": "io.micronaut.core.annotation.AnnotationMetadata",
+    "member": "Method io.micronaut.core.annotation.AnnotationMetadata.getAnnotationValuesByStereotype(java.lang.String)",
+    "reason": "New default method"
   }
 ]
