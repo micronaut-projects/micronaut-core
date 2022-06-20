@@ -160,6 +160,7 @@ class ArgumentSpec extends Specification {
         expect:
             argument.asType() == type
             type == argument.asType()
+            type.hashCode() == argument.asType().hashCode()
 
         where:
             field << ["justString", "stringList", "mapStringInteger", "objectMap", "noTypeMap"]

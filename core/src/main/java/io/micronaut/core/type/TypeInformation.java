@@ -246,6 +246,10 @@ public interface TypeInformation<T> extends TypeVariableResolver, AnnotationMeta
                 return getTypeName();
             }
 
+            public int hashCode() {
+                return Arrays.hashCode(getActualTypeArguments()) ^ Objects.hashCode(getOwnerType()) ^ Objects.hashCode(getRawType());
+            }
+
             @Override
             public boolean equals(Object o) {
                 if (o instanceof ParameterizedType) {
