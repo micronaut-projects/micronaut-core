@@ -178,5 +178,15 @@
     "type": "io.micronaut.inject.ast.beans.BeanElementBuilder",
     "member": "Method io.micronaut.inject.ast.beans.BeanElementBuilder.intercept(io.micronaut.core.annotation.AnnotationValue[])",
     "reason": "New New internal default method default method"
+  },
+  {
+    "type": "io.micronaut.core.type.TypeInformation",
+    "member": "Class io.micronaut.core.type.TypeInformation",
+    "reason": "Added a default method"
+  },
+  {
+    "type": "io.micronaut.core.type.TypeInformation",
+    "member": "Method io.micronaut.core.type.TypeInformation.asType()",
+    "reason": "Added a default method"
   }
 ]

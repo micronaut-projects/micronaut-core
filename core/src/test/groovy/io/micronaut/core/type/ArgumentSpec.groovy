@@ -23,6 +23,7 @@ import spock.lang.Unroll
  */
 class ArgumentSpec extends Specification {
 
+    private String justString
     private List<String> stringList
     private List<Integer> integerList
     private Map<String, Integer> mapStringInteger
@@ -148,6 +149,20 @@ class ArgumentSpec extends Specification {
         arg.getType() == List.class
         arg.getTypeParameters()[0].getType() == List.class
         arg.getTypeParameters()[0].getTypeParameters()[0].getType() == Long.class
+    }
+
+    @Unroll
+    void 'test #field type is equals the argument parameterized type'() {
+        given:
+            def argument = Argument.of(getClass().getDeclaredField(field).genericType)
+            def type = getClass().getDeclaredField(field).genericType
+
+        expect:
+            argument.asType() == type
+            type == argument.asType()
+
+        where:
+            field << ["justString", "stringList", "mapStringInteger", "objectMap", "noTypeMap"]
     }
 
 /*
