@@ -171,13 +171,7 @@ public class Qualifiers {
     }
 
     /**
-     * <p>Build a qualifier for the given annotation. This qualifier will match a candidate under the following
-     * circumstances:</p>
-     *
-     * <ul>
-     * <li>If the <tt>type</tt> parameter is {@link Named} then the value of the {@link Named} annotation within the metadata is used to match the candidate by name</li>
-     * <li>If the <tt>type</tt> parameter is {@link Type} then the value of the {@link Type} annotation is used to match the candidate by type</li>
-     * </ul>
+     * <p>Build a qualifier for the given annotation value.
      *
      * @param metadata        The metadata
      * @param annotationValue The annotation value
