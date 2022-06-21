@@ -202,6 +202,7 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
         }
 
         @Override
+        @SuppressWarnings("java:S1872")
         public Builder<B> scope(Class<? extends Annotation> scope) {
             this.scope = scope;
             if (scope != null && scope.getSimpleName().equals("Singleton")) {
