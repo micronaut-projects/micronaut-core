@@ -3169,7 +3169,7 @@ public class DefaultHttpClient implements
 
             HttpHeaders headers = msg.headers();
             if (log.isTraceEnabled()) {
-                log.trace("HTTP Client Streaming Response Received ({}) for Request: {} {}", msg.status(), finalRequest.getMethodName(), finalRequest.getUri());
+                log.trace("HTTP Client Response Received ({}) for Request: {} {}", msg.status(), finalRequest.getMethodName(), finalRequest.getUri());
                 traceHeaders(headers);
             }
             buildResponse(responsePromise, msg, httpStatus);
@@ -3257,6 +3257,10 @@ public class DefaultHttpClient implements
         @Override
         protected void buildResponse(Promise<? super HttpResponse<O>> promise, FullHttpResponse msg, HttpStatus httpStatus) {
             try {
+                if (log.isTraceEnabled()) {
+                    traceBody("Response", msg.content());
+                }
+
                 if (httpStatus == HttpStatus.NO_CONTENT) {
                     // normalize the NO_CONTENT header, since http content aggregator adds it even if not present in the response
                     msg.headers().remove(HttpHeaderNames.CONTENT_LENGTH);

@@ -25,6 +25,7 @@ import io.micronaut.context.annotation.Provided;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.naming.Named;
@@ -431,20 +432,20 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
             // All qualifiers are removed from the factory class anyway, so we can skip the hierarchy
             annotationMetadata = annotationMetadata.getDeclaredMetadata();
         }
-        final List<String> annotations = annotationMetadata.getAnnotationNamesByStereotype(AnnotationUtil.QUALIFIER);
+        List<AnnotationValue<Annotation>> annotations = annotationMetadata.getAnnotationValuesByStereotype(AnnotationUtil.QUALIFIER);
         if (!annotations.isEmpty()) {
             if (annotations.size() == 1) {
-                final String annotation = annotations.iterator().next();
-                if (annotation.equals(Qualifier.PRIMARY)) {
+                final AnnotationValue<Annotation> annotationValue = annotations.iterator().next();
+                if (annotationValue.getAnnotationName().equals(Qualifier.PRIMARY)) {
                     // primary is the same as null
                     return null;
                 }
-                return Qualifiers.byAnnotation(annotationMetadata, annotation);
+                return (Qualifier<T>) Qualifiers.byAnnotation(annotationMetadata, annotationValue);
             } else {
                 Qualifier<T>[] qualifiers = new Qualifier[annotations.size()];
                 int i = 0;
-                for (String annotationName : annotations) {
-                    qualifiers[i++] = Qualifiers.byAnnotation(annotationMetadata, annotationName);
+                for (AnnotationValue<Annotation> annotationValue : annotations) {
+                    qualifiers[i++] = (Qualifier<T>) Qualifiers.byAnnotation(annotationMetadata, annotationValue);
                 }
                 return Qualifiers.byQualifiers(qualifiers);
             }

@@ -102,6 +102,18 @@ public interface AnnotationMetadata extends AnnotationSource {
     }
 
     /**
+     * Resolve all of the annotation values that feature the given stereotype.
+     *
+     * @param stereotype The annotation names
+     * @return A set of annotation names
+     * @since 3.5.2
+     */
+    @NonNull
+    default <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByStereotype(@Nullable String stereotype) {
+        return Collections.emptyList();
+    }
+
+    /**
      * All the annotation names this metadata declares.
      *
      * @return All the annotation names this metadata declares

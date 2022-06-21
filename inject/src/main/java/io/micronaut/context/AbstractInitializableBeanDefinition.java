@@ -144,6 +144,8 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
     @Nullable
     private Argument<?>[] requiredParametrizedArguments;
 
+    private Qualifier<T> declaredQualifier;
+
     @SuppressWarnings("ParameterNumber")
     @Internal
     @UsedByGeneratedCode
@@ -229,6 +231,14 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
                 isContainerType,
                 requiresMethodProcessing);
         this.annotationInjection = annotationInjection;
+    }
+
+    @Override
+    public Qualifier<T> getDeclaredQualifier() {
+        if (declaredQualifier == null) {
+            declaredQualifier = BeanDefinition.super.getDeclaredQualifier();
+        }
+        return declaredQualifier;
     }
 
     @Override
