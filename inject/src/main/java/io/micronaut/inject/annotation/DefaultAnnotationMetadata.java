@@ -1209,6 +1209,45 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     }
 
     @Override
+    public <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByStereotype(String stereotype) {
+        if (stereotype == null) {
+            return Collections.emptyList();
+        }
+        if (annotationsByStereotype != null) {
+            List<String> annotations = annotationsByStereotype.get(stereotype);
+            if (annotations != null) {
+                List<AnnotationValue<T>> result = new ArrayList<>(annotations.size());
+                for (String annotation : annotations) {
+                    String repeatableTypeName = getRepeatedName(annotation);
+                    if (repeatableTypeName == null) {
+                        repeatableTypeName = AnnotationMetadataSupport.getRepeatableAnnotation(annotation);
+                    }
+                    if (repeatableTypeName != null) {
+                        List<AnnotationValue<T>> results =
+                            resolveRepeatableAnnotations(repeatableTypeName,
+                                allAnnotations,
+                                allStereotypes
+                            );
+                        if (results != null) {
+                            result.addAll(results);
+                        }
+                    } else {
+                        result.add(getAnnotation(annotation));
+                    }
+                }
+                return Collections.unmodifiableList(result);
+            }
+        }
+        if (allAnnotations != null) {
+            return getAnnotationValuesByName(stereotype);
+        }
+        if (declaredAnnotations != null) {
+            return getDeclaredAnnotationValuesByName(stereotype);
+        }
+        return Collections.emptyList();
+    }
+
+    @Override
     public @NonNull
     Set<String> getAnnotationNames() {
         if (allAnnotations != null) {
