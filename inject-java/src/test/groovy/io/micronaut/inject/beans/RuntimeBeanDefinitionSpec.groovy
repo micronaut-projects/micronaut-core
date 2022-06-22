@@ -1,6 +1,7 @@
 package io.micronaut.inject.beans
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
 import io.micronaut.context.RuntimeBeanDefinition
 import io.micronaut.context.annotation.Prototype
@@ -13,12 +14,13 @@ import java.util.function.Supplier
 
 class RuntimeBeanDefinitionSpec extends AbstractTypeElementSpec {
 
-    @Shared def sharedContext = BeanContext.build()
+    @Shared
+    BeanContext sharedContext = BeanContext.build()
 
     void 'test simple runtime bean definition'() {
         given:
 
-        def bean = RuntimeBeanDefinition.of(new Foo())
+        RuntimeBeanDefinition<Foo> bean = RuntimeBeanDefinition.of(new Foo())
 
         expect:
         bean.beanType == Foo
@@ -29,14 +31,13 @@ class RuntimeBeanDefinitionSpec extends AbstractTypeElementSpec {
         bean.load(sharedContext).is(bean)
         bean.isEnabled(sharedContext)
         bean.declaredQualifier == null
-        bean.beanDefinitionName
         bean.isPresent()
         bean.singleton
     }
 
     void 'test simple runtime bean definition with qualifier'() {
         given:
-        def bean = RuntimeBeanDefinition
+        RuntimeBeanDefinition<?> bean = RuntimeBeanDefinition
                                     .builder(Argument.of(Supplier, String), () -> () -> "Foo")
                                     .qualifier(Qualifiers.byName("foo"))
                                     .scope(Prototype)
@@ -61,7 +62,7 @@ class RuntimeBeanDefinitionSpec extends AbstractTypeElementSpec {
 
     void 'test from supplier runtime bean definition with qualifier'() {
         given:
-        def bean = RuntimeBeanDefinition.builder(Foo.class,() -> new Foo())
+        RuntimeBeanDefinition<Foo> bean = RuntimeBeanDefinition.builder(Foo.class,() -> new Foo())
                                 .qualifier(Qualifiers.byName("foo"))
                                 .exposedTypes(IFoo)
                                 .build()
@@ -77,12 +78,13 @@ class RuntimeBeanDefinitionSpec extends AbstractTypeElementSpec {
         bean.declaredQualifier == Qualifiers.byName("foo")
         bean.beanDefinitionName
         bean.isPresent()
+        !bean.scope.isPresent()
         !bean.singleton
     }
 
     void "test dynamic bean definition registration"() {
         given:
-        def context = buildContext('''
+        ApplicationContext context = buildContext('''
 package registerref;
 
 import io.micronaut.context.BeanDefinitionRegistry;
