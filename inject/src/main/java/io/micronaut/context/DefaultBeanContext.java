@@ -1542,7 +1542,8 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
     @SuppressWarnings("unchecked")
     @Override
-    public <B> BeanContext registerBeanDefinition(RuntimeBeanDefinition<B> definition) {
+    @NonNull
+    public <B> BeanContext registerBeanDefinition(@NonNull RuntimeBeanDefinition<B> definition) {
         Objects.requireNonNull(definition, "Bean definition cannot be null");
         this.beanDefinitionsClasses.add(definition);
         beanCandidateCache.entrySet().removeIf(entry -> entry.getKey().isAssignableFrom(definition.getBeanType()));

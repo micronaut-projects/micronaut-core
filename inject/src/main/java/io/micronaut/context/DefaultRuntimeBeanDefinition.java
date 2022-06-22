@@ -76,12 +76,11 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
     }
 
     @Override
+    @NonNull
     public Set<Class<?>> getExposedTypes() {
-        if (ArrayUtils.isNotEmpty(exposedTypes)) {
-            return CollectionUtils.setOf(exposedTypes);
-        } else {
-            return RuntimeBeanDefinition.super.getExposedTypes();
-        }
+        return ArrayUtils.isNotEmpty(exposedTypes) ?
+            CollectionUtils.setOf(exposedTypes) :
+            RuntimeBeanDefinition.super.getExposedTypes();
     }
 
     @Override
@@ -95,6 +94,7 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
     }
 
     @Override
+    @NonNull
     public Argument<T> asArgument() {
         return beanType;
     }
@@ -106,11 +106,8 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
 
     @Override
     public Qualifier<T> getDeclaredQualifier() {
-        if (this.qualifier != null) {
-            return this.qualifier;
-        } else {
-            return RuntimeBeanDefinition.super.getDeclaredQualifier();
-        }
+        return this.qualifier != null ? this.qualifier :
+            RuntimeBeanDefinition.super.getDeclaredQualifier();
     }
 
     @Override
@@ -134,6 +131,7 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
     }
 
     @Override
+    @NonNull
     public AnnotationMetadata getAnnotationMetadata() {
         return annotationMetadata;
     }
@@ -155,11 +153,13 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
 
     @SuppressWarnings("unchecked")
     @Override
+    @NonNull
     public List<Argument<?>> getTypeArguments() {
         return Arrays.asList(beanType.getTypeParameters());
     }
 
     @Override
+    @NonNull
     public Class<?>[] getTypeParameters() {
         return getTypeArguments()
             .stream()
@@ -173,7 +173,9 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
     }
 
     @Override
-    public T build(BeanResolutionContext resolutionContext, BeanContext context, BeanDefinition<T> definition) throws BeanInstantiationException {
+    public T build(BeanResolutionContext resolutionContext,
+                   BeanContext context,
+                   BeanDefinition<T> definition) throws BeanInstantiationException {
         return supplier.get();
     }
 
@@ -235,6 +237,7 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
         }
 
         @Override
+        @NonNull
         public RuntimeBeanDefinition<B> build() {
             return new DefaultRuntimeBeanDefinition<>(
                 beanType,
