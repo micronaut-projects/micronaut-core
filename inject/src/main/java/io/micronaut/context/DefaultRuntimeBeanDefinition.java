@@ -78,11 +78,9 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
     @Override
     @NonNull
     public Set<Class<?>> getExposedTypes() {
-        if (ArrayUtils.isNotEmpty(exposedTypes)) {
-            return CollectionUtils.setOf(exposedTypes);
-        } else {
-            return RuntimeBeanDefinition.super.getExposedTypes();
-        }
+        return ArrayUtils.isNotEmpty(exposedTypes) ?
+            CollectionUtils.setOf(exposedTypes) :
+            RuntimeBeanDefinition.super.getExposedTypes();
     }
 
     @Override
@@ -108,11 +106,8 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
 
     @Override
     public Qualifier<T> getDeclaredQualifier() {
-        if (this.qualifier != null) {
-            return this.qualifier;
-        } else {
-            return RuntimeBeanDefinition.super.getDeclaredQualifier();
-        }
+        return this.qualifier != null ? this.qualifier :
+            RuntimeBeanDefinition.super.getDeclaredQualifier();
     }
 
     @Override
