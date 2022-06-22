@@ -183,5 +183,15 @@
     "type": "io.micronaut.core.annotation.AnnotationMetadata",
     "member": "Method io.micronaut.core.annotation.AnnotationMetadata.getAnnotationValuesByStereotype(java.lang.String)",
     "reason": "New default method"
+  },
+  {
+    "type": "io.micronaut.core.io.service.SoftServiceLoader$ServiceCollector",
+    "member": "Class io.micronaut.core.io.service.SoftServiceLoader$ServiceCollector",
+    "reason": "New default method"
+  },
+  {
+    "type": "io.micronaut.core.io.service.SoftServiceLoader$ServiceCollector",
+    "member": "Method io.micronaut.core.io.service.SoftServiceLoader$ServiceCollector.collect(java.util.Collection,boolean)",
+    "reason": "New default method"
   }
 ]
