@@ -56,7 +56,7 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, Be
     }
 
     @Override
-    default boolean isEnabled(BeanContext context, BeanResolutionContext resolutionContext) {
+    default boolean isEnabled(@NonNull BeanContext context, BeanResolutionContext resolutionContext) {
         return true;
     }
 

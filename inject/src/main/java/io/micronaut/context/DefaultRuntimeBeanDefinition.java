@@ -76,6 +76,7 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
     }
 
     @Override
+    @NonNull
     public Set<Class<?>> getExposedTypes() {
         if (ArrayUtils.isNotEmpty(exposedTypes)) {
             return CollectionUtils.setOf(exposedTypes);
@@ -95,6 +96,7 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
     }
 
     @Override
+    @NonNull
     public Argument<T> asArgument() {
         return beanType;
     }
@@ -134,6 +136,7 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
     }
 
     @Override
+    @NonNull
     public AnnotationMetadata getAnnotationMetadata() {
         return annotationMetadata;
     }
@@ -155,11 +158,13 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
 
     @SuppressWarnings("unchecked")
     @Override
+    @NonNull
     public List<Argument<?>> getTypeArguments() {
         return Arrays.asList(beanType.getTypeParameters());
     }
 
     @Override
+    @NonNull
     public Class<?>[] getTypeParameters() {
         return getTypeArguments()
             .stream()
@@ -235,6 +240,7 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
         }
 
         @Override
+        @NonNull
         public RuntimeBeanDefinition<B> build() {
             return new DefaultRuntimeBeanDefinition<>(
                 beanType,
