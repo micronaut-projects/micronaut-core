@@ -16,6 +16,7 @@
 package io.micronaut.core.io.service;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
 
 import java.util.Optional;
 import java.util.ServiceConfigurationError;
@@ -29,15 +30,16 @@ import java.util.function.Supplier;
  * @since 1.0
  */
 @Internal
-class DefaultServiceDefinition<S> implements ServiceDefinition<S> {
+final class DefaultServiceDefinition<S> implements ServiceDefinition<S> {
     private final String name;
-    private final Optional<Class<S>> loadedClass;
+    @Nullable
+    private final Class<S> loadedClass;
 
     /**
      * @param name        The name
      * @param loadedClass The loaded class
      */
-    DefaultServiceDefinition(String name, Optional<Class<S>> loadedClass) {
+    DefaultServiceDefinition(String name, @Nullable Class<S> loadedClass) {
         this.name = name;
         this.loadedClass = loadedClass;
     }
@@ -49,14 +51,17 @@ class DefaultServiceDefinition<S> implements ServiceDefinition<S> {
 
     @Override
     public boolean isPresent() {
-        return loadedClass.isPresent();
+        return loadedClass != null;
     }
 
     @Override
+    @SuppressWarnings("java:S1181")
     public <X extends Throwable> S orElseThrow(Supplier<? extends X> exceptionSupplier) throws X {
-        final Class<S> type = loadedClass.orElseThrow(exceptionSupplier);
+        if (loadedClass == null) {
+            throw exceptionSupplier.get();
+        }
         try {
-            return type.getDeclaredConstructor().newInstance();
+            return loadedClass.getDeclaredConstructor().newInstance();
         } catch (Throwable e) {
             throw exceptionSupplier.get();
         }
@@ -64,7 +69,7 @@ class DefaultServiceDefinition<S> implements ServiceDefinition<S> {
 
     @Override
     public S load() {
-        return loadedClass.map(aClass -> {
+        return Optional.ofNullable(loadedClass).map(aClass -> {
             try {
                 return aClass.getDeclaredConstructor().newInstance();
             } catch (Throwable e) {

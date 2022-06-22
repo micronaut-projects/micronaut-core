@@ -1,6 +1,7 @@
 package io.micronaut.http.server.netty.resources
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.annotation.NonNull
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.netty.AbstractNettyHttpRequest
 import io.micronaut.runtime.server.EmbeddedServer
@@ -29,7 +30,6 @@ import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler
 import io.netty.handler.ssl.SslContextBuilder
 import io.netty.handler.ssl.SupportedCipherSuiteFilter
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory
-import org.jetbrains.annotations.NotNull
 import spock.lang.Specification
 
 import java.time.Instant
@@ -46,8 +46,8 @@ class Http2StaticResourceCacheSpec extends Specification {
         def app = ApplicationContext.run([
                 'micronaut.server.http-version': '2.0',
                 'micronaut.ssl.enabled': true,
-                'micronaut.ssl.port': -1,
-                'micronaut.ssl.buildSelfSigned': true,
+                'micronaut.server.ssl.port': -1,
+                'micronaut.server.ssl.buildSelfSigned': true,
                 'micronaut.router.static-resources.default.paths': ['classpath:public', 'file:' + tempFile.parent, 'file:' + tempSubDir.absolutePath]
         ])
         def embeddedServer = app.getBean(EmbeddedServer)
@@ -72,7 +72,7 @@ class Http2StaticResourceCacheSpec extends Specification {
                 .option(ChannelOption.AUTO_READ, true)
                 .handler(new ChannelInitializer<SocketChannel>() {
                     @Override
-                    protected void initChannel(@NotNull SocketChannel ch) throws Exception {
+                    protected void initChannel(@NonNull SocketChannel ch) throws Exception {
                         def connection = new DefaultHttp2Connection(false)
                         def connectionHandler = new HttpToHttp2ConnectionHandlerBuilder()
                                 .initialSettings(Http2Settings.defaultSettings())

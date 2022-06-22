@@ -22,9 +22,9 @@ mongodb:
   uri: mongodb://username:password@localhost:27017/databaseName
 ----
 
-TIP: The `mongodb.uri` follows the https://docs.mongodb.com/manual/reference/connection-string[MongoDB Connection String] format.
+TIP: The `mongodb.uri` follows the https://docs.mongodb.com/manual/reference/connection-string/[MongoDB Connection String] format.
 
-A non-blocking Reactive Streams http://mongodb.github.io/mongo-java-driver-reactivestreams/1.8/javadoc/com/mongodb/reactivestreams/client/MongoClient.html[MongoClient] is then available for dependency injection.
+A non-blocking Reactive Streams https://mongodb.github.io/mongo-java-driver-reactivestreams/1.8/javadoc/com/mongodb/reactivestreams/client/MongoClient.html[MongoClient] is then available for dependency injection.
 
 To use the blocking driver, add a dependency to your build on the mongo-java-driver:
 
@@ -33,6 +33,6 @@ To use the blocking driver, add a dependency to your build on the mongo-java-dri
 compile "org.mongodb:mongo-java-driver"
 ----
 
-Then the blocking http://mongodb.github.io/mongo-java-driver/3.7/javadoc/com/mongodb/MongoClient.html[MongoClient] will be available for injection.
+Then the blocking https://mongodb.github.io/mongo-java-driver/3.7/javadoc/com/mongodb/MongoClient.html[MongoClient] will be available for injection.
 
 See the https://micronaut-projects.github.io/micronaut-mongodb/latest/guide/[Micronaut MongoDB] documentation for further information on configuring and using MongoDB within Micronaut.

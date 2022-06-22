@@ -28,6 +28,9 @@ import javax.lang.model.element.PackageElement;
  */
 @Internal
 public class JavaPackageElement extends AbstractJavaElement implements io.micronaut.inject.ast.PackageElement {
+
+    private final PackageElement element;
+
     /**
      * @param element            The {@link PackageElement}
      * @param annotationMetadata The Annotation metadata
@@ -38,5 +41,16 @@ public class JavaPackageElement extends AbstractJavaElement implements io.micron
             AnnotationMetadata annotationMetadata,
             JavaVisitorContext visitorContext) {
         super(element, annotationMetadata, visitorContext);
+        this.element = element;
+    }
+
+    @Override
+    public String getName() {
+        return element.getQualifiedName().toString();
+    }
+
+    @Override
+    public String getSimpleName() {
+        return element.getSimpleName().toString();
     }
 }

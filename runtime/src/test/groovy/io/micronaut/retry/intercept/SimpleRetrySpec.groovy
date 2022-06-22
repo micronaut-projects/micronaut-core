@@ -295,6 +295,38 @@ class SimpleRetrySpec extends Specification {
         context.stop()
     }
 
+    void "test retry with throwable capture"() {
+        given:
+        ApplicationContext context = ApplicationContext.run()
+        CounterService counterService = context.getBean(CounterService)
+
+        when:
+        counterService.getCountThrowable()
+
+        then: "retry kicks in because the exception thrown doesn't match based exception"
+        noExceptionThrown()
+        counterService.countThrowable == counterService.countThreshold
+
+        cleanup:
+        context.stop()
+    }
+
+    void "test retry with throwable uncapture"() {
+        given:
+        ApplicationContext context = ApplicationContext.run()
+        CounterService counterService = context.getBean(CounterService)
+
+        when:
+        counterService.getCountThrowableUncapture()
+
+        then: "retry didn't kick in because the exception thrown doesn't configured for throwable"
+        thrown(Throwable)
+        counterService.countThrowableUncaptured == 1
+
+        cleanup:
+        context.stop()
+    }
+
     @Singleton
     static class MyRetryListener implements RetryEventListener {
 
@@ -331,6 +363,8 @@ class SimpleRetrySpec extends Specification {
         int countPredicate = 0
         int countThreshold = 3
         int countPreThreshold = 3
+        int countThrowable = 0;
+        int countThrowableUncaptured = 0;
 
         @Retryable(attempts = '5', delay = '5ms')
         int getCountSync() {
@@ -443,6 +477,25 @@ class SimpleRetrySpec extends Specification {
                 }
             }
             return countPredicate
+        }
+
+        @Retryable(attempts = '5', delay = '5ms', capturedException = Throwable.class)
+        Integer getCountThrowable() {
+            countThrowable++
+            println(countThrowable)
+            if(countThrowable < countThreshold - 1) {
+                throw new Throwable()
+            }
+            return countThrowable
+        }
+
+        @Retryable(attempts = '5', delay = '5ms')
+        Integer getCountThrowableUncapture() {
+            countThrowableUncaptured++
+            if(countThrowableUncaptured < countThreshold) {
+                throw new Throwable()
+            }
+            return countThrowableUncaptured
         }
     }
 }

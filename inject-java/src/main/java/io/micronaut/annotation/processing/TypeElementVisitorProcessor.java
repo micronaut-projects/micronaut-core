@@ -154,6 +154,19 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
     }
 
     /**
+     * Does this process have any visitors.
+     * @return True if visitors are present.
+     */
+    protected boolean hasVisitors() {
+        for (TypeElementVisitor<?, ?> typeElementVisitor : typeElementVisitors) {
+            if (typeElementVisitor.getVisitorKind() == getVisitorKind()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * @return The loaded visitors.
      */
     protected List<LoadedVisitor> getLoadedVisitors() {
@@ -210,13 +223,17 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
             TypeElement groovyObjectTypeElement = elementUtils.getTypeElement("groovy.lang.GroovyObject");
             TypeMirror groovyObjectType = groovyObjectTypeElement != null ? groovyObjectTypeElement.asType() : null;
 
-            List<TypeElement> elements = roundEnv.getRootElements()
-                    .stream()
-                    .filter(element -> JavaModelUtils.isClassOrInterface(element) || JavaModelUtils.isEnum(element) || JavaModelUtils.isRecord(element))
-                    .filter(element -> element.getAnnotation(Generated.class) == null)
-                    .map(modelUtils::classElementFor)
-                    .filter(typeElement -> typeElement == null || (groovyObjectType == null || !typeUtils.isAssignable(typeElement.asType(), groovyObjectType)))
-                    .collect(Collectors.toList());
+            Set<TypeElement> elements = new LinkedHashSet<>();
+
+            for (TypeElement annotation : annotations) {
+                final Set<? extends Element> annotatedElements = roundEnv.getElementsAnnotatedWith(annotation);
+                includeElements(elements, annotatedElements, groovyObjectType);
+            }
+
+            // This call to getRootElements() should be removed in Micronaut 4. It should not be possible
+            // to process elements without at least one annotation present and this call breaks that assumption.
+            final Set<? extends Element> rootElements = roundEnv.getRootElements();
+            includeElements(elements, rootElements, groovyObjectType);
 
             if (!elements.isEmpty()) {
 
@@ -262,6 +279,19 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
             writeBeanDefinitionsToMetaInf();
         }
         return false;
+    }
+
+    private void includeElements(Set<TypeElement> target,
+                                 Set<? extends Element> annotatedElements, TypeMirror groovyObjectType) {
+        annotatedElements
+                .stream()
+                .filter(element -> JavaModelUtils.isClassOrInterface(element) || JavaModelUtils.isEnum(element) || JavaModelUtils.isRecord(element))
+                .map(modelUtils::classElementFor)
+                .filter(Objects::nonNull)
+                .filter(element -> element.getAnnotation(Generated.class) == null)
+                .filter(typeElement -> groovyObjectType == null || !typeUtils.isAssignable(typeElement.asType(),
+                                                                                           groovyObjectType))
+                .forEach(target::add);
     }
 
     /**
@@ -385,16 +415,22 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                 } else if (JavaModelUtils.isEnum(classElement)) {
                     return scan(classElement.getEnclosedElements(), o);
                 } else {
+                    List<TypeElement> classes = new ArrayList<>();
                     List<? extends Element> elements = enclosedElements(classElement);
                     Object value = null;
-                    for (Element element: elements) {
-                        value = scan(element, o);
+                    for (Element element : elements) {
                         if (element instanceof TypeElement) {
-                            TypeElement typeElement = (TypeElement) element;
-                            for (LoadedVisitor visitor : visitors) {
-                                if (visitor.matches(typeElement)) {
-                                    value = scan(enclosedElements(typeElement), o);
-                                }
+                            classes.add((TypeElement) element);
+                        } else {
+                            value = scan(element, o);
+                        }
+                    }
+                    // TypeElementVisitor needs to process type's methods first and then all inner classes
+                    for (TypeElement typeElement : classes) {
+                        value = scan(typeElement, o);
+                        for (LoadedVisitor visitor : visitors) {
+                            if (visitor.matches(typeElement)) {
+                                value = scan(enclosedElements(typeElement), o);
                             }
                         }
                     }

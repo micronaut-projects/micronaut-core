@@ -29,6 +29,9 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/**
+ * Remaps from jakarta.inject to javax.inject.
+ */
 @Internal
 public final class JakartaRemapper implements AnnotationRemapper {
 

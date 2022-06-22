@@ -1,0 +1,27 @@
+You can enforce a subset of constraints using https://beanvalidation.org/2.0/spec/#validationapi-validatorapi-groups[validation groups] using `groups` on api:validation.Validated[]. More information is available in the https://beanvalidation.org/2.0/spec/#constraintdeclarationvalidationprocess-groupsequence[Bean Validation specification]
+
+snippet::io.micronaut.docs.datavalidation.groups.FinalValidation[tags="clazz", indent=0]
+
+<1> Define a custom validation group. This one extends `Default` so any validations done with this group will include constraints in the `Default` group.
+
+snippet::io.micronaut.docs.datavalidation.groups.Email[tags="clazz", indent=0]
+
+<1> Specify a constraint using the Default validation group. This constraint will only be enforced when `Default` is active.
+<2> Specify a constraint using the custom `FinalValidation` validation group. This constraint will only be enforced when `FinalValidation` is active.
+
+Annotate your controller with api:validation.Validated[], specifying the validation groups that will be active or letting it default to `Default`. Also annotate the binding POJO with `@Valid`.
+
+snippet::io.micronaut.docs.datavalidation.groups.EmailController[tags="imports,clazz", indent=0,title="Example"]
+
+<1> Annotating with api:validation.Validated[] without specifying groups means that the `Default` group will be active. Since this is defined on the class, it will apply to all methods.
+<2> Constraints in the `Default` validation group will be enforced, inheriting from the class. The effect is that `@NotBlank` on `email.recipient` will not be enforced when this method is called.
+<3> Specifying `groups` means that these validation groups will be enforced when this method is called.  Note that `FinalValidation` extends `Default` so constraints from both groups will be enforced.
+<4> Constraints in the `Default` and `FinalValidation` validation groups will be enforced, since `FinalValidation` extends `Default`. The effect is that both `@NotBlank` constraints in `email` will be enforced when this method is called.
+
+Validation of POJOs using the default validation group is shown in the following test:
+
+snippet::io.micronaut.docs.datavalidation.groups.EmailControllerSpec[tags="pojovalidateddefault",indent=0]
+
+Validation of POJOs using the custom `FinalValidation` validation group is shown in the following test:
+
+snippet::io.micronaut.docs.datavalidation.groups.EmailControllerSpec[tags="pojovalidatedfinal",indent=0]

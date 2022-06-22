@@ -69,7 +69,7 @@ The git info source can be disabled using the `endpoints.info.git.enabled` prope
 
 === Build Info Source
 
-If a `META-INF/build-info.properties` file is available on the classpath, the link:{api}/io/micronaut/management/endpoint/info/source/BuildInfoSource.html[BuildInfoSource] exposes the values in that file under the `build` key. Generating a `build-info.properties` file must be configured as part of your build. One easy option for Gradle users is the https://plugins.gradle.org/plugin/com.pasam.gradle.buildinfo[Gradle Build Info Plugin]. An option for Maven users is the https://docs.spring.io/spring-boot/docs/current/maven-plugin/examples/build-info.html[Spring Boot Maven Plugin]
+If a `META-INF/build-info.properties` file is available on the classpath, the link:{api}/io/micronaut/management/endpoint/info/source/BuildInfoSource.html[BuildInfoSource] exposes the values in that file under the `build` key. Generating a `build-info.properties` file must be configured as part of your build. One easy option for Gradle users is the https://plugins.gradle.org/plugin/com.pasam.gradle.buildinfo[Gradle Build Info Plugin]. An option for Maven users is the https://docs.spring.io/spring-boot/docs/current/maven-plugin/reference/htmlsingle/#goals-build-info[Spring Boot Maven Plugin]
 
 ==== Configuration
 

@@ -416,10 +416,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                     try {
                         converted = mediaTypeCodecRegistry.findCodec(mediaType).map(codec -> codec.decode(bodyArgument, new NettyByteBufferFactory(ctx.alloc()).wrap(msg.content())));
                     } catch (CodecException e) {
-                        if (LOG.isErrorEnabled()) {
-                            LOG.error("Error Processing WebSocket Message [" + webSocketBean + "]: " + e.getMessage(), e);
-                        }
-                        exceptionCaught(ctx, e);
+                        messageProcessingException(ctx, e);
                         return;
                     }
                 }
@@ -445,22 +442,14 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                             flowable.subscribe(
                                     o -> {
                                     },
-                                    error -> {
-                                        if (LOG.isErrorEnabled()) {
-                                            LOG.error("Error Processing WebSocket Message [" + webSocketBean + "]: " + error.getMessage(), error);
-                                        }
-                                        exceptionCaught(ctx, error);
-                                    },
+                                    error -> messageProcessingException(ctx, error),
                                     () -> messageHandled(ctx, session, v)
                             );
                         } else {
                             messageHandled(ctx, session, v);
                         }
                     } catch (Throwable e) {
-                        if (LOG.isErrorEnabled()) {
-                            LOG.error("Error Processing WebSocket Message [" + webSocketBean + "]: " + e.getMessage(), e);
-                        }
-                        exceptionCaught(ctx, e);
+                        messageProcessingException(ctx, e);
                     }
 
                 } else {
@@ -526,6 +515,13 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                     CloseReason.UNSUPPORTED_DATA
             );
         }
+    }
+
+    private void messageProcessingException(ChannelHandlerContext ctx, Throwable e) {
+        if (LOG.isErrorEnabled()) {
+            LOG.error("Error Processing WebSocket Message [" + webSocketBean + "]: " + e.getMessage(), e);
+        }
+        exceptionCaught(ctx, e);
     }
 
     /**

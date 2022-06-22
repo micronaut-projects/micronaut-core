@@ -24,9 +24,9 @@ import static java.util.concurrent.CompletableFuture.supplyAsync
 
 @MicronautTest
 @Property(name = "micronaut.server.http-version", value = "2.0")
-@Property(name = "micronaut.ssl.enabled", value = "true")
-@Property(name = "micronaut.ssl.port", value = "-1")
-@Property(name = "micronaut.ssl.buildSelfSigned", value = "true")
+@Property(name = "micronaut.server.ssl.enabled", value = "true")
+@Property(name = "micronaut.server.ssl.port", value = "-1")
+@Property(name = "micronaut.server.ssl.buildSelfSigned", value = "true")
 @Property(name = "micronaut.server.netty.log-level", value = "TRACE")
 @Property(name = "micronaut.http.client.log-level", value = "TRACE")
 @Requires({ jvm.current.isJava11Compatible() })

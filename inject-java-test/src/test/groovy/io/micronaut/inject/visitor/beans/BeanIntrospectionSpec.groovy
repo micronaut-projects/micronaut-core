@@ -28,9 +28,6 @@ import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.jackson.modules.BeanIntrospectionModule
 import spock.lang.IgnoreIf
 
-//import org.objectweb.asm.ClassReader
-//import org.objectweb.asm.util.ASMifier
-//import org.objectweb.asm.util.TraceClassVisitor
 import spock.lang.Issue
 import spock.lang.Requires
 
@@ -3739,17 +3736,15 @@ class MyConfig {
 }
 """)
 
-        when:
-        BeanIntrospector beanIntrospector = BeanIntrospector.forClassLoader(classLoader)
+        BeanIntrospection beanIntrospection = classLoader.loadClass('test.$io_micronaut_inject_visitor_beans_TestClass$Introspection').newInstance()
 
-        then:
-        BeanIntrospection beanIntrospection = beanIntrospector.getIntrospection(TestClass)
+        expect:
         beanIntrospection != null
         beanIntrospection.getBeanProperties().size() == 2
     }
 
     void "test targeting abstract class with @Introspected(classes = ) with custom getter"() {
-        ClassLoader classLoader = buildClassLoader("test.Test", """
+        ClassLoader classLoader = buildClassLoader(TestCustomGetterClass.name, """
 package test;
 
 import io.micronaut.core.annotation.Introspected;
@@ -3759,12 +3754,9 @@ class MyConfig {
 
 }
 """)
+        BeanIntrospection beanIntrospection = classLoader.loadClass('test.$io_micronaut_inject_visitor_beans_TestCustomGetterClass$Introspection').newInstance()
 
-        when:
-        BeanIntrospector beanIntrospector = BeanIntrospector.forClassLoader(classLoader)
-
-        then:
-        BeanIntrospection beanIntrospection = beanIntrospector.getIntrospection(TestCustomGetterClass)
+        expect:
         beanIntrospection != null
         beanIntrospection.getBeanProperties().size() == 2
     }
@@ -4100,6 +4092,35 @@ public class Test {
         beanIntrospection.getBeanProperties()[0].annotationMetadata.getAnnotation(JsonProperty).stringValue().get() == 'field'
     }
 
+    void "verify the type of the bean property should be the getter/setter/constructor type, not the private field type."() {
+        when:
+        BeanIntrospection beanIntrospection = buildBeanIntrospection("test.Test", '''\
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+public class Test {
+    private final java.util.ArrayList<String> foo;
+    
+    public Test(java.util.List<String> foo) {
+        this.foo = null;
+    }
+    
+    public java.util.List<String> getFoo() {
+        return null;
+    }
+    
+}
+''')
+
+        then:
+        noExceptionThrown()
+        beanIntrospection != null
+        beanIntrospection.getBeanProperties().size() == 1
+        beanIntrospection.getBeanProperties()[0].type == List.class
+    }
+
     void "test field annotation overrides setter with custom setter"() {
         when:
         BeanIntrospection beanIntrospection = buildBeanIntrospection("test.Test", """
@@ -4130,6 +4151,77 @@ public class Test {
         beanIntrospection != null
         beanIntrospection.getBeanProperties().size() == 1
         beanIntrospection.getBeanProperties()[0].annotationMetadata.getAnnotation(JsonProperty).stringValue().get() == 'field'
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/6756")
+    def "covariant property is not read only"() {
+        when:
+        def introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+@io.micronaut.core.annotation.Introspected
+class Test implements B {
+
+    private AImpl a;
+
+    @Override
+    public AImpl getA() {
+        return a;
+    }
+
+    public void setA(AImpl a) {
+        this.a = a;
+    }
+}
+
+interface A {}
+
+interface B {
+    A getA();
+}
+
+class AImpl implements A {
+}
+''')
+        def property = introspection.getProperty("a").get()
+
+        then:
+        property.isReadWrite()
+    }
+
+    void "test targeting abstract class with @Introspected(classes = ) with getter matching field name"() {
+        ClassLoader classLoader = buildClassLoader("test.MyConfig", '''\
+package test;
+import io.micronaut.core.annotation.Introspected;
+@Introspected(classes = {io.micronaut.inject.visitor.beans.TestMatchingGetterClass.class})
+class MyConfig {
+}''')
+        when:
+        BeanIntrospection beanIntrospection = classLoader.loadClass('test.$io_micronaut_inject_visitor_beans_TestMatchingGetterClass$Introspection').newInstance()
+
+        then:
+        beanIntrospection
+        beanIntrospection.beanProperties.size() == 3
+        beanIntrospection.propertyNames as List<String> == ["deleted", "updated", "name"]
+    }
+
+    @Requires({ jvm.isJava14Compatible() })
+    void "test records with is in the property name"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''\
+package test;
+
+import io.micronaut.core.annotation.Creator;
+import java.util.List;
+import javax.validation.constraints.Min;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+@io.micronaut.core.annotation.Introspected
+public record Foo(String name, String isSurname, boolean contains, Boolean purged, boolean isUpdated, Boolean isDeleted) {
+}''')
+        expect:
+        introspection.propertyNames as List<String> == ["name", "isSurname", "contains", "purged", "isUpdated", "isDeleted"]
     }
 
     @Override

@@ -102,11 +102,50 @@ public interface AnnotationMetadata extends AnnotationSource {
     }
 
     /**
+     * Resolve all of the annotation values that feature the given stereotype.
+     *
+     * @param stereotype The annotation names
+     * @return A set of annotation names
+     * @since 3.5.2
+     */
+    @NonNull
+    default <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByStereotype(@Nullable String stereotype) {
+        return Collections.emptyList();
+    }
+
+    /**
      * All the annotation names this metadata declares.
      *
      * @return All the annotation names this metadata declares
      */
     default @NonNull Set<String> getAnnotationNames() {
+        return Collections.emptySet();
+    }
+
+    /**
+     * Returns the names of the annotations which are stereotypes.
+     *
+     * <p>A stereotype is a meta-annotation (an annotation declared on another annotation).</p>
+     * @return The names of the stereotype annotations
+     * @since 3.4.1
+     * @see #getDeclaredStereotypeAnnotationNames()
+     */
+    default @NonNull Set<String> getStereotypeAnnotationNames() {
+        return Collections.emptySet();
+    }
+
+    /**
+     * Returns the names of the annotations which are declared stereotypes.
+     *
+     * <p>A stereotype is a meta-annotation (an annotation declared on another annotation).</p>
+     *
+     * <p>A stereotype is considered declared when it it is a meta-annotation that is present on an annotation directly declared on the element and not inherited from a super class.</p>
+     * @return The names of the stereotype annotations
+     * @since 3.4.1
+     * @see #getStereotypeAnnotationNames()
+     * @see #getDeclaredAnnotationNames()
+     */
+    default @NonNull Set<String> getDeclaredStereotypeAnnotationNames() {
         return Collections.emptySet();
     }
 
@@ -1395,11 +1434,9 @@ public interface AnnotationMetadata extends AnnotationSource {
      */
     default boolean hasAnnotation(@Nullable Class<? extends Annotation> annotation) {
         if (annotation != null) {
-            if (isRepeatableAnnotation(annotation)) {
-                return hasAnnotation(findRepeatableAnnotation(annotation).get());
-            } else {
-                return hasAnnotation(annotation.getName());
-            }
+            return findRepeatableAnnotation(annotation)
+                    .map(this::hasAnnotation)
+                    .orElseGet(() -> hasAnnotation(annotation.getName()));
         }
         return false;
     }
@@ -1414,11 +1451,9 @@ public interface AnnotationMetadata extends AnnotationSource {
      */
     default boolean hasStereotype(@Nullable Class<? extends Annotation> annotation) {
         if (annotation != null) {
-            if (isRepeatableAnnotation(annotation)) {
-                return hasStereotype(findRepeatableAnnotation(annotation).get());
-            } else {
-                return hasStereotype(annotation.getName());
-            }
+            return findRepeatableAnnotation(annotation)
+                    .map(this::hasStereotype)
+                    .orElseGet(() -> hasStereotype(annotation.getName()));
         }
         return false;
     }
@@ -1468,11 +1503,9 @@ public interface AnnotationMetadata extends AnnotationSource {
      */
     default boolean hasDeclaredAnnotation(@Nullable Class<? extends Annotation> annotation) {
         if (annotation != null) {
-            if (isRepeatableAnnotation(annotation)) {
-                return hasDeclaredAnnotation(findRepeatableAnnotation(annotation).get());
-            } else {
-                return hasDeclaredAnnotation(annotation.getName());
-            }
+            return findRepeatableAnnotation(annotation)
+                    .map(this::hasDeclaredAnnotation)
+                    .orElseGet(() -> hasDeclaredAnnotation(annotation.getName()));
         }
         return false;
     }
@@ -1485,11 +1518,9 @@ public interface AnnotationMetadata extends AnnotationSource {
      */
     default boolean hasDeclaredStereotype(@Nullable Class<? extends Annotation> stereotype) {
         if (stereotype != null) {
-            if (isRepeatableAnnotation(stereotype)) {
-                return hasDeclaredStereotype(findRepeatableAnnotation(stereotype).get());
-            } else {
-                return hasDeclaredStereotype(stereotype.getName());
-            }
+            return findRepeatableAnnotation(stereotype)
+                    .map(this::hasDeclaredStereotype)
+                    .orElseGet(() -> hasDeclaredStereotype(stereotype.getName()));
         }
         return false;
     }

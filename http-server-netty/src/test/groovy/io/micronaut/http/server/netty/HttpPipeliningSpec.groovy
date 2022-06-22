@@ -2,6 +2,7 @@ package io.micronaut.http.server.netty
 
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requires
+import io.micronaut.core.annotation.NonNull
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
@@ -9,6 +10,7 @@ import io.micronaut.http.annotation.Post
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import io.netty.bootstrap.Bootstrap
+import io.netty.buffer.ByteBuf
 import io.netty.buffer.Unpooled
 import io.netty.channel.Channel
 import io.netty.channel.ChannelHandlerContext
@@ -26,7 +28,6 @@ import io.netty.handler.codec.http.HttpObjectAggregator
 import io.netty.handler.codec.http.HttpVersion
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
-import org.jetbrains.annotations.NotNull
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
@@ -67,13 +68,13 @@ class HttpPipeliningSpec extends Specification {
                 .channel(NioSocketChannel)
                 .handler(new ChannelInitializer<Channel>() {
                     @Override
-                    protected void initChannel(@NotNull Channel ch) throws Exception {
+                    protected void initChannel(@NonNull Channel ch) throws Exception {
                         ch.pipeline()
                                 .addLast(new HttpClientCodec())
                                 .addLast(new HttpObjectAggregator(1024))
                                 .addLast(new ChannelInboundHandlerAdapter() {
                                     @Override
-                                    void channelRead(@NotNull ChannelHandlerContext ctx, @NotNull Object msg) throws Exception {
+                                    void channelRead(@NonNull ChannelHandlerContext ctx, @NonNull Object msg) throws Exception {
                                         responses.add(msg)
                                     }
                                 })
@@ -96,6 +97,7 @@ class HttpPipeliningSpec extends Specification {
         responses[1].content().toString(StandardCharsets.UTF_8) == '[bar1,bar2]'
 
         cleanup:
+        responses.forEach(r -> r.release())
         eventLoopGroup.shutdownGracefully()
     }
 
@@ -108,13 +110,13 @@ class HttpPipeliningSpec extends Specification {
                 .channel(NioSocketChannel)
                 .handler(new ChannelInitializer<Channel>() {
                     @Override
-                    protected void initChannel(@NotNull Channel ch) throws Exception {
+                    protected void initChannel(@NonNull Channel ch) throws Exception {
                         ch.pipeline()
                                 .addLast(new HttpClientCodec())
                                 .addLast(new HttpObjectAggregator(1024))
                                 .addLast(new ChannelInboundHandlerAdapter() {
                                     @Override
-                                    void channelRead(@NotNull ChannelHandlerContext ctx, @NotNull Object msg) throws Exception {
+                                    void channelRead(@NonNull ChannelHandlerContext ctx, @NonNull Object msg) throws Exception {
                                         responses.add(msg)
                                     }
                                 })
@@ -135,7 +137,9 @@ class HttpPipeliningSpec extends Specification {
             responses.size() == 10
         }
         for (def r : responses) {
-            r.content().toString(StandardCharsets.UTF_8) == 'foo'
+            def content = r.content()
+            assert content.toString(StandardCharsets.UTF_8) == 'foo'
+            content.release()
         }
 
         cleanup:

@@ -53,8 +53,10 @@ class AbstractBean {
         interfaces += Session.class
         for(i in interfaces) {
             for(m in i.declaredMethods) {
-                count++
-                assert clazz.getDeclaredMethod(m.name, m.parameterTypes)
+                if (!m.name.containsIgnoreCase("jacoco")) {
+                    count++
+                    assert clazz.getDeclaredMethod(m.name, m.parameterTypes)
+                }
             }
         }
 
@@ -94,8 +96,10 @@ class AbstractBean {
         interfaces += SessionFactory.class
         for(i in interfaces) {
             for(m in i.declaredMethods) {
-                count++
-                assert clazz.getDeclaredMethod(m.name, m.parameterTypes)
+                if (!m.name.containsIgnoreCase("jacoco")) {
+                    count++
+                    assert clazz.getDeclaredMethod(m.name, m.parameterTypes)
+                }
             }
         }
 

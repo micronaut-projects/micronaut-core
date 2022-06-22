@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        java: ['java11', 'java17']
+        java: ['11', '17']
     steps:
        # https://github.com/actions/virtual-environments/issues/709
       - name: Free disk space
@@ -27,21 +27,20 @@ jobs:
          sudo rm -rf "/usr/local/share/boost"
          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
          sudo apt-get clean
-         df -h    
-      - uses: actions/checkout@v2
-      - uses: actions/cache@v2.1.7
+         df -h
+      - uses: actions/checkout@v3
+      - uses: actions/cache@v3
         with:
           path: ~/.gradle/caches
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle') }}
           restore-keys: |
             ${{ runner.os }}-gradle-
       - name: Setup GraalVM CE
-        uses: DeLaGuardo/setup-graalvm@5.0
+        uses: graalvm/setup-graalvm@v1
         with:
-          graalvm: 21.3.0
-          java: ${{ matrix.java }}
-      - name: Install Native Image
-        run: gu install native-image
+          version: '22.1.0'
+          java-version: ${{ matrix.java }}
+          components: 'native-image'
       - name: Build with Gradle
         run: |
           if ./gradlew tasks --no-daemon --all | grep -w "testNativeImage"
@@ -55,9 +54,11 @@ jobs:
            GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
            GRADLE_ENTERPRISE_CACHE_USERNAME: ${{ secrets.GRADLE_ENTERPRISE_CACHE_USERNAME }}
            GRADLE_ENTERPRISE_CACHE_PASSWORD: ${{ secrets.GRADLE_ENTERPRISE_CACHE_PASSWORD }}
+           PREDICTIVE_TEST_SELECTION: "${{ github.event_name == 'pull_request' && 'true' || 'false' }}"
       - name: Publish Test Report
         if: always()
-        uses: mikepenz/action-junit-report@v2
+        uses: mikepenz/action-junit-report@v3.0.3
         with:
-          check_name: GraalVM CE CI / Test Report (${{ matrix.java }})
+          check_name: GraalVM CE CI / Test Report (Java ${{ matrix.java }})
           report_paths: '**/build/test-results/test/TEST-*.xml'
+          check_retries: 'true'

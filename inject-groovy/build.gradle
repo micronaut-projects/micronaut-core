@@ -1,13 +1,18 @@
 plugins {
+    id "io.micronaut.build.internal.convention-library"
     id 'io.micronaut.build.internal.functional-test'
+}
+
+micronautBuild {
+    core {
+        usesMicronautTest()
+    }
 }
 
 dependencies {
     api project(":inject")
     api project(':aop')
     api libs.managed.groovy
-    implementation(libs.managed.slf4j.simple)
-
 //    testImplementation 'javax.validation:validation-api:1.1.0.Final'
     testImplementation project(":context")
     testImplementation libs.javax.inject
@@ -28,12 +33,6 @@ dependencies {
     }
     testImplementation libs.managed.groovy.json
     testImplementation libs.blaze.persistence.core
-
-    testImplementation(libs.managed.micronaut.test.core) {
-        exclude module:'micronaut-runtime'
-        exclude module:'micronaut-inject'
-        exclude module:'micronaut-bom'
-    }
 
     testImplementation libs.managed.reactor
 

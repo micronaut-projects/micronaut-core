@@ -17,6 +17,9 @@ package io.micronaut.http.filter;
 
 import io.micronaut.core.util.PathMatcher;
 
+/**
+ * Styles of filter patterns.
+ */
 public enum FilterPatternStyle {
   /**
    * Ant-style pattern matching.

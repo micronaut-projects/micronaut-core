@@ -1,10 +1,14 @@
 plugins {
+    id "io.micronaut.build.internal.convention-core-library"
     id "org.jetbrains.kotlin.jvm"
 }
 
-ext {
-    shadowJarEnabled = true
+micronautBuild {
+    core {
+        documented = false
+    }
 }
+
 dependencies {
     api project(':inject')
     api project(':core')

@@ -15,22 +15,24 @@
  */
 package io.micronaut.inject;
 
+import io.micronaut.context.BeanContext;
+import io.micronaut.context.BeanResolutionContext;
+import io.micronaut.context.Qualifier;
 import io.micronaut.context.annotation.DefaultScope;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Provided;
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.context.BeanContext;
-import io.micronaut.context.BeanResolutionContext;
-import io.micronaut.context.Qualifier;
-import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ArgumentCoercible;
-import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import jakarta.inject.Singleton;
 
@@ -104,6 +106,9 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
             Class<?> beanClass = beanType.getType();
             if (len == 0) {
                 if (isContainerType()) {
+                    if (getBeanType().isAssignableFrom(beanClass)) {
+                        return true;
+                    }
                     final Optional<Argument<?>> containerElement = getContainerElement();
                     if (containerElement.isPresent()) {
                         final Class<?> t = containerElement.get().getType();
@@ -421,29 +426,34 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
      * @return The qualifier or null if this isn't one
      */
     default @Nullable Qualifier<T> getDeclaredQualifier() {
-        final List<String> annotations = getAnnotationNamesByStereotype(AnnotationUtil.QUALIFIER);
-        if (CollectionUtils.isNotEmpty(annotations)) {
+        AnnotationMetadata annotationMetadata = getAnnotationMetadata();
+        if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
+            // Beans created by a factory will have AnnotationMetadataHierarchy = producing element + factory class
+            // All qualifiers are removed from the factory class anyway, so we can skip the hierarchy
+            annotationMetadata = annotationMetadata.getDeclaredMetadata();
+        }
+        List<AnnotationValue<Annotation>> annotations = annotationMetadata.getAnnotationValuesByStereotype(AnnotationUtil.QUALIFIER);
+        if (!annotations.isEmpty()) {
             if (annotations.size() == 1) {
-                final String annotation = annotations.iterator().next();
-                if (annotation.equals(Qualifier.PRIMARY)) {
+                final AnnotationValue<Annotation> annotationValue = annotations.iterator().next();
+                if (annotationValue.getAnnotationName().equals(Qualifier.PRIMARY)) {
                     // primary is the same as null
                     return null;
                 }
-                return Qualifiers.byAnnotation(this, annotation);
+                return (Qualifier<T>) Qualifiers.byAnnotation(annotationMetadata, annotationValue);
             } else {
-                @SuppressWarnings("rawtypes") final Qualifier[] qualifiers = annotations.stream()
-                        .map((name) -> Qualifiers.byAnnotation(this, name))
-                        .toArray(Qualifier[]::new);
-                //noinspection unchecked
-                return Qualifiers.byQualifiers(
-                        qualifiers
-                );
+                Qualifier<T>[] qualifiers = new Qualifier[annotations.size()];
+                int i = 0;
+                for (AnnotationValue<Annotation> annotationValue : annotations) {
+                    qualifiers[i++] = (Qualifier<T>) Qualifiers.byAnnotation(annotationMetadata, annotationValue);
+                }
+                return Qualifiers.byQualifiers(qualifiers);
             }
         } else {
             Qualifier<T> qualifier = resolveDynamicQualifier();
             if (qualifier == null) {
-                String name = getAnnotationMetadata().stringValue(AnnotationUtil.NAMED).orElse(null);
-                qualifier = name != null ? Qualifiers.byAnnotation(this, name) : null;
+                String name = annotationMetadata.stringValue(AnnotationUtil.NAMED).orElse(null);
+                qualifier = name != null ? Qualifiers.byAnnotation(annotationMetadata, name) : null;
             }
             return qualifier;
         }

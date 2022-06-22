@@ -46,7 +46,9 @@ public interface StreamingFileUpload extends FileUpload, Publisher<PartData> {
      * @param location the name of the file to which the stream will be written. The file is created relative to
      *                 the location as specified in the <tt>MultipartConfiguration</tt>
      * @return A {@link Publisher} that outputs whether the transfer was successful
+     * @deprecated Use {@link #transferTo(File)} or {@link #transferTo(OutputStream)} instead.
      */
+    @Deprecated
     Publisher<Boolean> transferTo(String location);
 
     /**

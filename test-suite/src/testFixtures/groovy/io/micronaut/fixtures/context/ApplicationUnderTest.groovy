@@ -130,7 +130,7 @@ class ApplicationUnderTest {
     }
 
     void hasServiceFileFor(String serviceType, @DelegatesTo(value = ServiceFile, strategy = Closure.DELEGATE_FIRST) Closure<?> spec = {}) {
-        def serviceFile = new File(buildDir, "META-INF/services/$serviceType")
+        def serviceFile = new File(buildDir, "META-INF/micronaut/$serviceType")
         assert serviceFile.exists(): "Service file $serviceType doesn't exist. Candidates are: $serviceFiles"
         spec.delegate = new ServiceFile(serviceFile)
         spec.resolveStrategy = Closure.DELEGATE_FIRST
@@ -145,7 +145,8 @@ class ApplicationUnderTest {
         private final Set<String> actualServiceImpls
 
         ServiceFile(File serviceFile) {
-            actualServiceImpls = serviceFile.readLines().findAll() as Set
+            actualServiceImpls = []
+            serviceFile.eachFile { actualServiceImpls.add(it.name) }
         }
 
         void withImplementations(String... implementations) {

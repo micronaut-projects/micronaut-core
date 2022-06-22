@@ -76,7 +76,7 @@ import java.util.stream.Collectors;
  * @since 1.0
  */
 @Internal
-public abstract class AbstractClassFileWriter implements Opcodes, OriginatingElements {
+public abstract class AbstractClassFileWriter implements Opcodes, OriginatingElements, ClassOutputWriter {
 
     protected static final Type TYPE_ARGUMENT = Type.getType(Argument.class);
     protected static final Type TYPE_ARGUMENT_ARRAY = Type.getType(Argument[].class);
@@ -540,13 +540,13 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * @param defaults             The annotation defaults
      * @param loadTypeMethods      The load type methods
      */
-    protected void pushArgument(Type owningType,
-                              ClassWriter classWriter,
-                              GeneratorAdapter generatorAdapter,
-                              String declaringTypeName,
-                              ClassElement argument,
-                              Map<String, Integer> defaults,
-                              Map<String, GeneratorAdapter> loadTypeMethods) {
+    protected void pushReturnTypeArgument(Type owningType,
+                                          ClassWriter classWriter,
+                                          GeneratorAdapter generatorAdapter,
+                                          String declaringTypeName,
+                                          ClassElement argument,
+                                          Map<String, Integer> defaults,
+                                          Map<String, GeneratorAdapter> loadTypeMethods) {
         Type type = Type.getType(Argument.class);
         if (argument.isPrimitive() && !argument.isArray()) {
             String constantName = argument.getName().toUpperCase(Locale.ENGLISH);
@@ -567,7 +567,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
                     generatorAdapter,
                     argument.getName(),
                     argument,
-                    argument.getAnnotationMetadata(),
+                    AnnotationMetadata.EMPTY_METADATA, // Don't store return type annotations, method annotations are returned
                     argument.getTypeArguments(),
                     defaults,
                     loadTypeMethods
@@ -720,14 +720,6 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
             return null;
         }
     }
-
-    /**
-     * Accept a ClassWriterOutputVisitor to write this writer to disk.
-     *
-     * @param classWriterOutputVisitor The {@link ClassWriterOutputVisitor}
-     * @throws IOException if there is an error writing to disk
-     */
-    public abstract void accept(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException;
 
     /**
      * Implements a method called "getInterceptedType" for the given type and class writer.

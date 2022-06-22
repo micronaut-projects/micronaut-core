@@ -1094,8 +1094,10 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      */
     public final @NonNull
     <T extends Annotation> List<AnnotationValue<T>> getAnnotations(String member, Class<T> type) {
-        ArgumentUtils.requireNonNull("member", member);
         ArgumentUtils.requireNonNull("type", type);
+        String typeName = type.getName();
+
+        ArgumentUtils.requireNonNull("member", member);
         Object v = values.get(member);
         AnnotationValue[] values = null;
         if (v instanceof AnnotationValue) {
@@ -1105,7 +1107,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         }
         if (ArrayUtils.isNotEmpty(values)) {
             List<AnnotationValue<T>> list = new ArrayList<>(values.length);
-            String typeName = type.getName();
+
             for (AnnotationValue value : values) {
                 if (value == null) {
                     continue;
@@ -1160,8 +1162,53 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      */
     public @NonNull
     final <T extends Annotation> Optional<AnnotationValue<T>> getAnnotation(String member, Class<T> type) {
-        for (AnnotationValue<T> tAnnotationValue : getAnnotations(member, type)) {
-            return Optional.of(tAnnotationValue);
+        ArgumentUtils.requireNonNull("type", type);
+        String typeName = type.getName();
+
+        ArgumentUtils.requireNonNull("member", member);
+        Object v = values.get(member);
+        if (v instanceof AnnotationValue) {
+            final AnnotationValue<T> av = (AnnotationValue<T>) v;
+            if (av.getAnnotationName().equals(typeName)) {
+                return Optional.of(av);
+            }
+            return Optional.empty();
+        } else if (v instanceof AnnotationValue[]) {
+            final AnnotationValue[] values = (AnnotationValue[]) v;
+            if (ArrayUtils.isNotEmpty(values)) {
+                final AnnotationValue value = values[0];
+                if (value.getAnnotationName().equals(typeName)) {
+                    return Optional.of(value);
+                }
+            }
+            return Optional.empty();
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * Gets a list of {@link AnnotationValue} for the given member.
+     *
+     * @param member The member
+     * @param <T>    The type
+     * @return The result
+     * @throws IllegalStateException If no member is available that conforms to the given name and type
+     * @since 3.3.0
+     */
+    public @NonNull
+    final <T extends Annotation> Optional<AnnotationValue<T>> getAnnotation(@NonNull String member) {
+        ArgumentUtils.requireNonNull("member", member);
+        Object v = values.get(member);
+        if (v instanceof AnnotationValue) {
+            final AnnotationValue<T> av = (AnnotationValue<T>) v;
+            return Optional.of(av);
+        } else if (v instanceof AnnotationValue[]) {
+            final AnnotationValue[] values = (AnnotationValue[]) v;
+            if (ArrayUtils.isNotEmpty(values)) {
+                final AnnotationValue value = values[0];
+                return Optional.of(value);
+            }
+            return Optional.empty();
         }
         return Optional.empty();
     }

@@ -22,8 +22,10 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.http.netty.configuration.NettyGlobalConfiguration;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.ServerChannel;
 import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.socket.SocketChannel;
+import io.netty.channel.unix.ServerDomainSocketChannel;
 import io.netty.util.ResourceLeakDetector;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
@@ -98,15 +100,31 @@ public class DefaultEventLoopGroupFactory implements EventLoopGroupFactory {
         return nativeFactory.serverSocketChannelClass();
     }
 
+    @Override
+    public Class<? extends ServerDomainSocketChannel> domainServerSocketChannelClass() throws UnsupportedOperationException {
+        return nativeFactory.domainServerSocketChannelClass();
+    }
+
     @NonNull
     @Override
     public Class<? extends ServerSocketChannel> serverSocketChannelClass(EventLoopGroupConfiguration configuration) {
         return getFactory(configuration).serverSocketChannelClass(configuration);
     }
 
+    @NonNull
+    @Override
+    public Class<? extends ServerDomainSocketChannel> domainServerSocketChannelClass(EventLoopGroupConfiguration configuration) {
+        return getFactory(configuration).domainServerSocketChannelClass(configuration);
+    }
+
     @Override
     public ServerSocketChannel serverSocketChannelInstance(EventLoopGroupConfiguration configuration) {
         return getFactory(configuration).serverSocketChannelInstance(configuration);
+    }
+
+    @Override
+    public ServerChannel domainServerSocketChannelInstance(@Nullable EventLoopGroupConfiguration configuration) {
+        return getFactory(configuration).domainServerSocketChannelInstance(configuration);
     }
 
     @NonNull

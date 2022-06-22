@@ -42,6 +42,21 @@ import java.util.function.Predicate;
 public interface BeanElementBuilder extends ConfigurableElement {
 
     /**
+     * Intercept the bean.
+     * @param annotationValue The annotation to intercept
+     * @return This bean method
+     * @since 3.5.2
+     */
+    default @NonNull BeanElementBuilder intercept(AnnotationValue<?>... annotationValue) {
+        if (annotationValue != null) {
+            for (AnnotationValue<?> value : annotationValue) {
+                annotate(value);
+            }
+        }
+        return this;
+    }
+
+    /**
      * @return The originating element
      */
     @NonNull

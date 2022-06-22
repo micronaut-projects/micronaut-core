@@ -1,6 +1,7 @@
 package io.micronaut.http.server.netty
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.annotation.NonNull
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Body
@@ -47,7 +48,6 @@ import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler
 import io.netty.handler.ssl.SslContextBuilder
 import io.netty.handler.ssl.SupportedCipherSuiteFilter
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory
-import org.jetbrains.annotations.NotNull
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import io.micronaut.core.async.annotation.SingleResult
@@ -263,13 +263,13 @@ class MaxRequestSizeSpec extends Specification {
                 .channel(NioSocketChannel)
                 .handler(new ChannelInitializer<Channel>() {
                     @Override
-                    protected void initChannel(@NotNull Channel ch) throws Exception {
+                    protected void initChannel(@NonNull Channel ch) throws Exception {
                         ch.pipeline()
                                 .addLast(new HttpClientCodec())
                                 .addLast(new HttpObjectAggregator(1024))
                                 .addLast(new ChannelInboundHandlerAdapter() {
                                     @Override
-                                    void channelRead(@NotNull ChannelHandlerContext ctx, @NotNull Object msg) throws Exception {
+                                    void channelRead(@NonNull ChannelHandlerContext ctx, @NonNull Object msg) throws Exception {
                                         responses.add(msg)
                                     }
                                 })
@@ -320,20 +320,21 @@ class MaxRequestSizeSpec extends Specification {
         }
 
         cleanup:
+        responses.forEach(r -> r.release())
         channel.close()
         embeddedServer.close()
     }
 
-    @PendingFeature
+    @Ignore
     void 'large request should not affect other http2 connections'() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
                 'micronaut.server.maxRequestSize': '10KB',
                 'micronaut.server.http-version': '2.0',
-                'micronaut.ssl.enabled': true,
+                'micronaut.server.ssl.enabled': true,
                 'micronaut.server.netty.log-level': 'TRACE',
-                'micronaut.ssl.port': -1,
-                'micronaut.ssl.buildSelfSigned': true
+                'micronaut.server.ssl.port': -1,
+                'micronaut.server.ssl.buildSelfSigned': true
         ])
 
         def request1 = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, '/test-max-size/multipart-body')
@@ -365,7 +366,7 @@ class MaxRequestSizeSpec extends Specification {
                 .option(ChannelOption.AUTO_READ, true)
                 .handler(new ChannelInitializer<SocketChannel>() {
                     @Override
-                    protected void initChannel(@NotNull SocketChannel ch) throws Exception {
+                    protected void initChannel(@NonNull SocketChannel ch) throws Exception {
                         def connection = new DefaultHttp2Connection(false)
                         def connectionHandler = new HttpToHttp2ConnectionHandlerBuilder()
                                 .initialSettings(Http2Settings.defaultSettings())
@@ -426,6 +427,7 @@ class MaxRequestSizeSpec extends Specification {
         responses[1].status() == HttpResponseStatus.OK
 
         cleanup:
+        responses.forEach(r -> r.release())
         channel.close()
         embeddedServer.close()
     }
@@ -449,6 +451,11 @@ class MaxRequestSizeSpec extends Specification {
                          CompletedFileUpload c,
                          CompletedFileUpload d,
                          CompletedFileUpload e) {
+            a.discard()
+            b.discard()
+            c.discard()
+            d.discard()
+            e.discard()
             "OK"
         }
 

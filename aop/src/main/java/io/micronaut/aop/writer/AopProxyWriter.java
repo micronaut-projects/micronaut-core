@@ -19,9 +19,11 @@ import io.micronaut.aop.HotSwappableInterceptedProxy;
 import io.micronaut.aop.Intercepted;
 import io.micronaut.aop.InterceptedProxy;
 import io.micronaut.aop.Interceptor;
+import io.micronaut.aop.InterceptorKind;
 import io.micronaut.aop.Introduced;
 import io.micronaut.aop.chain.InterceptorChain;
 import io.micronaut.aop.chain.MethodInterceptorChain;
+import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.BeanRegistration;
@@ -123,6 +125,11 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             "getProxyTargetBean",
             Argument.class,
             Qualifier.class
+    ));
+
+    public static final Method METHOD_HAS_CACHED_INTERCEPTED_METHOD = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(
+            InterceptedProxy.class,
+            "hasCachedInterceptedTarget"
     ));
 
     public static final Type FIELD_TYPE_INTERCEPTORS = Type.getType(Interceptor[][].class);
@@ -387,6 +394,21 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     }
 
     @Override
+    public void visitBeanFactoryMethod(ClassElement factoryClass, MethodElement factoryMethod) {
+        proxyBeanDefinitionWriter.visitBeanFactoryMethod(factoryClass, factoryMethod);
+    }
+
+    @Override
+    public void visitBeanFactoryMethod(ClassElement factoryClass, MethodElement factoryMethod, ParameterElement[] parameters) {
+        proxyBeanDefinitionWriter.visitBeanFactoryMethod(factoryClass, factoryMethod, parameters);
+    }
+
+    @Override
+    public void visitBeanFactoryField(ClassElement factoryClass, FieldElement factoryField) {
+        proxyBeanDefinitionWriter.visitBeanFactoryField(factoryClass, factoryField);
+    }
+
+    @Override
     public boolean isSingleton() {
         return proxyBeanDefinitionWriter.isSingleton();
     }
@@ -451,6 +473,9 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         this.constructorRequiresReflection = requiresReflection;
         this.declaredConstructor = constructor;
         this.visitorContext = visitorContext;
+        io.micronaut.core.annotation.AnnotationValue<?>[] interceptorTypes =
+                InterceptedMethodUtil.resolveInterceptorBinding(constructor.getAnnotationMetadata(), InterceptorKind.AROUND_CONSTRUCT);
+        visitInterceptorBinding(interceptorTypes);
     }
 
     @Override
@@ -742,7 +767,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             processAlreadyVisitedMethods(parentWriter);
         }
 
-        interceptorParameter.annotate(AnnotationUtil.ANN_INTERCEPTOR_BINDING_QUALIFIER, builder -> {
+        interceptorParameter.annotate(AnnotationUtil. ANN_INTERCEPTOR_BINDING_QUALIFIER, builder -> {
             final AnnotationValue<?>[] interceptorBinding = this.interceptorBinding.toArray(new AnnotationValue[0]);
             builder.values(interceptorBinding);
         });
@@ -926,6 +951,11 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
             // Write the Object interceptedTarget() method
             writeInterceptedTargetMethod(proxyClassWriter, targetType);
+
+            if (!lazy || cacheLazyTarget) {
+                // Write `boolean hasCachedInterceptedTarget()`
+                writeHasCachedInterceptedTargetMethod(proxyClassWriter, targetType);
+            }
 
             // Write the swap method
             // e. T swap(T newInstance);
@@ -1260,6 +1290,19 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     }
 
     @Override
+    public void visitAnnotationMemberPropertyInjectionPoint(TypedElement annotationMemberBeanType,
+                                                            String annotationMemberProperty,
+                                                            String requiredValue,
+                                                            String notEqualsValue) {
+        deferredInjectionPoints.add(() ->
+                proxyBeanDefinitionWriter.visitAnnotationMemberPropertyInjectionPoint(
+                    annotationMemberBeanType,
+                    annotationMemberProperty,
+                    requiredValue,
+                    notEqualsValue));
+    }
+
+    @Override
     public void visitFieldValue(
             TypedElement declaringType,
             FieldElement fieldType,
@@ -1543,6 +1586,21 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
         interceptedTargetVisitor.visitMaxs(1, 2);
         interceptedTargetVisitor.visitEnd();
+    }
+
+    private void writeHasCachedInterceptedTargetMethod(ClassWriter proxyClassWriter, Type targetType) {
+        GeneratorAdapter methodVisitor = startPublicMethod(proxyClassWriter, METHOD_HAS_CACHED_INTERCEPTED_METHOD);
+        methodVisitor.loadThis();
+        methodVisitor.getField(proxyType, FIELD_TARGET, targetType);
+        Label notNull = new Label();
+        methodVisitor.ifNonNull(notNull);
+        methodVisitor.push(false);
+        methodVisitor.returnValue();
+        methodVisitor.visitLabel(notNull);
+        methodVisitor.push(true);
+        methodVisitor.returnValue();
+        methodVisitor.visitMaxs(1, 2);
+        methodVisitor.visitEnd();
     }
 
     private void pushResolveInterceptorsCall(GeneratorAdapter proxyConstructorGenerator, int i, boolean isIntroduction) {

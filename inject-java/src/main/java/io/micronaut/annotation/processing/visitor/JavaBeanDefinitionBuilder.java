@@ -16,6 +16,10 @@
 package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.annotation.processing.AnnotationUtils;
+import io.micronaut.aop.Around;
+import io.micronaut.aop.InterceptorKind;
+import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil;
+import io.micronaut.aop.writer.AopProxyWriter;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
@@ -25,17 +29,21 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.TypedElement;
+import io.micronaut.inject.ast.beans.BeanParameterElement;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
+import io.micronaut.inject.writer.BeanDefinitionVisitor;
 import io.micronaut.inject.writer.BeanDefinitionWriter;
 
+import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.VariableElement;
 import java.lang.annotation.Annotation;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
-
-import javax.lang.model.element.ExecutableElement;
-import javax.lang.model.element.VariableElement;
 
 /**
  * Java implementation of {@link AbstractBeanDefinitionBuilder}.
@@ -86,16 +94,17 @@ class JavaBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
             }
 
             @Override
-            protected BeanDefinitionWriter createBeanDefinitionWriter() {
-                final BeanDefinitionWriter writer = super.createBeanDefinitionWriter();
+            protected BeanDefinitionVisitor createBeanDefinitionWriter() {
+                final BeanDefinitionVisitor writer = super.createBeanDefinitionWriter();
                 final JavaElementFactory elementFactory = ((JavaVisitorContext) visitorContext).getElementFactory();
                 final VariableElement variableElement = (VariableElement) producerField.getNativeType();
+                ClassElement resolvedParent = resolveParentType(parentType, elementFactory);
                 writer.visitBeanFactoryField(
-                        parentType,
+                        resolvedParent,
                         elementFactory.newFieldElement(
-                                parentType,
+                                resolvedParent,
                                 variableElement,
-                                new AnnotationMetadataHierarchy(parentType.getDeclaredMetadata(), producerField.getDeclaredMetadata())
+                                new AnnotationMetadataHierarchy(resolvedParent.getDeclaredMetadata(), producerField.getDeclaredMetadata())
                         )
                 );
                 return writer;
@@ -104,8 +113,29 @@ class JavaBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
     }
 
     @Override
-    protected BeanDefinitionWriter createBeanDefinitionWriter() {
-        return super.createBeanDefinitionWriter();
+    protected BeanDefinitionVisitor createAopWriter(BeanDefinitionWriter beanDefinitionWriter, AnnotationMetadata annotationMetadata) {
+        AnnotationValue<?>[] interceptorTypes =
+                InterceptedMethodUtil.resolveInterceptorBinding(annotationMetadata, InterceptorKind.AROUND);
+        return new AopProxyWriter(
+                beanDefinitionWriter,
+                annotationMetadata.getValues(Around.class, Boolean.class),
+                ConfigurationMetadataBuilder.getConfigurationMetadataBuilder().orElse(null),
+                visitorContext,
+                interceptorTypes
+        );
+    }
+
+    @Override
+    protected BiConsumer<TypedElement, MethodElement> createAroundMethodVisitor(BeanDefinitionVisitor aopWriter) {
+        AopProxyWriter aopProxyWriter = (AopProxyWriter) aopWriter;
+        return (bean, method) -> {
+            AnnotationValue<?>[] newTypes =
+                    InterceptedMethodUtil.resolveInterceptorBinding(method.getAnnotationMetadata(), InterceptorKind.AROUND);
+            aopProxyWriter.visitInterceptorBinding(newTypes);
+            aopProxyWriter.visitAroundMethod(
+                    bean, method
+            );
+        };
     }
 
     @Override
@@ -117,6 +147,7 @@ class JavaBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
                 JavaBeanDefinitionBuilder.this.metadataBuilder,
                 (JavaVisitorContext) JavaBeanDefinitionBuilder.this.visitorContext
         ) {
+            BeanParameterElement[] parameters;
             @Override
             public Element getProducingElement() {
                 return producerMethod;
@@ -128,21 +159,44 @@ class JavaBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
             }
 
             @Override
-            protected BeanDefinitionWriter createBeanDefinitionWriter() {
-                final BeanDefinitionWriter writer = super.createBeanDefinitionWriter();
+            protected BeanParameterElement[] getParameters() {
+                if (parameters == null) {
+                    parameters = initBeanParameters(producerMethod.getParameters());
+                }
+                return parameters;
+            }
+
+            @Override
+            protected BeanDefinitionVisitor createBeanDefinitionWriter() {
+                final BeanDefinitionVisitor writer = super.createBeanDefinitionWriter();
                 final JavaElementFactory elementFactory = ((JavaVisitorContext) visitorContext).getElementFactory();
                 final ExecutableElement variableElement = (ExecutableElement) producerMethod.getNativeType();
+                ClassElement resolvedParent = resolveParentType(parentType, elementFactory);
                 writer.visitBeanFactoryMethod(
-                        parentType,
+                        resolvedParent,
                         elementFactory.newMethodElement(
-                                parentType,
+                                resolvedParent,
                                 variableElement,
-                                new AnnotationMetadataHierarchy(parentType.getDeclaredMetadata(), producerMethod.getDeclaredMetadata())
-                        )
+                                new AnnotationMetadataHierarchy(resolvedParent.getDeclaredMetadata(), producerMethod.getDeclaredMetadata())
+                        ),
+                        getParameters()
                 );
                 return writer;
             }
+
         };
+    }
+
+    @Override
+    protected <T extends Annotation> void annotate(AnnotationMetadata annotationMetadata, AnnotationValue<T> annotationValue) {
+        ArgumentUtils.requireNonNull("annotationMetadata", annotationMetadata);
+        ArgumentUtils.requireNonNull("annotationValue", annotationValue);
+
+        AnnotationUtils annotationUtils = javaVisitorContext
+                .getAnnotationUtils();
+        annotationUtils
+                .newAnnotationBuilder()
+                .annotate(annotationMetadata, annotationValue);
     }
 
     @Override
@@ -188,5 +242,14 @@ class JavaBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
         annotationUtils
                 .newAnnotationBuilder()
                 .removeAnnotation(annotationMetadata, annotationType);
+    }
+
+    private ClassElement resolveParentType(ClassElement parentType, JavaElementFactory elementFactory) {
+        Object nativeType = parentType.getNativeType();
+        ClassElement resolvedParent = parentType;
+        if (nativeType instanceof TypeElement) {
+            resolvedParent = elementFactory.newClassElement((TypeElement) nativeType, this.getAnnotationMetadata());
+        }
+        return resolvedParent;
     }
 }

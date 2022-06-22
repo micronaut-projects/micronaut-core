@@ -230,7 +230,7 @@ $ mn create-websocket-client MyChat
 |===
 
 The `create-command` command generates a standalone application that can be executed as a
-http://picocli.info[picocli] link:http://picocli.info/apidocs/picocli/CommandLine.Command.html[Command]. It follows a `*Command` convention for generating the class name. It creates an associated test that runs the application and verifies that a command line option was set.
+https://picocli.info[picocli] link:https://picocli.info/apidocs/picocli/CommandLine.Command.html[Command]. It follows a `*Command` convention for generating the class name. It creates an associated test that runs the application and verifies that a command line option was set.
 
 [source,bash]
 ----

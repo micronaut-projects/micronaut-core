@@ -1,5 +1,5 @@
 You can use any IDE to develop Micronaut applications, if you depend on your configured build tool (Gradle or Maven) to build the application.
 
-However, running tests within the IDE is currently possible with http://jetbrains.com/idea[IntelliJ IDEA] or Eclipse 4.9 or higher.
+However, running tests within the IDE is currently possible with https://jetbrains.com/idea[IntelliJ IDEA] or Eclipse 4.9 or higher.
 
 See the section on <<ideSetup, IDE Setup>> in the Quick start for more information on how to configure IntelliJ and Eclipse.

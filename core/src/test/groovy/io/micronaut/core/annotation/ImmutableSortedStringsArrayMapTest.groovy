@@ -3,6 +3,7 @@ package io.micronaut.core.annotation
 
 import spock.lang.Specification
 import spock.lang.Unroll
+import spock.lang.Shared
 
 class ImmutableSortedStringsArrayMapTest extends Specification {
     private static <V> ImmutableSortedStringsArrayMap<V> build(Map<String, V> source) {
@@ -10,31 +11,41 @@ class ImmutableSortedStringsArrayMapTest extends Specification {
         new ImmutableSortedStringsArrayMap<V>(sorted.keySet() as String[], sorted.values() as Object[])
     }
 
-    private static final Random SEED = new Random(20211004)
-    private static final Set<String> KEYS = (0..65536).collect {
-        int len = 1+SEED.nextInt(32)
-        StringBuilder sb = new StringBuilder()
-        len.times {
-            sb.append((char) (48 + SEED.nextInt(120)))
-        }
-        sb.toString()
-    } as Set<String>
+    @Shared
+    private Set<String> present
 
-    private static final Set<String> PRESENT = KEYS.indexed().collect([] as Set) { i, v ->
-        if (i < KEYS.size()/10) {
-            return v
-        }
-        null
-    }.findAll() as Set<String>
+    @Shared
+    private Set<String> absent
 
-    private static final Set<String> ABSENT = KEYS - PRESENT
+    def setupSpec() {
+        Random seed = new Random(20211004)
+
+        def keys = (0..65536).collect {
+            int len = 1 + seed.nextInt(32)
+            StringBuilder sb = new StringBuilder()
+            len.times {
+                sb.append((char) (48 + seed.nextInt(120)))
+            }
+            sb.toString()
+        } as Set<String>
+
+        present = keys.indexed().collect([] as Set) { i, v ->
+            if (i < keys.size() / 10) {
+                return v
+            }
+            null
+        }.findAll() as Set<String>
+
+        keys.removeAll(present)
+        absent = keys
+    }
 
     @Unroll("Verifies correct behavior of map of size #size")
     void verifyMapBehavior() {
         given:
         Map<String, Object> source = [:]
         size.times { idx ->
-            source[PRESENT[idx]] = "value for $idx".toString()
+            source[present[idx]] = "value for $idx".toString()
         }
         def sorted = build(source)
 
@@ -47,7 +58,7 @@ class ImmutableSortedStringsArrayMapTest extends Specification {
         }
 
         and:
-        ABSENT.each {
+        absent.each {
             assert !sorted.containsKey(it)
         }
 

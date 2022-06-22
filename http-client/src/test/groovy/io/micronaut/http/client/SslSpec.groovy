@@ -16,6 +16,7 @@
 package io.micronaut.http.client
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.annotation.NonNull
 import io.micronaut.http.ssl.ClientSslConfiguration
 import io.micronaut.runtime.server.EmbeddedServer
 import io.netty.bootstrap.Bootstrap
@@ -29,7 +30,6 @@ import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.nio.NioServerSocketChannel
 import io.netty.channel.socket.nio.NioSocketChannel
 import io.netty.handler.ssl.SslHandshakeTimeoutException
-import org.jetbrains.annotations.NotNull
 import reactor.core.publisher.Flux
 import spock.lang.Ignore
 import spock.lang.Specification
@@ -81,10 +81,10 @@ class SslSpec extends Specification {
         given:
         def group = new NioEventLoopGroup()
         ApplicationContext context = ApplicationContext.run([
-                'micronaut.ssl.port'            : -1,
-                'micronaut.ssl.enabled'         : true,
-                'micronaut.ssl.buildSelfSigned' : true,
-                'micronaut.ssl.handshakeTimeout': '1s',
+                'micronaut.server.ssl.port'            : -1,
+                'micronaut.server.ssl.enabled'         : true,
+                'micronaut.server.ssl.buildSelfSigned' : true,
+                'micronaut.ssl.handshakeTimeout'       : '1s',
         ])
         def embeddedServer = context.getBean(EmbeddedServer)
         embeddedServer.start()
@@ -102,10 +102,10 @@ class SslSpec extends Specification {
 
     static class IgnoringChannelInitializer extends ChannelInitializer<Channel> {
         @Override
-        protected void initChannel(@NotNull Channel ch) throws Exception {
+        protected void initChannel(@NonNull Channel ch) throws Exception {
             ch.pipeline().addLast(new ChannelInboundHandlerAdapter() {
                 @Override
-                void channelRead(@NotNull ChannelHandlerContext ctx, @NotNull Object msg) throws Exception {
+                void channelRead(@NonNull ChannelHandlerContext ctx, @NonNull Object msg) throws Exception {
                     // ignore
                 }
             })

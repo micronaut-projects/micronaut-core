@@ -18,6 +18,9 @@ package io.micronaut.inject.ast;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.AnnotationMetadata;
 
+/**
+ * A {@link ClassElement} of primitive types.
+ */
 public final class PrimitiveElement implements ArrayableClassElement {
 
     public static final PrimitiveElement VOID = new PrimitiveElement("void");

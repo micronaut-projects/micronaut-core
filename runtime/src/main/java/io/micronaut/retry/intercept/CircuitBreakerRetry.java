@@ -154,6 +154,11 @@ class CircuitBreakerRetry implements MutableRetryState {
         return childState.getRetryPredicate();
     }
 
+    @Override
+    public Class<? extends Throwable> getCapturedException() {
+        return childState.getCapturedException();
+    }
+
     /**
      * @return The current state
      */

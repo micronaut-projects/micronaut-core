@@ -70,8 +70,10 @@ import java.util.Optional;
 @Internal
 public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandler {
     private final WebSocketClientHandshaker handshaker;
-    private final WebSocketBean<T> webSocketBean;
-    private final MutableHttpRequest<?> originatingRequest;
+    /**
+     * Generic version of {@link #webSocketBean}.
+     */
+    private final WebSocketBean<T> genericWebSocketBean;
     private final FluxSink<T> emitter;
     private final UriMatchInfo matchInfo;
     private final MediaTypeCodecRegistry codecRegistry;
@@ -101,8 +103,7 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
         super(null, requestBinderRegistry, mediaTypeCodecRegistry, webSocketBean, request, Collections.emptyMap(), handshaker.version(), handshaker.actualSubprotocol(), null);
         this.codecRegistry = mediaTypeCodecRegistry;
         this.handshaker = handshaker;
-        this.webSocketBean = webSocketBean;
-        this.originatingRequest = request;
+        this.genericWebSocketBean = webSocketBean;
         this.emitter = emitter;
         this.webSocketStateBinderRegistry = new WebSocketStateBinderRegistry(requestBinderRegistry != null ? requestBinderRegistry : new DefaultRequestBinderRegistry(ConversionService.SHARED));
         String clientPath = webSocketBean.getBeanDefinition().stringValue(ClientWebSocket.class).orElse("");
@@ -173,7 +174,7 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
 
             this.clientSession = createWebSocketSession(ctx);
 
-            T targetBean = webSocketBean.getTarget();
+            T targetBean = genericWebSocketBean.getTarget();
 
             if (targetBean instanceof WebSocketSessionAware) {
                 ((WebSocketSessionAware) targetBean).setWebSocketSession(clientSession);

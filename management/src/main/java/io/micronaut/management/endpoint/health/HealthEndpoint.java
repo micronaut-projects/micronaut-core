@@ -185,6 +185,7 @@ public class HealthEndpoint {
                 break;
             case ANONYMOUS:
                 showDetails = true;
+                break;
             default:
                 // no-op
         }
