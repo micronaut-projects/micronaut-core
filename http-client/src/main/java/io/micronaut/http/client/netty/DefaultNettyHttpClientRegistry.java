@@ -321,7 +321,6 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
             }
 
             LoadBalancer loadBalancer = null;
-            List<String> clientIdentifiers = null;
             final HttpClientConfiguration configuration;
             if (configurationClass != null) {
                 configuration = (HttpClientConfiguration) this.beanContext.getBean(configurationClass);
@@ -339,7 +338,6 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
                 loadBalancer = loadBalancerResolver.resolve(clientId)
                         .orElseThrow(() ->
                                 new HttpClientException("Invalid service reference [" + clientId + "] specified to @Client"));
-                clientIdentifiers = Collections.singletonList(clientId);
             }
 
             String contextPath = null;
@@ -358,7 +356,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
                     loadBalancer,
                     clientKey.httpVersion,
                     configuration,
-                    clientIdentifiers,
+                    clientId,
                     contextPath,
                     beanContext,
                     annotationMetadata
@@ -387,7 +385,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
             LoadBalancer loadBalancer,
             HttpVersion httpVersion,
             HttpClientConfiguration configuration,
-            List<String> clientIdentifiers,
+            String clientId,
             String contextPath,
             BeanContext beanContext,
             AnnotationMetadata annotationMetadata) {
@@ -400,7 +398,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
                 contextPath,
                 clientFilterResolver,
                 clientFilterResolver.resolveFilterEntries(new ClientFilterResolutionContext(
-                        clientIdentifiers,
+                        clientId == null ? null : Collections.singletonList(clientId),
                         annotationMetadata
                 )),
                 threadFactory,
@@ -413,7 +411,8 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
                 eventLoopGroup,
                 resolveSocketChannelFactory(configuration, beanContext),
                 pipelineListeners,
-                invocationInstrumenterFactories
+                invocationInstrumenterFactories,
+                clientId
         );
     }
 

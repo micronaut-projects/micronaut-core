@@ -24,6 +24,8 @@ import io.micronaut.http.exceptions.HttpException;
  * @since 1.0
  */
 public class HttpClientException extends HttpException {
+    private String serviceId;
+    private boolean serviceIdLocked;
 
     /**
      * @param message The message
@@ -50,5 +52,26 @@ public class HttpClientException extends HttpException {
         if (!shared) {
             throw new IllegalArgumentException("shared must be true");
         }
+        serviceIdLocked = true;
+    }
+
+    public final String getServiceId() {
+        return serviceId;
+    }
+
+    public final void setServiceId(String serviceId) {
+        if (serviceIdLocked) {
+            throw new IllegalStateException("Service ID already set");
+        }
+        this.serviceId = serviceId;
+        serviceIdLocked = true;
+    }
+
+    @Override
+    public String getMessage() {
+        if (serviceId != null) {
+            return "Client '" + serviceId + "': " + super.getMessage();
+        }
+        return super.getMessage();
     }
 }
