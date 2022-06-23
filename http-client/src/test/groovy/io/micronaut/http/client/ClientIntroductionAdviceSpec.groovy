@@ -55,7 +55,7 @@ class ClientIntroductionAdviceSpec extends Specification {
         then:
         def e = thrown(HttpClientResponseException)
         e.serviceId == 'test-service'
-        e.message == 'Client \'test-service\': Bad Request'
+        e.message == "Client 'test-service': Bad Request"
 
         cleanup:
         embeddedServer.close()
