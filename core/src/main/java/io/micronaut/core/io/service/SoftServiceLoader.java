@@ -403,7 +403,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
     /**
      * Exception thrown when a service cannot be loaded.
      */
-    final static class ServiceLoadingException extends RuntimeException {
+    static final class ServiceLoadingException extends RuntimeException {
         public ServiceLoadingException(String message, Throwable cause) {
             super(message, cause);
         }
