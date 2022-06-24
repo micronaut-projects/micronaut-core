@@ -134,7 +134,6 @@ managed-slf4j = "1.7.36"
 managed-spock = "2.0-groovy-3.0"
 managed-spotbugs = "4.7.0"
 managed-spring = "5.3.20"
-managed-springboot = "2.5.12"
 managed-swagger = "2.2.0"
 managed-validation = "2.0.1.Final"
 managed-testcontainers = "1.17.2"
@@ -340,8 +339,6 @@ managed-spring-context = { module = "org.springframework:spring-context", versio
 managed-spring-tx = { module = "org.springframework:spring-tx", version.ref = "managed-spring" }
 managed-spring-orm = { module = "org.springframework:spring-orm", version.ref = "managed-spring" }
 managed-spring-jdbc = { module = "org.springframework:spring-jdbc", version.ref = "managed-spring" }
-managed-spring-boot-starter = { module = "org.springframework.boot:spring-boot-starter", version.ref = "managed-springboot" }
-managed-spring-boot-starter-web = { module = "org.springframework.boot:spring-boot-starter-web", version.ref = "managed-springboot" }
 
 managed-swagger = { module = "io.swagger.core.v3:swagger-core", version.ref = "managed-swagger" }
 managed-swagger-models = { module = "io.swagger.core.v3:swagger-models", version.ref = "managed-swagger" }
