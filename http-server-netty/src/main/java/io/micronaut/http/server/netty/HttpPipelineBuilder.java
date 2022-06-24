@@ -498,16 +498,5 @@ final class HttpPipelineBuilder {
                 pipeline.addLast(name, outboundHandlerAdapter);
             }
         }
-
-        @NonNull
-        private HttpServerCodec createServerCodec() {
-            return new HttpServerCodec(
-                    server.getServerConfiguration().getMaxInitialLineLength(),
-                    server.getServerConfiguration().getMaxHeaderSize(),
-                    server.getServerConfiguration().getMaxChunkSize(),
-                    server.getServerConfiguration().isValidateHeaders(),
-                    server.getServerConfiguration().getInitialBufferSize()
-            );
-        }
     }
 }
