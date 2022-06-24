@@ -74,7 +74,7 @@ final class ServiceScanner<S> {
     }
 
     /**
-     * Note: referenced by io.micronaut.core.graal.ServiceLoaderInitialization
+     * Note: referenced by {@code io.micronaut.core.graal.ServiceLoaderInitialization}.
      */
     @SuppressWarnings("java:S3398")
     private static Set<String> computeMicronautServiceTypeNames(URI uri, String path) {
