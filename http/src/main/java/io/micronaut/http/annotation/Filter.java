@@ -72,9 +72,15 @@ public @interface Filter {
 
     /**
      * The service identifiers this filter applies to. Currently, applies only to {@link io.micronaut.http.filter.HttpClientFilter} instances.
-     * Equivalent to the {@code id()} of {@code io.micronaut.http.client.Client}.
      *
      * @return The service identifiers
      */
     String[] serviceId() default {};
+
+    /**
+     * The service identifiers this filter does not apply to. Currently, applies only to {@link io.micronaut.http.filter.HttpClientFilter} instances.
+     *
+     * @return The service identifiers
+     */
+    String[] excludeServiceId() default {};
 }
