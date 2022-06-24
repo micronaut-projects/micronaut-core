@@ -533,7 +533,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
             new Http2StreamChannelBootstrap(channelHandlerContext.channel().parent())
                     .handler(new ChannelInitializer<Http2StreamChannel>() {
                         @Override
-                        protected void initChannel(@NotNull Http2StreamChannel ch) throws Exception {
+                        protected void initChannel(@NonNull Http2StreamChannel ch) throws Exception {
                             int newStream = ch.stream().id();
 
                             channelHandlerContext.write(new DefaultHttp2PushPromiseFrame(HttpConversionUtil.toHttp2Headers(outboundRequest, false))
