@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client.exceptions;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.exceptions.HttpException;
 
 /**
@@ -55,10 +56,23 @@ public class HttpClientException extends HttpException {
         serviceIdLocked = true;
     }
 
+    /**
+     * Get the service ID of the http client that produced this exception.
+     *
+     * @return The service ID of the client
+     */
     public final String getServiceId() {
         return serviceId;
     }
 
+    /**
+     * Set the service id that produced this exception.
+     *
+     * @param serviceId The service id
+     * @throws IllegalStateException If the service ID has already been set, or this is a shared
+     *                               exception (e.g. {@link ReadTimeoutException}).
+     */
+    @Internal
     public final void setServiceId(String serviceId) {
         if (serviceIdLocked) {
             throw new IllegalStateException("Service ID already set");
