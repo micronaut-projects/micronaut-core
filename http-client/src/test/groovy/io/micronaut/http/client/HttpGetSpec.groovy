@@ -52,8 +52,6 @@ import java.util.function.Consumer
  */
 @MicronautTest
 @Property(name = 'spec.name', value = 'HttpGetSpec')
-@Property(name = "micronaut.server.netty.log-level", value = 'trace')
-@Property(name = "micronaut.http.client.log-level", value = 'trace')
 class HttpGetSpec extends Specification {
 
     @Inject

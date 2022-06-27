@@ -16,6 +16,7 @@
 package io.micronaut.context;
 
 import io.micronaut.context.exceptions.NoSuchBeanException;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.inject.BeanConfiguration;
@@ -78,6 +79,23 @@ public interface BeanDefinitionRegistry {
                 null
         );
     }
+
+    /**
+     * Registers a new reference at runtime. Not that registering beans can impact
+     * the object graph therefore should this should be done as soon as possible prior to
+     * the creation of other beans preferably with a high priority {@link io.micronaut.context.annotation.Context} scope bean.
+     *
+     * @param definition The reference.
+     * @return The registry
+     * @param <B> The bean type
+     * @since 3.6.0
+     */
+    @NonNull
+    @Experimental
+    default <B> BeanDefinitionRegistry registerBeanDefinition(@NonNull RuntimeBeanDefinition<B> definition) {
+        throw new UnsupportedOperationException("This implementation of BeanDefinitionRegistry doesn't support runtime registration of bean definitions");
+    }
+
 
     /**
      * <p>Registers a new singleton bean at runtime. This method expects that the bean definition data will have been

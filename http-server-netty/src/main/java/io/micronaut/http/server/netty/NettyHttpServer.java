@@ -72,7 +72,6 @@ import io.netty.handler.codec.http2.HttpToHttp2ConnectionHandler;
 import io.netty.handler.codec.http2.HttpToHttp2ConnectionHandlerBuilder;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GlobalEventExecutor;
-import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -557,7 +556,9 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         applicationContext.getEventPublisher(ServerStartupEvent.class)
                 .publishEvent(new ServerStartupEvent(this));
         applicationName.ifPresent(id -> {
-            this.serviceInstance = applicationContext.createBean(NettyEmbeddedServerInstance.class, id, this);
+            if (serviceInstance == null) {
+                serviceInstance = applicationContext.createBean(NettyEmbeddedServerInstance.class, id, this);
+            }
             applicationContext
                     .getEventPublisher(ServiceReadyEvent.class)
                     .publishEvent(new ServiceReadyEvent(serviceInstance));
@@ -761,13 +762,13 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         }
 
         @Override
-        protected void initChannel(@NotNull Channel ch) throws Exception {
+        protected void initChannel(@NonNull Channel ch) throws Exception {
             httpPipelineBuilder.new ConnectionPipeline(ch, config.isSsl()).initChannel();
         }
     }
 
     private static class DomainSocketHolder {
-        @NotNull
+        @NonNull
         private static SocketAddress makeDomainSocketAddress(String path) {
             try {
                 return new DomainSocketAddress(path);

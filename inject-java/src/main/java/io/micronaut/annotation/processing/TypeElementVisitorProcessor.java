@@ -222,7 +222,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
             TypeElement groovyObjectTypeElement = elementUtils.getTypeElement("groovy.lang.GroovyObject");
             TypeMirror groovyObjectType = groovyObjectTypeElement != null ? groovyObjectTypeElement.asType() : null;
-            
+
             Set<TypeElement> elements = new LinkedHashSet<>();
 
             for (TypeElement annotation : annotations) {
@@ -415,16 +415,22 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                 } else if (JavaModelUtils.isEnum(classElement)) {
                     return scan(classElement.getEnclosedElements(), o);
                 } else {
+                    List<TypeElement> classes = new ArrayList<>();
                     List<? extends Element> elements = enclosedElements(classElement);
                     Object value = null;
-                    for (Element element: elements) {
-                        value = scan(element, o);
+                    for (Element element : elements) {
                         if (element instanceof TypeElement) {
-                            TypeElement typeElement = (TypeElement) element;
-                            for (LoadedVisitor visitor : visitors) {
-                                if (visitor.matches(typeElement)) {
-                                    value = scan(enclosedElements(typeElement), o);
-                                }
+                            classes.add((TypeElement) element);
+                        } else {
+                            value = scan(element, o);
+                        }
+                    }
+                    // TypeElementVisitor needs to process type's methods first and then all inner classes
+                    for (TypeElement typeElement : classes) {
+                        value = scan(typeElement, o);
+                        for (LoadedVisitor visitor : visitors) {
+                            if (visitor.matches(typeElement)) {
+                                value = scan(enclosedElements(typeElement), o);
                             }
                         }
                     }

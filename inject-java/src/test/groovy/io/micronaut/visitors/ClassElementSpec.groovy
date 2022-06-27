@@ -53,10 +53,10 @@ import java.lang.annotation.Target;
 
 class Test {
     Test() {}
-    
+
     void instance(@SomeAnn Test this) {}
     static void staticMethod() {}
-    
+
     class Inner {
         Inner(@SomeAnn Test Test.this) {}
     }
@@ -65,7 +65,7 @@ class Test {
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE_USE)
 @interface SomeAnn {
-    
+
 }
 """)
 
@@ -244,24 +244,24 @@ abstract class Test extends SuperType implements AnotherInterface, SomeInt {
 
     protected boolean t1;
     private boolean t2;
-    
+
     private boolean privateMethod() {
         return true;
     }
-    
+
     boolean packagePrivateMethod() {
         return true;
     }
-    
+
     @java.lang.Override
     public boolean publicMethod() {
         return true;
     }
-    
+
     static boolean staticMethod() {
         return true;
     }
-    
+
     abstract boolean unimplementedMethod();
 }
 
@@ -271,15 +271,15 @@ abstract class SuperType {
     private boolean privateMethod() {
         return true;
     }
-    
+
     public boolean publicMethod() {
         return true;
     }
-    
+
     public boolean otherSuper() {
         return true;
     }
-    
+
     abstract boolean unimplementedSuperMethod();
 }
 
@@ -287,13 +287,13 @@ interface SomeInt {
     default boolean itfeMethod() {
         return true;
     }
-    
+
     boolean publicMethod();
 }
 
 interface AnotherInterface {
     boolean publicMethod();
-    
+
     boolean unimplementedItfeMethod();
 }
 ''')
@@ -325,19 +325,19 @@ class Test extends SuperType implements AnotherInterface, SomeInt {
 
     protected boolean t1;
     private boolean t2;
-    
+
     private boolean privateMethod() {
         return true;
     }
-    
+
     boolean packagePrivateMethod() {
         return true;
     }
-    
+
     public boolean publicMethod() {
         return true;
     }
-    
+
     static boolean staticMethod() {
         return true;
     }
@@ -349,11 +349,11 @@ class SuperType {
     private boolean privateMethod() {
         return true;
     }
-    
+
     public boolean publicMethod() {
         return true;
     }
-    
+
     public boolean otherSuper() {
         return true;
     }
@@ -363,7 +363,7 @@ interface SomeInt {
     default boolean itfeMethod() {
         return true;
     }
-    
+
     boolean publicMethod();
 }
 
@@ -423,17 +423,17 @@ package elementquery;
 
 class Test extends SuperType {
     static {}
-    
+
     Test() {}
-    
+
     Test(int i) {}
 }
 
 class SuperType {
     static {}
-    
+
     SuperType() {}
-    
+
     SuperType(String s) {}
 }
 ''')
@@ -1136,7 +1136,7 @@ class InheritedMethods extends SuperClassWithMethods implements SuperInterfaceWi
     public String instanceMethod3() {
         return null;
     }
-    
+
 }
 
 interface SuperSuperInterfaceWithMethods {
@@ -1274,7 +1274,7 @@ abstract class SuperClassWithMethods extends SuperSuperClassWithMethods implemen
         assertMethodsByName(allMethods, "instanceMethod2", ["SuperSuperClassWithMethods", "SuperClassWithMethods"])
         assertMethodsByName(allMethods, "instanceMethod3", ["InheritedMethods"])
     }
-    
+
     private final static String FIELDS_SCENARIO = '''\
 package elementquery;
 
@@ -1340,6 +1340,33 @@ abstract class SuperClassWithFields extends SuperSuperClassWithFields implements
         expected.each { k, v ->
             assertFieldsByName(fields, k, v)
         }
+    }
+
+    void "test first inner class not breaking method's owning and declaring class"() {
+        buildBeanDefinition('test.TestController', '''
+package test;
+
+import io.micronaut.http.annotation.*;
+import jakarta.inject.Inject;
+
+@Controller("/test")
+public class TestController {
+
+    public static class SomeException extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+    }
+
+    @Get
+    public String hello() {
+        return "HW";
+    }
+
+}
+
+''')
+        expect:
+            AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].owningType.name == 'test.TestController'
+            AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].declaringType.name == 'test.TestController'
     }
 
     private void assertMethodsByName(List<MethodElement> allMethods, String name, List<String> expectedDeclaringTypeSimpleNames) {

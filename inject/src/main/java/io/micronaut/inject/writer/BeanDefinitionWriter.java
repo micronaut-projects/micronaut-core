@@ -477,6 +477,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     );
     private static final Type TYPE_QUALIFIERS = Type.getType(Qualifiers.class);
     private static final Type TYPE_QUALIFIER = Type.getType(Qualifier.class);
+    private static final String MESSAGE_ONLY_SINGLE_CALL_PERMITTED = "Only a single call to visitBeanFactoryMethod(..) is permitted";
 
     private final ClassWriter classWriter;
     private final String beanFullClassName;
@@ -737,9 +738,11 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     @NonNull
     @Override
     public ClassElement[] getTypeArguments() {
-        final Map<String, ClassElement> args = this.typeArguments.get(this.getBeanTypeName());
-        if (CollectionUtils.isNotEmpty(args)) {
-            return args.values().toArray(new ClassElement[0]);
+        if (hasTypeArguments()) {
+            final Map<String, ClassElement> args = this.typeArguments.get(this.getBeanTypeName());
+            if (CollectionUtils.isNotEmpty(args)) {
+                return args.values().toArray(ClassElement.ZERO_CLASS_ELEMENTS);
+            }
         }
         return BeanDefinitionVisitor.super.getTypeArguments();
     }
@@ -845,10 +848,11 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
      * @param factoryClass  The factory class
      * @param factoryMethod The factory method
      */
+    @Override
     public void visitBeanFactoryMethod(ClassElement factoryClass,
                                        MethodElement factoryMethod) {
         if (constructor != null) {
-            throw new IllegalStateException("Only a single call to visitBeanFactoryMethod(..) is permitted");
+            throw new IllegalStateException(MESSAGE_ONLY_SINGLE_CALL_PERMITTED);
         } else {
             constructor = factoryMethod;
             // now prepare the implementation of the build method. See BeanFactory interface
@@ -866,11 +870,12 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
      * @param factoryMethod The factory method
      * @param parameters    The parameters
      */
+    @Override
     public void visitBeanFactoryMethod(ClassElement factoryClass,
                                        MethodElement factoryMethod,
                                        ParameterElement[] parameters) {
         if (constructor != null) {
-            throw new IllegalStateException("Only a single call to visitBeanFactoryMethod(..) is permitted");
+            throw new IllegalStateException(MESSAGE_ONLY_SINGLE_CALL_PERMITTED);
         } else {
             constructor = factoryMethod;
             // now prepare the implementation of the build method. See BeanFactory interface
@@ -887,9 +892,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
      * @param factoryClass The factory class
      * @param factoryField The factory field
      */
+    @Override
     public void visitBeanFactoryField(ClassElement factoryClass, FieldElement factoryField) {
         if (constructor != null) {
-            throw new IllegalStateException("Only a single call to visitBeanFactoryMethod(..) is permitted");
+            throw new IllegalStateException(MESSAGE_ONLY_SINGLE_CALL_PERMITTED);
         } else {
             constructor = factoryField;
 
@@ -4036,7 +4042,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     private boolean isContainerType() {
-        return DefaultArgument.CONTAINER_TYPES.stream().map(Class::getName).anyMatch(c -> c.equals(beanFullClassName));
+        return beanTypeElement.isArray() || DefaultArgument.CONTAINER_TYPES.stream().map(Class::getName).anyMatch(c -> c.equals(beanFullClassName));
     }
 
     private boolean isConfigurationProperties(AnnotationMetadata annotationMetadata) {
@@ -4192,8 +4198,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         if (superType == TYPE_ABSTRACT_BEAN_DEFINITION || isSuperFactory) {
             for (Type typeParameter : typeParameters) {
 
-                ArrayAwareSignatureWriter ppsv = (ArrayAwareSignatureWriter)
-                        psv.visitTypeArgument('=');
+                SignatureVisitor ppsv = psv.visitTypeArgument('=');
                 visitTypeParameter(typeParameter, ppsv);
             }
         }
@@ -4203,6 +4208,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     private void visitTypeParameter(Type typeParameter, SignatureVisitor ppsv) {
         final boolean isArray = typeParameter.getSort() == Type.ARRAY;
+        boolean isPrimitiveArray = false;
         if (isArray) {
             for (int i = 0; i < typeParameter.getDimensions(); i++) {
                 ppsv.visitArrayType();
@@ -4216,11 +4222,12 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             } else {
                 // primitive
                 ppsv.visitBaseType(elementType.getInternalName().charAt(0));
+                isPrimitiveArray = true;
             }
         } else {
             ppsv.visitClassType(typeParameter.getInternalName());
         }
-        if (isArray) {
+        if (isPrimitiveArray && ppsv instanceof ArrayAwareSignatureWriter) {
             ((ArrayAwareSignatureWriter) ppsv).visitEndArray();
         } else {
             ppsv.visitEnd();

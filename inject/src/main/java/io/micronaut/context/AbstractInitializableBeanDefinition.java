@@ -144,6 +144,8 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
     @Nullable
     private Argument<?>[] requiredParametrizedArguments;
 
+    private Qualifier<T> declaredQualifier;
+
     @SuppressWarnings("ParameterNumber")
     @Internal
     @UsedByGeneratedCode
@@ -232,6 +234,14 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
     }
 
     @Override
+    public Qualifier<T> getDeclaredQualifier() {
+        if (declaredQualifier == null) {
+            declaredQualifier = BeanDefinition.super.getDeclaredQualifier();
+        }
+        return declaredQualifier;
+    }
+
+    @Override
     public final boolean isContainerType() {
         return isContainerType;
     }
@@ -242,9 +252,13 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
             if (containerElement != null) {
                 return containerElement;
             }
-            final List<Argument<?>> iterableArguments = getTypeArguments(Iterable.class);
-            if (!iterableArguments.isEmpty()) {
-                containerElement = Optional.of(iterableArguments.iterator().next());
+            if (getBeanType().isArray()) {
+                containerElement = Optional.of(Argument.of(getBeanType().getComponentType()));
+            } else {
+                final List<Argument<?>> iterableArguments = getTypeArguments(Iterable.class);
+                if (!iterableArguments.isEmpty()) {
+                    containerElement = Optional.of(iterableArguments.iterator().next());
+                }
             }
             return containerElement;
         }
