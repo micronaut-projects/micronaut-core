@@ -133,7 +133,6 @@ managed-rxjava1-interop = "0.13.7"
 managed-slf4j = "1.7.36"
 managed-spock = "2.0-groovy-3.0"
 managed-spotbugs = "4.7.0"
-managed-spring = "5.3.20"
 managed-swagger = "2.2.0"
 managed-validation = "2.0.1.Final"
 managed-testcontainers = "1.17.2"
@@ -327,12 +326,6 @@ managed-snakeyaml = { module = "org.yaml:snakeyaml", version.ref = "managed-snak
 
 managed-spock = { module = "org.spockframework:spock-core", version.ref = "managed-spock" }
 managed-spotbugs = { module = "com.github.spotbugs:spotbugs-annotations", version.ref = "managed-spotbugs" }
-
-managed-spring = { module = "org.springframework:spring-core", version.ref = "managed-spring" }
-managed-spring-context = { module = "org.springframework:spring-context", version.ref = "managed-spring" }
-managed-spring-tx = { module = "org.springframework:spring-tx", version.ref = "managed-spring" }
-managed-spring-orm = { module = "org.springframework:spring-orm", version.ref = "managed-spring" }
-managed-spring-jdbc = { module = "org.springframework:spring-jdbc", version.ref = "managed-spring" }
 
 managed-swagger = { module = "io.swagger.core.v3:swagger-core", version.ref = "managed-swagger" }
 managed-swagger-models = { module = "io.swagger.core.v3:swagger-models", version.ref = "managed-swagger" }
