@@ -5,6 +5,9 @@
 # and edit them there. Note that it will be sync'ed to all the Micronaut repos
 name: Publish snapshot release
 on: [workflow_dispatch]
+permissions:
+  contents: read
+
 jobs:
   build:
     if: github.repository != 'micronaut-projects/micronaut-project-template'

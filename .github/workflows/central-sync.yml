@@ -10,6 +10,9 @@ on:
       release_version:
         description: 'Release version (eg: 1.2.3)'
         required: true
+permissions:
+  contents: read
+
 jobs:
   central-sync:
     runs-on: ubuntu-latest
