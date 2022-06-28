@@ -77,7 +77,6 @@ public class IOUtils {
     @Blocking
     @SuppressWarnings({"java:S2095", "java:S1141", "java:S3776"})
     public static void eachFile(@NonNull URI uri, String path, @NonNull Consumer<Path> consumer) {
-        Path myPath;
         try {
             String scheme = uri.getScheme();
             FileSystem fileSystem = null;
