@@ -26,7 +26,9 @@ import java.io.Reader;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.file.ClosedFileSystemException;
 import java.nio.file.FileSystem;
+import java.nio.file.FileSystemAlreadyExistsException;
 import java.nio.file.FileSystemNotFoundException;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
@@ -82,39 +84,59 @@ public class IOUtils {
 
             try {
                 if ("jar".equals(scheme)) {
-                    try {
-                        fileSystem = FileSystems.getFileSystem(uri);
-                    } catch (FileSystemNotFoundException e) {
-                        fileSystem = FileSystems.newFileSystem(uri, Collections.emptyMap());
+                    synchronized (IOUtils.class) {
+                        try {
+                            fileSystem = FileSystems.getFileSystem(uri);
+                        } catch (FileSystemNotFoundException e) {
+                            //no-op
+                        }
+                        if (fileSystem == null || !fileSystem.isOpen()) {
+                            try {
+                                fileSystem = FileSystems.newFileSystem(uri, Collections.emptyMap());
+                            } catch (FileSystemAlreadyExistsException e) {
+                                fileSystem = FileSystems.getFileSystem(uri);
+                            }
+                        }
+                        try {
+                            walkFiles(consumer,  fileSystem.getPath(path));
+                        } finally {
+                            if (fileSystem != null && fileSystem.isOpen()) {
+                                try {
+                                    fileSystem.close();
+                                } catch (ClosedFileSystemException e) {
+                                    // no-op, because it is already closed
+                                }
+                            }
+                        }
                     }
-                    myPath = fileSystem.getPath(path);
+
                 } else if ("file".equals(scheme)) {
-                    myPath = Paths.get(uri).resolve(path);
+                    walkFiles(consumer, Paths.get(uri).resolve(path));
                 } else {
                     // graal resource: case
-                    myPath = Paths.get(uri);
+                    walkFiles(consumer, Paths.get(uri));
                 }
             } catch (FileSystemNotFoundException e) {
-                myPath = null;
+                // no-op, can't log because class is used in compiler
             }
 
-            if (myPath != null) {
-                try (Stream<Path> walk = Files.walk(myPath, 1)) {
-                    for (Iterator<Path> it = walk.iterator(); it.hasNext();) {
-                        final Path currentPath = it.next();
-                        if (currentPath.equals(myPath) || Files.isHidden(currentPath) || currentPath.getFileName().startsWith(".")) {
-                            continue;
-                        }
-                        consumer.accept(currentPath);
-                    }
-                } finally {
-                    if (fileSystem != null && fileSystem.isOpen()) {
-                        fileSystem.close();
-                    }
-                }
-            }
+
         } catch (IOException e) {
             // ignore, can't do anything here and can't log because class used in compiler
+        }
+    }
+
+    private static void walkFiles(Consumer<Path> consumer, Path myPath) throws IOException {
+        if (myPath != null) {
+            try (Stream<Path> walk = Files.walk(myPath, 1)) {
+                for (Iterator<Path> it = walk.iterator(); it.hasNext();) {
+                    final Path currentPath = it.next();
+                    if (currentPath.equals(myPath) || Files.isHidden(currentPath) || currentPath.getFileName().startsWith(".")) {
+                        continue;
+                    }
+                    consumer.accept(currentPath);
+                }
+            }
         }
     }
 
