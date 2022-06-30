@@ -34,6 +34,7 @@ import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.function.Consumer;
@@ -84,6 +85,7 @@ public class IOUtils {
             try {
                 if ("jar".equals(scheme)) {
                     synchronized (IOUtils.class) {
+                        final String[] jarFiles = uri.toString().split("!");
                         try {
                             fileSystem = FileSystems.getFileSystem(uri);
                         } catch (FileSystemNotFoundException e) {
@@ -94,6 +96,20 @@ public class IOUtils {
                                 fileSystem = FileSystems.newFileSystem(uri, Collections.emptyMap());
                             } catch (FileSystemAlreadyExistsException e) {
                                 fileSystem = FileSystems.getFileSystem(uri);
+                            }
+                        }
+                        Path currentJar = null;
+                        if (jarFiles.length > 2) {
+                            for (int i = 1; i < (jarFiles.length -1); i++) {
+                                final Path nestedJar = fileSystem.getPath(jarFiles[i]);
+                                final Path extractedJar = Files.createTempFile("jar-" + i, ".jar");
+                                Files.copy(nestedJar, extractedJar, StandardCopyOption.REPLACE_EXISTING);
+                                fileSystem.close();
+                                if (currentJar != null) {
+                                    Files.delete(currentJar);
+                                }
+                                currentJar = extractedJar;
+                                fileSystem = FileSystems.newFileSystem(URI.create("jar:file:" + extractedJar), Collections.emptyMap());
                             }
                         }
                         try {
