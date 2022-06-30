@@ -105,6 +105,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * Resolve all of the annotation values that feature the given stereotype.
      *
      * @param stereotype The annotation names
+     * @param <T> The annotation type
      * @return A set of annotation names
      * @since 3.5.2
      */
