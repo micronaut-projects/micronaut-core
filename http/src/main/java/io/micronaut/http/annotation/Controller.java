@@ -43,7 +43,7 @@ public @interface Controller {
 
     /**
      * <p>This attribute returns the base URI of the controller</p>
-     * <p>
+     *
      * <p>A value of {@code /} can be used to map a controller
      * to the root URI.</p>
      *

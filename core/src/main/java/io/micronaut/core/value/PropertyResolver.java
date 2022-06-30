@@ -38,10 +38,10 @@ public interface PropertyResolver extends ValueResolver<String> {
 
     /**
      * <p>Whether the given property is contained within this resolver.</p>
-     * <p>
+     *
      * <p>Note that this method will return false for nested properties. In other words given a key of {@code foo.bar} this method will
      * return {@code false} for: {@code resolver.containsProperty("foo")}</p>
-     * <p>
+     *
      * <p>To check for nested properties using {@link #containsProperties(String)} instead.</p>
      *
      * @param name The name of the property
@@ -59,7 +59,7 @@ public interface PropertyResolver extends ValueResolver<String> {
 
     /**
      * <p>Resolve the given property for the given name, type and generic type arguments.</p>
-     * <p>
+     *
      * <p>Implementers can choose to implement more intelligent type conversion by analyzing the typeArgument.</p>
      *
      * @param name              The name
@@ -90,7 +90,7 @@ public interface PropertyResolver extends ValueResolver<String> {
 
     /**
      * <p>Resolve the given property for the given name, type and generic type arguments.</p>
-     * <p>
+     *
      * <p>Implementers can choose to implement more intelligent type conversion by analyzing the typeArgument.</p>
      *
      * @param name     The name
@@ -126,7 +126,7 @@ public interface PropertyResolver extends ValueResolver<String> {
 
     /**
      * <p>Resolve the given property for the given name, type and generic type arguments.</p>
-     * <p>
+     *
      * <p>Implementers can choose to implement more intelligent type conversion by analyzing the typeArgument.</p>
      *
      * @param name         The name

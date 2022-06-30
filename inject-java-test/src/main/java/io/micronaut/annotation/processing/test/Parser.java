@@ -30,10 +30,11 @@ import static java.lang.Boolean.TRUE;
 public final class Parser {
 
     /**
-     * Parses {@code sources} into {@linkplain CompilationUnitTree} compilation units. This method
+     * Parses {@code sources} into {@linkplain com.sun.source.tree.CompilationUnitTree} compilation units. This method
      * <b>does not</b> compile the sources.
      *
-     * @param sources
+     * @param sources The sources
+     * @return parsed {@link com.sun.source.tree.CompilationUnitTree} iterable object
      */
     public static Iterable<? extends Element> parse(JavaFileObject... sources) {
         JavaParser javaParser = new JavaParser();
@@ -45,26 +46,35 @@ public final class Parser {
     }
 
     /**
-     * Parses {@code sources} into {@linkplain CompilationUnitTree} compilation units. This method
+     * Parses {@code sources} into {@linkplain com.sun.source.tree.CompilationUnitTree} compilation units. This method
      * <b>does not</b> compile the sources.
+     *
+     * @param className the fully qualified name class name
+     * @param lines The source
+     * @return parsed {@link com.sun.source.tree.CompilationUnitTree} iterable object
      */
     public static Iterable<? extends Element> parseLines(String className, String... lines) {
         return parse(JavaFileObjects.forSourceLines(className.replace('.', File.separatorChar) + ".java", lines));
     }
 
     /**
-     * Parses {@code sources} into {@linkplain CompilationUnitTree} compilation units. This method
+     * Parses {@code sources} into {@linkplain com.sun.source.tree.CompilationUnitTree} compilation units. This method
      * <b>does not</b> compile the sources.
+     *
+     * @param className the fully qualified name class name
+     * @param code The source
+     * @return parsed {@link com.sun.source.tree.CompilationUnitTree} iterable object
      */
     public static Iterable<? extends JavaFileObject> generate(String className, String code) {
         return generate(JavaFileObjects.forSourceString(className, code));
     }
 
     /**
-     * Parses {@code sources} into {@linkplain CompilationUnitTree} compilation units. This method
+     * Parses {@code sources} into {@linkplain com.sun.source.tree.CompilationUnitTree} compilation units. This method
      * <b>does not</b> compile the sources.
      *
      * @param sources The sources
+     * @return parsed {@link com.sun.source.tree.CompilationUnitTree} iterable object
      */
     public static Iterable<? extends JavaFileObject> generate(JavaFileObject... sources) {
         final JavaParser javaParser = new JavaParser();

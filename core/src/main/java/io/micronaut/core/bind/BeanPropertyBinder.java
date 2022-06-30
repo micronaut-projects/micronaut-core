@@ -24,7 +24,7 @@ import java.util.Set;
 
 /**
  * <p>An interface that provides the ability to bind Maps and Java bean properties</p>.
- * <p>
+ *
  * <p>This class is designed specifically for binding of String based property data such as Form submissions and
  * dynamic binding of Java Properties files and should not be used beyond these two use cases.</p>
  *

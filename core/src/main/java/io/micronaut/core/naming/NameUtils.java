@@ -619,7 +619,7 @@ public class NameUtils {
 
     /**
      * Retrieves the extension of a file name.
-     * Ex: index.html -> html
+     * Ex: index.html -&gt; html
      *
      * @param filename The name of the file
      * @return The file extension
@@ -669,7 +669,7 @@ public class NameUtils {
 
     /**
      * Retrieves the fileName of a file without extension.
-     * Ex: index.html -> index
+     * Ex: index.html -&gt; index
      *
      * @param path The path of the file
      * @return The file name without extension

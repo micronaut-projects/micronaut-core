@@ -382,7 +382,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     }
 
     /**
-     * Sets the maximum request size. Default value ({@value #DEFAULT_MAX_REQUEST_SIZE} => // 10MB)
+     * Sets the maximum request size. Default value ({@value #DEFAULT_MAX_REQUEST_SIZE} =&gt; // 10MB)
      *
      * @param maxRequestSize The max request size
      */
@@ -608,7 +608,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
         }
 
         /**
-         * Sets the max file size. Default value ({@value #DEFAULT_MAX_FILE_SIZE} => 1MB).
+         * Sets the max file size. Default value ({@value #DEFAULT_MAX_FILE_SIZE} =&gt; 1MB).
          * @param maxFileSize The max file size
          */
         public void setMaxFileSize(@ReadableBytes long maxFileSize) {

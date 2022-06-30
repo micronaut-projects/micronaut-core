@@ -23,8 +23,8 @@ import java.util.Optional;
 
 /**
  * <p>Interface for a hateoas link.</p>
- * <p>
- * <p>See https://tools.ietf.org/html/draft-kelly-json-hal-08#section-5</p>
+ *
+ * <p>See <a href="https://tools.ietf.org/html/draft-kelly-json-hal-08#section-5">this</a></p>
  *
  * @author Graeme Rocher
  * @since 1.1

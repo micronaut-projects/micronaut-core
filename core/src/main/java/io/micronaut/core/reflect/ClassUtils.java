@@ -182,7 +182,7 @@ public class ClassUtils {
 
     /**
      * <p>Converts a URI to a class file reference to the class name</p>.
-     * <p>
+     *
      * <p>ie. ClassUtils.pathToClassName("foo/bar/MyClass.class") == "foo.bar.MyClass"</p>
      *
      * @param path The path name

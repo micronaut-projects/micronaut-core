@@ -27,7 +27,7 @@ import java.lang.annotation.Target;
 /**
  * <p>Specifies that an argument to a bean constructor is user provided and a
  * {@link io.micronaut.inject.ParametrizedBeanFactory} should be generated.</p>
- * <p>
+ *
  * <p>Should be applied only to constructor arguments and {@link Bean} factory methods</p>
  *
  * @author Graeme Rocher

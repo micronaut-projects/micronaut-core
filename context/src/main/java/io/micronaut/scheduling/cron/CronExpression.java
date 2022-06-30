@@ -33,14 +33,15 @@ import java.util.regex.Pattern;
 
 /**
  * This provides cron support for Java 8 using java-time.
- * <p>
+ *
  * <p>
  * Parser for unix-like cron expressions: Cron expressions allow specifying combinations of criteria for time
  * such as: &quot;Each Monday-Friday at 08:00&quot; or &quot;Every last friday of the month at 01:30&quot;
+ * </p>
  * <p>
  * A cron expressions consists of 5 or 6 mandatory fields (seconds may be omitted) separated by space. <br>
  * These are:
- * <p>
+ * </p>
  * <table>
  *     <caption>Cron expressions</caption>
  * <tr>
@@ -93,17 +94,21 @@ import java.util.regex.Pattern;
  * <td>{@code , - * ? / L #}</td>
  * </tr>
  * </table>
- * <p>
+ *
  * <p>
  * '*' Can be used in all fields and means 'for all values'. E.g. &quot;*&quot; in minutes, means 'for all minutes'
+ * </p>
  * <p>
  * '?' Can be used in Day-of-month and Day-of-week fields. Used to signify 'no special value'. It is used when one want
  * to specify something for one of those two fields, but not the other.
+ * </p>
  * <p>
  * '-' Used to specify a time interval. E.g. &quot;10-12&quot; in Hours field means 'for hours 10, 11 and 12'
+ * </p>
  * <p>
  * ',' Used to specify multiple values for a field. E.g. &quot;MON,WED,FRI&quot; in Day-of-week field means &quot;for
  * monday, wednesday and friday&quot;
+ * </p>
  * <p>
  * '/' Used to specify increments. E.g. &quot;0/15&quot; in Seconds field means &quot;for seconds 0, 15, 30, ad
  * 45&quot;. And &quot;5/15&quot; in seconds field means &quot;for seconds 5, 20, 35, and 50&quot;. If '*' s specified
@@ -111,22 +116,26 @@ import java.util.regex.Pattern;
  * off. For Seconds and Minutes these range from 0-59. For Hours from 0 to 23, For Day-of-month it's 1 to 31, For Months
  * 1 to 12. &quot;/&quot; character helsp turn some of these values back on. Thus &quot;7/6&quot; in Months field
  * specify just Month 7. It doesn't turn on every 6 month following, since cron fields never roll over
+ * </p>
  * <p>
  * 'L' Can be used on Day-of-month and Day-of-week fields. It signifies last day of the set of allowed values. In
  * Day-of-month field it's the last day of the month (e.g.. 31 jan, 28 feb (29 in leap years), 31 march, etc.). In
  * Day-of-week field it's Sunday. If there's a prefix, this will be subtracted (5L in Day-of-month means 5 days before
  * last day of Month: 26 jan, 23 feb, etc.)
+ * </p>
  * <p>
  * 'W' Can be specified in Day-of-Month field. It specifies closest weekday (monday-friday). Holidays are not accounted
  * for. &quot;15W&quot; in Day-of-Month field means 'closest weekday to 15 i in given month'. If the 15th is a Saturday,
  * it gives Friday. If 15th is a Sunday, the it gives following Monday.
+ * </p>
  * <p>
  * '#' Can be used in Day-of-Week field. For example: &quot;5#3&quot; means 'third friday in month' (day 5 = friday, #3
  * - the third). If the day does not exist (e.g. &quot;5#5&quot; - 5th friday of month) and there aren't 5 fridays in
  * the month, then it won't match until the next month with 5 fridays.
+ * </p>
  * <p>
  * <b>Case-sensitive</b> No fields are case-sensitive
- * <p>
+ * </p>
  * <b>Dependencies between fields</b> Fields are always evaluated independently, but the expression doesn't match until
  * the constraints of each field are met. Overlap of intervals are not allowed. That is: for
  * Day-of-week field &quot;FRI-MON&quot; is invalid, but &quot;FRI-SUN,MON&quot; is valid
@@ -294,7 +303,7 @@ public final class CronExpression {
     /**
      * @since 3.1.0
      * Returns String expression.
-     * 
+     *
      * @return The underlying cron expression as string.
      */
     public String getExpression() {

@@ -41,7 +41,7 @@ import java.util.Set;
 public interface TypeElementVisitor<C, E> extends Ordered, Toggleable {
 
     /**
-     * Executed when a class is encountered that matches the {@literal <}C> generic.
+     * Executed when a class is encountered that matches the {@literal <}C{@literal >} generic.
      *
      * @param element The element
      * @param context The visitor context
@@ -51,7 +51,7 @@ public interface TypeElementVisitor<C, E> extends Ordered, Toggleable {
     }
 
     /**
-     * Executed when a method is encountered that matches the {@literal <}E> generic.
+     * Executed when a method is encountered that matches the {@literal <}E{@literal >} generic.
      *
      * @param element The element
      * @param context The visitor context
@@ -61,7 +61,7 @@ public interface TypeElementVisitor<C, E> extends Ordered, Toggleable {
     }
 
     /**
-     * Executed when a constructor is encountered that matches the {@literal <}C> generic.
+     * Executed when a constructor is encountered that matches the {@literal <}C{@literal >} generic.
      *
      * @param element The element
      * @param context The visitor context
@@ -71,7 +71,7 @@ public interface TypeElementVisitor<C, E> extends Ordered, Toggleable {
     }
 
     /**
-     * Executed when a field is encountered that matches the {@literal <}E> generic.
+     * Executed when a field is encountered that matches the {@literal <}E{@literal >} generic.
      *
      * @param element The element
      * @param context The visitor context
@@ -81,7 +81,7 @@ public interface TypeElementVisitor<C, E> extends Ordered, Toggleable {
     }
 
     /**
-     * Executed when a enum constant is encountered that matches the {@literal <}E> generic.
+     * Executed when a enum constant is encountered that matches the {@literal <}E{@literal >} generic.
      *
      * @param element The element
      * @param context The visitor context

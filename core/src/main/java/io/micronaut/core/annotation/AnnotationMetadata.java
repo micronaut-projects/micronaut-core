@@ -40,13 +40,13 @@ import java.util.Set;
 /**
  * <p>An interface implemented at compile time by Micronaut that allows the inspection of annotation metadata and
  * stereotypes (meta-annotations)</p>.
- * <p>
+ *
  * <p>This interface exposes fast and efficient means to expose annotation data at runtime without requiring reflective
  * tricks to read the annotation metadata</p>
- * <p>
+ *
  * <p>Users of Micronaut should in general avoid the methods of the {@link java.lang.reflect.AnnotatedElement}
  * interface and use this interface instead to obtain maximum efficiency</p>
- * <p>
+ *
  * <p>Core framework types such as {@code io.micronaut.inject.BeanDefinition} and
  * {@code io.micronaut.inject.ExecutableMethod} implement this interface</p>
  *
@@ -313,7 +313,7 @@ public interface AnnotationMetadata extends AnnotationSource {
 
     /**
      * <p>Checks whether this object has the given annotation stereotype on the object itself or inherited from a parent</p>.
-     * <p>
+     *
      * <p>An annotation stereotype is a meta annotation potentially applied to another annotation</p>
      *
      * @param annotation The annotation
@@ -325,7 +325,7 @@ public interface AnnotationMetadata extends AnnotationSource {
 
     /**
      * <p>Checks whether this object has the given annotation stereotype on the object itself and not inherited from a parent</p>.
-     * <p>
+     *
      * <p>An annotation stereotype is a meta annotation potentially applied to another annotation</p>
      *
      * @param annotation The annotation
@@ -1444,7 +1444,7 @@ public interface AnnotationMetadata extends AnnotationSource {
 
     /**
      * <p>Checks whether this object has the given annotation stereotype on the object itself or inherited from a parent</p>.
-     * <p>
+     *
      * <p>An annotation stereotype is a meta annotation potentially applied to another annotation</p>
      *
      * @param annotation The annotation

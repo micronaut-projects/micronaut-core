@@ -25,9 +25,8 @@ import java.lang.annotation.*;
 /**
  * <p>An annotation that can be applied to method argument to indicate that the method argument is bound from an HTTP header
  *   This also can be used in conjunction with &#064;Headers to list headers on a client class that will always be applied.</p>
- * <p></p>
+ *
  * <p>The following example demonstrates usage at the type level to declare default values to pass in the request when using the {@code Client} annotation:</p>
- * <p></p>
  *
  * <pre class="code">
  * &#064;Header(name = "X-Username", value = "Freddy"),
