@@ -103,12 +103,15 @@ final class HttpPipelineBuilder {
 
     private final HttpRequestCertificateHandler requestCertificateHandler = new HttpRequestCertificateHandler();
 
-    HttpPipelineBuilder(NettyHttpServer server, NettyEmbeddedServices embeddedServices, ServerSslConfiguration sslConfiguration, RoutingInBoundHandler routingInBoundHandler, HttpHostResolver hostResolver) {
+    private final ServerNettyCustomizer serverCustomizer;
+
+    HttpPipelineBuilder(NettyHttpServer server, NettyEmbeddedServices embeddedServices, ServerSslConfiguration sslConfiguration, RoutingInBoundHandler routingInBoundHandler, HttpHostResolver hostResolver, ServerNettyCustomizer serverCustomizer) {
         this.server = server;
         this.embeddedServices = embeddedServices;
         this.sslConfiguration = sslConfiguration;
         this.routingInBoundHandler = routingInBoundHandler;
         this.hostResolver = hostResolver;
+        this.serverCustomizer = serverCustomizer;
 
         loggingHandler = server.getServerConfiguration().getLogLevel().isPresent() ? new LoggingHandler(NettyHttpServer.class, server.getServerConfiguration().getLogLevel().get()) : null;
         sslContext = embeddedServices.getServerSslBuilder() != null ? embeddedServices.getServerSslBuilder().build().orElse(null) : null;
@@ -140,10 +143,13 @@ final class HttpPipelineBuilder {
 
         private final boolean ssl;
 
+        private final ServerNettyCustomizer connectionCustomizer;
+
         ConnectionPipeline(Channel channel, boolean ssl) {
             this.channel = channel;
             this.pipeline = channel.pipeline();
             this.ssl = ssl;
+            this.connectionCustomizer = serverCustomizer.specializeForChannel(channel, ServerNettyCustomizer.ChannelRole.CONNECTION);
         }
 
         void insertPcapLoggingHandler(String qualifier) {
@@ -226,8 +232,9 @@ final class HttpPipelineBuilder {
             }
         }
 
-        private void triggerPipelineListeners() {
+        private void onRequestPipelineBuilt() {
             server.triggerPipelineListeners(pipeline);
+            connectionCustomizer.onStreamPipelineBuilt();
         }
 
         /**
@@ -276,7 +283,8 @@ final class HttpPipelineBuilder {
 
             insertHttp1DownstreamHandlers();
 
-            triggerPipelineListeners();
+            connectionCustomizer.onInitialPipelineBuilt();
+            onRequestPipelineBuilt();
         }
 
         /**
@@ -308,7 +316,8 @@ final class HttpPipelineBuilder {
 
             insertHttp2DownstreamHandlers();
 
-            triggerPipelineListeners();
+            connectionCustomizer.onInitialPipelineBuilt();
+            onRequestPipelineBuilt();
         }
 
         /**
@@ -414,7 +423,7 @@ final class HttpPipelineBuilder {
                         public void upgradeTo(ChannelHandlerContext ctx, FullHttpRequest upgradeRequest) {
                             pipeline.remove(fallbackHandlerName);
                             insertHttp2DownstreamHandlers();
-                            triggerPipelineListeners();
+                            onRequestPipelineBuilt();
                             super.upgradeTo(ctx, upgradeRequest);
                             // HTTP1 request is on the implicit stream 1
                             upgradeRequest.headers().set(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text(), 1);
@@ -459,10 +468,11 @@ final class HttpPipelineBuilder {
                     // note: we have to reuse the serverCodec in case it still has some data buffered
                     insertHttp1DownstreamHandlers();
 
-                    triggerPipelineListeners();
+                    onRequestPipelineBuilt();
                     pipeline.fireChannelRead(ReferenceCountUtil.retain(msg));
                 }
             });
+            connectionCustomizer.onInitialPipelineBuilt();
         }
 
         /**

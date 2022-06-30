@@ -18,6 +18,7 @@ package io.micronaut.http.server.netty;
 import java.util.Collections;
 import java.util.Set;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.websocket.WebSocketSessionRepository;
 import io.micronaut.runtime.context.scope.refresh.RefreshEventListener;
@@ -34,7 +35,8 @@ public interface NettyEmbeddedServer
         extends EmbeddedServer,
                 WebSocketSessionRepository,
                 ChannelPipelineCustomizer,
-                RefreshEventListener {
+                RefreshEventListener,
+                ServerNettyCustomizer.Registry {
     /**
      * Gets the set of all ports this Netty server is bound to.
      * @return An immutable set of bound ports if the server has been started with {@link #start()} an empty set otherwise.
@@ -51,5 +53,10 @@ public interface NettyEmbeddedServer
     @Override
     default NettyEmbeddedServer stop() {
         return (NettyEmbeddedServer) EmbeddedServer.super.stop();
+    }
+
+    @Override
+    default void register(@NonNull ServerNettyCustomizer customizer) {
+        throw new UnsupportedOperationException();
     }
 }
