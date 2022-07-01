@@ -183,5 +183,15 @@
     "type": "io.micronaut.core.annotation.AnnotationMetadata",
     "member": "Method io.micronaut.core.annotation.AnnotationMetadata.getAnnotationValuesByStereotype(java.lang.String)",
     "reason": "New default method"
+  },
+  {
+    "type": "io.micronaut.http.server.netty.NettyEmbeddedServer",
+    "member": "Class io.micronaut.http.server.netty.NettyEmbeddedServer",
+    "reason": "New default method"
+  },
+  {
+    "type": "io.micronaut.http.server.netty.NettyEmbeddedServer",
+    "member": "Method io.micronaut.http.server.netty.NettyEmbeddedServer.register(io.micronaut.http.server.netty.ServerNettyCustomizer)",
+    "reason": "New default method"
   }
 ]
