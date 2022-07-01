@@ -234,7 +234,6 @@ final class HttpPipelineBuilder {
 
         private void onRequestPipelineBuilt() {
             server.triggerPipelineListeners(pipeline);
-            connectionCustomizer.onStreamPipelineBuilt();
         }
 
         /**
@@ -259,9 +258,10 @@ final class HttpPipelineBuilder {
 
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_SERVER_CODEC, createServerCodec());
 
-            new StreamPipeline(channel, ssl).insertHttp1DownstreamHandlers();
+            new StreamPipeline(channel, ssl, connectionCustomizer).insertHttp1DownstreamHandlers();
 
             connectionCustomizer.onInitialPipelineBuilt();
+            connectionCustomizer.onStreamPipelineBuilt();
             onRequestPipelineBuilt();
         }
 
@@ -275,7 +275,9 @@ final class HttpPipelineBuilder {
             pipeline.addLast(new Http2MultiplexHandler(new ChannelInitializer<Channel>() {
                 @Override
                 protected void initChannel(@NonNull Channel ch) {
-                    new StreamPipeline(ch, ssl).insertHttp2FrameHandlers();
+                    StreamPipeline streamPipeline = new StreamPipeline(ch, ssl, connectionCustomizer.specializeForChannel(ch, NettyServerCustomizer.ChannelRole.REQUEST_STREAM));
+                    streamPipeline.insertHttp2FrameHandlers();
+                    streamPipeline.streamCustomizer.onStreamPipelineBuilt();
                 }
             }));
 
@@ -356,7 +358,9 @@ final class HttpPipelineBuilder {
                     return new Http2ServerUpgradeCodec(connectionHandler, new Http2MultiplexHandler(new ChannelInitializer<Http2StreamChannel>() {
                         @Override
                         protected void initChannel(@NonNull Http2StreamChannel ch) {
-                            new StreamPipeline(ch, ssl).insertHttp2FrameHandlers();
+                            StreamPipeline streamPipeline = new StreamPipeline(ch, ssl, connectionCustomizer.specializeForChannel(ch, NettyServerCustomizer.ChannelRole.REQUEST_STREAM));
+                            streamPipeline.insertHttp2FrameHandlers();
+                            streamPipeline.streamCustomizer.onStreamPipelineBuilt();
                         }
                     })) {
                         @Override
@@ -393,7 +397,8 @@ final class HttpPipelineBuilder {
 
                     // reconfigure for http1
                     // note: we have to reuse the serverCodec in case it still has some data buffered
-                    new StreamPipeline(channel, ssl).insertHttp1DownstreamHandlers();
+                    new StreamPipeline(channel, ssl, connectionCustomizer).insertHttp1DownstreamHandlers();
+                    connectionCustomizer.onStreamPipelineBuilt();
                     onRequestPipelineBuilt();
                     pipeline.fireChannelRead(ReferenceCountUtil.retain(msg));
                 }
@@ -418,14 +423,19 @@ final class HttpPipelineBuilder {
         private final ChannelPipeline pipeline;
         private final boolean ssl;
 
-        private StreamPipeline(Channel channel, boolean ssl) {
+        private final NettyServerCustomizer streamCustomizer;
+
+        private StreamPipeline(Channel channel, boolean ssl, NettyServerCustomizer streamCustomizer) {
             this.channel = channel;
             this.pipeline = channel.pipeline();
             this.ssl = ssl;
+            this.streamCustomizer = streamCustomizer;
         }
 
         void initializeChildPipelineForPushPromise(Channel childChannel) {
-            new StreamPipeline(childChannel, ssl).insertHttp2FrameHandlers();
+            StreamPipeline promisePipeline = new StreamPipeline(childChannel, ssl, streamCustomizer.specializeForChannel(childChannel, NettyServerCustomizer.ChannelRole.PUSH_PROMISE_STREAM));
+            promisePipeline.insertHttp2FrameHandlers();
+            promisePipeline.streamCustomizer.onStreamPipelineBuilt();
         }
 
         private void insertHttp2FrameHandlers() {

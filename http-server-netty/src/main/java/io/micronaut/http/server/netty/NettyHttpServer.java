@@ -713,14 +713,25 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     /**
      * Builds Embedded Channel.
      *
-     * @param ssl SSL
-     * @return Embedded Channel
+     * @param ssl whether to enable SSL
+     * @return The embedded channel with our server handlers
      */
     @Internal
     public EmbeddedChannel buildEmbeddedChannel(boolean ssl) {
-        EmbeddedChannel embeddedChannel = new EmbeddedChannel();
-        createPipelineBuilder(rootCustomizer).new ConnectionPipeline(embeddedChannel, ssl).initChannel();
-        return embeddedChannel;
+        EmbeddedChannel channel = new EmbeddedChannel();
+        buildEmbeddedChannel(channel, ssl);
+        return channel;
+    }
+
+    /**
+     * Builds Embedded Channel.
+     *
+     * @param prototype The embedded channel to add our handlers to
+     * @param ssl whether to enable SSL
+     */
+    @Internal
+    public void buildEmbeddedChannel(EmbeddedChannel prototype, boolean ssl) {
+        createPipelineBuilder(rootCustomizer).new ConnectionPipeline(prototype, ssl).initChannel();
     }
 
     static Predicate<String> inclusionPredicate(NettyHttpServerConfiguration.AccessLogger config) {
