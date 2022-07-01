@@ -180,9 +180,24 @@
     "reason": "New New internal default method default method"
   },
   {
+    "type": "io.micronaut.core.type.TypeInformation",
+    "member": "Class io.micronaut.core.type.TypeInformation",
+    "reason": "Added a default method"
+  },
+  {
+    "type": "io.micronaut.core.type.TypeInformation",
+    "member": "Method io.micronaut.core.type.TypeInformation.asType()",
+    "reason": "Added a default method"
+  },
+  {
     "type": "io.micronaut.core.annotation.AnnotationMetadata",
     "member": "Method io.micronaut.core.annotation.AnnotationMetadata.getAnnotationValuesByStereotype(java.lang.String)",
     "reason": "New default method"
+  },
+  {
+    "type": "io.micronaut.context.BeanDefinitionRegistry",
+    "member": "Method io.micronaut.context.BeanDefinitionRegistry.registerBeanDefinition(io.micronaut.context.RuntimeBeanDefinition)",
+    "reason": "new internal default method"
   },
   {
     "type": "io.micronaut.http.server.netty.NettyEmbeddedServer",

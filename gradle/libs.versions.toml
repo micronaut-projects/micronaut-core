@@ -74,7 +74,7 @@ managed-micronaut-coherence = "3.4.1"
 managed-micronaut-data = "3.4.2"
 managed-micronaut-discovery = "3.1.0"
 managed-micronaut-elasticsearch = "4.2.0"
-managed-micronaut-email = "1.2.3"
+managed-micronaut-email = "1.3.0"
 managed-micronaut-flyway = "5.3.0"
 managed-micronaut-gcp = "4.2.0"
 managed-micronaut-graphql = "3.0.0"
@@ -112,7 +112,7 @@ managed-micronaut-rxjava3 = "2.2.1"
 managed-micronaut-security = "3.6.1"
 managed-micronaut-serialization = "1.1.0"
 managed-micronaut-servlet = "3.2.3"
-managed-micronaut-spring = "4.1.1"
+managed-micronaut-spring = "4.2.1"
 managed-micronaut-sql = "4.4.0"
 managed-micronaut-test = "3.4.0"
 managed-micronaut-test-resources = "1.0.0-M1"
@@ -133,8 +133,6 @@ managed-rxjava1-interop = "0.13.7"
 managed-slf4j = "1.7.36"
 managed-spock = "2.0-groovy-3.0"
 managed-spotbugs = "4.7.0"
-managed-spring = "5.3.20"
-managed-springboot = "2.5.12"
 managed-swagger = "2.2.0"
 managed-validation = "2.0.1.Final"
 managed-testcontainers = "1.17.2"
@@ -170,6 +168,7 @@ boms-micronaut-reactor = { module = "io.micronaut.reactor:micronaut-reactor-bom"
 boms-micronaut-security = { module = "io.micronaut.security:micronaut-security-bom", version.ref = "managed-micronaut-security" }
 boms-micronaut-serialization = { module = "io.micronaut.serde:micronaut-serde-bom", version.ref = "managed-micronaut-serialization" }
 boms-micronaut-servlet = { module = "io.micronaut.servlet:micronaut-servlet-bom", version.ref = "managed-micronaut-servlet" }
+boms-micronaut-spring = { module = "io.micronaut.spring:micronaut-spring-bom", version.ref = "managed-micronaut-spring" }
 boms-micronaut-sql = { module = "io.micronaut.sql:micronaut-sql-bom", version.ref = "managed-micronaut-sql" }
 boms-micronaut-test = { module = "io.micronaut.test:micronaut-test-bom", version.ref = "managed-micronaut-test" }
 boms-micronaut-tracing = { module = "io.micronaut.tracing:micronaut-tracing-bom", version.ref = "managed-micronaut-tracing" }
@@ -301,13 +300,6 @@ managed-micronaut-rss-itunespodcast = { module = "io.micronaut.rss:micronaut-itu
 managed-micronaut-rss-jsonfeed-core = { module = "io.micronaut.rss:micronaut-jsonfeed-core", version.ref = "managed-micronaut-rss" }
 managed-micronaut-rss-jsonfeed = { module = "io.micronaut.rss:micronaut-jsonfeed", version.ref = "managed-micronaut-rss" }
 managed-micronaut-rxjava1 = { module = "io.micronaut.rxjava1:micronaut-rxjava1", version.ref = "managed-micronaut-rxjava1" }
-managed-micronaut-spring = { module = "io.micronaut.spring:micronaut-spring", version.ref = "managed-micronaut-spring" }
-managed-micronaut-spring-annotation = { module = "io.micronaut.spring:micronaut-spring-annotation", version.ref = "managed-micronaut-spring" }
-managed-micronaut-spring-boot = { module = "io.micronaut.spring:micronaut-spring-boot", version.ref = "managed-micronaut-spring" }
-managed-micronaut-spring-boot-annotation = { module = "io.micronaut.spring:micronaut-spring-boot-annotation", version.ref = "managed-micronaut-spring" }
-managed-micronaut-spring-context = { module = "io.micronaut.spring:micronaut-spring-context", version.ref = "managed-micronaut-spring" }
-managed-micronaut-spring-web = { module = "io.micronaut.spring:micronaut-spring-web", version.ref = "managed-micronaut-spring" }
-managed-micronaut-spring-web-annotation = { module = "io.micronaut.spring:micronaut-spring-web-annotation", version.ref = "managed-micronaut-spring" }
 managed-micronaut-sql-jdbc = { module = "io.micronaut.sql:micronaut-jdbc", version.ref = "managed-micronaut-sql" }
 managed-micronaut-sql-jdbc-tomcat = { module = "io.micronaut.sql:micronaut-jdbc-tomcat", version.ref = "managed-micronaut-sql" }
 managed-micronaut-test-bom = { module = "io.micronaut.test:micronaut-test-bom", version.ref = "managed-micronaut-test" }
@@ -334,14 +326,6 @@ managed-snakeyaml = { module = "org.yaml:snakeyaml", version.ref = "managed-snak
 
 managed-spock = { module = "org.spockframework:spock-core", version.ref = "managed-spock" }
 managed-spotbugs = { module = "com.github.spotbugs:spotbugs-annotations", version.ref = "managed-spotbugs" }
-
-managed-spring = { module = "org.springframework:spring-core", version.ref = "managed-spring" }
-managed-spring-context = { module = "org.springframework:spring-context", version.ref = "managed-spring" }
-managed-spring-tx = { module = "org.springframework:spring-tx", version.ref = "managed-spring" }
-managed-spring-orm = { module = "org.springframework:spring-orm", version.ref = "managed-spring" }
-managed-spring-jdbc = { module = "org.springframework:spring-jdbc", version.ref = "managed-spring" }
-managed-spring-boot-starter = { module = "org.springframework.boot:spring-boot-starter", version.ref = "managed-springboot" }
-managed-spring-boot-starter-web = { module = "org.springframework.boot:spring-boot-starter-web", version.ref = "managed-springboot" }
 
 managed-swagger = { module = "io.swagger.core.v3:swagger-core", version.ref = "managed-swagger" }
 managed-swagger-models = { module = "io.swagger.core.v3:swagger-models", version.ref = "managed-swagger" }

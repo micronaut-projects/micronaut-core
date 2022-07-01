@@ -570,7 +570,9 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         applicationContext.getEventPublisher(ServerStartupEvent.class)
                 .publishEvent(new ServerStartupEvent(this));
         applicationName.ifPresent(id -> {
-            this.serviceInstance = applicationContext.createBean(NettyEmbeddedServerInstance.class, id, this);
+            if (serviceInstance == null) {
+                serviceInstance = applicationContext.createBean(NettyEmbeddedServerInstance.class, id, this);
+            }
             applicationContext
                     .getEventPublisher(ServiceReadyEvent.class)
                     .publishEvent(new ServiceReadyEvent(serviceInstance));
