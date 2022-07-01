@@ -100,7 +100,7 @@ public class IOUtils {
                         }
                         Path currentJar = null;
                         if (jarFiles.length > 2) {
-                            for (int i = 1; i < (jarFiles.length -1); i++) {
+                            for (int i = 1; i < (jarFiles.length - 1); i++) {
                                 final Path nestedJar = fileSystem.getPath(jarFiles[i]);
                                 final Path extractedJar = Files.createTempFile("jar-" + i, ".jar");
                                 Files.copy(nestedJar, extractedJar, StandardCopyOption.REPLACE_EXISTING);
