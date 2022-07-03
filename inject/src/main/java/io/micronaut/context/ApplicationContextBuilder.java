@@ -206,6 +206,14 @@ public interface ApplicationContextBuilder {
     @NonNull ApplicationContextBuilder banner(boolean isEnabled);
 
     /**
+     * Whether the version of Micronaut is showed after main banner or not.
+     *
+     * @param isEnabled Whether the version of Micronaut is showed after main banner or not.
+     * @return This application
+     */
+    @NonNull ApplicationContextBuilder bannerMicronautVersion(boolean isEnabled);
+
+    /**
      * Whether to error on an empty bean provider. Defaults to {@code false}.
      *
      * @param shouldAllow True if empty {@link jakarta.inject.Provider} instances are allowed

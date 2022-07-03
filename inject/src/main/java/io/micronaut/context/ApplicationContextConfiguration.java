@@ -111,6 +111,15 @@ public interface ApplicationContextConfiguration extends BeanContextConfiguratio
         return true;
     }
 
+    /**
+     * The Micronaut version banner is enabled by default.
+     *
+     * @return The Micronaut version banner is enabled by default
+     */
+    default boolean isBannerMicronautVersionEnabled() {
+        return true;
+    }
+
     @Nullable
     default Boolean isBootstrapEnvironmentEnabled() {
         return null;

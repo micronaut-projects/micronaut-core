@@ -63,6 +63,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     private Set<Class<? extends Annotation>> eagerInitAnnotated = new HashSet<>(3);
     private String[] overrideConfigLocations;
     private boolean banner = true;
+    private boolean bannerMicronautVersion = true;
     private ClassPathResourceLoader classPathResourceLoader;
     private boolean allowEmptyProviders = false;
     private Boolean bootstrapEnvironment = null;
@@ -111,6 +112,11 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     @Override
     public boolean isBannerEnabled() {
         return banner;
+    }
+
+    @Override
+    public boolean isBannerMicronautVersionEnabled() {
+        return bannerMicronautVersion;
     }
 
     @Nullable
@@ -365,6 +371,12 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     @Override
     public @NonNull ApplicationContextBuilder banner(boolean isEnabled) {
         this.banner = isEnabled;
+        return this;
+    }
+
+    @Override
+    public @NonNull ApplicationContextBuilder bannerMicronautVersion(boolean isEnabled) {
+        this.bannerMicronautVersion = isEnabled;
         return this;
     }
 

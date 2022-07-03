@@ -15,6 +15,7 @@
  */
 package io.micronaut.runtime;
 
+import io.micronaut.context.banner.MicronautVersionBanner;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.context.ApplicationContext;
@@ -187,6 +188,11 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
         return (Micronaut) super.banner(isEnabled);
     }
 
+    @Override
+    public @NonNull Micronaut bannerMicronautVersion(boolean isEnabled) {
+        return (Micronaut) super.bannerMicronautVersion(isEnabled);
+    }
+
     /**
      * Add classes to be included in the initialization of the application.
      *
@@ -350,6 +356,10 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
             new ResourceBanner(resource.get(), out).print();
         } else {
             new MicronautBanner(out).print();
+        }
+
+        if (isBannerMicronautVersionEnabled()) {
+            new MicronautVersionBanner(out).print();
         }
     }
 
