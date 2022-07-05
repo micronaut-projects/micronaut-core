@@ -18,6 +18,7 @@ micronautBom {
             'paho.v5': 'pahov5',
             'graal.sdk': 'graalSdk',
             'neo4j.java.driver': 'neo4j.bolt',
+            'micronaut.test.resources': 'micronaut.test-resources'
     ]
     propertyName = 'core'
     suppressions {
