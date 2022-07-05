@@ -17,7 +17,6 @@ package io.micronaut.buffer.netty;
 
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.netty.buffer.ByteBuf;
@@ -42,16 +41,6 @@ public class NettyByteBufferFactory implements ByteBufferFactory<ByteBufAllocato
     public static final NettyByteBufferFactory DEFAULT = new NettyByteBufferFactory();
 
     private final ByteBufAllocator allocator;
-
-    static {
-        ConversionService.SHARED.addConverter(ByteBuf.class, ByteBuffer.class, DEFAULT::wrap);
-        ConversionService.SHARED.addConverter(ByteBuffer.class, ByteBuf.class, byteBuffer -> {
-            if (byteBuffer instanceof NettyByteBuffer) {
-                return (ByteBuf) byteBuffer.asNativeBuffer();
-            }
-            throw new IllegalArgumentException("Unconvertible buffer type " + byteBuffer);
-        });
-    }
 
     /**
      * Default constructor.
