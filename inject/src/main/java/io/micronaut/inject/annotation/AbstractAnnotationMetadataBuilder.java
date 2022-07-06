@@ -17,7 +17,6 @@ package io.micronaut.inject.annotation;
 
 import io.micronaut.context.annotation.*;
 import io.micronaut.core.annotation.*;
-import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.CollectionUtils;
@@ -63,61 +62,49 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     private static final Map<String, Map<String, Object>> ANNOTATION_DEFAULTS = new HashMap<>(20);
 
     static {
-        SoftServiceLoader<AnnotationMapper> serviceLoader = SoftServiceLoader.load(AnnotationMapper.class,
-                                                                                   AbstractAnnotationMetadataBuilder.class.getClassLoader());
-        for (ServiceDefinition<AnnotationMapper> definition : serviceLoader) {
-            if (definition.isPresent()) {
-                AnnotationMapper mapper = definition.load();
-                try {
-                    String name = null;
-                    if (mapper instanceof TypedAnnotationMapper) {
-                        name = ((TypedAnnotationMapper) mapper).annotationType().getName();
-                    } else if (mapper instanceof NamedAnnotationMapper) {
-                        name = ((NamedAnnotationMapper) mapper).getName();
-                    }
-                    if (StringUtils.isNotEmpty(name)) {
-                        ANNOTATION_MAPPERS.computeIfAbsent(name, s -> new ArrayList<>(2)).add(mapper);
-                    }
-                } catch (Throwable e) {
-                    // mapper, missing dependencies, continue
+        for (AnnotationMapper mapper : SoftServiceLoader.load(AnnotationMapper.class, AbstractAnnotationMetadataBuilder.class.getClassLoader())
+            .disableFork().collectAll()) {
+            try {
+                String name = null;
+                if (mapper instanceof TypedAnnotationMapper) {
+                    name = ((TypedAnnotationMapper) mapper).annotationType().getName();
+                } else if (mapper instanceof NamedAnnotationMapper) {
+                    name = ((NamedAnnotationMapper) mapper).getName();
                 }
+                if (StringUtils.isNotEmpty(name)) {
+                    ANNOTATION_MAPPERS.computeIfAbsent(name, s -> new ArrayList<>(2)).add(mapper);
+                }
+            } catch (Throwable e) {
+                // mapper, missing dependencies, continue
             }
         }
 
-        SoftServiceLoader<AnnotationTransformer> transformerSoftServiceLoader =
-                SoftServiceLoader.load(AnnotationTransformer.class, AbstractAnnotationMetadataBuilder.class.getClassLoader());
-        for (ServiceDefinition<AnnotationTransformer> definition : transformerSoftServiceLoader) {
-            if (definition.isPresent()) {
-                AnnotationTransformer transformer = definition.load();
-                try {
-                    String name = null;
-                    if (transformer instanceof TypedAnnotationTransformer) {
-                        name = ((TypedAnnotationTransformer) transformer).annotationType().getName();
-                    } else if (transformer instanceof NamedAnnotationTransformer) {
-                        name = ((NamedAnnotationTransformer) transformer).getName();
-                    }
-                    if (StringUtils.isNotEmpty(name)) {
-                        ANNOTATION_TRANSFORMERS.computeIfAbsent(name, s -> new ArrayList<>(2)).add(transformer);
-                    }
-                } catch (Throwable e) {
-                    // mapper, missing dependencies, continue
+        for (AnnotationTransformer transformer : SoftServiceLoader.load(AnnotationTransformer.class, AbstractAnnotationMetadataBuilder.class.getClassLoader())
+            .disableFork().collectAll()) {
+            try {
+                String name = null;
+                if (transformer instanceof TypedAnnotationTransformer) {
+                    name = ((TypedAnnotationTransformer) transformer).annotationType().getName();
+                } else if (transformer instanceof NamedAnnotationTransformer) {
+                    name = ((NamedAnnotationTransformer) transformer).getName();
                 }
+                if (StringUtils.isNotEmpty(name)) {
+                    ANNOTATION_TRANSFORMERS.computeIfAbsent(name, s -> new ArrayList<>(2)).add(transformer);
+                }
+            } catch (Throwable e) {
+                // mapper, missing dependencies, continue
             }
         }
 
-        SoftServiceLoader<AnnotationRemapper> remapperLoader = SoftServiceLoader.load(AnnotationRemapper.class,
-                                                                                      AbstractAnnotationMetadataBuilder.class.getClassLoader());
-        for (ServiceDefinition<AnnotationRemapper> definition : remapperLoader) {
-            if (definition.isPresent()) {
-                AnnotationRemapper mapper = definition.load();
-                try {
-                    String name = mapper.getPackageName();
-                    if (StringUtils.isNotEmpty(name)) {
-                        ANNOTATION_REMAPPERS.computeIfAbsent(name, s -> new ArrayList<>(2)).add(mapper);
-                    }
-                } catch (Throwable e) {
-                    // mapper, missing dependencies, continue
+        for (AnnotationRemapper mapper : SoftServiceLoader.load(AnnotationRemapper.class, AbstractAnnotationMetadataBuilder.class.getClassLoader())
+            .disableFork().collectAll()) {
+            try {
+                String name = mapper.getPackageName();
+                if (StringUtils.isNotEmpty(name)) {
+                    ANNOTATION_REMAPPERS.computeIfAbsent(name, s -> new ArrayList<>(2)).add(mapper);
                 }
+            } catch (Throwable e) {
+                // mapper, missing dependencies, continue
             }
         }
     }

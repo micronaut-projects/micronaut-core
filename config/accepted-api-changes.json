@@ -195,6 +195,16 @@
     "reason": "New default method"
   },
   {
+    "type": "io.micronaut.core.io.service.SoftServiceLoader$ServiceCollector",
+    "member": "Class io.micronaut.core.io.service.SoftServiceLoader$ServiceCollector",
+    "reason": "New default method"
+  },
+  {
+    "type": "io.micronaut.core.io.service.SoftServiceLoader$ServiceCollector",
+    "member": "Method io.micronaut.core.io.service.SoftServiceLoader$ServiceCollector.collect(java.util.Collection,boolean)",
+    "reason": "New default method"
+  },
+  {
     "type": "io.micronaut.context.BeanDefinitionRegistry",
     "member": "Method io.micronaut.context.BeanDefinitionRegistry.registerBeanDefinition(io.micronaut.context.RuntimeBeanDefinition)",
     "reason": "new internal default method"
