@@ -8,7 +8,8 @@ dependencies {
     api project(":router")
     compileOnly libs.kotlinx.coroutines.core
     compileOnly libs.kotlinx.coroutines.reactor
-    implementation libs.managed.reactor
+    implementation(platform(libs.boms.micronaut.reactor))
+    implementation libs.project.reactor
     annotationProcessor project(":inject-java")
 
     testImplementation libs.managed.netty.codec.http

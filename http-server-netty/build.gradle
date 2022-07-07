@@ -26,7 +26,8 @@ dependencies {
     api project(":http-netty")
     api libs.managed.netty.codec.http
 
-    implementation libs.managed.reactor
+    implementation(platform(libs.boms.micronaut.reactor))
+    implementation libs.project.reactor
 
     compileOnly libs.kotlin.stdlib
     compileOnly libs.managed.netty.transport.native.unix.common

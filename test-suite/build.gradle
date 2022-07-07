@@ -87,7 +87,8 @@ dependencies {
         testImplementation libs.bcpkix
     }
 
-    testImplementation libs.managed.reactor
+    testImplementation(platform(libs.boms.micronaut.reactor))
+    testImplementation libs.project.reactor
 
     testFixturesApi libs.managed.spock
     testFixturesApi libs.managed.groovy

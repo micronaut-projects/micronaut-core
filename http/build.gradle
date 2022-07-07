@@ -8,7 +8,10 @@ dependencies {
     annotationProcessor project(":graal")
     api project(":inject")
     api project(":core-reactive")
-    implementation libs.managed.reactor
+
+    implementation(platform(libs.boms.micronaut.reactor))
+    implementation libs.project.reactor
+
     compileOnly libs.kotlinx.coroutines.core
     compileOnly libs.kotlinx.coroutines.reactor
 

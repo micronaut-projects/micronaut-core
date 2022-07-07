@@ -13,7 +13,8 @@ dependencies {
     api project(":jackson-databind")
     api libs.managed.validation
 
-    implementation libs.managed.reactor
+    implementation(platform(libs.boms.micronaut.reactor))
+    implementation libs.project.reactor
 
     compileOnly libs.managed.graal
     compileOnly libs.managed.jcache

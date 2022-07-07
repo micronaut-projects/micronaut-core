@@ -13,7 +13,8 @@ dependencies {
         exclude module:'micronaut-bom'
     }
 
-    implementation libs.managed.reactor
+    implementation(platform(libs.boms.micronaut.reactor))
+    implementation libs.project.reactor
 
     testImplementation project(":http-client")
     testImplementation project(":inject-groovy")

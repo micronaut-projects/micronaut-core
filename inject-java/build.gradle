@@ -24,7 +24,8 @@ dependencies {
     testImplementation project(":inject-test-utils")
     testImplementation project(":runtime")
 
-    testImplementation libs.managed.reactor
+    testImplementation(platform(libs.boms.micronaut.reactor))
+    testImplementation libs.project.reactor
 
     testImplementation libs.managed.spotbugs
     testImplementation libs.hibernate

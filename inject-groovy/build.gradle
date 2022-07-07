@@ -34,7 +34,8 @@ dependencies {
     testImplementation libs.managed.groovy.json
     testImplementation libs.blaze.persistence.core
 
-    testImplementation libs.managed.reactor
+    testImplementation(platform(libs.boms.micronaut.reactor))
+    testImplementation libs.project.reactor
 
     functionalTestImplementation(testFixtures(project(":test-suite")))
 }

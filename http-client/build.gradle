@@ -24,7 +24,8 @@ dependencies {
     testImplementation project(":validation")
     testImplementation project(":inject")
 
-    implementation libs.managed.reactor
+    implementation(platform(libs.boms.micronaut.reactor))
+    implementation libs.project.reactor
 
     testImplementation project(":http-server-netty")
     testImplementation libs.wiremock

@@ -103,7 +103,7 @@ managed-micronaut-picocli = "4.2.1"
 managed-micronaut-problem = "2.3.1"
 managed-micronaut-rabbitmq = "3.1.0"
 managed-micronaut-r2dbc = "3.0.0"
-managed-micronaut-reactor = "2.2.2"
+managed-micronaut-reactor = "2.3.0"
 managed-micronaut-redis = "5.2.0"
 managed-micronaut-rss = "3.0.0"
 managed-micronaut-rxjava1 = "1.0.0"
@@ -126,8 +126,6 @@ managed-neo4j-java-driver = "4.2.7"
 managed-netty = "4.1.77.Final"
 managed-reactive-pg-client = "0.11.4"
 managed-reactive-streams = "1.0.4"
-# This should be kept aligned with https://github.com/micronaut-projects/micronaut-reactor/blob/master/gradle.properties from the BOM
-managed-reactor = "3.4.18"
 managed-rxjava1 = "1.3.8"
 managed-rxjava1-interop = "0.13.7"
 managed-slf4j = "1.7.36"
@@ -322,8 +320,6 @@ managed-micronaut-xml = { module = "io.micronaut.xml:micronaut-jackson-xml", ver
 managed-reactive-pg-client = { module = "io.reactiverse:reactive-pg-client", version.ref = "managed-reactive-pg-client" }
 managed-reactive-streams = { module = "org.reactivestreams:reactive-streams", version.ref = "managed-reactive-streams" }
 
-managed-reactor = { module = "io.projectreactor:reactor-core", version.ref = "managed-reactor" }
-
 managed-rxjava1 = { module = "io.reactivex:rxjava", version.ref = "managed-rxjava1" }
 managed-rxjava1-interop = { module = "com.github.akarnokd:rxjava2-interop", version.ref = "managed-rxjava1-interop" }
 
@@ -423,6 +419,8 @@ mysql-driver = { module = "mysql:mysql-connector-java" }
 
 netty-tcnative = { module = 'io.netty:netty-tcnative' }
 netty-tcnative-boringssl = { module = 'io.netty:netty-tcnative-boringssl-static' }
+
+project-reactor = { module = "io.projectreactor:reactor-core" }
 
 selenium-remote-driver = { module = "org.seleniumhq.selenium:selenium-remote-driver", version.ref = "selenium" }
 selenium-api = { module = "org.seleniumhq.selenium:selenium-api", version.ref = "selenium" }

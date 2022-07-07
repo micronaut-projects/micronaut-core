@@ -5,7 +5,8 @@ plugins {
 dependencies {
     annotationProcessor project(":inject-java")
 
-    implementation libs.managed.reactor
+    implementation(platform(libs.boms.micronaut.reactor))
+    implementation libs.project.reactor
 
     api project(":runtime")
 

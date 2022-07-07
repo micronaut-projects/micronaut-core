@@ -8,7 +8,8 @@ dependencies {
     api project(":router")
     api project(":http-server")
 
-    testImplementation libs.managed.reactor
+    testImplementation(platform(libs.boms.micronaut.reactor))
+    testImplementation libs.project.reactor
 
     testImplementation project(":http-client")
     testImplementation project(":inject")

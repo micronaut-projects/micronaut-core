@@ -7,5 +7,6 @@ dependencies {
     api project(":function")
     api project(":http-client")
 
-    implementation libs.managed.reactor
+    implementation(platform(libs.boms.micronaut.reactor))
+    implementation libs.project.reactor
 }
