@@ -17,11 +17,13 @@ package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.order.OrderUtil;
 import io.netty.channel.Channel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -41,9 +43,15 @@ final class CompositeNettyServerCustomizer implements NettyServerCustomizer {
         this(new CopyOnWriteArrayList<>());
     }
 
-    public void add(NettyServerCustomizer customizer) {
+    public synchronized void add(NettyServerCustomizer customizer) {
         assert members instanceof CopyOnWriteArrayList : "only allow adding to root customizer";
-        members.add(customizer);
+        // do the insertion in one operation, so that concurrent readers don't see an inconsistent
+        // (unsorted) state
+        int insertionIndex = Collections.binarySearch(members, customizer, OrderUtil.COMPARATOR);
+        if (insertionIndex < 0) {
+            insertionIndex = ~insertionIndex;
+        }
+        members.add(insertionIndex, customizer);
     }
 
     @NonNull
