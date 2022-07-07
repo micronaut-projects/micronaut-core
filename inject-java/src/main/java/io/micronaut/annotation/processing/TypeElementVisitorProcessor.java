@@ -344,7 +344,9 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                 }
             }
             return true;
-        });
+        }).stream()
+            // remove duplicate classes
+            .collect(Collectors.toMap(v -> v.getClass(), v -> v)).values();
     }
 
     /**
