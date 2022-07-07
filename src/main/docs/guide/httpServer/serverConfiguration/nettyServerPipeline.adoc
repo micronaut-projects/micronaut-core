@@ -1,4 +1,4 @@
-You can customize the Netty server pipeline by writing a <<events, Bean Event Listener>> that listens for the creation of api:io.micronaut.http.server.netty.ServerNettyCustomizer.Registry[].
+You can customize the Netty server pipeline by writing a <<events, Bean Event Listener>> that listens for the creation of api:io.micronaut.http.server.netty.NettyServerCustomizer.Registry[].
 
 The api:http.netty.channel.ChannelPipelineCustomizer[] interface defines constants for the names of the various handlers Micronaut registers.
 

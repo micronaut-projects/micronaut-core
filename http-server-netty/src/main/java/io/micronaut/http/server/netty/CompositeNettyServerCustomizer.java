@@ -28,31 +28,31 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
 @Internal
-final class CompositeServerNettyCustomizer implements ServerNettyCustomizer {
-    private static final Logger LOG = LoggerFactory.getLogger(CompositeServerNettyCustomizer.class);
+final class CompositeNettyServerCustomizer implements NettyServerCustomizer {
+    private static final Logger LOG = LoggerFactory.getLogger(CompositeNettyServerCustomizer.class);
 
-    private final List<ServerNettyCustomizer> members;
+    private final List<NettyServerCustomizer> members;
 
-    private CompositeServerNettyCustomizer(List<ServerNettyCustomizer> members) {
+    private CompositeNettyServerCustomizer(List<NettyServerCustomizer> members) {
         this.members = members;
     }
 
-    public CompositeServerNettyCustomizer() {
+    public CompositeNettyServerCustomizer() {
         this(new CopyOnWriteArrayList<>());
     }
 
-    public void add(ServerNettyCustomizer customizer) {
+    public void add(NettyServerCustomizer customizer) {
         assert members instanceof CopyOnWriteArrayList : "only allow adding to root customizer";
         members.add(customizer);
     }
 
     @NonNull
     @Override
-    public ServerNettyCustomizer specializeForChannel(@NonNull Channel channel, @NonNull ChannelRole role) {
-        List<ServerNettyCustomizer> specialized = null;
+    public NettyServerCustomizer specializeForChannel(@NonNull Channel channel, @NonNull ChannelRole role) {
+        List<NettyServerCustomizer> specialized = null;
         for (int i = 0; i < this.members.size(); i++) {
-            ServerNettyCustomizer old = this.members.get(i);
-            ServerNettyCustomizer nev;
+            NettyServerCustomizer old = this.members.get(i);
+            NettyServerCustomizer nev;
             try {
                 nev = old.specializeForChannel(channel, role);
                 Objects.requireNonNull(nev, "specializeForChannel must not return null");
@@ -72,12 +72,12 @@ final class CompositeServerNettyCustomizer implements ServerNettyCustomizer {
         if (specialized == null) {
             return this;
         } else {
-            return new CompositeServerNettyCustomizer(specialized);
+            return new CompositeNettyServerCustomizer(specialized);
         }
     }
 
-    private void forEach(Consumer<ServerNettyCustomizer> consumer) {
-        for (ServerNettyCustomizer member : members) {
+    private void forEach(Consumer<NettyServerCustomizer> consumer) {
+        for (NettyServerCustomizer member : members) {
             try {
                 consumer.accept(member);
             } catch (Exception e) {
@@ -88,11 +88,11 @@ final class CompositeServerNettyCustomizer implements ServerNettyCustomizer {
 
     @Override
     public void onInitialPipelineBuilt() {
-        forEach(ServerNettyCustomizer::onInitialPipelineBuilt);
+        forEach(NettyServerCustomizer::onInitialPipelineBuilt);
     }
 
     @Override
     public void onStreamPipelineBuilt() {
-        forEach(ServerNettyCustomizer::onStreamPipelineBuilt);
+        forEach(NettyServerCustomizer::onStreamPipelineBuilt);
     }
 }

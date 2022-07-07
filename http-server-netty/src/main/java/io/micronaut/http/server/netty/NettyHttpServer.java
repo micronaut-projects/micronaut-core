@@ -139,7 +139,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     @Nullable
     private volatile List<Listener> activeListeners = null;
     private final List<NettyHttpServerConfiguration.NettyListenerConfiguration> listenerConfigurations;
-    private final CompositeServerNettyCustomizer rootCustomizer = new CompositeServerNettyCustomizer();
+    private final CompositeNettyServerCustomizer rootCustomizer = new CompositeNettyServerCustomizer();
 
     /**
      * @param serverConfiguration                     The Netty HTTP server configuration
@@ -331,7 +331,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     }
 
     @Override
-    public void register(@NonNull ServerNettyCustomizer customizer) {
+    public void register(@NonNull NettyServerCustomizer customizer) {
         Objects.requireNonNull(customizer, "customizer");
         rootCustomizer.add(customizer);
     }
@@ -729,7 +729,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         }
     }
 
-    private HttpPipelineBuilder createPipelineBuilder(ServerNettyCustomizer customizer) {
+    private HttpPipelineBuilder createPipelineBuilder(NettyServerCustomizer customizer) {
         Objects.requireNonNull(customizer, "customizer");
         return new HttpPipelineBuilder(NettyHttpServer.this, nettyEmbeddedServices, sslConfiguration, routingHandler, hostResolver, customizer);
     }
@@ -760,7 +760,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
     private class Listener extends ChannelInitializer<Channel> {
         Channel serverChannel;
-        private ServerNettyCustomizer listenerCustomizer;
+        private NettyServerCustomizer listenerCustomizer;
         NettyHttpServerConfiguration.NettyListenerConfiguration config;
 
         private volatile HttpPipelineBuilder httpPipelineBuilder;
@@ -778,7 +778,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
         void setServerChannel(Channel serverChannel) {
             this.serverChannel = serverChannel;
-            this.listenerCustomizer = rootCustomizer.specializeForChannel(serverChannel, ServerNettyCustomizer.ChannelRole.LISTENER);
+            this.listenerCustomizer = rootCustomizer.specializeForChannel(serverChannel, NettyServerCustomizer.ChannelRole.LISTENER);
             refresh();
         }
 

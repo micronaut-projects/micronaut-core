@@ -36,7 +36,7 @@ import io.netty.channel.Channel;
  * @since 3.6.0
  * @author yawkat
  */
-public interface ServerNettyCustomizer {
+public interface NettyServerCustomizer {
     /**
      * Specialize this customizer for the given channel. In the "boring" case, the customizer will
      * first be specialized for a {@link io.netty.channel.socket.ServerSocketChannel} when the
@@ -57,7 +57,7 @@ public interface ServerNettyCustomizer {
      * @return The new customizer, or {@code this} if no specialization needs to take place.
      */
     @NonNull
-    default ServerNettyCustomizer specializeForChannel(@NonNull Channel channel, @NonNull ChannelRole role) {
+    default NettyServerCustomizer specializeForChannel(@NonNull Channel channel, @NonNull ChannelRole role) {
         return this;
     }
 
@@ -94,7 +94,7 @@ public interface ServerNettyCustomizer {
          *
          * @param customizer The customizer to register.
          */
-        void register(@NonNull ServerNettyCustomizer customizer);
+        void register(@NonNull NettyServerCustomizer customizer);
     }
 
     /**

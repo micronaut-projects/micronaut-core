@@ -36,7 +36,7 @@ public interface NettyEmbeddedServer
                 WebSocketSessionRepository,
                 ChannelPipelineCustomizer,
                 RefreshEventListener,
-                ServerNettyCustomizer.Registry {
+                NettyServerCustomizer.Registry {
     /**
      * Gets the set of all ports this Netty server is bound to.
      * @return An immutable set of bound ports if the server has been started with {@link #start()} an empty set otherwise.
@@ -56,7 +56,7 @@ public interface NettyEmbeddedServer
     }
 
     @Override
-    default void register(@NonNull ServerNettyCustomizer customizer) {
+    default void register(@NonNull NettyServerCustomizer customizer) {
         throw new UnsupportedOperationException();
     }
 }

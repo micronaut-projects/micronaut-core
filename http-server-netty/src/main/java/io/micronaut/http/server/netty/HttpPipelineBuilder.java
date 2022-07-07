@@ -103,9 +103,9 @@ final class HttpPipelineBuilder {
 
     private final HttpRequestCertificateHandler requestCertificateHandler = new HttpRequestCertificateHandler();
 
-    private final ServerNettyCustomizer serverCustomizer;
+    private final NettyServerCustomizer serverCustomizer;
 
-    HttpPipelineBuilder(NettyHttpServer server, NettyEmbeddedServices embeddedServices, ServerSslConfiguration sslConfiguration, RoutingInBoundHandler routingInBoundHandler, HttpHostResolver hostResolver, ServerNettyCustomizer serverCustomizer) {
+    HttpPipelineBuilder(NettyHttpServer server, NettyEmbeddedServices embeddedServices, ServerSslConfiguration sslConfiguration, RoutingInBoundHandler routingInBoundHandler, HttpHostResolver hostResolver, NettyServerCustomizer serverCustomizer) {
         this.server = server;
         this.embeddedServices = embeddedServices;
         this.sslConfiguration = sslConfiguration;
@@ -143,13 +143,13 @@ final class HttpPipelineBuilder {
 
         private final boolean ssl;
 
-        private final ServerNettyCustomizer connectionCustomizer;
+        private final NettyServerCustomizer connectionCustomizer;
 
         ConnectionPipeline(Channel channel, boolean ssl) {
             this.channel = channel;
             this.pipeline = channel.pipeline();
             this.ssl = ssl;
-            this.connectionCustomizer = serverCustomizer.specializeForChannel(channel, ServerNettyCustomizer.ChannelRole.CONNECTION);
+            this.connectionCustomizer = serverCustomizer.specializeForChannel(channel, NettyServerCustomizer.ChannelRole.CONNECTION);
         }
 
         void insertPcapLoggingHandler(String qualifier) {

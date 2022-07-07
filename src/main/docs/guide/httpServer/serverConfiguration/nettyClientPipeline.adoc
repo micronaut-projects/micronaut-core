@@ -1,6 +1,6 @@
 You can customize the Netty client pipeline by writing a <<events, Bean Event Listener>> that listens for the creation of api:http.netty.channel.ChannelPipelineCustomizer[].
 
-Both the Netty HTTP server and client implement this interface and it lets you customize the Netty `ChannelPipeline` and add additional handlers. Use for the server is deprecated in favor of api:io.micronaut.http.server.netty.ServerNettyCustomizer[].
+Both the Netty HTTP server and client implement this interface and it lets you customize the Netty `ChannelPipeline` and add additional handlers. Use for the server is deprecated in favor of api:io.micronaut.http.server.netty.NettyServerCustomizer[].
 
 The api:http.netty.channel.ChannelPipelineCustomizer[] interface defines constants for the names of the various handlers Micronaut registers.
 

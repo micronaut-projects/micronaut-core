@@ -50,7 +50,7 @@ import spock.lang.Specification
 
 import java.nio.charset.StandardCharsets
 
-class LogbookServerNettyCustomizerSpec extends Specification {
+class LogbookNettyServerCustomizerSpec extends Specification {
     private EmbeddedChannel connectClientEmbeddedChannel(EmbeddedChannel serverEmbeddedChannel) {
         def clientEmbeddedChannel = new EmbeddedChannel()
 
