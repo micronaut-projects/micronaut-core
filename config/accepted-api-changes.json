@@ -206,7 +206,7 @@
   },
   {
     "type": "io.micronaut.http.server.netty.NettyEmbeddedServer",
-    "member": "Method io.micronaut.http.server.netty.NettyEmbeddedServer.register(io.micronaut.http.server.netty.ServerNettyCustomizer)",
+    "member": "Method io.micronaut.http.server.netty.NettyEmbeddedServer.register(io.micronaut.http.server.netty.NettyServerCustomizer)",
     "reason": "New default method"
   }
 ]
