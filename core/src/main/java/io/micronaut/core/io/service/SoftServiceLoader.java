@@ -29,6 +29,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ForkJoinPool;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -57,6 +58,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
     private Collection<ServiceDefinition<S>> servicesForIterator;
     private final Predicate<String> condition;
     private boolean allowFork = true;
+    private ForkJoinPool forkJoinPool = ForkJoinPool.commonPool();
 
     private SoftServiceLoader(Class<S> serviceType, ClassLoader classLoader) {
         this(serviceType, classLoader, (String name) -> true);
@@ -109,6 +111,11 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
 
     public SoftServiceLoader<S> disableFork() {
         allowFork = false;
+        return this;
+    }
+
+    public SoftServiceLoader<S> withForkJoinPool(ForkJoinPool forkJoinPool) {
+        this.forkJoinPool = forkJoinPool;
         return this;
     }
 
@@ -194,7 +201,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
                 throw new ServiceLoadingException(e);
             }
             return null;
-        });
+        }, forkJoinPool);
         collector.collect(values, allowFork);
     }
 
@@ -254,7 +261,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
                     } catch (NoClassDefFoundError | ClassNotFoundException e) {
                         return createService(name, null);
                     }
-                }).collect(serviceDefinitions, false);
+                }, forkJoinPool).collect(serviceDefinitions, false);
                 this.servicesForIterator = serviceDefinitions;
             }
         }
@@ -287,8 +294,16 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
     public static <S> ServiceCollector<S> newCollector(String serviceName,
                                                        Predicate<String> lineCondition,
                                                        ClassLoader classLoader,
+                                                       Function<String, S> transformer,
+                                                       ForkJoinPool forkJoinPool) {
+        return new ServiceScanner<>(classLoader, serviceName, lineCondition, transformer).new DefaultServiceCollector(forkJoinPool);
+    }
+
+    public static <S> ServiceCollector<S> newCollector(String serviceName,
+                                                       Predicate<String> lineCondition,
+                                                       ClassLoader classLoader,
                                                        Function<String, S> transformer) {
-        return new ServiceScanner<>(classLoader, serviceName, lineCondition, transformer).new DefaultServiceCollector();
+        return new ServiceScanner<>(classLoader, serviceName, lineCondition, transformer).new DefaultServiceCollector(ForkJoinPool.commonPool());
     }
 
     /**

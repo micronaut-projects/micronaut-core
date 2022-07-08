@@ -960,7 +960,12 @@ public class DefaultConversionService implements ConversionService<DefaultConver
 
         Collection<TypeConverterRegistrar> registrars = new ArrayList<>();
         ForkJoinPool forkJoinPool = new ForkJoinPool(); // Create a custom ForkJoinPool to prevent deadlock
-        SoftServiceLoader.load(TypeConverterRegistrar.class).collectAll(registrars, null, forkJoinPool);
+        SoftServiceLoader.load(TypeConverterRegistrar.class)
+            .withForkJoinPool(forkJoinPool)
+            .collectAll(registrars);
+        for (TypeConverterRegistrar registrar : registrars) {
+            registrar.register(this);
+        }
         forkJoinPool.shutdown();
     }
 
