@@ -2,6 +2,7 @@ package io.micronaut.http.netty.allocator
 
 import io.micronaut.context.ApplicationContext
 import io.netty.buffer.PooledByteBufAllocator
+import spock.lang.Ignore
 import spock.lang.Specification
 import spock.lang.Stepwise
 import spock.lang.Unroll
@@ -37,6 +38,7 @@ class DefaultAllocatorSpec extends Specification {
         'maxCachedByteBuffersPerChunk' | 20
     }
 
+    @Ignore
     void "test default allocator configured"() {
         given:
         def context = ApplicationContext.run(
