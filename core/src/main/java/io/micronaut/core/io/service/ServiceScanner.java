@@ -152,12 +152,7 @@ final class ServiceScanner<S> {
     @SuppressWarnings("java:S1948")
     final class DefaultServiceCollector extends RecursiveActionValuesCollector<S> implements SoftServiceLoader.ServiceCollector<S> {
 
-        private final ForkJoinPool forkJoinPool;
         private final List<RecursiveActionValuesCollector<S>> tasks = new ArrayList<>();
-
-        DefaultServiceCollector(ForkJoinPool forkJoinPool) {
-            this.forkJoinPool = forkJoinPool;
-        }
 
         @Override
         protected void compute() {

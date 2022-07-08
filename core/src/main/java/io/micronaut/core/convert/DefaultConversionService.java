@@ -77,7 +77,6 @@ import java.util.StringJoiner;
 import java.util.TimeZone;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ForkJoinPool;
 import java.util.function.Function;
 
 /**
@@ -959,14 +958,12 @@ public class DefaultConversionService implements ConversionService<DefaultConver
                 new MultiValuesConverterFactory.ObjectToMultiValuesConverter(this));
 
         Collection<TypeConverterRegistrar> registrars = new ArrayList<>();
-        ForkJoinPool forkJoinPool = new ForkJoinPool(); // Create a custom ForkJoinPool to prevent deadlock
         SoftServiceLoader.load(TypeConverterRegistrar.class)
-            .withForkJoinPool(forkJoinPool)
+            .disableFork()
             .collectAll(registrars);
         for (TypeConverterRegistrar registrar : registrars) {
             registrar.register(this);
         }
-        forkJoinPool.shutdown();
     }
 
     /**
