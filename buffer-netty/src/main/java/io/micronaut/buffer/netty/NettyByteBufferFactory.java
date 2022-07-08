@@ -17,11 +17,13 @@ package io.micronaut.buffer.netty;
 
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.Unpooled;
+import jakarta.annotation.PostConstruct;
 import jakarta.inject.Singleton;
 
 /**
@@ -54,6 +56,17 @@ public class NettyByteBufferFactory implements ByteBufferFactory<ByteBufAllocato
      */
     public NettyByteBufferFactory(ByteBufAllocator allocator) {
         this.allocator = allocator;
+    }
+
+    @PostConstruct
+    final void register(ConversionService<?> conversionService) {
+        conversionService.addConverter(ByteBuf.class, ByteBuffer.class, DEFAULT::wrap);
+        conversionService.addConverter(ByteBuffer.class, ByteBuf.class, byteBuffer -> {
+            if (byteBuffer instanceof NettyByteBuffer) {
+                return (ByteBuf) byteBuffer.asNativeBuffer();
+            }
+            throw new IllegalArgumentException("Unconvertible buffer type " + byteBuffer);
+        });
     }
 
     @Override
