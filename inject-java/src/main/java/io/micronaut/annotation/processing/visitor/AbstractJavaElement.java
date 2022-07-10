@@ -48,6 +48,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -65,7 +66,7 @@ import static javax.lang.model.element.Modifier.PUBLIC;
  * @author graemerocher
  * @since 1.0
  */
-public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Element, AnnotationMetadataDelegate {
+public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Element {
 
     private final Element element;
     private final JavaVisitorContext visitorContext;
@@ -93,7 +94,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
         final AnnotationValue<T> av = builder.build();
         AnnotationUtils annotationUtils = visitorContext
                 .getAnnotationUtils();
-        this.annotationMetadata = annotationUtils
+        annotationMetadata = annotationUtils
                 .newAnnotationBuilder()
                 .annotate(annotationMetadata, av);
 
@@ -107,7 +108,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
 
         AnnotationUtils annotationUtils = visitorContext
                 .getAnnotationUtils();
-        this.annotationMetadata = annotationUtils
+        annotationMetadata = annotationUtils
                 .newAnnotationBuilder()
                 .annotate(annotationMetadata, annotationValue);
 
@@ -121,7 +122,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
         try {
             AnnotationUtils annotationUtils = visitorContext
                     .getAnnotationUtils();
-            this.annotationMetadata = annotationUtils
+            annotationMetadata = annotationUtils
                     .newAnnotationBuilder()
                     .removeAnnotation(annotationMetadata, annotationType);
             return this;
@@ -137,7 +138,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
             try {
                 AnnotationUtils annotationUtils = visitorContext
                         .getAnnotationUtils();
-                this.annotationMetadata = annotationUtils
+                annotationMetadata = annotationUtils
                         .newAnnotationBuilder()
                         .removeAnnotationIf(annotationMetadata, predicate);
                 return this;
@@ -154,7 +155,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
         try {
             AnnotationUtils annotationUtils = visitorContext
                     .getAnnotationUtils();
-            this.annotationMetadata = annotationUtils
+            annotationMetadata = annotationUtils
                     .newAnnotationBuilder()
                     .removeStereotype(annotationMetadata, annotationType);
             return this;
@@ -176,7 +177,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
             final Element nativeType = (Element) owningType.getNativeType();
             declaringTypeName = resolveCanonicalName(nativeType);
         } else {
-            final Object nativeType = this.getNativeType();
+            final Object nativeType = getNativeType();
             if (nativeType instanceof TypeVariable) {
                 declaringTypeName = resolveCanonicalName(((TypeVariable) nativeType).asElement());
             } else if (nativeType instanceof Element) {
@@ -214,10 +215,16 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
 
     @Override
     public Set<ElementModifier> getModifiers() {
-        return this.element
+        return element
                 .getModifiers().stream()
                 .map(m -> ElementModifier.valueOf(m.name()))
                 .collect(Collectors.toSet());
+    }
+
+    @Override
+    public Optional<String> getDocumentation() {
+        String doc = visitorContext.getElements().getDocComment(element);
+        return Optional.ofNullable(doc != null ? doc.trim() : null);
     }
 
     @Override
