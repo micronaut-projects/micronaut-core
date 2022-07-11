@@ -96,7 +96,7 @@ public class EndpointDefaultConfiguration {
     }
 
     /**
-     * The endpoints base path. It must include a trailing '/'. Default value ({@value #DEFAULT_ENDPOINT_BASE_PATH}).
+     * The endpoints base path. It must include a leading and trailing '/'. Default value ({@value #DEFAULT_ENDPOINT_BASE_PATH}).
      * @param path The path
      */
     public void setPath(String path) {
