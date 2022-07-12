@@ -267,6 +267,9 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     @Override
     public synchronized NettyEmbeddedServer start() {
         if (!isRunning()) {
+            if (isDefault && !applicationContext.isRunning()) {
+                applicationContext.start();
+            }
             //suppress unused
             //done here to prevent a blocking service loader in the event loop
             EventLoopGroupConfiguration workerConfig = resolveWorkerConfiguration();
