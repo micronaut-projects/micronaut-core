@@ -103,6 +103,8 @@ final class ServiceLoaderFeature implements Feature {
                                     if (i > -1) {
                                         serviceName = serviceName.substring(i);
                                     }
+                                } else if (serviceName.startsWith("/")) {
+                                    serviceName = serviceName.substring(1);
                                 }
                                 if (serviceName.startsWith(path)) {
                                     servicePaths.add(serviceName);
