@@ -176,7 +176,7 @@ boms-micronaut-tracing = { module = "io.micronaut.tracing:micronaut-tracing-bom"
 boms-micronaut-views = { module = "io.micronaut.views:micronaut-views-bom", version.ref = "managed-micronaut-views" }
 boms-micronaut-r2dbc = { module = "io.micronaut.r2dbc:micronaut-r2dbc-bom", version.ref = "managed-micronaut-r2dbc" }
 boms-micronaut-flyway = { module = "io.micronaut.flyway:micronaut-flyway-bom", version.ref = "managed-micronaut-flyway" }
-boms-micronaut-test-resources = { module = "io.micronaut.testresources:micronaut-testresources-bom", version.ref = "managed-micronaut-test-resources" }
+boms-micronaut-test-resources = { module = "io.micronaut.testresources:micronaut-test-resources-bom", version.ref = "managed-micronaut-test-resources" }
 
 boms-groovy = { module = "org.codehaus.groovy:groovy-bom", version.ref = "managed-groovy" }
 boms-jackson = { module = "com.fasterxml.jackson:jackson-bom", version.ref = "managed-jackson" }
