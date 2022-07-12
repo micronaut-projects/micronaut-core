@@ -2863,6 +2863,10 @@ public class DefaultBeanContext implements InitializableBeanContext {
                                                             @NonNull BeanDefinition<T> definition,
                                                             @NonNull Argument<T> beanType,
                                                             @Nullable Qualifier<T> qualifier) {
+        if (!running.get()) {
+            throw new BeanContextException("Bean context is shutdown!");
+        }
+
         final boolean isScopedProxyDefinition = definition.hasStereotype(SCOPED_PROXY_ANN);
 
         if (qualifier != null && AnyQualifier.INSTANCE.equals(definition.getDeclaredQualifier())) {
