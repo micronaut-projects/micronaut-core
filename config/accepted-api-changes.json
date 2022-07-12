@@ -189,7 +189,7 @@
     "member": "Method io.micronaut.core.type.TypeInformation.asType()",
     "reason": "Added a default method"
   },
-  {  
+  {
     "type": "io.micronaut.core.annotation.AnnotationMetadata",
     "member": "Method io.micronaut.core.annotation.AnnotationMetadata.getAnnotationValuesByStereotype(java.lang.String)",
     "reason": "New default method"
@@ -208,5 +208,35 @@
     "type": "io.micronaut.context.BeanDefinitionRegistry",
     "member": "Method io.micronaut.context.BeanDefinitionRegistry.registerBeanDefinition(io.micronaut.context.RuntimeBeanDefinition)",
     "reason": "new internal default method"
+  },
+  {
+    "type": "io.micronaut.runtime.converters.time.$TimeConverterRegistrar$Definition$Reference",
+    "member": "Class io.micronaut.runtime.converters.time.$TimeConverterRegistrar$Definition$Reference",
+    "reason": "Not a bean anymore"
+  },
+  {
+    "type": "io.micronaut.runtime.converters.time.$TimeConverterRegistrar$Definition$Reference",
+    "member": "Field $ANNOTATION_METADATA",
+    "reason": "Not a bean anymore"
+  },
+  {
+    "type": "io.micronaut.runtime.converters.time.$TimeConverterRegistrar$Definition$Reference",
+    "member": "Method io.micronaut.runtime.converters.time.$TimeConverterRegistrar$Definition$Reference.getBeanDefinitionType()",
+    "reason": "Not a bean anymore"
+  },
+  {
+    "type": "io.micronaut.runtime.converters.time.$TimeConverterRegistrar$Definition$Reference",
+    "member": "Method io.micronaut.runtime.converters.time.$TimeConverterRegistrar$Definition$Reference.getBeanType()",
+    "reason": "Not a bean anymore"
+  },
+  {
+    "type": "io.micronaut.runtime.converters.time.$TimeConverterRegistrar$Definition$Reference",
+    "member": "Method io.micronaut.runtime.converters.time.$TimeConverterRegistrar$Definition$Reference.load()",
+    "reason": "Not a bean anymore"
+  },
+  {
+    "type": "io.micronaut.runtime.converters.time.$TimeConverterRegistrar$Definition$Reference",
+    "member": "Constructor io.micronaut.runtime.converters.time.$TimeConverterRegistrar$Definition$Reference()",
+    "reason": "Not a bean anymore"
   }
 ]
