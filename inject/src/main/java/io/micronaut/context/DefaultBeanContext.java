@@ -2863,7 +2863,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                                                             @NonNull BeanDefinition<T> definition,
                                                             @NonNull Argument<T> beanType,
                                                             @Nullable Qualifier<T> qualifier) {
-        if (!running.get()) {
+        if (!running.get() && !initializing.get()) {
             throw new BeanContextException("Bean context is shutdown!");
         }
 
