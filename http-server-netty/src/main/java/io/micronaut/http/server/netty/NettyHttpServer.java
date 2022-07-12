@@ -267,6 +267,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     @Override
     public synchronized NettyEmbeddedServer start() {
         if (!isRunning()) {
+
             if (isDefault && !applicationContext.isRunning()) {
                 applicationContext.start();
             }
