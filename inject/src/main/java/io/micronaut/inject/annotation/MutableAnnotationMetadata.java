@@ -20,7 +20,6 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.CollectionUtils;
-import org.jetbrains.annotations.NotNull;
 
 import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
@@ -50,11 +49,11 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
     }
 
     MutableAnnotationMetadata(DefaultAnnotationMetadata annotationMetadata) {
-        this(newMapOrNull(annotationMetadata.declaredAnnotations),
-                newMapOrNull(annotationMetadata.declaredStereotypes),
-                newMapOrNull(annotationMetadata.allStereotypes),
-                newMapOrNull(annotationMetadata.allAnnotations),
-                newMapOrNull(annotationMetadata.annotationsByStereotype),
+        this(cloneMapOfMapValue(annotationMetadata.declaredAnnotations),
+            cloneMapOfMapValue(annotationMetadata.declaredStereotypes),
+            cloneMapOfMapValue(annotationMetadata.allStereotypes),
+            cloneMapOfMapValue(annotationMetadata.allAnnotations),
+            cloneMapOfListValue(annotationMetadata.annotationsByStereotype),
                 annotationMetadata.hasPropertyExpressions());
     }
 
@@ -81,28 +80,23 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
     @Override
     public MutableAnnotationMetadata clone() {
         final MutableAnnotationMetadata cloned = new MutableAnnotationMetadata(
-                newMapOrNull(declaredAnnotations),
-                newMapOrNull(declaredStereotypes),
-                newMapOrNull(allStereotypes),
-                newMapOrNull(allAnnotations),
-                newMapOrNull(annotationsByStereotype),
+                cloneMapOfMapValue(declaredAnnotations),
+                cloneMapOfMapValue(declaredStereotypes),
+                cloneMapOfMapValue(allStereotypes),
+                cloneMapOfMapValue(allAnnotations),
+                cloneMapOfListValue(annotationsByStereotype),
                 hasPropertyExpressions
         );
         if (annotationDefaultValues != null) {
             cloned.annotationDefaultValues = new LinkedHashMap<>(annotationDefaultValues);
         }
+        if (repeated != null) {
+            cloned.repeated = new HashMap<>(repeated);
+        }
         return cloned;
     }
 
-    private static <K, V> Map<K, V> newMapOrNull(Map<K, V> map) {
-        if (map == null) {
-            return null;
-        } else {
-            return new HashMap<>(map);
-        }
-    }
-
-    @NotNull
+    @NonNull
     @Override
     public Map<String, Object> getDefaultValues(@NonNull String annotation) {
         Map<String, Object> values = super.getDefaultValues(annotation);

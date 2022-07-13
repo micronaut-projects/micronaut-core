@@ -2,6 +2,7 @@ package io.micronaut.http.server.netty.http2
 
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requires
+import io.micronaut.core.annotation.NonNull
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.PushCapableHttpRequest
@@ -44,7 +45,6 @@ import io.netty.handler.ssl.SupportedCipherSuiteFilter
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory
 import jakarta.inject.Inject
 import org.intellij.lang.annotations.Language
-import org.jetbrains.annotations.NotNull
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
@@ -80,7 +80,7 @@ class Http2ServerPushSpec extends Specification {
         runner.responses.any { it.content().toString(StandardCharsets.UTF_8) == 'baz' }
 
         cleanup:
-        runner.responses*.content().forEach(ByteBuf::release)
+        runner.responses.forEach(FullHttpResponse::release)
     }
 
     def 'check headers'() {
@@ -112,6 +112,9 @@ class Http2ServerPushSpec extends Specification {
                     it.get("proxy-authorization") == null &&
                     it.get("referer") == '/serverPush/automatic'
         }
+
+        cleanup:
+        runner.responses.forEach(FullHttpResponse::release)
     }
 
     def 'with push disabled'() {
@@ -124,7 +127,7 @@ class Http2ServerPushSpec extends Specification {
         runner.responses[0].content().toString(StandardCharsets.UTF_8) == 'push supported: false'
 
         cleanup:
-        runner.responses*.content().forEach(ByteBuf::release)
+        runner.responses.forEach(FullHttpResponse::release)
     }
 
     private class Runner {
@@ -153,7 +156,7 @@ class Http2ServerPushSpec extends Specification {
                     .option(ChannelOption.AUTO_READ, true)
                     .handler(new ChannelInitializer<SocketChannel>() {
                         @Override
-                        protected void initChannel(@NotNull SocketChannel ch) throws Exception {
+                        protected void initChannel(@NonNull SocketChannel ch) throws Exception {
                             def connection = new DefaultHttp2Connection(false)
                             def http2Settings = Http2Settings.defaultSettings()
                             http2Settings.pushEnabled(pushEnabled);

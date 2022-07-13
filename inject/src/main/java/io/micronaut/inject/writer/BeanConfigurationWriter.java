@@ -67,7 +67,11 @@ public class BeanConfigurationWriter extends AbstractAnnotationMetadataWriter {
             ClassWriter classWriter = generateClassBytes();
             outputStream.write(classWriter.toByteArray());
         }
-        classWriterOutputVisitor.visitServiceDescriptor(BeanConfiguration.class, configurationClassName);
+        classWriterOutputVisitor.visitServiceDescriptor(
+                BeanConfiguration.class,
+                configurationClassName,
+                getOriginatingElement()
+        );
     }
 
     private ClassWriter generateClassBytes() {

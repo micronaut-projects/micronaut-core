@@ -96,7 +96,7 @@ public final class RouteExecutor {
      * Also present in netty RoutingInBoundHandler.
      */
     private static final Pattern IGNORABLE_ERROR_MESSAGE = Pattern.compile(
-            "^.*(?:connection.*(?:reset|closed|abort|broken)|broken.*pipe).*$", Pattern.CASE_INSENSITIVE);
+            "^.*(?:connection (?:reset|closed|abort|broken)|broken pipe).*$", Pattern.CASE_INSENSITIVE);
 
     private final Router router;
     private final BeanContext beanContext;
@@ -393,9 +393,9 @@ public final class RouteExecutor {
                 }
                 HttpFilter httpFilter = filters.get(pos);
 
-                HttpRequest<?> requestForFilter = requestReference.getAndSet(request);
+                requestReference.set(request);
                 try {
-                    return Flux.from((Publisher<MutableHttpResponse<?>>) httpFilter.doFilter(requestForFilter, this))
+                    return Flux.from((Publisher<MutableHttpResponse<?>>) httpFilter.doFilter(request, this))
                             .flatMap(handleStatusException)
                             .onErrorResume(onError);
                 } catch (Throwable t) {

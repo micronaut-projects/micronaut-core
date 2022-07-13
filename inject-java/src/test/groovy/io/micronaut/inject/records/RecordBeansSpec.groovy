@@ -27,7 +27,7 @@ import io.micronaut.context.BeanContext;
 record Test(
     @Min(20) int num, 
     String name, 
-    @Primary ConversionService conversionService,
+    @Inject ConversionService conversionService,
     @Inject BeanContext beanContext) {
 }
 ''')

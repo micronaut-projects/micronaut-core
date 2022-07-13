@@ -25,13 +25,8 @@ import io.micronaut.http.ssl.ServerSslConfiguration;
 import io.micronaut.http.ssl.SslBuilder;
 import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.http.ssl.SslConfigurationException;
-import io.netty.handler.codec.http2.Http2SecurityUtil;
-import io.netty.handler.ssl.ApplicationProtocolConfig;
-import io.netty.handler.ssl.ApplicationProtocolNames;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
-import io.netty.handler.ssl.SslProvider;
-import io.netty.handler.ssl.SupportedCipherSuiteFilter;
 import io.netty.handler.ssl.util.SelfSignedCertificate;
 import jakarta.inject.Singleton;
 import org.slf4j.Logger;
@@ -93,18 +88,7 @@ public class SelfSignedSslBuilder extends SslBuilder<SslContext> implements Serv
             }
             SelfSignedCertificate ssc = new SelfSignedCertificate();
             final SslContextBuilder sslBuilder = SslContextBuilder.forServer(ssc.certificate(), ssc.privateKey());
-            final boolean isHttp2 = httpVersion == HttpVersion.HTTP_2_0;
-            if (isHttp2) {
-                SslProvider provider = SslProvider.isAlpnSupported(SslProvider.OPENSSL) ? SslProvider.OPENSSL : SslProvider.JDK;
-                sslBuilder.sslProvider(provider);
-                sslBuilder.ciphers(Http2SecurityUtil.CIPHERS, SupportedCipherSuiteFilter.INSTANCE);
-                sslBuilder.applicationProtocolConfig(new ApplicationProtocolConfig(
-                        ApplicationProtocolConfig.Protocol.ALPN,
-                        ApplicationProtocolConfig.SelectorFailureBehavior.NO_ADVERTISE,
-                        ApplicationProtocolConfig.SelectedListenerFailureBehavior.ACCEPT,
-                        ApplicationProtocolNames.HTTP_2,
-                        ApplicationProtocolNames.HTTP_1_1));
-            }
+            CertificateProvidedSslBuilder.setupSslBuilder(sslBuilder, ssl, httpVersion);
             return Optional.of(sslBuilder.build());
         } catch (CertificateException | SSLException e) {
             throw new SslConfigurationException("Encountered an error while building a self signed certificate", e);

@@ -13,16 +13,16 @@ $ mn create-app my-app --features jdbc-tomcat
 
 To get started, add a dependency for one of the JDBC configurations that corresponds to the implementation you will use. Choose one of the following:
 
-dependency:micronaut-jdbc-tomcat[groupId="io.micronaut.sql", scope="runtime"]
+dependency:micronaut-jdbc-tomcat[groupId="io.micronaut.sql", scope="runtimeOnly"]
 
-dependency:micronaut-jdbc-hikari[groupId="io.micronaut.sql",scope="runtime"]
+dependency:micronaut-jdbc-hikari[groupId="io.micronaut.sql",scope="runtimeOnly"]
 
-dependency:micronaut-jdbc-dbcp[groupId="io.micronaut.sql",scope="runtime"]
+dependency:micronaut-jdbc-dbcp[groupId="io.micronaut.sql",scope="runtimeOnly"]
 
-dependency:micronaut-jdbc-ucp[groupId="io.micronaut.sql",scope="runtime"]
+dependency:micronaut-jdbc-ucp[groupId="io.micronaut.sql",scope="runtimeOnly"]
 
 Also, add a JDBC driver dependency to your build. For example to add the https://www.h2database.com[H2 In-Memory Database]:
 
-dependency:h2[groupId="com.h2database",scope="runtime"]
+dependency:h2[groupId="com.h2database",scope="runtimeOnly"]
 
 For more information see the https://micronaut-projects.github.io/micronaut-sql/latest/guide/#jdbc[Configuring JDBC] section of the https://github.com/micronaut-projects/micronaut-sql[Micronaut SQL libraries] project.

@@ -25,4 +25,15 @@ class KotlinBeanIntrospectionSpec {
         }
 
     }
+
+    @Test
+    fun testIsProperties() {
+        val introspection = BeanIntrospection.getIntrospection(TestEntity::class.java)
+
+        assertEquals(listOf("id", "name", "getSurname", "isDeleted", "isImportant", "corrected", "upgraded", "isMyBool", "isMyBool2", "myBool3", "myBool4", "myBool5"), introspection.propertyNames.asList())
+
+        val introspection2 = BeanIntrospection.getIntrospection(TestEntity2::class.java)
+
+        assertEquals(listOf("id", "name", "getSurname", "isDeleted", "isImportant", "corrected", "upgraded", "isMyBool", "isMyBool2", "myBool3", "myBool4", "myBool5"), introspection2.propertyNames.asList())
+    }
 }

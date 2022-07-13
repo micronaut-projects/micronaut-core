@@ -1,7 +1,13 @@
+plugins {
+    id "io.micronaut.build.internal.convention-library"
+}
 
-internalSanityChecks {
-    expectedServiceCount.put('io.micronaut.inject.BeanDefinitionReference', 3)
-}           
+micronautBuild {
+    core {
+        usesMicronautTestJunit()
+        usesMicronautTestSpock()
+    }
+}
 
 dependencies {
     annotationProcessor project(":inject-java")
@@ -22,14 +28,7 @@ dependencies {
 
     testImplementation project(":http-server-netty")
     testImplementation libs.wiremock
-    testImplementation(libs.managed.micronaut.test.junit5) {
-        exclude module:'micronaut-runtime'
-        exclude module:'micronaut-inject'
-    }
-    testImplementation(libs.managed.micronaut.test.spock) {
-        exclude module:'micronaut-runtime'
-        exclude module:'micronaut-inject'
-    }
+    testImplementation libs.managed.logback
 
     if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_15)) {
         testImplementation libs.bcpkix

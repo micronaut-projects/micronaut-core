@@ -38,6 +38,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 /**
  * Default implementation of {@link AnnotationMetadata}.
@@ -1208,10 +1209,65 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     }
 
     @Override
+    public <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByStereotype(String stereotype) {
+        if (stereotype == null) {
+            return Collections.emptyList();
+        }
+        if (annotationsByStereotype != null) {
+            List<String> annotations = annotationsByStereotype.get(stereotype);
+            if (annotations != null) {
+                List<AnnotationValue<T>> result = new ArrayList<>(annotations.size());
+                for (String annotation : annotations) {
+                    String repeatableTypeName = getRepeatedName(annotation);
+                    if (repeatableTypeName == null) {
+                        repeatableTypeName = AnnotationMetadataSupport.getRepeatableAnnotation(annotation);
+                    }
+                    if (repeatableTypeName != null) {
+                        List<AnnotationValue<T>> results =
+                            resolveRepeatableAnnotations(repeatableTypeName,
+                                allAnnotations,
+                                allStereotypes
+                            );
+                        if (results != null) {
+                            result.addAll(results);
+                        }
+                    } else {
+                        result.add(getAnnotation(annotation));
+                    }
+                }
+                return Collections.unmodifiableList(result);
+            }
+        }
+        if (allAnnotations != null) {
+            return getAnnotationValuesByName(stereotype);
+        }
+        if (declaredAnnotations != null) {
+            return getDeclaredAnnotationValuesByName(stereotype);
+        }
+        return Collections.emptyList();
+    }
+
+    @Override
     public @NonNull
     Set<String> getAnnotationNames() {
         if (allAnnotations != null) {
             return allAnnotations.keySet();
+        }
+        return Collections.emptySet();
+    }
+
+    @Override
+    public Set<String> getStereotypeAnnotationNames() {
+        if (allStereotypes != null) {
+            return Collections.unmodifiableSet(allStereotypes.keySet());
+        }
+        return Collections.emptySet();
+    }
+
+    @Override
+    public Set<String> getDeclaredStereotypeAnnotationNames() {
+        if (declaredStereotypes != null) {
+            return Collections.unmodifiableSet(declaredStereotypes.keySet());
         }
         return Collections.emptySet();
     }
@@ -1381,14 +1437,56 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
 
     @Override
     public DefaultAnnotationMetadata clone() {
-        return new DefaultAnnotationMetadata(
-                declaredAnnotations != null ? new HashMap<>(declaredAnnotations) : null,
-                declaredStereotypes != null ? new HashMap<>(declaredStereotypes) : null,
-                allStereotypes != null ? new HashMap<>(allStereotypes) : null,
-                allAnnotations != null ? new HashMap<>(allAnnotations) : null,
-                annotationsByStereotype != null ? new HashMap<>(annotationsByStereotype) : null,
+        DefaultAnnotationMetadata cloned = new DefaultAnnotationMetadata(
+                cloneMapOfMapValue(declaredAnnotations),
+                cloneMapOfMapValue(declaredStereotypes),
+                cloneMapOfMapValue(allStereotypes),
+                cloneMapOfMapValue(allAnnotations),
+                cloneMapOfListValue(annotationsByStereotype),
                 hasPropertyExpressions
         );
+        if (repeated != null) {
+            cloned.repeated = new HashMap<>(repeated);
+        }
+        return cloned;
+    }
+
+    protected static <X, Y, K> Map<K, Map<X, Y>> cloneMapOfMapValue(Map<K, Map<X, Y>> toClone) {
+        if (toClone == null) {
+            return null;
+        }
+        return toClone.entrySet().stream()
+                .map(e -> new AbstractMap.SimpleEntry<>(e.getKey(), cloneMap(e.getValue())))
+                .collect(Collectors.toMap(AbstractMap.SimpleEntry::getKey, AbstractMap.SimpleEntry::getValue, (a, b) -> a, () -> {
+                    if (toClone instanceof HashMap) {
+                        return new HashMap<>();
+                    }
+                    return new LinkedHashMap<>();
+                }));
+    }
+
+    protected static <K, V> Map<K, List<V>> cloneMapOfListValue(Map<K, List<V>> toClone) {
+        if (toClone == null) {
+            return null;
+        }
+        return toClone.entrySet().stream()
+                .map(e -> new AbstractMap.SimpleEntry<>(e.getKey(), new ArrayList<>(e.getValue())))
+                .collect(Collectors.toMap(AbstractMap.SimpleEntry::getKey, AbstractMap.SimpleEntry::getValue, (a, b) -> a, () -> {
+                    if (toClone instanceof HashMap) {
+                        return new HashMap<>();
+                    }
+                    return new LinkedHashMap<>();
+                }));
+    }
+
+    protected static <K, V> Map<K, V> cloneMap(Map<K, V> map) {
+        if (map instanceof HashMap) {
+            return (Map<K, V>) ((HashMap<K, V>) map).clone();
+        }
+        if (map instanceof LinkedHashMap) {
+            return (Map<K, V>) ((LinkedHashMap<K, V>) map).clone();
+        }
+        return new HashMap<>(map);
     }
 
     /**

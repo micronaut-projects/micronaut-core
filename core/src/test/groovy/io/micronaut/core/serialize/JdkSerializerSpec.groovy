@@ -32,6 +32,15 @@ class JdkSerializerSpec extends Specification {
         foo.name == "test"
     }
 
+    void 'test serialize null'() {
+        when:
+        def bytes = ObjectSerializer.JDK.serialize(null).get()
+        Optional<Foo> foo = ObjectSerializer.JDK.deserialize(bytes, Foo)
+
+        then:
+        !foo.isPresent()
+    }
+
     static class Foo implements Serializable {
         String name
     }

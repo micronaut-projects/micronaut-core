@@ -123,6 +123,10 @@ class KotlinVisitorContext(private val environment: SymbolProcessorEnvironment,
         outputVisitor.visitServiceDescriptor(type, classname)
     }
 
+    override fun visitServiceDescriptor(type: String, classname: String, originatingElement: Element) {
+        outputVisitor.visitServiceDescriptor(type, classname, originatingElement)
+    }
+
     override fun visitMetaInfFile(path: String, vararg originatingElements: Element): Optional<GeneratedFile> {
         return outputVisitor.visitMetaInfFile(path, *originatingElements)
     }

@@ -106,7 +106,8 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
         }
         outputVisitor.visitServiceDescriptor(
                 BeanDefinitionReference.class,
-                beanDefinitionReferenceClassName
+                beanDefinitionReferenceClassName,
+                getOriginatingElement()
         );
     }
 
@@ -186,7 +187,7 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
         // 6: isConditional
         cv.push(annotationMetadata.hasStereotype(Requires.class));
         // 7: isContainerType
-        cv.push(DefaultArgument.CONTAINER_TYPES.stream().anyMatch(clazz -> clazz.getName().equals(beanTypeName)));
+        cv.push(providedType.getSort() == Type.ARRAY || DefaultArgument.CONTAINER_TYPES.stream().anyMatch(clazz -> clazz.getName().equals(beanTypeName)));
         // 8: isSingleton
         cv.push(
                 annotationMetadata.hasDeclaredStereotype(AnnotationUtil.SINGLETON) ||

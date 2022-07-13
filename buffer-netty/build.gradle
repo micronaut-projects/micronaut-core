@@ -1,7 +1,6 @@
-
-internalSanityChecks {
-    expectedServiceCount.put('io.micronaut.inject.BeanDefinitionReference', 2)
-}           
+plugins {
+    id "io.micronaut.build.internal.convention-library"
+}
 
 dependencies {
     api project(":core")

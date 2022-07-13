@@ -29,6 +29,7 @@ import io.micronaut.core.annotation.NonNull
 import io.micronaut.core.annotation.Nullable
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap
+import io.micronaut.core.graal.GraalReflectionConfigurer
 import io.micronaut.core.naming.NameUtils
 import io.micronaut.inject.BeanConfiguration
 import io.micronaut.inject.BeanDefinition
@@ -149,6 +150,20 @@ abstract class AbstractTypeElementSpec extends Specification {
     }
 
     /**
+     * Build and return a {@link GraalReflectionConfigurer} for the given class name and class data.
+     *
+     * @return the GraalReflectionConfigurer if it is correct
+     **/
+    protected GraalReflectionConfigurer buildReflectionConfigurer(String className, @Language("java") String cls) {
+        String beanDefName = (className.startsWith('$') ? '' : '$') + NameUtils.getSimpleName(className) + GraalReflectionConfigurer.CLASS_SUFFIX
+        String packageName = NameUtils.getPackageName(className)
+        String beanFullName = "${packageName}.${beanDefName}"
+
+        ClassLoader classLoader = buildClassLoader(className, cls)
+        return (GraalReflectionConfigurer)classLoader.loadClass(beanFullName).newInstance()
+    }
+
+    /**
      * @param annotationExpression the annotation expression
      * @param packages the packages to import
      * @return The metadata
@@ -190,6 +205,17 @@ class Test {
      */
     Object getBean(ApplicationContext context, String className, Qualifier qualifier = null) {
         context.getBean(context.classLoader.loadClass(className), qualifier)
+    }
+
+
+    /**
+     * Gets a bean definition from the context for the given class name
+     * @param context The context
+     * @param className The class name
+     * @return The bean instance
+     */
+    BeanDefinition<?> getBeanDefinition(ApplicationContext context, String className, Qualifier qualifier = null) {
+        context.getBeanDefinition(context.classLoader.loadClass(className), qualifier)
     }
 
     /**

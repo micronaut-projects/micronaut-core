@@ -17,6 +17,7 @@ package io.micronaut.http.server.netty.errors
 
 import groovy.json.JsonSlurper
 import io.micronaut.context.annotation.Property
+import io.micronaut.core.annotation.NonNull
 import io.micronaut.http.*
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
@@ -43,7 +44,6 @@ import io.netty.handler.codec.http.HttpClientCodec
 import io.netty.handler.codec.http.HttpObjectAggregator
 import io.netty.handler.codec.http.HttpResponseDecoder
 import jakarta.inject.Singleton
-import org.jetbrains.annotations.NotNull
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
@@ -232,13 +232,13 @@ class ErrorSpec extends AbstractMicronautSpec {
                 .channel(NioSocketChannel)
                 .handler(new ChannelInitializer<Channel>() {
                     @Override
-                    protected void initChannel(@NotNull Channel ch) throws Exception {
+                    protected void initChannel(@NonNull Channel ch) throws Exception {
                         ch.pipeline()
                                 .addLast(new HttpResponseDecoder())
                                 .addLast(new HttpObjectAggregator(8192))
                                 .addLast(new ChannelInboundHandlerAdapter() {
                                     @Override
-                                    void channelRead(@NotNull ChannelHandlerContext ctx, @NotNull Object msg) throws Exception {
+                                    void channelRead(@NonNull ChannelHandlerContext ctx, @NonNull Object msg) throws Exception {
                                         response = msg
                                     }
                                 })
@@ -262,6 +262,9 @@ X-Long-Header: $longString\r
 
         then:
         response.status().code() == 413
+
+        cleanup:
+        response.release()
     }
 
     @Controller('/errors')

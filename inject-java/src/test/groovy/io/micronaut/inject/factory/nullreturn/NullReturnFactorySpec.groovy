@@ -141,6 +141,9 @@ class Test2 {}
 
     void "test each bean on a class with null factory"() {
         given:
+        DProcessor.constructed.set(0)
+        ParameterDProcessor.constructed.set(0)
+        NullableDProcessor.constructed.set(0)
         BeanContext beanContext = ApplicationContext.run(["spec.name": getClass().simpleName])
 
         expect:

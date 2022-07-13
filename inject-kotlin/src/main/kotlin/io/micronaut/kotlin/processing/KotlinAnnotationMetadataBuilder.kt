@@ -18,6 +18,7 @@ package io.micronaut.kotlin.processing
 import com.google.devtools.ksp.closestClassDeclaration
 import com.google.devtools.ksp.getClassDeclarationByName
 import com.google.devtools.ksp.getDeclaredProperties
+import com.google.devtools.ksp.isDefault
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.symbol.*
 import io.micronaut.core.annotation.AnnotationClassValue
@@ -195,14 +196,34 @@ class KotlinAnnotationMetadataBuilder(private val annotationUtils: AnnotationUti
     }
 
     override fun readAnnotationDefaultValues(annotationMirror: KSAnnotation): MutableMap<out KSDeclaration, *> {
-        return mutableMapOf<KSDeclaration, Any>()
+        val map = mutableMapOf<KSDeclaration, Any>()
+        val declaration = annotationMirror.annotationType.resolve().declaration as KSClassDeclaration
+        val defaultArguments = annotationMirror.defaultArguments
+        declaration.getAllProperties().forEach { prop ->
+            val argument = defaultArguments.find { it.name == prop.simpleName }
+            if (argument?.value != null) {
+                map[prop] = argument.value!!
+            }
+        }
+        return map
     }
 
     override fun readAnnotationDefaultValues(
         annotationName: String,
         annotationType: KSAnnotated
     ): MutableMap<out KSDeclaration, *> {
-        return mutableMapOf<KSDeclaration, Any>()
+        val map = mutableMapOf<KSDeclaration, Any>()
+        val annotation = annotationType.annotations.find { it.shortName.asString() == annotationName }
+            ?: return mutableMapOf<KSDeclaration, Any>()
+        val declaration = annotation.annotationType.resolve().declaration as KSClassDeclaration
+        val defaultArguments = annotation.defaultArguments
+        declaration.getAllProperties().forEach { prop ->
+            val argument = defaultArguments.find { it.name == prop.simpleName }
+            if (argument?.value != null) {
+                map[prop] = argument.value!!
+            }
+        }
+        return map
     }
 
     override fun readAnnotationRawValues(annotationMirror: KSAnnotation): MutableMap<out KSDeclaration, *> {
@@ -210,7 +231,7 @@ class KotlinAnnotationMetadataBuilder(private val annotationUtils: AnnotationUti
         val declaration = annotationMirror.annotationType.resolve().declaration as KSClassDeclaration
         declaration.getAllProperties().forEach { prop ->
             val argument = annotationMirror.arguments.find { it.name == prop.simpleName }
-            if (argument?.value != null) {
+            if (argument?.value != null && !argument.isDefault()) {
                 map[prop] = argument.value!!
             }
         }

@@ -16,7 +16,6 @@
 package io.micronaut.kotlin.processing
 
 import com.google.devtools.ksp.processing.Dependencies
-import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.symbol.KSFile
 import io.micronaut.core.util.StringUtils
@@ -27,6 +26,8 @@ import io.micronaut.inject.writer.GeneratedFile
 import io.micronaut.kotlin.processing.visitor.KotlinVisitorContext
 import java.io.*
 import java.util.*
+import javax.tools.FileObject
+import javax.tools.StandardLocation
 
 class KotlinOutputVisitor(private val environment: SymbolProcessorEnvironment): ClassWriterOutputVisitor {
 
@@ -40,12 +41,24 @@ class KotlinOutputVisitor(private val environment: SymbolProcessorEnvironment): 
             "class")
     }
 
-    override fun getServiceEntries(): MutableMap<String, MutableSet<String>> = serviceDescriptors
-
     override fun visitServiceDescriptor(type: String, classname: String) {
         if (StringUtils.isNotEmpty(type) && StringUtils.isNotEmpty(classname)) {
             serviceDescriptors.computeIfAbsent(type) { s -> LinkedHashSet() }.add(classname)
         }
+    }
+
+    override fun getServiceEntries(): MutableMap<String, MutableSet<String>> = serviceDescriptors
+
+    override fun visitServiceDescriptor(type: String, classname: String, originatingElement: Element) {
+        val outputStream = environment.codeGenerator.createNewFile(
+                getNativeElements(originatingElement),
+                "META-INF/services/$type",
+                classname,
+                "")
+        outputStream.use {
+            outputStream.write(0)
+        }
+        environment.codeGenerator.associate()
     }
 
     override fun visitMetaInfFile(path: String, vararg originatingElements: Element): Optional<GeneratedFile> {
@@ -111,6 +124,14 @@ class KotlinOutputVisitor(private val environment: SymbolProcessorEnvironment): 
             if (nativeType is KSFile) {
                 originatingFiles.add(nativeType)
             }
+        }
+        return Dependencies(false, *originatingFiles.toTypedArray())
+    }
+    private fun getNativeElements(originatingElement: Element): Dependencies {
+        val originatingFiles: MutableList<KSFile> = ArrayList(1)
+        val nativeType = originatingElement.nativeType
+        if (nativeType is KSFile) {
+            originatingFiles.add(nativeType)
         }
         return Dependencies(false, *originatingFiles.toTypedArray())
     }

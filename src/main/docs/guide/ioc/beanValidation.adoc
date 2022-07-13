@@ -93,7 +93,7 @@ snippet::io.micronaut.docs.ioc.validation.custom.DurationPattern[tags="imports,c
 <2> A `message` template can be provided in a hard-coded manner as above. If none is specified, Micronaut tries to find a message using `ClassName.message` using the api:context.MessageSource[] interface (optional)
 <3> To support repeated annotations you can define an inner annotation (optional)
 
-TIP: You can add messages and message bundles using the api:context.MessageSource[] and api:context.i18n.ResourceBundleMessageSource[] classes.
+TIP: You can add messages and message bundles using the api:context.MessageSource[] and api:context.i18n.ResourceBundleMessageSource[] classes. See <<bundle, Resource Bundles>> documentation.
 
 Once you have defined the annotation, implement a api:validation.validator.constraints.ConstraintValidator[] that validates the annotation. You can either create a bean class that implements the interface directly or define a factory that returns one or more validators.
 

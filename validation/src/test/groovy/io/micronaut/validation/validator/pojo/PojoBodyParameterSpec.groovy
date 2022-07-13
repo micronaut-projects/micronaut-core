@@ -30,6 +30,8 @@ import io.micronaut.http.annotation.*
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.validation.Validated
+import javax.validation.groups.Default
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -108,6 +110,75 @@ class PojoBodyParameterSpec extends Specification {
             def e = thrown(HttpClientResponseException)
             e.status == HttpStatus.BAD_REQUEST
     }
+
+    void "should not fail on default validation group with missing nullable value"() {
+        given:
+            HttpRequest req = HttpRequest.POST("/search/extended", '{"type":"NULLABLE", "requiredVal":"xxx"}')
+
+        when:
+            def response = client.toBlocking().exchange(req)
+
+        then:
+            response.status() == HttpStatus.OK
+    }
+
+    void "should fail on on default validation group with missing requiredVal"() {
+        given:
+            HttpRequest req = HttpRequest.POST("/search/extended", '{"type":"NULLABLE", "nullableValue": "value"}')
+
+        when:
+            client.toBlocking().exchange(req)
+
+        then:
+            def e = thrown(HttpClientResponseException)
+            e.status == HttpStatus.BAD_REQUEST
+    }
+
+    void "should not fail on on default validation group with nothing missing"() {
+        given:
+            HttpRequest req = HttpRequest.POST("/search/extended", '{"type":"NULLABLE", "requiredVal":"xxx", "nullableValue": "value"}')
+
+        when:
+            def response = client.toBlocking().exchange(req)
+
+        then:
+            response.status() == HttpStatus.OK
+    }
+
+    void "should fail on custom validation group with missing nullable value"() {
+        given:
+            HttpRequest req = HttpRequest.POST("/search/extended-group", '{"type":"NULLABLE", "requiredVal":"xxx"}')
+
+        when:
+            client.toBlocking().exchange(req)
+
+        then:
+            def e = thrown(HttpClientResponseException)
+            e.status == HttpStatus.BAD_REQUEST
+    }
+
+    void "should fail on custom validation group with missing requiredVal"() {
+        given:
+            HttpRequest req = HttpRequest.POST("/search/extended-group", '{"type":"NULLABLE", "nullableValue": "value"}')
+
+        when:
+            client.toBlocking().exchange(req)
+
+        then:
+            def e = thrown(HttpClientResponseException)
+            e.status == HttpStatus.BAD_REQUEST
+    }
+
+    void "should not fail on custom validation group with nothing missing"() {
+        given:
+            HttpRequest req = HttpRequest.POST("/search/extended-group", '{"type":"NULLABLE", "requiredVal":"xxx", "nullableValue": "value"}')
+
+        when:
+            def response = client.toBlocking().exchange(req)
+
+        then:
+            response.status() == HttpStatus.OK
+    }
 }
 
 
@@ -119,7 +190,8 @@ class PojoBodyParameterSpec extends Specification {
 @Introspected
 @JsonSubTypes([
     @JsonSubTypes.Type(value = ByName.class, name = "NAME"),
-    @JsonSubTypes.Type(value = ByAge.class, name = "AGE")])
+    @JsonSubTypes.Type(value = ByAge.class, name = "AGE"),
+    @JsonSubTypes.Type(value = ByNullableValue.class, name = "NULLABLE")])
 abstract class SearchBy {
     @NotEmpty
     String requiredVal;
@@ -137,6 +209,14 @@ class ByAge extends SearchBy {
     @NotNull
     Integer age;
 }
+
+@Introspected
+class ByNullableValue extends SearchBy {
+    @NotNull(groups = TestGroup)
+    String nullableValue;
+}
+
+interface TestGroup extends Default {}
 
 @Controller("/search")
 @Requires(property = "spec.name", value = "customValidatorPOJO")
@@ -157,9 +237,14 @@ class SearchController {
         return HttpResponse.ok(search)
     }
 
+    @Post("/extended-group")
+    @Validated(groups = TestGroup)
+    HttpResponse extendedSearchWithValidationGroup(@Valid @Body SearchBy search) {
+        return HttpResponse.ok(search)
+    }
+
     @Error(exception = ConstraintViolationException.class)
     HttpResponse validationError(ConstraintViolationException ex) {
         return HttpResponse.badRequest()
     }
 }
-

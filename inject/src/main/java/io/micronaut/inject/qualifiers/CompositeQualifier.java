@@ -31,7 +31,7 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 @Internal
-class CompositeQualifier<T> implements Qualifier<T> {
+final class CompositeQualifier<T> implements Qualifier<T> {
 
     private final Qualifier[] qualifiers;
 
@@ -49,6 +49,10 @@ class CompositeQualifier<T> implements Qualifier<T> {
             reduced = qualifier.reduce(beanType, reduced);
         }
         return reduced;
+    }
+
+    public Qualifier[] getQualifiers() {
+        return qualifiers;
     }
 
     @Override
