@@ -21,3 +21,9 @@ tasks.named("shadowJar") {
     relocate "com.github.benmanes.caffeine", "io.micronaut.caffeine"
     relocate "org.objectweb.asm", "io.micronaut.asm"
 }
+
+micronautBuild {
+    binaryCompatibility {
+        enabled = false
+    }
+}
