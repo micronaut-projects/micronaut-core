@@ -89,7 +89,7 @@ public class IOUtils {
                     // try to match FileSystems.newFileSystem(URI) semantics for zipfs here.
                     // Basically ignores anything after the !/ if it exists, and uses the part
                     // before as the jar path to extract.
-                    String jarUri = uri.getSchemeSpecificPart();
+                    String jarUri = uri.getRawSchemeSpecificPart();
                     int sep = jarUri.lastIndexOf("!/");
                     if (sep != -1) {
                         jarUri = jarUri.substring(0, sep);

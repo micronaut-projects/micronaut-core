@@ -1,9 +1,11 @@
 package io.micronaut.core.io
 
+import org.junit.AssumptionViolatedException
 import spock.lang.Specification
 
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
+import java.nio.file.InvalidPathException
 import java.nio.file.Path
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
@@ -65,5 +67,37 @@ class IOUtilsSpec extends Specification {
 
         cleanup:
         Files.deleteIfExists(zipPath)
+    }
+
+    def 'weird file name'() {
+        given:
+        Path tempDir = Files.createTempDirectory("micronaut-ioutils-spec")
+        Path file
+        try {
+            file = tempDir.resolve("foo?bar.zip")
+            try (ZipOutputStream zos = new ZipOutputStream(Files.newOutputStream(file))) {
+                zos.putNextEntry(new ZipEntry("foo/bar.txt"))
+                zos.write("baz".getBytes(StandardCharsets.UTF_8))
+                zos.closeEntry()
+            }
+        } catch (Exception e) {
+            throw new AssumptionViolatedException("Failed to create file with weird name (maybe FS doesn't support " +
+                    "the name itself)", e)
+        }
+
+        def visitedOuter = []
+
+        when:
+        IOUtils.eachFile(URI.create('jar:' + file.toUri()), 'foo', entry -> {
+            visitedOuter.add(entry.getFileName().toString())
+        })
+        then:
+        visitedOuter == ['bar.txt']
+
+        cleanup:
+        if (file != null) {
+            Files.deleteIfExists(file)
+        }
+        Files.deleteIfExists(tempDir)
     }
 }
