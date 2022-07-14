@@ -90,9 +90,9 @@ public class IOUtils {
                     // Basically ignores anything after the !/ if it exists, and uses the part
                     // before as the jar path to extract.
                     String jarUri = uri.getSchemeSpecificPart();
-                    int sep = jarUri.lastIndexOf("!/");
+                    int sep = jarUri.toLowerCase().lastIndexOf(".jar!/");
                     if (sep != -1) {
-                        jarUri = jarUri.substring(0, sep);
+                        jarUri = jarUri.substring(0, sep+4);
                     }
                     // now, add the !/ at the end again so that loadNestedJarUri can handle it:
                     jarUri += "!/";
