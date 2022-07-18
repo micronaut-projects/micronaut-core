@@ -1,11 +1,10 @@
 package io.micronaut.core.io
 
-import org.junit.AssumptionViolatedException
+import org.opentest4j.TestAbortedException
 import spock.lang.Specification
 
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
-import java.nio.file.InvalidPathException
 import java.nio.file.Path
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
@@ -81,7 +80,7 @@ class IOUtilsSpec extends Specification {
                 zos.closeEntry()
             }
         } catch (Exception e) {
-            throw new AssumptionViolatedException("Failed to create file with weird name (maybe FS doesn't support " +
+            throw new TestAbortedException("Failed to create file with weird name (maybe FS doesn't support " +
                     "the name itself)", e)
         }
 
