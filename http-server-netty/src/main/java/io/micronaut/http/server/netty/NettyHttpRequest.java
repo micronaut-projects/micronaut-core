@@ -371,7 +371,6 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     public void release() {
         destroyed = true;
         Consumer<Object> releaseIfNecessary = this::releaseIfNecessary;
-        getBody().ifPresent(releaseIfNecessary);
         receivedContent.forEach(releaseIfNecessary);
         receivedData.values().forEach(releaseIfNecessary);
         releaseIfNecessary(bodyUnwrapped);
