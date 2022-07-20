@@ -26,6 +26,8 @@ import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.multipart.*;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
+import reactor.core.publisher.Operators;
+import reactor.util.context.Context;
 
 import java.io.IOException;
 import java.nio.charset.Charset;
@@ -136,77 +138,85 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
             message.release();
             return;
         }
+        try {
+            Subscriber<? super HttpData> subscriber = getSubscriber();
 
-        Subscriber<? super HttpData> subscriber = getSubscriber();
+            if (message instanceof HttpContent) {
+                HttpContent httpContent = (HttpContent) message;
+                List<InterfaceHttpData> messages = new ArrayList<>(1);
 
-        if (message instanceof HttpContent) {
-            HttpContent httpContent = (HttpContent) message;
-            List<InterfaceHttpData> messages = new ArrayList<>(1);
+                try {
+                    InterfaceHttpPostRequestDecoder postRequestDecoder = this.decoder;
+                    postRequestDecoder.offer(httpContent);
 
-            try {
-                InterfaceHttpPostRequestDecoder postRequestDecoder = this.decoder;
-                postRequestDecoder.offer(httpContent);
-
-                while (postRequestDecoder.hasNext()) {
-                    InterfaceHttpData data = postRequestDecoder.next();
-                    data.touch();
-                    switch (data.getHttpDataType()) {
-                        case Attribute:
-                            Attribute attribute = (Attribute) data;
-                            // bodyListHttpData keeps a copy and releases it later
-                            messages.add(attribute.retain());
-                            postRequestDecoder.removeHttpDataFromClean(attribute);
-                            break;
-                        case FileUpload:
-                            FileUpload fileUpload = (FileUpload) data;
-                            if (fileUpload.isCompleted()) {
+                    while (postRequestDecoder.hasNext()) {
+                        InterfaceHttpData data = postRequestDecoder.next();
+                        data.touch();
+                        switch (data.getHttpDataType()) {
+                            case Attribute:
+                                Attribute attribute = (Attribute) data;
                                 // bodyListHttpData keeps a copy and releases it later
-                                messages.add(fileUpload.retain());
-                                postRequestDecoder.removeHttpDataFromClean(fileUpload);
-                            }
-                            break;
-                        default:
-                            // no-op
+                                messages.add(attribute.retain());
+                                postRequestDecoder.removeHttpDataFromClean(attribute);
+                                break;
+                            case FileUpload:
+                                FileUpload fileUpload = (FileUpload) data;
+                                if (fileUpload.isCompleted()) {
+                                    // bodyListHttpData keeps a copy and releases it later
+                                    messages.add(fileUpload.retain());
+                                    postRequestDecoder.removeHttpDataFromClean(fileUpload);
+                                }
+                                break;
+                            default:
+                                // no-op
+                        }
                     }
-                }
 
-                InterfaceHttpData currentPartialHttpData = postRequestDecoder.currentPartialHttpData();
-                if (currentPartialHttpData instanceof HttpData) {
-                    // can't give away ownership of this data yet, so retain it
-                    messages.add(currentPartialHttpData.retain());
-                }
-
-            } catch (HttpPostRequestDecoder.EndOfDataDecoderException e) {
-                // ok, ignore
-            } catch (HttpPostRequestDecoder.ErrorDataDecoderException e) {
-                Throwable cause = e.getCause();
-                if (cause instanceof IOException && cause.getMessage().equals("Size exceed allowed maximum capacity")) {
-                    String partName = decoder.currentPartialHttpData().getName();
-                    try {
-                        onError(new ContentLengthExceededException("The part named [" + partName + "] exceeds the maximum allowed content length [" + partMaxSize + "]"));
-                    } finally {
-                        parentSubscription.cancel();
+                    InterfaceHttpData currentPartialHttpData = postRequestDecoder.currentPartialHttpData();
+                    if (currentPartialHttpData instanceof HttpData) {
+                        // can't give away ownership of this data yet, so retain it
+                        messages.add(currentPartialHttpData.retain());
                     }
-                } else {
+
+                } catch (HttpPostRequestDecoder.EndOfDataDecoderException e) {
+                    // ok, ignore
+                } catch (HttpPostRequestDecoder.ErrorDataDecoderException e) {
+                    Throwable cause = e.getCause();
+                    if (cause instanceof IOException && cause.getMessage().equals("Size exceed allowed maximum capacity")) {
+                        String partName = decoder.currentPartialHttpData().getName();
+                        try {
+                            onError(new ContentLengthExceededException("The part named [" + partName + "] exceeds the maximum allowed content length [" + partMaxSize + "]"));
+                        } finally {
+                            parentSubscription.cancel();
+                        }
+                    } else {
+                        onError(e);
+                    }
+                } catch (Throwable e) {
                     onError(e);
-                }
-            } catch (Throwable e) {
-                onError(e);
-            } finally {
-                if (messages.isEmpty()) {
-                    subscription.request(1);
-                } else {
-                    extraMessages.updateAndGet(p -> p + messages.size() - 1);
-                    messages.stream().map(HttpData.class::cast).forEach(subscriber::onNext);
-                }
+                } finally {
+                    if (messages.isEmpty()) {
+                        subscription.request(1);
+                    } else {
+                        extraMessages.updateAndGet(p -> p + messages.size() - 1);
+                        messages.stream().map(HttpData.class::cast).forEach(data -> {
+                            try {
+                                subscriber.onNext(data);
+                            } catch (Throwable e) {
+                                subscriber.onError(Operators.onOperatorError(subscription, e, data, Context.empty()));
+                            }
+                        });
+                    }
 
-                httpContent.release();
+                    httpContent.release();
+                }
+            } else {
+                message.release();
             }
-        } else {
-            message.release();
+        } finally {
+            inFlight = false;
+            destroyIfRequested();
         }
-        inFlight = false;
-        destroyIfRequested();
     }
 
     @Override
