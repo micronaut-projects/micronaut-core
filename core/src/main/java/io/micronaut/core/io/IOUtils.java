@@ -136,6 +136,11 @@ public class IOUtils {
             return Paths.get(URI.create(jarUri));
         }
         Path jarPath = loadNestedJarUri(toClose, jarUri.substring(0, sep));
+        if (Files.isDirectory(jarPath)) {
+            // spring boot creates weird jar URLs, like 'jar:file:/xyz.jar!/BOOT-INF/classes!/abc'
+            // This check makes our class loading resilient to that
+            return jarPath;
+        }
         FileSystem zipfs;
         try {
             // can't use newFileSystem(Path) here (without CL) because it doesn't exist on java 8

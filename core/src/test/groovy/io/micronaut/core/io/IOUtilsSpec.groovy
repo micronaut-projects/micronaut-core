@@ -1,6 +1,7 @@
 package io.micronaut.core.io
 
 import org.opentest4j.TestAbortedException
+import spock.lang.Issue
 import spock.lang.Specification
 
 import java.nio.charset.StandardCharsets
@@ -98,5 +99,31 @@ class IOUtilsSpec extends Specification {
             Files.deleteIfExists(file)
         }
         Files.deleteIfExists(tempDir)
+    }
+
+    @Issue('https://github.com/grails/grails-core/issues/12625/')
+    def 'dir inside jar'() {
+        given:
+        Path zipPath = Files.createTempFile("micronaut-ioutils-spec", ".zip")
+        try (ZipOutputStream outer = new ZipOutputStream(Files.newOutputStream(zipPath))) {
+            outer.putNextEntry(new ZipEntry("foo/bar/baz/test.txt"))
+            outer.write("bla".getBytes(StandardCharsets.UTF_8))
+            outer.closeEntry()
+        }
+
+        def visitedInner = []
+        def textInner = []
+
+        when:
+        IOUtils.eachFile(URI.create('jar:' + zipPath.toUri() + '!/foo/bar!/xyz'), 'baz', entry -> {
+            visitedInner.add(entry.getFileName().toString())
+            textInner = Files.readAllLines(entry)
+        })
+        then:
+        visitedInner == ['test.txt']
+        textInner == ['bla']
+
+        cleanup:
+        Files.deleteIfExists(zipPath)
     }
 }
