@@ -604,20 +604,26 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
          * Gets the {@code SETTINGS_ENABLE_PUSH} value. If unavailable, returns {@code null}.
          *
          * @return The {@code SETTINGS_ENABLE_PUSH} value. If unavailable, returns {@code null}.
+         * @deprecated The {@code SETTINGS_ENABLE_PUSH} setting makes no sense when sent by the
+         * server, and clients must reject any setting except {@code false} (the default) according
+         * to the spec.
          */
+        @Deprecated
         public Boolean getPushEnabled() {
             return settings.pushEnabled();
         }
 
         /**
-         * Sets the {@code SETTINGS_ENABLE_PUSH} value.
+         * Does nothing.
          *
          * @param enabled The {@code SETTINGS_ENABLE_PUSH} value.
+         * @deprecated The {@code SETTINGS_ENABLE_PUSH} setting makes no sense when sent by the
+         * server, and clients must reject any setting except {@code false} (the default) according
+         * to the spec. Netty will refuse to write this setting altogether. To prevent this, this
+         * setter now does nothing and will be removed in a future release.
          */
+        @Deprecated
         public void setPushEnabled(Boolean enabled) {
-            if (enabled != null) {
-                settings.pushEnabled(enabled);
-            }
         }
 
         /**
