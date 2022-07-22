@@ -683,10 +683,19 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 protected void doOnNext(Object message) {
                     try {
                         doOnNext0(message);
-                    } finally {
-                        // the upstream processor gives us ownership of the message, so we need to release it.
-                        ReferenceCountUtil.release(message);
+
+                        // now, a pseudo try-finally with addSuppressed.
+                    } catch (Throwable t) {
+                        try {
+                            ReferenceCountUtil.release(message);
+                        } catch (Throwable u) {
+                            t.addSuppressed(u);
+                        }
+                        throw t;
                     }
+
+                    // the upstream processor gives us ownership of the message, so we need to release it.
+                    ReferenceCountUtil.release(message);
                 }
 
                 private void doOnNext0(Object message) {
@@ -878,16 +887,18 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 @Override
                 protected void doOnError(Throwable t) {
                     s.cancel();
-                    // discard parameters that have already been bound
-                    for (Object toDiscard : routeMatch.getVariableValues().values()) {
-                        if (toDiscard instanceof ReferenceCounted) {
-                            ((ReferenceCounted) toDiscard).release();
-                        }
-                        if (toDiscard instanceof io.netty.util.ReferenceCounted) {
-                            ((io.netty.util.ReferenceCounted) toDiscard).release();
-                        }
-                        if (toDiscard instanceof NettyCompletedFileUpload) {
-                            ((NettyCompletedFileUpload) toDiscard).discard();
+                    if (executed.compareAndSet(false, true)) {
+                        // discard parameters that have already been bound
+                        for (Object toDiscard : routeMatch.getVariableValues().values()) {
+                            if (toDiscard instanceof ReferenceCounted) {
+                                ((ReferenceCounted) toDiscard).release();
+                            }
+                            if (toDiscard instanceof io.netty.util.ReferenceCounted) {
+                                ((io.netty.util.ReferenceCounted) toDiscard).release();
+                            }
+                            if (toDiscard instanceof NettyCompletedFileUpload) {
+                                ((NettyCompletedFileUpload) toDiscard).discard();
+                            }
                         }
                     }
                     for (Sinks.Many<Object> subject : downstreamSubscribers) {
