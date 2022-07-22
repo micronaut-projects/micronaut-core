@@ -44,7 +44,7 @@ managed-google-function-invoker = "1.0.0"
 managed-gorm = "7.3.1"
 managed-gorm-hibernate = "7.2.2"
 # be sure to update graal version in gradle.properties as well
-# Intentionally pin to 22.0.0.2 see https://github.com/micronaut-projects/micronaut-kafka/pull/564 and https://github.com/micronaut-projects/micronaut-core/pull/7663 
+# Intentionally pin to 22.0.0.2 see https://github.com/micronaut-projects/micronaut-kafka/pull/564 and https://github.com/micronaut-projects/micronaut-core/pull/7663
 managed-graal-sdk = "22.0.0.2"
 managed-graal = "22.1.0"
 managed-graal-svm = "22.0.0.2"
@@ -134,6 +134,8 @@ managed-rxjava1-interop = "0.13.7"
 managed-slf4j = "1.7.36"
 managed-spock = "2.0-groovy-3.0"
 managed-spotbugs = "4.7.0"
+managed-spring = "5.3.20"
+managed-springboot = "2.7.0"
 managed-swagger = "2.2.1"
 managed-validation = "2.0.1.Final"
 managed-testcontainers = "1.17.2"
@@ -328,6 +330,8 @@ managed-snakeyaml = { module = "org.yaml:snakeyaml", version.ref = "managed-snak
 
 managed-spock = { module = "org.spockframework:spock-core", version.ref = "managed-spock" }
 managed-spotbugs = { module = "com.github.spotbugs:spotbugs-annotations", version.ref = "managed-spotbugs" }
+
+managed-spring = { module = "org.springframework:spring-core", version.ref = "managed-spring" }
 
 managed-swagger = { module = "io.swagger.core.v3:swagger-core", version.ref = "managed-swagger" }
 managed-swagger-models = { module = "io.swagger.core.v3:swagger-models", version.ref = "managed-swagger" }
