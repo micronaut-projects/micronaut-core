@@ -65,6 +65,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.Order;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.DefaultConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
@@ -333,6 +334,8 @@ public class DefaultBeanContext implements InitializableBeanContext {
         if (!isRunning()) {
 
             if (initializing.compareAndSet(false, true)) {
+                // Reset possibly modified shared context
+                ((DefaultConversionService) ConversionService.SHARED).reset();
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Starting BeanContext");
                 }
@@ -419,7 +422,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
             beanCreationEventListeners = null;
             beanPreDestroyEventListeners = null;
             beanDestroyedEventListeners = null;
-
+            ((DefaultConversionService) ConversionService.SHARED).reset();
             terminating.set(false);
             running.set(false);
         }
