@@ -1,5 +1,6 @@
 package io.micronaut.core.io
 
+import org.opentest4j.TestAbortedException
 import spock.lang.Issue
 import spock.lang.Specification
 
@@ -66,6 +67,38 @@ class IOUtilsSpec extends Specification {
 
         cleanup:
         Files.deleteIfExists(zipPath)
+    }
+
+    def 'weird file name'() {
+        given:
+        Path tempDir = Files.createTempDirectory("micronaut-ioutils-spec")
+        Path file
+        try {
+            file = tempDir.resolve("foo?bar.zip")
+            try (ZipOutputStream zos = new ZipOutputStream(Files.newOutputStream(file))) {
+                zos.putNextEntry(new ZipEntry("foo/bar.txt"))
+                zos.write("baz".getBytes(StandardCharsets.UTF_8))
+                zos.closeEntry()
+            }
+        } catch (Exception e) {
+            throw new TestAbortedException("Failed to create file with weird name (maybe FS doesn't support " +
+                    "the name itself)", e)
+        }
+
+        def visitedOuter = []
+
+        when:
+        IOUtils.eachFile(URI.create('jar:' + file.toUri()), 'foo', entry -> {
+            visitedOuter.add(entry.getFileName().toString())
+        })
+        then:
+        visitedOuter == ['bar.txt']
+
+        cleanup:
+        if (file != null) {
+            Files.deleteIfExists(file)
+        }
+        Files.deleteIfExists(tempDir)
     }
 
     @Issue('https://github.com/grails/grails-core/issues/12625/')
