@@ -18,6 +18,7 @@ package io.micronaut.http.server.netty;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.exceptions.ContentLengthExceededException;
+import io.micronaut.http.netty.MicronautHttpDataFactory;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.netty.buffer.ByteBufHolder;
@@ -72,13 +73,13 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
         super(nettyHttpRequest, configuration);
         Charset characterEncoding = nettyHttpRequest.getCharacterEncoding();
         HttpServerConfiguration.MultipartConfiguration multipart = configuration.getMultipart();
-        DefaultHttpDataFactory factory;
+        HttpDataFactory factory;
         if (multipart.isDisk()) {
-            factory = new DefaultHttpDataFactory(true, characterEncoding);
+            factory = new MicronautHttpDataFactory(true, characterEncoding);
         } else if (multipart.isMixed()) {
-            factory = new DefaultHttpDataFactory(multipart.getThreshold(), characterEncoding);
+            factory = new MicronautHttpDataFactory(multipart.getThreshold(), characterEncoding);
         } else {
-            factory = new DefaultHttpDataFactory(false, characterEncoding);
+            factory = new MicronautHttpDataFactory(false, characterEncoding);
         }
         factory.setMaxLimit(multipart.getMaxFileSize());
         final HttpRequest nativeRequest = nettyHttpRequest.getNativeRequest();
