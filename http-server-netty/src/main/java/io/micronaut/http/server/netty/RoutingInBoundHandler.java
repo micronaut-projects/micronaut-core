@@ -76,6 +76,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.buffer.ByteBufOutputStream;
 import io.netty.buffer.Unpooled;
+import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandler.Sharable;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
@@ -1204,6 +1205,31 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         boolean decodeError = request instanceof NettyHttpRequest &&
                 ((NettyHttpRequest<?>) request).getNativeRequest().decoderResult().isFailure();
 
+        GenericFutureListener<Future<? super Void>> requestCompletor = future -> {
+            try {
+                if (!future.isSuccess()) {
+                    final Throwable throwable = future.cause();
+                    if (!(throwable instanceof ClosedChannelException)) {
+                        if (throwable instanceof Http2Exception.StreamException) {
+                            Http2Exception.StreamException se = (Http2Exception.StreamException) throwable;
+                            if (se.error() == Http2Error.STREAM_CLOSED) {
+                                // ignore
+                                return;
+                            }
+                        }
+                        if (LOG.isErrorEnabled()) {
+                            LOG.error("Error writing final response: " + throwable.getMessage(), throwable);
+                        }
+                    }
+                }
+            } finally {
+                if (request instanceof NettyHttpRequest) {
+                    cleanupRequest(context, (NettyHttpRequest<?>) request);
+                }
+                context.read();
+            }
+        };
+
         final Object body = message.body();
         if (body instanceof NettyCustomizableResponseTypeHandlerInvoker) {
             // default Connection header if not set explicitly
@@ -1218,7 +1244,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             }
             NettyCustomizableResponseTypeHandlerInvoker handler = (NettyCustomizableResponseTypeHandlerInvoker) body;
             message.body(null);
-            handler.invoke(request, message, context);
+            handler.invoke(request, message, context).addListener(requestCompletor);
         } else {
             io.netty.handler.codec.http.HttpResponse nettyResponse = NettyHttpResponseBuilder.toHttpResponse(message);
             io.netty.handler.codec.http.HttpHeaders nettyHeaders = nettyResponse.headers();
@@ -1247,28 +1273,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             }
             io.netty.handler.codec.http.HttpRequest nativeRequest = nettyHttpRequest.getNativeRequest();
 
-            GenericFutureListener<Future<? super Void>> requestCompletor = future -> {
-                try {
-                    if (!future.isSuccess()) {
-                        final Throwable throwable = future.cause();
-                        if (!(throwable instanceof ClosedChannelException)) {
-                            if (throwable instanceof Http2Exception.StreamException) {
-                                Http2Exception.StreamException se = (Http2Exception.StreamException) throwable;
-                                if (se.error() == Http2Error.STREAM_CLOSED) {
-                                    // ignore
-                                    return;
-                                }
-                            }
-                            if (LOG.isErrorEnabled()) {
-                                LOG.error("Error writing final response: " + throwable.getMessage(), throwable);
-                            }
-                        }
-                    }
-                } finally {
-                    cleanupRequest(context, nettyHttpRequest);
-                    context.read();
-                }
-            };
             if (nativeRequest instanceof StreamedHttpRequest && !((StreamedHttpRequest) nativeRequest).isConsumed()) {
                 StreamedHttpRequest streamedHttpRequest = (StreamedHttpRequest) nativeRequest;
                 // We have to clear the buffer of FlowControlHandler before writing the response
@@ -1470,8 +1474,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         }
 
         @SuppressWarnings("unchecked")
-        void invoke(HttpRequest<?> request, MutableHttpResponse response, ChannelHandlerContext channelHandlerContext) {
-            this.handler.handle(body, request, response, channelHandlerContext);
+        ChannelFuture invoke(HttpRequest<?> request, MutableHttpResponse response, ChannelHandlerContext channelHandlerContext) {
+            return this.handler.handle(body, request, response, channelHandlerContext);
         }
     }
 }
