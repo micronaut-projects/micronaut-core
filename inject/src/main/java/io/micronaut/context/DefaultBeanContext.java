@@ -2985,10 +2985,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                     @NonNull
                     @Override
                     public CreatedBean<T> create() throws BeanCreationException {
-                        if (resolutionContext == null) {
-                            return createRegistration(null, beanType, qualifier, definition, true);
-                        }
-                        return createRegistration(resolutionContext.copy(), beanType, qualifier, definition, true);
+                        return createRegistration(resolutionContext == null ? null : resolutionContext.copy(), beanType, qualifier, definition, true);
                     }
                 }
         );
