@@ -639,7 +639,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             this.beanTypeElement = beanElementBuilder.getBeanType();
             this.packageName = this.beanTypeElement.getPackageName();
             this.isInterface = this.beanTypeElement.isInterface();
-            this.isAbstract = this.beanTypeElement.isAbstract();
+            this.isAbstract = beanElementBuilder.getProducingElement() instanceof ClassElement && this.beanTypeElement.isAbstract();
             this.beanFullClassName = this.beanTypeElement.getName();
             this.beanSimpleClassName = this.beanTypeElement.getSimpleName();
             if (uniqueIdentifier == null) {
