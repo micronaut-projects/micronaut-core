@@ -53,10 +53,10 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
     /**
      * <p>Perform an HTTP request for the given request object emitting the full HTTP response from returned
      * {@link Publisher} and converting the response body to the specified type.</p>
-     * <p>
+     *
      * <p>This method will send a {@code Content-Length} header and except a content length header the response and is
      * designed for simple non-streaming exchanges of data</p>
-     * <p>
+     *
      * <p>By default the exchange {@code Content-Type} is application/json, unless otherwise specified in the passed
      * {@link HttpRequest}</p>
      *
@@ -73,10 +73,10 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
     /**
      * <p>Perform an HTTP request for the given request object emitting the full HTTP response from returned
      * {@link Publisher} and converting the response body to the specified type.</p>
-     * <p>
+     *
      * <p>This method will send a {@code Content-Length} header and except a content length header the response and is
      * designed for simple non-streaming exchanges of data</p>
-     * <p>
+     *
      * <p>By default the exchange {@code Content-Type} is application/json, unless otherwise specified in the passed
      * {@link HttpRequest}</p>
      *

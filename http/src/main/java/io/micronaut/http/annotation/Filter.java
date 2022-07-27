@@ -30,7 +30,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 /**
  * <p>An annotation that can be applied to classes that implement {@link io.micronaut.http.filter.HttpFilter} to
  * specify the patterns.</p>
- * <p>
+ *
  * <p>Used as an alternative to applying filters manually via the {code Router} API</p>
  *
  * @author Graeme Rocher

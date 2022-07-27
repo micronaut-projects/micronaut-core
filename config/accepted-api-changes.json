@@ -1,4 +1,5 @@
 [
+
   {
     "type": "io.micronaut.ast.groovy.visitor.AbstractGroovyElement",
     "member": "Class io.micronaut.ast.groovy.visitor.AbstractGroovyElement",
@@ -14,6 +15,26 @@
     "member": "Class io.micronaut.scheduling.TaskScheduler",
     "reason": "Added default methods"
   },
+  {
+      "type": "io.micronaut.inject.ast.EnumElement",
+      "member": "Class io.micronaut.inject.ast.EnumElement",
+      "reason": "Added EnumConstantElement. Added EnumElement.elements() method to collect enum constant elements"
+  },
+  {
+      "type": "io.micronaut.inject.ast.EnumElement",
+      "member": "Method io.micronaut.inject.ast.EnumElement.elements()",
+      "reason": "Added EnumConstantElement. Added EnumElement.elements() method to collect enum constant elements"
+  },
+  {
+      "type": "io.micronaut.inject.visitor.TypeElementVisitor",
+      "member": "Class io.micronaut.inject.visitor.TypeElementVisitor",
+      "reason": "Added EnumConstantElement. Added EnumElement.elements() method to collect enum constant elements"
+  },
+  {
+      "type": "io.micronaut.inject.visitor.TypeElementVisitor",
+      "member": "Method io.micronaut.inject.visitor.TypeElementVisitor.visitEnumConstant(io.micronaut.inject.ast.EnumConstantElement,io.micronaut.inject.visitor.VisitorContext)",
+      "reason": "Added EnumConstantElement. Added EnumElement.elements() method to collect enum constant elements"
+  },  
   {
     "type": "io.micronaut.scheduling.TaskScheduler",
     "member": "Method io.micronaut.scheduling.TaskScheduler.schedule(java.lang.String,java.lang.String,java.lang.Runnable)",

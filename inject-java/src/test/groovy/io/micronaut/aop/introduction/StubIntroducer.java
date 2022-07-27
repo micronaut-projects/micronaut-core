@@ -28,7 +28,7 @@ import java.util.Iterator;
  * @since 1.0
  */
 @Singleton
-public class StubIntroducer implements MethodInterceptor<Object,Object> {
+public class StubIntroducer implements MethodInterceptor<Object, Object> {
 
     public static final int POSITION = 0;
 

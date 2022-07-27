@@ -92,7 +92,7 @@ public class RouteVersionFilter implements VersionRouteMatchFilter {
      *
      * @param request HTTP Request
      * @param version The version resolved evaluating the HTTP Request with beans of type {@link RequestVersionResolver}
-     * @return <code>true</code> if no version was resolved from the request
+     * @return {@code true} if no version was resolved from the request
      */
     protected boolean matchIfRouteIsNotVersioned(@NonNull HttpRequest<?> request,
                                                  @Nullable String version) {
@@ -114,7 +114,7 @@ public class RouteVersionFilter implements VersionRouteMatchFilter {
      * @param request HTTP Request
      * @param resolvedVersion The version resolved evaluating the HTTP Request with beans of type {@link RequestVersionResolver} and the {@link RoutesVersioningConfiguration#getDefaultVersion()}.
      * @param routeVersion The route's version. For example, it could specified by the {@link Version} annotation.
-     * @return <code>true</code> if the resolved version matches the route version or if the resolved version is <code>null</code>
+     * @return {@code true} if the resolved version matches the route version or if the resolved version is {@code null}
      */
     protected boolean matchIfRouteIsVersioned(@NonNull HttpRequest<?> request,
                                               @Nullable String resolvedVersion,

@@ -46,7 +46,7 @@ public interface SessionStore<S extends Session> {
      * Delete a session for the given ID.
      *
      * @param id The ID of the session
-     * @return A future that outputs <tt>true</tt> if the session was successfully deleted
+     * @return A future that outputs {@code true} if the session was successfully deleted
      */
     CompletableFuture<Boolean> deleteSession(String id);
 

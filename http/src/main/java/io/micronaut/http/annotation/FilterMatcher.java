@@ -28,21 +28,21 @@ import java.lang.annotation.*;
  * <pre>{@code
  * Example:
  *
- * @FilterMatcher
+ * {@literal @}FilterMatcher
  * public @interface Metered {
  *     ...
  * }
  *
- * @Metered
+ * {@literal @}Metered
  * public class MeteredHttpFilter implements HttpClientFilter {
  *     ....
  * }
  *
- * @Metered
+ * {@literal @}Metered
  * private HttpClient httpClient;
  * }</pre>
  *
- * In the example above only clients annotated with {@code @Metered} annotations are going to be filtered by MeteredHttpFilter
+ * In the example above only clients annotated with {@code {@literal @}Metered} annotations are going to be filtered by MeteredHttpFilter
  *
  * @author svishnyakoff
  * @author James Kleeh

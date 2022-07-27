@@ -278,14 +278,14 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
-     * @return Whether throwing an exception upon HTTP error status (>= 400) is preferred.
+     * @return Whether throwing an exception upon HTTP error status (&gt;= 400) is preferred.
      */
     public boolean isExceptionOnErrorStatus() {
         return exceptionOnErrorStatus;
     }
 
     /**
-     * Sets whether throwing an exception upon HTTP error status (>= 400) is preferred. Default value ({@link io.micronaut.http.client.HttpClientConfiguration#DEFAULT_EXCEPTION_ON_ERROR_STATUS})
+     * Sets whether throwing an exception upon HTTP error status (&gt;= 400) is preferred. Default value ({@link io.micronaut.http.client.HttpClientConfiguration#DEFAULT_EXCEPTION_ON_ERROR_STATUS})
      *
      * @param exceptionOnErrorStatus Whether
      */
@@ -509,7 +509,7 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
-     * Sets the maximum content length the client can consume. Default value ({@value io.micronaut.http.client.HttpClientConfiguration#DEFAULT_MAX_CONTENT_LENGTH} => 10MB).
+     * Sets the maximum content length the client can consume. Default value ({@value io.micronaut.http.client.HttpClientConfiguration#DEFAULT_MAX_CONTENT_LENGTH} =&gt; 10MB).
      *
      * @param maxContentLength The maximum content length the client can consume
      */
@@ -518,9 +518,9 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
-     * The proxy to use. For authentication specify http.proxyUser and http.proxyPassword system properties.
-     * <p>
-     * Alternatively configure a {@code java.net.ProxySelector}
+     * <p>The proxy to use. For authentication specify http.proxyUser and http.proxyPassword system properties.</p>
+     *
+     * <p>Alternatively configure a {@code java.net.ProxySelector}</p>
      *
      * @return The proxy type
      */

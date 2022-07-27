@@ -13,24 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.inject.factory.multiple;
+package io.micronaut.inject.ast;
 
-import io.micronaut.context.annotation.Bean;
-import io.micronaut.context.annotation.Factory;
-import io.micronaut.context.annotation.Requires;
+import java.util.HashSet;
+import java.util.Set;
 
-@Factory
-class AFactory {
+/**
+ * Stores data about an element that references a enum constant.
+ *
+ * @since 3.6.0
+ */
+public interface EnumConstantElement extends TypedElement, MemberElement {
 
-    @Bean
-    @Requires(beans = X.class, missingBeans = Y.class)
-    A a(X x) {
-        return new A();
-    }
-
-    @Bean
-    @Requires(beans= {X.class, Y.class})
-    A a(X x, Y y) {
-        return new A();
-    }
+    Set<ElementModifier> ENUM_CONSTANT_MODIFIERS = new HashSet<ElementModifier>() {{
+        add(ElementModifier.PUBLIC);
+        add(ElementModifier.STATIC);
+        add(ElementModifier.FINAL);
+    }};
 }

@@ -22,7 +22,7 @@ import java.util.EventListener;
 
 /**
  * <p>An event listener that is triggered each time a bean is created.</p>
- * <p>
+ *
  * <p>Allows customization of the created beans.</p>
  *
  * @param <T> The event type

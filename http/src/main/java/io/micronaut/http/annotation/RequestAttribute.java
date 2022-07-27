@@ -30,20 +30,19 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  * <p>An annotation that can be applied to method arguments to indicate that the method argument is bound to an HTTP request attribute
  *   This can also be used in conjuction with &#064;RequestAttributes to list attributes on a client class that will always be applied
  *   <i>Note: Request attributes are intended for internal data sharing only, and are not attached to the outbound request.</i></p>
- * <p></p>
+ *
  * <p>The following example demonstrates usage at the type level to declare default values to pass in the request when using the {@code Client} annotation;</p>
- * <p></p>
  *
  * <pre class="code">
- * &#064;RequestAttribute(name="X-Username",value='Freddy'),
- * &#064;RequestAttribute(name="X-MyParam",value='${foo.bar}')
+ * &#064;RequestAttribute(name = "X-Username", value = "Freddy"),
+ * &#064;RequestAttribute(name = "X-MyParam", value = "${foo.bar}")
  * &#064;Client('/users')
  * interface UserClient {
  *
  * }
  * </pre>
  *
- * <p>When declared as a binding annotation the <code>&#064;RequestAttribute</code> annotation is declared on each parameter to be bound:</p>
+ * <p>When declared as a binding annotation the {@code &#064;RequestAttribute} annotation is declared on each parameter to be bound:</p>
  *
  * <pre class="code">
  * &#064;Get('/user')

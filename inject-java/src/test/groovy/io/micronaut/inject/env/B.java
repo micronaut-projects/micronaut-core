@@ -21,7 +21,7 @@ import io.micronaut.context.annotation.PropertySource;
 import jakarta.inject.Singleton;
 
 @PropertySource({
-        @Property(name="x", value="${from.config}")
+        @Property(name = "x", value = "${from.config}")
 })
 @Singleton
 public class B {
