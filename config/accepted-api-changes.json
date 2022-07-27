@@ -1,5 +1,15 @@
 [
   {
+    "type": "io.micronaut.ast.groovy.visitor.AbstractGroovyElement",
+    "member": "Class io.micronaut.ast.groovy.visitor.AbstractGroovyElement",
+    "reason": "Add support getDocumentation (groovydoc) for groovy"
+  },
+  {
+    "type": "io.micronaut.ast.groovy.visitor.AbstractGroovyElement",
+    "member": "Constructor io.micronaut.ast.groovy.visitor.AbstractGroovyElement(io.micronaut.ast.groovy.visitor.GroovyVisitorContext,org.codehaus.groovy.ast.AnnotatedNode,io.micronaut.core.annotation.AnnotationMetadata)",
+    "reason": "Add support getDocumentation (groovydoc) for groovy"
+  },
+  {
     "type": "io.micronaut.scheduling.TaskScheduler",
     "member": "Class io.micronaut.scheduling.TaskScheduler",
     "reason": "Added default methods"
