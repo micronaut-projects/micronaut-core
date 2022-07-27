@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.server.netty.handler.accesslog.element;
 
-import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.order.OrderUtil;
 import io.netty.channel.ChannelHandlerContext;
@@ -95,13 +94,10 @@ public class AccessLogFormatParser {
     private String[] elements;
 
     static {
-        SoftServiceLoader<LogElementBuilder> builders = SoftServiceLoader.load(LogElementBuilder.class, LogElementBuilder.class.getClassLoader());
+        SoftServiceLoader<LogElementBuilder> builders = SoftServiceLoader.load(LogElementBuilder.class, LogElementBuilder.class.getClassLoader())
+            .disableFork();
         LOG_ELEMENT_BUILDERS = new ArrayList<>();
-        for (ServiceDefinition<LogElementBuilder> definition : builders) {
-            if (definition.isPresent()) {
-                LOG_ELEMENT_BUILDERS.add(definition.load());
-            }
-        }
+        builders.collectAll(LOG_ELEMENT_BUILDERS);
         OrderUtil.sort(LOG_ELEMENT_BUILDERS);
         trimToSize(LOG_ELEMENT_BUILDERS);
     }

@@ -14,4 +14,5 @@
 <!--    <logger name="io.micronaut.http" level="TRACE"/>-->
     <!--<logger name="io.micronaut.websocket" level="TRACE"/>-->
 
+    <logger name="io.micronaut.core.async.subscriber.CompletionAwareSubscriber" level="DEBUG"/>
 </configuration>

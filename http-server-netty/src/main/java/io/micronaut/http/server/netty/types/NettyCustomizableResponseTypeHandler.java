@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
+import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
 
 /**
@@ -40,8 +41,9 @@ public interface NettyCustomizableResponseTypeHandler<T> extends Ordered {
      * @param request  The native Netty request
      * @param response The mutable Micronaut response
      * @param context  The channel context
+     * @return The channel future that completes when the response is fully written.
      */
-    void handle(T object, HttpRequest<?> request, MutableHttpResponse<?> response, ChannelHandlerContext context);
+    ChannelFuture handle(T object, HttpRequest<?> request, MutableHttpResponse<?> response, ChannelHandlerContext context);
 
     /**
      * @param type The type to check
