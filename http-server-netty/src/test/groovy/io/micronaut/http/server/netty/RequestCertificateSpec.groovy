@@ -4,7 +4,6 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
-import io.micronaut.http.server.netty.AbstractMicronautSpec
 import reactor.core.publisher.Flux
 
 import java.security.cert.X509Certificate
@@ -24,6 +23,7 @@ class RequestCertificateSpec extends AbstractMicronautSpec {
     @Override
     Map<String, Object> getConfiguration() {
         super.getConfiguration() << [
+                "micronaut.http.client.read-timeout": "15s",
                 'micronaut.server.ssl.enabled': true,
                 'micronaut.server.ssl.port': -1,
                 // Cannot be true!

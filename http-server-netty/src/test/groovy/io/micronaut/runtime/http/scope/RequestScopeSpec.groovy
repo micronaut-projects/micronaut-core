@@ -15,6 +15,7 @@
  */
 package io.micronaut.runtime.http.scope
 
+import io.micronaut.context.annotation.Prototype
 import io.micronaut.context.event.ApplicationEventListener
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.annotation.Controller
@@ -28,6 +29,7 @@ import jakarta.inject.Singleton
 import spock.util.concurrent.PollingConditions
 
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * @author Marcel Overdijk
@@ -36,7 +38,24 @@ import java.nio.charset.StandardCharsets
 class RequestScopeSpec extends AbstractMicronautSpec {
 
     def setupSpec() {
-        ServerRequestContext.set(null);
+        ServerRequestContext.set(null)
+    }
+
+    def setup() {
+        ReqTerminatedListener listener = applicationContext.getBean(ReqTerminatedListener)
+        listener.callCount = 0
+        SimpleBean.destroyed.set(0)
+    }
+
+    void "test dependent beans leak"() {
+        when:
+        (0..100).each {
+            rxClient.toBlocking().retrieve(HttpRequest.GET("/test-simple-request-scope"), String)
+        }
+        def controller = applicationContext.getBean(SimpleTestController)
+        then:
+        SimpleBean.destroyed.get() == 101
+        (controller.simpleRequestBean.$beanResolutionContext.popDependentBeans() as Collection) == null
     }
 
     void 'test request scope no request'() {
@@ -149,6 +168,47 @@ class RequestScopeSpec extends AbstractMicronautSpec {
         @PreDestroy
         void killMe() {
             this.dead = true
+        }
+    }
+
+    @RequestScope
+    static class SimpleRequestBean {
+
+        private final SimpleBean simpleBean
+
+        SimpleRequestBean(SimpleBean simpleBean) {
+            this.simpleBean = simpleBean
+        }
+
+        String sayHello() {
+            return "HELLO"
+        }
+
+    }
+
+    @Prototype
+    static class SimpleBean {
+
+        static AtomicInteger destroyed = new AtomicInteger()
+
+        @PreDestroy
+        void destroy() {
+            destroyed.incrementAndGet()
+        }
+
+    }
+
+    @Controller
+    static class SimpleTestController {
+        final SimpleRequestBean simpleRequestBean
+
+        SimpleTestController(SimpleRequestBean simpleRequestBean) {
+            this.simpleRequestBean = simpleRequestBean
+        }
+
+        @Get("/test-simple-request-scope")
+        String test() {
+            return simpleRequestBean.sayHello()
         }
     }
 
