@@ -46,7 +46,7 @@ managed-gorm-hibernate = "7.2.2"
 # be sure to update graal version in gradle.properties as well
 # Intentionally pin to 22.0.0.2 see https://github.com/micronaut-projects/micronaut-kafka/pull/564 and https://github.com/micronaut-projects/micronaut-core/pull/7663
 managed-graal-sdk = "22.0.0.2"
-managed-graal = "22.1.0"
+managed-graal = "22.2.0"
 managed-graal-svm = "22.0.0.2"
 managed-groovy = "3.0.10"
 managed-h2 = "1.4.200"
