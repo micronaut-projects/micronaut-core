@@ -15,15 +15,18 @@
  */
 package io.micronaut.ast.groovy.visitor;
 
-import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.EnumElement;
-import org.codehaus.groovy.ast.ClassNode;
-import org.codehaus.groovy.ast.FieldNode;
-
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
+
+import io.micronaut.ast.groovy.utils.AstAnnotationUtils;
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.EnumConstantElement;
+import io.micronaut.inject.ast.EnumElement;
+
+import org.codehaus.groovy.ast.ClassNode;
+import org.codehaus.groovy.ast.FieldNode;
 
 /**
  * Implementation of {@link EnumElement} for Groovy.
@@ -32,6 +35,9 @@ import java.util.stream.Collectors;
  * @since 1.0
  */
 class GroovyEnumElement extends GroovyClassElement implements EnumElement {
+
+    protected List<EnumConstantElement> enumConstants;
+    protected List<String> values;
 
     /**
      * @param visitorContext     The visitor context
@@ -54,17 +60,47 @@ class GroovyEnumElement extends GroovyClassElement implements EnumElement {
 
     @Override
     public List<String> values() {
-        ClassNode cn = (ClassNode) getNativeType();
-        List<String> values = cn.getFields().stream()
-                .filter((fn -> !fn.getName().equals("MAX_VALUE") && !fn.getName().equals("MIN_VALUE")))
-                .filter(fn -> fn.getType().equals(cn))
-                .map(FieldNode::getName)
-                .collect(Collectors.toList());
-        return Collections.unmodifiableList(values);
+        if (values != null) {
+            return values;
+        }
+        initEnum();
+        return values;
+    }
+
+    @Override
+    public List<EnumConstantElement> elements() {
+        if (enumConstants != null) {
+            return enumConstants;
+        }
+        initEnum();
+        return enumConstants;
+    }
+
+    private void initEnum() {
+        values = new ArrayList<>();
+        enumConstants = new ArrayList<>();
+        ClassNode nativeType = (ClassNode) getNativeType();
+        for (FieldNode field : nativeType.getFields()) {
+            if (field.getName().equals("MAX_VALUE") || field.getName().equals("MIN_VALUE")) {
+                continue;
+            }
+            if (field.isEnum()) {
+                values.add(field.getName());
+                enumConstants.add(new GroovyEnumConstantElement(this, visitorContext, field, field, AstAnnotationUtils.getAnnotationMetadata(
+                        sourceUnit,
+                        compilationUnit,
+                        field
+                )));
+            }
+        }
+
+        values = Collections.unmodifiableList(values);
+        enumConstants = Collections.unmodifiableList(enumConstants);
     }
 
     @Override
     public ClassElement withArrayDimensions(int arrayDimensions) {
         return new GroovyEnumElement(visitorContext, classNode, getAnnotationMetadata(), arrayDimensions);
     }
+
 }

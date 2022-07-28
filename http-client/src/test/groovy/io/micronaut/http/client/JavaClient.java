@@ -12,10 +12,10 @@ import java.util.concurrent.atomic.AtomicReference;
 @Client("/")
 public abstract class JavaClient {
 
-    @Get(value ="/get/simple", single = true)
+    @Get(value = "/get/simple", single = true)
     abstract Publisher<Void> simple();
 
-    @Get(value ="/test/redirect", single = true)
+    @Get(value = "/test/redirect", single = true)
     abstract Publisher<Void> redirect();
 
     public void subscribe(Publisher<Void> publisher) {

@@ -24,7 +24,7 @@ import jakarta.inject.Singleton;
 // tag::class[]
 @Singleton
 @InterceptorBean(Stub.class) // <1>
-public class StubIntroduction implements MethodInterceptor<Object,Object> { // <2>
+public class StubIntroduction implements MethodInterceptor<Object, Object> { // <2>
 
     @Nullable
     @Override

@@ -23,15 +23,15 @@ import org.reactivestreams.Publisher;
 /**
  * <p>A interface for classes that can intercept and filter {@link io.micronaut.http.HttpRequest} instances and can
  * either proceed with the request or return a modified result.</p>
- * <p>
+ *
  * <p>Implementations are passed a {@link FilterChain} where the last entry in the chain in the action to be executed
  * that returns a {@link Publisher} that emits an {@link HttpResponse}</p>
- * <p>
+ *
  * <p>Each filter implements {@link Ordered} and can return an order to increase or decrease the priority of the filter</p>
- * <p>
+ *
  * <p>To modify the request filters can either wrap it (using {@link io.micronaut.http.HttpRequestWrapper} or pass it
  * along the chain as is</p>
- * <p>
+ *
  * <p>The response can be altered by returning an alternative {@link Publisher} that emits a {@link HttpResponse} or
  * by altering the publisher returned by {@link FilterChain#proceed(HttpRequest)}</p>
  *

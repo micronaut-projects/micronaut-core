@@ -20,7 +20,6 @@ import io.micronaut.inject.BeanDefinition;
 
 /**
  * <p>An event fired when a bean has been destroyed and all {@link jakarta.annotation.PreDestroy} methods have been invoked.</p>
- * <p>
  *
  * @param <T> The event type
  * @author Graeme Rocher

@@ -671,7 +671,7 @@ public class BeanIntrospectionModule extends SimpleModule {
         final BeanProperty beanProperty;
         final TypeResolutionContext typeResolutionContext;
 
-        VirtualSetter(TypeResolutionContext typeResolutionContext, TypeFactory typeFactory, BeanProperty<?,?> beanProperty, String propertyName, JsonDeserializer<Object> valueDeser) {
+        VirtualSetter(TypeResolutionContext typeResolutionContext, TypeFactory typeFactory, BeanProperty<?, ?> beanProperty, String propertyName, JsonDeserializer<Object> valueDeser) {
             super(
                     new PropertyName(propertyName),
                     newType(beanProperty.asArgument(), typeFactory),

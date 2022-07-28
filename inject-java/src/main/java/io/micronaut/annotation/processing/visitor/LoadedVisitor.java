@@ -147,12 +147,21 @@ public class LoadedVisitor implements Ordered {
     public @Nullable io.micronaut.inject.ast.Element visit(
             Element element, AnnotationMetadata annotationMetadata) {
         if (element instanceof VariableElement) {
-            final JavaFieldElement e = elementFactory.newFieldElement(rootClassElement, (VariableElement) element, annotationMetadata);
-            visitor.visitField(
-                    e,
-                    visitorContext
-            );
-            return e;
+            if (element.getKind() == ElementKind.ENUM_CONSTANT) {
+                final JavaEnumConstantElement e = elementFactory.newEnumConstantElement(rootClassElement, (VariableElement) element, annotationMetadata);
+                visitor.visitEnumConstant(
+                        e,
+                        visitorContext
+                );
+                return e;
+            } else {
+                final JavaFieldElement e = elementFactory.newFieldElement(rootClassElement, (VariableElement) element, annotationMetadata);
+                visitor.visitField(
+                        e,
+                        visitorContext
+                );
+                return e;
+            }
         } else if (element instanceof ExecutableElement) {
             ExecutableElement executableElement = (ExecutableElement) element;
             if (rootClassElement != null) {

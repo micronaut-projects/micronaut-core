@@ -31,25 +31,25 @@ import java.util.Optional;
 public interface PartData {
 
     /**
-     * Gets the content of this chunk as an <tt>InputStream</tt>.
+     * Gets the content of this chunk as an {@code InputStream}.
      *
-     * @return The content of this chunk as an <tt>InputStream</tt>
+     * @return The content of this chunk as an {@code InputStream}
      * @throws IOException If an error occurs in retrieving the content
      */
     InputStream getInputStream() throws IOException;
 
     /**
-     * Gets the content of this chunk as a <tt>byte[]</tt>.
+     * Gets the content of this chunk as a {@code byte[]}.
      *
-     * @return The content of this chunk as a <tt>byte[]</tt>
+     * @return The content of this chunk as a {@code byte[]}
      * @throws IOException If an error occurs in retrieving the content
      */
     byte[] getBytes() throws IOException;
 
     /**
-     * Gets the content of this chunk as a <tt>ByteBuffer</tt>.
+     * Gets the content of this chunk as a {@code ByteBuffer}.
      *
-     * @return The content of this chunk as a <tt>ByteBuffer</tt>
+     * @return The content of this chunk as a {@code ByteBuffer}
      * @throws IOException If an error occurs in retrieving the content
      */
     ByteBuffer getByteBuffer() throws IOException;

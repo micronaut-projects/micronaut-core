@@ -23,7 +23,7 @@ import io.micronaut.context.annotation.Requires;
 class AFactory {
 
     @Bean
-    @Requires(beans=X.class, missingBeans=Y.class)
+    @Requires(beans = X.class, missingBeans = Y.class)
     A a(X x) {
         return new A();
     }

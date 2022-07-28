@@ -36,7 +36,7 @@ public interface SseClient {
 
     /**
      * <p>Perform an HTTP request and receive data as a stream of SSE {@link Event} objects as they become available without blocking.</p>
-     * <p>
+     *
      * <p>The downstream {@link org.reactivestreams.Subscriber} can regulate demand via the subscription</p>
      *
      * @param request The {@link HttpRequest} to execute
@@ -47,7 +47,7 @@ public interface SseClient {
 
     /**
      * <p>Perform an HTTP request and receive data as a stream of SSE {@link Event} objects as they become available without blocking.</p>
-     * <p>
+     *
      * <p>The downstream {@link org.reactivestreams.Subscriber} can regulate demand via the subscription</p>
      *
      * @param request The {@link HttpRequest} to execute
@@ -60,7 +60,7 @@ public interface SseClient {
 
     /**
      * <p>Perform an HTTP request and receive data as a stream of SSE {@link Event} objects as they become available without blocking.</p>
-     * <p>
+     *
      * <p>The downstream {@link org.reactivestreams.Subscriber} can regulate demand via the subscription</p>
      *
      * @since 3.1.0
@@ -75,7 +75,7 @@ public interface SseClient {
 
     /**
      * <p>Perform an HTTP request and receive data as a stream of SSE {@link Event} objects as they become available without blocking.</p>
-     * <p>
+     *
      * <p>The downstream {@link org.reactivestreams.Subscriber} can regulate demand via the subscription</p>
      *
      * @param request The {@link HttpRequest} to execute
@@ -90,7 +90,7 @@ public interface SseClient {
 
     /**
      * <p>Perform an HTTP GET request and receive data as a stream of SSE {@link Event} objects as they become available without blocking.</p>
-     * <p>
+     *
      * <p>The downstream {@link org.reactivestreams.Subscriber} can regulate demand via the subscription</p>
      *
      * @param uri The request URI
@@ -104,7 +104,7 @@ public interface SseClient {
 
     /**
      * <p>Perform an HTTP GET request and receive data as a stream of SSE {@link Event} objects as they become available without blocking.</p>
-     * <p>
+     *
      * <p>The downstream {@link org.reactivestreams.Subscriber} can regulate demand via the subscription</p>
      *
      * @param uri The request URI
