@@ -20,7 +20,6 @@ micronautBom {
             'neo4j.java.driver': 'neo4j.bolt',
     ]
     propertyName = 'core'
-
     suppressions {
         // https://github.com/micronaut-projects/micronaut-serialization/issues/167
         dependencies.add("io.micronaut.serde:micronaut-serde-tck:1.0.0")
@@ -42,7 +41,15 @@ micronautBom {
         // https://github.com/micronaut-projects/micronaut-data/issues/1403
         dependencies.add("io.micronaut.data:micronaut-data-tck:3.3.0")
         dependencies.add("io.micronaut.data:micronaut-data-document-tck:3.3.0")
-        
+
+        // https://github.com/micronaut-projects/micronaut-core/pull/7631#issuecomment-1174702395
+        bomAuthorizedGroupIds.put(
+                "io.opentelemetry.instrumentation:opentelemetry-instrumentation-bom-alpha",
+                ["io.opentelemetry.javaagent", "io.opentelemetry", "io.opentelemetry.instrumentation", "io.opentelemetry.javaagent.instrumentation"] as Set
+        )
+        dependencies.add("io.opentelemetry:opentelemetry-bom:1.15.0")
+        dependencies.add("io.opentelemetry:opentelemetry-bom-alpha:1.15.0-alpha")
+
         // The R2DBC bom that we include mentions dependencies which do not belong to io.r2dbc group
         bomAuthorizedGroupIds.put("io.r2dbc:r2dbc-bom", ["com.google.cloud", "com.oracle.database.r2dbc", "org.mariadb", "dev.miku"] as Set)
     }

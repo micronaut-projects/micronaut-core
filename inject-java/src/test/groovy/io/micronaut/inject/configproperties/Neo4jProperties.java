@@ -24,8 +24,8 @@ class Neo4jProperties {
     protected java.net.URI uri;
 
     @ConfigurationBuilder(
-            prefixes="with",
-            allowZeroArgs=true
+            prefixes = "with",
+            allowZeroArgs = true
     )
     Config.ConfigBuilder options = Config.build();
 

@@ -22,7 +22,7 @@ import java.util.EventListener;
 
 /**
  * <p>An event listener that is triggered after a bean is destroyed.</p>
- * <p>
+ *
  * <p>Allows customization of the bean destruction.</p>
  *
  * @param <T> The event type

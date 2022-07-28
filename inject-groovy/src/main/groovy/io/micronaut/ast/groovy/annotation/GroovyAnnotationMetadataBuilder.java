@@ -26,7 +26,6 @@ import io.micronaut.ast.groovy.visitor.GroovyVisitorContext;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -100,18 +99,8 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
                 if (validator instanceof AnnotatedElementValidator) {
                     elementValidator = (AnnotatedElementValidator) validator;
                 } else {
-                    final SoftServiceLoader<AnnotatedElementValidator> validators = SoftServiceLoader.load(AnnotatedElementValidator.class);
-                    final Iterator<ServiceDefinition<AnnotatedElementValidator>> i = validators.iterator();
-                    AnnotatedElementValidator elementValidator = null;
-                    while (i.hasNext()) {
-                        final ServiceDefinition<AnnotatedElementValidator> v = i.next();
-                        if (v.isPresent()) {
-                            elementValidator = v.load();
-                            break;
-                        }
-                    }
-                    this.elementValidator = elementValidator;
-                    ast.putNodeMetaData(VALIDATOR_KEY, elementValidator);
+                    this.elementValidator = SoftServiceLoader.load(AnnotatedElementValidator.class).firstAvailable().orElse(null);
+                    ast.putNodeMetaData(VALIDATOR_KEY, this.elementValidator);
                 }
             } else {
                 this.elementValidator = null;

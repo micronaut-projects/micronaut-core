@@ -394,7 +394,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     }
 
     private UriRoute buildBeanRoute(HttpMethod httpMethod, String uri, BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
-        return buildBeanRoute(httpMethod.name(), httpMethod, uri, beanDefinition,  method);
+        return buildBeanRoute(httpMethod.name(), httpMethod, uri, beanDefinition, method);
     }
 
     /**

@@ -28,7 +28,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * <p>AOP around advice that can be applied to any type or method that requires {@link Fallback} handling.</p>
- * <p>
+ *
  * <p>When applied to a type if an exception occurs this advice will attempt to resolve an implementation of the
  * class that is annotated with {@link Fallback}</p>
  *

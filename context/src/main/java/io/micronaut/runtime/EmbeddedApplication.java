@@ -28,7 +28,7 @@ import io.micronaut.context.env.Environment;
  * <p>Applications that did not expose a port and address (messaging applications, CLI applications etc.
  * may wish to use this interface instead</p>
  *
- * @param <T>
+ * @param <T> EmbeddedApplication
  * @see io.micronaut.runtime.server.EmbeddedServer
  * @author Graeme Rocher
  * @since 1.0

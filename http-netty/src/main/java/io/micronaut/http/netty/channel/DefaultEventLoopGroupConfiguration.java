@@ -52,7 +52,7 @@ public class DefaultEventLoopGroupConfiguration implements EventLoopGroupConfigu
      * @param preferNativeTransport Whether native transport is to be preferred
      * @param executor              A named executor service to use (optional)
      * @param shutdownQuietPeriod   The shutdown quiet period
-     * @param shutdownTimeout       The shutdown timeout (must be >= shutdownQuietPeriod)
+     * @param shutdownTimeout       The shutdown timeout (must be &gt;= shutdownQuietPeriod)
      */
     @ConfigurationInject
     public DefaultEventLoopGroupConfiguration(

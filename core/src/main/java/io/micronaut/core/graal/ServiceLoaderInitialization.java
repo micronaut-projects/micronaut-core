@@ -180,14 +180,14 @@ final class StaticServiceDefinitions {
 }
 
 @SuppressWarnings("unused")
-@TargetClass(SoftServiceLoader.class)
+@TargetClass(className = "io.micronaut.core.io.service.ServiceScanner")
 @Internal
 final class ServiceLoaderInitialization {
     private ServiceLoaderInitialization() {
     }
 
     @Substitute
-    private static Set<String> computeServiceTypeNames(URI uri, String path) {
+    private static Set<String> computeMicronautServiceTypeNames(URI uri, String path) {
         final StaticServiceDefinitions ssd = ImageSingletons.lookup(StaticServiceDefinitions.class);
         return ssd.serviceTypeMap.getOrDefault(
                 path,

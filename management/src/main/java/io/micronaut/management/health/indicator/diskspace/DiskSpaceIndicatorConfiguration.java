@@ -91,7 +91,7 @@ public class DiskSpaceIndicatorConfiguration implements Toggleable {
     }
 
     /**
-     * Default value ({@value #DEFAULT_THRESHOLD} => 10MB).
+     * Default value ({@value #DEFAULT_THRESHOLD} =&gt; 10MB).
      * @param threshold Set the threshold
      */
     protected void setThreshold(@ReadableBytes long threshold) {

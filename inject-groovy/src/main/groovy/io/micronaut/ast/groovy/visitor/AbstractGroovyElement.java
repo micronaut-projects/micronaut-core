@@ -27,6 +27,7 @@ import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
@@ -46,6 +47,7 @@ import java.lang.reflect.Modifier;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
+import java.util.regex.Pattern;
 
 /**
  * Abstract Groovy element.
@@ -55,6 +57,8 @@ import java.util.function.Predicate;
  */
 
 public abstract class AbstractGroovyElement implements AnnotationMetadataDelegate, Element {
+
+    private static final Pattern JAVADOC_PATTERN = Pattern.compile("(/\\s*\\*\\*)|\\s*\\*|(\\s*[*/])");
 
     protected final SourceUnit sourceUnit;
     protected final CompilationUnit compilationUnit;
@@ -68,7 +72,7 @@ public abstract class AbstractGroovyElement implements AnnotationMetadataDelegat
      * @param annotatedNode      The annotated node
      * @param annotationMetadata The annotation metadata
      */
-    public AbstractGroovyElement(GroovyVisitorContext visitorContext, AnnotatedNode annotatedNode, AnnotationMetadata annotationMetadata) {
+    protected AbstractGroovyElement(GroovyVisitorContext visitorContext, AnnotatedNode annotatedNode, AnnotationMetadata annotationMetadata) {
         this.visitorContext = visitorContext;
         this.compilationUnit = visitorContext.getCompilationUnit();
         this.annotatedNode = annotatedNode;
@@ -333,6 +337,14 @@ public abstract class AbstractGroovyElement implements AnnotationMetadataDelegat
             }
         }
         return null;
+    }
+
+    @Override
+    public Optional<String> getDocumentation() {
+        if (annotatedNode.getGroovydoc() == null || annotatedNode.getGroovydoc().getContent() == null) {
+            return Optional.empty();
+        }
+        return Optional.of(JAVADOC_PATTERN.matcher(annotatedNode.getGroovydoc().getContent()).replaceAll(StringUtils.EMPTY_STRING).trim());
     }
 
     /**

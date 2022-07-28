@@ -33,7 +33,7 @@ import reactor.core.publisher.Flux;
 
 /**
  * <p>A {@link io.micronaut.management.health.indicator.HealthIndicator} that signals when the service is ready to
- * service requests.</>
+ * service requests.</p>
  *
  * @author Pavol Gressa
  * @since 2.1

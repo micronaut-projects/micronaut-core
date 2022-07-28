@@ -53,4 +53,15 @@ public final class PrimaryQualifier<T> implements Qualifier<T> {
     public String toString() {
         return "@Primary";
     }
+
+    /**
+     * Generified way to get the a primary instance.
+     * @return The instance
+     * @param <T1> The generic type
+     * @since 3.6.0
+     */
+    @SuppressWarnings("unchecked")
+    public static <T1> PrimaryQualifier<T1> instance() {
+        return PrimaryQualifier.INSTANCE;
+    }
 }

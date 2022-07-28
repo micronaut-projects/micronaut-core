@@ -20,7 +20,7 @@ import java.lang.annotation.*;
 /**
  * <p>Allows specifying an annotation member alias. In other words, a value of an annotation member can be used to
  * represent the value of another annotation's member or a another member within the same annotation.</p>
- * <p>
+ *
  * <p>The representation is constructed via the {@link io.micronaut.core.annotation.AnnotationMetadata} interface</p>
  *
  * @author Graeme Rocher

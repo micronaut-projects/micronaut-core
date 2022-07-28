@@ -27,8 +27,8 @@ import java.lang.annotation.Target;
  * Example usage:
  * <pre><code>
  * {@literal @}RequestAttributes({
- *     {@literal @}RequestAttribute(name="api-key",value="my-key-value"),
- *     {@literal @}RequestAttribute(name="api-name",value="my-api-name")
+ *     {@literal @}RequestAttribute(name = "api-key", value = "my-key-value"),
+ *     {@literal @}RequestAttribute(name = "api-name", value = "my-api-name")
  * })
  * </code></pre>
  *
@@ -46,8 +46,8 @@ public @interface RequestAttributes {
      * Example usage:
      * <pre><code>
      * {@literal @}RequestAttributes({
-     *     {@literal @}RequestAttribute(name="api-key",value="my-key-value"),
-     *     {@literal @}RequestAttribute(name="api-name",value="my-api-name")
+     *     {@literal @}RequestAttribute(name = "api-key", value = "my-key-value"),
+     *     {@literal @}RequestAttribute(name = "api-name", value = "my-api-name")
      * })
      * </code></pre>
      * @return The attributes

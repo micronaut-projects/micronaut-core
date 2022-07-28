@@ -17,7 +17,7 @@ package io.micronaut.health;
 
 /**
  * <p>Strategy interface for retrieving and updating the current {@link HealthStatus} of the application.</p>
- * <p>
+ *
  * <p>Implementations of this class should be thread safe</p>
  *
  * @author Graeme Rocher

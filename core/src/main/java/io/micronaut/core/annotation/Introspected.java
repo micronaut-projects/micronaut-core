@@ -35,7 +35,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  * <p>If the classes you wish to introspect are already compiled then this annotation can be used on another class (doesn't matter which, but typically on a configuration class) to specify which existing compiled classes to produce {@link io.micronaut.core.beans.BeanIntrospection} instances for either through the {@link #classes()} method or the {@link #packages()} method. The latter uses compile time package scanning and for the moment is regarded as {@link Experimental}.</p>
  *
  * <pre class="code">
- * &#064;Introspected(classes=MyBean.class)
+ * &#064;Introspected(classes = MyBean.class)
  * public class MyConfiguration {
  *      ...
  * }</pre>
@@ -129,11 +129,11 @@ public @interface Introspected {
     /**
      * The annotation types that should be indexed for lookup via {@link io.micronaut.core.beans.BeanIntrospection#getIndexedProperties(Class)} or {@link io.micronaut.core.beans.BeanIntrospection#getIndexedProperty(Class, String)} if {@link IndexedAnnotation#member()} is specified.
      *
-     * <p>Property lookup indexing allows building indexes at compilation time for performing reverse property lookups. Consider for example a property with an annotation such as {@code @Column(name="foo_bar"}. To lookup the property by "foo_bar" you can specify:</p>
+     * <p>Property lookup indexing allows building indexes at compilation time for performing reverse property lookups. Consider for example a property with an annotation such as {@code @Column(name = "foo_bar"}. To lookup the property by "foo_bar" you can specify:</p>
      *
      * <pre class="code">
      * &#064;Introspected(
-     *   indexed = &#064;IndexedAnnotation(annotation=Column.class, member="name")
+     *   indexed = &#064;IndexedAnnotation(annotation = Column.class, member = "name")
      * )
      * public class MyBean {
      *      ...

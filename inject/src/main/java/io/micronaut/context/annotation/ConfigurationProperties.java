@@ -26,13 +26,13 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * <p>Defines a singleton bean whose property values are resolved from a {@link io.micronaut.core.value.PropertyResolver}.</p>
- * <p>
+ *
  * <p>The {@link io.micronaut.core.value.PropertyResolver} is typically the Micronaut {@link io.micronaut.context.env.Environment}.</p>
- * <p>
+ *
  * <p>The {@link #value()} of the annotation is used to indicate the prefix where the configuration properties are located.
  * The class can define properties or fields which will have the configuration properties to them at runtime.
  * </p>
- * <p>
+ *
  * <p>Complex nested properties are supported via classes that are public static inner classes and are also annotated
  * with {@link ConfigurationProperties}.</p>
  *
@@ -56,7 +56,7 @@ public @interface ConfigurationProperties {
 
     /**
      * <p>If the properties of this configuration can also be resolved from the CLI a prefix can be specified.</p>
-     * <p>
+     *
      * <p>For example given a prefix value {code server-} and a property called {code port}, Micronaut will attempt
      * to resolve the value of --server-port when specified on the command line</p>
      *
