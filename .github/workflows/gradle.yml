@@ -60,13 +60,19 @@ jobs:
            PREDICTIVE_TEST_SELECTION: "${{ github.event_name == 'pull_request' && 'true' || 'false' }}"
       - name: Publish Test Report
         if: always()
-        uses: mikepenz/action-junit-report@v3.0.3
+        uses: mikepenz/action-junit-report@v3.2.0
         with:
           check_name: Java CI / Test Report (${{ matrix.java }})
           report_paths: '**/build/test-results/test/TEST-*.xml'
           check_retries: 'true'
+      - name: "📜 Upload binary compatibility check results"
+        if: always()
+        uses: actions/upload-artifact@v2
+        with:
+          name: binary-compatibility-reports
+          path: "**/build/reports/binary-compatibility-*.html"
       - name: Publish to Sonatype Snapshots
-        if: success() && github.event_name == 'push' && matrix.java == '8'
+        if: success() && github.event_name == 'push' && matrix.java == '11'
         env:
           SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
           SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
@@ -82,7 +88,7 @@ jobs:
           if_true: "micronaut-projects/micronaut-docs"
           if_false: ${{ github.repository }}
       - name: Publish to Github Pages
-        if: success() && github.event_name == 'push' && matrix.java == '8'
+        if: success() && github.event_name == 'push' && matrix.java == '11'
         uses: micronaut-projects/github-pages-deploy-action@master
         env:
           TARGET_REPOSITORY: ${{ steps.docs_target.outputs.value }}

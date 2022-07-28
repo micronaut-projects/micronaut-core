@@ -27,17 +27,17 @@ import java.lang.annotation.Target;
 /**
  * <p>This annotation allows driving the production of {@link Bean} definitions from presence of other bean definitions.
  * Typically used in conjunction with {@link EachProperty}</p>
- * <p>
+ *
  * <p>For example:</p>
  * <pre><code>
  *  {@literal @}EachProperty("foo.bar")
  *   public class ExampleConfiguration {
  *   }
  * </code></pre>
- * <p>
+ *
  * <p>In the above example a new {@code ExampleConfiguration} bean will be created for each item under the
  * {@code foo.bar} key in application configuration</p>
- * <p>
+ *
  * <p>One can then drive the configuration of other beans with the same annotation:</p>
  * <pre><code>
  *  {@literal @}EachBean(ExampleConfiguration)

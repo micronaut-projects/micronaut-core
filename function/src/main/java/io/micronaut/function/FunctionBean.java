@@ -30,7 +30,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * <p>An annotation applied to classes that should be exposed as functions. The class itself must implement an interface
- * from <tt>java.util.function</tt> such as {@link java.util.function.Consumer} to be exposed as a function.</p>
+ * from {@code java.util.function} such as {@link java.util.function.Consumer} to be exposed as a function.</p>
  *
  * @author Graeme Rocher
  * @since 1.0

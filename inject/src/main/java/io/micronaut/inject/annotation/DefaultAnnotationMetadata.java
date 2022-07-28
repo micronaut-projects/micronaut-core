@@ -16,25 +16,45 @@
 package io.micronaut.inject.annotation;
 
 import io.micronaut.context.exceptions.ConfigurationException;
-import io.micronaut.core.annotation.*;
+import io.micronaut.core.annotation.AnnotationClassValue;
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
-
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.ast.ClassElement;
 
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Repeatable;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.reflect.Array;
-import java.util.*;
+import java.util.AbstractMap;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.OptionalDouble;
+import java.util.OptionalInt;
+import java.util.OptionalLong;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -52,34 +72,6 @@ import java.util.stream.Collectors;
  */
 @Internal
 public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implements AnnotationMetadata, Cloneable, EnvironmentAnnotationMetadata {
-
-    static {
-        ConversionService.SHARED.addConverter(io.micronaut.core.annotation.AnnotationValue.class, Annotation.class, (object, targetType, context) -> {
-            Optional<Class> annotationClass = ClassUtils.forName(object.getAnnotationName(), targetType.getClassLoader());
-            return annotationClass.map(aClass -> AnnotationMetadataSupport.buildAnnotation(aClass, object));
-        });
-
-        ConversionService.SHARED.addConverter(io.micronaut.core.annotation.AnnotationValue[].class, Object[].class, (object, targetType, context) -> {
-            List result = new ArrayList();
-            Class annotationClass = null;
-            for (io.micronaut.core.annotation.AnnotationValue annotationValue : object) {
-                if (annotationClass == null) {
-                    // all annotations will be on the same type
-                    Optional<Class> aClass = ClassUtils.forName(annotationValue.getAnnotationName(), targetType.getClassLoader());
-                    if (!aClass.isPresent()) {
-                        break;
-                    }
-                    annotationClass = aClass.get();
-                }
-                Annotation annotation = AnnotationMetadataSupport.buildAnnotation(annotationClass, annotationValue);
-                result.add(annotation);
-            }
-            if (!result.isEmpty()) {
-                return Optional.of(result.toArray((Object[]) Array.newInstance(annotationClass, result.size())));
-            }
-            return Optional.empty();
-        });
-    }
 
     @Nullable
     Map<String, Map<CharSequence, Object>> declaredAnnotations;
@@ -1204,6 +1196,45 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         }
         if (declaredAnnotations != null && declaredAnnotations.containsKey(stereotype)) {
             return StringUtils.internListOf(stereotype);
+        }
+        return Collections.emptyList();
+    }
+
+    @Override
+    public <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByStereotype(String stereotype) {
+        if (stereotype == null) {
+            return Collections.emptyList();
+        }
+        if (annotationsByStereotype != null) {
+            List<String> annotations = annotationsByStereotype.get(stereotype);
+            if (annotations != null) {
+                List<AnnotationValue<T>> result = new ArrayList<>(annotations.size());
+                for (String annotation : annotations) {
+                    String repeatableTypeName = getRepeatedName(annotation);
+                    if (repeatableTypeName == null) {
+                        repeatableTypeName = AnnotationMetadataSupport.getRepeatableAnnotation(annotation);
+                    }
+                    if (repeatableTypeName != null) {
+                        List<AnnotationValue<T>> results =
+                            resolveRepeatableAnnotations(repeatableTypeName,
+                                allAnnotations,
+                                allStereotypes
+                            );
+                        if (results != null) {
+                            result.addAll(results);
+                        }
+                    } else {
+                        result.add(getAnnotation(annotation));
+                    }
+                }
+                return Collections.unmodifiableList(result);
+            }
+        }
+        if (allAnnotations != null) {
+            return getAnnotationValuesByName(stereotype);
+        }
+        if (declaredAnnotations != null) {
+            return getDeclaredAnnotationValuesByName(stereotype);
         }
         return Collections.emptyList();
     }

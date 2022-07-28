@@ -41,7 +41,7 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.BeanConfiguration;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
-import io.micronaut.inject.qualifiers.Qualifiers;
+import io.micronaut.inject.qualifiers.PrimaryQualifier;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -374,41 +374,42 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
         if (!dependentCandidates.isEmpty()) {
             for (BeanDefinition dependentCandidate : dependentCandidates) {
-
-                BeanDefinitionDelegate<?> delegate = BeanDefinitionDelegate.create(candidate);
-                Optional<Qualifier> optional;
+                Qualifier qualifier;
                 if (dependentCandidate instanceof BeanDefinitionDelegate) {
-                    BeanDefinitionDelegate<?> parentDelegate = (BeanDefinitionDelegate) dependentCandidate;
-                    optional = parentDelegate.get(Named.class.getName(), String.class).map(Qualifiers::byName);
+                    qualifier = dependentCandidate.resolveDynamicQualifier();
                 } else {
-                    Optional<String> qualifierName = dependentCandidate.getAnnotationNameByStereotype(AnnotationUtil.QUALIFIER);
-                    optional = qualifierName.map(name -> Qualifiers.byAnnotation(dependentCandidate, name));
+                    qualifier = dependentCandidate.getDeclaredQualifier();
                 }
+                if (qualifier == null && dependentCandidate.isPrimary()) {
+                    // Backwards compatibility, `getDeclaredQualifier` strips @Primary
+                    // This should be removed if @Primary is no longer qualifier
+                    qualifier = PrimaryQualifier.INSTANCE;
+                }
+
+                BeanDefinitionDelegate<?> delegate = BeanDefinitionDelegate.create(candidate, qualifier);
 
                 if (dependentCandidate.isPrimary()) {
                     delegate.put(BeanDefinitionDelegate.PRIMARY_ATTRIBUTE, true);
                 }
 
-                optional.ifPresent(qualifier -> {
-                            String qualifierKey = AnnotationUtil.QUALIFIER;
-                            Argument<?>[] arguments = candidate.getConstructor().getArguments();
-                            for (Argument<?> argument : arguments) {
-                                Class<?> argumentType = argument.getType();
-                                if (argumentType.equals(dependentType)) {
-                                    Map<? extends Argument<?>, Qualifier> qualifedArg = Collections.singletonMap(argument, qualifier);
-                                    delegate.put(qualifierKey, qualifedArg);
-                                    break;
-                                }
-                            }
-
-                            if (qualifier instanceof Named) {
-                                delegate.put(Named.class.getName(), ((Named) qualifier).getName());
-                            }
-                            if (delegate.isEnabled(this, resolutionContext)) {
-                                transformedCandidates.add((BeanDefinition<T>) delegate);
-                            }
+                if (qualifier != null) {
+                    String qualifierKey = AnnotationUtil.QUALIFIER;
+                    Argument<?>[] arguments = candidate.getConstructor().getArguments();
+                    for (Argument<?> argument : arguments) {
+                        Class<?> argumentType = argument.getType();
+                        if (argumentType.equals(dependentType)) {
+                            delegate.put(qualifierKey, Collections.singletonMap(argument, qualifier));
+                            break;
                         }
-                );
+                    }
+
+                    if (qualifier instanceof Named) {
+                        delegate.put(Named.class.getName(), ((Named) qualifier).getName());
+                    }
+                    if (delegate.isEnabled(this, resolutionContext)) {
+                        transformedCandidates.add((BeanDefinition<T>) delegate);
+                    }
+                }
             }
         }
     }
@@ -487,22 +488,11 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                 return super.findConcreteCandidate(beanType, qualifier, candidates);
             }
         }
-        Named named = (Named) qualifier;
-        String name = named.getName();
         for (BeanDefinition<T> candidate : candidates) {
             if (candidate instanceof BeanDefinitionDelegate) {
-
-                BeanDefinitionDelegate<T> delegate = (BeanDefinitionDelegate) candidate;
-                Optional<String> value = delegate.get(Named.class.getName(), String.class);
-                if (value.isPresent()) {
-                    if (name.equals(value.get())) {
-                        return delegate;
-                    }
-                } else {
-                    Optional<Qualifier> resolvedQualifier = delegate.get(AnnotationUtil.QUALIFIER, Qualifier.class);
-                    if (resolvedQualifier.isPresent() && resolvedQualifier.get().equals(qualifier)) {
-                        return delegate;
-                    }
+                Qualifier<T> delegateQualifier = candidate.resolveDynamicQualifier();
+                if (delegateQualifier != null && delegateQualifier.equals(qualifier)) {
+                    return candidate;
                 }
             }
         }

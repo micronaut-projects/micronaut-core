@@ -36,6 +36,12 @@ import java.lang.annotation.Retention;
 @Retention(RUNTIME)
 public @interface Primary {
     /**
+     * Qualified name.
+     * @since 3.5.1
+     */
+    String NAME = Primary.class.getName();
+
+    /**
      * The simple name of this annotation.
      */
     String SIMPLE_NAME = Primary.class.getSimpleName();

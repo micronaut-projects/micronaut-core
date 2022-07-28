@@ -82,7 +82,7 @@ public interface EventLoopGroupConfiguration extends Named {
     }
 
     /**
-     * @return The shutdown timeout (must be >= shutdownQuietPeriod)
+     * @return The shutdown timeout (must be &gt;= shutdownQuietPeriod)
      */
     default Duration getShutdownTimeout() {
         return Duration.ofSeconds(DEFAULT_SHUTDOWN_TIMEOUT);

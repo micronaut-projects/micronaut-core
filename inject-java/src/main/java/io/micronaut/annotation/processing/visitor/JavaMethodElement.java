@@ -148,11 +148,6 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
     }
 
     @Override
-    public Optional<String> getDocumentation() {
-        return Optional.ofNullable(visitorContext.getElements().getDocComment(executableElement));
-    }
-
-    @Override
     public boolean isSuspend() {
         getParameters();
         return this.continuationParameter != null;

@@ -25,7 +25,9 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanType;
+import io.micronaut.inject.DelegatingBeanDefinition;
 
 import java.lang.annotation.Annotation;
 import java.util.Arrays;
@@ -55,49 +57,39 @@ class AnnotationMetadataQualifier<T> implements Qualifier<T> {
     @Nullable
     final AnnotationValue<Annotation> qualifierAnn;
 
-    /**
-     * @param annotationMetadata The annotation metadata
-     * @param name               The name
-     */
-    AnnotationMetadataQualifier(@NonNull AnnotationMetadata annotationMetadata,
-                                @NonNull String name) {
-        this(annotationMetadata, name, annotationMetadata.getAnnotationType(name).orElse(null));
+    private AnnotationMetadataQualifier(@NonNull String annotationName,
+                                        @NonNull String annotationSimpleName,
+                                        @Nullable AnnotationValue<Annotation> value) {
+        this.annotationName = annotationName;
+        this.annotationSimpleName = annotationSimpleName;
+        this.qualifierAnn = value;
     }
 
-    /**
-     * @param annotationMetadata The annotation metadata
-     * @param annotationType     The name
-     */
-    AnnotationMetadataQualifier(@NonNull AnnotationMetadata annotationMetadata,
-                                @NonNull Class<? extends Annotation> annotationType) {
-        this(annotationMetadata, null, annotationType);
+    static <T> AnnotationMetadataQualifier<T> fromType(@NonNull AnnotationMetadata annotationMetadata,
+                                                       @NonNull Class<? extends Annotation> annotationType) {
+        return new AnnotationMetadataQualifier<>(
+            annotationType.getName(),
+            annotationType.getSimpleName(),
+            resolveBindingAnnotationValue(annotationMetadata, annotationType.getName())
+        );
     }
 
-    /**
-     * @param annotationMetadata The annotation metadata
-     * @param annotationType     The name
-     */
-    private AnnotationMetadataQualifier(@NonNull AnnotationMetadata annotationMetadata,
-                                @Nullable String annotationTypeName,
-                                @Nullable Class<? extends Annotation> annotationType) {
-        if (annotationType == null) {
-            Objects.requireNonNull(annotationTypeName, "Annotation name cannot be null");
-            annotationType = annotationMetadata.getAnnotationType(annotationTypeName).orElse(null);
-        }
-        if (annotationType == null) {
-            this.annotationName = annotationTypeName;
-            this.annotationSimpleName = NameUtils.getSimpleName(annotationName);
-        } else {
-            this.annotationName = annotationType.getName();
-            this.annotationSimpleName = annotationType.getSimpleName();
-        }
-        Set<String> nonBinding = resolveNonBindingMembers(annotationMetadata);
-        Map<CharSequence, Object> bindingValues = resolveBindingValues(annotationMetadata, annotationName, nonBinding);
-        if (CollectionUtils.isNotEmpty(bindingValues)) {
-            qualifierAnn = new AnnotationValue<>(annotationName, bindingValues);
-        } else {
-            qualifierAnn = null;
-        }
+    static <T> AnnotationMetadataQualifier<T> fromTypeName(@NonNull AnnotationMetadata annotationMetadata,
+                                                           @NonNull String annotationTypeName) {
+        return new AnnotationMetadataQualifier<>(
+            annotationTypeName,
+            NameUtils.getSimpleName(annotationTypeName),
+            resolveBindingAnnotationValue(annotationMetadata, annotationTypeName)
+        );
+    }
+
+    static <T extends Annotation> AnnotationMetadataQualifier<T> fromValue(@NonNull AnnotationMetadata annotationMetadata,
+                                                                           @NonNull AnnotationValue<T> annotationValue) {
+        return new AnnotationMetadataQualifier<>(
+            annotationValue.getAnnotationName(),
+            NameUtils.getSimpleName(annotationValue.getAnnotationName()),
+            resolveBindingAnnotationValue(annotationMetadata, annotationValue.getAnnotationName(), annotationValue.getValues())
+        );
     }
 
     @Override
@@ -109,38 +101,73 @@ class AnnotationMetadataQualifier<T> implements Qualifier<T> {
             if (QualifierUtils.matchAny(beanType, candidate)) {
                 return true;
             }
-            if (qualifierAnn == null) {
-                if (candidate.getAnnotationMetadata().hasDeclaredAnnotation(annotationName)) {
+            if (candidate instanceof BeanDefinition) {
+                BeanDefinition<T> bdCandidate = (BeanDefinition<T>) candidate;
+                Qualifier<T> candidateDeclaredQualifier = bdCandidate.getDeclaredQualifier();
+                if (candidateDeclaredQualifier != null && candidateDeclaredQualifier.contains(this)) {
                     return true;
                 }
-            } else {
-                final AnnotationMetadata annotationMetadata = candidate.getAnnotationMetadata();
-                final AnnotationValue<Annotation> av = candidate.getAnnotation(annotationName);
-                if (av != null) {
-                    Set<String> nonBinding = resolveNonBindingMembers(annotationMetadata);
-                    final Map<CharSequence, Object> values = resolveBindingValues(annotationMetadata, annotationName, nonBinding);
-                    if (qualifierAnn.equals(new AnnotationValue<>(annotationName, values))) {
+                if (candidate instanceof DelegatingBeanDefinition) {
+                    if (matchByAnnotationMetadata(candidate)) {
                         return true;
                     }
                 }
+            } else if (matchByAnnotationMetadata(candidate)) {
+                return true;
             }
             return QualifierUtils.matchByCandidateName(candidate, beanType, annotationSimpleName);
         });
     }
 
+    private <BT extends BeanType<T>> boolean matchByAnnotationMetadata(BT candidate) {
+        if (qualifierAnn == null) {
+            return candidate.getAnnotationMetadata().hasAnnotation(annotationName);
+        }
+        return qualifierAnn.equals(resolveBindingAnnotationValue(candidate.getAnnotationMetadata()));
+    }
+
     @Nullable
-    private Map<CharSequence, Object> resolveBindingValues(AnnotationMetadata annotationMetadata, String qualifierName, Set<String> nonBinding) {
-        Map<CharSequence, Object> bindingValues = annotationMetadata.getValues(qualifierName);
-        if (nonBinding == null || bindingValues.isEmpty() || nonBinding.isEmpty()) {
-            return bindingValues;
+    private <K extends Annotation> AnnotationValue<K> resolveBindingAnnotationValue(AnnotationMetadata annotationMetadata) {
+        return resolveBindingAnnotationValue(annotationMetadata, annotationName, annotationMetadata.getValues(annotationName));
+    }
+
+    @Nullable
+    private static <K extends Annotation> AnnotationValue<K> resolveBindingAnnotationValue(AnnotationMetadata annotationMetadata,
+                                                                                           String annotationName) {
+        return resolveBindingAnnotationValue(annotationMetadata, annotationName, annotationMetadata.getValues(annotationName));
+    }
+
+    @Nullable
+    private static <K extends Annotation> AnnotationValue<K> resolveBindingAnnotationValue(AnnotationMetadata annotationMetadata,
+                                                                                           String annotationName,
+                                                                                           Map<CharSequence, Object> values) {
+        Map<CharSequence, Object> bindingValues = resolveBindingValues(annotationMetadata, values);
+        if (CollectionUtils.isNotEmpty(bindingValues)) {
+            return new AnnotationValue<>(annotationName, bindingValues);
+        }
+        return null;
+    }
+
+    @Nullable
+    private static Map<CharSequence, Object> resolveBindingValues(AnnotationMetadata annotationMetadata,
+                                                                  Map<CharSequence, Object> values) {
+        Set<String> nonBinding = resolveNonBindingMembers(annotationMetadata);
+        if (values.isEmpty() || nonBinding.isEmpty()) {
+            return values;
         }
         Map<CharSequence, Object> map = new HashMap<>();
-        for (Map.Entry<CharSequence, Object> entry : bindingValues.entrySet()) {
+        for (Map.Entry<CharSequence, Object> entry : values.entrySet()) {
             if (!nonBinding.contains(entry.getKey().toString()) && map.put(entry.getKey(), entry.getValue()) != null) {
                 throw new IllegalStateException("Duplicate key: " + entry.getKey());
             }
         }
         return map;
+    }
+
+    @NonNull
+    private static Set<String> resolveNonBindingMembers(AnnotationMetadata annotationMetadata) {
+        final String[] nonBindingArray = annotationMetadata.stringValues(AnnotationUtil.QUALIFIER, "nonBinding");
+        return ArrayUtils.isNotEmpty(nonBindingArray) ? new HashSet<>(Arrays.asList(nonBindingArray)) : Collections.emptySet();
     }
 
     @Override
@@ -157,12 +184,6 @@ class AnnotationMetadataQualifier<T> implements Qualifier<T> {
     @Override
     public int hashCode() {
         return Objects.hash(annotationName, qualifierAnn);
-    }
-
-    @NonNull
-    private Set<String> resolveNonBindingMembers(AnnotationMetadata annotationMetadata) {
-        final String[] nonBindingArray = annotationMetadata.stringValues(AnnotationUtil.QUALIFIER, "nonBinding");
-        return ArrayUtils.isNotEmpty(nonBindingArray) ? new HashSet<>(Arrays.asList(nonBindingArray)) : Collections.emptySet();
     }
 
     @Override

@@ -45,7 +45,7 @@ public @interface ConfigurationBuilder {
     /**
      * <p>The default is for {@link ConfigurationBuilder} to look for public JavaBean-style setters. Many APIs however
      * use a builder-style or other style to for constructing configuration.</p>
-     * <p>
+     *
      * <p>This method allows overriding this behaviour. For example if the builder you are authoring for prefixes write
      * operations with the word "with" by setting the value of this attribute to "with" you can process methods such
      * as {@code withDebug(true)}</p>
@@ -58,7 +58,7 @@ public @interface ConfigurationBuilder {
     /**
      * <p>When this annotation is used, by default the name of the field or method is not taken into account when
      * retrieving configuration properties.</p>
-     * <p>
+     *
      * <p>This method allows overriding this behaviour. For example if the annotation is placed on a field, you can
      * change the prefix for which configuration values will be searched to populate the field.</p>
      *
@@ -70,7 +70,7 @@ public @interface ConfigurationBuilder {
     /**
      * <p>Some APIs allow zero argument setters to set boolean flags such as {@code setDebug()}. These by default are
      * not processed unless the value of this annotation is set to true.</p>
-     * <p>
+     *
      * <p>Note that this attribute works in conjunction with {@link #prefixes()} to allow other styles such as
      * {@code withDebug()}</p>
      *

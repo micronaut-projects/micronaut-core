@@ -52,6 +52,7 @@ dependencies {
     testImplementation libs.vertx
     testImplementation libs.vertx.webclient
     testImplementation libs.httpcomponents.client
+    testImplementation libs.httpcomponents.mime
     testImplementation libs.jetty.alpn.openjdk8.client
 
     testImplementation libs.managed.groovy.json

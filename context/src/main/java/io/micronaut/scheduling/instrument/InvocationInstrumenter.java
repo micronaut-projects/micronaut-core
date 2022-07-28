@@ -130,7 +130,7 @@ public interface InvocationInstrumenter {
      * to be considered that all instrumentation will be done with this very same {@code invocationInstrumenter}
      * instance. This is especially useful when follow-up actions of a given task need to be registered, where a new
      * instrumenter, thus a new wrapped executor instance belongs to each task.
-     * <p/>
+     * <p>
      * The returned wrapped executor be of subtype {@link ExecutorService} or {@link ScheduledExecutorService} if the
      * input executor instance implemented those interfaces.
      *

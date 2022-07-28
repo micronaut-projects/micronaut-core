@@ -20,6 +20,7 @@ jobs:
     strategy:
       matrix:
         java: ['11', '17']
+        graalvm: ['latest', 'dev']
     steps:
        # https://github.com/actions/virtual-environments/issues/709
       - name: Free disk space
@@ -38,7 +39,7 @@ jobs:
       - name: Setup GraalVM CE
         uses: graalvm/setup-graalvm@v1
         with:
-          version: '22.0.0.2'
+          version: ${{ matrix.graalvm }}
           java-version: ${{ matrix.java }}
           components: 'native-image'
       - name: Build with Gradle
@@ -55,9 +56,10 @@ jobs:
            GRADLE_ENTERPRISE_CACHE_USERNAME: ${{ secrets.GRADLE_ENTERPRISE_CACHE_USERNAME }}
            GRADLE_ENTERPRISE_CACHE_PASSWORD: ${{ secrets.GRADLE_ENTERPRISE_CACHE_PASSWORD }}
            PREDICTIVE_TEST_SELECTION: "${{ github.event_name == 'pull_request' && 'true' || 'false' }}"
+           GRAALVM_QUICK_BUILD: true
       - name: Publish Test Report
         if: always()
-        uses: mikepenz/action-junit-report@v3.0.3
+        uses: mikepenz/action-junit-report@v3.2.0
         with:
           check_name: GraalVM CE CI / Test Report (Java ${{ matrix.java }})
           report_paths: '**/build/test-results/test/TEST-*.xml'

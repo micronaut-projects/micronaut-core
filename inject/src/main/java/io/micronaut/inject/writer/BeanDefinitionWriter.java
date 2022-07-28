@@ -140,9 +140,9 @@ import static io.micronaut.inject.visitor.BeanElementVisitor.VISITORS;
 
 /**
  * <p>Responsible for building {@link BeanDefinition} instances at compile time. Uses ASM build the class definition.</p>
- * <p>
+ *
  * <p>Should be used from AST frameworks to build bean definitions from source code data.</p>
- * <p>
+ *
  * <p>For example:</p>
  *
  * <pre>
@@ -366,7 +366,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             ExecutableMethod.class,
             Object.class
     ));
-    private static final Method METHOD_GET_BEAN = ReflectionUtils.getRequiredInternalMethod(DefaultBeanContext.class, "getBean", BeanResolutionContext.class, Class.class);
+    private static final Method METHOD_GET_BEAN = ReflectionUtils.getRequiredInternalMethod(DefaultBeanContext.class, "getBean", BeanResolutionContext.class, Class.class, Qualifier.class);
     private static final org.objectweb.asm.commons.Method COLLECTION_TO_ARRAY = org.objectweb.asm.commons.Method.getMethod(
             ReflectionUtils.getRequiredInternalMethod(Collection.class, "toArray", Object[].class)
     );
@@ -477,6 +477,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     );
     private static final Type TYPE_QUALIFIERS = Type.getType(Qualifiers.class);
     private static final Type TYPE_QUALIFIER = Type.getType(Qualifier.class);
+    private static final String MESSAGE_ONLY_SINGLE_CALL_PERMITTED = "Only a single call to visitBeanFactoryMethod(..) is permitted";
 
     private final ClassWriter classWriter;
     private final String beanFullClassName;
@@ -638,7 +639,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             this.beanTypeElement = beanElementBuilder.getBeanType();
             this.packageName = this.beanTypeElement.getPackageName();
             this.isInterface = this.beanTypeElement.isInterface();
-            this.isAbstract = this.beanTypeElement.isAbstract();
+            this.isAbstract = beanElementBuilder.getProducingElement() instanceof ClassElement && this.beanTypeElement.isAbstract();
             this.beanFullClassName = this.beanTypeElement.getName();
             this.beanSimpleClassName = this.beanTypeElement.getSimpleName();
             if (uniqueIdentifier == null) {
@@ -737,9 +738,11 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     @NonNull
     @Override
     public ClassElement[] getTypeArguments() {
-        final Map<String, ClassElement> args = this.typeArguments.get(this.getBeanTypeName());
-        if (CollectionUtils.isNotEmpty(args)) {
-            return args.values().toArray(new ClassElement[0]);
+        if (hasTypeArguments()) {
+            final Map<String, ClassElement> args = this.typeArguments.get(this.getBeanTypeName());
+            if (CollectionUtils.isNotEmpty(args)) {
+                return args.values().toArray(ClassElement.ZERO_CLASS_ELEMENTS);
+            }
         }
         return BeanDefinitionVisitor.super.getTypeArguments();
     }
@@ -845,15 +848,38 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
      * @param factoryClass  The factory class
      * @param factoryMethod The factory method
      */
+    @Override
     public void visitBeanFactoryMethod(ClassElement factoryClass,
                                        MethodElement factoryMethod) {
         if (constructor != null) {
-            throw new IllegalStateException("Only a single call to visitBeanFactoryMethod(..) is permitted");
+            throw new IllegalStateException(MESSAGE_ONLY_SINGLE_CALL_PERMITTED);
         } else {
             constructor = factoryMethod;
-
             // now prepare the implementation of the build method. See BeanFactory interface
-            visitBuildFactoryMethodDefinition(factoryClass, factoryMethod);
+            visitBuildFactoryMethodDefinition(factoryClass, factoryMethod, factoryMethod.getParameters());
+            // now override the injectBean method
+            visitInjectMethodDefinition();
+        }
+    }
+
+    /**
+     * <p>In the case where the produced class is produced by a factory method annotated with
+     * {@link Bean} this method should be called.</p>
+     *
+     * @param factoryClass  The factory class
+     * @param factoryMethod The factory method
+     * @param parameters    The parameters
+     */
+    @Override
+    public void visitBeanFactoryMethod(ClassElement factoryClass,
+                                       MethodElement factoryMethod,
+                                       ParameterElement[] parameters) {
+        if (constructor != null) {
+            throw new IllegalStateException(MESSAGE_ONLY_SINGLE_CALL_PERMITTED);
+        } else {
+            constructor = factoryMethod;
+            // now prepare the implementation of the build method. See BeanFactory interface
+            visitBuildFactoryMethodDefinition(factoryClass, factoryMethod, parameters);
             // now override the injectBean method
             visitInjectMethodDefinition();
         }
@@ -866,9 +892,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
      * @param factoryClass The factory class
      * @param factoryField The factory field
      */
+    @Override
     public void visitBeanFactoryField(ClassElement factoryClass, FieldElement factoryField) {
         if (constructor != null) {
-            throw new IllegalStateException("Only a single call to visitBeanFactoryMethod(..) is permitted");
+            throw new IllegalStateException(MESSAGE_ONLY_SINGLE_CALL_PERMITTED);
         } else {
             constructor = factoryField;
 
@@ -2256,7 +2283,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                                             Element element,
                                             String annotationName,
                                             Runnable resolveArgument) {
-        if (annotationName.equals(AnnotationUtil.NAMED)) {
+        if (annotationName.equals(Primary.NAME)) {
+            // primary is the same as no qualifier
+            generatorAdapter.visitInsn(ACONST_NULL);
+        } else if (annotationName.equals(AnnotationUtil.NAMED)) {
             final String n = element.stringValue(AnnotationUtil.NAMED)
                     .orElse(element.getName());
             if (!n.contains("$")) {
@@ -3059,15 +3089,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     private void visitBuildFactoryMethodDefinition(
             ClassElement factoryClass,
-            Element factoryMethod) {
+            Element factoryMethod, ParameterElement... parameters) {
         if (buildMethodVisitor == null) {
-            ParameterElement[] parameters;
-
-            if (factoryMethod instanceof MethodElement) {
-                parameters = ((MethodElement) factoryMethod).getParameters();
-            } else {
-                parameters = new ParameterElement[0];
-            }
 
             List<ParameterElement> parameterList = Arrays.asList(parameters);
             boolean isParametrized = isParametrized(parameters);
@@ -3090,6 +3113,12 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             buildMethodVisitor.loadArg(0);
             // second argument is the bean type
             buildMethodVisitor.push(factoryType);
+            // third argument is the qualifier for the factory if any
+            pushQualifier(buildMethodVisitor, factoryClass, () -> {
+                buildMethodVisitor.push(factoryType);
+                buildMethodVisitor.push("factory");
+                invokeInterfaceStaticMethod(buildMethodVisitor, Argument.class, METHOD_CREATE_ARGUMENT_SIMPLE);
+            });
             buildMethodVisitor.invokeVirtual(
                     Type.getType(DefaultBeanContext.class),
                     org.objectweb.asm.commons.Method.getMethod(METHOD_GET_BEAN)
@@ -3507,7 +3536,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             final Element originatingElement = getOriginatingElements()[0];
             final boolean isFactoryMethod = (originatingElement instanceof MethodElement && !(originatingElement instanceof ConstructorElement));
             final boolean isProxyTarget = annotationMetadata.booleanValue(AnnotationUtil.ANN_AROUND, "proxyTarget").orElse(false) || isFactoryMethod;
-            // for beans that are @Around(proxyTarget=false) only the generated AOP impl should be intercepted
+            // for beans that are @Around(proxyTarget = false) only the generated AOP impl should be intercepted
             final boolean isAopType = StringUtils.isNotEmpty(interceptedType);
             final boolean isConstructorInterceptionCandidate = (isProxyTarget && !isAopType) || (isAopType && !isProxyTarget);
             final boolean hasAroundConstruct;
@@ -4013,7 +4042,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     private boolean isContainerType() {
-        return DefaultArgument.CONTAINER_TYPES.stream().map(Class::getName).anyMatch(c -> c.equals(beanFullClassName));
+        return beanTypeElement.isArray() || DefaultArgument.CONTAINER_TYPES.stream().map(Class::getName).anyMatch(c -> c.equals(beanFullClassName));
     }
 
     private boolean isConfigurationProperties(AnnotationMetadata annotationMetadata) {
@@ -4169,8 +4198,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         if (superType == TYPE_ABSTRACT_BEAN_DEFINITION || isSuperFactory) {
             for (Type typeParameter : typeParameters) {
 
-                ArrayAwareSignatureWriter ppsv = (ArrayAwareSignatureWriter)
-                        psv.visitTypeArgument('=');
+                SignatureVisitor ppsv = psv.visitTypeArgument('=');
                 visitTypeParameter(typeParameter, ppsv);
             }
         }
@@ -4180,6 +4208,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     private void visitTypeParameter(Type typeParameter, SignatureVisitor ppsv) {
         final boolean isArray = typeParameter.getSort() == Type.ARRAY;
+        boolean isPrimitiveArray = false;
         if (isArray) {
             for (int i = 0; i < typeParameter.getDimensions(); i++) {
                 ppsv.visitArrayType();
@@ -4193,11 +4222,12 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             } else {
                 // primitive
                 ppsv.visitBaseType(elementType.getInternalName().charAt(0));
+                isPrimitiveArray = true;
             }
         } else {
             ppsv.visitClassType(typeParameter.getInternalName());
         }
-        if (isArray) {
+        if (isPrimitiveArray && ppsv instanceof ArrayAwareSignatureWriter) {
             ((ArrayAwareSignatureWriter) ppsv).visitEndArray();
         } else {
             ppsv.visitEnd();

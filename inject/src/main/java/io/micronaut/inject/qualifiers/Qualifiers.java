@@ -17,18 +17,19 @@ package io.micronaut.inject.qualifiers;
 
 import io.micronaut.context.Qualifier;
 import io.micronaut.context.annotation.Any;
+import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Type;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.UsedByGeneratedCode;
-import io.micronaut.core.util.StringUtils;
-import jakarta.inject.Named;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.StringUtils;
+import jakarta.inject.Named;
 
 import java.lang.annotation.Annotation;
 import java.util.Collection;
@@ -124,18 +125,11 @@ public class Qualifiers {
      * @return The qualifier
      */
     public static <T> Qualifier<T> byAnnotation(Annotation annotation) {
-        if (annotation instanceof Type) {
-            Type typeAnn = (Type) annotation;
-            return byType(typeAnn.value());
-        } else if (annotation instanceof Named) {
-            Named nameAnn = (Named) annotation;
-            return byName(nameAnn.value());
-        } else if (annotation instanceof Any) {
-            //noinspection unchecked
-            return AnyQualifier.INSTANCE;
-        } else {
-            return new AnnotationQualifier<>(annotation);
+        Qualifier<T> qualifier = findCustomByType(AnnotationMetadata.EMPTY_METADATA, annotation.annotationType());
+        if (qualifier != null) {
+            return qualifier;
         }
+        return new AnnotationQualifier<>(annotation);
     }
 
     /**
@@ -147,21 +141,11 @@ public class Qualifiers {
      * @return The qualifier
      */
     public static <T> Qualifier<T> byAnnotation(AnnotationMetadata metadata, Class<? extends Annotation> type) {
-        if (Any.class == type) {
-            //noinspection unchecked
-            return AnyQualifier.INSTANCE;
-        } else if (Type.class == type) {
-            Optional<Class> aClass = metadata.classValue(type);
-            if (aClass.isPresent()) {
-                return byType(aClass.get());
-            }
-        } else if (Named.class == type || AnnotationUtil.NAMED.equals(type.getName())) {
-            Optional<String> value = metadata.stringValue(type);
-            if (value.isPresent()) {
-                return byName(value.get());
-            }
+        Qualifier<T> instance = findCustomByType(metadata, type);
+        if (instance != null) {
+            return instance;
         }
-        return new AnnotationMetadataQualifier<>(metadata, type);
+        return AnnotationMetadataQualifier.fromType(metadata, type);
     }
 
     /**
@@ -169,8 +153,8 @@ public class Qualifiers {
      * circumstances:</p>
      *
      * <ul>
-     * <li>If the <tt>type</tt> parameter is {@link Named} then the value of the {@link Named} annotation within the metadata is used to match the candidate by name</li>
-     * <li>If the <tt>type</tt> parameter is {@link Type} then the value of the {@link Type} annotation is used to match the candidate by type</li>
+     * <li>If the {@code type} parameter is {@link Named} then the value of the {@link Named} annotation within the metadata is used to match the candidate by name</li>
+     * <li>If the {@code type} parameter is {@link Type} then the value of the {@link Type} annotation is used to match the candidate by type</li>
      * </ul>
      *
      * @param metadata The metadata
@@ -179,21 +163,27 @@ public class Qualifiers {
      * @return The qualifier
      */
     public static <T> Qualifier<T> byAnnotation(AnnotationMetadata metadata, String type) {
-        if (Type.NAME.equals(type)) {
-            Optional<Class> aClass = metadata.classValue(type);
-            if (aClass.isPresent()) {
-                return byType(aClass.get());
-            }
-        } else if (Any.NAME.equals(type)) {
-            //noinspection unchecked
-            return AnyQualifier.INSTANCE;
-        } else if (Named.class.getName().equals(type) || AnnotationUtil.NAMED.equals(type)) {
-            String n = metadata.stringValue(type).orElse(null);
-            if (n != null) {
-                return byName(n);
-            }
+        Qualifier<T> qualifier = findCustomByName(metadata, type);
+        if (qualifier != null) {
+            return qualifier;
         }
-        return new AnnotationMetadataQualifier<>(metadata, type);
+        return AnnotationMetadataQualifier.fromTypeName(metadata, type);
+    }
+
+    /**
+     * <p>Build a qualifier for the given annotation value.
+     *
+     * @param metadata        The metadata
+     * @param annotationValue The annotation value
+     * @param <T>             The component type
+     * @return The qualifier
+     */
+    public static <T extends Annotation> Qualifier<T> byAnnotation(AnnotationMetadata metadata, AnnotationValue<T> annotationValue) {
+        Qualifier<T> qualifier = findCustomByName(metadata, annotationValue.getAnnotationName());
+        if (qualifier != null) {
+            return qualifier;
+        }
+        return AnnotationMetadataQualifier.fromValue(metadata, annotationValue);
     }
 
     /**
@@ -223,7 +213,11 @@ public class Qualifiers {
     @UsedByGeneratedCode
     @Internal
     public static <T> Qualifier<T> byAnnotationSimple(AnnotationMetadata metadata, String type) {
-        return new AnnotationMetadataQualifier<>(metadata, type);
+        Qualifier<T> qualifier = findCustomByName(metadata, type);
+        if (qualifier != null) {
+            return qualifier;
+        }
+        return AnnotationMetadataQualifier.fromTypeName(metadata, type);
     }
 
     /**
@@ -234,6 +228,10 @@ public class Qualifiers {
      * @return The qualifier
      */
     public static <T> Qualifier<T> byStereotype(Class<? extends Annotation> stereotype) {
+        Qualifier<T> instance = findCustomByType(AnnotationMetadata.EMPTY_METADATA, stereotype);
+        if (instance != null) {
+            return instance;
+        }
         return new AnnotationStereotypeQualifier<>(stereotype);
     }
 
@@ -246,6 +244,10 @@ public class Qualifiers {
      * @since 3.0.0
      */
     public static <T> Qualifier<T> byStereotype(String stereotype) {
+        Qualifier<T> qualifier = findCustomByName(AnnotationMetadata.EMPTY_METADATA, stereotype);
+        if (qualifier != null) {
+            return qualifier;
+        }
         return new NamedAnnotationStereotypeQualifier<>(stereotype);
     }
 
@@ -334,4 +336,49 @@ public class Qualifiers {
     <T> Qualifier<T> byInterceptorBindingValues(@NonNull Collection<AnnotationValue<?>> binding) {
         return new InterceptorBindingQualifier<>(binding);
     }
+
+    @Nullable
+    private static <T> Qualifier<T> findCustomByType(@NonNull AnnotationMetadata metadata, @NonNull Class<? extends Annotation> type) {
+        if (Any.class == type) {
+            //noinspection unchecked
+            return AnyQualifier.INSTANCE;
+        } else if (Primary.class == type) {
+            //noinspection unchecked
+            return PrimaryQualifier.INSTANCE;
+        } else if (Type.class == type) {
+            Optional<Class> aClass = metadata.classValue(type);
+            if (aClass.isPresent()) {
+                return byType(aClass.get());
+            }
+        } else if (Named.class == type || AnnotationUtil.NAMED.equals(type.getName())) {
+            Optional<String> value = metadata.stringValue(type);
+            if (value.isPresent()) {
+                return byName(value.get());
+            }
+        }
+        return null;
+    }
+
+    @Nullable
+    private static <T> Qualifier<T> findCustomByName(@NonNull AnnotationMetadata metadata, @NonNull String type) {
+        if (Type.NAME.equals(type)) {
+            Optional<Class> aClass = metadata.classValue(type);
+            if (aClass.isPresent()) {
+                return byType(aClass.get());
+            }
+        } else if (Any.NAME.equals(type)) {
+            //noinspection unchecked
+            return AnyQualifier.INSTANCE;
+        } else if (Qualifier.PRIMARY.equals(type)) {
+            //noinspection unchecked
+            return PrimaryQualifier.INSTANCE;
+        } else if (Named.class.getName().equals(type) || AnnotationUtil.NAMED.equals(type)) {
+            String n = metadata.stringValue(type).orElse(null);
+            if (n != null) {
+                return byName(n);
+            }
+        }
+        return null;
+    }
+
 }

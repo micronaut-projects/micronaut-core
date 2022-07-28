@@ -20,7 +20,6 @@ import io.micronaut.annotation.processing.visitor.JavaMethodElement;
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.aop.Adapter;
 import io.micronaut.aop.Interceptor;
-import io.micronaut.aop.InterceptorBinding;
 import io.micronaut.aop.InterceptorKind;
 import io.micronaut.aop.Introduction;
 import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil;
@@ -63,7 +62,6 @@ import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.configuration.ConfigurationMetadata;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
-import io.micronaut.inject.configuration.ConfigurationMetadataWriter;
 import io.micronaut.inject.configuration.PropertyMetadata;
 import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.visitor.BeanElementVisitor;
@@ -106,8 +104,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.ServiceConfigurationError;
-import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -326,8 +322,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         error("Unexpected error: %s", message != null ? message : e.getClass().getSimpleName());
                     }
                 }
-
-                writeConfigurationMetadata();
             } finally {
                 AnnotationUtils.invalidateCache();
                 AbstractAnnotationMetadataBuilder.clearMutated();
@@ -347,35 +341,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         } catch (Exception e) {
             String message = e.getMessage();
             error("Error occurred writing META-INF files: %s", message != null ? message : e);
-        }
-    }
-
-    private void writeConfigurationMetadata() {
-        ConfigurationMetadataBuilder.getConfigurationMetadataBuilder().ifPresent(builder -> {
-            try {
-                if (builder.hasMetadata()) {
-                    ServiceLoader<ConfigurationMetadataWriter> writers = ServiceLoader.load(ConfigurationMetadataWriter.class, getClass().getClassLoader());
-
-                    try {
-                        for (ConfigurationMetadataWriter writer : writers) {
-                            writeConfigurationMetadata(builder, writer);
-                        }
-                    } catch (ServiceConfigurationError e) {
-                        warning("Unable to load ConfigurationMetadataWriter due to : %s", e.getMessage());
-                    }
-                }
-            } finally {
-                ConfigurationMetadataBuilder.setConfigurationMetadataBuilder(null);
-            }
-        });
-
-    }
-
-    private void writeConfigurationMetadata(ConfigurationMetadataBuilder<?> metadataBuilder, ConfigurationMetadataWriter writer) {
-        try {
-            writer.write(metadataBuilder, classWriterOutputVisitor);
-        } catch (IOException e) {
-            warning("Error occurred writing configuration metadata: %s", e.getMessage());
         }
     }
 
@@ -457,7 +422,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             this.beanDefinitionWriters = new LinkedHashMap<>();
             this.isFactoryType = concreteClassMetadata.hasStereotype(Factory.class);
             this.isConfigurationPropertiesType = concreteClassMetadata.hasDeclaredStereotype(ConfigurationReader.class) || concreteClassMetadata.hasDeclaredStereotype(EachProperty.class);
-            this.isAopProxyType = !concreteClassElement.isAbstract() && !concreteClassElement.isAssignable(Interceptor.class) && hasAroundStereotype(concreteClassMetadata);
+            this.isAopProxyType = !concreteClassElement.isAbstract() && !concreteClassElement.isAssignable(Interceptor.class) && InterceptedMethodUtil.hasAroundStereotype(concreteClassMetadata);
             this.aopSettings = isAopProxyType ? concreteClassMetadata.getValues(AROUND_TYPE, Boolean.class) : OptionalValues.empty();
             this.constructorElement = concreteClassElement.getPrimaryConstructor().orElse(null);
             MethodElement constructorElement = this.constructorElement;
@@ -725,7 +690,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         private void visitIntroductionAdviceInterface(TypeElement classElement, AnnotationMetadata typeAnnotationMetadata, AopProxyWriter aopProxyWriter) {
             ClassElement introductionType = elementFactory.newClassElement(classElement, typeAnnotationMetadata);
             final AnnotationMetadata resolvedTypeMetadata = annotationUtils.getAnnotationMetadata(classElement);
-            final boolean isAopProxyType = hasDeclaredAroundAdvice(resolvedTypeMetadata);
+            final boolean resolvedTypeMetadataIsAopProxyType = InterceptedMethodUtil.hasDeclaredAroundAdvice(resolvedTypeMetadata);
             final boolean isConfigProps = typeAnnotationMetadata.hasAnnotation(ANN_CONFIGURATION_ADVICE);
             if (isConfigProps) {
                 metadataBuilder.visitProperties(
@@ -738,13 +703,13 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 @Override
                 protected boolean isAcceptableMethod(ExecutableElement executableElement) {
                     return super.isAcceptableMethod(executableElement)
-                            || isAopProxyType
+                            || resolvedTypeMetadataIsAopProxyType
                             || hasMethodLevelAdvice(executableElement);
                 }
 
                 private boolean hasMethodLevelAdvice(ExecutableElement executableElement) {
                     final AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(executableElement);
-                    return hasDeclaredAroundAdvice(annotationMetadata);
+                    return InterceptedMethodUtil.hasDeclaredAroundAdvice(annotationMetadata);
                 }
 
                 @Override
@@ -936,7 +901,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             Set<Modifier> modifiers = method.getModifiers();
             boolean isExecutable =
                             isExecutableThroughType(method.getEnclosingElement(), methodAnnotationMetadata, annotationMetadata, modifiers, isPublic) ||
-                            hasAroundStereotype(annotationMetadata);
+                            InterceptedMethodUtil.hasAroundStereotype(annotationMetadata);
 
             boolean hasConstraints = false;
             if (isDeclaredBean && !methodAnnotationMetadata.hasStereotype(ANN_VALIDATED) &&
@@ -991,19 +956,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 );
             }
             return methodAnnotationMetadata;
-        }
-
-        private boolean hasAroundStereotype(AnnotationMetadata annotationMetadata) {
-            if (annotationMetadata.hasStereotype(AROUND_TYPE)) {
-                return true;
-            } else if (annotationMetadata.hasStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS)) {
-                return annotationMetadata.getAnnotationValuesByType(InterceptorBinding.class)
-                        .stream().anyMatch(av ->
-                                av.enumValue("kind", InterceptorKind.class).orElse(InterceptorKind.AROUND) == InterceptorKind.AROUND
-                        );
-            }
-
-            return false;
         }
 
         private boolean isExecutableThroughType(
@@ -1433,7 +1385,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 final boolean isPublic = javaMethodElement.isPublic() || javaMethodElement.isPackagePrivate();
                 if ((isAopProxyType && isPublic) ||
                         (!isAopProxyType && methodAnnotationMetadata.hasStereotype(AROUND_TYPE)) ||
-                        (hasDeclaredAroundAdvice(methodAnnotationMetadata) && isConcrete)) {
+                        (InterceptedMethodUtil.hasDeclaredAroundAdvice(methodAnnotationMetadata) && isConcrete)) {
 
                     io.micronaut.core.annotation.AnnotationValue<?>[] interceptorTypes = InterceptedMethodUtil.resolveInterceptorBinding(methodAnnotationMetadata, InterceptorKind.AROUND);
 
@@ -1449,7 +1401,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     aopProxyWriter.visitInterceptorBinding(interceptorTypes);
 
                     if (javaMethodElement.isFinal()) {
-                        if (hasDeclaredAroundAdvice(methodAnnotationMetadata)) {
+                        if (InterceptedMethodUtil.hasDeclaredAroundAdvice(methodAnnotationMetadata)) {
                             error(method, "Method defines AOP advice but is declared final. Change the method to be non-final in order for AOP advice to be applied.");
                         } else {
                             if (isAopProxyType && isPublic && !declaringClass.equals(concreteClass)) {
@@ -1487,22 +1439,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
         }
 
-        private boolean hasDeclaredAroundAdvice(AnnotationMetadata annotationMetadata) {
-            if (annotationMetadata.hasDeclaredStereotype(AROUND_TYPE)) {
-                return true;
-            } else if (annotationMetadata.hasDeclaredStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS)) {
-                return annotationMetadata.getDeclaredAnnotationValuesByType(InterceptorBinding.class)
-                        .stream().anyMatch(av ->
-                                av.enumValue("kind", InterceptorKind.class).orElse(InterceptorKind.AROUND) == InterceptorKind.AROUND
-                        );
-            }
-
-            return false;
-        }
-
         private void visitAdaptedMethod(ExecutableElement sourceMethod, AnnotationMetadata methodAnnotationMetadata) {
             if (methodAnnotationMetadata instanceof AnnotationMetadataHierarchy) {
-                methodAnnotationMetadata = ((AnnotationMetadataHierarchy) methodAnnotationMetadata).getDeclaredMetadata();
+                methodAnnotationMetadata = methodAnnotationMetadata.getDeclaredMetadata();
             }
             Optional<TypeElement> targetType = methodAnnotationMetadata.getValue(Adapter.class, String.class).flatMap(s ->
                     Optional.ofNullable(elementUtils.getTypeElement(s))

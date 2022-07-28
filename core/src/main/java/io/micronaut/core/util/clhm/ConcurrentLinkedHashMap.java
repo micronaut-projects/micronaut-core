@@ -55,14 +55,14 @@ import static io.micronaut.core.util.clhm.ConcurrentLinkedHashMap.DrainStatus.RE
  * concurrency for updates, and a maximum capacity to bound the map by. This
  * implementation differs from {@link ConcurrentHashMap} in that it maintains a
  * page replacement algorithm that is used to evict an entry when the map has
- * exceeded its capacity. Unlike the <tt>Java Collections Framework</tt>, this
+ * exceeded its capacity. Unlike the {@code Java Collections Framework}, this
  * map does not have a publicly visible constructor and instances are created
  * through a {@link Builder}.
  * <p>
- * An entry is evicted from the map when the <tt>weighted capacity</tt> exceeds
- * its <tt>maximum weighted capacity</tt> threshold. A {@link EntryWeigher}
+ * An entry is evicted from the map when the {@code weighted capacity} exceeds
+ * its {@code maximum weighted capacity} threshold. A {@link EntryWeigher}
  * determines how many units of capacity that an entry consumes. The default
- * weigher assigns each value a weight of <tt>1</tt> to bound the map by the
+ * weigher assigns each value a weight of {@code 1} to bound the map by the
  * total number of key-value pairs. A map that holds collections may choose to
  * weigh values by the number of elements in the collection and bound the map
  * by the total number of elements that it contains. A change to a value that
@@ -78,7 +78,7 @@ import static io.micronaut.core.util.clhm.ConcurrentLinkedHashMap.DrainStatus.RE
  * operation asynchronously, such as by submitting a task to an
  * {@link java.util.concurrent.ExecutorService}.
  * <p>
- * The <tt>concurrency level</tt> determines the number of threads that can
+ * The {@code concurrency level} determines the number of threads that can
  * concurrently modify the table. Using a significantly higher or lower value
  * than needed can waste space or lead to thread contention, but an estimate
  * within an order of magnitude of the ideal value does not usually have a
@@ -90,7 +90,7 @@ import static io.micronaut.core.util.clhm.ConcurrentLinkedHashMap.DrainStatus.RE
  * interfaces.
  * <p>
  * Like {@link java.util.Hashtable} but unlike {@link HashMap}, this class
- * does <em>not</em> allow <tt>null</tt> to be used as a key or value. Unlike
+ * does <em>not</em> allow {@code null} to be used as a key or value. Unlike
  * {@link LinkedHashMap}, this class does <em>not</em> provide
  * predictable iteration order. A snapshot of the keys and entries may be
  * obtained in ascending and descending order of retention.
@@ -474,8 +474,8 @@ public final class ConcurrentLinkedHashMap<K, V> extends AbstractMap<K, V>
     }
 
     /**
-     * Attempts to transition the node from the <tt>alive</tt> state to the
-     * <tt>retired</tt> state.
+     * Attempts to transition the node from the {@code alive} state to the
+     * {@code retired} state.
      *
      * @param node the entry in the page replacement policy
      * @param expect the expected weighted value
@@ -490,8 +490,8 @@ public final class ConcurrentLinkedHashMap<K, V> extends AbstractMap<K, V>
     }
 
     /**
-     * Atomically transitions the node from the <tt>alive</tt> state to the
-     * <tt>retired</tt> state, if a valid transition.
+     * Atomically transitions the node from the {@code alive} state to the
+     * {@code retired} state, if a valid transition.
      *
      * @param node the entry in the page replacement policy
      */
@@ -509,8 +509,8 @@ public final class ConcurrentLinkedHashMap<K, V> extends AbstractMap<K, V>
     }
 
     /**
-     * Atomically transitions the node to the <tt>dead</tt> state and decrements
-     * the <tt>weightedSize</tt>.
+     * Atomically transitions the node to the {@code dead} state and decrements
+     * the {@code weightedSize}.
      *
      * @param node the entry in the page replacement policy
      */
@@ -1234,7 +1234,7 @@ public final class ConcurrentLinkedHashMap<K, V> extends AbstractMap<K, V>
             this.next = next;
         }
 
-        /** Retrieves the value held by the current <tt>WeightedValue</tt>. */
+        /** Retrieves the value held by the current {@code WeightedValue}. */
         V getValue() {
             return super.get().value;
         }
@@ -1678,7 +1678,7 @@ public final class ConcurrentLinkedHashMap<K, V> extends AbstractMap<K, V>
         }
 
         /**
-         * Specifies the initial capacity of the hash table (default <tt>16</tt>).
+         * Specifies the initial capacity of the hash table (default {@code 16}).
          * This is the number of key-value pairs that the hash table can hold
          * before a resize operation is required.
          *
@@ -1712,7 +1712,7 @@ public final class ConcurrentLinkedHashMap<K, V> extends AbstractMap<K, V>
         /**
          * Specifies the estimated number of concurrently updating threads. The
          * implementation performs internal sizing to try to accommodate this many
-         * threads (default <tt>16</tt>).
+         * threads (default {@code 16}).
          *
          * @param concurrencyLevel the estimated number of concurrently updating
          *     threads
@@ -1743,7 +1743,7 @@ public final class ConcurrentLinkedHashMap<K, V> extends AbstractMap<K, V>
         /**
          * Specifies an algorithm to determine how many the units of capacity a
          * value consumes. The default algorithm bounds the map by the number of
-         * key-value pairs by giving each entry a weight of <tt>1</tt>.
+         * key-value pairs by giving each entry a weight of {@code 1}.
          *
          * @param weigher the algorithm to determine a value's weight
          * @throws NullPointerException if the weigher is null
@@ -1759,7 +1759,7 @@ public final class ConcurrentLinkedHashMap<K, V> extends AbstractMap<K, V>
         /**
          * Specifies an algorithm to determine how many the units of capacity an
          * entry consumes. The default algorithm bounds the map by the number of
-         * key-value pairs by giving each entry a weight of <tt>1</tt>.
+         * key-value pairs by giving each entry a weight of {@code 1}.
          *
          * @param weigher the algorithm to determine a entry's weight
          * @throws NullPointerException if the weigher is null

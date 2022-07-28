@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameResolver;
+import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanType;
 
 import java.lang.annotation.Annotation;
@@ -66,17 +67,26 @@ class NameQualifier<T> implements Qualifier<T>, io.micronaut.core.naming.Named {
             }
             AnnotationMetadata annotationMetadata = candidate.getAnnotationMetadata();
             // here we resolved the declared Qualifier of the bean
-            Optional<String> beanQualifier = annotationMetadata
+            String thisName = annotationMetadata
                     .findDeclaredAnnotation(AnnotationUtil.NAMED)
-                    .flatMap(AnnotationValue::stringValue);
-            String typeName = beanQualifier.orElseGet(() -> {
-                if (candidate instanceof NameResolver) {
-                    Optional<String> resolvedName = ((NameResolver) candidate).resolveName();
-                    return resolvedName.orElse(candidate.getBeanType().getSimpleName());
+                    .flatMap(AnnotationValue::stringValue)
+                    .orElse(null);
+
+            if (thisName == null && candidate instanceof BeanDefinition) {
+                Qualifier<?> qualifier = ((BeanDefinition<?>) candidate).getDeclaredQualifier();
+                if (qualifier != null && qualifier.contains((Qualifier) this)) {
+                    return true;
                 }
-                return candidate.getBeanType().getSimpleName();
-            });
-            return typeName.equalsIgnoreCase(name) || typeName.equalsIgnoreCase(name + beanType.getSimpleName());
+            }
+            if (thisName == null) {
+                 if (candidate instanceof NameResolver) {
+                    Optional<String> resolvedName = ((NameResolver) candidate).resolveName();
+                    thisName = resolvedName.orElse(candidate.getBeanType().getSimpleName());
+                } else {
+                     thisName = candidate.getBeanType().getSimpleName();
+                 }
+            }
+            return thisName.equalsIgnoreCase(name) || thisName.equalsIgnoreCase(name + beanType.getSimpleName());
         });
     }
 

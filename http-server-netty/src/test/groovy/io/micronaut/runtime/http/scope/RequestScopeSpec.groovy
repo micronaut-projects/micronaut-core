@@ -19,20 +19,25 @@ import io.micronaut.context.event.ApplicationEventListener
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.context.ServerRequestContext
 import io.micronaut.http.context.event.HttpRequestTerminatedEvent
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 import jakarta.annotation.PreDestroy
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
-import reactor.core.publisher.Flux
 import spock.util.concurrent.PollingConditions
 
+import java.nio.charset.StandardCharsets
 
 /**
  * @author Marcel Overdijk
  * @since 1.2.0
  */
 class RequestScopeSpec extends AbstractMicronautSpec {
+
+    def setupSpec() {
+        ServerRequestContext.set(null);
+    }
 
     void 'test request scope no request'() {
         when:
@@ -89,6 +94,22 @@ class RequestScopeSpec extends AbstractMicronautSpec {
 
         then:
         result == "message count 3, count within request 1"
+        RequestBean.BEANS_CREATED.size() == 1
+        RequestScopeFactoryBean.BEANS_CREATED.size() == 1
+        conditions.eventually {
+            listener.callCount == 1
+            RequestBean.BEANS_CREATED.first().dead
+            RequestScopeFactoryBean.BEANS_CREATED.first().dead
+        }
+
+        when:
+        RequestBean.BEANS_CREATED.clear()
+        RequestScopeFactoryBean.BEANS_CREATED.clear()
+        listener.callCount = 0
+        result = rxClient.toBlocking().retrieve(HttpRequest.GET("/test-request-scope-stream"), String)
+
+        then:
+        result == "message count 4, count within request 1"
         RequestBean.BEANS_CREATED.size() == 1
         RequestScopeFactoryBean.BEANS_CREATED.size() == 1
         conditions.eventually {
@@ -178,6 +199,11 @@ class RequestScopeSpec extends AbstractMicronautSpec {
         @Get("/test-request-scope")
         String test() {
             return messageService.message
+        }
+
+        @Get("/test-request-scope-stream")
+        InputStream testStream() {
+            return new ByteArrayInputStream(messageService.message.getBytes(StandardCharsets.UTF_8))
         }
 
         @Get("/test-request-aware")

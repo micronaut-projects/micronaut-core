@@ -23,7 +23,7 @@ import spock.lang.Specification
 
 class OptionsRequestAttributesSpec extends Specification {
 
-    def 'test OPTIONS rquests attributes'() {
+    def 'test OPTIONS requests attributes'() {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': 'OptionsRequestAttributesSpec'])
         def ctx = server.applicationContext
         HttpClient client = ctx.createBean(HttpClient, server.getURL())
