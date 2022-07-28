@@ -145,6 +145,16 @@ public interface ElementQuery<T extends Element> {
     @NonNull ElementQuery<T> named(@NonNull Predicate<String> predicate);
 
     /**
+     * Allows filtering elements by name.
+     * @param name The name to filter by
+     * @return This query
+     * @since 3.5.2
+     */
+    default @NonNull ElementQuery<T> named(@NonNull String name) {
+        return named(n -> n.equals(name));
+    }
+
+    /**
      * Allows filtering elements by type. For {@link MethodElement} instances this is based on the return type.
      * @param predicate The predicate to use. Should return true to include the element.
      * @return This query

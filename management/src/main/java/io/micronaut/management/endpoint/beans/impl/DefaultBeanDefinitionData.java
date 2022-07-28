@@ -29,7 +29,7 @@ import java.util.stream.Collectors;
 /**
  * The default {@link BeanDefinitionData} implementation. Returns a {@link Map} with
  * 3 keys; "dependencies": A list of class names the bean depends on, "scope": The
- * scope of the bean {@link javax.inject.Scope}, "type": The bean class name.
+ * scope of the bean {@link jakarta.inject.Scope}, "type": The bean class name.
  *
  * @author James Kleeh
  * @since 1.0

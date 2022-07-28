@@ -281,6 +281,7 @@ class SomeBean {
         then:
         definition
         !definition.getTypeArguments(Supplier).isEmpty()
+        definition.getTypeArguments(Supplier).first().type.name == 'addbean.Test'
     }
 
     @Override

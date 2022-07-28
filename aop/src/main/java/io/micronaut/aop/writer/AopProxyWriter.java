@@ -208,7 +208,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
     /**
      * <p>Constructs a new {@link AopProxyWriter} for the given parent {@link BeanDefinitionWriter} and starting interceptors types.</p>
-     * <p>
+     * 
      * <p>Additional {@link Interceptor} types can be added downstream with {@link #visitInterceptorBinding(AnnotationValue[])} .</p>
      *  @param parent             The parent {@link BeanDefinitionWriter}
      * @param settings           optional setting
@@ -391,6 +391,21 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     @Deprecated
     public Element getOriginatingElement() {
         return proxyBeanDefinitionWriter.getOriginatingElement();
+    }
+
+    @Override
+    public void visitBeanFactoryMethod(ClassElement factoryClass, MethodElement factoryMethod) {
+        proxyBeanDefinitionWriter.visitBeanFactoryMethod(factoryClass, factoryMethod);
+    }
+
+    @Override
+    public void visitBeanFactoryMethod(ClassElement factoryClass, MethodElement factoryMethod, ParameterElement[] parameters) {
+        proxyBeanDefinitionWriter.visitBeanFactoryMethod(factoryClass, factoryMethod, parameters);
+    }
+
+    @Override
+    public void visitBeanFactoryField(ClassElement factoryClass, FieldElement factoryField) {
+        proxyBeanDefinitionWriter.visitBeanFactoryField(factoryClass, factoryField);
     }
 
     @Override

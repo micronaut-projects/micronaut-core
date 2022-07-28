@@ -375,6 +375,15 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
         return list;
     }
 
+    @Override
+    public <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByStereotype(String stereotype) {
+        List<AnnotationValue<T>> list = new ArrayList<>();
+        for (AnnotationMetadata am : hierarchy) {
+            list.addAll(am.getAnnotationValuesByStereotype(stereotype));
+        }
+        return list;
+    }
+
     @NonNull
     @Override
     public Set<String> getDeclaredAnnotationNames() {

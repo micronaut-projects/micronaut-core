@@ -24,7 +24,7 @@ import java.lang.annotation.Retention;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
- * A {@link Secondary} {@link javax.inject.Scope} for types that should be used as a fallback.
+ * A {@link Secondary} {@link jakarta.inject.Scope} for types that should be used as a fallback.
  *
  * @author graemerocher
  * @since 1.0

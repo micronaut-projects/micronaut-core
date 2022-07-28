@@ -104,9 +104,9 @@ public interface RouteBuilder {
 
     /**
      * <p>Builds the necessary mappings to treat the given class as a REST endpoint.</p>
-     * <p>
+     *
      * <p>For example given a class called BookController the following routes will be produced:</p>
-     * <p>
+     *
      * <pre>{@code
      *     GET "/book"
      *     GET "/book{/id}"
@@ -115,7 +115,7 @@ public interface RouteBuilder {
      *     PATCH "/book{/id}"
      *     DELETE "/book{/id}"
      * }</pre>
-     * <p>
+     *
      * <p>By default it is assumed the accepted and returned content type is
      * {@link io.micronaut.http.MediaType#APPLICATION_JSON_TYPE}.</p>
      *
@@ -137,9 +137,9 @@ public interface RouteBuilder {
 
     /**
      * <p>Builds the necessary mappings to treat the given class as a singular REST endpoint.</p>
-     * <p>
+     *
      * <p>For example given a class called BookController the following routes will be produced:</p>
-     * <p>
+     *
      * <pre>{@code
      *     GET "/book"
      *     POST "/book"
@@ -147,7 +147,7 @@ public interface RouteBuilder {
      *     PATCH "/book"
      *     DELETE "/book"
      * }</pre>
-     * <p>
+     *
      * <p>By default it is assumed the accepted and returned content type is
      * {@link io.micronaut.http.MediaType#APPLICATION_JSON_TYPE}.</p>
      *
@@ -334,7 +334,7 @@ public interface RouteBuilder {
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param uri    The URI
@@ -347,7 +347,7 @@ public interface RouteBuilder {
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param beanDefinition The bean definition
@@ -361,7 +361,7 @@ public interface RouteBuilder {
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param uri            The URI
@@ -374,7 +374,7 @@ public interface RouteBuilder {
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param uri            The URI
@@ -444,7 +444,7 @@ public interface RouteBuilder {
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param uri    The URI
@@ -457,7 +457,7 @@ public interface RouteBuilder {
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param beanDefinition The bean definition
@@ -471,7 +471,7 @@ public interface RouteBuilder {
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param uri            The URI
@@ -484,7 +484,7 @@ public interface RouteBuilder {
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param uri            The URI
@@ -553,7 +553,7 @@ public interface RouteBuilder {
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param uri    The URI
@@ -566,7 +566,7 @@ public interface RouteBuilder {
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param beanDefinition The bean definition
@@ -580,7 +580,7 @@ public interface RouteBuilder {
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param uri            The URI
@@ -593,7 +593,7 @@ public interface RouteBuilder {
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param uri            The URI
@@ -662,7 +662,7 @@ public interface RouteBuilder {
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param uri    The URI
@@ -675,7 +675,7 @@ public interface RouteBuilder {
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param beanDefinition The bean definition
@@ -689,7 +689,7 @@ public interface RouteBuilder {
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param uri            The URI
@@ -702,7 +702,7 @@ public interface RouteBuilder {
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param uri            The URI
@@ -771,7 +771,7 @@ public interface RouteBuilder {
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param uri    The URI
@@ -784,7 +784,7 @@ public interface RouteBuilder {
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param beanDefinition The bean definition
@@ -798,7 +798,7 @@ public interface RouteBuilder {
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param uri            The URI
@@ -811,7 +811,7 @@ public interface RouteBuilder {
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param uri            The URI
@@ -880,7 +880,7 @@ public interface RouteBuilder {
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param uri    The URI
@@ -893,7 +893,7 @@ public interface RouteBuilder {
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param beanDefinition The bean definition
@@ -907,7 +907,7 @@ public interface RouteBuilder {
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param uri            The URI
@@ -920,7 +920,7 @@ public interface RouteBuilder {
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param uri            The URI
@@ -989,7 +989,7 @@ public interface RouteBuilder {
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param uri    The URI
@@ -1002,7 +1002,7 @@ public interface RouteBuilder {
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param beanDefinition The bean definition
@@ -1016,7 +1016,7 @@ public interface RouteBuilder {
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param uri            The URI
@@ -1029,7 +1029,7 @@ public interface RouteBuilder {
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param uri            The URI
@@ -1098,7 +1098,7 @@ public interface RouteBuilder {
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments.</p>
      *
      * @param uri    The URI
@@ -1111,7 +1111,7 @@ public interface RouteBuilder {
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param beanDefinition The bean definition
@@ -1125,7 +1125,7 @@ public interface RouteBuilder {
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param uri            The URI
@@ -1138,7 +1138,7 @@ public interface RouteBuilder {
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param uri            The URI
@@ -1151,14 +1151,14 @@ public interface RouteBuilder {
 
     /**
      * <p>A URI naming strategy is used to dictate the default name to use when building a URI for a class.</p>
-     * <p>
+     *
      * <p>The default strategy is as follows:</p>
-     * <p>
+     *
      * <ul>
-     * <li>{@link #resolveUri(Class)} - Where type is <code>example.BookController</code> value is <code>/book</code></li>
-     * <li>{@link #resolveUri(Class, PropertyConvention)} - Where type is <code>example.BookController</code> value is <code>/book{/id}</code></li>
+     * <li>{@link #resolveUri(Class)} - Where type is {@code example.BookController} value is {@code /book}</li>
+     * <li>{@link #resolveUri(Class, PropertyConvention)} - Where type is {@code example.BookController} value is {@code /book{/id}}</li>
      * </ul>
-     * <p>
+     *
      * <p>Implementers can override to provide other strategies such as pluralization etc.</p>
      */
     interface UriNamingStrategy {

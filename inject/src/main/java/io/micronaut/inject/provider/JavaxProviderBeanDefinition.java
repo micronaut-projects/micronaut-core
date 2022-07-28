@@ -50,12 +50,7 @@ public final class JavaxProviderBeanDefinition extends AbstractProviderDefinitio
     }
 
     @Override
-    protected Provider<Object> buildProvider(
-            BeanResolutionContext resolutionContext,
-            BeanContext context,
-            Argument<Object> argument,
-            Qualifier<Object> qualifier,
-            boolean singleton) {
+    protected Provider<Object> buildProvider(BeanResolutionContext resolutionContext, BeanContext context, Argument<Object> argument, Qualifier<Object> qualifier, boolean singleton) {
         if (singleton) {
             return new Provider<Object>() {
                 Object bean;
@@ -63,14 +58,13 @@ public final class JavaxProviderBeanDefinition extends AbstractProviderDefinitio
                 @Override
                 public Object get() {
                     if (bean == null) {
-                        bean = ((DefaultBeanContext) context).getBean(resolutionContext, argument, qualifier);
+                        bean = ((DefaultBeanContext) context).getBean(resolutionContext.copy(), argument, qualifier);
                     }
                     return bean;
                 }
             };
-        } else {
-            return () -> ((DefaultBeanContext) context).getBean(resolutionContext, argument, qualifier);
         }
+        return () -> ((DefaultBeanContext) context).getBean(resolutionContext.copy(), argument, qualifier);
     }
 
     private static boolean isTypePresent() {

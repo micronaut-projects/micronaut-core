@@ -15,6 +15,7 @@
  */
 package io.micronaut.aop.internal.intercepted;
 
+import io.micronaut.aop.Around;
 import io.micronaut.aop.InterceptedMethod;
 import io.micronaut.aop.InterceptorBinding;
 import io.micronaut.aop.InterceptorKind;
@@ -23,11 +24,15 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.type.ReturnType;
 
 import java.util.List;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Future;
+import java.util.function.Function;
+import java.util.function.Predicate;
 
 /**
  * The {@link InterceptedMethod} utils class.
@@ -91,5 +96,45 @@ public final class InterceptedMethodUtil {
                     .toArray(io.micronaut.core.annotation.AnnotationValue[]::new);
         }
         return AnnotationUtil.ZERO_ANNOTATION_VALUES;
+    }
+
+    /**
+     * Does the given metadata have AOP advice declared.
+     * @param annotationMetadata The annotation metadata
+     * @return True if it does
+     */
+    public static boolean hasAroundStereotype(@Nullable AnnotationMetadata annotationMetadata) {
+        return hasAround(annotationMetadata,
+                annMetadata -> annMetadata.hasStereotype(Around.class),
+                annMetdata -> annMetdata.getAnnotationValuesByType(InterceptorBinding.class));
+    }
+
+    /**
+     * Does the given metadata have declared AOP advice.
+     * @param annotationMetadata The annotation metadata
+     * @return True if it does
+     */
+    public static boolean hasDeclaredAroundAdvice(@Nullable AnnotationMetadata annotationMetadata) {
+        return hasAround(annotationMetadata,
+                annMetadata -> annMetadata.hasDeclaredStereotype(Around.class),
+                annMetdata -> annMetdata.getDeclaredAnnotationValuesByType(InterceptorBinding.class));
+    }
+
+    private static boolean hasAround(@Nullable AnnotationMetadata annotationMetadata,
+                                     @NonNull Predicate<AnnotationMetadata> hasFunction,
+                                     @NonNull Function<AnnotationMetadata, List<AnnotationValue<InterceptorBinding>>> interceptorBindingsFunction) {
+        if (annotationMetadata == null) {
+            return false;
+        }
+        if (hasFunction.test(annotationMetadata)) {
+            return true;
+        } else if (annotationMetadata.hasDeclaredStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS)) {
+            return interceptorBindingsFunction.apply(annotationMetadata)
+                    .stream().anyMatch(av ->
+                            av.enumValue("kind", InterceptorKind.class).orElse(InterceptorKind.AROUND) == InterceptorKind.AROUND
+                    );
+        }
+
+        return false;
     }
 }
