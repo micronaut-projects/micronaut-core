@@ -26,6 +26,7 @@ import io.micronaut.http.server.netty.AbstractMicronautSpec
 import jakarta.annotation.PreDestroy
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
+import spock.lang.Shared
 import spock.util.concurrent.PollingConditions
 
 import java.nio.charset.StandardCharsets
@@ -36,6 +37,9 @@ import java.util.concurrent.atomic.AtomicInteger
  * @since 1.2.0
  */
 class RequestScopeSpec extends AbstractMicronautSpec {
+
+    @Shared
+    PollingConditions conditions = new PollingConditions(delay: 0.5, timeout: 3)
 
     def setupSpec() {
         ServerRequestContext.set(null)
@@ -54,7 +58,9 @@ class RequestScopeSpec extends AbstractMicronautSpec {
         }
         def controller = applicationContext.getBean(SimpleTestController)
         then:
-        SimpleBean.destroyed.get() == 101
+        conditions.eventually {
+            SimpleBean.destroyed.get() == 101
+        }
         (controller.simpleRequestBean.$beanResolutionContext.popDependentBeans() as Collection) == null
     }
 
@@ -73,7 +79,6 @@ class RequestScopeSpec extends AbstractMicronautSpec {
 
     void "test @Request bean created per request"() {
         given:
-        PollingConditions conditions = new PollingConditions(delay: 0.5, timeout: 3)
         ReqTerminatedListener listener = applicationContext.getBean(ReqTerminatedListener)
 
         when:
