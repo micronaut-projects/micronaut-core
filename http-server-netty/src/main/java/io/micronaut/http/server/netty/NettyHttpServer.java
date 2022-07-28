@@ -139,6 +139,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     @Nullable
     private volatile List<Listener> activeListeners = null;
     private final List<NettyHttpServerConfiguration.NettyListenerConfiguration> listenerConfigurations;
+    private final CompositeNettyServerCustomizer rootCustomizer = new CompositeNettyServerCustomizer();
 
     /**
      * @param serverConfiguration                     The Netty HTTP server configuration
@@ -333,6 +334,12 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     }
 
     @Override
+    public void register(@NonNull NettyServerCustomizer customizer) {
+        Objects.requireNonNull(customizer, "customizer");
+        rootCustomizer.add(customizer);
+    }
+
+    @Override
     public int getPort() {
         List<Listener> listenersLocal = this.activeListeners;
 
@@ -479,8 +486,16 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
         try {
             Listener listener = new Listener(cfg);
-            ServerBootstrap listenerBootstrap = bootstrap.clone();
-            listenerBootstrap.childHandler(listener);
+            ServerBootstrap listenerBootstrap = bootstrap.clone()
+                // this initializer runs before the actual bind operation, so we can be sure
+                // setServerChannel has been called by the time bind runs.
+                .handler(new ChannelInitializer<Channel>() {
+                    @Override
+                    protected void initChannel(@NonNull Channel ch) {
+                        listener.setServerChannel(ch);
+                    }
+                })
+                .childHandler(listener);
             ChannelFuture future;
             switch (cfg.getFamily()) {
                 case TCP:
@@ -502,7 +517,6 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 default:
                     throw new UnsupportedOperationException("Unsupported family: " + cfg.getFamily());
             }
-            listener.serverChannel = future.channel();
             future.syncUninterruptibly();
             return listener;
         } catch (Exception e) {
@@ -718,8 +732,9 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         }
     }
 
-    private HttpPipelineBuilder createPipelineBuilder() {
-        return new HttpPipelineBuilder(NettyHttpServer.this, nettyEmbeddedServices, sslConfiguration, routingHandler, hostResolver);
+    private HttpPipelineBuilder createPipelineBuilder(NettyServerCustomizer customizer) {
+        Objects.requireNonNull(customizer, "customizer");
+        return new HttpPipelineBuilder(NettyHttpServer.this, nettyEmbeddedServices, sslConfiguration, routingHandler, hostResolver, customizer);
     }
 
     /**
@@ -731,7 +746,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     @Internal
     public EmbeddedChannel buildEmbeddedChannel(boolean ssl) {
         EmbeddedChannel embeddedChannel = new EmbeddedChannel();
-        createPipelineBuilder().new ConnectionPipeline(embeddedChannel, ssl).initChannel();
+        createPipelineBuilder(rootCustomizer).new ConnectionPipeline(embeddedChannel, ssl).initChannel();
         return embeddedChannel;
     }
 
@@ -748,20 +763,26 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
     private class Listener extends ChannelInitializer<Channel> {
         Channel serverChannel;
+        private NettyServerCustomizer listenerCustomizer;
         NettyHttpServerConfiguration.NettyListenerConfiguration config;
 
         private volatile HttpPipelineBuilder httpPipelineBuilder;
 
         Listener(NettyHttpServerConfiguration.NettyListenerConfiguration config) {
             this.config = config;
-            refresh();
         }
 
         void refresh() {
-            httpPipelineBuilder = createPipelineBuilder();
+            httpPipelineBuilder = createPipelineBuilder(listenerCustomizer);
             if (config.isSsl() && !httpPipelineBuilder.supportsSsl()) {
                 throw new IllegalStateException("Listener configured for SSL, but no SSL context available");
             }
+        }
+
+        void setServerChannel(Channel serverChannel) {
+            this.serverChannel = serverChannel;
+            this.listenerCustomizer = rootCustomizer.specializeForChannel(serverChannel, NettyServerCustomizer.ChannelRole.LISTENER);
+            refresh();
         }
 
         @Override

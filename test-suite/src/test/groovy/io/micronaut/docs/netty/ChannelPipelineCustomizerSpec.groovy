@@ -41,13 +41,4 @@ class ChannelPipelineCustomizerSpec extends Specification {
     Logbook logbook() {
         Mock(Logbook)
     }
-
-    @Controller("/logbook/logged")
-    static class LoggedController {
-        @Get("/")
-        @Produces(MediaType.TEXT_PLAIN)
-        String index() {
-            return "hello"
-        }
-    }
 }

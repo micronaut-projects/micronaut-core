@@ -241,6 +241,16 @@
     "reason": "new internal default method"
   },
   {
+    "type": "io.micronaut.http.server.netty.NettyEmbeddedServer",
+    "member": "Class io.micronaut.http.server.netty.NettyEmbeddedServer",
+    "reason": "New default method"
+  },
+  {
+    "type": "io.micronaut.http.server.netty.NettyEmbeddedServer",
+    "member": "Method io.micronaut.http.server.netty.NettyEmbeddedServer.register(io.micronaut.http.server.netty.NettyServerCustomizer)",
+    "reason": "New default method"
+  },
+  {
     "type": "io.micronaut.runtime.converters.time.$TimeConverterRegistrar$Definition$Reference",
     "member": "Class io.micronaut.runtime.converters.time.$TimeConverterRegistrar$Definition$Reference",
     "reason": "Not a bean anymore"
