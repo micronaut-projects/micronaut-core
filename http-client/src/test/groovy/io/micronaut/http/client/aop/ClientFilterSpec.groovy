@@ -42,13 +42,11 @@ import spock.lang.Specification
  */
 class ClientFilterSpec extends Specification{
 
-    @Shared
     @AutoCleanup
     ApplicationContext context = ApplicationContext.run([
             'spec.name': 'ClientFilterSpec',
     ])
 
-    @Shared
     EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
     void "test client filter includes header"() {
