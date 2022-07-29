@@ -28,6 +28,7 @@ import jakarta.inject.Inject
 import jakarta.inject.Singleton
 import spock.lang.Shared
 import spock.util.concurrent.PollingConditions
+import java.util.concurrent.atomic.AtomicInteger
 
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.AtomicInteger
