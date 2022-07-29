@@ -1221,12 +1221,6 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
         FieldNode fieldNode = propertyNode.field
         if (fieldNode.name == 'metaClass') return
         def modifiers = propertyNode.getModifiers()
-        if (Modifier.isStatic(modifiers)) {
-            if (isFactoryClass && AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, fieldNode).hasDeclaredStereotype(Bean.class)) {
-                AstMessageUtils.error(sourceUnit, propertyNode, "Beans produced from fields cannot be static")
-            }
-            return
-        }
         AnnotationMetadata fieldAnnotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, fieldNode)
         if (Modifier.isFinal(modifiers) && !fieldAnnotationMetadata.hasStereotype(ConfigurationBuilder)) {
             if (isFactoryClass && fieldAnnotationMetadata.hasDeclaredStereotype(Bean.class)) {
@@ -1381,9 +1375,10 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
 
     private void visitFactoryProperty(PropertyNode propertyNode, FieldNode fieldNode, AnnotationMetadata fieldAnnotationMetadata) {
 
+        def modifiers = propertyNode.isStatic() ? Modifier.STATIC | Modifier.PUBLIC : Modifier.PUBLIC
         def getterNode = new MethodNode(
                 getGetterName(propertyNode),
-                Modifier.PUBLIC,
+                modifiers,
                 fieldNode.type,
                 new Parameter[0],
                 null,

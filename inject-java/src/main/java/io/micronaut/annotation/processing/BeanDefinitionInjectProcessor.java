@@ -852,7 +852,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 return null;
             }
 
-            if (modelUtils.isStatic(method) || modelUtils.isAbstract(method)) {
+            if (modelUtils.isAbstract(method)) {
                 return null;
             }
 
@@ -876,6 +876,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 return null;
             }
 
+            if (modelUtils.isStatic(method)) {
+                return null;
+            }
 
             boolean injected = methodAnnotationMetadata.hasDeclaredStereotype(AnnotationUtil.INJECT);
             boolean postConstruct = methodAnnotationMetadata.hasDeclaredAnnotation(AnnotationUtil.POST_CONSTRUCT);
@@ -1727,13 +1730,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 return null;
             }
 
-            if (modelUtils.isStatic(variable)) {
-                AnnotationMetadata fieldAnnotationMetadata = annotationUtils.getAnnotationMetadata(variable);
-                if (isFactoryType && fieldAnnotationMetadata.hasDeclaredStereotype(Bean.class)) {
-                    error(variable, "Beans produced from fields cannot be static");
-                }
-                return null;
-            } else if (modelUtils.isFinal(variable)) {
+            if (modelUtils.isFinal(variable)) {
                 AnnotationMetadata fieldAnnotationMetadata = annotationUtils.getAnnotationMetadata(variable);
                 if (isFactoryType && fieldAnnotationMetadata.hasDeclaredStereotype(Bean.class)) {
                     // field factory for bean
@@ -2261,7 +2258,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             }
         }
     }
-    
+
     /**
      * A dynamic name.
      */
