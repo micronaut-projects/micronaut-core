@@ -1731,22 +1731,20 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             }
 
             AnnotationMetadata fieldAnnotationMetadata = annotationUtils.getAnnotationMetadata(variable);
-            if (modelUtils.isFinal(variable)) {
-                if (isFactoryType && fieldAnnotationMetadata.hasDeclaredStereotype(Bean.class)) {
-                    // field factory for bean
-                    if (modelUtils.isPrivate(variable) || modelUtils.isProtected(variable)) {
-                        error(variable, "Beans produced from fields cannot be private or protected");
-                    } else {
-                        visitBeanFactoryElement(variable);
-                    }
-                    return null;
+            if (isFactoryType && fieldAnnotationMetadata.hasDeclaredStereotype(Bean.class)) {
+                // field factory for bean
+                if (modelUtils.isPrivate(variable) || modelUtils.isProtected(variable)) {
+                    error(variable, "Beans produced from fields cannot be private or protected");
                 } else {
-                    boolean isConfigBuilder = fieldAnnotationMetadata.hasStereotype(ConfigurationBuilder.class);
-                    if (isConfigBuilder) {
-                        visitConfigurationProperty(variable, fieldAnnotationMetadata);
-                    }
+                    visitBeanFactoryElement(variable);
                 }
                 return null;
+            } else {
+                boolean isConfigBuilder = fieldAnnotationMetadata.hasStereotype(ConfigurationBuilder.class);
+                if (isConfigBuilder) {
+                    visitConfigurationProperty(variable, fieldAnnotationMetadata);
+                    return null;
+                }
             }
 
             if (modelUtils.isStatic(variable)) {
