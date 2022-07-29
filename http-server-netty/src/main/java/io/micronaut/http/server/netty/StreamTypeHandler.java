@@ -21,6 +21,7 @@ import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandler;
 import io.micronaut.http.server.netty.types.stream.NettyStreamedCustomizableResponseType;
 import io.micronaut.http.server.types.CustomizableResponseTypeException;
+import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
 
 import java.io.InputStream;
@@ -38,7 +39,7 @@ class StreamTypeHandler implements NettyCustomizableResponseTypeHandler<Object> 
     private static final Class<?>[] SUPPORTED_TYPES = new Class[]{NettyStreamedCustomizableResponseType.class, InputStream.class};
 
     @Override
-    public void handle(Object object, HttpRequest<?> request, MutableHttpResponse<?> response, ChannelHandlerContext context) {
+    public ChannelFuture handle(Object object, HttpRequest<?> request, MutableHttpResponse<?> response, ChannelHandlerContext context) {
         NettyStreamedCustomizableResponseType type;
 
         if (object instanceof InputStream) {
@@ -50,8 +51,7 @@ class StreamTypeHandler implements NettyCustomizableResponseTypeHandler<Object> 
         }
 
         type.process(response);
-        type.write(request, response, context);
-        context.read();
+        return type.write(request, response, context);
     }
 
     @Override

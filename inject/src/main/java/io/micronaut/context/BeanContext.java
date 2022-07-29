@@ -33,7 +33,7 @@ import java.util.concurrent.Future;
 /**
  * <p>The core BeanContext abstraction which allows for dependency injection of classes annotated with
  * {@link javax.inject.Inject}.</p>
- * <p>
+ *
  * <p>Apart of the standard {@code javax.inject} annotations for dependency injection, additional annotations within
  * the {@code io.micronaut.context.annotation} package allow control over configuration of the bean context.</p>
  *
@@ -130,10 +130,10 @@ public interface BeanContext extends
 
     /**
      * <p>Creates a new instance of the given bean performing dependency injection and returning a new instance.</p>
-     * <p>
+     *
      * <p>If the bean defines any {@link io.micronaut.context.annotation.Parameter} values then the values passed
      * in the {@code argumentValues} parameter will be used</p>
-     * <p>
+     *
      * <p>Note that the instance returned is not saved as a singleton in the context.</p>
      *
      * @param beanType       The bean type
@@ -147,10 +147,10 @@ public interface BeanContext extends
 
     /**
      * <p>Creates a new instance of the given bean performing dependency injection and returning a new instance.</p>
-     * <p>
+     *
      * <p>If the bean defines any {@link io.micronaut.context.annotation.Parameter} values then the values passed in
      * the {@code argumentValues} parameter will be used</p>
-     * <p>
+     *
      * <p>Note that the instance returned is not saved as a singleton in the context.</p>
      *
      * @param beanType  The bean type
@@ -164,10 +164,10 @@ public interface BeanContext extends
 
     /**
      * <p>Creates a new instance of the given bean performing dependency injection and returning a new instance.</p>
-     * <p>
+     *
      * <p>If the bean defines any {@link io.micronaut.context.annotation.Parameter} values then the values passed in
      * the {@code argumentValues} parameter will be used</p>
-     * <p>
+     *
      * <p>Note that the instance returned is not saved as a singleton in the context.</p>
      *
      * @param beanType The bean type
@@ -182,10 +182,10 @@ public interface BeanContext extends
 
     /**
      * <p>Creates a new instance of the given bean performing dependency injection and returning a new instance.</p>
-     * <p>
+     *
      * <p>If the bean defines any {@link io.micronaut.context.annotation.Parameter} values then the values passed in
      * the {@code argumentValues} parameter will be used</p>
-     * <p>
+     *
      * <p>Note that the instance returned is not saved as a singleton in the context.</p>
      *
      * @param beanType       The bean type
@@ -259,7 +259,7 @@ public interface BeanContext extends
 
     /**
      * <p>Refresh the state of the given registered bean applying dependency injection and configuration wiring again.</p>
-     * <p>
+     *
      * <p>Note that if the bean was produced by a {@link io.micronaut.context.annotation.Factory} then this method will
      * refresh the factory too</p>
      *
@@ -272,10 +272,10 @@ public interface BeanContext extends
 
     /**
      * <p>Refresh the state of the given registered bean applying dependency injection and configuration wiring again.</p>
-     * <p>
+     *
      * <p>Note that if the bean was produced by a {@link io.micronaut.context.annotation.Factory} then this method will
      * refresh the factory too</p>
-     * <p>
+     *
      * This methods skips an additional resolution of the {@link BeanRegistration}.
      *
      * @param beanRegistration The {@link BeanRegistration}

@@ -15,6 +15,7 @@
  */
 package io.micronaut.runtime;
 
+import io.micronaut.context.banner.Banner;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.context.ApplicationContext;
@@ -25,6 +26,7 @@ import io.micronaut.context.banner.ResourceBanner;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.core.naming.Described;
+import io.micronaut.core.version.VersionUtils;
 import io.micronaut.runtime.exceptions.ApplicationStartupException;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.slf4j.Logger;
@@ -46,6 +48,7 @@ import java.util.function.Function;
  * @since 1.0
  */
 public class Micronaut extends DefaultApplicationContextBuilder implements ApplicationContextBuilder  {
+    private static final String MICRONAUT = "  Micronaut";
     private static final String BANNER_NAME = "micronaut-banner.txt";
     private static final Logger LOG = LoggerFactory.getLogger(Micronaut.class);
     private static final String SHUTDOWN_MONITOR_THREAD = "micronaut-shutdown-monitor-thread";
@@ -344,13 +347,21 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
             return;
         }
         PrintStream out = System.out;
+        resolveBanner(out).print();
+        printMicronautVersion(out);
+    }
 
-        Optional<URL> resource = getResourceLoader().getResource(BANNER_NAME);
-        if (resource.isPresent()) {
-            new ResourceBanner(resource.get(), out).print();
-        } else {
-            new MicronautBanner(out).print();
-        }
+    private void printMicronautVersion(@NonNull PrintStream out) {
+        String version = VersionUtils.getMicronautVersion();
+        version = (version != null) ? " (v" + version + ")" : "";
+        out.println(MICRONAUT + version + "\n");
+    }
+
+    @NonNull
+    private Banner resolveBanner(@NonNull PrintStream out) {
+        return getResourceLoader().getResource(BANNER_NAME)
+            .map(resource -> (Banner) new ResourceBanner(resource, out))
+            .orElseGet(() -> new MicronautBanner(out));
     }
 
 }

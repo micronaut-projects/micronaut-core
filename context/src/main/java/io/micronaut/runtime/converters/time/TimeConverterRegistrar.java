@@ -15,9 +15,7 @@
  */
 package io.micronaut.runtime.converters.time;
 
-import io.micronaut.context.annotation.BootstrapContextCompatible;
-import io.micronaut.context.annotation.Requires;
-import io.micronaut.context.env.Environment;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
@@ -25,9 +23,20 @@ import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.convert.format.Format;
 import io.micronaut.core.util.StringUtils;
-import jakarta.inject.Singleton;
 
-import java.time.*;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.MonthDay;
+import java.time.OffsetDateTime;
+import java.time.OffsetTime;
+import java.time.Period;
+import java.time.Year;
+import java.time.YearMonth;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.TemporalAccessor;
@@ -43,10 +52,6 @@ import java.util.regex.Pattern;
  * @author Graeme Rocher
  * @since 1.0
  */
-@Singleton
-// Android doesn't support java.time
-@Requires(notEnv = Environment.ANDROID)
-@BootstrapContextCompatible
 @TypeHint(
         value = {
                 Duration.class,
@@ -66,6 +71,7 @@ import java.util.regex.Pattern;
         },
         accessType = TypeHint.AccessType.ALL_PUBLIC
 )
+@Internal
 public class TimeConverterRegistrar implements TypeConverterRegistrar {
 
     private static final Pattern DURATION_MATCHER = Pattern.compile("^(-?\\d+)([unsmhd])(s?)$");

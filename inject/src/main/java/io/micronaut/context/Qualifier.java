@@ -23,7 +23,7 @@ import java.util.stream.Stream;
 
 /**
  * <p>Used to qualify which bean to select in the case of multiple possible options.</p>
- * <p>
+ *
  * <p>NOTE: When implementing a custom Qualifier you MUST implement {@link Object#hashCode()} and
  * {@link Object#equals(Object)} so that the qualifier can be used in comparisons and equality checks</p>
  *

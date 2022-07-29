@@ -21,7 +21,7 @@ import java.util.concurrent.Future;
 
 /**
  * <p>Interface for classes that publish events received by {@link ApplicationEventListener} instances.</p>
- * <p>
+ *
  * <p>Note that this interface is designed for application level, non-blocking synchronous events for decoupling code
  * and is not a replacement for a messaging system</p>
  *

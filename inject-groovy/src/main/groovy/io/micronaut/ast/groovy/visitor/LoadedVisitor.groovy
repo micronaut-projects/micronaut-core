@@ -32,7 +32,6 @@ import org.codehaus.groovy.ast.FieldNode
 import org.codehaus.groovy.ast.GenericsType
 import org.codehaus.groovy.ast.MethodNode
 import org.codehaus.groovy.ast.PropertyNode
-import org.codehaus.groovy.ast.Variable
 import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.SourceUnit
 
@@ -152,9 +151,16 @@ class LoadedVisitor implements Ordered {
                 visitor.visitField(e, visitorContext)
                 return e
             case FieldNode:
-                def e = visitorContext.getElementFactory().newFieldElement(currentClassElement, (FieldNode) annotatedNode, annotationMetadata)
-                visitor.visitField(e, visitorContext)
-                return e
+                def field = (FieldNode) annotatedNode;
+                if (field.enum) {
+                    def e = visitorContext.getElementFactory().newEnumConstantElement(currentClassElement, (FieldNode) annotatedNode, annotationMetadata)
+                    visitor.visitEnumConstant(e, visitorContext)
+                    return e
+                } else {
+                    def e = visitorContext.getElementFactory().newFieldElement(currentClassElement, (FieldNode) annotatedNode, annotationMetadata)
+                    visitor.visitField(e, visitorContext)
+                    return e
+                }
             case ConstructorNode:
                 def e = visitorContext.getElementFactory().newConstructorElement(currentClassElement, (ConstructorNode) annotatedNode, annotationMetadata)
                 visitor.visitConstructor(e, visitorContext)

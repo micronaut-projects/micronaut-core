@@ -116,7 +116,7 @@ public interface BeanProvider<T> extends Iterable<T> {
     }
 
     /**
-     * <p>Determines if more than one bean matches the specified type and qualifiers.</p>>
+     * <p>Determines if more than one bean matches the specified type and qualifiers.</p>
      *
      * @since 3.0.0
      * @return <code>true</code> if only one bean matches.

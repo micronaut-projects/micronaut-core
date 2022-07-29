@@ -78,7 +78,6 @@ public interface ClassWriterOutputVisitor {
      *
      * @param type      the fully qualified service name
      * @param classname the fully qualified classname
-     * @throws IOException If the file couldn't be created
      */
     void visitServiceDescriptor(String type, String classname);
 
@@ -89,7 +88,6 @@ public interface ClassWriterOutputVisitor {
      * @param type      the fully qualified service name
      * @param classname the fully qualified classname
      * @param originatingElement The originating element
-     * @throws IOException If the file couldn't be created
      * @since 3.5.0
      */
     void visitServiceDescriptor(String type, String classname, Element originatingElement);
@@ -99,7 +97,6 @@ public interface ClassWriterOutputVisitor {
      *
      * @param path The path to the file
      * @return An optional file it was possible to create it
-     * @throws IOException If the file couldn't be created
      * @deprecated Visiting a file should supply the originating elements. Use {@link #visitMetaInfFile(String, Element...)} instead
      */
     @Deprecated
@@ -113,7 +110,6 @@ public interface ClassWriterOutputVisitor {
      * @param path The path to the file
      * @param originatingElements The originating elements
      * @return An optional file it was possible to create it
-     * @throws IOException If the file couldn't be created
      */
     Optional<GeneratedFile> visitMetaInfFile(String path, Element... originatingElements);
 
@@ -145,7 +141,6 @@ public interface ClassWriterOutputVisitor {
      *
      * @param type      The service type
      * @param classname the fully qualified classname
-     * @throws IOException If the file couldn't be created
      * @deprecated Use {@link #visitServiceDescriptor(String, String, io.micronaut.inject.ast.Element)}
      */
     @Deprecated
@@ -161,7 +156,6 @@ public interface ClassWriterOutputVisitor {
      * @param type      The service type
      * @param classname the fully qualified classname
      * @param originatingElement The originating element
-     * @throws IOException If the file couldn't be created
      * @since 3.5.0
      */
     default void visitServiceDescriptor(Class<?> type, String classname, Element originatingElement) {

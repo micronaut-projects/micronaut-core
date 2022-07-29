@@ -60,10 +60,11 @@ public class MultiValuesConverterFactory {
      * Values separated with commas ",". In case of iterables, the values are converted to {@link String} and joined
      * with comma delimiter. In case of {@link Map} or a POJO {@link Object} the keys and values are alternating and all
      * delimited with commas.
-     * <table borer="0">
+     * <table border="1">
+     *     <caption>Examples</caption>
      *     <tr> <th><b> Type </b></th>      <th><b> Example value </b></th>                     <th><b> Example representation </b></th> </tr>
-     *     <tr> <td> Iterable &emsp </td>   <td> param=["Mike", "Adam", "Kate"] </td>           <td> "param=Mike,Adam,Kate" </td></tr>
-     *     <tr> <td> Map </td>              <td> param=["name": "Mike", "age": "30"] &emsp</td> <td> "param=name,Mike,age,30" </td> </tr>
+     *     <tr> <td> Iterable &emsp; </td>   <td> param=["Mike", "Adam", "Kate"] </td>           <td> "param=Mike,Adam,Kate" </td></tr>
+     *     <tr> <td> Map </td>              <td> param=["name": "Mike", "age": "30"] &emsp;</td> <td> "param=name,Mike,age,30" </td> </tr>
      *     <tr> <td> Object </td>           <td> param={name: "Mike", age: 30} </td>            <td> "param=name,Mike,age,30" </td> </tr>
      * </table>
      * Note that ambiguity may arise when the values contain commas themselves after being converted to String.
@@ -84,10 +85,11 @@ public class MultiValuesConverterFactory {
      * Values are repeated with the same parameter name for {@link Iterable}, while {@link Map} and POJO {@link Object}
      * would be expanded with its property names.
      * <table border="1">
+     *     <caption>Examples</caption>
      *     <tr> <th><b> Type </b></th>      <th><b> Example value </b></th>                        <th><b> Example representation </b></th> </tr>
-     *     <tr> <td> Iterable &emsp </td>   <td> param=["Mike", "Adam", "Kate"] </td>              <td> "param=Mike&param=Adam&param=Kate </td></tr>
-     *     <tr> <td> Map </td>              <td> param=["name": "Mike", "age": "30"] &emsp </td>   <td> "name=Mike&age=30" </td> </tr>
-     *     <tr> <td> Object </td>           <td> param={name: "Mike", age: 30} </td>               <td> "name=Mike&age=30" </td> </tr>
+     *     <tr> <td> Iterable &emsp; </td>   <td> param=["Mike", "Adam", "Kate"] </td>              <td> "param=Mike&amp;param=Adam&amp;param=Kate </td></tr>
+     *     <tr> <td> Map </td>              <td> param=["name": "Mike", "age": "30"] &emsp; </td>   <td> "name=Mike&amp;age=30" </td> </tr>
+     *     <tr> <td> Object </td>           <td> param={name: "Mike", age: 30} </td>               <td> "name=Mike&amp;age=30" </td> </tr>
      * </table>
      */
     public static final String FORMAT_MULTI = "multi";
@@ -96,10 +98,11 @@ public class MultiValuesConverterFactory {
      * Values are put in the representation with property name for {@link Map} and POJO {@link Object} in square
      * after the original parameter name.
      * <table border="1">
+     *     <caption>Examples</caption>
      *     <tr> <th><b> Type </b></th>      <th><b> Example value </b></th>                        <th><b> Example representation </b></th> </tr>
-     *     <tr> <td> Iterable &emsp </td>   <td> param=["Mike", "Adam", "Kate"] </td>              <td> "param[0]=Mike&param[1]=Adam&param[2]=Kate </td></tr>
-     *     <tr> <td> Map </td>              <td> param=["name": "Mike", "age": "30"] &emsp </td>   <td> "param[name]=Mike&param[age]=30" </td> </tr>
-     *     <tr> <td> Object </td>           <td> param={name: "Mike", age: 30} </td>               <td> "param[name]=Mike&param[age]=30" </td> </tr>
+     *     <tr> <td> Iterable &emsp; </td>   <td> param=["Mike", "Adam", "Kate"] </td>              <td> "param[0]=Mike&amp;param[1]=Adam&amp;param[2]=Kate </td></tr>
+     *     <tr> <td> Map </td>              <td> param=["name": "Mike", "age": "30"] &emsp; </td>   <td> "param[name]=Mike&amp;param[age]=30" </td> </tr>
+     *     <tr> <td> Object </td>           <td> param={name: "Mike", age: 30} </td>               <td> "param[name]=Mike&amp;param[age]=30" </td> </tr>
      * </table>
      */
     public static final String FORMAT_DEEP_OBJECT = "deepobject";
@@ -305,7 +308,6 @@ public class MultiValuesConverterFactory {
          *                          (including type and annotations)
          * @param name the name of the parameter
          * @param parameters all the parameters from which the parameter of given name needs to be retrieved
-         * @param defaultValue default value
          * @return the converted value if conversion was successful
          */
         protected abstract Optional<T> retrieveMultiValue(ArgumentConversionContext<T> conversionContext,

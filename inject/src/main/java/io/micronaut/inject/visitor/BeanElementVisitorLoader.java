@@ -15,12 +15,10 @@
  */
 package io.micronaut.inject.visitor;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.order.OrderUtil;
 
@@ -34,21 +32,11 @@ final class BeanElementVisitorLoader {
     /**
      * @return The loaded visitors
      */
+    @SuppressWarnings("unchecked")
     static @NonNull List<BeanElementVisitor<?>> load() {
-        List<BeanElementVisitor<?>> visitors = new ArrayList<>(10);
-        final SoftServiceLoader<BeanElementVisitor> serviceLoader = SoftServiceLoader.load(BeanElementVisitor.class);
-        for (ServiceDefinition<BeanElementVisitor> definition : serviceLoader) {
-            if (definition.isPresent()) {
-                try {
-                    final BeanElementVisitor<?> visitor = definition.load();
-                    if (visitor.isEnabled()) {
-                        visitors.add(visitor);
-                    }
-                } catch (Exception e) {
-                    // ignore and skip
-                }
-            }
-        }
+        List<? extends BeanElementVisitor<?>> visitors = (List) SoftServiceLoader.load(BeanElementVisitor.class)
+            .disableFork()
+            .collectAll(BeanElementVisitor::isEnabled);
 
         if (visitors.isEmpty()) {
             return Collections.emptyList();

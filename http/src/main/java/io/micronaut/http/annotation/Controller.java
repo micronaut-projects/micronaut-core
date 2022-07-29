@@ -43,7 +43,7 @@ public @interface Controller {
 
     /**
      * <p>This attribute returns the base URI of the controller</p>
-     * <p>
+     *
      * <p>A value of {@code /} can be used to map a controller
      * to the root URI.</p>
      *
@@ -68,7 +68,7 @@ public @interface Controller {
      * Allows specifying an alternate port to run the controller on. Setting this member will
      * cause.
      *
-     * <p>The member is defined as a string to allow resolving the port value from configuration. For example: {@code member="${my.port.number}"}</p>
+     * <p>The member is defined as a string to allow resolving the port value from configuration. For example: {@code member = "${my.port.number}"}</p>
      * @return The port to use.
      */
     String port() default "";
