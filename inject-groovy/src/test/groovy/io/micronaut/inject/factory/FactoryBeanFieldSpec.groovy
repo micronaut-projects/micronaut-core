@@ -38,7 +38,7 @@ class MyBean {
     MyBean(@Named $primitiveType[] totals) {
         this.totals = totals;
     }
-    
+
     @Inject
     void setTotals(@Named $primitiveType[] totals) {
         this.totalsFromMethod = totals;
@@ -118,17 +118,17 @@ class TestFactory$TestField {
     @Bean
     @io.micronaut.context.annotation.Primary
     Foo one = new Foo("one");
-    
+
     // final fields are implicitly singleton
     @Bean
     @Named("two")
     final Foo two = new Foo("two");
-    
+
     // non-final fields are prototype
     @Bean
     @Named("three")
     Foo three = new Foo("three");
-    
+
     @SomeMeta
     @Bean
     Foo four = new Foo("four");
@@ -153,14 +153,14 @@ class Foo {
 class TestConstructInterceptor implements ConstructorInterceptor<Object> {
     boolean invoked = false;
     Object[] parameters;
-    
+
     @Override
     public Object intercept(ConstructorInvocationContext<Object> context) {
         invoked = true;
         parameters = context.getParameterValues();
         return context.proceed();
     }
-} 
+}
 ''')
 
         expect:
@@ -206,6 +206,6 @@ class Test {}
         e.message.contains(modifier)
 
         where:
-        modifier << ['private', 'protected', 'static']
+        modifier << ['private', 'protected']
     }
 }

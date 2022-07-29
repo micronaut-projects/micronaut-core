@@ -1730,8 +1730,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 return null;
             }
 
+            AnnotationMetadata fieldAnnotationMetadata = annotationUtils.getAnnotationMetadata(variable);
             if (modelUtils.isFinal(variable)) {
-                AnnotationMetadata fieldAnnotationMetadata = annotationUtils.getAnnotationMetadata(variable);
                 if (isFactoryType && fieldAnnotationMetadata.hasDeclaredStereotype(Bean.class)) {
                     // field factory for bean
                     if (modelUtils.isPrivate(variable) || modelUtils.isProtected(variable)) {
@@ -1739,6 +1739,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     } else {
                         visitBeanFactoryElement(variable);
                     }
+                    return null;
                 } else {
                     boolean isConfigBuilder = fieldAnnotationMetadata.hasStereotype(ConfigurationBuilder.class);
                     if (isConfigBuilder) {
@@ -1748,7 +1749,11 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 return null;
             }
 
-            AnnotationMetadata fieldAnnotationMetadata = annotationUtils.getAnnotationMetadata(variable);
+            if (modelUtils.isStatic(variable)) {
+                // static injection not allowed at this stage
+                return null;
+            }
+
             boolean isInjected = fieldAnnotationMetadata.hasStereotype(AnnotationUtil.INJECT) || (fieldAnnotationMetadata.hasDeclaredStereotype(AnnotationUtil.QUALIFIER) && !fieldAnnotationMetadata.hasDeclaredAnnotation(Bean.class));
             boolean isValue = (fieldAnnotationMetadata.hasStereotype(Value.class) || fieldAnnotationMetadata.hasStereotype(Property.class));
 
