@@ -16,6 +16,7 @@
 package io.micronaut.http.client.exceptions;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.exceptions.HttpException;
 
 /**
@@ -61,6 +62,7 @@ public class HttpClientException extends HttpException {
      *
      * @return The service ID of the client
      */
+    @Nullable
     public final String getServiceId() {
         return serviceId;
     }
