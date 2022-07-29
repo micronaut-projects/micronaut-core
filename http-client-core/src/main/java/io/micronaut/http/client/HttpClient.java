@@ -153,6 +153,7 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
      * @return A {@link Publisher} that emits a result of the given type
      */
     default <I, O, E> Publisher<O> retrieve(@NonNull HttpRequest<I> request, @NonNull Argument<O> bodyType, @NonNull Argument<E> errorType) {
+        // note: this default impl isn't used by us anymore, it's overridden by DefaultHttpClient
         return Flux.from(exchange(request, bodyType, errorType)).map(response -> {
             if (bodyType.getType() == HttpStatus.class) {
                 return (O) response.getStatus();
