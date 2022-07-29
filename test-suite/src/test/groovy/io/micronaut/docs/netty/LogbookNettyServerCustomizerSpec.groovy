@@ -95,7 +95,7 @@ class LogbookNettyServerCustomizerSpec extends Specification {
 
     def 'plaintext http 1'() {
         given:
-        def ctx = ApplicationContext.run(['spec.name': 'LogbookServerNettyCustomizerSpec'])
+        def ctx = ApplicationContext.run(['spec.name': 'LogbookNettyServerCustomizerSpec'])
         ctx.getBean(Logbook)
 
         def serverEmbeddedChannel = ((NettyHttpServer) ctx.getBean(EmbeddedServer)).buildEmbeddedChannel(false)
@@ -138,7 +138,7 @@ class LogbookNettyServerCustomizerSpec extends Specification {
                 'micronaut.server.http-version'       : '2.0',
                 'micronaut.server.ssl.enabled'        : true,
                 'micronaut.server.ssl.buildSelfSigned': true,
-                'spec.name'                           : 'LogbookServerNettyCustomizerSpec'
+                'spec.name'                           : 'LogbookNettyServerCustomizerSpec'
         ])
 
         def sslContext = SslContextBuilder.forClient()
@@ -214,7 +214,7 @@ class LogbookNettyServerCustomizerSpec extends Specification {
         def ctx = ApplicationContext.run([
                 'micronaut.server.ssl.enabled'        : true,
                 'micronaut.server.ssl.buildSelfSigned': true,
-                'spec.name'                           : 'LogbookServerNettyCustomizerSpec'
+                'spec.name'                           : 'LogbookNettyServerCustomizerSpec'
         ])
 
         def sslContext = SslContextBuilder.forClient()
@@ -277,7 +277,7 @@ class LogbookNettyServerCustomizerSpec extends Specification {
         given:
         def ctx = ApplicationContext.run([
                 'micronaut.server.http-version': '2.0',
-                'spec.name'                    : 'LogbookServerNettyCustomizerSpec'
+                'spec.name'                    : 'LogbookNettyServerCustomizerSpec'
         ])
 
 
@@ -341,7 +341,7 @@ class LogbookNettyServerCustomizerSpec extends Specification {
         given:
         def ctx = ApplicationContext.run([
                 'micronaut.server.http-version': '2.0',
-                'spec.name'                    : 'LogbookServerNettyCustomizerSpec'
+                'spec.name'                    : 'LogbookNettyServerCustomizerSpec'
         ])
 
 
@@ -418,7 +418,7 @@ class LogbookNettyServerCustomizerSpec extends Specification {
         ]
     }
 
-    @Requires(property = 'spec.name', value = 'LogbookServerNettyCustomizerSpec')
+    @Requires(property = 'spec.name', value = 'LogbookNettyServerCustomizerSpec')
     @Factory
     static class LogbookFactory {
         List<String> log = new ArrayList<>()

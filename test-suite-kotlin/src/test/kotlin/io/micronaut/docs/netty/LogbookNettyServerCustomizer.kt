@@ -16,7 +16,7 @@ import org.zalando.logbook.netty.LogbookServerHandler
 // tag::class[]
 @Requires(beans = [Logbook::class])
 @Singleton
-class LogbookServerNettyCustomizer(private val logbook: Logbook) :
+class LogbookNettyServerCustomizer(private val logbook: Logbook) :
     BeanCreatedEventListener<NettyServerCustomizer.Registry> { // <1>
 
     override fun onCreated(event: BeanCreatedEvent<NettyServerCustomizer.Registry>): NettyServerCustomizer.Registry {
