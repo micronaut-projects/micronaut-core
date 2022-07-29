@@ -1660,8 +1660,8 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
         List<String> prefixes = Arrays.asList(annotationMetadata.getValue(AccessorsStyle.class, "writePrefixes", String[].class).orElse(["set"] as String[]))
         String configurationPrefix = annotationMetadata.getValue(ConfigurationBuilder.class, String.class)
                 .map({ value -> value + "."}).orElse("")
-        Set<String> includes = annotationMetadata.getValue(ConfigurationBuilder.class, "includes", Set.class).orElse(Collections.emptySet())
-        Set<String> excludes = annotationMetadata.getValue(ConfigurationBuilder.class, "excludes", Set.class).orElse(Collections.emptySet())
+        Set<String> includes = annotationMetadata.getValue(ConfigurationBuilder.class, "includes", Set.class).orElse(Collections.<String>emptySet())
+        Set<String> excludes = annotationMetadata.getValue(ConfigurationBuilder.class, "excludes", Set.class).orElse(Collections.<String>emptySet())
 
         SourceUnit source = this.sourceUnit
         CompilationUnit compilationUnit = this.compilationUnit
