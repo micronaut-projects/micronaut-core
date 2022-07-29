@@ -1739,12 +1739,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     visitBeanFactoryElement(variable);
                 }
                 return null;
-            } else {
-                boolean isConfigBuilder = fieldAnnotationMetadata.hasStereotype(ConfigurationBuilder.class);
-                if (isConfigBuilder) {
-                    visitConfigurationProperty(variable, fieldAnnotationMetadata);
-                    return null;
-                }
+            } else if (fieldAnnotationMetadata.hasStereotype(ConfigurationBuilder.class)) {
+                visitConfigurationProperty(variable, fieldAnnotationMetadata);
+                return null;
             }
 
             if (modelUtils.isStatic(variable)) {
