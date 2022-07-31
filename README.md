@@ -1,4 +1,4 @@
-# Micronaut 
+# Micronaut
 
 [![Build Status](https://github.com/micronaut-projects/micronaut-core/workflows/Java%20CI/badge.svg)](https://github.com/micronaut-projects/micronaut-core/actions)
 [![Revved up by Gradle Enterprise](https://img.shields.io/badge/Revved%20up%20by-Gradle%20Enterprise-06A0CE?logo=Gradle&labelColor=02303A)](https://ge.micronaut.io/scans)
@@ -46,14 +46,9 @@ To build from source checkout the code and run:
 ./gradlew publishToMavenLocal
 ```
 
-This will publish the current version to your local Maven cache. To get the CLI operational you can do:
+This will publish the current version to your local Maven cache.
 
-```
-export MICRONAUT_HOME=/path/to/checkout
-export PATH="$PATH:$MICRONAUT_HOME/cli/build/bin"
-```
-
-You will also need to checkout the [Micronaut Profiles](https://github.com/micronaut-projects/micronaut-profiles/) and run `./gradlew publishToMavenLocal` there too.
+To get the CLI operational you can build and install it from source by [following these instructions](https://micronaut-projects.github.io/micronaut-starter/latest/guide/index.html#installFromSource)
 
 You should then be able to `mn create-app hello-world`.
 
@@ -69,7 +64,7 @@ Micronaut is using Semantic Versioning 2.0.0. To understand what that means, ple
 
 ## CI
 
-[Github Actions](https://github.com/micronaut-projects/micronaut-core/actions) are used to build Micronaut. If a build fails in `master`, check the [test reports](https://micronaut-projects.github.io/micronaut-core/index.html). 
+[Github Actions](https://github.com/micronaut-projects/micronaut-core/actions) are used to build Micronaut. If a build fails in `master`, check the [test reports](https://micronaut-projects.github.io/micronaut-core/index.html).
 
 
 
