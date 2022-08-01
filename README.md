@@ -46,17 +46,6 @@ To build from source checkout the code and run:
 ./gradlew publishToMavenLocal
 ```
 
-This will publish the current version to your local Maven cache. To get the CLI operational you can do:
-
-```
-export MICRONAUT_HOME=/path/to/checkout
-export PATH="$PATH:$MICRONAUT_HOME/cli/build/bin"
-```
-
-You will also need to checkout the [Micronaut Profiles](https://github.com/micronaut-projects/micronaut-profiles/) and run `./gradlew publishToMavenLocal` there too.
-
-You should then be able to `mn create-app hello-world`.
-
 To build the documentation run `./gradlew docs`. The documentation is built to `build/docs/index.html`.
 
 ## Contributing Code
