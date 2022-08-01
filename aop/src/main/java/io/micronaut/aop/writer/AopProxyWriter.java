@@ -208,7 +208,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
     /**
      * <p>Constructs a new {@link AopProxyWriter} for the given parent {@link BeanDefinitionWriter} and starting interceptors types.</p>
-     * <p>
+     * 
      * <p>Additional {@link Interceptor} types can be added downstream with {@link #visitInterceptorBinding(AnnotationValue[])} .</p>
      *  @param parent             The parent {@link BeanDefinitionWriter}
      * @param settings           optional setting

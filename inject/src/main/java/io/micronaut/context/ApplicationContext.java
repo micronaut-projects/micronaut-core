@@ -33,10 +33,10 @@ import java.util.function.Consumer;
 /**
  * <p>An application context extends a {@link BeanContext} and adds the concepts of configuration, environments and
  *   runtimes.</p>
- * <p>
+ *
  * <p>The {@link ApplicationContext} is the main entry point for starting and running Micronaut applications. It
  * can be thought of as a container object for all dependency injected objects.</p>
- * <p>
+ *
  * <p>The {@link ApplicationContext} can be started via the {@link #run()} method. For example:</p>
  *
  * <pre class="code">

@@ -29,7 +29,7 @@ import java.lang.annotation.Target;
 
 /**
  * <p>An annotation to indicate the {@link MediaType}s produced by a particular component.</p>
- * <p>
+ *
  * <p>Generally with controllers one can use the {@code produces} attribute of the {@code Controller} annotation,
  * however this annotation is more generic and applies to any component</p>
  *
@@ -51,10 +51,10 @@ public @interface Produces {
      * <p>In the case of reactive types this member indicates whether only a single result is returned. Normally this
      * annotation is unnecessary unless the declared type doesn't indicate how many items are emitted.</p>
      *
-     * <p>For JSON with single=false if an Reactive streams Publisher type is returned these will be automatically
+     * <p>For JSON with single = false if an Reactive streams Publisher type is returned these will be automatically
      * wrapped in an Array type to ensure valid JSON is returned.</p>
      *
-     * <p>If single=true it is expected that only a single result will be emitted and the result will not be wrapped
+     * <p>If single = true it is expected that only a single result will be emitted and the result will not be wrapped
      * in a JSON array.</p>
      *
      * @return True if only a single result is emitted

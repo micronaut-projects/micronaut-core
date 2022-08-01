@@ -22,7 +22,6 @@ import io.micronaut.context.event.BeanCreatedEventListener;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import org.zalando.logbook.Logbook;
 import org.zalando.logbook.netty.LogbookClientHandler;
-import org.zalando.logbook.netty.LogbookServerHandler;
 
 import jakarta.inject.Singleton;
 // end::imports[]
@@ -44,6 +43,7 @@ public class LogbookPipelineCustomizer
         ChannelPipelineCustomizer customizer = event.getBean();
 
         if (customizer.isServerChannel()) { // <2>
+            /*
             customizer.doOnConnect(pipeline -> {
                 pipeline.addAfter(
                     ChannelPipelineCustomizer.HANDLER_HTTP_SERVER_CODEC,
@@ -52,6 +52,7 @@ public class LogbookPipelineCustomizer
                 );
                 return pipeline;
             });
+            */
         } else { // <3>
             customizer.doOnConnect(pipeline -> {
                 pipeline.addAfter(

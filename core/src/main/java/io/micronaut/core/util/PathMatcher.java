@@ -17,7 +17,7 @@ package io.micronaut.core.util;
 
 /**
  * Interface for components that can match source strings against a specified pattern string.
- * <p/>
+ * <p>
  * Different implementations can support different pattern types, for example, Ant style path expressions, or
  * regular expressions, or other types of text based patterns.
  *

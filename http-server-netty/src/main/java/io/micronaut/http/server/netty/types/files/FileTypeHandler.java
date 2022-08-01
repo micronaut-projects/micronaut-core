@@ -28,6 +28,7 @@ import io.micronaut.http.server.netty.types.NettyFileCustomizableResponseType;
 import io.micronaut.http.server.types.CustomizableResponseTypeException;
 import io.micronaut.http.server.types.files.StreamedFile;
 import io.micronaut.http.server.types.files.SystemFile;
+import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.FullHttpResponse;
 
@@ -61,7 +62,7 @@ public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Obj
 
     @SuppressWarnings("MagicNumber")
     @Override
-    public void handle(Object obj, HttpRequest<?> request, MutableHttpResponse<?> response, ChannelHandlerContext context) {
+    public ChannelFuture handle(Object obj, HttpRequest<?> request, MutableHttpResponse<?> response, ChannelHandlerContext context) {
         NettyFileCustomizableResponseType type;
         if (obj instanceof File) {
             type = new NettySystemFileCustomizableResponseType((File) obj);
@@ -87,8 +88,7 @@ public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Obj
             long fileLastModifiedSeconds = lastModified / 1000;
             if (ifModifiedSinceDateSeconds == fileLastModifiedSeconds) {
                 FullHttpResponse nettyResponse = notModified(response);
-                context.writeAndFlush(nettyResponse);
-                return;
+                return context.writeAndFlush(nettyResponse);
             }
         }
 
@@ -98,8 +98,7 @@ public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Obj
         setDateAndCacheHeaders(response, lastModified);
 
         type.process(response);
-        type.write(request, response, context);
-        context.read();
+        return type.write(request, response, context);
     }
 
     @Override

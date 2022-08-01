@@ -103,7 +103,7 @@ public class NettySystemFileCustomizableResponseType extends SystemFile implemen
     }
 
     @Override
-    public void write(HttpRequest<?> request, MutableHttpResponse<?> response, ChannelHandlerContext context) {
+    public ChannelFuture write(HttpRequest<?> request, MutableHttpResponse<?> response, ChannelHandlerContext context) {
 
         if (response instanceof NettyMutableHttpResponse) {
 
@@ -122,13 +122,13 @@ public class NettySystemFileCustomizableResponseType extends SystemFile implemen
                 // SSL not enabled - can use zero-copy file transfer.
                 context.write(new DefaultFileRegion(file.raf.getChannel(), 0, getLength()), context.newProgressivePromise())
                         .addListener(file);
-                context.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT);
+                return context.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT);
             } else {
                 // SSL enabled - cannot use zero-copy file transfer.
                 try {
                     // HttpChunkedInput will write the end marker (LastHttpContent) for us.
                     final HttpChunkedInput chunkedInput = new HttpChunkedInput(new ChunkedFile(file.raf, 0, getLength(), LENGTH_8K));
-                    context.writeAndFlush(chunkedInput, context.newProgressivePromise())
+                    return context.writeAndFlush(chunkedInput, context.newProgressivePromise())
                             .addListener(file);
                 } catch (IOException e) {
                     throw new CustomizableResponseTypeException("Could not read file", e);

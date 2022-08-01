@@ -12,5 +12,6 @@ class VehicleSpec extends Specification {
     void 'test start engine'()  {
         expect:
         vehicle.start() == 'Starting V8'
+        [6] == vehicle.v6Engines.collect {engine -> engine.cylinders }
     }
 }

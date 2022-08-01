@@ -20,6 +20,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.server.netty.types.NettyCustomizableResponseType;
+import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.DefaultHttpResponse;
@@ -48,7 +49,7 @@ public interface NettyStreamedCustomizableResponseType extends NettyCustomizable
     InputStream getInputStream();
 
     @Override
-    default void write(HttpRequest<?> request, MutableHttpResponse<?> response, ChannelHandlerContext context) {
+    default ChannelFuture write(HttpRequest<?> request, MutableHttpResponse<?> response, ChannelHandlerContext context) {
         if (response instanceof NettyMutableHttpResponse) {
             NettyMutableHttpResponse nettyResponse = ((NettyMutableHttpResponse) response);
 
@@ -67,9 +68,9 @@ public interface NettyStreamedCustomizableResponseType extends NettyCustomizable
                     }
                 };
                 final HttpChunkedInput chunkedInput = new HttpChunkedInput(new ChunkedStream(inputStream));
-                context.writeAndFlush(chunkedInput).addListener(closeListener);
+                return context.writeAndFlush(chunkedInput).addListener(closeListener);
             } else {
-                context.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT);
+                return context.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT);
             }
 
         } else {

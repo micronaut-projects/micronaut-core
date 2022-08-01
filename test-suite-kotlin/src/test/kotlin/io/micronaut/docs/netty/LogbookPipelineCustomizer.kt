@@ -8,7 +8,6 @@ import io.micronaut.http.netty.channel.ChannelPipelineCustomizer
 import io.netty.channel.ChannelPipeline
 import org.zalando.logbook.Logbook
 import org.zalando.logbook.netty.LogbookClientHandler
-import org.zalando.logbook.netty.LogbookServerHandler
 import jakarta.inject.Singleton
 // end::imports[]
 
@@ -21,6 +20,7 @@ class LogbookPipelineCustomizer(private val logbook: Logbook) :
     override fun onCreated(event: BeanCreatedEvent<ChannelPipelineCustomizer>): ChannelPipelineCustomizer {
         val customizer = event.bean
         if (customizer.isServerChannel) { // <2>
+            /*
             customizer.doOnConnect { pipeline: ChannelPipeline ->
                 pipeline.addAfter(
                         ChannelPipelineCustomizer.HANDLER_HTTP_SERVER_CODEC,
@@ -29,6 +29,7 @@ class LogbookPipelineCustomizer(private val logbook: Logbook) :
                 )
                 pipeline
             }
+            */
         } else { // <3>
             customizer.doOnConnect { pipeline: ChannelPipeline ->
                 pipeline.addAfter(

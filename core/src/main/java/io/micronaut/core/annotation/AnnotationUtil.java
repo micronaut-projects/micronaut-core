@@ -257,7 +257,7 @@ public class AnnotationUtil {
      * Create a new immutable {@link Map} from an array of values.
      * String values must be sorted!
      *
-     * @param array The key,value array
+     * @param array The key, value array
      * @return The created map
      */
     @UsedByGeneratedCode

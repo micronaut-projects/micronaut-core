@@ -23,7 +23,7 @@ import org.reactivestreams.Publisher;
 /**
  * <p>A {@link io.micronaut.http.client.LoadBalancer} that uses the {@link DiscoveryClient} and a
  * {@link ServiceInstance} ID to automatically load balance between discovered clients in a non-blocking manner.</p>
- * <p>
+ *
  * <p>Note that the when {@link DiscoveryClient} caching is enabled then this load balancer may not always have the
  * latest server list from the {@link DiscoveryClient} (the default TTL is 30 seconds)</p>
  *

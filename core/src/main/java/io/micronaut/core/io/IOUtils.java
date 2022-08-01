@@ -21,6 +21,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.BufferedReader;
+import java.io.Closeable;
 import java.io.IOException;
 import java.io.Reader;
 import java.net.URI;
@@ -32,8 +33,11 @@ import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Collections;
+import java.nio.file.ProviderNotFoundException;
+import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
@@ -76,18 +80,23 @@ public class IOUtils {
     @SuppressWarnings({"java:S2095", "java:S1141", "java:S3776"})
     public static void eachFile(@NonNull URI uri, String path, @NonNull Consumer<Path> consumer) {
         Path myPath;
+        List<Closeable> toClose = new ArrayList<>();
         try {
             String scheme = uri.getScheme();
-            FileSystem fileSystem = null;
 
             try {
                 if ("jar".equals(scheme)) {
-                    try {
-                        fileSystem = FileSystems.getFileSystem(uri);
-                    } catch (FileSystemNotFoundException e) {
-                        fileSystem = FileSystems.newFileSystem(uri, Collections.emptyMap());
+                    // try to match FileSystems.newFileSystem(URI) semantics for zipfs here.
+                    // Basically ignores anything after the !/ if it exists, and uses the part
+                    // before as the jar path to extract.
+                    String jarUri = uri.getRawSchemeSpecificPart();
+                    int sep = jarUri.lastIndexOf("!/");
+                    if (sep != -1) {
+                        jarUri = jarUri.substring(0, sep);
                     }
-                    myPath = fileSystem.getPath(path);
+                    // now, add the !/ at the end again so that loadNestedJarUri can handle it:
+                    jarUri += "!/";
+                    myPath = loadNestedJarUri(toClose, jarUri).resolve(path);
                 } else if ("file".equals(scheme)) {
                     myPath = Paths.get(uri).resolve(path);
                 } else {
@@ -107,15 +116,49 @@ public class IOUtils {
                         }
                         consumer.accept(currentPath);
                     }
-                } finally {
-                    if (fileSystem != null && fileSystem.isOpen()) {
-                        fileSystem.close();
-                    }
                 }
             }
         } catch (IOException e) {
             // ignore, can't do anything here and can't log because class used in compiler
+        } finally {
+            for (Closeable closeable : toClose) {
+                try {
+                    closeable.close();
+                } catch (IOException ignored) {
+                }
+            }
         }
+    }
+
+    private static Path loadNestedJarUri(List<Closeable> toClose, String jarUri) throws IOException {
+        int sep = jarUri.lastIndexOf("!/");
+        if (sep == -1) {
+            return Paths.get(URI.create(jarUri));
+        }
+        Path jarPath = loadNestedJarUri(toClose, jarUri.substring(0, sep));
+        if (Files.isDirectory(jarPath)) {
+            // spring boot creates weird jar URLs, like 'jar:file:/xyz.jar!/BOOT-INF/classes!/abc'
+            // This check makes our class loading resilient to that
+            return jarPath;
+        }
+        FileSystem zipfs;
+        try {
+            // can't use newFileSystem(Path) here (without CL) because it doesn't exist on java 8
+            // the CL cast is necessary because since java 13 there is a newFileSystem(Path, Map)
+            zipfs = FileSystems.newFileSystem(jarPath, (ClassLoader) null);
+            toClose.add(0, zipfs);
+        } catch (ProviderNotFoundException e) {
+            // java versions earlier than 11 do not support nested zipfs and will fail with this
+            // exception. Try to extract the file instead. This is not efficient, but what else can
+            // we do?
+            Path tmp = Files.createTempFile("micronaut-IOUtils-nested-zip", ".zip");
+            toClose.add(0, () -> Files.deleteIfExists(tmp));
+            Files.copy(jarPath, tmp, StandardCopyOption.REPLACE_EXISTING);
+
+            zipfs = FileSystems.newFileSystem(tmp, (ClassLoader) null);
+            toClose.add(0, zipfs);
+        }
+        return zipfs.getPath(jarUri.substring(sep + 1));
     }
 
     /**

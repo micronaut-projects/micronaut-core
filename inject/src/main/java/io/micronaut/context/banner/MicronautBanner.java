@@ -15,8 +15,6 @@
  */
 package io.micronaut.context.banner;
 
-import io.micronaut.core.version.VersionUtils;
-
 import java.io.PrintStream;
 
 /**
@@ -31,7 +29,6 @@ public class MicronautBanner implements Banner {
             "| |  | | | (__| | | (_) | | | | (_| | |_| | |_ ",
             "|_|  |_|_|\\___|_|  \\___/|_| |_|\\__,_|\\__,_|\\__|"
     };
-    private static final String MICRONAUT = "  Micronaut";
 
     private final PrintStream out;
 
@@ -49,8 +46,5 @@ public class MicronautBanner implements Banner {
         for (String line : MICRONAUT_BANNER) {
             out.println(line);
         }
-        String version = VersionUtils.getMicronautVersion();
-        version = (version != null) ? " (v" + version + ")" : "";
-        out.println(MICRONAUT + version + "\n");
     }
 }
