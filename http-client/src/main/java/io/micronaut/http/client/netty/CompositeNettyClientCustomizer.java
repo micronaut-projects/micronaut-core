@@ -13,43 +13,52 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.netty;
+package io.micronaut.http.client.netty;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.netty.AbstractCompositeCustomizer;
 import io.netty.channel.Channel;
 
+import java.util.Collections;
 import java.util.List;
 
 @Internal
-final class CompositeNettyServerCustomizer
-    extends AbstractCompositeCustomizer<NettyServerCustomizer, NettyServerCustomizer.ChannelRole>
-    implements NettyServerCustomizer {
-    private CompositeNettyServerCustomizer(List<NettyServerCustomizer> members) {
+final class CompositeNettyClientCustomizer
+    extends AbstractCompositeCustomizer<NettyClientCustomizer, NettyClientCustomizer.ChannelRole>
+    implements NettyClientCustomizer {
+    static final NettyClientCustomizer EMPTY =
+        new CompositeNettyClientCustomizer(Collections.emptyList());
+
+    private CompositeNettyClientCustomizer(List<NettyClientCustomizer> members) {
         super(members);
     }
 
-    CompositeNettyServerCustomizer() {
+    CompositeNettyClientCustomizer() {
         super();
     }
 
     @Override
-    protected NettyServerCustomizer specializeForChannel(NettyServerCustomizer member, Channel channel, ChannelRole role) {
+    protected NettyClientCustomizer specializeForChannel(NettyClientCustomizer member, Channel channel, ChannelRole role) {
         return member.specializeForChannel(channel, role);
     }
 
     @Override
-    protected NettyServerCustomizer makeNewComposite(List<NettyServerCustomizer> members) {
-        return new CompositeNettyServerCustomizer(members);
+    protected NettyClientCustomizer makeNewComposite(List<NettyClientCustomizer> members) {
+        return new CompositeNettyClientCustomizer(members);
     }
 
     @Override
     public void onInitialPipelineBuilt() {
-        forEach(NettyServerCustomizer::onInitialPipelineBuilt);
+        forEach(NettyClientCustomizer::onInitialPipelineBuilt);
     }
 
     @Override
     public void onStreamPipelineBuilt() {
-        forEach(NettyServerCustomizer::onStreamPipelineBuilt);
+        forEach(NettyClientCustomizer::onStreamPipelineBuilt);
+    }
+
+    @Override
+    public void onRequestPipelineBuilt() {
+        forEach(NettyClientCustomizer::onRequestPipelineBuilt);
     }
 }

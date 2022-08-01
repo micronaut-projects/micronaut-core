@@ -97,7 +97,8 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
         StreamingHttpClientRegistry<StreamingHttpClient>,
         WebSocketClientRegistry<WebSocketClient>,
         ProxyHttpClientRegistry<ProxyHttpClient>,
-        ChannelPipelineCustomizer {
+        ChannelPipelineCustomizer,
+        NettyClientCustomizer.Registry {
     private static final Logger LOG = LoggerFactory.getLogger(DefaultNettyHttpClientRegistry.class);
     private final Map<ClientKey, DefaultHttpClient> clients = new ConcurrentHashMap<>(10);
     private final LoadBalancerResolver loadBalancerResolver;
@@ -112,6 +113,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
     private final HttpClientFilterResolver<ClientFilterResolutionContext> clientFilterResolver;
     private final JsonMapper jsonMapper;
     private final Collection<ChannelPipelineListener> pipelineListeners = new CopyOnWriteArrayList<>();
+    private final CompositeNettyClientCustomizer clientCustomizer = new CompositeNettyClientCustomizer();
 
     /**
      * Default constructor.
@@ -299,6 +301,12 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
         pipelineListeners.add(listener);
     }
 
+    @Override
+    public void register(@NonNull NettyClientCustomizer customizer) {
+        Objects.requireNonNull(customizer, "customizer");
+        clientCustomizer.add(customizer);
+    }
+
     private DefaultHttpClient getClient(ClientKey key, BeanContext beanContext, AnnotationMetadata annotationMetadata) {
         return clients.computeIfAbsent(key, clientKey -> {
             DefaultHttpClient clientBean = null;
@@ -411,6 +419,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
                 eventLoopGroup,
                 resolveSocketChannelFactory(configuration, beanContext),
                 pipelineListeners,
+                clientCustomizer,
                 invocationInstrumenterFactories,
                 clientId
         );

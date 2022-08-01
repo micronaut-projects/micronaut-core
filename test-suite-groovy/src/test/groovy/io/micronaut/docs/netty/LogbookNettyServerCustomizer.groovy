@@ -16,11 +16,11 @@ import jakarta.inject.Singleton
 // tag::class[]
 @Requires(beans = Logbook.class)
 @Singleton
-class LogbookServerNettyCustomizer
+class LogbookNettyServerCustomizer
         implements BeanCreatedEventListener<NettyServerCustomizer.Registry> { // <1>
     private final Logbook logbook;
 
-    LogbookServerNettyCustomizer(Logbook logbook) {
+    LogbookNettyServerCustomizer(Logbook logbook) {
         this.logbook = logbook
     }
 
