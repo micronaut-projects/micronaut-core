@@ -40,15 +40,15 @@ import java.util.Set;
 /**
  * <p>An interface implemented at compile time by Micronaut that allows the inspection of annotation metadata and
  * stereotypes (meta-annotations)</p>.
- * <p>
+ *
  * <p>This interface exposes fast and efficient means to expose annotation data at runtime without requiring reflective
  * tricks to read the annotation metadata</p>
- * <p>
+ *
  * <p>Users of Micronaut should in general avoid the methods of the {@link java.lang.reflect.AnnotatedElement}
  * interface and use this interface instead to obtain maximum efficiency</p>
- * <p>
- * <p>Core framework types such as <tt>io.micronaut.inject.BeanDefinition</tt> and
- * <tt>io.micronaut.inject.ExecutableMethod</tt> implement this interface</p>
+ *
+ * <p>Core framework types such as {@code io.micronaut.inject.BeanDefinition} and
+ * {@code io.micronaut.inject.ExecutableMethod} implement this interface</p>
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -60,7 +60,7 @@ public interface AnnotationMetadata extends AnnotationSource {
     AnnotationMetadata EMPTY_METADATA = new EmptyAnnotationMetadata();
 
     /**
-     * The default <tt>value()</tt> member.
+     * The default {@code value()} member.
      */
     String VALUE_MEMBER = "value";
 
@@ -98,6 +98,19 @@ public interface AnnotationMetadata extends AnnotationSource {
      */
     default @NonNull
     List<String> getAnnotationNamesByStereotype(@Nullable String stereotype) {
+        return Collections.emptyList();
+    }
+
+    /**
+     * Resolve all of the annotation values that feature the given stereotype.
+     *
+     * @param stereotype The annotation names
+     * @param <T> The annotation type
+     * @return A set of annotation names
+     * @since 3.5.2
+     */
+    @NonNull
+    default <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByStereotype(@Nullable String stereotype) {
         return Collections.emptyList();
     }
 
@@ -300,7 +313,7 @@ public interface AnnotationMetadata extends AnnotationSource {
 
     /**
      * <p>Checks whether this object has the given annotation stereotype on the object itself or inherited from a parent</p>.
-     * <p>
+     *
      * <p>An annotation stereotype is a meta annotation potentially applied to another annotation</p>
      *
      * @param annotation The annotation
@@ -312,7 +325,7 @@ public interface AnnotationMetadata extends AnnotationSource {
 
     /**
      * <p>Checks whether this object has the given annotation stereotype on the object itself and not inherited from a parent</p>.
-     * <p>
+     *
      * <p>An annotation stereotype is a meta annotation potentially applied to another annotation</p>
      *
      * @param annotation The annotation
@@ -1431,7 +1444,7 @@ public interface AnnotationMetadata extends AnnotationSource {
 
     /**
      * <p>Checks whether this object has the given annotation stereotype on the object itself or inherited from a parent</p>.
-     * <p>
+     *
      * <p>An annotation stereotype is a meta annotation potentially applied to another annotation</p>
      *
      * @param annotation The annotation

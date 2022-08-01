@@ -54,7 +54,7 @@ public class CollectionUtils {
     /**
      * Null safe not empty check.
      *
-     * @param map The ,ap
+     * @param map The map
      * @return True if it is not null and not empty
      */
     public static boolean isNotEmpty(@Nullable Map map) {

@@ -35,7 +35,6 @@ import io.micronaut.http.netty.channel.ChannelPipelineListener;
 import io.micronaut.http.netty.channel.DefaultEventLoopGroupConfiguration;
 import io.micronaut.http.netty.channel.EventLoopGroupConfiguration;
 import io.micronaut.http.netty.channel.converters.ChannelOptionFactory;
-import io.micronaut.http.netty.stream.StreamingInboundHttp2ToHttpAdapter;
 import io.micronaut.http.netty.websocket.WebSocketSessionRepository;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.exceptions.ServerStartupException;
@@ -64,12 +63,6 @@ import io.netty.channel.group.ChannelGroup;
 import io.netty.channel.group.DefaultChannelGroup;
 import io.netty.channel.unix.DomainSocketAddress;
 import io.netty.handler.codec.http.multipart.DiskFileUpload;
-import io.netty.handler.codec.http2.DefaultHttp2Connection;
-import io.netty.handler.codec.http2.Http2Connection;
-import io.netty.handler.codec.http2.Http2FrameListener;
-import io.netty.handler.codec.http2.Http2FrameLogger;
-import io.netty.handler.codec.http2.HttpToHttp2ConnectionHandler;
-import io.netty.handler.codec.http2.HttpToHttp2ConnectionHandlerBuilder;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GlobalEventExecutor;
 import org.slf4j.Logger;
@@ -139,6 +132,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     @Nullable
     private volatile List<Listener> activeListeners = null;
     private final List<NettyHttpServerConfiguration.NettyListenerConfiguration> listenerConfigurations;
+    private final CompositeNettyServerCustomizer rootCustomizer = new CompositeNettyServerCustomizer();
 
     /**
      * @param serverConfiguration                     The Netty HTTP server configuration
@@ -267,6 +261,9 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     @Override
     public synchronized NettyEmbeddedServer start() {
         if (!isRunning()) {
+            if (isDefault && !applicationContext.isRunning()) {
+                applicationContext.start();
+            }
             //suppress unused
             //done here to prevent a blocking service loader in the event loop
             EventLoopGroupConfiguration workerConfig = resolveWorkerConfiguration();
@@ -327,6 +324,12 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             }
         }
         return this;
+    }
+
+    @Override
+    public void register(@NonNull NettyServerCustomizer customizer) {
+        Objects.requireNonNull(customizer, "customizer");
+        rootCustomizer.add(customizer);
     }
 
     @Override
@@ -476,8 +479,16 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
         try {
             Listener listener = new Listener(cfg);
-            ServerBootstrap listenerBootstrap = bootstrap.clone();
-            listenerBootstrap.childHandler(listener);
+            ServerBootstrap listenerBootstrap = bootstrap.clone()
+                // this initializer runs before the actual bind operation, so we can be sure
+                // setServerChannel has been called by the time bind runs.
+                .handler(new ChannelInitializer<Channel>() {
+                    @Override
+                    protected void initChannel(@NonNull Channel ch) {
+                        listener.setServerChannel(ch);
+                    }
+                })
+                .childHandler(listener);
             ChannelFuture future;
             switch (cfg.getFamily()) {
                 case TCP:
@@ -499,7 +510,6 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 default:
                     throw new UnsupportedOperationException("Unsupported family: " + cfg.getFamily());
             }
-            listener.serverChannel = future.channel();
             future.syncUninterruptibly();
             return listener;
         } catch (Exception e) {
@@ -556,7 +566,9 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         applicationContext.getEventPublisher(ServerStartupEvent.class)
                 .publishEvent(new ServerStartupEvent(this));
         applicationName.ifPresent(id -> {
-            this.serviceInstance = applicationContext.createBean(NettyEmbeddedServerInstance.class, id, this);
+            if (serviceInstance == null) {
+                serviceInstance = applicationContext.createBean(NettyEmbeddedServerInstance.class, id, this);
+            }
             applicationContext
                     .getEventPublisher(ServiceReadyEvent.class)
                     .publishEvent(new ServiceReadyEvent(serviceInstance));
@@ -658,26 +670,6 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         return this;
     }
 
-    private HttpToHttp2ConnectionHandler newHttpToHttp2ConnectionHandler() {
-        Http2Connection connection = new DefaultHttp2Connection(true);
-        final Http2FrameListener http2ToHttpAdapter = new StreamingInboundHttp2ToHttpAdapter(
-                connection,
-                (int) serverConfiguration.getMaxRequestSize(),
-                serverConfiguration.isValidateHeaders(),
-                true
-        );
-        final HttpToHttp2ConnectionHandlerBuilder builder = new HttpToHttp2ConnectionHandlerBuilder()
-                .frameListener(http2ToHttpAdapter)
-                .validateHeaders(serverConfiguration.isValidateHeaders())
-                .initialSettings(serverConfiguration.getHttp2().http2Settings());
-
-        serverConfiguration.getLogLevel().ifPresent(logLevel ->
-                builder.frameLogger(new Http2FrameLogger(logLevel,
-                        NettyHttpServer.class))
-        );
-        return builder.connection(connection).build();
-    }
-
     @Override
     public boolean isClientChannel() {
         return false;
@@ -713,8 +705,9 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         }
     }
 
-    private HttpPipelineBuilder createPipelineBuilder() {
-        return new HttpPipelineBuilder(NettyHttpServer.this, nettyEmbeddedServices, sslConfiguration, routingHandler, hostResolver);
+    private HttpPipelineBuilder createPipelineBuilder(NettyServerCustomizer customizer) {
+        Objects.requireNonNull(customizer, "customizer");
+        return new HttpPipelineBuilder(NettyHttpServer.this, nettyEmbeddedServices, sslConfiguration, routingHandler, hostResolver, customizer);
     }
 
     /**
@@ -726,7 +719,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     @Internal
     public EmbeddedChannel buildEmbeddedChannel(boolean ssl) {
         EmbeddedChannel embeddedChannel = new EmbeddedChannel();
-        createPipelineBuilder().new ConnectionPipeline(embeddedChannel, ssl).initChannel();
+        createPipelineBuilder(rootCustomizer).new ConnectionPipeline(embeddedChannel, ssl).initChannel();
         return embeddedChannel;
     }
 
@@ -743,20 +736,26 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
     private class Listener extends ChannelInitializer<Channel> {
         Channel serverChannel;
+        private NettyServerCustomizer listenerCustomizer;
         NettyHttpServerConfiguration.NettyListenerConfiguration config;
 
         private volatile HttpPipelineBuilder httpPipelineBuilder;
 
         Listener(NettyHttpServerConfiguration.NettyListenerConfiguration config) {
             this.config = config;
-            refresh();
         }
 
         void refresh() {
-            httpPipelineBuilder = createPipelineBuilder();
+            httpPipelineBuilder = createPipelineBuilder(listenerCustomizer);
             if (config.isSsl() && !httpPipelineBuilder.supportsSsl()) {
                 throw new IllegalStateException("Listener configured for SSL, but no SSL context available");
             }
+        }
+
+        void setServerChannel(Channel serverChannel) {
+            this.serverChannel = serverChannel;
+            this.listenerCustomizer = rootCustomizer.specializeForChannel(serverChannel, NettyServerCustomizer.ChannelRole.LISTENER);
+            refresh();
         }
 
         @Override

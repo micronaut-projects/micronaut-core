@@ -1221,12 +1221,6 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
         FieldNode fieldNode = propertyNode.field
         if (fieldNode.name == 'metaClass') return
         def modifiers = propertyNode.getModifiers()
-        if (Modifier.isStatic(modifiers)) {
-            if (isFactoryClass && AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, fieldNode).hasDeclaredStereotype(Bean.class)) {
-                AstMessageUtils.error(sourceUnit, propertyNode, "Beans produced from fields cannot be static")
-            }
-            return
-        }
         AnnotationMetadata fieldAnnotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, fieldNode)
         if (Modifier.isFinal(modifiers) && !fieldAnnotationMetadata.hasStereotype(ConfigurationBuilder)) {
             if (isFactoryClass && fieldAnnotationMetadata.hasDeclaredStereotype(Bean.class)) {
@@ -1381,9 +1375,10 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
 
     private void visitFactoryProperty(PropertyNode propertyNode, FieldNode fieldNode, AnnotationMetadata fieldAnnotationMetadata) {
 
+        def modifiers = propertyNode.isStatic() ? Modifier.STATIC | Modifier.PUBLIC : Modifier.PUBLIC
         def getterNode = new MethodNode(
                 getGetterName(propertyNode),
-                Modifier.PUBLIC,
+                modifiers,
                 fieldNode.type,
                 new Parameter[0],
                 null,
@@ -1660,8 +1655,8 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
         List<String> prefixes = Arrays.asList(annotationMetadata.getValue(AccessorsStyle.class, "writePrefixes", String[].class).orElse(["set"] as String[]))
         String configurationPrefix = annotationMetadata.getValue(ConfigurationBuilder.class, String.class)
                 .map({ value -> value + "."}).orElse("")
-        Set<String> includes = annotationMetadata.getValue(ConfigurationBuilder.class, "includes", Set.class).orElse(Collections.emptySet())
-        Set<String> excludes = annotationMetadata.getValue(ConfigurationBuilder.class, "excludes", Set.class).orElse(Collections.emptySet())
+        Set<String> includes = annotationMetadata.getValue(ConfigurationBuilder.class, "includes", Set.class).orElse(Collections.<String>emptySet())
+        Set<String> excludes = annotationMetadata.getValue(ConfigurationBuilder.class, "excludes", Set.class).orElse(Collections.<String>emptySet())
 
         SourceUnit source = this.sourceUnit
         CompilationUnit compilationUnit = this.compilationUnit

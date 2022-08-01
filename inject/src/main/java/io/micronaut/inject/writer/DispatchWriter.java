@@ -500,6 +500,7 @@ public class DispatchWriter extends AbstractClassFileWriter implements Opcodes {
             ClassElement returnType = methodElement.isSuspend() ? ClassElement.of(Object.class) : methodElement.getReturnType();
             boolean isInterface = declaringType.getType().isInterface();
             Type returnTypeObject = JavaModelUtils.getTypeReference(returnType);
+            boolean hasArgs = !argumentTypes.isEmpty();
 
             // load this
             writer.loadArg(1);
@@ -507,21 +508,16 @@ public class DispatchWriter extends AbstractClassFileWriter implements Opcodes {
             if (reflectionRequired) {
                 writer.loadThis();
                 writer.push(methodIndex);
-                writer.invokeVirtual(
-                        ExecutableMethodsDefinitionWriter.SUPER_TYPE,
-                        GET_ACCESSIBLE_TARGET_METHOD
-                );
-            } else {
-                // duplicate target
-                writer.dup();
-                pushCastToType(writer, declaringTypeObject);
-            }
-
-            boolean hasArgs = !argumentTypes.isEmpty();
-            if (hasArgs) {
-                if (reflectionRequired) {
+                writer.invokeVirtual(ExecutableMethodsDefinitionWriter.SUPER_TYPE, GET_ACCESSIBLE_TARGET_METHOD);
+                if (hasArgs) {
                     writer.loadArg(2);
                 } else {
+                    writer.getStatic(Type.getType(ArrayUtils.class), "EMPTY_OBJECT_ARRAY", Type.getType(Object[].class));
+                }
+                writer.invokeStatic(TYPE_REFLECTION_UTILS, METHOD_INVOKE_METHOD);
+            } else {
+                pushCastToType(writer, declaringTypeObject);
+                if (hasArgs) {
                     int argCount = argumentTypes.size();
                     Iterator<ParameterElement> argIterator = argumentTypes.iterator();
                     for (int i = 0; i < argCount; i++) {
@@ -532,25 +528,15 @@ public class DispatchWriter extends AbstractClassFileWriter implements Opcodes {
                         pushCastToType(writer, argIterator.next());
                     }
                 }
-            } else if (reflectionRequired) {
-                writer.getStatic(Type.getType(ArrayUtils.class), "EMPTY_OBJECT_ARRAY", Type.getType(Object[].class));
-            }
-
-            if (reflectionRequired) {
-                writer.invokeStatic(
-                        TYPE_REFLECTION_UTILS,
-                        METHOD_INVOKE_METHOD
-                );
-            } else {
                 String methodDescriptor = getMethodDescriptor(returnType, argumentTypes);
                 writer.visitMethodInsn(isInterface ? INVOKEINTERFACE : INVOKEVIRTUAL,
-                                       declaringTypeObject.getInternalName(), methodName,
-                                       methodDescriptor, isInterface);
+                    declaringTypeObject.getInternalName(), methodName,
+                    methodDescriptor, isInterface);
             }
 
             if (returnTypeObject.equals(Type.VOID_TYPE)) {
                 writer.visitInsn(ACONST_NULL);
-            } else {
+            } else if (!reflectionRequired) {
                 pushBoxPrimitiveIfNecessary(returnType, writer);
             }
         }

@@ -124,7 +124,8 @@ httpServer:
       title: Configuring Server Thread Pools
       blockingOperations: Blocking Operations
       atBlocking: '@Blocking'
-    nettyPipeline: Configuring the Netty Pipeline
+    nettyClientPipeline: Configuring the Netty Client Pipeline
+    nettyServerPipeline: Configuring the Netty Server Pipeline
     listener: Advanced Listener Configuration
     cors: Configuring CORS
     https: Securing the Server with HTTPS

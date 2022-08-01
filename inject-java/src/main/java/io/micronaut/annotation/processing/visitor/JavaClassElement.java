@@ -776,9 +776,16 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                         );
                     break;
                     case FIELD:
-                    case ENUM_CONSTANT:
                         //noinspection unchecked
                         element = (T) elementFactory.newFieldElement(
+                                this,
+                                (VariableElement) enclosedElement,
+                                metadata
+                        );
+                        break;
+                    case ENUM_CONSTANT:
+                        //noinspection unchecked
+                        element = (T) elementFactory.newEnumConstantElement(
                                 this,
                                 (VariableElement) enclosedElement,
                                 metadata

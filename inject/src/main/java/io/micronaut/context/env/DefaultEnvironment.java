@@ -586,8 +586,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     @SuppressWarnings("MagicNumber")
     private Collection<PropertySourceLoader> evaluatePropertySourceLoaders() {
         SoftServiceLoader<PropertySourceLoader> definitions = readPropertySourceLoaders();
-        Collection<PropertySourceLoader> allLoaders = new ArrayList<>(10);
-        definitions.collectAll(allLoaders);
+        Collection<PropertySourceLoader> allLoaders = definitions.collectAll();
         for (PropertySourceLoader propertySourceLoader : allLoaders) {
             Set<String> extensions = propertySourceLoader.getExtensions();
             for (String extension : extensions) {

@@ -140,9 +140,9 @@ import static io.micronaut.inject.visitor.BeanElementVisitor.VISITORS;
 
 /**
  * <p>Responsible for building {@link BeanDefinition} instances at compile time. Uses ASM build the class definition.</p>
- * <p>
+ *
  * <p>Should be used from AST frameworks to build bean definitions from source code data.</p>
- * <p>
+ *
  * <p>For example:</p>
  *
  * <pre>
@@ -639,7 +639,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             this.beanTypeElement = beanElementBuilder.getBeanType();
             this.packageName = this.beanTypeElement.getPackageName();
             this.isInterface = this.beanTypeElement.isInterface();
-            this.isAbstract = this.beanTypeElement.isAbstract();
+            this.isAbstract = beanElementBuilder.getProducingElement() instanceof ClassElement && this.beanTypeElement.isAbstract();
             this.beanFullClassName = this.beanTypeElement.getName();
             this.beanSimpleClassName = this.beanTypeElement.getSimpleName();
             if (uniqueIdentifier == null) {
@@ -3151,18 +3151,37 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                     hasInjectScope = pushConstructorArguments(buildMethodVisitor, parameters);
                 }
                 if (factoryMethod instanceof MethodElement) {
-                    buildMethodVisitor.visitMethodInsn(INVOKEVIRTUAL,
+                    MethodElement methodElement = (MethodElement) factoryMethod;
+                    if (methodElement.isStatic()) {
+                        buildMethodVisitor.visitMethodInsn(INVOKESTATIC,
                             factoryType.getInternalName(),
                             factoryMethod.getName(),
                             methodDescriptor,
                             false
-                    );
+                        );
+                    } else {
+                        buildMethodVisitor.visitMethodInsn(INVOKEVIRTUAL,
+                            factoryType.getInternalName(),
+                            factoryMethod.getName(),
+                            methodDescriptor,
+                            false
+                        );
+                    }
                 } else {
-                    buildMethodVisitor.getField(
+                    if (factoryMethod.isStatic()) {
+
+                        buildMethodVisitor.getStatic(
                             factoryType,
                             factoryMethod.getName(),
                             beanType
-                    );
+                        );
+                    } else {
+                        buildMethodVisitor.getField(
+                            factoryType,
+                            factoryMethod.getName(),
+                            beanType
+                        );
+                    }
                 }
             }
 
@@ -3536,7 +3555,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             final Element originatingElement = getOriginatingElements()[0];
             final boolean isFactoryMethod = (originatingElement instanceof MethodElement && !(originatingElement instanceof ConstructorElement));
             final boolean isProxyTarget = annotationMetadata.booleanValue(AnnotationUtil.ANN_AROUND, "proxyTarget").orElse(false) || isFactoryMethod;
-            // for beans that are @Around(proxyTarget=false) only the generated AOP impl should be intercepted
+            // for beans that are @Around(proxyTarget = false) only the generated AOP impl should be intercepted
             final boolean isAopType = StringUtils.isNotEmpty(interceptedType);
             final boolean isConstructorInterceptionCandidate = (isProxyTarget && !isAopType) || (isAopType && !isProxyTarget);
             final boolean hasAroundConstruct;
@@ -4042,7 +4061,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     private boolean isContainerType() {
-        return DefaultArgument.CONTAINER_TYPES.stream().map(Class::getName).anyMatch(c -> c.equals(beanFullClassName));
+        return beanTypeElement.isArray() || DefaultArgument.CONTAINER_TYPES.stream().map(Class::getName).anyMatch(c -> c.equals(beanFullClassName));
     }
 
     private boolean isConfigurationProperties(AnnotationMetadata annotationMetadata) {
@@ -4198,8 +4217,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         if (superType == TYPE_ABSTRACT_BEAN_DEFINITION || isSuperFactory) {
             for (Type typeParameter : typeParameters) {
 
-                ArrayAwareSignatureWriter ppsv = (ArrayAwareSignatureWriter)
-                        psv.visitTypeArgument('=');
+                SignatureVisitor ppsv = psv.visitTypeArgument('=');
                 visitTypeParameter(typeParameter, ppsv);
             }
         }
@@ -4209,6 +4227,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     private void visitTypeParameter(Type typeParameter, SignatureVisitor ppsv) {
         final boolean isArray = typeParameter.getSort() == Type.ARRAY;
+        boolean isPrimitiveArray = false;
         if (isArray) {
             for (int i = 0; i < typeParameter.getDimensions(); i++) {
                 ppsv.visitArrayType();
@@ -4222,11 +4241,12 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             } else {
                 // primitive
                 ppsv.visitBaseType(elementType.getInternalName().charAt(0));
+                isPrimitiveArray = true;
             }
         } else {
             ppsv.visitClassType(typeParameter.getInternalName());
         }
-        if (isArray) {
+        if (isPrimitiveArray && ppsv instanceof ArrayAwareSignatureWriter) {
             ((ArrayAwareSignatureWriter) ppsv).visitEndArray();
         } else {
             ppsv.visitEnd();

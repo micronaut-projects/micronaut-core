@@ -98,10 +98,15 @@ public class DefaultHttpClientFilterResolver implements HttpClientFilterResolver
                     }
 
                     if (matches) {
-                        String[] clients = annotationMetadata.stringValues(Filter.class, "serviceId");
-                        boolean hasClients = ArrayUtils.isNotEmpty(clients);
-                        if (hasClients) {
-                            matches = containsIdentifier(context.getClientIds(), clients);
+                        String[] serviceIds = annotationMetadata.stringValues(Filter.class, "serviceId");
+                        if (ArrayUtils.isNotEmpty(serviceIds)) {
+                            matches = containsIdentifier(context.getClientIds(), serviceIds);
+                        }
+                    }
+                    if (matches) {
+                        String[] serviceIdsExclude = annotationMetadata.stringValues(Filter.class, "excludeServiceId");
+                        if (ArrayUtils.isNotEmpty(serviceIdsExclude)) {
+                            matches = !containsIdentifier(context.getClientIds(), serviceIdsExclude);
                         }
                     }
                     return matches;

@@ -62,12 +62,12 @@ public interface ConversionContext extends AnnotationMetadataProvider, TypeVaria
     ArgumentConversionContext<String> STRING = ImmutableArgumentConversionContext.of(Argument.STRING);
 
     /**
-     * Constant for List<String> argument.
+     * Constant for {@code List<String>} argument.
      */
     ArgumentConversionContext<List<String>> LIST_OF_STRING = ImmutableArgumentConversionContext.of(Argument.LIST_OF_STRING);
 
     /**
-     * Constant for List<String> argument.
+     * Constant for {@code List<String>} argument.
      */
     ArgumentConversionContext<Map> MAP = ImmutableArgumentConversionContext.of(Argument.of(Map.class));
 

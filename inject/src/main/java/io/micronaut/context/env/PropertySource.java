@@ -21,7 +21,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * A PropertySource is a location to resolve property values from. The property keys are are available via the
+ * A PropertySource is a location to resolve property values from. The property keys are available via the
  * {@link #iterator()} method.
  *
  * @author Graeme Rocher

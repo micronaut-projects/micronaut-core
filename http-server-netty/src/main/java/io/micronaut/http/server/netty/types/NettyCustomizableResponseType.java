@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.server.types.CustomizableResponseType;
+import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
 
 /**
@@ -36,6 +37,7 @@ public interface NettyCustomizableResponseType extends CustomizableResponseType 
      * @param request  The request
      * @param response The response
      * @param context  The Netty {@link ChannelHandlerContext}
+     * @return The netty future that completes when the response is fully written.
      */
-    void write(HttpRequest<?> request, MutableHttpResponse<?> response, ChannelHandlerContext context);
+    ChannelFuture write(HttpRequest<?> request, MutableHttpResponse<?> response, ChannelHandlerContext context);
 }

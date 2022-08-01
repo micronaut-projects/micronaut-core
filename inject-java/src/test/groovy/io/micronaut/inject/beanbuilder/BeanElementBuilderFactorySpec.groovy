@@ -14,12 +14,14 @@ import io.micronaut.context.annotation.Prototype;
 
 @Prototype
 class Foo {
-    
+
 }
 ''')
         expect:
         context.getBean(TestBeanProducer.BeanB) instanceof TestBeanProducer.BeanB
         context.getBean(TestBeanProducer.BeanA) instanceof TestBeanProducer.BeanA
+        context.getBean(TestBeanProducer.BeanC) instanceof TestBeanProducer.BeanC
+        context.getBean(TestBeanProducer.InterfaceA) instanceof TestBeanProducer.InterfaceA
 
         cleanup:
         context.close()

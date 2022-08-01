@@ -38,7 +38,7 @@ class ClientBindSpec extends Specification {
 
         then:
         HttpClientException ex = thrown()
-        ex.message == "Failed to construct the request URI"
+        ex.message == "Client '/': Failed to construct the request URI"
     }
 
     void "test bind to method"() {

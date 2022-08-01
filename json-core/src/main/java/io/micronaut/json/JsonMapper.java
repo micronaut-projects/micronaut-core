@@ -45,6 +45,7 @@ public interface JsonMapper {
      * @param type The type to deserialize.
      * @param <T>  Type variable of the return type.
      * @return The deserialized value.
+     * @throws IOException IOException
      */
     <T> T readValueFromTree(@NonNull JsonNode tree, @NonNull Argument<T> type) throws IOException;
 
@@ -55,6 +56,7 @@ public interface JsonMapper {
      * @param type The type to deserialize.
      * @param <T>  Type variable of the return type.
      * @return The deserialized value.
+     * @throws IOException IOException
      */
     default <T> T readValueFromTree(@NonNull JsonNode tree, @NonNull Class<T> type) throws IOException {
         return readValueFromTree(tree, Argument.of(type));
@@ -67,6 +69,7 @@ public interface JsonMapper {
      * @param type        The type to deserialize to.
      * @param <T>         Type variable of the return type.
      * @return The deserialized object.
+     * @throws IOException IOException
      */
     <T> T readValue(@NonNull InputStream inputStream, @NonNull Argument<T> type) throws IOException;
 
@@ -77,6 +80,7 @@ public interface JsonMapper {
      * @param type      The type to deserialize to.
      * @param <T>       Type variable of the return type.
      * @return The deserialized object.
+     * @throws IOException IOException
      */
     <T> T readValue(@NonNull byte[] byteArray, @NonNull Argument<T> type) throws IOException;
 
@@ -87,6 +91,7 @@ public interface JsonMapper {
      * @param type   The type to deserialize to.
      * @param <T>    Type variable of the return type.
      * @return The deserialized object.
+     * @throws IOException IOException
      */
     default <T> T readValue(@NonNull String string, @NonNull Argument<T> type) throws IOException {
         return readValue(string.getBytes(StandardCharsets.UTF_8), type);
@@ -129,6 +134,7 @@ public interface JsonMapper {
      *
      * @param outputStream The stream to write to.
      * @param object       The object to serialize.
+     * @throws IOException IOException
      */
     void writeValue(@NonNull OutputStream outputStream, @Nullable Object object) throws IOException;
 
@@ -139,6 +145,7 @@ public interface JsonMapper {
      * @param type         The object type
      * @param object       The object to serialize.
      * @param <T>  The generic type
+     * @throws IOException IOException
      */
     <T> void writeValue(@NonNull OutputStream outputStream, @NonNull Argument<T> type, @Nullable T object) throws IOException;
 
@@ -147,6 +154,7 @@ public interface JsonMapper {
      *
      * @param object The object to serialize.
      * @return The serialized encoded json.
+     * @throws IOException IOException
      */
     byte[] writeValueAsBytes(@Nullable Object object) throws IOException;
 
@@ -157,6 +165,7 @@ public interface JsonMapper {
      * @param object The object to serialize.
      * @return The serialized encoded json.
      * @param <T> The generidc type
+     * @throws IOException IOException
      */
     <T> byte[] writeValueAsBytes(@NonNull Argument<T> type, @Nullable T object) throws IOException;
 

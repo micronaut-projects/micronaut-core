@@ -22,10 +22,10 @@ import java.lang.annotation.Annotation;
 
 /**
  * <p>A class capable of processing an {@link io.micronaut.inject.ExecutableMethod} instances.</p>
- * <p>
+ *
  * <p>The use case here is framework components that need to react to the presence of an annotation. For example given
  * the following annotation:</p>
- * <p>
+ *
  * <pre class="code">
  * &#064;Executable
  * &#064;Retention(RUNTIME)
@@ -34,7 +34,7 @@ import java.lang.annotation.Annotation;
  * String cron()
  * }
  * </pre>
- * <p>
+ *
  * <p>One could write a {@code ExecutableMethodProcessor} that processed all methods annotated with {@literal @}Scheduled:</p>
  *
  * <pre class="code">

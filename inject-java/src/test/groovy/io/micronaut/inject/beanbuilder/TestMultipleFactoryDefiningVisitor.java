@@ -21,19 +21,22 @@ public class TestMultipleFactoryDefiningVisitor implements TypeElementVisitor<Pr
                                 .qualifier(AnnotationValue.builder(Primary.class).build());
                         final ElementQuery<MethodElement> query = ElementQuery.ALL_METHODS
                                 .annotated((am) -> am.hasAnnotation(TestProduces.class));
-                        beanElementBuilder.produceBeans(query, (builder) ->
-                                builder.withParameters(params ->
-                                    params[0].injectValue("primary")
-                                ).qualifier(AnnotationValue.builder(Primary.class).build())
+                        beanElementBuilder.produceBeans(query, (builder) -> {
+                            builder.annotate("test.Foo");
+                            builder.withParameters(params ->
+                                params[0].injectValue("primary")
+                            ).qualifier(AnnotationValue.builder(Primary.class).build());
+                            }
                         );
 
                         final BeanElementBuilder beanElementBuilder2 = element.addAssociatedBean(producer)
                                 .qualifier("other");
-                        beanElementBuilder2.produceBeans(query, (builder) ->
+                        beanElementBuilder2.produceBeans(query, (builder) -> {
+                            builder.annotate("test.Bar");
                             builder.withParameters(params ->
-                                    params[0].injectValue("other")
-                            ).qualifier("other")
-                        );
+                                params[0].injectValue("other")
+                            ).qualifier("other");
+                        });
                     });
         }
     }
