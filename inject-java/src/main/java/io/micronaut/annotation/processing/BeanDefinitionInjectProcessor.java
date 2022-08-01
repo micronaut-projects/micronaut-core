@@ -1744,8 +1744,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 return null;
             }
 
-            if (modelUtils.isStatic(variable)) {
-                // static injection not allowed at this stage
+            if (modelUtils.isStatic(variable) || modelUtils.isFinal(variable)) {
+                // static and final injection not allowed at this stage
                 return null;
             }
 
