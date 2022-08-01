@@ -502,7 +502,6 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
                                                                      Consumer<BeanElementBuilder> childBeanBuilder) {
         methodsOrFields = methodsOrFields
                 .onlyConcrete()
-                .onlyInstance()
                 .modifiers(modifiers -> modifiers.contains(ElementModifier.PUBLIC));
         final List<E> enclosedElements = this.beanType.getEnclosedElements(methodsOrFields);
         for (E enclosedElement : enclosedElements) {

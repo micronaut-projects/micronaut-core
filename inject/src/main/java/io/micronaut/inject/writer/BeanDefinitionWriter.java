@@ -3151,18 +3151,37 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                     hasInjectScope = pushConstructorArguments(buildMethodVisitor, parameters);
                 }
                 if (factoryMethod instanceof MethodElement) {
-                    buildMethodVisitor.visitMethodInsn(INVOKEVIRTUAL,
+                    MethodElement methodElement = (MethodElement) factoryMethod;
+                    if (methodElement.isStatic()) {
+                        buildMethodVisitor.visitMethodInsn(INVOKESTATIC,
                             factoryType.getInternalName(),
                             factoryMethod.getName(),
                             methodDescriptor,
                             false
-                    );
+                        );
+                    } else {
+                        buildMethodVisitor.visitMethodInsn(INVOKEVIRTUAL,
+                            factoryType.getInternalName(),
+                            factoryMethod.getName(),
+                            methodDescriptor,
+                            false
+                        );
+                    }
                 } else {
-                    buildMethodVisitor.getField(
+                    if (factoryMethod.isStatic()) {
+
+                        buildMethodVisitor.getStatic(
                             factoryType,
                             factoryMethod.getName(),
                             beanType
-                    );
+                        );
+                    } else {
+                        buildMethodVisitor.getField(
+                            factoryType,
+                            factoryMethod.getName(),
+                            beanType
+                        );
+                    }
                 }
             }
 
