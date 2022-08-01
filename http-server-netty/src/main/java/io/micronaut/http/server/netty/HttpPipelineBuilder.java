@@ -85,9 +85,9 @@ import java.util.concurrent.ThreadLocalRandom;
  * @author ywkat
  */
 final class HttpPipelineBuilder {
-    private static final Logger LOG = LoggerFactory.getLogger(HttpPipelineBuilder.class);
-
     static final AttributeKey<StreamPipeline> STREAM_PIPELINE_ATTRIBUTE = AttributeKey.newInstance("stream-pipeline");
+
+    private static final Logger LOG = LoggerFactory.getLogger(HttpPipelineBuilder.class);
 
     private final NettyHttpServer server;
     private final NettyEmbeddedServices embeddedServices;
