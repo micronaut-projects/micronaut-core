@@ -35,7 +35,6 @@ import io.micronaut.http.netty.channel.ChannelPipelineListener;
 import io.micronaut.http.netty.channel.DefaultEventLoopGroupConfiguration;
 import io.micronaut.http.netty.channel.EventLoopGroupConfiguration;
 import io.micronaut.http.netty.channel.converters.ChannelOptionFactory;
-import io.micronaut.http.netty.stream.StreamingInboundHttp2ToHttpAdapter;
 import io.micronaut.http.netty.websocket.WebSocketSessionRepository;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.exceptions.ServerStartupException;
@@ -64,12 +63,6 @@ import io.netty.channel.group.ChannelGroup;
 import io.netty.channel.group.DefaultChannelGroup;
 import io.netty.channel.unix.DomainSocketAddress;
 import io.netty.handler.codec.http.multipart.DiskFileUpload;
-import io.netty.handler.codec.http2.DefaultHttp2Connection;
-import io.netty.handler.codec.http2.Http2Connection;
-import io.netty.handler.codec.http2.Http2FrameListener;
-import io.netty.handler.codec.http2.Http2FrameLogger;
-import io.netty.handler.codec.http2.HttpToHttp2ConnectionHandler;
-import io.netty.handler.codec.http2.HttpToHttp2ConnectionHandlerBuilder;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GlobalEventExecutor;
 import org.slf4j.Logger;
@@ -675,26 +668,6 @@ public class NettyHttpServer implements NettyEmbeddedServer {
      */
     public WebSocketSessionRepository getWebSocketSessionRepository() {
         return this;
-    }
-
-    private HttpToHttp2ConnectionHandler newHttpToHttp2ConnectionHandler() {
-        Http2Connection connection = new DefaultHttp2Connection(true);
-        final Http2FrameListener http2ToHttpAdapter = new StreamingInboundHttp2ToHttpAdapter(
-                connection,
-                (int) serverConfiguration.getMaxRequestSize(),
-                serverConfiguration.isValidateHeaders(),
-                true
-        );
-        final HttpToHttp2ConnectionHandlerBuilder builder = new HttpToHttp2ConnectionHandlerBuilder()
-                .frameListener(http2ToHttpAdapter)
-                .validateHeaders(serverConfiguration.isValidateHeaders())
-                .initialSettings(serverConfiguration.getHttp2().http2Settings());
-
-        serverConfiguration.getLogLevel().ifPresent(logLevel ->
-                builder.frameLogger(new Http2FrameLogger(logLevel,
-                        NettyHttpServer.class))
-        );
-        return builder.connection(connection).build();
     }
 
     @Override

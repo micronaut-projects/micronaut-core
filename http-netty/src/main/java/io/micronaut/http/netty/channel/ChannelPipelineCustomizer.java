@@ -59,12 +59,16 @@ public interface ChannelPipelineCustomizer {
 
     /**
      * @return Is this customizer the client.
+     * @deprecated Use NettyClientCustomizer or NettyServerCustomizer instead.
      */
+    @Deprecated
     boolean isClientChannel();
 
     /**
      * @return Is this customizer the server.
+     * @deprecated Use NettyClientCustomizer or NettyServerCustomizer instead.
      */
+    @Deprecated
     default boolean isServerChannel() {
         return !isClientChannel();
     }
@@ -73,6 +77,8 @@ public interface ChannelPipelineCustomizer {
      * A hook to customize the pipeline upon establishing a connection.
      *
      * @param listener The listener The listener.
+     * @deprecated Use NettyClientCustomizer or NettyServerCustomizer instead.
      */
+    @Deprecated
     void doOnConnect(@NonNull ChannelPipelineListener listener);
 }

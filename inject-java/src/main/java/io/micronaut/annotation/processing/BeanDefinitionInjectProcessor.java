@@ -852,7 +852,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 return null;
             }
 
-            if (modelUtils.isStatic(method) || modelUtils.isAbstract(method)) {
+            if (modelUtils.isAbstract(method)) {
                 return null;
             }
 
@@ -876,6 +876,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 return null;
             }
 
+            if (modelUtils.isStatic(method)) {
+                return null;
+            }
 
             boolean injected = methodAnnotationMetadata.hasDeclaredStereotype(AnnotationUtil.INJECT);
             boolean postConstruct = methodAnnotationMetadata.hasDeclaredAnnotation(AnnotationUtil.POST_CONSTRUCT);
@@ -1727,31 +1730,25 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 return null;
             }
 
-            if (modelUtils.isStatic(variable)) {
-                AnnotationMetadata fieldAnnotationMetadata = annotationUtils.getAnnotationMetadata(variable);
-                if (isFactoryType && fieldAnnotationMetadata.hasDeclaredStereotype(Bean.class)) {
-                    error(variable, "Beans produced from fields cannot be static");
+            AnnotationMetadata fieldAnnotationMetadata = annotationUtils.getAnnotationMetadata(variable);
+            if (isFactoryType && fieldAnnotationMetadata.hasDeclaredStereotype(Bean.class)) {
+                // field factory for bean
+                if (modelUtils.isPrivate(variable) || modelUtils.isProtected(variable)) {
+                    error(variable, "Beans produced from fields cannot be private or protected");
+                } else {
+                    visitBeanFactoryElement(variable);
                 }
                 return null;
-            } else if (modelUtils.isFinal(variable)) {
-                AnnotationMetadata fieldAnnotationMetadata = annotationUtils.getAnnotationMetadata(variable);
-                if (isFactoryType && fieldAnnotationMetadata.hasDeclaredStereotype(Bean.class)) {
-                    // field factory for bean
-                    if (modelUtils.isPrivate(variable) || modelUtils.isProtected(variable)) {
-                        error(variable, "Beans produced from fields cannot be private or protected");
-                    } else {
-                        visitBeanFactoryElement(variable);
-                    }
-                } else {
-                    boolean isConfigBuilder = fieldAnnotationMetadata.hasStereotype(ConfigurationBuilder.class);
-                    if (isConfigBuilder) {
-                        visitConfigurationProperty(variable, fieldAnnotationMetadata);
-                    }
-                }
+            } else if (fieldAnnotationMetadata.hasStereotype(ConfigurationBuilder.class)) {
+                visitConfigurationProperty(variable, fieldAnnotationMetadata);
                 return null;
             }
 
-            AnnotationMetadata fieldAnnotationMetadata = annotationUtils.getAnnotationMetadata(variable);
+            if (modelUtils.isStatic(variable) || modelUtils.isFinal(variable)) {
+                // static and final injection not allowed at this stage
+                return null;
+            }
+
             boolean isInjected = fieldAnnotationMetadata.hasStereotype(AnnotationUtil.INJECT) || (fieldAnnotationMetadata.hasDeclaredStereotype(AnnotationUtil.QUALIFIER) && !fieldAnnotationMetadata.hasDeclaredAnnotation(Bean.class));
             boolean isValue = (fieldAnnotationMetadata.hasStereotype(Value.class) || fieldAnnotationMetadata.hasStereotype(Property.class));
 
@@ -2261,7 +2258,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             }
         }
     }
-    
+
     /**
      * A dynamic name.
      */

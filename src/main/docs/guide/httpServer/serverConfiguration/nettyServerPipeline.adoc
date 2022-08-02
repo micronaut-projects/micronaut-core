@@ -4,11 +4,11 @@ The api:http.netty.channel.ChannelPipelineCustomizer[] interface defines constan
 
 As an example the following code sample demonstrates registering the https://github.com/zalando/logbook[Logbook] library which includes additional Netty handlers to perform request and response logging:
 
-snippet::io.micronaut.docs.netty.LogbookServerNettyCustomizer[tags="imports,class", indent=0, title="Customizing the Netty server pipeline for Logbook"]
+snippet::io.micronaut.docs.netty.LogbookNettyServerCustomizer[tags="imports,class", indent=0, title="Customizing the Netty server pipeline for Logbook"]
 
-<1> `LogbookPipelineCustomizer` listens for a api:http.server.netty.ServerNettyCustomizer.Registry[] and requires the definition of a `Logbook` bean
+<1> `LogbookNettyServerCustomizer` listens for a api:http.server.netty.NettyServerCustomizer.Registry[] and requires the definition of a `Logbook` bean
 <2> The root customizer is initialized without a channel and registered
-<3> The actual customizer implements api:http.server.netty.ServerNettyCustomizer[]
+<3> The actual customizer implements api:http.server.netty.NettyServerCustomizer[]
 <4> When a new channel is created, a new, specialized customizer is created for that channel
 <5> When the server signals that the stream pipeline has been fully constructed, the logbook handler is registered
 

@@ -226,6 +226,15 @@ public class DefaultHttpClient implements
      */
     private static final Logger DEFAULT_LOG = LoggerFactory.getLogger(DefaultHttpClient.class);
     private static final AttributeKey<Http2Stream> STREAM_KEY = AttributeKey.valueOf("micronaut.http2.stream");
+    private static final AttributeKey<NettyClientCustomizer> CHANNEL_CUSTOMIZER_KEY =
+        AttributeKey.valueOf("micronaut.http.customizer");
+    /**
+     * Future on a pooled channel that will be completed when the channel has fully connected (e.g.
+     * TLS handshake has completed). If unset, then no handshake is needed or it has already
+     * completed.
+     */
+    private static final AttributeKey<Future<?>> STREAM_CHANNEL_INITIALIZED =
+        AttributeKey.valueOf("micronaut.http.streamChannelInitialized");
     private static final int DEFAULT_HTTP_PORT = 80;
     private static final int DEFAULT_HTTPS_PORT = 443;
 
@@ -275,6 +284,7 @@ public class DefaultHttpClient implements
     private final WebSocketBeanRegistry webSocketRegistry;
     private final RequestBinderRegistry requestBinderRegistry;
     private final Collection<ChannelPipelineListener> pipelineListeners;
+    private final NettyClientCustomizer clientCustomizer;
     private final List<InvocationInstrumenterFactory> invocationInstrumenterFactories;
     private final String informationalServiceId;
 
@@ -300,7 +310,22 @@ public class DefaultHttpClient implements
             @Nullable AnnotationMetadataResolver annotationMetadataResolver,
             List<InvocationInstrumenterFactory> invocationInstrumenterFactories,
             HttpClientFilter... filters) {
-        this(loadBalancer, configuration.getHttpVersion(), configuration, contextPath, new DefaultHttpClientFilterResolver(annotationMetadataResolver, Arrays.asList(filters)), null, threadFactory, nettyClientSslBuilder, codecRegistry, WebSocketBeanRegistry.EMPTY, new DefaultRequestBinderRegistry(ConversionService.SHARED), null, NioSocketChannel::new, Collections.emptySet(), invocationInstrumenterFactories, null);
+        this(loadBalancer,
+            configuration.getHttpVersion(),
+            configuration,
+            contextPath,
+            new DefaultHttpClientFilterResolver(annotationMetadataResolver, Arrays.asList(filters)),
+            null,
+            threadFactory,
+            nettyClientSslBuilder,
+            codecRegistry,
+            WebSocketBeanRegistry.EMPTY,
+            new DefaultRequestBinderRegistry(ConversionService.SHARED),
+            null,
+            NioSocketChannel::new,
+            Collections.emptySet(),
+            CompositeNettyClientCustomizer.EMPTY,
+            invocationInstrumenterFactories, null);
     }
 
     /**
@@ -319,6 +344,7 @@ public class DefaultHttpClient implements
      * @param eventLoopGroup                  The event loop group to use
      * @param socketChannelFactory            The socket channel factory
      * @param pipelineListeners               The listeners to call for pipeline customization
+     * @param clientCustomizer                The pipeline customizer
      * @param invocationInstrumenterFactories The invocation instrumeter factories to instrument netty handlers execution with
      * @param informationalServiceId          Optional service ID that will be passed to exceptions created by this client
      */
@@ -336,6 +362,7 @@ public class DefaultHttpClient implements
                              @Nullable EventLoopGroup eventLoopGroup,
                              @NonNull ChannelFactory socketChannelFactory,
                              Collection<ChannelPipelineListener> pipelineListeners,
+                             NettyClientCustomizer clientCustomizer,
                              List<InvocationInstrumenterFactory> invocationInstrumenterFactories,
                              @Nullable String informationalServiceId
     ) {
@@ -455,6 +482,7 @@ public class DefaultHttpClient implements
         this.webSocketRegistry = webSocketBeanRegistry != null ? webSocketBeanRegistry : WebSocketBeanRegistry.EMPTY;
         this.requestBinderRegistry = requestBinderRegistry;
         this.pipelineListeners = pipelineListeners;
+        this.clientCustomizer = clientCustomizer;
         this.informationalServiceId = informationalServiceId;
     }
 
@@ -1257,8 +1285,10 @@ public class DefaultHttpClient implements
                     addInstrumentedListener(channelFuture, future -> {
                         if (future.isSuccess()) {
                             Channel channel = future.get();
-                            try {
-                                sendRequestThroughChannel(
+                            Future<?> initFuture = channel.attr(STREAM_CHANNEL_INITIALIZED).get();
+                            if (initFuture == null) {
+                                try {
+                                    sendRequestThroughChannel(
                                         requestWrapper.get(),
                                         bodyType,
                                         errorType,
@@ -1266,9 +1296,27 @@ public class DefaultHttpClient implements
                                         channel,
                                         requestKey.isSecure(),
                                         channelPool
-                                );
-                            } catch (Exception e) {
-                                emitter.error(e);
+                                    );
+                                } catch (Exception e) {
+                                    emitter.error(e);
+                                }
+                            } else {
+                                // we should wait until the handshake completes
+                                addInstrumentedListener(initFuture, f -> {
+                                    try {
+                                        sendRequestThroughChannel(
+                                            requestWrapper.get(),
+                                            bodyType,
+                                            errorType,
+                                            emitter,
+                                            channel,
+                                            requestKey.isSecure(),
+                                            channelPool
+                                        );
+                                    } catch (Exception e) {
+                                        emitter.error(e);
+                                    }
+                                });
                             }
                         } else {
                             Throwable cause = future.cause();
@@ -1905,6 +1953,7 @@ public class DefaultHttpClient implements
                     ctx.close();
                     throw customizeException(new HttpClientException("Unknown Protocol: " + protocol));
                 }
+                httpClientInitializer.onStreamPipelineBuilt();
             }
         });
 
@@ -1930,6 +1979,16 @@ public class DefaultHttpClient implements
         pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC, sourceCodec);
         httpClientInitializer.settingsHandler = new Http2SettingsHandler(ch.newPromise());
         pipeline.addLast(upgradeHandler);
+        pipeline.addLast(new ChannelInboundHandlerAdapter() {
+            @Override
+            public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+                ctx.fireUserEventTriggered(evt);
+                if (evt instanceof HttpClientUpgradeHandler.UpgradeEvent) {
+                    httpClientInitializer.onStreamPipelineBuilt();
+                    ctx.pipeline().remove(this);
+                }
+            }
+        });
         pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_UPGRADE_REQUEST, new UpgradeRequestHandler(httpClientInitializer) {
             @Override
             public void handlerRemoved(ChannelHandlerContext ctx) {
@@ -2104,6 +2163,7 @@ public class DefaultHttpClient implements
         Promise<HttpResponse<O>> responsePromise = channel.eventLoop().newPromise();
         channel.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_FULL_HTTP_RESPONSE,
                 new FullHttpResponseHandler<>(responsePromise, channelPool, secure, finalRequest, bodyType, errorType));
+        channel.attr(CHANNEL_CUSTOMIZER_KEY).get().onRequestPipelineBuilt();
         Publisher<HttpResponse<O>> publisher = new NettyFuturePublisher<>(responsePromise, true);
         if (bodyType != null && bodyType.isVoid()) {
             // don't emit response if bodyType is void
@@ -2156,6 +2216,7 @@ public class DefaultHttpClient implements
         ChannelPipeline pipeline = channel.pipeline();
         pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE_FULL, new StreamFullHttpResponseHandler(responsePromise, parentRequest, finalRequest));
         pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE_STREAM, new StreamStreamHttpResponseHandler(responsePromise, parentRequest, finalRequest));
+        channel.attr(CHANNEL_CUSTOMIZER_KEY).get().onRequestPipelineBuilt();
 
         if (log.isDebugEnabled()) {
             debugRequest(finalRequest.getUri(), nettyRequest);
@@ -2516,6 +2577,24 @@ public class DefaultHttpClient implements
         return new AbstractChannelPoolHandler() {
             @Override
             public void channelCreated(Channel ch) {
+                Promise<?> streamPipelineBuilt = ch.newPromise();
+                ch.attr(STREAM_CHANNEL_INITIALIZED).set(streamPipelineBuilt);
+
+                // make sure the future completes eventually
+                ChannelHandler failureHandler = new ChannelInboundHandlerAdapter() {
+                    @Override
+                    public void handlerRemoved(ChannelHandlerContext ctx) {
+                        streamPipelineBuilt.trySuccess(null);
+                    }
+
+                    @Override
+                    public void channelInactive(ChannelHandlerContext ctx) {
+                        streamPipelineBuilt.trySuccess(null);
+                        ctx.fireChannelInactive();
+                    }
+                };
+                ch.pipeline().addLast(failureHandler);
+
                 ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_INIT, new HttpClientInitializer(
                         key.isSecure() ? sslContext : null,
                         key.getHost(),
@@ -2529,6 +2608,14 @@ public class DefaultHttpClient implements
                     protected void addFinalHandler(ChannelPipeline pipeline) {
                         // no-op, don't add the stream handler which is not supported
                         // in the connection pooled scenario
+                    }
+
+                    @Override
+                    void onStreamPipelineBuilt() {
+                        super.onStreamPipelineBuilt();
+                        streamPipelineBuilt.trySuccess(null);
+                        ch.pipeline().remove(failureHandler);
+                        ch.attr(STREAM_CHANNEL_INITIALIZED).set(null);
                     }
                 });
 
@@ -2644,6 +2731,7 @@ public class DefaultHttpClient implements
         final boolean acceptsEvents;
         Http2SettingsHandler settingsHandler;
         private final Consumer<ChannelHandlerContext> contextConsumer;
+        private NettyClientCustomizer channelCustomizer;
 
         /**
          * @param sslContext      The ssl context
@@ -2676,6 +2764,9 @@ public class DefaultHttpClient implements
          */
         @Override
         protected void initChannel(SocketChannel ch) {
+            channelCustomizer = clientCustomizer.specializeForChannel(ch, NettyClientCustomizer.ChannelRole.CONNECTION);
+            ch.attr(CHANNEL_CUSTOMIZER_KEY).set(channelCustomizer);
+
             ChannelPipeline p = ch.pipeline();
 
             Proxy proxy = configuration.resolveProxy(sslContext != null, host, port);
@@ -2705,6 +2796,7 @@ public class DefaultHttpClient implements
                 } else {
                     configureHttp2ClearText(this, ch, connectionHandler);
                 }
+                channelCustomizer.onInitialPipelineBuilt();
             } else {
                 if (stream) {
                     // for streaming responses we disable auto read
@@ -2750,7 +2842,17 @@ public class DefaultHttpClient implements
                 }
 
                 addHttp1Handlers(p);
+                channelCustomizer.onInitialPipelineBuilt();
+                onStreamPipelineBuilt();
             }
+        }
+
+        /**
+         * Called when the stream pipeline is fully set up (all handshakes completed) and we can
+         * start processing requests.
+         */
+        void onStreamPipelineBuilt() {
+            channelCustomizer.onStreamPipelineBuilt();
         }
 
         private void addHttp1Handlers(ChannelPipeline p) {
