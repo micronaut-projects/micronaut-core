@@ -1,5 +1,5 @@
 [versions]
-asm = "9.3"
+asm = "9.2"
 awaitility = "4.2.0"
 bcpkix = "1.70"
 blaze = "1.6.6"
