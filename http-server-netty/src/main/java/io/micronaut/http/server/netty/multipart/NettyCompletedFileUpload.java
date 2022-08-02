@@ -90,12 +90,14 @@ public class NettyCompletedFileUpload implements CompletedFileUpload {
             if (byteBuf == null) {
                 throw new IOException("The input stream has already been released");
             }
+            closeTracker();
             return new ByteBufInputStream(byteBuf, controlRelease);
         } else {
             File file = fileUpload.getFile();
             if (file == null) {
                 throw new IOException("The input stream has already been released");
             }
+            closeTracker();
             return new NettyFileUploadInputStream(fileUpload, controlRelease);
         }
     }
@@ -179,6 +181,10 @@ public class NettyCompletedFileUpload implements CompletedFileUpload {
         if (controlRelease) {
             fileUpload.release();
         }
+        closeTracker();
+    }
+
+    private void closeTracker() {
         if (tracker != null) {
             tracker.close(this);
         }
