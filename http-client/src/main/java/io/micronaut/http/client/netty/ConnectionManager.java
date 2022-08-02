@@ -611,7 +611,9 @@ final class ConnectionManager {
                 }
 
                 try {
-                    pipeline.addLast(WebSocketClientCompressionHandler.INSTANCE);
+                    if (configuration.isWsPerMessageDeflate()) {
+                        pipeline.addLast(WebSocketClientCompressionHandler.INSTANCE);
+                    }
                     pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_WEBSOCKET_CLIENT, handler);
                     initial.tryEmitEmpty();
                 } catch (Throwable e) {

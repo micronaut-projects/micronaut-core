@@ -132,7 +132,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
      */
     public DefaultNettyHttpClientRegistry(
             HttpClientConfiguration defaultHttpClientConfiguration,
-            HttpClientFilterResolver httpClientFilterResolver,
+            HttpClientFilterResolver<ClientFilterResolutionContext> httpClientFilterResolver,
             LoadBalancerResolver loadBalancerResolver,
             NettyClientSslBuilder nettyClientSslBuilder,
             ThreadFactory threadFactory,

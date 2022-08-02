@@ -95,8 +95,12 @@ public abstract class HttpClientConfiguration {
     /**
      * The default value.
      */
-    @SuppressWarnings("WeakerAccess")
     public static final boolean DEFAULT_EXCEPTION_ON_ERROR_STATUS = true;
+
+    /**
+     * The default websocket per message deflate value.
+     */
+    public static final boolean DEFAULT_WS_PER_MESSAGE_DEFLATE = true;
 
     private Map<String, Object> channelOptions = Collections.emptyMap();
 
@@ -138,6 +142,8 @@ public abstract class HttpClientConfiguration {
     private boolean followRedirects = DEFAULT_FOLLOW_REDIRECTS;
 
     private boolean exceptionOnErrorStatus = DEFAULT_EXCEPTION_ON_ERROR_STATUS;
+
+    private boolean wsPerMessageDeflate = DEFAULT_WS_PER_MESSAGE_DEFLATE;
 
     private SslConfiguration sslConfiguration = new ClientSslConfiguration();
 
@@ -195,6 +201,7 @@ public abstract class HttpClientConfiguration {
             this.sslConfiguration = copy.sslConfiguration;
             this.threadFactory = copy.threadFactory;
             this.httpVersion = copy.httpVersion;
+            this.wsPerMessageDeflate = copy.wsPerMessageDeflate;
         }
     }
 
@@ -285,6 +292,13 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
+     * @return Whether the per message deflate extension is enabled for websocket connections.
+     */
+    public boolean isWsPerMessageDeflate() {
+        return wsPerMessageDeflate;
+    }
+
+    /**
      * Sets whether throwing an exception upon HTTP error status (&gt;= 400) is preferred. Default value ({@link io.micronaut.http.client.HttpClientConfiguration#DEFAULT_EXCEPTION_ON_ERROR_STATUS})
      *
      * @param exceptionOnErrorStatus Whether
@@ -316,6 +330,16 @@ public abstract class HttpClientConfiguration {
      */
     public void setFollowRedirects(boolean followRedirects) {
         this.followRedirects = followRedirects;
+    }
+
+    /**
+     * Sets whether the per message deflate extension is enabled for websocket connections.
+     * Default value ({@link io.micronaut.http.client.HttpClientConfiguration#DEFAULT_WS_PER_MESSAGE_DEFLATE}).
+     *
+     * @param wsPerMessageDeflate
+     */
+    public void setWsPerMessageDeflate(boolean wsPerMessageDeflate) {
+        this.wsPerMessageDeflate = wsPerMessageDeflate;
     }
 
     /**
