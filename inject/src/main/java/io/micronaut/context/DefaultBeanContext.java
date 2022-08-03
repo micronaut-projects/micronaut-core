@@ -1142,7 +1142,13 @@ public class DefaultBeanContext implements InitializableBeanContext {
         beanToDestroy = triggerPreDestroyListeners(definition, beanToDestroy);
 
         if (definition instanceof DisposableBeanDefinition) {
-            ((DisposableBeanDefinition<T>) definition).dispose(this, beanToDestroy);
+            try {
+                ((DisposableBeanDefinition<T>) definition).dispose(this, beanToDestroy);
+            } catch (Exception e) {
+                if (LOG.isWarnEnabled()) {
+                    LOG.warn("Error disposing bean [" + beanToDestroy + "]... Continuing...", e);
+                }
+            }
         }
         if (beanToDestroy instanceof LifeCycle) {
             try {
