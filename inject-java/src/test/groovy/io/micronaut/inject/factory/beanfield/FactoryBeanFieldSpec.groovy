@@ -916,6 +916,7 @@ class Implementation1 implements SubInterface {
     }
 }
 
+@Singleton
 public class Implementation2 implements Interface {
     public static AtomicInteger closed = new AtomicInteger(0);
 
