@@ -888,12 +888,6 @@ class FactoryClass {
     Test testBean() {
         return new Test();
     }
-
-    @Bean(preDestroy="close")
-    @Singleton
-    Implementation2 build2() {
-        return new Implementation2();
-    }
 }
 
 class Test {
@@ -901,7 +895,6 @@ class Test {
 
     public void close() {
         closed.incrementAndGet();
-        System.out.println("Test closing");
         throw new RuntimeException("Test");
     }
 }
@@ -919,7 +912,6 @@ class Implementation1 implements SubInterface {
     @Override
     public void close() {
         closed.incrementAndGet();
-        System.out.println("Implementation 1 closing");
         throw new RuntimeException("Implementation 1");
     }
 }
@@ -930,7 +922,6 @@ public class Implementation2 implements Interface {
     @Override
     public void close() {
         closed.incrementAndGet();
-        System.out.println("Implementation 2 closing");
         throw new RuntimeException("Implementation 2");
     }
 }
