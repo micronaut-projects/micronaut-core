@@ -17,7 +17,7 @@ package io.micronaut.function.executor;
 
 /**
  * <p>Allows executing the function configured by {@link io.micronaut.function.LocalFunctionRegistry#FUNCTION_NAME}</p>.
- * <p>
+ *
  * <p>Or a named function</p>
  *
  * @param <I> input type

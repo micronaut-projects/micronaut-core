@@ -28,7 +28,7 @@ import java.util.Map;
 public class MessageSourceUtils {
     /**
      * Returns a Map whose keys are the index of the varargs.
-     * E.g. for "Sergio", "John" the map ["0" => "Sergio", "1" => "John"] is returned
+     * E.g. for "Sergio", "John" the map ["0" =&gt; "Sergio", "1" =&gt; "John"] is returned
      * @param args variables
      * @return The variables map.
      */

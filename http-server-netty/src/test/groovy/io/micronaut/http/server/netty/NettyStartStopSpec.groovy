@@ -29,6 +29,10 @@ class NettyStartStopSpec extends Specification {
 
         then:
         listener.eventCount.get() == 2
+        server.applicationContext.isRunning()
+
+        cleanup:
+        server.stop()
     }
 
     @Context

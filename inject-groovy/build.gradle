@@ -41,6 +41,8 @@ dependencies {
 
 tasks.named("test") {
     exclude '**/*$_closure*'
+
+    systemProperty "groovy.attach.groovydoc", true
 }
 
 //compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']

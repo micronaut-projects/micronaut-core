@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.ast;
 
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -31,4 +32,15 @@ public interface EnumElement extends ClassElement {
      * @return The values
      */
     List<String> values();
+
+    /**
+     * The enum constant elements that make up this enum.
+     *
+     * @return The enum constant elements
+     *
+     * @since 3.6.0
+     */
+    default List<EnumConstantElement> elements() {
+        return Collections.emptyList();
+    }
 }

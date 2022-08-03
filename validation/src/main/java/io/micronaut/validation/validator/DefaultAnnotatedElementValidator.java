@@ -17,7 +17,6 @@ package io.micronaut.validation.validator;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.util.ArrayUtils;
@@ -80,22 +79,18 @@ public class DefaultAnnotatedElementValidator extends DefaultValidator implement
 
         private Map<ValidatorKey, ConstraintValidator> initializeValidatorMap() {
             validatorMap = new HashMap<>();
-            final SoftServiceLoader<ConstraintValidator> constraintValidators = SoftServiceLoader.load(ConstraintValidator.class);
-            for (ServiceDefinition<ConstraintValidator> constraintValidator : constraintValidators) {
-                if (constraintValidator.isPresent()) {
-                    try {
-                        final ConstraintValidator validator = constraintValidator.load();
-                        final Class[] typeArgs = GenericTypeUtils.resolveInterfaceTypeArguments(validator.getClass(), ConstraintValidator.class);
-                        if (ArrayUtils.isNotEmpty(typeArgs) && typeArgs.length == 2) {
-                            validatorMap.put(
-                                    new ValidatorKey(typeArgs[0], typeArgs[1]),
-                                    validator
-                            );
-                        }
-                    } catch (Exception e) {
-                        // as this will occur in the compiler, we print a warning and not log it
-                        System.err.println("WARNING: Could not validator [" + constraintValidator.getName() + "]: " + e.getMessage());
+            for (ConstraintValidator validator : SoftServiceLoader.load(ConstraintValidator.class).collectAll()) {
+                try {
+                    final Class[] typeArgs = GenericTypeUtils.resolveInterfaceTypeArguments(validator.getClass(), ConstraintValidator.class);
+                    if (ArrayUtils.isNotEmpty(typeArgs) && typeArgs.length == 2) {
+                        validatorMap.put(
+                                new ValidatorKey(typeArgs[0], typeArgs[1]),
+                                validator
+                        );
                     }
+                } catch (Exception e) {
+                    // as this will occur in the compiler, we print a warning and not log it
+                    System.err.println("WARNING: Could not load validator [" + validator.getClass().getName() + "]: " + e.getMessage());
                 }
             }
 

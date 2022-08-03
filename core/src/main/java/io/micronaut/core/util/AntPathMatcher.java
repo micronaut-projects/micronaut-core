@@ -22,36 +22,36 @@ package io.micronaut.core.util;
 /**
  * <p>PathMatcher implementation for Ant-style path patterns.
  * Examples are provided below.</p>
- * <p>
+ *
  * <p>Part of this mapping code has been kindly borrowed from
  * <a href="https://ant.apache.org">Apache Ant</a>.
- * <p>
+ *
  * <p>The mapping matches URLs using the following rules:<br>
  * <ul>
  * <li>? matches one character</li>
  * <li>* matches zero or more characters</li>
  * <li>** matches zero or more 'directories' in a path</li>
  * </ul>
- * <p>
+ *
  * <p>Some examples:<br>
  * <ul>
- * <li><code>com/t?st.jsp</code> - matches <code>com/test.jsp</code> but also
- * <code>com/tast.jsp</code> or <code>com/txst.jsp</code>
+ * <li>{@code com/t?st.jsp} - matches {@code com/test.jsp} but also
+ * {@code com/tast.jsp} or {@code com/txst.jsp}
  * </li>
- * <li><code>com/*.jsp</code> - matches all <code>.jsp</code> files in the
- * <code>com</code> directory</li>
- * <li><code>com/&#42;&#42;/test.jsp</code> - matches all <code>test.jsp</code>
- * files underneath the <code>com</code> path</li>
- * <li><code>org/apache/shiro/&#42;&#42;/*.jsp</code> - matches all <code>.jsp</code>
- * files underneath the <code>org/apache/shiro</code> path</li>
- * <li><code>org/&#42;&#42;/servlet/bla.jsp</code> - matches
- * <code>org/apache/shiro/servlet/bla.jsp</code> but also
- * <code>org/apache/shiro/testing/servlet/bla.jsp</code> and
- * <code>org/servlet/bla.jsp</code></li>
+ * <li>{@code com/*.jsp} - matches all {@code .jsp} files in the
+ * {@code com} directory</li>
+ * <li>{@code com/&#42;&#42;/test.jsp} - matches all {@code test.jsp}
+ * files underneath the {@code com} path</li>
+ * <li>{@code org/apache/shiro/&#42;&#42;/*.jsp} - matches all {@code .jsp}
+ * files underneath the {@code org/apache/shiro} path</li>
+ * <li>{@code org/&#42;&#42;/servlet/bla.jsp} - matches
+ * {@code org/apache/shiro/servlet/bla.jsp} but also
+ * {@code org/apache/shiro/testing/servlet/bla.jsp} and
+ * {@code org/servlet/bla.jsp}</li>
  * </ul>
- * <p>
+ *
  * <p><b>N.B.</b>: This class was forked from Apache Shiro with modifications.</p>
- * <p>
+ *
  * <p>As per the Apache 2.0 license, the original copyright notice and all author and copyright information have
  * remained intact.</p>
  *
@@ -90,14 +90,14 @@ public class AntPathMatcher implements PathMatcher {
     }
 
     /**
-     * Actually match the given <code>path</code> against the given <code>pattern</code>.
+     * Actually match the given {@code path} against the given {@code pattern}.
      *
      * @param pattern   the pattern to match against
      * @param path      the path String to test
      * @param fullMatch whether a full pattern match is required
      *                  (else a pattern match as far as the given base path goes is sufficient)
-     * @return <code>true</code> if the supplied <code>path</code> matched,
-     * <code>false</code> if it didn't
+     * @return {@code true} if the supplied {@code path} matched,
+     * {@code false} if it didn't
      */
     protected boolean doMatch(String pattern, String path, boolean fullMatch) {
         if (path == null || pattern == null || path.startsWith(this.pathSeparator) != pattern.startsWith(this.pathSeparator)) {
@@ -230,11 +230,11 @@ public class AntPathMatcher implements PathMatcher {
      * '?' means one and only one character
      *
      * @param pattern pattern to match against.
-     *                Must not be <code>null</code>.
+     *                Must not be {@code null}.
      * @param str     string which must be matched against the pattern.
-     *                Must not be <code>null</code>.
-     * @return <code>true</code> if the string matches against the
-     * pattern, or <code>false</code> otherwise.
+     *                Must not be {@code null}.
+     * @return {@code true} if the string matches against the
+     * pattern, or {@code false} otherwise.
      */
     @SuppressWarnings("InnerAssignment")
     private boolean matchStrings(String pattern, String str) {
@@ -378,17 +378,17 @@ public class AntPathMatcher implements PathMatcher {
      * Given a pattern and a full path, determine the pattern-mapped part.
      * <p>For example:
      * <ul>
-     * <li>'<code>/docs/cvs/commit.html</code>' and '<code>/docs/cvs/commit.html</code> -> ''</li>
-     * <li>'<code>/docs/*</code>' and '<code>/docs/cvs/commit</code> -> '<code>cvs/commit</code>'</li>
-     * <li>'<code>/docs/cvs/*.html</code>' and '<code>/docs/cvs/commit.html</code> -> '<code>commit.html</code>'</li>
-     * <li>'<code>/docs/**</code>' and '<code>/docs/cvs/commit</code> -> '<code>cvs/commit</code>'</li>
-     * <li>'<code>/docs/**\/*.html</code>' and '<code>/docs/cvs/commit.html</code> -> '<code>cvs/commit.html</code>'</li>
-     * <li>'<code>/*.html</code>' and '<code>/docs/cvs/commit.html</code> -> '<code>docs/cvs/commit.html</code>'</li>
-     * <li>'<code>*.html</code>' and '<code>/docs/cvs/commit.html</code> -> '<code>/docs/cvs/commit.html</code>'</li>
-     * <li>'<code>*</code>' and '<code>/docs/cvs/commit.html</code> -> '<code>/docs/cvs/commit.html</code>'</li>
+     * <li>'{@code /docs/cvs/commit.html}' and '{@code /docs/cvs/commit.html} -&gt; ''</li>
+     * <li>'{@code /docs/*}' and '{@code /docs/cvs/commit} -&gt; '{@code cvs/commit}'</li>
+     * <li>'{@code /docs/cvs/*.html}' and '{@code /docs/cvs/commit.html} -&gt; '{@code commit.html}'</li>
+     * <li>'{@code /docs/**}' and '{@code /docs/cvs/commit} -&gt; '{@code cvs/commit}'</li>
+     * <li>'{@code /docs/**\/*.html}' and '{@code /docs/cvs/commit.html} -&gt; '{@code cvs/commit.html}'</li>
+     * <li>'{@code /*.html}' and '{@code /docs/cvs/commit.html} -&gt; '{@code docs/cvs/commit.html}'</li>
+     * <li>'{@code *.html}' and '{@code /docs/cvs/commit.html} -&gt; '{@code /docs/cvs/commit.html}'</li>
+     * <li>'{@code *}' and '{@code /docs/cvs/commit.html} -&gt; '{@code /docs/cvs/commit.html}'</li>
      * </ul>
-     * <p>Assumes that {@link #matches(String, String)} returns <code>true</code> for '<code>pattern</code>'
-     * and '<code>path</code>', but does <strong>not</strong> enforce this.
+     * <p>Assumes that {@link #matches(String, String)} returns {@code true} for '{@code pattern}'
+     * and '{@code path}', but does <strong>not</strong> enforce this.
      *
      * @param pattern The pattern
      * @param path    The path

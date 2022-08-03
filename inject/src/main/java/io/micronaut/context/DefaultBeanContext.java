@@ -65,6 +65,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.Order;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.DefaultConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
@@ -185,7 +186,6 @@ public class DefaultBeanContext implements InitializableBeanContext {
     protected final AtomicBoolean terminating = new AtomicBoolean(false);
 
     final Map<BeanIdentifier, BeanRegistration<?>> singlesInCreation = new ConcurrentHashMap<>(5);
-
     Set<Map.Entry<Class<?>, List<BeanInitializedEventListener>>> beanInitializedEventListeners;
 
     private final SingletonScope singletonScope = new SingletonScope();
@@ -333,6 +333,8 @@ public class DefaultBeanContext implements InitializableBeanContext {
         if (!isRunning()) {
 
             if (initializing.compareAndSet(false, true)) {
+                // Reset possibly modified shared context
+                ((DefaultConversionService) ConversionService.SHARED).reset();
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Starting BeanContext");
                 }
@@ -419,7 +421,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
             beanCreationEventListeners = null;
             beanPreDestroyEventListeners = null;
             beanDestroyedEventListeners = null;
-
+            ((DefaultConversionService) ConversionService.SHARED).reset();
             terminating.set(false);
             running.set(false);
         }
@@ -1540,6 +1542,19 @@ public class DefaultBeanContext implements InitializableBeanContext {
         return Collections.emptyList();
     }
 
+    @SuppressWarnings("unchecked")
+    @Override
+    @NonNull
+    public <B> BeanContext registerBeanDefinition(@NonNull RuntimeBeanDefinition<B> definition) {
+        Objects.requireNonNull(definition, "Bean definition cannot be null");
+        this.beanDefinitionsClasses.add(definition);
+        beanCandidateCache.entrySet().removeIf(entry -> entry.getKey().isAssignableFrom(definition.getBeanType()));
+        beanConcreteCandidateCache.entrySet().removeIf(entry -> entry.getKey().beanType.isAssignableFrom(definition.getBeanType()));
+        singletonBeanRegistrations.entrySet().removeIf(entry -> entry.getKey().beanType.isAssignableFrom(definition.getBeanType()));
+        containsBeanCache.entrySet().removeIf(entry -> entry.getKey().beanType.isAssignableFrom(definition.getBeanType()));
+        return this;
+    }
+
     /**
      * Get a bean of the given type.
      *
@@ -1877,7 +1892,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
             @NonNull List<BeanDefinitionReference> parallelBeans) {
 
         if (CollectionUtils.isNotEmpty(contextScopeBeans)) {
-            final Collection<BeanDefinition> contextBeans = new ArrayList<>(contextScopeBeans.size());
+            final List<BeanDefinition> contextBeans = new ArrayList<>(contextScopeBeans.size());
 
             for (BeanDefinitionReference contextScopeBean : contextScopeBeans) {
                 try {
@@ -1888,7 +1903,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
             }
             filterProxiedTypes((Collection) contextBeans, true, false, null);
             filterReplacedBeans(null, (Collection) contextBeans);
-
+            OrderUtil.sort(contextBeans);
             for (BeanDefinition contextScopeDefinition : contextBeans) {
                 try {
                     loadContextScopeBean(contextScopeDefinition);
@@ -3298,8 +3313,8 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
         }
 
-        beanDefinitionReferences = null;
-        beanConfigurationsList = null;
+        this.beanDefinitionReferences = null;
+        this.beanConfigurationsList = null;
 
         initializeEventListeners();
         initializeContext(contextScopeBeans, processedBeans, parallelBeans);

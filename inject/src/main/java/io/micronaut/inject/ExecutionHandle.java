@@ -27,7 +27,7 @@ import java.lang.reflect.Method;
  * <p>Represents a handle to an executable object. Differs from {@link io.micronaut.core.type.Executable} in that the
  * first argument to {@link #invoke(Object...)} is not the object instead the object is typically held within the
  * handle itself.</p>
- * <p>
+ *
  * <p>Executable handles are also applicable to constructors and static methods</p>
  *
  * @param <T> The target type

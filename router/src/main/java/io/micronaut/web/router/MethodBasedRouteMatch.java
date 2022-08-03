@@ -30,8 +30,8 @@ import java.util.Collection;
 public interface MethodBasedRouteMatch<T, R> extends RouteMatch<R>, MethodExecutionHandle<T, R> {
 
     /**
-     * <p>Returns the required arguments for this RouteMatch<./p>
-     * <p>
+     * <p>Returns the required arguments for this RouteMatch.</p>
+     *
      * <p>Note that this is not the save as {@link #getArguments()} as it will include a subset of the arguments
      * excluding those that have been subtracted from the URI variables.</p>
      *

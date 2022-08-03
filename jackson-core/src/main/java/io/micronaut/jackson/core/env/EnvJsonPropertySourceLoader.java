@@ -27,7 +27,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
 /**
- * <p>Reads properties from JSON stored in the environment variables <tt>SPRING_APPLICATION_JSON</tt> or <tt>MICRONAUT_APPLICATION_JSON</tt>.</p>
+ * <p>Reads properties from JSON stored in the environment variables {@code SPRING_APPLICATION_JSON} or {@code MICRONAUT_APPLICATION_JSON}.</p>
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -58,7 +58,7 @@ public class EnvJsonPropertySourceLoader extends JsonPropertySourceLoader {
 
     /**
      * @return The JSON as input stream stored in the environment variables
-     * <tt>SPRING_APPLICATION_JSON</tt> or <tt>MICRONAUT_APPLICATION_JSON</tt>.
+     * {@code SPRING_APPLICATION_JSON} or {@code MICRONAUT_APPLICATION_JSON}.
      */
     protected Optional<InputStream> getEnvValueAsStream() {
         String v = getEnvValue();
@@ -72,7 +72,7 @@ public class EnvJsonPropertySourceLoader extends JsonPropertySourceLoader {
 
     /**
      * @return The JSON stored in the environment variables
-     * <tt>SPRING_APPLICATION_JSON</tt> or <tt>MICRONAUT_APPLICATION_JSON</tt>.
+     * {@code SPRING_APPLICATION_JSON} or {@code MICRONAUT_APPLICATION_JSON}.
      */
     protected String getEnvValue() {
         String v = CachedEnvironment.getenv(SPRING_APPLICATION_JSON);

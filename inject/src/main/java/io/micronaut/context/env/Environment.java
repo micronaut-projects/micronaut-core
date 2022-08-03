@@ -36,7 +36,7 @@ import java.util.stream.Stream;
 /**
  * <p>The current application environment. The environment represents the loaded configuration of the application
  * for a current list of active environment names.</p>
- * <p>
+ *
  * <p>The active environment names can be obtained from the {@link #getActiveNames()} method and are established from one
  * of the following sources:
  * </p>

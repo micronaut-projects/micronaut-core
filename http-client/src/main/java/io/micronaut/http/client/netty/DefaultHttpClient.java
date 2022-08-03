@@ -51,6 +51,7 @@ import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.ProxyHttpClient;
 import io.micronaut.http.client.ProxyRequestOptions;
+import io.micronaut.http.client.ServiceHttpClientConfiguration;
 import io.micronaut.http.client.StreamingHttpClient;
 import io.micronaut.http.client.exceptions.ContentLengthExceededException;
 import io.micronaut.http.client.exceptions.HttpClientErrorDecoder;
@@ -225,6 +226,15 @@ public class DefaultHttpClient implements
      */
     private static final Logger DEFAULT_LOG = LoggerFactory.getLogger(DefaultHttpClient.class);
     private static final AttributeKey<Http2Stream> STREAM_KEY = AttributeKey.valueOf("micronaut.http2.stream");
+    private static final AttributeKey<NettyClientCustomizer> CHANNEL_CUSTOMIZER_KEY =
+        AttributeKey.valueOf("micronaut.http.customizer");
+    /**
+     * Future on a pooled channel that will be completed when the channel has fully connected (e.g.
+     * TLS handshake has completed). If unset, then no handshake is needed or it has already
+     * completed.
+     */
+    private static final AttributeKey<Future<?>> STREAM_CHANNEL_INITIALIZED =
+        AttributeKey.valueOf("micronaut.http.streamChannelInitialized");
     private static final int DEFAULT_HTTP_PORT = 80;
     private static final int DEFAULT_HTTPS_PORT = 443;
 
@@ -274,7 +284,9 @@ public class DefaultHttpClient implements
     private final WebSocketBeanRegistry webSocketRegistry;
     private final RequestBinderRegistry requestBinderRegistry;
     private final Collection<ChannelPipelineListener> pipelineListeners;
+    private final NettyClientCustomizer clientCustomizer;
     private final List<InvocationInstrumenterFactory> invocationInstrumenterFactories;
+    private final String informationalServiceId;
 
     /**
      * Construct a client for the given arguments.
@@ -298,7 +310,22 @@ public class DefaultHttpClient implements
             @Nullable AnnotationMetadataResolver annotationMetadataResolver,
             List<InvocationInstrumenterFactory> invocationInstrumenterFactories,
             HttpClientFilter... filters) {
-        this(loadBalancer, configuration.getHttpVersion(), configuration, contextPath, new DefaultHttpClientFilterResolver(annotationMetadataResolver, Arrays.asList(filters)), null, threadFactory, nettyClientSslBuilder, codecRegistry, WebSocketBeanRegistry.EMPTY, new DefaultRequestBinderRegistry(ConversionService.SHARED), null, NioSocketChannel::new, Collections.emptySet(), invocationInstrumenterFactories);
+        this(loadBalancer,
+            configuration.getHttpVersion(),
+            configuration,
+            contextPath,
+            new DefaultHttpClientFilterResolver(annotationMetadataResolver, Arrays.asList(filters)),
+            null,
+            threadFactory,
+            nettyClientSslBuilder,
+            codecRegistry,
+            WebSocketBeanRegistry.EMPTY,
+            new DefaultRequestBinderRegistry(ConversionService.SHARED),
+            null,
+            NioSocketChannel::new,
+            Collections.emptySet(),
+            CompositeNettyClientCustomizer.EMPTY,
+            invocationInstrumenterFactories, null);
     }
 
     /**
@@ -317,7 +344,9 @@ public class DefaultHttpClient implements
      * @param eventLoopGroup                  The event loop group to use
      * @param socketChannelFactory            The socket channel factory
      * @param pipelineListeners               The listeners to call for pipeline customization
+     * @param clientCustomizer                The pipeline customizer
      * @param invocationInstrumenterFactories The invocation instrumeter factories to instrument netty handlers execution with
+     * @param informationalServiceId          Optional service ID that will be passed to exceptions created by this client
      */
     public DefaultHttpClient(@Nullable LoadBalancer loadBalancer,
                              @Nullable io.micronaut.http.HttpVersion httpVersion,
@@ -333,7 +362,9 @@ public class DefaultHttpClient implements
                              @Nullable EventLoopGroup eventLoopGroup,
                              @NonNull ChannelFactory socketChannelFactory,
                              Collection<ChannelPipelineListener> pipelineListeners,
-                             List<InvocationInstrumenterFactory> invocationInstrumenterFactories
+                             NettyClientCustomizer clientCustomizer,
+                             List<InvocationInstrumenterFactory> invocationInstrumenterFactories,
+                             @Nullable String informationalServiceId
     ) {
         ArgumentUtils.requireNonNull("nettyClientSslBuilder", nettyClientSslBuilder);
         ArgumentUtils.requireNonNull("codecRegistry", codecRegistry);
@@ -451,6 +482,8 @@ public class DefaultHttpClient implements
         this.webSocketRegistry = webSocketBeanRegistry != null ? webSocketBeanRegistry : WebSocketBeanRegistry.EMPTY;
         this.requestBinderRegistry = requestBinderRegistry;
         this.pipelineListeners = pipelineListeners;
+        this.clientCustomizer = clientCustomizer;
+        this.informationalServiceId = informationalServiceId;
     }
 
     /**
@@ -616,6 +649,29 @@ public class DefaultHttpClient implements
                     }
                 }).blockFirst();
             }
+
+            @Override
+            public <I, O, E> O retrieve(io.micronaut.http.HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType) {
+                // mostly copied from super method, but with customizeException
+
+                HttpResponse<O> response = exchange(request, bodyType, errorType);
+                if (HttpStatus.class.isAssignableFrom(bodyType.getType())) {
+                    return (O) response.getStatus();
+                } else {
+                    Optional<O> body = response.getBody();
+                    if (!body.isPresent() && response.getBody(Argument.of(byte[].class)).isPresent()) {
+                        throw customizeException(new HttpClientResponseException(
+                            String.format("Failed to decode the body for the given content type [%s]", response.getContentType().orElse(null)),
+                            response
+                        ));
+                    } else {
+                        return body.orElseThrow(() -> customizeException(new HttpClientResponseException(
+                            "Empty body",
+                            response
+                        )));
+                    }
+                }
+            }
         };
     }
 
@@ -740,7 +796,7 @@ public class DefaultHttpClient implements
                         if (t instanceof HttpClientException) {
                             emitter.error(t);
                         } else {
-                            emitter.error(new HttpClientException("Error consuming Server Sent Events: " + t.getMessage(), t));
+                            emitter.error(customizeException(new HttpClientException("Error consuming Server Sent Events: " + t.getMessage(), t)));
                         }
                     }
 
@@ -849,6 +905,29 @@ public class DefaultHttpClient implements
     }
 
     @Override
+    public <I, O, E> Publisher<O> retrieve(io.micronaut.http.HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType) {
+        // mostly same as default impl, but with exception customization
+        return Flux.from(exchange(request, bodyType, errorType)).map(response -> {
+            if (bodyType.getType() == HttpStatus.class) {
+                return (O) response.getStatus();
+            } else {
+                Optional<O> body = response.getBody();
+                if (!body.isPresent() && response.getBody(byte[].class).isPresent()) {
+                    throw customizeException(new HttpClientResponseException(
+                        String.format("Failed to decode the body for the given content type [%s]", response.getContentType().orElse(null)),
+                        response
+                    ));
+                } else {
+                    return body.orElseThrow(() -> customizeException(new HttpClientResponseException(
+                        "Empty body",
+                        response
+                    )));
+                }
+            }
+        });
+    }
+
+    @Override
     public <T extends AutoCloseable> Publisher<T> connect(Class<T> clientEndpointType, io.micronaut.http.MutableHttpRequest<?> request) {
         Publisher<URI> uriPublisher = resolveRequestURI(request);
         return Flux.from(uriPublisher)
@@ -890,7 +969,7 @@ public class DefaultHttpClient implements
 
             RequestKey requestKey;
             try {
-                requestKey = new RequestKey(uri);
+                requestKey = new RequestKey(this, uri);
             } catch (HttpClientException e) {
                 emitter.error(e);
                 return;
@@ -1169,9 +1248,7 @@ public class DefaultHttpClient implements
                                     ).subscribe(new ForwardingSubscriber<>(emitter));
                                 } else {
                                     Throwable cause = f.cause();
-                                    emitter.error(
-                                            new HttpClientException("Connect error:" + cause.getMessage(), cause)
-                                    );
+                                    emitter.error(customizeException(new HttpClientException("Connect error:" + cause.getMessage(), cause)));
                                 }
                             });
                 }
@@ -1202,14 +1279,16 @@ public class DefaultHttpClient implements
             boolean multipart = MediaType.MULTIPART_FORM_DATA_TYPE.equals(request.getContentType().orElse(null));
             if (poolMap != null && !multipart) {
                 try {
-                    RequestKey requestKey = new RequestKey(requestURI);
+                    RequestKey requestKey = new RequestKey(this, requestURI);
                     ChannelPool channelPool = poolMap.get(requestKey);
                     Future<Channel> channelFuture = channelPool.acquire();
                     addInstrumentedListener(channelFuture, future -> {
                         if (future.isSuccess()) {
                             Channel channel = future.get();
-                            try {
-                                sendRequestThroughChannel(
+                            Future<?> initFuture = channel.attr(STREAM_CHANNEL_INITIALIZED).get();
+                            if (initFuture == null) {
+                                try {
+                                    sendRequestThroughChannel(
                                         requestWrapper.get(),
                                         bodyType,
                                         errorType,
@@ -1217,15 +1296,31 @@ public class DefaultHttpClient implements
                                         channel,
                                         requestKey.isSecure(),
                                         channelPool
-                                );
-                            } catch (Exception e) {
-                                emitter.error(e);
+                                    );
+                                } catch (Exception e) {
+                                    emitter.error(e);
+                                }
+                            } else {
+                                // we should wait until the handshake completes
+                                addInstrumentedListener(initFuture, f -> {
+                                    try {
+                                        sendRequestThroughChannel(
+                                            requestWrapper.get(),
+                                            bodyType,
+                                            errorType,
+                                            emitter,
+                                            channel,
+                                            requestKey.isSecure(),
+                                            channelPool
+                                        );
+                                    } catch (Exception e) {
+                                        emitter.error(e);
+                                    }
+                                });
                             }
                         } else {
                             Throwable cause = future.cause();
-                            emitter.error(
-                                    new HttpClientException("Connect Error: " + cause.getMessage(), cause)
-                            );
+                            emitter.error(customizeException(new HttpClientException("Connect Error: " + cause.getMessage(), cause)));
                         }
                     });
                 } catch (HttpClientException e) {
@@ -1240,9 +1335,7 @@ public class DefaultHttpClient implements
                         if (emitter.isCancelled()) {
                             log.trace("Connection to {} failed, but emitter already cancelled.", requestURI, cause);
                         } else {
-                            emitter.error(
-                                    new HttpClientException("Connect Error: " + cause.getMessage(), cause)
-                            );
+                            emitter.error(customizeException(new HttpClientException("Connect Error: " + cause.getMessage(), cause)));
                         }
                     } else {
                         try {
@@ -1367,7 +1460,7 @@ public class DefaultHttpClient implements
             try {
                 return new URI(StringUtils.prependUri(contextPath, requestURI.toString()));
             } catch (URISyntaxException e) {
-                throw new HttpClientException("Failed to construct the request URI", e);
+                throw customizeException(new HttpClientException("Failed to construct the request URI", e));
             }
         }
         return requestURI;
@@ -1427,7 +1520,7 @@ public class DefaultHttpClient implements
             boolean isProxy,
             Consumer<ChannelHandlerContext> contextConsumer) throws HttpClientException {
 
-        RequestKey requestKey = new RequestKey(uri);
+        RequestKey requestKey = new RequestKey(this, uri);
         return doConnect(request, requestKey.getHost(), requestKey.getPort(), sslCtx, isStream, isProxy, contextConsumer);
     }
 
@@ -1542,7 +1635,7 @@ public class DefaultHttpClient implements
             sslCtx = sslContext;
             //Allow https requests to be sent if SSL is disabled but a proxy is present
             if (sslCtx == null && !configuration.getProxyAddress().isPresent()) {
-                throw new HttpClientException("Cannot send HTTPS request. SSL is disabled");
+                throw customizeException(new HttpClientException("Cannot send HTTPS request. SSL is disabled"));
             }
         } else {
             sslCtx = null;
@@ -1774,7 +1867,7 @@ public class DefaultHttpClient implements
                     }
                     if (bodyContent == null) {
                         bodyContent = ConversionService.SHARED.convert(bodyValue, ByteBuf.class).orElseThrow(() ->
-                                new HttpClientException("Body [" + bodyValue + "] cannot be encoded to content type [" + requestContentType + "]. No possible codecs or converters found.")
+                                customizeException(new HttpClientException("Body [" + bodyValue + "] cannot be encoded to content type [" + requestContentType + "]. No possible codecs or converters found."))
                         );
                     }
                 }
@@ -1858,8 +1951,9 @@ public class DefaultHttpClient implements
                     httpClientInitializer.addHttp1Handlers(p);
                 } else {
                     ctx.close();
-                    throw new HttpClientException("Unknown Protocol: " + protocol);
+                    throw customizeException(new HttpClientException("Unknown Protocol: " + protocol));
                 }
+                httpClientInitializer.onStreamPipelineBuilt();
             }
         });
 
@@ -1885,6 +1979,16 @@ public class DefaultHttpClient implements
         pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC, sourceCodec);
         httpClientInitializer.settingsHandler = new Http2SettingsHandler(ch.newPromise());
         pipeline.addLast(upgradeHandler);
+        pipeline.addLast(new ChannelInboundHandlerAdapter() {
+            @Override
+            public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+                ctx.fireUserEventTriggered(evt);
+                if (evt instanceof HttpClientUpgradeHandler.UpgradeEvent) {
+                    httpClientInitializer.onStreamPipelineBuilt();
+                    ctx.pipeline().remove(this);
+                }
+            }
+        });
         pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_UPGRADE_REQUEST, new UpgradeRequestHandler(httpClientInitializer) {
             @Override
             public void handlerRemoved(ChannelHandlerContext ctx) {
@@ -1968,17 +2072,17 @@ public class DefaultHttpClient implements
                                         FullHttpResponse fullHttpResponse = new DefaultFullHttpResponse(nettyResponse.protocolVersion(), nettyResponse.status(), buffer, nettyResponse.headers(), new DefaultHttpHeaders(true));
                                         final FullNettyClientHttpResponse<Object> fullNettyClientHttpResponse = new FullNettyClientHttpResponse<>(fullHttpResponse, response.status(), mediaTypeCodecRegistry, byteBufferFactory, (Argument<Object>) errorType, true);
                                         fullNettyClientHttpResponse.onComplete();
-                                        emitter.error(new HttpClientResponseException(
-                                                fullHttpResponse.status().reasonPhrase(),
-                                                null,
-                                                fullNettyClientHttpResponse,
-                                                new HttpClientErrorDecoder() {
-                                                    @Override
-                                                    public Argument<?> getErrorType(MediaType mediaType) {
-                                                        return errorType;
-                                                    }
+                                        emitter.error(customizeException(new HttpClientResponseException(
+                                            fullHttpResponse.status().reasonPhrase(),
+                                            null,
+                                            fullNettyClientHttpResponse,
+                                            new HttpClientErrorDecoder() {
+                                                @Override
+                                                public Argument<?> getErrorType(MediaType mediaType) {
+                                                    return errorType;
                                                 }
-                                        ));
+                                            }
+                                        )));
                                     } finally {
                                         buffer.release();
                                     }
@@ -1996,7 +2100,7 @@ public class DefaultHttpClient implements
     private <I> Publisher<URI> resolveURI(io.micronaut.http.HttpRequest<I> request, boolean includeContextPath) {
         URI requestURI = request.getUri();
         if (loadBalancer == null) {
-            return Flux.error(new NoHostException("Request URI specifies no host to connect to"));
+            return Flux.error(customizeException(new NoHostException("Request URI specifies no host to connect to")));
         }
 
         return Flux.from(loadBalancer.select(getLoadBalancerDiscriminator())).map(server -> {
@@ -2059,6 +2163,7 @@ public class DefaultHttpClient implements
         Promise<HttpResponse<O>> responsePromise = channel.eventLoop().newPromise();
         channel.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_FULL_HTTP_RESPONSE,
                 new FullHttpResponseHandler<>(responsePromise, channelPool, secure, finalRequest, bodyType, errorType));
+        channel.attr(CHANNEL_CUSTOMIZER_KEY).get().onRequestPipelineBuilt();
         Publisher<HttpResponse<O>> publisher = new NettyFuturePublisher<>(responsePromise, true);
         if (bodyType != null && bodyType.isVoid()) {
             // don't emit response if bodyType is void
@@ -2089,7 +2194,7 @@ public class DefaultHttpClient implements
     ) {
         boolean errorStatus = response.code() >= 400;
         if (errorStatus && failOnError) {
-            return Flux.error(new HttpClientResponseException(response.getStatus().getReason(), response));
+            return Flux.error(customizeException(new HttpClientResponseException(response.getStatus().getReason(), response)));
         } else {
             return Flux.just(response);
         }
@@ -2111,6 +2216,7 @@ public class DefaultHttpClient implements
         ChannelPipeline pipeline = channel.pipeline();
         pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE_FULL, new StreamFullHttpResponseHandler(responsePromise, parentRequest, finalRequest));
         pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE_STREAM, new StreamStreamHttpResponseHandler(responsePromise, parentRequest, finalRequest));
+        channel.attr(CHANNEL_CUSTOMIZER_KEY).get().onRequestPipelineBuilt();
 
         if (log.isDebugEnabled()) {
             debugRequest(finalRequest.getUri(), nettyRequest);
@@ -2141,7 +2247,7 @@ public class DefaultHttpClient implements
     }
 
     private String getHostHeader(URI requestURI) {
-        RequestKey requestKey = new RequestKey(requestURI);
+        RequestKey requestKey = new RequestKey(this, requestURI);
         StringBuilder host = new StringBuilder(requestKey.getHost());
         int port = requestKey.getPort();
         if (port > -1 && port != 80 && port != 443) {
@@ -2471,6 +2577,24 @@ public class DefaultHttpClient implements
         return new AbstractChannelPoolHandler() {
             @Override
             public void channelCreated(Channel ch) {
+                Promise<?> streamPipelineBuilt = ch.newPromise();
+                ch.attr(STREAM_CHANNEL_INITIALIZED).set(streamPipelineBuilt);
+
+                // make sure the future completes eventually
+                ChannelHandler failureHandler = new ChannelInboundHandlerAdapter() {
+                    @Override
+                    public void handlerRemoved(ChannelHandlerContext ctx) {
+                        streamPipelineBuilt.trySuccess(null);
+                    }
+
+                    @Override
+                    public void channelInactive(ChannelHandlerContext ctx) {
+                        streamPipelineBuilt.trySuccess(null);
+                        ctx.fireChannelInactive();
+                    }
+                };
+                ch.pipeline().addLast(failureHandler);
+
                 ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_INIT, new HttpClientInitializer(
                         key.isSecure() ? sslContext : null,
                         key.getHost(),
@@ -2484,6 +2608,14 @@ public class DefaultHttpClient implements
                     protected void addFinalHandler(ChannelPipeline pipeline) {
                         // no-op, don't add the stream handler which is not supported
                         // in the connection pooled scenario
+                    }
+
+                    @Override
+                    void onStreamPipelineBuilt() {
+                        super.onStreamPipelineBuilt();
+                        streamPipelineBuilt.trySuccess(null);
+                        ch.pipeline().remove(failureHandler);
+                        ch.attr(STREAM_CHANNEL_INITIALIZED).set(null);
                     }
                 });
 
@@ -2572,6 +2704,15 @@ public class DefaultHttpClient implements
         return io.micronaut.http.HttpRequest.SCHEME_HTTPS.equalsIgnoreCase(scheme) || SCHEME_WSS.equalsIgnoreCase(scheme);
     }
 
+    private <E extends HttpClientException> E customizeException(E exc) {
+        if (informationalServiceId != null) {
+            exc.setServiceId(informationalServiceId);
+        } else if (configuration instanceof ServiceHttpClientConfiguration) {
+            exc.setServiceId(((ServiceHttpClientConfiguration) configuration).getServiceId());
+        }
+        return exc;
+    }
+
     @FunctionalInterface
     interface ThrowingBiConsumer<T1, T2> {
         void accept(T1 t1, T2 t2) throws Exception;
@@ -2590,6 +2731,7 @@ public class DefaultHttpClient implements
         final boolean acceptsEvents;
         Http2SettingsHandler settingsHandler;
         private final Consumer<ChannelHandlerContext> contextConsumer;
+        private NettyClientCustomizer channelCustomizer;
 
         /**
          * @param sslContext      The ssl context
@@ -2622,6 +2764,9 @@ public class DefaultHttpClient implements
          */
         @Override
         protected void initChannel(SocketChannel ch) {
+            channelCustomizer = clientCustomizer.specializeForChannel(ch, NettyClientCustomizer.ChannelRole.CONNECTION);
+            ch.attr(CHANNEL_CUSTOMIZER_KEY).set(channelCustomizer);
+
             ChannelPipeline p = ch.pipeline();
 
             Proxy proxy = configuration.resolveProxy(sslContext != null, host, port);
@@ -2641,7 +2786,7 @@ public class DefaultHttpClient implements
                         );
                         builder.frameLogger(new Http2FrameLogger(nettyLevel, DefaultHttpClient.class));
                     } catch (IllegalArgumentException e) {
-                        throw new HttpClientException("Unsupported log level: " + logLevel);
+                        throw customizeException(new HttpClientException("Unsupported log level: " + logLevel));
                     }
                 });
                 HttpToHttp2ConnectionHandler connectionHandler = builder
@@ -2651,6 +2796,7 @@ public class DefaultHttpClient implements
                 } else {
                     configureHttp2ClearText(this, ch, connectionHandler);
                 }
+                channelCustomizer.onInitialPipelineBuilt();
             } else {
                 if (stream) {
                     // for streaming responses we disable auto read
@@ -2665,7 +2811,7 @@ public class DefaultHttpClient implements
                         );
                         p.addLast(new LoggingHandler(DefaultHttpClient.class, nettyLevel));
                     } catch (IllegalArgumentException e) {
-                        throw new HttpClientException("Unsupported log level: " + logLevel);
+                        throw customizeException(new HttpClientException("Unsupported log level: " + logLevel));
                     }
                 });
 
@@ -2696,7 +2842,17 @@ public class DefaultHttpClient implements
                 }
 
                 addHttp1Handlers(p);
+                channelCustomizer.onInitialPipelineBuilt();
+                onStreamPipelineBuilt();
             }
+        }
+
+        /**
+         * Called when the stream pipeline is fully set up (all handshakes completed) and we can
+         * start processing requests.
+         */
+        void onStreamPipelineBuilt() {
+            channelCustomizer.onStreamPipelineBuilt();
         }
 
         private void addHttp1Handlers(ChannelPipeline p) {
@@ -2893,14 +3049,19 @@ public class DefaultHttpClient implements
         private final int port;
         private final boolean secure;
 
-        public RequestKey(URI requestURI) {
+        /**
+         * @param ctx The HTTP client that created this request key. Only used for exception
+         *            context, not stored
+         * @param requestURI The request URI
+         */
+        public RequestKey(DefaultHttpClient ctx, URI requestURI) {
             this.secure = isSecureScheme(requestURI.getScheme());
             String host = requestURI.getHost();
             int port;
             if (host == null) {
                 host = requestURI.getAuthority();
                 if (host == null) {
-                    throw new NoHostException("URI specifies no host to connect to");
+                    throw ctx.customizeException(new NoHostException("URI specifies no host to connect to"));
                 }
 
                 final int i = host.indexOf(':');
@@ -2910,7 +3071,7 @@ public class DefaultHttpClient implements
                     try {
                         port = Integer.parseInt(portStr);
                     } catch (NumberFormatException e) {
-                        throw new HttpClientException("URI specifies an invalid port: " + portStr);
+                        throw ctx.customizeException(new HttpClientException("URI specifies an invalid port: " + portStr));
                     }
                 } else {
                     port = requestURI.getPort() > -1 ? requestURI.getPort() : secure ? DEFAULT_HTTPS_PORT : DEFAULT_HTTP_PORT;
@@ -3018,7 +3179,7 @@ public class DefaultHttpClient implements
                         if (future.isSuccess()) {
                             processRequestWrite(channel, channelPool, emitter, pipeline);
                         } else {
-                            throw new HttpClientException("HTTP/2 clear text upgrade failed to complete", future.cause());
+                            throw customizeException(new HttpClientException("HTTP/2 clear text upgrade failed to complete", future.cause()));
                         }
                     });
                     return;
@@ -3118,11 +3279,11 @@ public class DefaultHttpClient implements
 
             HttpClientException result;
             if (cause instanceof TooLongFrameException) {
-                result = (new ContentLengthExceededException(configuration.getMaxContentLength()));
+                result = customizeException(new ContentLengthExceededException(configuration.getMaxContentLength()));
             } else if (cause instanceof io.netty.handler.timeout.ReadTimeoutException) {
                 result = ReadTimeoutException.TIMEOUT_EXCEPTION;
             } else {
-                result = new HttpClientException("Error occurred reading HTTP response: " + message, cause);
+                result = customizeException(new HttpClientException("Error occurred reading HTTP response: " + message, cause));
             }
             responsePromise.tryFailure(result);
         }
@@ -3302,19 +3463,19 @@ public class DefaultHttpClient implements
          */
         private HttpClientResponseException makeErrorFromRequestBody(HttpResponseStatus status, FullNettyClientHttpResponse<?> response) {
             if (errorType != null && errorType != HttpClient.DEFAULT_ERROR_TYPE) {
-                return new HttpClientResponseException(
-                        status.reasonPhrase(),
-                        null,
-                        response,
-                        new HttpClientErrorDecoder() {
-                            @Override
-                            public Argument<?> getErrorType(MediaType mediaType) {
-                                return errorType;
-                            }
+                return customizeException(new HttpClientResponseException(
+                    status.reasonPhrase(),
+                    null,
+                    response,
+                    new HttpClientErrorDecoder() {
+                        @Override
+                        public Argument<?> getErrorType(MediaType mediaType) {
+                            return errorType;
                         }
-                );
+                    }
+                ));
             } else {
-                return new HttpClientResponseException(status.reasonPhrase(), response);
+                return customizeException(new HttpClientResponseException(status.reasonPhrase(), response));
             }
         }
 
@@ -3332,12 +3493,12 @@ public class DefaultHttpClient implements
             );
             // this onComplete call disables further parsing by HttpClientResponseException
             errorResponse.onComplete();
-            return new HttpClientResponseException(
-                    "Error decoding HTTP error response body: " + t.getMessage(),
-                    t,
-                    errorResponse,
-                    null
-            );
+            return customizeException(new HttpClientResponseException(
+                "Error decoding HTTP error response body: " + t.getMessage(),
+                t,
+                errorResponse,
+                null
+            ));
         }
 
         private void makeNormalBodyParseError(FullHttpResponse fullResponse, HttpStatus httpStatus, Throwable t, Consumer<HttpClientResponseException> forward) {
@@ -3349,17 +3510,17 @@ public class DefaultHttpClient implements
                     null,
                     false
             );
-            HttpClientResponseException clientResponseError = new HttpClientResponseException(
-                    "Error decoding HTTP response body: " + t.getMessage(),
-                    t,
-                    response,
-                    new HttpClientErrorDecoder() {
-                        @Override
-                        public Argument<?> getErrorType(MediaType mediaType) {
-                            return errorType;
-                        }
+            HttpClientResponseException clientResponseError = customizeException(new HttpClientResponseException(
+                "Error decoding HTTP response body: " + t.getMessage(),
+                t,
+                response,
+                new HttpClientErrorDecoder() {
+                    @Override
+                    public Argument<?> getErrorType(MediaType mediaType) {
+                        return errorType;
                     }
-            );
+                }
+            ));
             try {
                 forward.accept(clientResponseError);
             } finally {

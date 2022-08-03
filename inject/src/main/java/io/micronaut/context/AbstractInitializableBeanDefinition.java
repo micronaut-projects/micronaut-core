@@ -84,10 +84,10 @@ import java.util.stream.Stream;
  * code.
  * Instead a build time tool does analysis of source code and dynamically produces subclasses of this class containing
  * information about the available injection points for a given class.</p>
- * <p>
+ *
  * <p>For technical reasons the class has to be marked as public, but is regarded as internal and should be used by
  * compiler tools and plugins (such as AST transformation frameworks)</p>
- * <p>
+ *
  * <p>The {@link io.micronaut.inject.writer.BeanDefinitionWriter} class can be used to produce bean definitions at
  * compile or runtime</p>
  *
@@ -1157,7 +1157,6 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
 
     /**
      * Obtains all bean definitions for a method argument at the given index.
-     * <p>
      *
      * @param resolutionContext The resolution context
      * @param context           The context
@@ -1204,7 +1203,6 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
 
     /**
      * Obtains all bean definitions for a method argument at the given index.
-     * <p>
      *
      * @param resolutionContext The resolution context
      * @param context           The context
@@ -1422,7 +1420,6 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
 
     /**
      * Obtains all bean definitions for a constructor argument at the given index.
-     * <p>
      *
      * @param resolutionContext The resolution context
      * @param context           The context
@@ -1753,7 +1750,6 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
 
     /**
      * Obtains all bean definitions for the field at the given index.
-     * <p>
      *
      * @param resolutionContext The resolution context
      * @param context           The context

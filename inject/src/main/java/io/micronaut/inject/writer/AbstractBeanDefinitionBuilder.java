@@ -502,15 +502,14 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
                                                                      Consumer<BeanElementBuilder> childBeanBuilder) {
         methodsOrFields = methodsOrFields
                 .onlyConcrete()
-                .onlyInstance()
-                .modifiers((modifiers) -> modifiers.contains(ElementModifier.PUBLIC));
+                .modifiers(modifiers -> modifiers.contains(ElementModifier.PUBLIC));
         final List<E> enclosedElements = this.beanType.getEnclosedElements(methodsOrFields);
         for (E enclosedElement : enclosedElements) {
             if (enclosedElement instanceof FieldElement) {
                 FieldElement fe = (FieldElement) enclosedElement;
                 final ClassElement type = fe.getGenericField().getType();
                 if (type.isPublic() && !type.isPrimitive()) {
-                    return addChildBean(fe, childBeanBuilder);
+                    addChildBean(fe, childBeanBuilder);
                 }
             }
 
@@ -518,7 +517,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
                 MethodElement me = (MethodElement) enclosedElement;
                 final ClassElement type = me.getGenericReturnType().getType();
                 if (type.isPublic() && !type.isPrimitive()) {
-                    return addChildBean(me, childBeanBuilder);
+                    addChildBean(me, childBeanBuilder);
                 }
             }
         }
@@ -777,25 +776,29 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         if (exposedTypes != null) {
             final AnnotationClassValue<?>[] annotationClassValues =
                     Arrays.stream(exposedTypes).map(ce -> new AnnotationClassValue<>(ce.getName())).toArray(AnnotationClassValue[]::new);
-            annotate(Bean.class, (builder) -> builder.member("typed", annotationClassValues));
+            annotate(Bean.class, builder -> builder.member("typed", annotationClassValues));
         }
         if (typeArguments != null) {
             beanDefinitionWriter.visitTypeArguments(AbstractBeanDefinitionBuilder.this.typeArguments);
         }
 
-        if (constructorElement == null) {
-            constructorElement = initConstructor(beanType);
-        }
+        Element producingElement = getProducingElement();
+        if (producingElement instanceof ClassElement) {
 
-        if (constructorElement == null) {
-            visitorContext.fail("Cannot create associated bean with no accessible primary constructor. Consider supply the constructor with createWith(..)", originatingElement);
-            return true;
-        } else {
-            beanDefinitionWriter.visitBeanDefinitionConstructor(
+            if (constructorElement == null) {
+                constructorElement = initConstructor(beanType);
+            }
+
+            if (constructorElement == null) {
+                visitorContext.fail("Cannot create associated bean with no accessible primary constructor. Consider supply the constructor with createWith(..)", originatingElement);
+                return true;
+            } else {
+                beanDefinitionWriter.visitBeanDefinitionConstructor(
                     constructorElement,
                     !constructorElement.isPublic(),
                     visitorContext
-            );
+                );
+            }
         }
         return false;
     }

@@ -32,7 +32,7 @@ import java.util.Optional;
 
 /**
  * <p>A builder for producing metadata for the available {@link io.micronaut.context.annotation.ConfigurationProperties}.</p>
- * <p>
+ *
  * <p>This data can then be subsequently written to a format readable by IDEs
  * (like spring-configuration-metadata.json for example).</p>
  *
@@ -167,13 +167,13 @@ public abstract class ConfigurationMetadataBuilder<T> {
 
     /**
      * <p>Build a property path for the given declaring type and property name.</p>
-     * <p>
+     *
      * <p>For {@link io.micronaut.context.annotation.ConfigurationProperties} that path is a property is
      * established by looking at the value of the {@link io.micronaut.context.annotation.ConfigurationProperties} and
      * then calculating the path based on the inheritance tree.</p>
-     * <p>
+     *
      * <p>For example consider the following classes:</p>
-     * <p>
+     *
      * <pre><code>
      *  {@literal @}ConfigurationProperties("parent")
      *   public class ParentProperties {
@@ -185,10 +185,10 @@ public abstract class ConfigurationMetadataBuilder<T> {
      *      String bar;
      *   }
      * </code></pre>
-     * <p>
+     *
      * <p>The path of the property {@code foo} will be "parent.foo" whilst the path of the property {@code bar} will
      * be "parent.child.bar" factoring in the class hierarchy</p>
-     * <p>
+     *
      * <p>Inner classes hierarchies are also taken into account</p>
      *
      * @param owningType    The owning type
