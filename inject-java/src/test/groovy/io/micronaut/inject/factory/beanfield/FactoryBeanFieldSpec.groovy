@@ -860,7 +860,7 @@ class Bar8 {
     }
 
 
-    void "test preDestroy on a subclassed bean"() {
+    void "test preDestroy continues if an exception is thrown in the disposal method"() {
         given:
         ApplicationContext context = buildContext('test.Implementation2', '''\
 package test;
