@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.netty.stream;
 
+import io.micronaut.core.annotation.Internal;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
@@ -47,9 +48,8 @@ import static io.netty.util.internal.ObjectUtil.checkNotNull;
  *
  * @author graemerocher
  * @since 2.0
- * @deprecated Should be treated as internal. May be removed in the future.
  */
-@Deprecated
+@Internal
 public class StreamingInboundHttp2ToHttpAdapter extends Http2EventAdapter {
     protected final Http2Connection connection;
     protected final boolean validateHttpHeaders;
