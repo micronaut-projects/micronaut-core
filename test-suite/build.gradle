@@ -34,6 +34,7 @@ dependencies {
     testImplementation project(":http-server-netty")
     testImplementation project(":http-client")
     testImplementation project(":validation")
+    testImplementation project(":crac")
     testImplementation project(":inject-groovy")
     testImplementation project(":inject-java")
     testImplementation project(":inject-java-test")

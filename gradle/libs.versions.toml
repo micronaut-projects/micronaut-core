@@ -5,6 +5,7 @@ bcpkix = "1.70"
 blaze = "1.6.6"
 caffeine = "2.9.3"
 compile-testing = "0.19"
+crac = "0.1.3"
 geb = "3.4.1"
 hibernate = "5.5.9.Final"
 hibernate-validator = "6.1.6.Final"
@@ -358,6 +359,8 @@ blaze-persistence-core = { module = "com.blazebit:blaze-persistence-core-impl", 
 caffeine = { module = "com.github.ben-manes.caffeine:caffeine", version.ref = "caffeine" }
 
 compile-testing = { module = "com.google.testing.compile:compile-testing", version.ref = "compile-testing" }
+
+crac = { module = "io.github.crac:org-crac", version.ref = "crac" }
 
 geb-spock = { module = "org.gebish:geb-spock", version.ref = "geb" }
 

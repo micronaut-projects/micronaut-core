@@ -26,6 +26,8 @@ dependencies {
     api project(":http-netty")
     api libs.managed.netty.codec.http
 
+    implementation project(":crac")
+
     implementation libs.managed.reactor
 
     compileOnly libs.kotlin.stdlib
