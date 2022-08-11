@@ -15,6 +15,7 @@
  */
 package io.micronaut.crac.support;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.order.Ordered;
 import org.crac.Resource;
 
@@ -24,5 +25,6 @@ import org.crac.Resource;
  * @author Tim Yates
  * @since 3.7.0
  */
+@Experimental
 public interface OrderedCracResource extends Ordered, Resource {
 }

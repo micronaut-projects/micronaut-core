@@ -15,6 +15,7 @@
  */
 package io.micronaut.crac.support;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import jakarta.inject.Singleton;
 import org.crac.Context;
@@ -27,6 +28,7 @@ import org.crac.Resource;
  * @author Tim Yates
  * @since 3.7.0
  */
+@Experimental
 @Singleton
 public class GlobalCracContextProvider implements CracResourceContextProvider<Context<? extends Resource>> {
 

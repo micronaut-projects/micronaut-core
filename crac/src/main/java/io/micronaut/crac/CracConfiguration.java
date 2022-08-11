@@ -16,6 +16,7 @@
 package io.micronaut.crac;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.core.annotation.Experimental;
 
 /**
  * Configuration for CRaC support. Enabled by default, and requires the {@link io.micronaut.crac.support.CracCondition} to be true.
@@ -25,6 +26,7 @@ import io.micronaut.context.annotation.ConfigurationProperties;
  * @author Tim Yates
  * @since 3.7.0
  */
+@Experimental
 @ConfigurationProperties(CracConfiguration.PREFIX)
 public class CracConfiguration {
 

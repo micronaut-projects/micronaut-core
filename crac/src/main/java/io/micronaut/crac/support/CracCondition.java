@@ -17,6 +17,7 @@ package io.micronaut.crac.support;
 
 import io.micronaut.context.condition.Condition;
 import io.micronaut.context.condition.ConditionContext;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.crac.CracConfiguration;
 
@@ -32,6 +33,7 @@ import java.util.stream.Stream;
  * @author Tim Yates
  * @since 3.7.0
  */
+@Experimental
 public class CracCondition implements Condition {
 
     // See https://github.com/CRaC/org.crac/blob/master/src/main/java/org/crac/Core.java

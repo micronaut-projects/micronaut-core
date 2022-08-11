@@ -15,6 +15,7 @@
  */
 package io.micronaut.crac.support;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 
 /**
@@ -25,6 +26,7 @@ import io.micronaut.core.annotation.NonNull;
  * @author Tim Yates
  * @since 3.7.0
  */
+@Experimental
 @FunctionalInterface
 public interface CracResourceContextProvider<T> {
 

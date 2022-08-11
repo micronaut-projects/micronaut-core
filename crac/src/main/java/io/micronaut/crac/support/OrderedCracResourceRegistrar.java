@@ -15,6 +15,7 @@
  */
 package io.micronaut.crac.support;
 
+import io.micronaut.core.annotation.Experimental;
 import jakarta.inject.Singleton;
 import org.crac.Context;
 
@@ -26,6 +27,7 @@ import java.util.List;
  * @author Tim Yates
  * @since 3.7.0
  */
+@Experimental
 @Singleton
 public class OrderedCracResourceRegistrar implements CracResourceRegistrar {
 
