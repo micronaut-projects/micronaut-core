@@ -6,7 +6,9 @@ dependencies {
     annotationProcessor project(":inject-java")
 
     api(project(":runtime"))
-    api(libs.crac)
+    compileOnly(libs.crac)
+
+    testImplementation(project(':context'))
 }
 
 // First version of the crac module

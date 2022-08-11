@@ -17,7 +17,6 @@ package io.micronaut.crac.support;
 
 import io.micronaut.core.annotation.Experimental;
 import jakarta.inject.Singleton;
-import org.crac.Context;
 
 import java.util.List;
 
@@ -32,20 +31,20 @@ import java.util.List;
 public class OrderedCracResourceRegistrar implements CracResourceRegistrar {
 
     private final List<? extends OrderedCracResource> resources;
-    private final CracResourceContextProvider<Context<? super OrderedCracResource>> contextProvider;
+    private final CracContext context;
 
     /**
      * Collects together all available CRaC resources in the order specified.
      *
      * @param resources The ordered registered CRaC resources
-     * @param contextProvider The context provider for the CRaC resources
+     * @param context   The CRaC context
      */
     public OrderedCracResourceRegistrar(
         List<? extends OrderedCracResource> resources,
-        CracResourceContextProvider<Context<? super OrderedCracResource>> contextProvider
+        CracContext context
     ) {
         this.resources = resources;
-        this.contextProvider = contextProvider;
+        this.context = context;
     }
 
     /**
@@ -53,7 +52,6 @@ public class OrderedCracResourceRegistrar implements CracResourceRegistrar {
      */
     @Override
     public void registerResources() {
-        Context<? super OrderedCracResource> context = contextProvider.createContext();
         resources.forEach(context::register);
     }
 }

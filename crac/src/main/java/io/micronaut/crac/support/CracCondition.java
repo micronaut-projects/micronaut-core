@@ -20,6 +20,8 @@ import io.micronaut.context.condition.ConditionContext;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.crac.CracConfiguration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
 import java.util.List;
@@ -36,6 +38,8 @@ import java.util.stream.Stream;
 @Experimental
 public class CracCondition implements Condition {
 
+    private static final Logger LOG = LoggerFactory.getLogger(CracCondition.class);
+
     // See https://github.com/CRaC/org.crac/blob/master/src/main/java/org/crac/Core.java
     private static final List<String> CRAC_LOCATIONS = Arrays.asList(
         "jdk.crac.Resource",
@@ -46,7 +50,11 @@ public class CracCondition implements Condition {
     public boolean matches(ConditionContext context) {
         Optional<CracConfiguration> cracConfiguration = context.findBean(CracConfiguration.class);
 
-        if (cracConfiguration.map(CracConfiguration::getEnabled).orElse(false)) {
+        boolean disabled = !cracConfiguration.map(CracConfiguration::getEnabled).orElse(CracConfiguration.DEFAULT_ENABLED);
+        if (disabled) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("CRaC is disabled");
+            }
             context.fail("CRaC is disabled");
             return false;
         }
@@ -62,6 +70,9 @@ public class CracCondition implements Condition {
             .anyMatch(this::located);
 
         if (!located) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("CRaC is not available");
+            }
             context.fail("CRaC is not available");
         }
         return located;

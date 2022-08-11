@@ -27,7 +27,6 @@ import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.io.socket.SocketUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.SupplierUtil;
-import io.micronaut.crac.support.OrderedCracResource;
 import io.micronaut.discovery.EmbeddedServerInstance;
 import io.micronaut.discovery.event.ServiceReadyEvent;
 import io.micronaut.discovery.event.ServiceStoppedEvent;
@@ -66,8 +65,6 @@ import io.netty.channel.unix.DomainSocketAddress;
 import io.netty.handler.codec.http.multipart.DiskFileUpload;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GlobalEventExecutor;
-import org.crac.Context;
-import org.crac.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -109,7 +106,7 @@ import java.util.stream.Collectors;
         value = ChannelOption.class,
         accessType = {TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS, TypeHint.AccessType.ALL_DECLARED_FIELDS}
 )
-public class NettyHttpServer implements NettyEmbeddedServer, OrderedCracResource {
+public class NettyHttpServer implements NettyEmbeddedServer {
 
     @SuppressWarnings("WeakerAccess")
     public static final String OUTBOUND_KEY = "-outbound-";
@@ -735,31 +732,6 @@ public class NettyHttpServer implements NettyEmbeddedServer, OrderedCracResource
             List<Pattern> patterns = exclusions.stream().map(Pattern::compile).collect(Collectors.toList());
             return uri -> patterns.stream().noneMatch(pattern -> pattern.matcher(uri).matches());
         }
-    }
-
-
-    /**
-     * CRaC support invoked by a {@code Context} as a notification about checkpoint.
-     *
-     * @param context {@code Context} providing notification
-     * @throws Exception if the method have failed
-     */
-    @Override
-    @SuppressWarnings("resource")
-    public void beforeCheckpoint(Context<? extends Resource> context) throws Exception {
-        stop();
-    }
-
-    /**
-     * CRaC support invoked by a {@code Context} as a notification about restore.
-     *
-     * @param context {@code Context} providing notification
-     * @throws Exception if the method have failed
-     */
-    @Override
-    @SuppressWarnings("resource")
-    public void afterRestore(Context<? extends Resource> context) throws Exception {
-        start();
     }
 
     private class Listener extends ChannelInitializer<Channel> {

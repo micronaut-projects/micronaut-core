@@ -1,9 +1,9 @@
 package io.micronaut.crac
 
-import io.micronaut.context.ApplicationContext
 import spock.lang.Specification
+import io.micronaut.context.ApplicationContext
 
-class CracConfigurationSpec extends Specification {
+class CracConfigSpec extends Specification {
 
     void "CRaC enabled by default with no custom compat lookup class"() {
         given:

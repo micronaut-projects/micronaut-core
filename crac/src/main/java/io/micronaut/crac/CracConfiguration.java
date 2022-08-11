@@ -46,7 +46,7 @@ public class CracConfiguration {
     /**
      * Disable CRaC support even if we're on a supporting JDK.
      *
-     * @param enabled
+     * @param enabled override CRaC if required
      */
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
@@ -66,5 +66,13 @@ public class CracConfiguration {
      */
     public void setCracCompatClass(String cracCompatClass) {
         this.cracCompatClass = cracCompatClass;
+    }
+
+    @Override
+    public String toString() {
+        return "CracConfiguration{" +
+            "enabled=" + enabled +
+            ", cracCompatClass='" + cracCompatClass + '\'' +
+            '}';
     }
 }

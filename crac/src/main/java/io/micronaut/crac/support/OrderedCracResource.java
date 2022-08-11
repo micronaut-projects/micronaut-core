@@ -17,7 +17,6 @@ package io.micronaut.crac.support;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.order.Ordered;
-import org.crac.Resource;
 
 /**
  * A Coordinated Restore at Checkpoint Resource that may also be Ordered.
@@ -26,5 +25,21 @@ import org.crac.Resource;
  * @since 3.7.0
  */
 @Experimental
-public interface OrderedCracResource extends Ordered, Resource {
+public interface OrderedCracResource extends Ordered {
+
+    /**
+     * Invoked by a {@code Context} as a notification about checkpoint.
+     *
+     * @param context {@code Context} providing notification
+     * @throws Exception if the method have failed
+     */
+    void beforeCheckpoint(CracContext context) throws Exception;
+
+    /**
+     * Invoked by a {@code Context} as a notification about restore.
+     *
+     * @param context {@code Context} providing notification
+     * @throws Exception if the method have failed
+     */
+    void afterRestore(CracContext context) throws Exception;
 }

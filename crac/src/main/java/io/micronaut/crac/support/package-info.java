@@ -20,8 +20,11 @@
  * @since 3.7.0
  */
 @Configuration
+@Requires(classes = {Resource.class, Context.class})
 @Requires(condition = CracCondition.class)
 package io.micronaut.crac.support;
 
 import io.micronaut.context.annotation.Configuration;
 import io.micronaut.context.annotation.Requires;
+import org.crac.Context;
+import org.crac.Resource;
