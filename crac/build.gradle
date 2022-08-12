@@ -9,6 +9,7 @@ dependencies {
     compileOnly(libs.crac)
 
     testImplementation(project(':context'))
+    testRuntimeOnly(libs.crac)
 }
 
 // First version of the crac module

@@ -19,9 +19,7 @@ import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.annotation.Experimental;
 
 /**
- * Configuration for CRaC support. Enabled by default, and requires the {@link io.micronaut.crac.support.CracCondition} to be true.
- * This can be disabled by setting the property here, and we can add a new class to check for the condition
- * (in case the proposed package or class changes in the CRaC JDK).
+ * Configuration for CRaC support. Enabled by default.
  *
  * @author Tim Yates
  * @since 3.7.0
@@ -31,10 +29,10 @@ import io.micronaut.core.annotation.Experimental;
 public class CracConfiguration {
 
     public static final String PREFIX = "crac";
-    public static final boolean DEFAULT_ENABLED = true;
+    public static final Boolean DEFAULT_ENABLED = true;
+    public static final String DEFAULT_ENABLED_STR = "true";
 
     private boolean enabled = DEFAULT_ENABLED;
-    private String cracCompatClass;
 
     /**
      * @return Whether CRaC is enabled.
@@ -50,29 +48,5 @@ public class CracConfiguration {
      */
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
-    }
-
-    /**
-     * @return The class to look for to check CRaC compatibility.
-     */
-    public String getCracCompatClass() {
-        return cracCompatClass;
-    }
-
-    /**
-     * Set the class to look for to check CRaC compatibility.
-     *
-     * @param cracCompatClass the fully qualified class name.
-     */
-    public void setCracCompatClass(String cracCompatClass) {
-        this.cracCompatClass = cracCompatClass;
-    }
-
-    @Override
-    public String toString() {
-        return "CracConfiguration{" +
-            "enabled=" + enabled +
-            ", cracCompatClass='" + cracCompatClass + '\'' +
-            '}';
     }
 }

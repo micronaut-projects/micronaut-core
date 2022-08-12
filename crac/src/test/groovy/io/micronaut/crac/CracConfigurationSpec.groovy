@@ -1,9 +1,11 @@
 package io.micronaut.crac
 
+import io.micronaut.context.exceptions.NoSuchBeanException
+import io.micronaut.crac.support.CracResourceRegistrar
 import spock.lang.Specification
 import io.micronaut.context.ApplicationContext
 
-class CracConfigSpec extends Specification {
+class CracConfigurationSpec extends Specification {
 
     void "CRaC enabled by default with no custom compat lookup class"() {
         given:
@@ -14,7 +16,12 @@ class CracConfigSpec extends Specification {
 
         then:
         cfg.enabled
-        cfg.cracCompatClass == null
+
+        when:
+        ctx.getBean(CracResourceRegistrar)
+
+        then:
+        noExceptionThrown()
 
         cleanup:
         ctx.close()
@@ -30,20 +37,11 @@ class CracConfigSpec extends Specification {
         then:
         !cfg.enabled
 
-        cleanup:
-        ctx.close()
-    }
-
-    void "CRaC custom compat can be configured"() {
-        given:
-        def ctx = ApplicationContext.run('crac.crac-compat-class': 'java.lang.String')
-
         when:
-        def cfg = ctx.getBean(CracConfiguration)
+        ctx.getBean(CracResourceRegistrar)
 
         then:
-        cfg.enabled
-        cfg.cracCompatClass == 'java.lang.String'
+        thrown(NoSuchBeanException)
 
         cleanup:
         ctx.close()

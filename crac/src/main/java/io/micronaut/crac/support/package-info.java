@@ -19,12 +19,14 @@
  * @author Tim Yates
  * @since 3.7.0
  */
+
 @Configuration
 @Requires(classes = {Resource.class, Context.class})
-@Requires(condition = CracCondition.class)
+@Requires(property = "crac.enabled", defaultValue = "true", value = StringUtils.TRUE)
 package io.micronaut.crac.support;
 
 import io.micronaut.context.annotation.Configuration;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.util.StringUtils;
 import org.crac.Context;
 import org.crac.Resource;

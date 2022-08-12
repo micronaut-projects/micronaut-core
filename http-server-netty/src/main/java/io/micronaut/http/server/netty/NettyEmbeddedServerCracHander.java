@@ -18,8 +18,8 @@ package io.micronaut.http.server.netty;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.crac.support.CracCondition;
 import io.micronaut.crac.support.CracContext;
+import io.micronaut.crac.support.CracResourceRegistrar;
 import io.micronaut.crac.support.OrderedCracResource;
 
 /**
@@ -30,7 +30,7 @@ import io.micronaut.crac.support.OrderedCracResource;
  */
 @Experimental
 @EachBean(NettyEmbeddedServer.class)
-@Requires(condition = CracCondition.class)
+@Requires(bean = CracResourceRegistrar.class)
 public class NettyEmbeddedServerCracHander implements OrderedCracResource {
 
     private final NettyEmbeddedServer server;
