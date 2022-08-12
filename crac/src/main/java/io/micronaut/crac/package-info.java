@@ -19,4 +19,7 @@
  * @author Tim Yates
  * @since 3.7.0
  */
+@Experimental
 package io.micronaut.crac;
+
+import io.micronaut.core.annotation.Experimental;

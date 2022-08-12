@@ -16,6 +16,7 @@
 package io.micronaut.crac.support;
 
 import io.micronaut.context.event.ApplicationEventListener;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.runtime.event.ApplicationStartupEvent;
 import jakarta.inject.Singleton;
 import org.slf4j.Logger;
@@ -24,6 +25,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Registers all defined Resources for Coordinated Restore at Checkpoint at application startup.
  */
+@Experimental
 @Singleton
 public class StartupCracRegistration implements ApplicationEventListener<ApplicationStartupEvent> {
 
