@@ -22,7 +22,6 @@ class CracExclusionSpec extends Specification {
 
         then:
         config.enabled
-        config.cracCompatClass == null
     }
 
     void "CRaC condition prevents support on non-CRaC jvm"() {
