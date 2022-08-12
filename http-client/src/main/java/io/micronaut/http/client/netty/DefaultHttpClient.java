@@ -406,6 +406,7 @@ public class DefaultHttpClient implements
 
         Optional<Duration> connectTtl = configuration.getConnectTtl();
         this.connectionTimeAliveMillis = connectTtl.map(duration -> !duration.isNegative() ? duration.toMillis() : null).orElse(null);
+        final ChannelHealthChecker channelHealthChecker = channel -> channel.eventLoop().newSucceededFuture(channel.isActive() && !ConnectTTLHandler.isChannelExpired(channel));
 
         this.invocationInstrumenterFactories =
                 invocationInstrumenterFactories == null ? Collections.emptyList() : invocationInstrumenterFactories;
@@ -427,7 +428,7 @@ public class DefaultHttpClient implements
                         return new FixedChannelPool(
                                 newBootstrap,
                                 channelPoolHandler,
-                                ChannelHealthChecker.ACTIVE,
+                                channelHealthChecker,
                                 acquireTimeoutMillis > -1 ? FixedChannelPool.AcquireTimeoutAction.FAIL : null,
                                 acquireTimeoutMillis,
                                 maxConnections,
@@ -447,7 +448,8 @@ public class DefaultHttpClient implements
                         AbstractChannelPoolHandler channelPoolHandler = newPoolHandler(key);
                         return new SimpleChannelPool(
                                 newBootstrap,
-                                channelPoolHandler
+                                channelPoolHandler,
+                                channelHealthChecker
                         );
                     }
                 };
@@ -2641,12 +2643,8 @@ public class DefaultHttpClient implements
                     }
                 }
 
-                if (connectionTimeAliveMillis != null) {
-                    boolean shouldCloseOnRelease = Boolean.TRUE.equals(ch.attr(ConnectTTLHandler.RELEASE_CHANNEL).get());
-
-                    if (shouldCloseOnRelease && ch.isOpen() && !ch.eventLoop().isShuttingDown()) {
-                        ch.close();
-                    }
+                if (ConnectTTLHandler.isChannelExpired(ch) && ch.isOpen() && !ch.eventLoop().isShuttingDown()) {
+                    ch.close();
                 }
 
                 removeReadTimeoutHandler(pipeline);
