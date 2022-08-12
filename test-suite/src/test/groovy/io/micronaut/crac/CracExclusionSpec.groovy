@@ -30,7 +30,7 @@ class CracExclusionSpec extends Specification {
         !context.findBean(GlobalCracContextFactory).present
     }
 
-    void "no Netty Crac handler is defined"() {
+    void "no Netty CRaC handler is defined"() {
         given:
         def cracHandler = context.findBean(NettyEmbeddedServerCracHander)
 

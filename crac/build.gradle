@@ -8,7 +8,12 @@ dependencies {
     api(project(":runtime"))
     compileOnly(libs.crac)
 
+    testAnnotationProcessor(project(":inject-groovy"))
+    testAnnotationProcessor(project(":inject-java"))
+    testImplementation project(":http-server-netty")
+    testImplementation project(":inject-groovy")
     testImplementation(project(':context'))
+    testImplementation(libs.managed.micronaut.test.spock)
     testRuntimeOnly(libs.crac)
 }
 

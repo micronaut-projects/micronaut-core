@@ -16,10 +16,6 @@
 package io.micronaut.crac.support;
 
 import io.micronaut.core.annotation.Experimental;
-import org.crac.Context;
-import org.crac.Resource;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * The gateway between Micronaut and the CRaC api.  Takes our own internal resources, and uses them as
@@ -29,47 +25,12 @@ import org.slf4j.LoggerFactory;
  * @since 3.7.0
  */
 @Experimental
-public class CracContext {
-
-    private static final Logger LOG = LoggerFactory.getLogger(CracContext.class);
-
-    private final Context<Resource> context;
-
-    public CracContext(Context<Resource> context) {
-        this.context = context;
-    }
+public interface CracContext {
 
     /**
      * Create a {@link org.crac.Resource} from the given {@link OrderedCracResource} and register it with the CRaC {@link org.crac.Context}.
      *
      * @param orderedCracResource
      */
-    void register(OrderedCracResource orderedCracResource) {
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("Registering CRaC resource {}", orderedCracResource);
-        }
-        context.register(new CracFacadeResource(orderedCracResource));
-    }
-
-    /**
-     * The bridge between a Micronaut CRaC Resource and the CRaC api.
-     */
-    public class CracFacadeResource implements Resource {
-
-        private final OrderedCracResource orderedCracResource;
-
-        public CracFacadeResource(OrderedCracResource orderedCracResource) {
-            this.orderedCracResource = orderedCracResource;
-        }
-
-        @Override
-        public void beforeCheckpoint(Context<? extends Resource> context) throws Exception {
-            orderedCracResource.beforeCheckpoint(CracContext.this);
-        }
-
-        @Override
-        public void afterRestore(Context<? extends Resource> context) throws Exception {
-            orderedCracResource.afterRestore(CracContext.this);
-        }
-    }
+    void register(OrderedCracResource orderedCracResource);
 }

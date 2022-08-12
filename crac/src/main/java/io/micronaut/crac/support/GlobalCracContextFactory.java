@@ -43,7 +43,7 @@ public class GlobalCracContextFactory {
     @NonNull
     @Singleton
     public CracContext createContext() {
-        CracContext cracContext = new CracContext(Core.getGlobalContext());
+        CracContext cracContext = new DefaultCracContext(Core.getGlobalContext());
         if (LOG.isDebugEnabled()) {
             LOG.debug("Creating a Global CRaC context delegate {}", cracContext);
         }
