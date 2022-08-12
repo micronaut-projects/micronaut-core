@@ -20,6 +20,8 @@ import io.micronaut.core.order.Ordered;
 
 /**
  * A Coordinated Restore at Checkpoint Resource that may also be Ordered.
+ * This matches the {@link org.crac.Resource} interface, but cannot extend it to prevent leaking org.crac
+ * into the Micronaut classpath.
  *
  * @author Tim Yates
  * @since 3.7.0
@@ -33,6 +35,7 @@ public interface OrderedCracResource extends Ordered {
      * @param context {@code Context} providing notification
      * @throws Exception if the method have failed
      */
+    @SuppressWarnings("java:S112")
     void beforeCheckpoint(CracContext context) throws Exception;
 
     /**
@@ -41,5 +44,6 @@ public interface OrderedCracResource extends Ordered {
      * @param context {@code Context} providing notification
      * @throws Exception if the method have failed
      */
+    @SuppressWarnings("java:S112")
     void afterRestore(CracContext context) throws Exception;
 }

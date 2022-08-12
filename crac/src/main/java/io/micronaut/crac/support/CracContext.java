@@ -39,14 +39,22 @@ public class CracContext {
         this.context = context;
     }
 
-    public void register(OrderedCracResource orderedCracResource) {
+    /**
+     * Create a {@link org.crac.Resource} from the given {@link OrderedCracResource} and register it with the CRaC {@link org.crac.Context}.
+     *
+     * @param orderedCracResource
+     */
+    void register(OrderedCracResource orderedCracResource) {
         if (LOG.isDebugEnabled()) {
             LOG.debug("Registering CRaC resource {}", orderedCracResource);
         }
         context.register(new CracFacadeResource(orderedCracResource));
     }
 
-    class CracFacadeResource implements Resource {
+    /**
+     * The bridge between a Micronaut CRaC Resource and the CRaC api.
+     */
+    public class CracFacadeResource implements Resource {
 
         private final OrderedCracResource orderedCracResource;
 
