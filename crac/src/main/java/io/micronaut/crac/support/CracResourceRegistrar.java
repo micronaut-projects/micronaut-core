@@ -24,6 +24,7 @@ import io.micronaut.core.annotation.Experimental;
  * @since 3.7.0
  */
 @Experimental
+@FunctionalInterface
 public interface CracResourceRegistrar {
 
     void registerResources();

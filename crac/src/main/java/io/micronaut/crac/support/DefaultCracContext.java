@@ -16,6 +16,7 @@
 package io.micronaut.crac.support;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.NonNull;
 import org.crac.Context;
 import org.crac.Resource;
 import org.slf4j.Logger;
@@ -44,7 +45,8 @@ public class DefaultCracContext implements CracContext {
      *
      * @param orderedCracResource the resources to register
      */
-    public void register(OrderedCracResource orderedCracResource) {
+    @Override
+    public void register(@NonNull OrderedCracResource orderedCracResource) {
         if (LOG.isDebugEnabled()) {
             LOG.debug("Registering CRaC resource {}", orderedCracResource);
         }

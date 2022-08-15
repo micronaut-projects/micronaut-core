@@ -16,8 +16,8 @@
 package io.micronaut.crac.support;
 
 import io.micronaut.context.event.ApplicationEventListener;
+import io.micronaut.context.event.StartupEvent;
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.runtime.event.ApplicationStartupEvent;
 import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,7 +27,7 @@ import org.slf4j.LoggerFactory;
  */
 @Experimental
 @Singleton
-public class StartupCracRegistration implements ApplicationEventListener<ApplicationStartupEvent> {
+public class StartupCracRegistration implements ApplicationEventListener<StartupEvent> {
 
     private static final Logger LOG = LoggerFactory.getLogger(StartupCracRegistration.class);
 
@@ -38,7 +38,7 @@ public class StartupCracRegistration implements ApplicationEventListener<Applica
     }
 
     @Override
-    public void onApplicationEvent(ApplicationStartupEvent event) {
+    public void onApplicationEvent(StartupEvent event) {
         if (LOG.isDebugEnabled()) {
             LOG.debug("Startup detected. Registering CRaC resources");
         }

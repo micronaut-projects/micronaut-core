@@ -16,21 +16,23 @@
 package io.micronaut.crac.support;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.NonNull;
 
 /**
- * The gateway between Micronaut and the CRaC api.  Takes our own internal resources, and uses them as
+ * The gateway between Micronaut and the CRaC api. Takes our own internal resources, and uses them as
  * delegates to the CRaC api.
  *
  * @author Tim Yates
  * @since 3.7.0
  */
 @Experimental
+@FunctionalInterface
 public interface CracContext {
 
     /**
      * Create a {@link org.crac.Resource} from the given {@link OrderedCracResource} and register it with the CRaC {@link org.crac.Context}.
      *
-     * @param orderedCracResource
+     * @param orderedCracResource CRaC Resource.
      */
-    void register(OrderedCracResource orderedCracResource);
+    void register(@NonNull OrderedCracResource orderedCracResource);
 }
