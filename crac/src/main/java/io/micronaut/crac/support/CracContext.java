@@ -21,7 +21,7 @@ import io.micronaut.core.annotation.NonNull;
 import javax.validation.constraints.NotNull;
 
 /**
- * The gateway between Micronaut and the CRaC api.  Takes our own internal resources, and uses them as
+ * The gateway between Micronaut and the CRaC api. Takes our own internal resources, and uses them as
  * delegates to the CRaC api.
  *
  * @author Tim Yates
@@ -34,7 +34,7 @@ public interface CracContext {
     /**
      * Create a {@link org.crac.Resource} from the given {@link OrderedCracResource} and register it with the CRaC {@link org.crac.Context}.
      *
-     * @param orderedCracResource
+     * @param orderedCracResource CrAC Resource.
      */
     void register(@NonNull @NotNull OrderedCracResource orderedCracResource);
 }
