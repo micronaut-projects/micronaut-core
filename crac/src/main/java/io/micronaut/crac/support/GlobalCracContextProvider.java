@@ -15,7 +15,6 @@
  */
 package io.micronaut.crac.support;
 
-import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.NonNull;
 import jakarta.inject.Singleton;
 import org.crac.Context;
@@ -27,7 +26,6 @@ import org.crac.Resource;
  * @author Sergio del Amo
  * @since 3.7.0
  */
-@Requires(classes = {Resource.class, Context.class})
 @Singleton
 public class GlobalCracContextProvider implements CracContextProvider {
     @Override
