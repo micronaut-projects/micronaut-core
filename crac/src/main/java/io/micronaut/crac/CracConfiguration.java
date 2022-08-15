@@ -17,6 +17,7 @@ package io.micronaut.crac;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.util.Toggleable;
 
 /**
  * Configuration for CRaC support. Enabled by default.
@@ -26,7 +27,7 @@ import io.micronaut.core.annotation.Experimental;
  */
 @Experimental
 @ConfigurationProperties(CracConfiguration.PREFIX)
-public class CracConfiguration {
+public class CracConfiguration implements Toggleable {
 
     public static final String PREFIX = "crac";
     public static final Boolean DEFAULT_ENABLED = true;
@@ -36,7 +37,8 @@ public class CracConfiguration {
     /**
      * @return Whether CRaC is enabled.
      */
-    public boolean getEnabled() {
+    @Override
+    public boolean isEnabled() {
         return enabled;
     }
 
