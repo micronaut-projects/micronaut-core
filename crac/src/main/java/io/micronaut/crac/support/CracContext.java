@@ -32,7 +32,7 @@ public interface CracContext {
     /**
      * Create a {@link org.crac.Resource} from the given {@link OrderedCracResource} and register it with the CRaC {@link org.crac.Context}.
      *
-     * @param orderedCracResource CrAC Resource.
+     * @param orderedCracResource CRaC Resource.
      */
     void register(@NonNull OrderedCracResource orderedCracResource);
 }
