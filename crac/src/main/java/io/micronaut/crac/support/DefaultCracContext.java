@@ -17,6 +17,7 @@ package io.micronaut.crac.support;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
+import jakarta.inject.Singleton;
 import org.crac.Context;
 import org.crac.Resource;
 import org.slf4j.Logger;
@@ -30,14 +31,19 @@ import org.slf4j.LoggerFactory;
  * @since 3.7.0
  */
 @Experimental
+@Singleton
 public class DefaultCracContext implements CracContext {
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultCracContext.class);
 
     private final Context<Resource> context;
 
-    public DefaultCracContext(Context<Resource> context) {
-        this.context = context;
+    /**
+     *
+     * @param cracContextProvider API to get the Context for checkpoint/restore notifications.
+     */
+    public DefaultCracContext(CracContextProvider cracContextProvider) {
+        this.context = cracContextProvider.provideContext();
     }
 
     /**
