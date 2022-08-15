@@ -23,7 +23,7 @@
 @Configuration
 @Experimental
 @Requires(classes = {Resource.class, Context.class})
-@Requires(property = "crac.enabled", defaultValue = "true", value = StringUtils.TRUE)
+@Requires(property = "crac.enabled", defaultValue = StringUtils.TRUE, value = StringUtils.TRUE)
 package io.micronaut.crac.support;
 
 import io.micronaut.context.annotation.Configuration;
