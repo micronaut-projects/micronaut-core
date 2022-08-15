@@ -43,7 +43,7 @@ public class CracConfiguration implements Toggleable {
     }
 
     /**
-     * Disable CRaC support even if we're on a supporting JDK.
+     * Whether CRaC (Coordinated Restore at Checkpoint) support, even if we're on a supporting JDK, is enabled. Default value ({@value #DEFAULT_ENABLED}).
      *
      * @param enabled override CRaC if required
      */
