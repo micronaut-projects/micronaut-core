@@ -18,6 +18,7 @@ package io.micronaut.http.server.netty;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.crac.support.CracContext;
 import io.micronaut.crac.support.CracResourceRegistrar;
 import io.micronaut.crac.support.OrderedCracResource;
@@ -40,12 +41,12 @@ public class NettyEmbeddedServerCracHander implements OrderedCracResource {
     }
 
     @Override
-    public void beforeCheckpoint(CracContext context) throws Exception {
+    public void beforeCheckpoint(@NonNull CracContext context) throws Exception {
         server.stop();
     }
 
     @Override
-    public void afterRestore(CracContext context) throws Exception {
+    public void afterRestore(@NonNull CracContext context) throws Exception {
         server.start();
     }
 }

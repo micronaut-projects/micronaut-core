@@ -16,7 +16,10 @@
 package io.micronaut.crac.support;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.order.Ordered;
+
+import javax.validation.constraints.NotNull;
 
 /**
  * A Coordinated Restore at Checkpoint Resource that may also be Ordered.
@@ -36,7 +39,7 @@ public interface OrderedCracResource extends Ordered {
      * @throws Exception if the method have failed
      */
     @SuppressWarnings("java:S112")
-    void beforeCheckpoint(CracContext context) throws Exception;
+    void beforeCheckpoint(@NonNull CracContext context) throws Exception;
 
     /**
      * Invoked by a {@code Context} as a notification about restore.
@@ -45,5 +48,5 @@ public interface OrderedCracResource extends Ordered {
      * @throws Exception if the method have failed
      */
     @SuppressWarnings("java:S112")
-    void afterRestore(CracContext context) throws Exception;
+    void afterRestore(@NonNull CracContext context) throws Exception;
 }
