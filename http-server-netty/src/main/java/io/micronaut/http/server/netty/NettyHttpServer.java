@@ -318,7 +318,9 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
     @Override
     public synchronized NettyEmbeddedServer stop() {
+        LOG.debug("Stopping server, isRunning: {}, workerGroup: {}", isRunning(), workerGroup);
         if (isRunning() && workerGroup != null) {
+            LOG.debug("Checking if running {}", running);
             if (running.compareAndSet(true, false)) {
                 stopInternal();
             }
@@ -585,6 +587,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     }
 
     private void stopInternal() {
+        LOG.info("Made it to stopInternal() shutdownParent={}, shutdownWorker={}", shutdownParent, shutdownWorker);
         try {
             if (shutdownParent) {
                 EventLoopGroupConfiguration parent = serverConfiguration.getParent();
