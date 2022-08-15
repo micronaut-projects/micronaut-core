@@ -58,26 +58,4 @@ public class DefaultCracContext implements CracContext {
         }
         context.register(new CracFacadeResource(orderedCracResource));
     }
-
-    /**
-     * The bridge between a Micronaut CRaC Resource and the CRaC api.
-     */
-    public class CracFacadeResource implements Resource {
-
-        private final OrderedCracResource orderedCracResource;
-
-        public CracFacadeResource(OrderedCracResource orderedCracResource) {
-            this.orderedCracResource = orderedCracResource;
-        }
-
-        @Override
-        public void beforeCheckpoint(Context<? extends Resource> context) throws Exception {
-            orderedCracResource.beforeCheckpoint(DefaultCracContext.this);
-        }
-
-        @Override
-        public void afterRestore(Context<? extends Resource> context) throws Exception {
-            orderedCracResource.afterRestore(DefaultCracContext.this);
-        }
-    }
 }
