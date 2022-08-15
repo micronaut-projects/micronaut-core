@@ -5,6 +5,7 @@ import io.micronaut.context.annotation.Factory
 import io.micronaut.context.annotation.Replaces
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.env.Environment
+import io.micronaut.core.annotation.NonNull
 import io.micronaut.crac.support.CracContext
 import io.micronaut.crac.support.GlobalCracContextFactory
 import io.micronaut.crac.support.OrderedCracResource
@@ -13,6 +14,8 @@ import jakarta.inject.Singleton
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
+
+import javax.validation.constraints.NotNull
 
 class CracRegistrationSpec extends Specification {
 
@@ -47,7 +50,7 @@ class CracRegistrationSpec extends Specification {
             new CracContext() {
 
                 @Override
-                void register(OrderedCracResource orderedCracResource) {
+                void register(@NonNull @NotNull OrderedCracResource orderedCracResource) {
                     registrations.add(orderedCracResource.class.simpleName)
                 }
             }

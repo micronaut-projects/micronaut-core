@@ -16,10 +16,13 @@
 package io.micronaut.crac.support;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.NonNull;
 import org.crac.Context;
 import org.crac.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.validation.constraints.NotNull;
 
 /**
  * The gateway between Micronaut and the CRaC api.  Takes our own internal resources, and uses them as
@@ -44,7 +47,8 @@ public class DefaultCracContext implements CracContext {
      *
      * @param orderedCracResource the resources to register
      */
-    public void register(OrderedCracResource orderedCracResource) {
+    @Override
+    public void register(@NonNull @NotNull OrderedCracResource orderedCracResource) {
         if (LOG.isDebugEnabled()) {
             LOG.debug("Registering CRaC resource {}", orderedCracResource);
         }
