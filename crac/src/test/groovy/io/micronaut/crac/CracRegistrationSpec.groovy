@@ -1,34 +1,26 @@
 package io.micronaut.crac
 
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.annotation.Factory
+import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Replaces
 import io.micronaut.context.annotation.Requires
-import io.micronaut.context.env.Environment
 import io.micronaut.core.annotation.NonNull
 import io.micronaut.crac.support.CracContext
 import io.micronaut.crac.support.OrderedCracResource
-import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.test.extensions.spock.annotation.MicronautTest
+import jakarta.inject.Inject
 import jakarta.inject.Singleton
-import spock.lang.AutoCleanup
-import spock.lang.Shared
 import spock.lang.Specification
 
+@Property(name = "spec.name", value = "CracRegistrationSpec")
+@MicronautTest
 class CracRegistrationSpec extends Specification {
 
-    @Shared
-    @AutoCleanup
-    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
-            'spec.name': CracRegistrationSpec.simpleName
-    ], Environment.TEST)
-
-    @Shared
-    def context = embeddedServer.applicationContext
-
+    @Inject
+    CracContextReplacement cracContextReplacement
 
     def "resources are registered in the expected order"() {
         expect:
-        context.getBean(CracContextReplacement).registrations == [
+        cracContextReplacement.registrations == [
                 'TestResource',
                 'NettyEmbeddedServerCracHander',
                 'TestResource3',
