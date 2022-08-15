@@ -19,7 +19,6 @@ import io.micronaut.context.annotation.Factory;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import jakarta.inject.Singleton;
-import org.crac.Core;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,12 +37,13 @@ public class GlobalCracContextFactory {
     /**
      * Creates a delegating context class to allow CRaC to be used in Micronaut.
      *
+     * @param cracContextProvider API to get the Context for checkpoint/restore notifications.
      * @return The Global context for Coordinated Restore at Checkpoint.
      */
     @NonNull
     @Singleton
-    public CracContext createContext() {
-        CracContext cracContext = new DefaultCracContext(Core.getGlobalContext());
+    public CracContext createContext(@NonNull CracContextProvider cracContextProvider) {
+        CracContext cracContext = new DefaultCracContext(cracContextProvider.provideContext());
         if (LOG.isDebugEnabled()) {
             LOG.debug("Creating a Global CRaC context delegate {}", cracContext);
         }
