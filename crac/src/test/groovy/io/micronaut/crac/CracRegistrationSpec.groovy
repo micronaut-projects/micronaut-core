@@ -58,12 +58,12 @@ class CracRegistrationSpec extends Specification {
         }
 
         @Override
-        void beforeCheckpoint(CracContext context) throws Exception {
+        void beforeCheckpoint(@NonNull CracContext context) throws Exception {
 
         }
 
         @Override
-        void afterRestore(CracContext context) throws Exception {
+        void afterRestore(@NonNull CracContext context) throws Exception {
 
         }
     }
@@ -78,12 +78,12 @@ class CracRegistrationSpec extends Specification {
         }
 
         @Override
-        void beforeCheckpoint(CracContext context) throws Exception {
+        void beforeCheckpoint(@NonNull CracContext context) throws Exception {
 
         }
 
         @Override
-        void afterRestore(CracContext context) throws Exception {
+        void afterRestore(@NonNull CracContext context) throws Exception {
 
         }
     }
@@ -98,12 +98,12 @@ class CracRegistrationSpec extends Specification {
         }
 
         @Override
-        void beforeCheckpoint(CracContext context) throws Exception {
+        void beforeCheckpoint(@NonNull CracContext context) throws Exception {
 
         }
 
         @Override
-        void afterRestore(CracContext context) throws Exception {
+        void afterRestore(@NonNull CracContext context) throws Exception {
 
         }
     }
