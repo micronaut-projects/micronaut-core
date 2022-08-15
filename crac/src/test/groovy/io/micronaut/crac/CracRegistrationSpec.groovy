@@ -7,7 +7,6 @@ import io.micronaut.context.annotation.Requires
 import io.micronaut.context.env.Environment
 import io.micronaut.core.annotation.NonNull
 import io.micronaut.crac.support.CracContext
-import io.micronaut.crac.support.GlobalCracContextFactory
 import io.micronaut.crac.support.OrderedCracResource
 import io.micronaut.runtime.server.EmbeddedServer
 import jakarta.inject.Singleton
@@ -26,11 +25,10 @@ class CracRegistrationSpec extends Specification {
     @Shared
     def context = embeddedServer.applicationContext
 
-    static registrations = []
 
     def "resources are registered in the expected order"() {
         expect:
-        registrations == [
+        context.getBean(CracContextReplacement).registrations == [
                 'TestResource',
                 'NettyEmbeddedServerCracHander',
                 'TestResource3',
@@ -38,20 +36,15 @@ class CracRegistrationSpec extends Specification {
         ]
     }
 
-    @Factory
+    @Singleton
     @Requires(property = "spec.name", value = "CracRegistrationSpec")
-    static class ContextFactory {
+    @Replaces(CracContext.class)
+    static class CracContextReplacement implements CracContext {
+        static List<String> registrations = []
 
-        @Singleton
-        @Replaces(bean = CracContext, factory = GlobalCracContextFactory)
-        CracContext cracContext() {
-            new CracContext() {
-
-                @Override
-                void register(@NonNull OrderedCracResource orderedCracResource) {
-                    registrations.add(orderedCracResource.class.simpleName)
-                }
-            }
+        @Override
+        void register(@NonNull OrderedCracResource orderedCracResource) {
+            registrations.add(orderedCracResource.class.simpleName)
         }
     }
 
