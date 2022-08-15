@@ -18,6 +18,8 @@ package io.micronaut.crac.support;
 import io.micronaut.core.annotation.Internal;
 import org.crac.Context;
 import org.crac.Resource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The bridge between a Micronaut CRaC Resource and the CRaC api.
@@ -27,6 +29,8 @@ import org.crac.Resource;
 @Internal
 public class CracFacadeResource implements Resource {
 
+    private static final Logger LOG = LoggerFactory.getLogger(CracFacadeResource.class);
+
     private final OrderedCracResource orderedCracResource;
 
     public CracFacadeResource(OrderedCracResource orderedCracResource) {
@@ -35,11 +39,17 @@ public class CracFacadeResource implements Resource {
 
     @Override
     public void beforeCheckpoint(Context<? extends Resource> context) throws Exception {
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("BEFORE CHECKPOINT FACADE!");
+        }
         orderedCracResource.beforeCheckpoint(createCracContext(context));
     }
 
     @Override
     public void afterRestore(Context<? extends Resource> context) throws Exception {
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("AFTER RESTORE FACADE!");
+        }
         orderedCracResource.afterRestore(createCracContext(context));
     }
 

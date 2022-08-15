@@ -54,7 +54,7 @@ public class DefaultCracContext implements CracContext {
     @Override
     public void register(@NonNull OrderedCracResource orderedCracResource) {
         if (LOG.isDebugEnabled()) {
-            LOG.debug("Registering CRaC resource {}", orderedCracResource);
+            LOG.debug("Registering CRaC resource {} with {}", orderedCracResource, context);
         }
         context.register(new CracFacadeResource(orderedCracResource));
     }

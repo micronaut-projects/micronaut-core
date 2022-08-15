@@ -22,6 +22,8 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.crac.support.CracContext;
 import io.micronaut.crac.support.CracResourceRegistrar;
 import io.micronaut.crac.support.OrderedCracResource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Register the NettyEmbedded server as a CRaC resource on startup if CRaC is enabled.
@@ -34,6 +36,8 @@ import io.micronaut.crac.support.OrderedCracResource;
 @Requires(bean = CracResourceRegistrar.class)
 public class NettyEmbeddedServerCracHander implements OrderedCracResource {
 
+    private static final Logger LOG = LoggerFactory.getLogger(CracResourceRegistrar.class);
+
     private final NettyEmbeddedServer server;
 
     public NettyEmbeddedServerCracHander(NettyEmbeddedServer server) {
@@ -42,11 +46,17 @@ public class NettyEmbeddedServerCracHander implements OrderedCracResource {
 
     @Override
     public void beforeCheckpoint(@NonNull CracContext context) throws Exception {
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Stopping netty server {}", server);
+        }
         server.stop();
     }
 
     @Override
     public void afterRestore(@NonNull CracContext context) throws Exception {
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Starting netty server {}", server);
+        }
         server.start();
     }
 }
