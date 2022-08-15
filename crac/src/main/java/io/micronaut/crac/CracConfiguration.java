@@ -29,8 +29,16 @@ import io.micronaut.core.util.Toggleable;
 @ConfigurationProperties(CracConfiguration.PREFIX)
 public class CracConfiguration implements Toggleable {
 
+    /**
+     * The prefix to use for CRaC configuration.
+     */
     public static final String PREFIX = "crac";
-    public static final Boolean DEFAULT_ENABLED = true;
+
+    /**
+     * The default enable value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_ENABLED = true;
 
     private boolean enabled = DEFAULT_ENABLED;
 
