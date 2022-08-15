@@ -14,8 +14,9 @@
  * limitations under the License.
  */
 /**
- * A set of classes to support Coordinated Restore at Checkpoint (CRaC) with Micronaut.
+ * A set of classes to support Coordinated Restore at Checkpoint (CRaC).
  *
+ * @see <a href="https://openjdk.org/projects/crac/">OpenJDK CrAC (Coordinated Restore at Checkpoint)</a>.
  * @author Tim Yates
  * @since 3.7.0
  */
