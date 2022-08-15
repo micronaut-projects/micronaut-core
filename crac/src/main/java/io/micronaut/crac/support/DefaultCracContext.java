@@ -22,8 +22,6 @@ import org.crac.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.validation.constraints.NotNull;
-
 /**
  * The gateway between Micronaut and the CRaC api.  Takes our own internal resources, and uses them as
  * delegates to the CRaC api.
@@ -48,7 +46,7 @@ public class DefaultCracContext implements CracContext {
      * @param orderedCracResource the resources to register
      */
     @Override
-    public void register(@NonNull @NotNull OrderedCracResource orderedCracResource) {
+    public void register(@NonNull OrderedCracResource orderedCracResource) {
         if (LOG.isDebugEnabled()) {
             LOG.debug("Registering CRaC resource {}", orderedCracResource);
         }

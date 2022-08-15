@@ -15,8 +15,6 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
-import javax.validation.constraints.NotNull
-
 class CracRegistrationSpec extends Specification {
 
     @Shared
@@ -50,7 +48,7 @@ class CracRegistrationSpec extends Specification {
             new CracContext() {
 
                 @Override
-                void register(@NonNull @NotNull OrderedCracResource orderedCracResource) {
+                void register(@NonNull OrderedCracResource orderedCracResource) {
                     registrations.add(orderedCracResource.class.simpleName)
                 }
             }

@@ -19,8 +19,6 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.order.Ordered;
 
-import javax.validation.constraints.NotNull;
-
 /**
  * A Coordinated Restore at Checkpoint Resource that may also be Ordered.
  * This matches the {@link org.crac.Resource} interface, but cannot extend it to prevent leaking org.crac

@@ -18,8 +18,6 @@ package io.micronaut.crac.support;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 
-import javax.validation.constraints.NotNull;
-
 /**
  * The gateway between Micronaut and the CRaC api. Takes our own internal resources, and uses them as
  * delegates to the CRaC api.
@@ -36,5 +34,5 @@ public interface CracContext {
      *
      * @param orderedCracResource CrAC Resource.
      */
-    void register(@NonNull @NotNull OrderedCracResource orderedCracResource);
+    void register(@NonNull OrderedCracResource orderedCracResource);
 }
