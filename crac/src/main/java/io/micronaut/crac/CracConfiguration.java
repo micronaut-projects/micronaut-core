@@ -30,7 +30,6 @@ public class CracConfiguration {
 
     public static final String PREFIX = "crac";
     public static final Boolean DEFAULT_ENABLED = true;
-    public static final String DEFAULT_ENABLED_STR = "true";
 
     private boolean enabled = DEFAULT_ENABLED;
 
