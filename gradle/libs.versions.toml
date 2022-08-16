@@ -42,7 +42,7 @@ managed-kotlin-coroutines = "1.5.1"
 managed-google-function-framework = "1.0.4"
 managed-google-function-invoker = "1.0.0"
 managed-gorm = "7.3.2"
-managed-gorm-hibernate = "7.2.2"
+managed-gorm-hibernate = "7.3.0"
 # be sure to update graal version in gradle.properties as well
 # Intentionally pin to 22.0.0.2 see https://github.com/micronaut-projects/micronaut-kafka/pull/564 and https://github.com/micronaut-projects/micronaut-core/pull/7663
 managed-graal-sdk = "22.0.0.2"
