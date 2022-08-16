@@ -174,6 +174,7 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
         addTemporalToDateConverter(conversionService, OffsetDateTime.class, OffsetDateTime::toInstant);
         addTemporalToDateConverter(conversionService, ZonedDateTime.class, ZonedDateTime::toInstant);
         // these two are a bit icky, but required for yaml parsing compatibility
+        // TODO Micronaut 4 Consider deletion
         addTemporalToDateConverter(conversionService, LocalDate.class, ld -> ld.atTime(0, 0).toInstant(ZoneOffset.UTC));
         addTemporalToDateConverter(conversionService, LocalDateTime.class, ldt -> ldt.toInstant(ZoneOffset.UTC));
     }
