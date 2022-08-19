@@ -82,6 +82,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     private final Map<String, List> annotationValuesByType = new ConcurrentHashMap<>(2);
 
     private final boolean hasPropertyExpressions;
+    private final boolean hasEvaluatedExpressions;
 
     /**
      * Constructs empty annotation metadata.
@@ -89,6 +90,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @Internal
     protected DefaultAnnotationMetadata() {
         hasPropertyExpressions = false;
+        hasEvaluatedExpressions = false;
     }
 
     /**
@@ -136,6 +138,30 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     /**
      * This constructor is designed to be used by compile time produced subclasses.
      *
+     * @param declaredAnnotations      The directly declared annotations
+     * @param declaredStereotypes      The directly declared stereotypes
+     * @param allStereotypes           All of the stereotypes
+     * @param allAnnotations           All of the annotations
+     * @param annotationsByStereotype  The annotations by stereotype
+     * @param hasPropertyExpressions   Whether property expressions exist in the metadata
+     * @param hasEvaluatedExpressions  Whether evaluated expressions exist in the metadata
+     */
+    @Internal
+    @UsedByGeneratedCode
+    public DefaultAnnotationMetadata(
+            @Nullable Map<String, Map<CharSequence, Object>> declaredAnnotations,
+            @Nullable Map<String, Map<CharSequence, Object>> declaredStereotypes,
+            @Nullable Map<String, Map<CharSequence, Object>> allStereotypes,
+            @Nullable Map<String, Map<CharSequence, Object>> allAnnotations,
+            @Nullable Map<String, List<String>> annotationsByStereotype,
+            boolean hasPropertyExpressions,
+            boolean hasEvaluatedExpressions) {
+        this(declaredAnnotations, declaredStereotypes, allStereotypes, allAnnotations, annotationsByStereotype, hasPropertyExpressions, hasEvaluatedExpressions, false);
+    }
+
+    /**
+     * This constructor is designed to be used by compile time produced subclasses.
+     *
      * @param declaredAnnotations     The directly declared annotations
      * @param declaredStereotypes     The directly declared stereotypes
      * @param allStereotypes          All of the stereotypes
@@ -156,6 +182,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
             @Nullable Map<String, Map<CharSequence, Object>> allAnnotations,
             @Nullable Map<String, List<String>> annotationsByStereotype,
             boolean hasPropertyExpressions,
+            boolean hasEvaluatedExpressions,
             boolean useRepeatableDefaults) {
         super(declaredAnnotations, allAnnotations);
         this.declaredAnnotations = declaredAnnotations;
@@ -164,6 +191,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         this.allAnnotations = allAnnotations;
         this.annotationsByStereotype = annotationsByStereotype;
         this.hasPropertyExpressions = hasPropertyExpressions;
+        this.hasEvaluatedExpressions = hasEvaluatedExpressions;
     }
 
     @NonNull
@@ -182,6 +210,11 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @Override
     public boolean hasPropertyExpressions() {
         return hasPropertyExpressions;
+    }
+
+    @Override
+    public boolean hasEvaluatedExpressions() {
+        return hasEvaluatedExpressions;
     }
 
     @NonNull

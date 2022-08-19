@@ -18,17 +18,24 @@ package io.micronaut.inject.writer;
 import io.micronaut.context.AbstractExecutableMethodsDefinition;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
+import io.micronaut.expressions.context.ExpressionContextFactory;
+import io.micronaut.expressions.context.ExpressionEvaluationContext;
+import io.micronaut.expressions.context.ExpressionWithContext;
+import io.micronaut.expressions.util.EvaluatedExpressionsUtils;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.annotation.AnnotationMetadataWriter;
+import io.micronaut.core.annotation.EvaluatedExpressionReference;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.processing.JavaModelUtils;
+import io.micronaut.inject.visitor.VisitorContext;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.Opcodes;
@@ -41,6 +48,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -96,8 +104,11 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
     private final DispatchWriter methodDispatchWriter;
 
     private final Set<String> methodNames = new HashSet<>();
+    private final ExpressionContextFactory expressionContextFactory;
+    private final Set<ExpressionWithContext> evaluatedExpressions = new HashSet<>();
 
-    public ExecutableMethodsDefinitionWriter(String beanDefinitionClassName,
+    public ExecutableMethodsDefinitionWriter(VisitorContext visitorContext,
+                                             String beanDefinitionClassName,
                                              String beanDefinitionReferenceClassName,
                                              OriginatingElements originatingElements) {
         super(originatingElements);
@@ -106,6 +117,7 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
         this.thisType = Type.getObjectType(internalName);
         this.beanDefinitionReferenceClassName = beanDefinitionReferenceClassName;
         this.methodDispatchWriter = new DispatchWriter(thisType);
+        this.expressionContextFactory = new ExpressionContextFactory(visitorContext);
     }
 
     /**
@@ -120,6 +132,14 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
      */
     public Type getClassType() {
         return thisType;
+    }
+
+    /**
+     * @return list of evaluated expressions.
+     */
+    @NonNull
+    public Set<ExpressionWithContext> getEvaluatedExpressions() {
+        return evaluatedExpressions;
     }
 
     private MethodElement getMethodElement(int index) {
@@ -190,6 +210,7 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
                                      MethodElement methodElement,
                                      String interceptedProxyClassName,
                                      String interceptedProxyBridgeMethodName) {
+        processEvaluatedExpressions(methodElement);
 
         String methodKey = methodElement.getName() +
                 "(" +
@@ -482,5 +503,17 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
         } else {
             throw new IllegalStateException("Unknown metadata: " + annotationMetadata);
         }
+    }
+
+    private void processEvaluatedExpressions(MethodElement methodElement) {
+        Collection<EvaluatedExpressionReference> expressionReferences =
+            EvaluatedExpressionsUtils.findEvaluatedExpressionReferences(methodElement.getDeclaredMetadata());
+
+        expressionReferences.stream()
+            .map(expression -> {
+                ExpressionEvaluationContext evaluationContext = expressionContextFactory.buildForMethod(expression, methodElement);
+                return new ExpressionWithContext(expression, evaluationContext);
+            })
+            .forEach(evaluatedExpressions::add);
     }
 }

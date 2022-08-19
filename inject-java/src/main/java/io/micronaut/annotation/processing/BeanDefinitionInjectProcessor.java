@@ -27,6 +27,9 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Vetoed;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.expressions.EvaluatedExpressionWriter;
+import io.micronaut.expressions.context.ExpressionContextLoader;
+import io.micronaut.expressions.context.ExpressionWithContext;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.processing.BeanDefinitionCreator;
@@ -262,6 +265,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             } finally {
                 AbstractAnnotationMetadataBuilder.clearMutated();
                 JavaAnnotationMetadataBuilder.clearCaches();
+                ExpressionContextLoader.reset();
             }
         }
 
@@ -269,7 +273,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
     }
 
     /**
-     * Writes {@link io.micronaut.inject.BeanDefinitionReference} into /META-INF/services/io.micronaut.inject.BeanDefinitionReference.
+     * Writes {@link io.micronaut.inject.BeanDefinitionReference} into /META-INF/services/io
+     * .micronaut.inject.BeanDefinitionReference.
      */
     private void writeBeanDefinitionsToMetaInf() {
         try {
@@ -285,6 +290,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             beanDefinitionWriter.visitBeanDefinitionEnd();
             if (beanDefinitionWriter.isEnabled()) {
                 beanDefinitionWriter.accept(classWriterOutputVisitor);
+
+                processEvaluatedExpressions(beanDefinitionWriter);
+
                 BeanDefinitionReferenceWriter beanDefinitionReferenceWriter =
                     new BeanDefinitionReferenceWriter(beanDefinitionWriter);
                 beanDefinitionReferenceWriter.setRequiresMethodProcessing(beanDefinitionWriter.requiresMethodProcessing());
@@ -300,6 +308,17 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             // raise a compile error
             String message = e.getMessage();
             error("Unexpected error: %s", message != null ? message : e.getClass().getSimpleName());
+        }
+    }
+
+    private void processEvaluatedExpressions(BeanDefinitionVisitor beanDefinitionWriter) throws IOException {
+        for (ExpressionWithContext expressionMetadata: beanDefinitionWriter.getEvaluatedExpressions()) {
+            EvaluatedExpressionWriter expressionWriter = new EvaluatedExpressionWriter(
+                expressionMetadata,
+                javaVisitorContext,
+                beanDefinitionWriter.getOriginatingElement());
+
+            expressionWriter.accept(classWriterOutputVisitor);
         }
     }
 

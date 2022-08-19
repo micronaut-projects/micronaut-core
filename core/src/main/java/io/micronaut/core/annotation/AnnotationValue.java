@@ -19,6 +19,7 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
+import io.micronaut.core.expression.EvaluatedExpression;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
@@ -1288,6 +1289,17 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         return Optional.empty();
     }
 
+    /**
+     * If this AnnotationValue contains Evaluated Expressions.
+     *
+     * @return true if it is
+     * @since 4.0.0
+     */
+    public boolean hasEvaluatedExpressions() {
+        return values.values().stream()
+            .anyMatch(value -> value instanceof EvaluatedExpression);
+    }
+
     @Override
     public String toString() {
         if (values.isEmpty()) {
@@ -1592,7 +1604,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
                 }
             }
         }
-        if (valueMapper != null && rawValue instanceof String) {
+        if (valueMapper != null && (rawValue instanceof String || rawValue instanceof EvaluatedExpression)) {
             return valueMapper.apply(rawValue);
         }
         return rawValue;

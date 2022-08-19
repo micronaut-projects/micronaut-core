@@ -37,7 +37,7 @@ import java.util.stream.Collectors;
  */
 public class UriMatchTemplate extends UriTemplate implements UriMatcher {
 
-    protected static final String VARIABLE_MATCH_PATTERN = "([^\\/\\?#&;\\+]";
+    protected static final String VARIABLE_MATCH_PATTERN = "([^\\/\\?#(?!\\{)&;\\+]";
     protected StringBuilder pattern;
     protected List<UriMatchVariable> variables;
     private final Pattern matchPattern;

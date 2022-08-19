@@ -27,6 +27,7 @@ import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
+import io.micronaut.core.annotation.EvaluatedExpressionReference;
 import io.micronaut.core.annotation.InstantiatedMember;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
@@ -55,6 +56,9 @@ import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
+
+import static io.micronaut.core.expression.EvaluatedExpression.EXPRESSION_PATTERN;
+import static io.micronaut.core.annotation.EvaluatedExpressionReference.EXPR_SUFFIX;
 
 /**
  * An abstract implementation that builds {@link AnnotationMetadata}.
@@ -479,11 +483,12 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      *
      * @param originatingElement The originating element
      * @param member             The member
+     * @param annotationName     The annotation name
      * @param memberName         The member name
      * @param annotationValue    The value
      * @return The object
      */
-    protected abstract Object readAnnotationValue(T originatingElement, T member, String memberName, Object annotationValue);
+    protected abstract Object readAnnotationValue(T originatingElement, T member, String annotationName, String memberName, Object annotationValue);
 
     /**
      * Read the raw default annotation values from the given annotation.
@@ -589,6 +594,46 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @return An optional mirror
      */
     protected abstract Optional<T> getAnnotationMirror(String annotationName);
+
+    /**
+     * Detect evaluated expression in annotation value.
+     *
+     * @param value - Annotation value
+     * @return if value contains evaluated expression
+     */
+    protected boolean isEvaluatedExpression(@Nullable Object value) {
+        return (value instanceof String str && str.matches(EXPRESSION_PATTERN))
+                   || (value instanceof String[] strArray &&
+                           Arrays.stream(strArray).anyMatch(this::isEvaluatedExpression));
+    }
+
+    /**
+     * Wraps original annotation value to make it processable at later stages.
+     *
+     * @param originatingElement originating annotated element
+     * @param annotationName annotation name
+     * @param memberName annotation member name
+     * @param initialAnnotationValue original annotation value
+     * @return expression reference
+     */
+    @NonNull
+    protected Object buildEvaluatedExpressionReference(@NonNull T originatingElement,
+                                                       @NonNull String annotationName,
+                                                       @NonNull String memberName,
+                                                       @NonNull Object initialAnnotationValue) {
+        String originatingClassName = getOriginatingClassName(originatingElement);
+
+        String packageName = NameUtils.getPackageName(originatingClassName);
+        String simpleClassName = NameUtils.getSimpleName(originatingClassName);
+        String exprClassName = "%s.$%s%s".formatted(packageName, simpleClassName, EXPR_SUFFIX);
+
+        Integer expressionIndex = EvaluatedExpressionReference.nextIndex(exprClassName);
+
+        return new EvaluatedExpressionReference(initialAnnotationValue, annotationName, memberName, exprClassName + expressionIndex);
+    }
+
+    @NonNull
+    protected abstract String getOriginatingClassName(@NonNull T orginatingElement);
 
     /**
      * Get the annotation member.
@@ -835,7 +880,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                     }
                     if (isInstantiatedMember) {
                         final String memberName = getAnnotationMemberName(member);
-                        final Object rawValue = readAnnotationValue(originatingElement, member, memberName, annotationValue);
+                        final Object rawValue = readAnnotationValue(originatingElement, member, annotationName, memberName, annotationValue);
                         if (rawValue instanceof AnnotationClassValue<?> annotationClassValue) {
                             annotationValues.put(memberName, new AnnotationClassValue<>(annotationClassValue.getName(), true));
                         }

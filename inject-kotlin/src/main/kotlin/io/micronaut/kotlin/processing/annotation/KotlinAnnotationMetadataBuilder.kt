@@ -282,7 +282,7 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
         annotationValues: MutableMap<CharSequence, Any>
     ) {
         if (!annotationValues.containsKey(memberName)) {
-            val value = readAnnotationValue(originatingElement, member, memberName, annotationValue)
+            val value = readAnnotationValue(originatingElement, member, annotationName, memberName, annotationValue)
             if (value != null) {
                 validateAnnotationValue(originatingElement, annotationName, member, memberName, value)
                 annotationValues[memberName] = value
@@ -315,6 +315,7 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
     override fun readAnnotationValue(
         originatingElement: KSAnnotated,
         member: KSAnnotated,
+        annotationName: String,
         memberName: String,
         annotationValue: Any
     ): Any? {
@@ -365,6 +366,10 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
         } else {
             mutableMapOf<KSDeclaration, Any>()
         }
+    }
+
+    override fun getOriginatingClassName(orginatingElement: KSAnnotated?): String {
+        TODO("Not yet implemented")
     }
 
     private fun readDefaultValuesReflectively(classDeclaration : KSClassDeclaration, annotationType: KSAnnotated, vararg path : String): MutableMap<KSDeclaration, Any> {
@@ -581,6 +586,7 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
         if (value is KSAnnotation) {
             return readNestedAnnotationValue(originatingElement, value)
         }
+
          return value
     }
 
