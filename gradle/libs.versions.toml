@@ -128,7 +128,7 @@ managed-netty = "4.1.79.Final"
 managed-reactive-pg-client = "0.11.4"
 managed-reactive-streams = "1.0.4"
 # This should be kept aligned with https://github.com/micronaut-projects/micronaut-reactor/blob/master/gradle.properties from the BOM
-managed-reactor = "3.4.21"
+managed-reactor = "3.4.22"
 managed-rxjava1 = "1.3.8"
 managed-rxjava1-interop = "0.13.7"
 managed-slf4j = "1.7.36"
