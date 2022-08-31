@@ -34,35 +34,12 @@ class RequestLineSpec extends Specification {
         def embeddedServer = (NettyHttpServer) ctx.getBean(EmbeddedServer)
 
         def serverEmbeddedChannel = embeddedServer.buildEmbeddedChannel(false)
-
         def clientEmbeddedChannel = new EmbeddedChannel()
+        clientEmbeddedChannel.config().setAutoRead(true)
 
-        serverEmbeddedChannel.pipeline()
-                .addFirst(new ChannelOutboundHandlerAdapter() {
-                    @Override
-                    void write(ChannelHandlerContext ctx_, Object msg, ChannelPromise promise) throws Exception {
-                        // forward to client
-                        clientEmbeddedChannel.writeOneInbound(msg)
-                    }
+        EmbeddedTestUtil.connect(serverEmbeddedChannel, clientEmbeddedChannel)
 
-                    @Override
-                    void flush(ChannelHandlerContext ctx_) throws Exception {
-                        clientEmbeddedChannel.flushInbound()
-                    }
-                })
         clientEmbeddedChannel.pipeline()
-                .addLast(new ChannelOutboundHandlerAdapter() {
-                    @Override
-                    void write(ChannelHandlerContext ctx_, Object msg, ChannelPromise promise) throws Exception {
-                        // forward to server
-                        serverEmbeddedChannel.writeOneInbound(msg)
-                    }
-
-                    @Override
-                    void flush(ChannelHandlerContext ctx_) throws Exception {
-                        serverEmbeddedChannel.flushInbound()
-                    }
-                })
                 .addLast(new HttpClientCodec())
                 .addLast(new HttpObjectAggregator(1024))
 
@@ -72,7 +49,7 @@ class RequestLineSpec extends Specification {
         when:
         clientEmbeddedChannel.writeOneOutbound(request1)
         clientEmbeddedChannel.flushOutbound()
-        serverEmbeddedChannel.runPendingTasks()
+        EmbeddedTestUtil.advance(serverEmbeddedChannel, clientEmbeddedChannel)
 
         then:
         FullHttpResponse response = clientEmbeddedChannel.readInbound()
