@@ -124,7 +124,7 @@ managed-micronaut-views = "3.5.0"
 managed-micronaut-xml = "3.1.0"
 managed-neo4j = "3.5.34"
 managed-neo4j-java-driver = "4.4.9"
-managed-netty = "4.1.79.Final"
+managed-netty = "4.1.80.Final"
 managed-reactive-pg-client = "0.11.4"
 managed-reactive-streams = "1.0.4"
 # This should be kept aligned with https://github.com/micronaut-projects/micronaut-reactor/blob/master/gradle.properties from the BOM
