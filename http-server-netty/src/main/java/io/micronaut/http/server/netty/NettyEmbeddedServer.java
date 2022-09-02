@@ -46,11 +46,13 @@ public interface NettyEmbeddedServer
     }
 
     @Override
+    @NonNull
     default NettyEmbeddedServer start() {
         return (NettyEmbeddedServer) EmbeddedServer.super.start();
     }
 
     @Override
+    @NonNull
     default NettyEmbeddedServer stop() {
         return (NettyEmbeddedServer) EmbeddedServer.super.stop();
     }
@@ -62,6 +64,7 @@ public interface NettyEmbeddedServer
      * @return The stopped NettyEmbeddedServer
      */
     @SuppressWarnings("unused") // Used by CRaC
+    @NonNull
     NettyEmbeddedServer stopServerOnly();
 
     @Override

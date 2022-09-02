@@ -259,6 +259,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     }
 
     @Override
+    @NonNull
     public synchronized NettyEmbeddedServer start() {
         if (!isRunning()) {
             if (isDefault && !applicationContext.isRunning()) {
@@ -317,15 +318,18 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     }
 
     @Override
+    @NonNull
     public synchronized NettyEmbeddedServer stop() {
         return stop(true);
     }
 
     @Override
+    @NonNull
     public NettyEmbeddedServer stopServerOnly() {
         return stop(false);
     }
 
+    @NonNull
     private NettyEmbeddedServer stop(boolean stopApplicationContext) {
         if (isRunning() && workerGroup != null) {
             if (running.compareAndSet(true, false)) {
