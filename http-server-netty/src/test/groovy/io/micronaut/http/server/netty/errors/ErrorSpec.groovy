@@ -49,6 +49,7 @@ import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import io.micronaut.core.async.annotation.SingleResult
 import spock.lang.Issue
+import spock.lang.PendingFeature
 import spock.lang.Timeout
 
 import java.nio.charset.StandardCharsets
@@ -196,6 +197,59 @@ class ErrorSpec extends AbstractMicronautSpec {
         response.getBody(String).get() == '<div>Error</div>'
     }
 
+    void "test encoding error"() {
+        given:
+        HttpResponse response = Flux.from(rxClient.exchange(
+                HttpRequest.GET('/errors/encoding-error')
+        )).onErrorResume(t -> {
+            if (t instanceof HttpClientResponseException) {
+                return Flux.just(((HttpClientResponseException) t).response)
+            }
+            throw t
+        }).blockFirst()
+
+        expect:
+        response.code() == HttpStatus.INTERNAL_SERVER_ERROR.code
+        response.header(HttpHeaders.CONTENT_TYPE) == MediaType.APPLICATION_JSON
+        response.getBody(Map).get()._embedded.errors[0].message.contains('foo')
+    }
+
+    @PendingFeature
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/7786')
+    void "test encoding error with handler"() {
+        given:
+        HttpResponse response = Flux.from(rxClient.exchange(
+                HttpRequest.GET('/errors/encoding-error/handled')
+        )).onErrorResume(t -> {
+            if (t instanceof HttpClientResponseException) {
+                return Flux.just(((HttpClientResponseException) t).response)
+            }
+            throw t
+        }).blockFirst()
+
+        expect:
+        response.code() == HttpStatus.INTERNAL_SERVER_ERROR.code
+        response.header(HttpHeaders.CONTENT_TYPE) == MediaType.APPLICATION_JSON
+        response.getBody(Map).get()._embedded.errors[0].message.contains('Server error')
+    }
+
+    void "test encoding error with handler loop"() {
+        given:
+        HttpResponse response = Flux.from(rxClient.exchange(
+                HttpRequest.GET('/errors/encoding-error/handled')
+        )).onErrorResume(t -> {
+            if (t instanceof HttpClientResponseException) {
+                return Flux.just(((HttpClientResponseException) t).response)
+            }
+            throw t
+        }).blockFirst()
+
+        expect:
+        response.code() == HttpStatus.INTERNAL_SERVER_ERROR.code
+        response.header(HttpHeaders.CONTENT_TYPE) == MediaType.APPLICATION_JSON
+        response.getBody(Map).get()._embedded.errors[0].message.contains('foo')
+    }
+
     void "test calling a controller that fails to inject with a local error handler"() {
         given:
         HttpResponse response = Flux.from(rxClient.exchange(
@@ -291,6 +345,11 @@ X-Long-Header: $longString\r
         @Post(value = "/feedBirds", processes = MediaType.APPLICATION_JSON)
         void feedBirds(Flock flock) {
         }
+
+        @Get('/encoding-error')
+        ErrorThrowingBean encodingError() {
+            return new ErrorThrowingBean()
+        }
     }
 
     static class Flock {
@@ -307,6 +366,12 @@ X-Long-Header: $longString\r
         public String getName() { return name; }
 
         public void setName(String name) { this.name = name; }
+    }
+
+    static class ErrorThrowingBean {
+        public String getName() {
+            throw new RuntimeException("foo")
+        }
     }
 
     @Controller('/errors/loop')
@@ -345,6 +410,32 @@ X-Long-Header: $longString\r
         @Error
         HttpResponse<String> error(HttpRequest<?> request, Throwable e) {
             HttpResponse.serverError("Server error")
+        }
+    }
+
+    @Controller('/errors/encoding-error/handled')
+    static class ErrorEncodingHandlerController {
+        @Get
+        ErrorThrowingBean ok() {
+            return new ErrorThrowingBean()
+        }
+
+        @Error
+        HttpResponse<String> error(HttpRequest<?> request, Throwable e) {
+            HttpResponse.serverError("Server error")
+        }
+    }
+
+    @Controller('/errors/encoding-error/handled/loop')
+    static class ErrorEncodingHandlerLoopController {
+        @Get
+        ErrorThrowingBean ok() {
+            return new ErrorThrowingBean()
+        }
+
+        @Error
+        ErrorThrowingBean error(HttpRequest<?> request, Throwable e) {
+            return new ErrorThrowingBean()
         }
     }
 
