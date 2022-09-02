@@ -139,7 +139,7 @@ managed-springboot = "2.7.0"
 managed-swagger = "2.2.2"
 managed-validation = "2.0.1.Final"
 managed-testcontainers = "1.17.3"
-managed-snakeyaml = "1.30"
+managed-snakeyaml = "1.31"
 micronaut-docs = "2.0.0"
 
 [libraries]
