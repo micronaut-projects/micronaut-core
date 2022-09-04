@@ -223,7 +223,9 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
 
     /**
      * @return The read timeout setting for the server
+     * @deprecated This setting does nothing
      */
+    @Deprecated
     public Optional<Integer> getReadTimeout() {
         return Optional.ofNullable(readTimeout);
     }
@@ -367,7 +369,9 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
      * Sets the default read timeout.
      *
      * @param readTimeout The read timeout
+     * @deprecated This setting does nothing
      */
+    @Deprecated
     public void setReadTimeout(Integer readTimeout) {
         this.readTimeout = readTimeout;
     }
