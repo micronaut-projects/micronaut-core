@@ -98,6 +98,7 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
     private final RouteExecutor routeExecutor;
     private final NettyEmbeddedServices nettyEmbeddedServices;
     private WebSocketServerHandshaker handshaker;
+    private boolean cancelUpgrade = false;
 
     /**
      * Default constructor.
@@ -161,6 +162,13 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
                 .subscribeOn(scheduler)
                 .contextWrite(reactorContext -> reactorContext.put(ServerRequestContext.KEY, requestReference.get()))
                 .subscribe((Consumer<MutableHttpResponse<?>>) actualResponse -> {
+                    if (cancelUpgrade) {
+                        if (LOG.isDebugEnabled()) {
+                            LOG.debug("Cancelling websocket upgrade, handler was removed while request was processing");
+                        }
+                        return;
+                    }
+
                     if (actualResponse == proceed) {
                         UriRouteMatch routeMatch = actualResponse.getAttribute(HttpAttributes.ROUTE_MATCH, UriRouteMatch.class).get();
                         //Adding new handler to the existing pipeline to handle WebSocket Messages
@@ -260,5 +268,17 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
     protected String getWebSocketURL(ChannelHandlerContext ctx, HttpRequest req) {
         boolean isSecure = ctx.pipeline().get(SslHandler.class) != null;
         return (isSecure ? SCHEME_SECURE_WEBSOCKET : SCHEME_WEBSOCKET) + req.getHeaders().get(HttpHeaderNames.HOST) + req.getUri();
+    }
+
+    @Override
+    public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
+        super.handlerRemoved(ctx);
+        cancelUpgrade = true;
+    }
+
+    @Override
+    public void channelInactive(@NonNull ChannelHandlerContext ctx) throws Exception {
+        super.channelInactive(ctx);
+        cancelUpgrade = true;
     }
 }

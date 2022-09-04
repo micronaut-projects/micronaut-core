@@ -67,6 +67,14 @@ dependencies {
     testImplementation libs.managed.reactor
 }
 
+configurations.testRuntimeClasspath {
+    resolutionStrategy.eachDependency {
+        if (it.requested.group == 'org.jetbrains.kotlin') {
+            it.useVersion(libs.versions.managed.kotlin.asProvider().get())
+        }
+    }
+}
+
 tasks.named("compileTestKotlin") {
     kotlinOptions.jvmTarget = "1.8"
 }
