@@ -25,29 +25,19 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
-import io.micronaut.http.multipart.CompletedFileUpload;
-import io.micronaut.http.multipart.CompletedPart;
 import io.micronaut.http.netty.channel.converters.ChannelOptionFactory;
-import io.micronaut.http.server.netty.multipart.NettyCompletedAttribute;
-import io.micronaut.http.server.netty.multipart.NettyCompletedFileUpload;
 import io.micronaut.http.server.netty.multipart.NettyPartData;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
-import io.netty.buffer.ByteBufUtil;
-import io.netty.buffer.CompositeByteBuf;
-import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelOption;
-import io.netty.channel.WriteBufferWaterMark;
 import io.netty.handler.codec.http.multipart.Attribute;
 import io.netty.handler.codec.http.multipart.FileUpload;
-import io.netty.handler.codec.http.multipart.HttpData;
 import jakarta.inject.Singleton;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -90,29 +80,6 @@ public class NettyConverters implements TypeConverterRegistrar {
                     return Optional.of(channelOptionFactory.channelOption(name));
                 }
         );
-        conversionService.addConverter(
-                ByteBuf.class,
-                CharSequence.class,
-                byteBufCharSequenceTypeConverter()
-        );
-
-        conversionService.addConverter(
-                CompositeByteBuf.class,
-                CharSequence.class,
-                compositeByteBufCharSequenceTypeConverter()
-        );
-
-        conversionService.addConverter(
-                ByteBuf.class,
-                byte[].class,
-                byteBufToArrayTypeConverter()
-        );
-
-        conversionService.addConverter(
-                byte[].class,
-                ByteBuf.class,
-                byteArrayToByteBuffTypeConverter()
-        );
 
         conversionService.addConverter(
                 ByteBuf.class,
@@ -122,38 +89,8 @@ public class NettyConverters implements TypeConverterRegistrar {
 
         conversionService.addConverter(
                 FileUpload.class,
-                CompletedFileUpload.class,
-                fileUploadToCompletedFileUploadConverter()
-        );
-
-        conversionService.addConverter(
-                Attribute.class,
-                CompletedPart.class,
-                attributeToCompletedPartConverter()
-        );
-
-        conversionService.addConverter(
-                FileUpload.class,
                 Object.class,
                 fileUploadToObjectConverter()
-        );
-
-        conversionService.addConverter(
-                HttpData.class,
-                byte[].class,
-                httpDataToByteArrayConverter()
-        );
-
-        conversionService.addConverter(
-                HttpData.class,
-                CharSequence.class,
-                httpDataToStringConverter()
-        );
-
-        conversionService.addConverter(
-                NettyPartData.class,
-                byte[].class,
-                nettyPartDataToByteArrayConverter()
         );
 
         conversionService.addConverter(
@@ -173,26 +110,6 @@ public class NettyConverters implements TypeConverterRegistrar {
                 ChannelOption.class,
                 s -> channelOptionFactory.channelOption(NameUtils.environmentName(s))
         );
-
-        conversionService.addConverter(
-                Map.class,
-                WriteBufferWaterMark.class,
-                (map, targetType, context) -> {
-                    Object h = map.get("high");
-                    Object l = map.get("low");
-                    if (h != null && l != null) {
-                        try {
-                            int high = Integer.parseInt(h.toString());
-                            int low = Integer.parseInt(l.toString());
-                            return Optional.of(new WriteBufferWaterMark(low, high));
-                        } catch (NumberFormatException e) {
-                            context.reject(e);
-                            return Optional.empty();
-                        }
-                    }
-                    return Optional.empty();
-                }
-        );
     }
 
     private TypeConverter<Attribute, Object> nettyAttributeToObjectConverter() {
@@ -204,17 +121,6 @@ public class NettyConverters implements TypeConverterRegistrar {
                 } else {
                     return conversionService.convert(value, targetType, context);
                 }
-            } catch (IOException e) {
-                context.reject(e);
-                return Optional.empty();
-            }
-        };
-    }
-
-    private TypeConverter<NettyPartData, byte[]> nettyPartDataToByteArrayConverter() {
-        return (upload, targetType, context) -> {
-            try {
-                return Optional.of(upload.getBytes());
             } catch (IOException e) {
                 context.reject(e);
                 return Optional.empty();
@@ -238,78 +144,6 @@ public class NettyConverters implements TypeConverterRegistrar {
                     }
                 }
             } catch (IOException e) {
-                context.reject(e);
-                return Optional.empty();
-            }
-        };
-    }
-
-    /**
-     * @return The HTTP data to string converter.
-     */
-    protected TypeConverter<HttpData, CharSequence> httpDataToStringConverter() {
-        return (upload, targetType, context) -> {
-            try {
-                if (!upload.isCompleted()) {
-                    return Optional.empty();
-                }
-                ByteBuf byteBuf = upload.getByteBuf();
-                return conversionService.convert(byteBuf, targetType, context);
-            } catch (Exception e) {
-                context.reject(e);
-                return Optional.empty();
-            }
-        };
-    }
-
-    /**
-     * @return The HTTP data to byte array converter
-     */
-    protected TypeConverter<HttpData, byte[]> httpDataToByteArrayConverter() {
-        return (upload, targetType, context) -> {
-            try {
-                if (!upload.isCompleted()) {
-                    return Optional.empty();
-                }
-                ByteBuf byteBuf = upload.getByteBuf();
-                return conversionService.convert(byteBuf, targetType, context);
-            } catch (Exception e) {
-                context.reject(e);
-                return Optional.empty();
-            }
-        };
-    }
-
-    /**
-     * @return A FileUpload to CompletedFileUpload converter
-     */
-    protected TypeConverter<FileUpload, CompletedFileUpload> fileUploadToCompletedFileUploadConverter() {
-        return (object, targetType, context) -> {
-            try {
-                if (!object.isCompleted()) {
-                    return Optional.empty();
-                }
-
-                return Optional.of(new NettyCompletedFileUpload(object));
-            } catch (Exception e) {
-                context.reject(e);
-                return Optional.empty();
-            }
-        };
-    }
-
-    /**
-     * @return An Attribute to CompletedPart converter
-     */
-    protected TypeConverter<Attribute, CompletedPart> attributeToCompletedPartConverter() {
-        return (object, targetType, context) -> {
-            try {
-                if (!object.isCompleted()) {
-                    return Optional.empty();
-                }
-
-                return Optional.of(new NettyCompletedAttribute(object));
-            } catch (Exception e) {
                 context.reject(e);
                 return Optional.empty();
             }
@@ -352,33 +186,5 @@ public class NettyConverters implements TypeConverterRegistrar {
      */
     protected TypeConverter<ByteBuf, Object> byteBufToObjectConverter() {
         return (object, targetType, context) -> conversionService.convert(object.toString(context.getCharset()), targetType, context);
-    }
-
-    /**
-     * @return A converter that converts bytebufs to strings
-     */
-    protected TypeConverter<ByteBuf, CharSequence> byteBufCharSequenceTypeConverter() {
-        return (object, targetType, context) -> Optional.of(object.toString(context.getCharset()));
-    }
-
-    /**
-     * @return A converter that converts composite bytebufs to strings
-     */
-    protected TypeConverter<CompositeByteBuf, CharSequence> compositeByteBufCharSequenceTypeConverter() {
-        return (object, targetType, context) -> Optional.of(object.toString(context.getCharset()));
-    }
-
-    /**
-     * @return A converter that converts bytebufs to byte arrays
-     */
-    protected TypeConverter<ByteBuf, byte[]> byteBufToArrayTypeConverter() {
-        return (object, targetType, context) -> Optional.of(ByteBufUtil.getBytes(object));
-    }
-
-    /**
-     * @return A converter that converts bytebufs to byte arrays
-     */
-    protected TypeConverter<byte[], ByteBuf> byteArrayToByteBuffTypeConverter() {
-        return (object, targetType, context) -> Optional.of(Unpooled.wrappedBuffer(object));
     }
 }
