@@ -32,7 +32,6 @@ import io.netty.buffer.ByteBufInputStream;
 import io.netty.channel.ChannelOption;
 import io.netty.handler.codec.http.multipart.Attribute;
 import io.netty.handler.codec.http.multipart.FileUpload;
-import io.netty.handler.codec.http.multipart.HttpData;
 import jakarta.inject.Singleton;
 
 import java.io.IOException;
