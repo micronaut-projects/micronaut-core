@@ -95,18 +95,6 @@ public class NettyConverters implements TypeConverterRegistrar {
         );
 
         conversionService.addConverter(
-                HttpData.class,
-                byte[].class,
-                httpDataToByteArrayConverter()
-        );
-
-        conversionService.addConverter(
-                HttpData.class,
-                CharSequence.class,
-                httpDataToStringConverter()
-        );
-
-        conversionService.addConverter(
                 NettyPartData.class,
                 Object.class,
                 nettyPartDataToObjectConverter()
@@ -157,42 +145,6 @@ public class NettyConverters implements TypeConverterRegistrar {
                     }
                 }
             } catch (IOException e) {
-                context.reject(e);
-                return Optional.empty();
-            }
-        };
-    }
-
-    /**
-     * @return The HTTP data to string converter.
-     */
-    protected TypeConverter<HttpData, CharSequence> httpDataToStringConverter() {
-        return (upload, targetType, context) -> {
-            try {
-                if (!upload.isCompleted()) {
-                    return Optional.empty();
-                }
-                ByteBuf byteBuf = upload.getByteBuf();
-                return conversionService.convert(byteBuf, targetType, context);
-            } catch (Exception e) {
-                context.reject(e);
-                return Optional.empty();
-            }
-        };
-    }
-
-    /**
-     * @return The HTTP data to byte array converter
-     */
-    protected TypeConverter<HttpData, byte[]> httpDataToByteArrayConverter() {
-        return (upload, targetType, context) -> {
-            try {
-                if (!upload.isCompleted()) {
-                    return Optional.empty();
-                }
-                ByteBuf byteBuf = upload.getByteBuf();
-                return conversionService.convert(byteBuf, targetType, context);
-            } catch (Exception e) {
                 context.reject(e);
                 return Optional.empty();
             }

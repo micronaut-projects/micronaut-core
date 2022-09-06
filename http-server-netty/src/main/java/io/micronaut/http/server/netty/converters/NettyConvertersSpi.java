@@ -31,6 +31,7 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.WriteBufferWaterMark;
 import io.netty.handler.codec.http.multipart.Attribute;
 import io.netty.handler.codec.http.multipart.FileUpload;
+import io.netty.handler.codec.http.multipart.HttpData;
 
 import java.io.IOException;
 import java.util.Map;
@@ -44,7 +45,7 @@ import java.util.Optional;
  * @since 3.6.3
  */
 @Internal
-public class NettyConvertersSpi implements TypeConverterRegistrar {
+public final class NettyConvertersSpi implements TypeConverterRegistrar {
     @Override
     public void register(ConversionService<?> conversionService) {
         conversionService.addConverter(
@@ -108,6 +109,18 @@ public class NettyConvertersSpi implements TypeConverterRegistrar {
                 return Optional.empty();
             }
         );
+
+        conversionService.addConverter(
+            HttpData.class,
+            byte[].class,
+            httpDataToByteArrayConverter()
+        );
+
+        conversionService.addConverter(
+            HttpData.class,
+            CharSequence.class,
+            httpDataToStringConverter()
+        );
     }
 
     private TypeConverter<NettyPartData, byte[]> nettyPartDataToByteArrayConverter() {
@@ -124,7 +137,7 @@ public class NettyConvertersSpi implements TypeConverterRegistrar {
     /**
      * @return A FileUpload to CompletedFileUpload converter
      */
-    protected TypeConverter<FileUpload, CompletedFileUpload> fileUploadToCompletedFileUploadConverter() {
+    private TypeConverter<FileUpload, CompletedFileUpload> fileUploadToCompletedFileUploadConverter() {
         return (object, targetType, context) -> {
             try {
                 if (!object.isCompleted()) {
@@ -142,7 +155,7 @@ public class NettyConvertersSpi implements TypeConverterRegistrar {
     /**
      * @return An Attribute to CompletedPart converter
      */
-    protected TypeConverter<Attribute, CompletedPart> attributeToCompletedPartConverter() {
+    private TypeConverter<Attribute, CompletedPart> attributeToCompletedPartConverter() {
         return (object, targetType, context) -> {
             try {
                 if (!object.isCompleted()) {
@@ -160,28 +173,64 @@ public class NettyConvertersSpi implements TypeConverterRegistrar {
     /**
      * @return A converter that converts bytebufs to strings
      */
-    protected TypeConverter<ByteBuf, CharSequence> byteBufCharSequenceTypeConverter() {
+    private TypeConverter<ByteBuf, CharSequence> byteBufCharSequenceTypeConverter() {
         return (object, targetType, context) -> Optional.of(object.toString(context.getCharset()));
     }
 
     /**
      * @return A converter that converts composite bytebufs to strings
      */
-    protected TypeConverter<CompositeByteBuf, CharSequence> compositeByteBufCharSequenceTypeConverter() {
+    private TypeConverter<CompositeByteBuf, CharSequence> compositeByteBufCharSequenceTypeConverter() {
         return (object, targetType, context) -> Optional.of(object.toString(context.getCharset()));
     }
 
     /**
      * @return A converter that converts bytebufs to byte arrays
      */
-    protected TypeConverter<ByteBuf, byte[]> byteBufToArrayTypeConverter() {
+    private TypeConverter<ByteBuf, byte[]> byteBufToArrayTypeConverter() {
         return (object, targetType, context) -> Optional.of(ByteBufUtil.getBytes(object));
     }
 
     /**
      * @return A converter that converts bytebufs to byte arrays
      */
-    protected TypeConverter<byte[], ByteBuf> byteArrayToByteBuffTypeConverter() {
+    private TypeConverter<byte[], ByteBuf> byteArrayToByteBuffTypeConverter() {
         return (object, targetType, context) -> Optional.of(Unpooled.wrappedBuffer(object));
+    }
+
+    /**
+     * @return The HTTP data to string converter.
+     */
+    private TypeConverter<HttpData, CharSequence> httpDataToStringConverter() {
+        return (upload, targetType, context) -> {
+            try {
+                if (!upload.isCompleted()) {
+                    return Optional.empty();
+                }
+                ByteBuf byteBuf = upload.getByteBuf();
+                return Optional.of(byteBuf.toString(context.getCharset()));
+            } catch (Exception e) {
+                context.reject(e);
+                return Optional.empty();
+            }
+        };
+    }
+
+    /**
+     * @return The HTTP data to byte array converter
+     */
+    private TypeConverter<HttpData, byte[]> httpDataToByteArrayConverter() {
+        return (upload, targetType, context) -> {
+            try {
+                if (!upload.isCompleted()) {
+                    return Optional.empty();
+                }
+                ByteBuf byteBuf = upload.getByteBuf();
+                return Optional.of(ByteBufUtil.getBytes(byteBuf));
+            } catch (Exception e) {
+                context.reject(e);
+                return Optional.empty();
+            }
+        };
     }
 }
