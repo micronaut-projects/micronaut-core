@@ -98,6 +98,7 @@ managed-micronaut-multitenancy = "4.2.0"
 managed-micronaut-neo4j = "5.2.0"
 managed-micronaut-nats = "3.1.0"
 managed-micronaut-netflix = "2.1.0"
+managed-micronaut-object-storage = "1.0.0"
 managed-micronaut-openapi = "4.4.3"
 managed-micronaut-oraclecloud = "2.1.5"
 managed-micronaut-picocli = "4.3.0"
@@ -162,6 +163,7 @@ boms-micronaut-micrometer = { module = "io.micronaut.micrometer:micronaut-microm
 boms-micronaut-microstream = { module = "io.micronaut.microstream:micronaut-microstream-bom", version.ref = "managed-micronaut-microstream" }
 boms-micronaut-mongo = { module = "io.micronaut.mongodb:micronaut-mongo-bom", version.ref = "managed-micronaut-mongo" }
 boms-micronaut-mqtt = { module = "io.micronaut.mqtt:micronaut-mqtt-bom", version.ref = "managed-micronaut-mqtt" }
+boms-micronaut-object-storage = { module = "io.micronaut.objectstorage:micronaut-object-storage-bom", version.ref = "managed-micronaut-object-storage" }
 boms-micronaut-oraclecloud = { module = "io.micronaut.oraclecloud:micronaut-oraclecloud-bom", version.ref = "managed-micronaut-oraclecloud" }
 boms-micronaut-openapi = { module = "io.micronaut.openapi:micronaut-openapi-bom", version.ref = "managed-micronaut-openapi" }
 boms-micronaut-picocli = { module = "io.micronaut.picocli:micronaut-picocli-bom", version.ref = "managed-micronaut-picocli" }
