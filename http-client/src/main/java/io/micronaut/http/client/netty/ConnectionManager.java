@@ -140,12 +140,12 @@ final class ConnectionManager {
      */
     ChannelFuture doConnect(
         DefaultHttpClient.RequestKey requestKey,
-        @Nullable SslContext sslCtx,
         boolean isStream,
         boolean isProxy,
         boolean acceptsEvents,
         Consumer<ChannelHandlerContext> contextConsumer) throws HttpClientException {
 
+        SslContext sslCtx = buildSslContext(requestKey);
         String host = requestKey.getHost();
         int port = requestKey.getPort();
         Bootstrap localBootstrap = bootstrap.clone();
@@ -165,5 +165,24 @@ final class ConnectionManager {
     static boolean isAcceptEvents(HttpRequest<?> request) {
         String acceptHeader = request.getHeaders().get(io.micronaut.http.HttpHeaders.ACCEPT);
         return acceptHeader != null && acceptHeader.equalsIgnoreCase(MediaType.TEXT_EVENT_STREAM);
+    }
+
+    /**
+     * Builds an {@link SslContext} for the given URI if necessary.
+     *
+     * @return The {@link SslContext} instance
+     */
+    private SslContext buildSslContext(DefaultHttpClient.RequestKey requestKey) {
+        final SslContext sslCtx;
+        if (requestKey.isSecure()) {
+            sslCtx = sslContext;
+            //Allow https requests to be sent if SSL is disabled but a proxy is present
+            if (sslCtx == null && !configuration.getProxyAddress().isPresent()) {
+                throw httpClient.customizeException(new HttpClientException("Cannot send HTTPS request. SSL is disabled"));
+            }
+        } else {
+            sslCtx = null;
+        }
+        return sslCtx;
     }
 }

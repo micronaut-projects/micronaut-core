@@ -1153,7 +1153,7 @@ public class DefaultHttpClient implements
             @Nullable Argument<?> errorType) {
 
         AtomicReference<io.micronaut.http.HttpRequest<?>> requestWrapper = new AtomicReference<>(request);
-        Flux<MutableHttpResponse<Object>> streamResponsePublisher = connectAndStream(parentRequest, request, requestURI, buildSslContext(requestURI), requestWrapper, false, true);
+        Flux<MutableHttpResponse<Object>> streamResponsePublisher = connectAndStream(parentRequest, request, requestURI, requestWrapper, false, true);
 
         streamResponsePublisher = readBodyOnError(errorType, streamResponsePublisher);
 
@@ -1183,7 +1183,7 @@ public class DefaultHttpClient implements
                     }
 
                     AtomicReference<io.micronaut.http.HttpRequest<?>> requestWrapper = new AtomicReference<>(httpRequest);
-                    Flux<MutableHttpResponse<Object>> proxyResponsePublisher = connectAndStream(request, request, requestURI, buildSslContext(requestURI), requestWrapper, true, false);
+                    Flux<MutableHttpResponse<Object>> proxyResponsePublisher = connectAndStream(request, request, requestURI, requestWrapper, true, false);
                     // apply filters
                     //noinspection unchecked
                     proxyResponsePublisher = Flux.from(
@@ -1203,7 +1203,6 @@ public class DefaultHttpClient implements
             io.micronaut.http.HttpRequest<?> parentRequest,
             io.micronaut.http.HttpRequest<I> request,
             URI requestURI,
-            SslContext sslContext,
             AtomicReference<io.micronaut.http.HttpRequest<?>> requestWrapper,
             boolean isProxy,
             boolean failOnError
@@ -1213,7 +1212,7 @@ public class DefaultHttpClient implements
             try {
                 if (connectionManager.httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0) {
 
-                    channelFuture = connectionManager.doConnect(new RequestKey(this, requestURI), sslContext, true, isProxy, ConnectionManager.isAcceptEvents(request), channelHandlerContext -> {
+                    channelFuture = connectionManager.doConnect(new RequestKey(this, requestURI), true, isProxy, ConnectionManager.isAcceptEvents(request), channelHandlerContext -> {
                         try {
                             final Channel channel = channelHandlerContext.channel();
                             request.setAttribute(NettyClientHttpRequest.CHANNEL, channel);
@@ -1228,7 +1227,7 @@ public class DefaultHttpClient implements
                         }
                     });
                 } else {
-                    channelFuture = connectionManager.doConnect(new RequestKey(this, requestURI), sslContext, true, isProxy, ConnectionManager.isAcceptEvents(request), null);
+                    channelFuture = connectionManager.doConnect(new RequestKey(this, requestURI), true, isProxy, ConnectionManager.isAcceptEvents(request), null);
                     addInstrumentedListener(channelFuture,
                             (ChannelFutureListener) f -> {
                                 if (f.isSuccess()) {
@@ -1321,8 +1320,7 @@ public class DefaultHttpClient implements
                     emitter.error(e);
                 }
             } else {
-                SslContext sslContext = buildSslContext(requestURI);
-                ChannelFuture connectionFuture = connectionManager.doConnect(new RequestKey(this, requestURI), sslContext, false, false, ConnectionManager.isAcceptEvents(request), null);
+                ChannelFuture connectionFuture = connectionManager.doConnect(new RequestKey(this, requestURI), false, false, ConnectionManager.isAcceptEvents(request), null);
                 addInstrumentedListener(connectionFuture, future -> {
                     if (!future.isSuccess()) {
                         Throwable cause = future.cause();
@@ -1339,7 +1337,7 @@ public class DefaultHttpClient implements
                                     errorType,
                                     emitter,
                                     connectionFuture.channel(),
-                                    sslContext != null,
+                                    buildSslContext(requestURI) != null,
                                     null);
                         } catch (Exception e) {
                             emitter.error(e);
@@ -2577,11 +2575,11 @@ public class DefaultHttpClient implements
                 .collect(Collectors.toList()));
     }
 
-    private static boolean isSecureScheme(String scheme) {
+    static boolean isSecureScheme(String scheme) {
         return io.micronaut.http.HttpRequest.SCHEME_HTTPS.equalsIgnoreCase(scheme) || SCHEME_WSS.equalsIgnoreCase(scheme);
     }
 
-    private <E extends HttpClientException> E customizeException(E exc) {
+    <E extends HttpClientException> E customizeException(E exc) {
         if (informationalServiceId != null) {
             exc.setServiceId(informationalServiceId);
         } else if (configuration instanceof ServiceHttpClientConfiguration) {
