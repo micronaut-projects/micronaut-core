@@ -1213,7 +1213,7 @@ public class DefaultHttpClient implements
             try {
                 if (connectionManager.httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0) {
 
-                    channelFuture = doConnect(request, requestURI, sslContext, true, isProxy, channelHandlerContext -> {
+                    channelFuture = connectionManager.doConnect(new RequestKey(this, requestURI), sslContext, true, isProxy, ConnectionManager.isAcceptEvents(request), channelHandlerContext -> {
                         try {
                             final Channel channel = channelHandlerContext.channel();
                             request.setAttribute(NettyClientHttpRequest.CHANNEL, channel);
@@ -1228,7 +1228,7 @@ public class DefaultHttpClient implements
                         }
                     });
                 } else {
-                    channelFuture = doConnect(request, requestURI, sslContext, true, isProxy, null);
+                    channelFuture = connectionManager.doConnect(new RequestKey(this, requestURI), sslContext, true, isProxy, ConnectionManager.isAcceptEvents(request), null);
                     addInstrumentedListener(channelFuture,
                             (ChannelFutureListener) f -> {
                                 if (f.isSuccess()) {
@@ -1322,7 +1322,7 @@ public class DefaultHttpClient implements
                 }
             } else {
                 SslContext sslContext = buildSslContext(requestURI);
-                ChannelFuture connectionFuture = doConnect(request, requestURI, sslContext, false, null);
+                ChannelFuture connectionFuture = connectionManager.doConnect(new RequestKey(this, requestURI), sslContext, false, false, ConnectionManager.isAcceptEvents(request), null);
                 addInstrumentedListener(connectionFuture, future -> {
                     if (!future.isSuccess()) {
                         Throwable cause = future.cause();
@@ -1475,105 +1475,6 @@ public class DefaultHttpClient implements
     }
 
     /**
-     * Creates an initial connection to the given remote host.
-     *
-     * @param request         The request
-     * @param uri             The URI to connect to
-     * @param sslCtx          The SslContext instance
-     * @param isStream        Is the connection a stream connection
-     * @param contextConsumer The logic to run once the channel is configured correctly
-     * @return A ChannelFuture
-     * @throws HttpClientException If the URI is invalid
-     */
-    protected ChannelFuture doConnect(
-            io.micronaut.http.HttpRequest<?> request,
-            URI uri,
-            @Nullable SslContext sslCtx,
-            boolean isStream,
-            Consumer<ChannelHandlerContext> contextConsumer) throws HttpClientException {
-        return doConnect(request, uri, sslCtx, isStream, false, contextConsumer);
-    }
-
-    /**
-     * Creates an initial connection to the given remote host.
-     *
-     * @param request         The request
-     * @param uri             The URI to connect to
-     * @param sslCtx          The SslContext instance
-     * @param isStream        Is the connection a stream connection
-     * @param isProxy         Is this a streaming proxy
-     * @param contextConsumer The logic to run once the channel is configured correctly
-     * @return A ChannelFuture
-     * @throws HttpClientException If the URI is invalid
-     */
-    protected ChannelFuture doConnect(
-            io.micronaut.http.HttpRequest<?> request,
-            URI uri,
-            @Nullable SslContext sslCtx,
-            boolean isStream,
-            boolean isProxy,
-            Consumer<ChannelHandlerContext> contextConsumer) throws HttpClientException {
-
-        RequestKey requestKey = new RequestKey(this, uri);
-        return doConnect(request, requestKey.getHost(), requestKey.getPort(), sslCtx, isStream, isProxy, contextConsumer);
-    }
-
-    /**
-     * Creates an initial connection to the given remote host.
-     *
-     * @param request         The request
-     * @param host            The host
-     * @param port            The port
-     * @param sslCtx          The SslContext instance
-     * @param isStream        Is the connection a stream connection
-     * @param contextConsumer The logic to run once the channel is configured correctly
-     * @return A ChannelFuture
-     */
-    protected ChannelFuture doConnect(
-            io.micronaut.http.HttpRequest<?> request,
-            String host,
-            int port,
-            @Nullable SslContext sslCtx,
-            boolean isStream,
-            Consumer<ChannelHandlerContext> contextConsumer) {
-        return doConnect(request, host, port, sslCtx, isStream, false, contextConsumer);
-    }
-
-    /**
-     * Creates an initial connection to the given remote host.
-     *
-     * @param request         The request
-     * @param host            The host
-     * @param port            The port
-     * @param sslCtx          The SslContext instance
-     * @param isStream        Is the connection a stream connection
-     * @param isProxy         Is this a streaming proxy
-     * @param contextConsumer The logic to run once the channel is configured correctly
-     * @return A ChannelFuture
-     */
-    protected ChannelFuture doConnect(
-            io.micronaut.http.HttpRequest<?> request,
-            String host,
-            int port,
-            @Nullable SslContext sslCtx,
-            boolean isStream,
-            boolean isProxy,
-            Consumer<ChannelHandlerContext> contextConsumer) {
-        Bootstrap localBootstrap = connectionManager.bootstrap.clone();
-        initBootstrapForProxy(localBootstrap, sslCtx != null, host, port);
-        String acceptHeader = request.getHeaders().get(io.micronaut.http.HttpHeaders.ACCEPT);
-        localBootstrap.handler(new HttpClientInitializer(
-                sslCtx,
-                host,
-                port,
-                isStream,
-                isProxy,
-                acceptHeader != null && acceptHeader.equalsIgnoreCase(MediaType.TEXT_EVENT_STREAM), contextConsumer)
-        );
-        return doConnect(localBootstrap, host, port);
-    }
-
-    /**
      * Creates the {@link NioEventLoopGroup} for this client.
      *
      * @param configuration The configuration
@@ -1603,18 +1504,6 @@ public class DefaultHttpClient implements
             }
         }
         return group;
-    }
-
-    /**
-     * Creates an initial connection with the given bootstrap and remote host.
-     *
-     * @param bootstrap The bootstrap instance
-     * @param host      The host
-     * @param port      The port
-     * @return The ChannelFuture
-     */
-    protected ChannelFuture doConnect(Bootstrap bootstrap, String host, int port) {
-        return bootstrap.connect(host, port);
     }
 
     /**

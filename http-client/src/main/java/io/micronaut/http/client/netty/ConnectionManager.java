@@ -1,13 +1,18 @@
 package io.micronaut.http.client.netty;
 
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpVersion;
+import io.micronaut.http.MediaType;
 import io.micronaut.http.client.HttpClientConfiguration;
+import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.netty.channel.ChannelPipelineListener;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFactory;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.pool.AbstractChannelPoolHandler;
@@ -22,6 +27,7 @@ import org.slf4j.Logger;
 
 import java.time.Duration;
 import java.util.Collection;
+import java.util.function.Consumer;
 
 final class ConnectionManager {
     private final DefaultHttpClient httpClient; // TODO
@@ -118,5 +124,46 @@ final class ConnectionManager {
         } else {
             this.poolMap = null;
         }
+    }
+
+    /**
+     * Creates an initial connection to the given remote host.
+     *
+     * @param requestKey
+     * @param sslCtx          The SslContext instance
+     * @param isStream        Is the connection a stream connection
+     * @param isProxy         Is this a streaming proxy
+     * @param acceptsEvents
+     * @param contextConsumer The logic to run once the channel is configured correctly
+     * @return A ChannelFuture
+     * @throws HttpClientException If the URI is invalid
+     */
+    ChannelFuture doConnect(
+        DefaultHttpClient.RequestKey requestKey,
+        @Nullable SslContext sslCtx,
+        boolean isStream,
+        boolean isProxy,
+        boolean acceptsEvents,
+        Consumer<ChannelHandlerContext> contextConsumer) throws HttpClientException {
+
+        String host = requestKey.getHost();
+        int port = requestKey.getPort();
+        Bootstrap localBootstrap = bootstrap.clone();
+        httpClient.initBootstrapForProxy(localBootstrap, sslCtx != null, host, port);
+        localBootstrap.handler(httpClient.new HttpClientInitializer(
+            sslCtx,
+            host,
+            port,
+            isStream,
+            isProxy,
+            acceptsEvents,
+            contextConsumer)
+        );
+        return localBootstrap.connect(host, port);
+    }
+
+    static boolean isAcceptEvents(HttpRequest<?> request) {
+        String acceptHeader = request.getHeaders().get(io.micronaut.http.HttpHeaders.ACCEPT);
+        return acceptHeader != null && acceptHeader.equalsIgnoreCase(MediaType.TEXT_EVENT_STREAM);
     }
 }
