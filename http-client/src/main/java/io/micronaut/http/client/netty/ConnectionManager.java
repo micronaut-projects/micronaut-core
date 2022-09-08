@@ -23,6 +23,8 @@ import io.netty.channel.pool.ChannelPoolMap;
 import io.netty.channel.pool.FixedChannelPool;
 import io.netty.channel.pool.SimpleChannelPool;
 import io.netty.handler.ssl.SslContext;
+import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.Promise;
 import org.slf4j.Logger;
 
 import java.time.Duration;
@@ -184,5 +186,56 @@ final class ConnectionManager {
             sslCtx = null;
         }
         return sslCtx;
+    }
+
+    Future<PoolHandle> acquireChannelFromPool(DefaultHttpClient.RequestKey requestKey) {
+        ChannelPool channelPool = poolMap.get(requestKey);
+        Future<Channel> channelFuture = channelPool.acquire();
+        Promise<PoolHandle> promise = group.next().newPromise();
+        channelFuture.addListener(f -> {
+            if (channelFuture.isSuccess()) {
+                promise.setSuccess(new PoolHandle(channelPool, channelFuture.getNow()));
+            } else {
+                promise.setFailure(channelFuture.cause());
+            }
+        });
+        return promise;
+    }
+
+    PoolHandle mockPoolHandle(Channel channel) {
+        // TODO: delete
+        return new PoolHandle(null, channel);
+    }
+
+    class PoolHandle {
+        final Channel channel;
+        private final ChannelPool channelPool;
+        private boolean canReturn;
+
+        private PoolHandle(ChannelPool channelPool, Channel channel) {
+            this.channel = channel;
+            this.channelPool = channelPool;
+            this.canReturn = channelPool != null;
+        }
+
+        void taint() {
+            canReturn = false;
+        }
+
+        void release() {
+            if (channelPool != null) {
+                httpClient.removeReadTimeoutHandler(channel.pipeline());
+                if (!canReturn) {
+                    channel.closeFuture().addListener((future ->
+                        channelPool.release(channel)
+                    ));
+                } else {
+                    channelPool.release(channel);
+                }
+            } else {
+                // just close it to prevent any future reads without a handler registered
+                channel.close();
+            }
+        }
     }
 }

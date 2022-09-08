@@ -1273,11 +1273,11 @@ public class DefaultHttpClient implements
             if (connectionManager.poolMap != null && !multipart) {
                 try {
                     RequestKey requestKey = new RequestKey(this, requestURI);
-                    ChannelPool channelPool = connectionManager.poolMap.get(requestKey);
-                    Future<Channel> channelFuture = channelPool.acquire();
+                    Future<ConnectionManager.PoolHandle> channelFuture = connectionManager.acquireChannelFromPool(requestKey);
                     addInstrumentedListener(channelFuture, future -> {
                         if (future.isSuccess()) {
-                            Channel channel = future.get();
+                            ConnectionManager.PoolHandle poolHandle = future.get();
+                            Channel channel = poolHandle.channel;
                             Future<?> initFuture = channel.attr(STREAM_CHANNEL_INITIALIZED).get();
                             if (initFuture == null) {
                                 try {
@@ -1288,7 +1288,7 @@ public class DefaultHttpClient implements
                                         emitter,
                                         channel,
                                         requestKey.isSecure(),
-                                        channelPool
+                                        poolHandle
                                     );
                                 } catch (Exception e) {
                                     emitter.error(e);
@@ -1304,7 +1304,7 @@ public class DefaultHttpClient implements
                                             emitter,
                                             channel,
                                             requestKey.isSecure(),
-                                            channelPool
+                                            poolHandle
                                         );
                                     } catch (Exception e) {
                                         emitter.error(e);
@@ -1338,7 +1338,7 @@ public class DefaultHttpClient implements
                                     emitter,
                                     connectionFuture.channel(),
                                     buildSslContext(requestURI) != null,
-                                    null);
+                                    connectionManager.mockPoolHandle(connectionFuture.channel()));
                         } catch (Exception e) {
                             emitter.error(e);
                         }
@@ -1995,13 +1995,36 @@ public class DefaultHttpClient implements
     }
 
     private <I, O, E> void sendRequestThroughChannel(
+        io.micronaut.http.HttpRequest<I> finalRequest,
+        Argument<O> bodyType,
+        Argument<E> errorType,
+        FluxSink<? super HttpResponse<O>> emitter,
+        Channel channel,
+        boolean secure,
+        ConnectionManager.PoolHandle poolHandle) throws HttpPostRequestEncoder.ErrorDataEncoderException {
+        try {
+            sendRequestThroughChannel0(
+                finalRequest,
+                bodyType,
+                errorType,
+                emitter,
+                channel,
+                secure,
+                poolHandle
+            );
+        } catch (Exception e) {
+            emitter.error(e);
+        }
+    }
+
+    private <I, O, E> void sendRequestThroughChannel0(
             io.micronaut.http.HttpRequest<I> finalRequest,
             Argument<O> bodyType,
             Argument<E> errorType,
             FluxSink<? super HttpResponse<O>> emitter,
             Channel channel,
             boolean secure,
-            ChannelPool channelPool) throws HttpPostRequestEncoder.ErrorDataEncoderException {
+            ConnectionManager.PoolHandle poolHandle) throws HttpPostRequestEncoder.ErrorDataEncoderException {
         URI requestURI = finalRequest.getUri();
         MediaType requestContentType = finalRequest
                 .getContentType()
@@ -2043,7 +2066,7 @@ public class DefaultHttpClient implements
 
         Promise<HttpResponse<O>> responsePromise = channel.eventLoop().newPromise();
         channel.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_FULL_HTTP_RESPONSE,
-                new FullHttpResponseHandler<>(responsePromise, channelPool, secure, finalRequest, bodyType, errorType));
+                new FullHttpResponseHandler<>(responsePromise, poolHandle, secure, finalRequest, bodyType, errorType));
         channel.attr(CHANNEL_CUSTOMIZER_KEY).get().onRequestPipelineBuilt();
         Publisher<HttpResponse<O>> publisher = new NettyFuturePublisher<>(responsePromise, true);
         if (bodyType != null && bodyType.isVoid()) {
@@ -2052,7 +2075,7 @@ public class DefaultHttpClient implements
         }
         publisher.subscribe(new ForwardingSubscriber<>(emitter));
 
-        requestWriter.writeAndClose(channel, channelPool, emitter);
+        requestWriter.writeAndClose(channel, poolHandle, emitter);
     }
 
     private Flux<MutableHttpResponse<Object>> streamRequestThroughChannel(
@@ -2231,7 +2254,7 @@ public class DefaultHttpClient implements
         }
     }
 
-    private void removeReadTimeoutHandler(ChannelPipeline pipeline) {
+    void removeReadTimeoutHandler(ChannelPipeline pipeline) {
         if (connectionManager.readTimeoutMillis != null && pipeline.context(ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT) != null) {
             pipeline.remove(ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT);
         }
@@ -2998,7 +3021,7 @@ public class DefaultHttpClient implements
     /**
      * A Netty request writer.
      */
-    protected class NettyRequestWriter {
+    private class NettyRequestWriter {
 
         private final HttpRequest nettyRequest;
         private final HttpPostRequestEncoder encoder;
@@ -3023,7 +3046,7 @@ public class DefaultHttpClient implements
          * @param channelPool The channel pool
          * @param emitter     The emitter
          */
-        protected void writeAndClose(Channel channel, ChannelPool channelPool, FluxSink<?> emitter) {
+        protected void writeAndClose(Channel channel, ConnectionManager.PoolHandle poolHandle, FluxSink<?> emitter) {
             final ChannelPipeline pipeline = channel.pipeline();
             if (connectionManager.httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0) {
                 final boolean isSecure = connectionManager.sslContext != null && isSecureScheme(scheme);
@@ -3052,7 +3075,7 @@ public class DefaultHttpClient implements
                 if (settingsHandler != null) {
                     addInstrumentedListener(settingsHandler.promise, future -> {
                         if (future.isSuccess()) {
-                            processRequestWrite(channel, channelPool, emitter, pipeline);
+                            processRequestWrite(channel, poolHandle, emitter, pipeline);
                         } else {
                             throw customizeException(new HttpClientException("HTTP/2 clear text upgrade failed to complete", future.cause()));
                         }
@@ -3060,10 +3083,10 @@ public class DefaultHttpClient implements
                     return;
                 }
             }
-            processRequestWrite(channel, channelPool, emitter, pipeline);
+            processRequestWrite(channel, poolHandle, emitter, pipeline);
         }
 
-        private void processRequestWrite(Channel channel, ChannelPool channelPool, FluxSink<?> emitter, ChannelPipeline pipeline) {
+        private void processRequestWrite(Channel channel, ConnectionManager.PoolHandle poolHandle, FluxSink<?> emitter, ChannelPipeline pipeline) {
             ChannelFuture channelFuture;
             if (encoder != null && encoder.isChunked()) {
                 channel.attr(AttributeKey.valueOf(ChannelPipelineCustomizer.HANDLER_HTTP_CHUNK)).set(true);
@@ -3074,7 +3097,7 @@ public class DefaultHttpClient implements
                 channelFuture = channel.writeAndFlush(nettyRequest);
             }
 
-            if (channelPool != null) {
+            if (poolHandle != null) {
                 closeChannelIfNecessary(channel, emitter, channelFuture, false);
             } else {
                 closeChannelIfNecessary(channel, emitter, channelFuture, closeChannelAfterWrite);
@@ -3237,13 +3260,11 @@ public class DefaultHttpClient implements
         private final boolean secure;
         private final Argument<O> bodyType;
         private final Argument<?> errorType;
-        private final ChannelPool channelPool;
-
-        private boolean keepAlive = true;
+        private final ConnectionManager.PoolHandle poolHandle;
 
         public FullHttpResponseHandler(
                 Promise<HttpResponse<O>> responsePromise,
-                ChannelPool channelPool,
+                ConnectionManager.PoolHandle poolHandle,
                 boolean secure,
                 io.micronaut.http.HttpRequest<?> request,
                 Argument<O> bodyType,
@@ -3252,7 +3273,7 @@ public class DefaultHttpClient implements
             this.secure = secure;
             this.bodyType = bodyType;
             this.errorType = errorType;
-            this.channelPool = channelPool;
+            this.poolHandle = poolHandle;
         }
 
         @Override
@@ -3284,7 +3305,7 @@ public class DefaultHttpClient implements
                     }
                 }
                 if (!HttpUtil.isKeepAlive(fullResponse)) {
-                    keepAlive = false;
+                    poolHandle.taint();
                 }
                 channelHandlerContext.pipeline().remove(this);
             }
@@ -3405,20 +3426,7 @@ public class DefaultHttpClient implements
 
         @Override
         public void handlerRemoved(ChannelHandlerContext ctx) {
-            if (channelPool != null) {
-                removeReadTimeoutHandler(ctx.pipeline());
-                final Channel ch = ctx.channel();
-                if (!keepAlive) {
-                    ch.closeFuture().addListener((future ->
-                            channelPool.release(ch)
-                    ));
-                } else {
-                    channelPool.release(ch);
-                }
-            } else {
-                // just close it to prevent any future reads without a handler registered
-                ctx.close();
-            }
+            poolHandle.release();
         }
 
         @Override
@@ -3429,7 +3437,7 @@ public class DefaultHttpClient implements
         @Override
         public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
             super.exceptionCaught(ctx, cause);
-            keepAlive = false;
+            poolHandle.taint();
             ctx.pipeline().remove(this);
         }
     }
