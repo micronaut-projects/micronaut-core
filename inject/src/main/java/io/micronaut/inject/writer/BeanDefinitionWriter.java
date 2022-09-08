@@ -388,6 +388,14 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             ReflectionUtils.getRequiredMethod(AbstractInitializableBeanDefinition.class, "invokeMethodWithReflection", BeanResolutionContext.class, BeanContext.class, int.class, Object.class, Object[].class)
     );
 
+    private static final Type TYPE_REFLECTION_UTILS = Type.getType(ReflectionUtils.class);
+
+    private static final org.objectweb.asm.commons.Method GET_FIELD_WITH_REFLECTION_METHOD = org.objectweb.asm.commons.Method.getMethod(
+        ReflectionUtils.getRequiredInternalMethod(ReflectionUtils.class, "getField", Class.class, String.class, Object.class));
+
+    private static final org.objectweb.asm.commons.Method METHOD_INVOKE_METHOD = org.objectweb.asm.commons.Method.getMethod(
+        ReflectionUtils.getRequiredInternalMethod(ReflectionUtils.class, "invokeMethod", Object.class, java.lang.reflect.Method.class, Object[].class));
+
     private static final org.objectweb.asm.commons.Method BEAN_DEFINITION_CLASS_CONSTRUCTOR = new org.objectweb.asm.commons.Method(CONSTRUCTOR_NAME, getConstructorDescriptor(
             Class.class, // beanType
             AbstractInitializableBeanDefinition.MethodOrFieldReference.class, // constructor
@@ -3089,114 +3097,138 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     private void visitBuildFactoryMethodDefinition(
             ClassElement factoryClass,
-            Element factoryMethod, ParameterElement... parameters) {
+            Element factoryElement, ParameterElement... parameters) {
         if (buildMethodVisitor == null) {
 
             List<ParameterElement> parameterList = Arrays.asList(parameters);
             boolean isParametrized = isParametrized(parameters);
-            boolean isIntercepted = isConstructorIntercepted(factoryMethod);
+            boolean isIntercepted = isConstructorIntercepted(factoryElement);
             Type factoryType = JavaModelUtils.getTypeReference(factoryClass);
 
             defineBuilderMethod(isParametrized);
             // load this
 
             GeneratorAdapter buildMethodVisitor = this.buildMethodVisitor;
-            invokeCheckIfShouldLoadIfNecessary(buildMethodVisitor);
-            // for Factory beans first we need to lookup the the factory bean
-            // before invoking the method to instantiate
-            // the below code looks up the factory bean.
 
-            // Load the BeanContext for the method call
-            buildMethodVisitor.loadArg(1);
-            pushCastToType(buildMethodVisitor, DefaultBeanContext.class);
-            // load the first argument of the method (the BeanResolutionContext) to be passed to the method
-            buildMethodVisitor.loadArg(0);
-            // second argument is the bean type
-            buildMethodVisitor.push(factoryType);
-            // third argument is the qualifier for the factory if any
-            pushQualifier(buildMethodVisitor, factoryClass, () -> {
-                buildMethodVisitor.push(factoryType);
-                buildMethodVisitor.push("factory");
-                invokeInterfaceStaticMethod(buildMethodVisitor, Argument.class, METHOD_CREATE_ARGUMENT_SIMPLE);
-            });
-            buildMethodVisitor.invokeVirtual(
-                    Type.getType(DefaultBeanContext.class),
-                    org.objectweb.asm.commons.Method.getMethod(METHOD_GET_BEAN)
-            );
-
-            int factoryVar = buildMethodVisitor.newLocal(factoryType);
-            buildMethodVisitor.storeLocal(factoryVar, factoryType);
-
-            // BeanResolutionContext
-            buildMethodVisitor.loadArg(0);
-            // .markDependentAsFactory()
-            buildMethodVisitor.invokeInterface(TYPE_RESOLUTION_CONTEXT, METHOD_BEAN_RESOLUTION_CONTEXT_MARK_FACTORY);
-
-            buildMethodVisitor.loadLocal(factoryVar);
-            pushCastToType(buildMethodVisitor, factoryClass);
+            int factoryVar  = -1;
+            // Skip initializing a producer instance for static producers
+            if (!factoryElement.isStatic()) {
+                factoryVar = pushGetFactoryBean(factoryClass, factoryType, buildMethodVisitor);
+            }
             String methodDescriptor = getMethodDescriptorForReturnType(beanType, parameterList);
             boolean hasInjectScope = false;
             if (isIntercepted) {
                 int constructorIndex = initInterceptedConstructorWriter(
                         buildMethodVisitor,
                         parameterList,
-                        new FactoryMethodDef(factoryType, factoryMethod, methodDescriptor, factoryVar)
+                        new FactoryMethodDef(factoryType, factoryElement, methodDescriptor, factoryVar)
                 );
                 // populate an Object[] of all constructor arguments
                 final int parametersIndex = createParameterArray(parameterList, buildMethodVisitor);
                 invokeConstructorChain(buildMethodVisitor, constructorIndex, parametersIndex, parameterList);
             } else {
-
-                if (!parameterList.isEmpty()) {
-                    hasInjectScope = pushConstructorArguments(buildMethodVisitor, parameters);
-                }
-                if (factoryMethod instanceof MethodElement) {
-                    MethodElement methodElement = (MethodElement) factoryMethod;
+                if (factoryElement instanceof MethodElement) {
+                    MethodElement methodElement = (MethodElement) factoryElement;
+                    if (!methodElement.isReflectionRequired() && !parameterList.isEmpty()) {
+                        hasInjectScope = pushConstructorArguments(buildMethodVisitor, parameters);
+                    }
+                    if (methodElement.isReflectionRequired()) {
+                        if (methodElement.isStatic()) {
+                            buildMethodVisitor.push((String) null);
+                        }
+                        DispatchWriter.pushTypeUtilsGetRequiredMethod(buildMethodVisitor, factoryType, methodElement);
+                        buildMethodVisitor.dup();
+                        buildMethodVisitor.push(true);
+                        buildMethodVisitor.invokeVirtual(Type.getType(Method.class), org.objectweb.asm.commons.Method.getMethod(
+                            ReflectionUtils.getRequiredMethod(Method.class, "setAccessible", boolean.class)
+                        ));
+                        hasInjectScope = pushParametersAsArray(buildMethodVisitor, parameters);
+                        buildMethodVisitor.invokeStatic(TYPE_REFLECTION_UTILS, METHOD_INVOKE_METHOD);
+//                        buildMethodVisitor.push((String) null);
+                        if (methodElement.isReflectionRequired() && isPrimitiveBean) {
+                            // Reflection always returns Object, convert it to appropriate primitive
+                            pushCastToType(buildMethodVisitor, beanType);
+                        }
+                    } else
                     if (methodElement.isStatic()) {
-                        buildMethodVisitor.visitMethodInsn(INVOKESTATIC,
-                            factoryType.getInternalName(),
-                            factoryMethod.getName(),
-                            methodDescriptor,
-                            false
-                        );
+                        buildMethodVisitor.invokeStatic(factoryType, new org.objectweb.asm.commons.Method(factoryElement.getName(), methodDescriptor));
                     } else {
-                        buildMethodVisitor.visitMethodInsn(INVOKEVIRTUAL,
-                            factoryType.getInternalName(),
-                            factoryMethod.getName(),
-                            methodDescriptor,
-                            false
-                        );
+                        buildMethodVisitor.invokeVirtual(factoryType, new org.objectweb.asm.commons.Method(factoryElement.getName(), methodDescriptor));
                     }
                 } else {
-                    if (factoryMethod.isStatic()) {
-
-                        buildMethodVisitor.getStatic(
-                            factoryType,
-                            factoryMethod.getName(),
-                            beanType
-                        );
+                    FieldElement fieldElement = (FieldElement) factoryElement;
+                    if (fieldElement.isReflectionRequired()) {
+                        if (!fieldElement.isStatic()) {
+                            buildMethodVisitor.storeLocal(factoryVar);
+                        }
+                        buildMethodVisitor.push(factoryType);
+                        buildMethodVisitor.push(fieldElement.getName());
+                        if (fieldElement.isStatic()) {
+                            buildMethodVisitor.push((String) null);
+                        } else {
+                            buildMethodVisitor.loadLocal(factoryVar);
+                        }
+                        buildMethodVisitor.invokeStatic(TYPE_REFLECTION_UTILS, GET_FIELD_WITH_REFLECTION_METHOD);
+                        if (fieldElement.isReflectionRequired() && isPrimitiveBean) {
+                            // Reflection always returns Object, convert it to appropriate primitive
+                            pushCastToType(buildMethodVisitor, beanType);
+                        }
+                    } else if (fieldElement.isStatic()) {
+                        buildMethodVisitor.getStatic(factoryType, factoryElement.getName(), beanType);
                     } else {
-                        buildMethodVisitor.getField(
-                            factoryType,
-                            factoryMethod.getName(),
-                            beanType
-                        );
+                        buildMethodVisitor.getField(factoryType, factoryElement.getName(), beanType);
                     }
                 }
             }
 
-
             this.buildInstanceLocalVarIndex = buildMethodVisitor.newLocal(beanType);
-            buildMethodVisitor.storeLocal(buildInstanceLocalVarIndex);
+            buildMethodVisitor.storeLocal(buildInstanceLocalVarIndex, beanType);
             if (!isPrimitiveBean) {
                 pushBeanDefinitionMethodInvocation(buildMethodVisitor, "injectBean");
                 pushCastToType(buildMethodVisitor, beanType);
                 buildMethodVisitor.storeLocal(buildInstanceLocalVarIndex);
             }
             destroyInjectScopeBeansIfNecessary(buildMethodVisitor, hasInjectScope);
-            buildMethodVisitor.loadLocal(buildInstanceLocalVarIndex);
+            buildMethodVisitor.loadLocal(buildInstanceLocalVarIndex, beanType);
             initLifeCycleMethodsIfNecessary();
         }
+    }
+
+    private int pushGetFactoryBean(ClassElement factoryClass, Type factoryType, GeneratorAdapter buildMethodVisitor) {
+        invokeCheckIfShouldLoadIfNecessary(buildMethodVisitor);
+        // for Factory beans first we need to lookup the factory bean
+        // before invoking the method to instantiate
+        // the below code looks up the factory bean.
+
+        // Load the BeanContext for the method call
+        buildMethodVisitor.loadArg(1);
+        pushCastToType(buildMethodVisitor, DefaultBeanContext.class);
+        // load the first argument of the method (the BeanResolutionContext) to be passed to the method
+        buildMethodVisitor.loadArg(0);
+        // second argument is the bean type
+        buildMethodVisitor.push(factoryType);
+        // third argument is the qualifier for the factory if any
+        pushQualifier(buildMethodVisitor, factoryClass, () -> {
+            buildMethodVisitor.push(factoryType);
+            buildMethodVisitor.push("factory");
+            invokeInterfaceStaticMethod(buildMethodVisitor, Argument.class, METHOD_CREATE_ARGUMENT_SIMPLE);
+        });
+        buildMethodVisitor.invokeVirtual(
+            Type.getType(DefaultBeanContext.class),
+            org.objectweb.asm.commons.Method.getMethod(METHOD_GET_BEAN)
+        );
+
+        int factoryVar = buildMethodVisitor.newLocal(factoryType);
+        buildMethodVisitor.storeLocal(factoryVar, factoryType);
+
+        // BeanResolutionContext
+        buildMethodVisitor.loadArg(0);
+        // .markDependentAsFactory()
+        buildMethodVisitor.invokeInterface(TYPE_RESOLUTION_CONTEXT, METHOD_BEAN_RESOLUTION_CONTEXT_MARK_FACTORY);
+
+        buildMethodVisitor.loadLocal(factoryVar);
+        pushCastToType(buildMethodVisitor, factoryClass);
+        return factoryVar;
     }
 
     private void visitBuildMethodDefinition(MethodElement constructor, boolean requiresReflection) {
@@ -3527,7 +3559,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                             parameter.getName(),
                             parameter,
                             parameter.getAnnotationMetadata(),
-                            parameterIndex
+                            parameterIndex,
+                            false
                     )
             );
         }
@@ -3603,7 +3636,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         if (size > 0) {
             for (int i = 0; i < parameters.length; i++) {
                 ParameterElement parameter = parameters[i];
-                pushConstructorArgument(buildMethodVisitor, parameter.getName(), parameter, parameter.getAnnotationMetadata(), i);
+                pushConstructorArgument(buildMethodVisitor, parameter.getName(), parameter, parameter.getAnnotationMetadata(), i, false);
                 if (parameter.hasDeclaredAnnotation(InjectScope.class)) {
                     hasInjectScope = true;
                 }
@@ -3612,11 +3645,28 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         return hasInjectScope;
     }
 
+    private boolean pushParametersAsArray(GeneratorAdapter buildMethodVisitor, ParameterElement[] parameters) {
+        final int pLen = parameters.length;
+        boolean hasInjectScope = false;
+        pushNewArray(buildMethodVisitor, Object.class, pLen);
+        for (int i = 0; i < pLen; i++) {
+            final ParameterElement parameter = parameters[i];
+            if (parameter.hasDeclaredAnnotation(InjectScope.class)) {
+                hasInjectScope = true;
+            }
+            int finalI = i;
+            pushStoreInArray(buildMethodVisitor, i, pLen, () ->
+                pushConstructorArgument(buildMethodVisitor, parameter.getName(), parameter, parameter.getAnnotationMetadata(), finalI, true)
+            );
+        }
+        return hasInjectScope;
+    }
+
     private void pushConstructorArgument(GeneratorAdapter buildMethodVisitor,
                                          String argumentName,
                                          ParameterElement argumentType,
                                          AnnotationMetadata annotationMetadata,
-                                         int index) {
+                                         int index, boolean castToObject) {
         if (isAnnotatedWithParameter(annotationMetadata) && isParametrized) {
             // load the args
             buildMethodVisitor.loadArg(3);
@@ -3691,7 +3741,13 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             if (isArray && hasGenericType) {
                 convertToArray(argumentType.getGenericType().fromArray(), buildMethodVisitor);
             }
-            pushCastToType(buildMethodVisitor, argumentType);
+            if (castToObject) {
+                if (argumentType.isPrimitive()) {
+                    pushCastToType(buildMethodVisitor, Object.class);
+                }
+            } else {
+                pushCastToType(buildMethodVisitor, argumentType);
+            }
         }
     }
 
