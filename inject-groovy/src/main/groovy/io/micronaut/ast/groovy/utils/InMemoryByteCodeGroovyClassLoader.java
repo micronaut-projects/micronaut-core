@@ -17,6 +17,7 @@ package io.micronaut.ast.groovy.utils;
 
 import groovy.lang.GroovyClassLoader;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import org.codehaus.groovy.control.CompilerConfiguration;
 
 import java.io.ByteArrayInputStream;
@@ -54,6 +55,8 @@ public class InMemoryByteCodeGroovyClassLoader extends GroovyClassLoader {
      */
     public InMemoryByteCodeGroovyClassLoader() {
         clearCache();
+        AbstractAnnotationMetadataBuilder.clearCaches();
+        AbstractAnnotationMetadataBuilder.clearMutated();
     }
 
     /**
@@ -62,6 +65,8 @@ public class InMemoryByteCodeGroovyClassLoader extends GroovyClassLoader {
     public InMemoryByteCodeGroovyClassLoader(ClassLoader loader) {
         super(loader);
         clearCache();
+        AbstractAnnotationMetadataBuilder.clearCaches();
+        AbstractAnnotationMetadataBuilder.clearMutated();
     }
 
     /**
@@ -70,6 +75,8 @@ public class InMemoryByteCodeGroovyClassLoader extends GroovyClassLoader {
     public InMemoryByteCodeGroovyClassLoader(GroovyClassLoader parent) {
         super(parent);
         clearCache();
+        AbstractAnnotationMetadataBuilder.clearCaches();
+        AbstractAnnotationMetadataBuilder.clearMutated();
     }
 
     /**
@@ -148,5 +155,9 @@ public class InMemoryByteCodeGroovyClassLoader extends GroovyClassLoader {
         } else {
             return super.findResources(name);
         }
+    }
+
+    public final Map<String, byte[]> getGeneratedClasses() {
+        return generatedClasses;
     }
 }

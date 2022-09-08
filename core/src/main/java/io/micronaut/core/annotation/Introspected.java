@@ -51,6 +51,9 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Inherited
 public @interface Introspected {
 
+     Introspected.AccessKind[] DEFAULT_ACCESS_KIND = {Introspected.AccessKind.METHOD};
+     Introspected.Visibility[] DEFAULT_VISIBILITY = {Introspected.Visibility.DEFAULT};
+
     /**
      * By default {@link Introspected} applies to the class it is applied on. However if classes are specified
      * introspections will instead be generated for each class specified. This is useful in cases where you cannot

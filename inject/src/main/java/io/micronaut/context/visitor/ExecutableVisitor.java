@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.validation.executable;
+package io.micronaut.context.visitor;
 
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.core.annotation.Internal;
@@ -40,9 +40,7 @@ public class ExecutableVisitor implements TypeElementVisitor<Object, Executable>
 
     @Override
     public void visitMethod(MethodElement element, VisitorContext context) {
-        ParameterElement[] parameters = element.getParameters();
-
-        for (ParameterElement parameter : parameters) {
+        for (ParameterElement parameter : element.getParameters()) {
             if (parameter.getType().isPrimitive() && parameter.isNullable()) {
                 context.warn("@Nullable on primitive types will allow the method to be executed at runtime with null values, causing an exception", parameter);
             }

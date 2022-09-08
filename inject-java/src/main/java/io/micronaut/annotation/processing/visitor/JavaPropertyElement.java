@@ -16,16 +16,26 @@
 package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationMetadataDelegate;
+import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
+import io.micronaut.inject.ast.FieldElement;
+import io.micronaut.inject.ast.MemberElement;
+import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.PropertyElement;
 
 import javax.lang.model.element.Element;
-import javax.lang.model.element.TypeElement;
-import javax.lang.model.type.TypeMirror;
-import java.util.Collections;
-import java.util.Map;
+import java.lang.annotation.Annotation;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 /**
  * Models a {@link PropertyElement} for Java.
@@ -34,70 +44,155 @@ import java.util.Map;
  * @since 1.0
  */
 @Internal
-class JavaPropertyElement extends AbstractJavaElement implements PropertyElement {
+final class JavaPropertyElement extends AbstractJavaElement implements PropertyElement {
 
-    private final String name;
     private final ClassElement type;
-    private final boolean readOnly;
-    private final ClassElement declaringElement;
-    private final JavaVisitorContext visitorContext;
+    private final String name;
+    private final AccessKind readAccessKind;
+    private final AccessKind writeAccessKind;
+    private final ClassElement owningElement;
+    @Nullable
+    private final MethodElement getter;
+    @Nullable
+    private final MethodElement setter;
+    @Nullable
+    private final FieldElement field;
+    private final boolean excluded;
+    private final List<MemberElement> elements;
+    private final AnnotationMetadata annotationMetadata;
 
-    /**
-     * Default constructor.
-     *
-     * @param declaringElement   The declaring element
-     * @param rootElement        The element
-     * @param annotationMetadata The annotation metadata
-     * @param name               The name
-     * @param type               The type
-     * @param readOnly           Whether it is read only
-     * @param visitorContext     The java visitor context
-     */
-    JavaPropertyElement(
-            ClassElement declaringElement,
-            Element rootElement,
-            AnnotationMetadata annotationMetadata,
-            String name,
-            ClassElement type,
-            boolean readOnly,
-            JavaVisitorContext visitorContext) {
-        super(rootElement, annotationMetadata, visitorContext);
-        this.name = name;
+    JavaPropertyElement(ClassElement owningElement,
+                        ClassElement type,
+                        MethodElement getter,
+                        MethodElement setter,
+                        FieldElement field,
+                        ElementAnnotationMetadataFactory annotationMetadataFactory,
+                        String name,
+                        AccessKind readAccessKind,
+                        AccessKind writeAccessKind,
+                        boolean excluded,
+                        JavaVisitorContext visitorContext) {
+        super(selectNativeType(getter, setter, field), annotationMetadataFactory, visitorContext);
         this.type = type;
-        this.readOnly = readOnly;
-        this.declaringElement = declaringElement;
-        this.visitorContext = visitorContext;
+        this.getter = getter;
+        this.setter = setter;
+        this.field = field;
+        this.name = name;
+        this.readAccessKind = readAccessKind;
+        this.writeAccessKind = writeAccessKind;
+        this.owningElement = owningElement;
+        this.excluded = excluded;
+        elements = new ArrayList<>(3);
+        if (setter != null) {
+            elements.add(setter);
+        }
+        if (field != null) {
+            elements.add(field);
+        }
+        if (getter != null) {
+            elements.add(getter);
+        }
+        // The instance AnnotationMetadata of each element can change after a modification
+        // Set annotation metadata as actual elements so the changes are reflected
+        if (elements.size() == 1) {
+            annotationMetadata = elements.iterator().next();
+        } else {
+            annotationMetadata = new AnnotationMetadataHierarchy(
+                true,
+                elements.stream().map(e -> {
+                    if (e instanceof MethodElement) {
+                        return new AnnotationMetadataDelegate() {
+                            @Override
+                            public AnnotationMetadata getAnnotationMetadata() {
+                                // Exclude type metadata
+                                return e.getAnnotationMetadata().getDeclaredMetadata();
+                            }
+                        };
+                    }
+                    return e;
+                }).toArray(AnnotationMetadata[]::new)
+            );
+        }
+    }
+
+    @Override
+    protected AbstractJavaElement copyThis() {
+        return new JavaPropertyElement(owningElement, type, getter, setter, field, elementAnnotationMetadataFactory, name, readAccessKind, writeAccessKind, excluded, visitorContext);
+    }
+
+    @Override
+    public PropertyElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
+        return (PropertyElement) super.withAnnotationMetadata(annotationMetadata);
+    }
+
+    private static Element selectNativeType(MethodElement getter,
+                                            MethodElement setter,
+                                            FieldElement field) {
+        if (getter != null) {
+            return (Element) getter.getNativeType();
+        }
+        if (setter != null) {
+            return (Element) setter.getNativeType();
+        }
+        if (field != null) {
+            return (Element) field.getNativeType();
+        }
+        throw new IllegalStateException();
+    }
+
+    @Override
+    public boolean isExcluded() {
+        return excluded;
+    }
+
+    @Override
+    public AnnotationMetadata getAnnotationMetadata() {
+        return annotationMetadata;
+    }
+
+    @Override
+    public ClassElement getType() {
+        return type;
     }
 
     @Override
     public ClassElement getGenericType() {
-        Map<String, Map<String, TypeMirror>> declaredGenericInfo;
-        if (declaringElement instanceof JavaClassElement) {
-            declaredGenericInfo = ((JavaClassElement) declaringElement).getGenericTypeInfo();
-        } else {
-            declaredGenericInfo = Collections.emptyMap();
-        }
-        return parameterizedClassElement(((TypeElement) type.getNativeType()).asType(), visitorContext, declaredGenericInfo);
+        return type; // Already generic
+    }
+
+    @Override
+    public Optional<FieldElement> getField() {
+        return Optional.ofNullable(field);
+    }
+
+    @Override
+    public Optional<MethodElement> getWriteMethod() {
+        return Optional.ofNullable(setter);
+    }
+
+    @Override
+    public Optional<MethodElement> getReadMethod() {
+        return Optional.ofNullable(getter);
     }
 
     @Override
     public boolean isPrimitive() {
-        return type.isPrimitive();
+        return getType().isPrimitive();
     }
 
     @Override
     public boolean isArray() {
-        return type.isArray();
+        return getType().isArray();
     }
 
     @Override
     public int getArrayDimensions() {
-        return type.getArrayDimensions();
+        return getType().getArrayDimensions();
     }
 
     @Override
     public String getName() {
-        return this.name;
+        return name;
     }
 
     @Override
@@ -105,19 +200,113 @@ class JavaPropertyElement extends AbstractJavaElement implements PropertyElement
         return name;
     }
 
-    @NonNull
     @Override
-    public ClassElement getType() {
-        return type;
+    public AccessKind getReadAccessKind() {
+        return readAccessKind;
+    }
+
+    @Override
+    public AccessKind getWriteAccessKind() {
+        return writeAccessKind;
     }
 
     @Override
     public boolean isReadOnly() {
-        return readOnly;
+        switch (readAccessKind) {
+            case METHOD:
+                return setter == null;
+            case FIELD:
+                return field == null || field.isFinal();
+            default:
+                throw new IllegalStateException();
+        }
+    }
+
+    @Override
+    public boolean isWriteOnly() {
+        switch (writeAccessKind) {
+            case METHOD:
+                return getter == null;
+            case FIELD:
+                return field == null;
+            default:
+                throw new IllegalStateException();
+        }
     }
 
     @Override
     public ClassElement getDeclaringType() {
-        return declaringElement;
+        if (field != null) {
+            return field.getDeclaringType();
+        }
+        if (getter != null) {
+            return getter.getDeclaringType();
+        }
+        if (setter != null) {
+            return setter.getDeclaringType();
+        }
+        throw new IllegalStateException();
     }
+
+    @Override
+    public ClassElement getOwningType() {
+        return owningElement;
+    }
+
+    @Override
+    public <T extends Annotation> io.micronaut.inject.ast.Element annotate(AnnotationValue<T> annotationValue) {
+        for (MemberElement memberElement : elements) {
+            memberElement.annotate(annotationValue);
+        }
+        return this;
+    }
+
+    @Override
+    public <T extends Annotation> io.micronaut.inject.ast.Element annotate(String annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
+        for (MemberElement memberElement : elements) {
+            memberElement.annotate(annotationType, consumer);
+        }
+        return this;
+    }
+
+    @Override
+    public <T extends Annotation> io.micronaut.inject.ast.Element annotate(Class<T> annotationType) {
+        for (MemberElement memberElement : elements) {
+            memberElement.annotate(annotationType);
+        }
+        return this;
+    }
+
+    @Override
+    public io.micronaut.inject.ast.Element annotate(String annotationType) {
+        for (MemberElement memberElement : elements) {
+            memberElement.annotate(annotationType);
+        }
+        return this;
+    }
+
+    @Override
+    public <T extends Annotation> io.micronaut.inject.ast.Element annotate(Class<T> annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
+        for (MemberElement memberElement : elements) {
+            memberElement.annotate(annotationType, consumer);
+        }
+        return this;
+    }
+
+    @Override
+    public io.micronaut.inject.ast.Element removeAnnotation(String annotationType) {
+        for (MemberElement memberElement : elements) {
+            memberElement.removeAnnotation(annotationType);
+        }
+        return this;
+    }
+
+    @Override
+    public <T extends Annotation> io.micronaut.inject.ast.Element removeAnnotationIf(Predicate<AnnotationValue<T>> predicate) {
+        for (MemberElement memberElement : elements) {
+            memberElement.removeAnnotationIf(predicate);
+        }
+        return this;
+    }
+
 }

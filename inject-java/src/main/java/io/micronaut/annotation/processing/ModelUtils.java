@@ -15,26 +15,37 @@
  */
 package io.micronaut.annotation.processing;
 
-import io.micronaut.core.annotation.AnnotationUtil;
-import io.micronaut.core.annotation.Nullable;
-import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.Creator;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.processing.JavaModelUtils;
 
-import javax.lang.model.element.*;
+import javax.lang.model.element.Element;
+import javax.lang.model.element.ElementKind;
+import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.Modifier;
+import javax.lang.model.element.Name;
+import javax.lang.model.element.PackageElement;
+import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.ElementFilter;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeSet;
 
-import static javax.lang.model.element.Modifier.*;
+import static javax.lang.model.element.Modifier.ABSTRACT;
+import static javax.lang.model.element.Modifier.FINAL;
+import static javax.lang.model.element.Modifier.PRIVATE;
+import static javax.lang.model.element.Modifier.PROTECTED;
+import static javax.lang.model.element.Modifier.PUBLIC;
+import static javax.lang.model.element.Modifier.STATIC;
 import static javax.lang.model.type.TypeKind.NONE;
 
 /**
@@ -190,124 +201,6 @@ public class ModelUtils {
     }
 
     /**
-     * The constructor inject for the given class element.
-     *
-     * @param classElement The class element
-     * @param annotationUtils The annotation utilities
-     * @return The constructor
-     */
-    @Nullable
-    public ExecutableElement concreteConstructorFor(TypeElement classElement, AnnotationUtils annotationUtils) {
-        if (JavaModelUtils.isRecord(classElement)) {
-            final List<ExecutableElement> constructors = ElementFilter
-                    .constructorsIn(classElement.getEnclosedElements());
-            Optional<ExecutableElement> element = findAnnotatedConstructor(annotationUtils, constructors);
-            if (element.isPresent()) {
-                 return element.get();
-            } else {
-
-                // with records the record constructor is always the last constructor
-                return constructors.get(constructors.size() - 1);
-            }
-        } else {
-            List<ExecutableElement> constructors = findNonPrivateConstructors(classElement);
-            if (constructors.isEmpty()) {
-                return null;
-            }
-            if (constructors.size() == 1) {
-                return constructors.get(0);
-            }
-
-            Optional<ExecutableElement> element = findAnnotatedConstructor(annotationUtils, constructors);
-            if (!element.isPresent()) {
-                element = constructors.stream().filter(ctor ->
-                        ctor.getModifiers().contains(PUBLIC)
-                ).findFirst();
-            }
-            return element.orElse(null);
-        }
-    }
-
-    private Optional<ExecutableElement> findAnnotatedConstructor(AnnotationUtils annotationUtils, List<ExecutableElement> constructors) {
-        return constructors.stream().filter(ctor -> {
-                    final AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(ctor);
-                    return annotationMetadata.hasStereotype(AnnotationUtil.INJECT) || annotationMetadata.hasStereotype(Creator.class);
-                }
-        ).findFirst();
-    }
-
-    /**
-     * The static method or Kotlin companion method to execute to
-     * construct the given class element.
-     *
-     * @param classElement The class element
-     * @param annotationUtils The annotation utilities
-     * @return The creator method
-     */
-    @Nullable
-    public ExecutableElement staticCreatorFor(TypeElement classElement, AnnotationUtils annotationUtils) {
-         List<ExecutableElement> creators = findNonPrivateStaticCreators(classElement, annotationUtils);
-
-        if (creators.isEmpty()) {
-            return null;
-        }
-        if (creators.size() == 1) {
-            return creators.get(0);
-        }
-
-        //Can be multiple static @Creator methods. Prefer one with args here. The no arg method (if present) will
-        //be picked up by staticDefaultCreatorFor
-        List<ExecutableElement> withArgs = creators.stream().filter(method -> !method.getParameters().isEmpty()).collect(Collectors.toList());
-
-        if (withArgs.size() == 1) {
-            return withArgs.get(0);
-        } else {
-            creators = withArgs;
-        }
-
-        return creators.stream().filter(method -> method.getModifiers().contains(PUBLIC)).findFirst().orElse(null);
-    }
-
-    /**
-     * @param classElement The class element
-     * @return True if the element has a non private 0 arg constructor
-     */
-    public ExecutableElement defaultConstructorFor(TypeElement classElement) {
-        List<ExecutableElement> constructors = findNonPrivateConstructors(classElement)
-                .stream().filter(ctor -> ctor.getParameters().isEmpty()).collect(Collectors.toList());
-
-        if (constructors.isEmpty()) {
-            return null;
-        }
-
-        if (constructors.size() == 1) {
-            return constructors.get(0);
-        }
-
-        return constructors.stream().filter(method -> method.getModifiers().contains(PUBLIC)).findFirst().orElse(null);
-    }
-
-    /**
-     * @param classElement The class element
-     * @param annotationUtils The annotation utils
-     * @return A static creator with no args, or null
-     */
-    public ExecutableElement defaultStaticCreatorFor(TypeElement classElement, AnnotationUtils annotationUtils) {
-        List<ExecutableElement> creators = findNonPrivateStaticCreators(classElement, annotationUtils)
-                .stream().filter(ctor -> ctor.getParameters().isEmpty()).collect(Collectors.toList());
-
-        if (creators.isEmpty()) {
-            return null;
-        }
-
-        if (creators.size() == 1) {
-            return creators.get(0);
-        }
-
-        return creators.stream().filter(method -> method.getModifiers().contains(PUBLIC)).findFirst().orElse(null);
-    }
-
-    /**
      * Return whether the given element is the java.lang.Object class.
      *
      * @param element The element
@@ -315,62 +208,6 @@ public class ModelUtils {
      */
     public boolean isObjectClass(TypeElement element) {
         return element.getSuperclass().getKind() == NONE;
-    }
-
-    /**
-     * @param classElement The {@link TypeElement}
-     * @return A list of {@link ExecutableElement}
-     */
-    private List<ExecutableElement> findNonPrivateConstructors(TypeElement classElement) {
-        List<ExecutableElement> ctors =
-            ElementFilter.constructorsIn(classElement.getEnclosedElements());
-        return ctors.stream()
-            .filter(ctor -> !ctor.getModifiers().contains(PRIVATE))
-            .collect(Collectors.toList());
-    }
-
-    private List<ExecutableElement> findNonPrivateStaticCreators(TypeElement classElement, AnnotationUtils annotationUtils) {
-        List<? extends Element> enclosedElements = classElement.getEnclosedElements();
-        List<ExecutableElement> staticCreators = ElementFilter.methodsIn(enclosedElements)
-                .stream()
-                .filter(method -> method.getModifiers().contains(STATIC))
-                .filter(method -> !method.getModifiers().contains(PRIVATE))
-                .filter(method -> typeUtils.isAssignable(typeUtils.erasure(method.getReturnType()), classElement.asType()))
-                .filter(method -> {
-                    final AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(method);
-                    return annotationMetadata.hasStereotype(Creator.class);
-                })
-                .collect(Collectors.toList());
-
-        if (staticCreators.isEmpty()) {
-            TypeElement companionClass = ElementFilter.typesIn(enclosedElements)
-                    .stream()
-                    .filter(type -> type.getSimpleName().toString().equals("Companion"))
-                    .filter(type -> type.getModifiers().contains(STATIC))
-                    .findFirst().orElse(null);
-
-            if (companionClass != null) {
-                staticCreators = ElementFilter.methodsIn(companionClass.getEnclosedElements())
-                        .stream()
-                        .filter(method -> !method.getModifiers().contains(PRIVATE))
-                        .filter(method -> method.getReturnType().equals(classElement.asType()))
-                        .filter(method -> {
-                            final AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(method);
-                            return annotationMetadata.hasStereotype(Creator.class);
-                        })
-                        .collect(Collectors.toList());
-            } else if (classElement.getKind() == ElementKind.ENUM) {
-                staticCreators = ElementFilter.methodsIn(classElement.getEnclosedElements())
-                        .stream()
-                        .filter(method -> method.getModifiers().contains(STATIC))
-                        .filter(method -> !method.getModifiers().contains(PRIVATE))
-                        .filter(method -> method.getReturnType().equals(classElement.asType()))
-                        .filter(method -> method.getSimpleName().toString().equals("valueOf"))
-                        .collect(Collectors.toList());
-            }
-        }
-
-        return staticCreators;
     }
 
     /**

@@ -16,20 +16,14 @@
 package io.micronaut.inject.ast;
 
 import io.micronaut.core.annotation.AnnotatedElement;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
-import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.core.annotation.AnnotationValueBuilder;
-import io.micronaut.core.naming.Described;
-import io.micronaut.core.util.ArgumentUtils;
-
 import io.micronaut.core.annotation.NonNull;
-import java.lang.annotation.Annotation;
+import io.micronaut.core.naming.Described;
+
 import java.util.Collections;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Consumer;
-import java.util.function.Predicate;
 
 /**
  * Stores data about a compile time element. The underlying object can be a class, field, or method.
@@ -38,7 +32,8 @@ import java.util.function.Predicate;
  * @author graemerocher
  * @since 1.0
  */
-public interface Element extends AnnotationMetadataDelegate, AnnotatedElement, Described {
+public interface Element extends MutableAnnotatedElement<Element>, AnnotatedElement, AnnotationMetadataDelegate, Described {
+
     /**
      * An empty array of elements.
      * @since 2.1.1
@@ -56,6 +51,14 @@ public interface Element extends AnnotationMetadataDelegate, AnnotatedElement, D
      * @since 2.3.0
      */
     default boolean isPackagePrivate() {
+        return false;
+    }
+
+    /**
+     * @return True if the element is synthetic.
+     * @since 4.0.0
+     */
+    default boolean isSynthetic() {
         return false;
     }
 
@@ -83,136 +86,6 @@ public interface Element extends AnnotationMetadataDelegate, AnnotatedElement, D
      */
     default Set<ElementModifier> getModifiers() {
         return Collections.emptySet();
-    }
-
-    /**
-     * Annotate this element with the given annotation type. If the annotation is already present then
-     * any values populated by the builder will be merged/overridden with the existing values.
-     *
-     * @param annotationType The annotation type
-     * @param consumer A function that receives the {@link AnnotationValueBuilder}
-     * @param <T> The annotation generic type
-     * @return This element
-     */
-    @NonNull
-    default <T extends Annotation> Element annotate(@NonNull String annotationType, @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
-        throw new UnsupportedOperationException("Element of type [" + getClass() + "] does not support adding annotations at compilation time");
-    }
-
-    /**
-     * Removes an annotation of the given type from the element.
-     *
-     * <p>If the annotation features any stereotypes these will also be removed unless there are other
-     * annotations that reference the stereotype to be removed.</p>
-     *
-     * <p>In the case of repeatable annotations this method will remove all repeated annotations, effectively
-     * clearing out all declared repeated annotations of the given type.</p>
-     *
-     * @param annotationType The annotation type
-     * @return This element
-     * @since 3.0.0
-     */
-    default  Element removeAnnotation(@NonNull String annotationType) {
-        throw new UnsupportedOperationException("Element of type [" + getClass() + "] does not support removing annotations at compilation time");
-    }
-
-    /**
-     * @see #removeAnnotation(String)
-     * @param annotationType The annotation type
-     * @param <T> The annotation generic type
-     * @return This element
-     * @since 3.0.0
-     */
-    default <T extends Annotation> Element removeAnnotation(@NonNull Class<T> annotationType) {
-        return removeAnnotation(Objects.requireNonNull(annotationType).getName());
-    }
-
-    /**
-     * Removes all annotations that pass the given predicate.
-     * @param predicate The predicate
-     * @param <T> The annotation generic type
-     * @return This element
-     * @since 3.0.0
-     */
-    default <T extends Annotation> Element removeAnnotationIf(@NonNull Predicate<AnnotationValue<T>> predicate) {
-        throw new UnsupportedOperationException("Element of type [" + getClass() + "] does not support removing annotations at compilation time");
-    }
-
-    /**
-     * Removes a stereotype of the given name from the element.
-     * @param annotationType The annotation type
-     * @return This element
-     * @since 3.0.0
-     */
-    default  Element removeStereotype(@NonNull String annotationType) {
-        throw new UnsupportedOperationException("Element of type [" + getClass() + "] does not support removing annotations at compilation time");
-    }
-
-    /**
-     * Removes a stereotype annotation of the given type from the element.
-     * @param annotationType The annotation type
-     * @param <T> The annotation generic type
-     * @return This element
-     * @since 3.0.0
-     */
-    default <T extends Annotation> Element removeStereotype(@NonNull Class<T> annotationType) {
-        return removeStereotype(Objects.requireNonNull(annotationType).getName());
-    }
-
-    /**
-     * Annotate this element with the given annotation type. If the annotation is already present then
-     * any values populated by the builder will be merged/overridden with the existing values.
-     *
-     * @param annotationType The annotation type
-     * @return This element
-     */
-    @NonNull
-    default Element annotate(@NonNull String annotationType) {
-        return annotate(annotationType, annotationValueBuilder -> { });
-    }
-
-    /**
-     * Annotate this element with the given annotation type. If the annotation is already present then
-     * any values populated by the builder will be merged/overridden with the existing values.
-     *
-     * @param annotationType The annotation type
-     * @param consumer A function that receives the {@link AnnotationValueBuilder}
-     * @param <T> The annotation generic type
-     * @return This element
-     */
-    @NonNull
-    default <T extends Annotation> Element annotate(@NonNull Class<T> annotationType, @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
-        ArgumentUtils.requireNonNull("annotationType", annotationType);
-        ArgumentUtils.requireNonNull("consumer", consumer);
-        return annotate(annotationType.getName(), consumer);
-    }
-
-    /**
-     * Annotate this element with the given annotation type. If the annotation is already present then
-     * any values populated by the builder will be merged/overridden with the existing values.
-     *
-     * @param annotationType The annotation type
-     * @param <T> The annotation generic type
-     * @return This element
-     */
-    @NonNull
-    default <T extends Annotation> Element annotate(@NonNull Class<T> annotationType) {
-        ArgumentUtils.requireNonNull("annotationType", annotationType);
-        return annotate(annotationType.getName(), annotationValueBuilder -> { });
-    }
-
-    /**
-     * Annotate this element with the given annotation type. If the annotation is already present then
-     * any values populated by the builder will be merged/overridden with the existing values.
-     *
-     * @param annotationValue The annotation type
-     * @param <T> The annotation generic type
-     * @return This element
-     * @since 3.0.0
-     */
-    @NonNull
-    default <T extends Annotation> Element annotate(@NonNull AnnotationValue<T> annotationValue) {
-        throw new UnsupportedOperationException("Element of type [" + getClass() + "] does not support adding annotations at compilation time");
     }
 
     /**
@@ -273,5 +146,16 @@ public interface Element extends AnnotationMetadataDelegate, AnnotatedElement, D
         } else {
             return getName();
         }
+    }
+
+    /**
+     * Copies this element and overrides its annotations.
+     *
+     * @param annotationMetadata The annotation metadata
+     * @return A new element
+     * @since 4.0.0
+     */
+    default Element withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
+        throw new UnsupportedOperationException("Element of type [" + getClass() + "] does not support copy constructor");
     }
 }

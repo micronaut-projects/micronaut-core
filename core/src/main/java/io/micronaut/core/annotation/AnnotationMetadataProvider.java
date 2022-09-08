@@ -95,4 +95,9 @@ public interface AnnotationMetadataProvider extends AnnotationSource {
     default <T extends Annotation> Optional<AnnotationValue<T>> findDeclaredAnnotation(Class<T> annotationClass) {
         return getAnnotationMetadata().findDeclaredAnnotation(annotationClass);
     }
+
+    @Override
+    default AnnotationSource unwrap() {
+        return getAnnotationMetadata().unwrap();
+    }
 }

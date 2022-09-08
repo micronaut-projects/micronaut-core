@@ -15,36 +15,41 @@
  */
 package io.micronaut.ast.groovy.visitor;
 
-import io.micronaut.core.annotation.Nullable;
 import groovy.transform.CompileStatic;
 import groovy.transform.PackageScope;
-import io.micronaut.ast.groovy.annotation.GroovyAnnotationMetadataBuilder;
-import io.micronaut.ast.groovy.utils.AstAnnotationUtils;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
-import io.micronaut.core.util.ArgumentUtils;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.ast.ElementAnnotationMetadata;
+import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.ElementModifier;
-import io.micronaut.inject.ast.MemberElement;
 import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.ClassNode;
-import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.FieldNode;
 import org.codehaus.groovy.ast.GenericsType;
+import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.control.CompilationUnit;
 import org.codehaus.groovy.control.SourceUnit;
 
-import io.micronaut.core.annotation.NonNull;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Modifier;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
@@ -63,26 +68,72 @@ public abstract class AbstractGroovyElement implements AnnotationMetadataDelegat
     protected final SourceUnit sourceUnit;
     protected final CompilationUnit compilationUnit;
     protected final GroovyVisitorContext visitorContext;
+    protected final ElementAnnotationMetadataFactory elementAnnotationMetadataFactory;
+    protected AnnotationMetadata presetAnnotationMetadata;
+    private ElementAnnotationMetadata elementAnnotationMetadata;
     private final AnnotatedNode annotatedNode;
-    private AnnotationMetadata annotationMetadata;
 
     /**
      * Default constructor.
-     * @param visitorContext     The groovy visitor context
-     * @param annotatedNode      The annotated node
-     * @param annotationMetadata The annotation metadata
+     *
+     * @param visitorContext            The groovy visitor context
+     * @param annotatedNode             The annotated node
+     * @param annotationMetadataFactory The annotation metadata factory
      */
-    protected AbstractGroovyElement(GroovyVisitorContext visitorContext, AnnotatedNode annotatedNode, AnnotationMetadata annotationMetadata) {
+    protected AbstractGroovyElement(GroovyVisitorContext visitorContext,
+                                    AnnotatedNode annotatedNode,
+                                    ElementAnnotationMetadataFactory annotationMetadataFactory) {
         this.visitorContext = visitorContext;
         this.compilationUnit = visitorContext.getCompilationUnit();
         this.annotatedNode = annotatedNode;
-        this.annotationMetadata = annotationMetadata;
+        this.elementAnnotationMetadataFactory = annotationMetadataFactory;
         this.sourceUnit = visitorContext.getSourceUnit();
+    }
+
+    private ElementAnnotationMetadata getElementAnnotationMetadata() {
+        if (elementAnnotationMetadata == null) {
+            if (presetAnnotationMetadata == null) {
+                elementAnnotationMetadata = elementAnnotationMetadataFactory.build(this);
+            } else {
+                elementAnnotationMetadata = elementAnnotationMetadataFactory.build(this, presetAnnotationMetadata);
+            }
+        }
+        return elementAnnotationMetadata;
+    }
+
+    /**
+     * @return the copy
+     */
+    protected abstract AbstractGroovyElement copyThis();
+
+    /**
+     * @param element the values to be copied to
+     */
+    protected void copyValues(AbstractGroovyElement element) {
+        element.presetAnnotationMetadata = presetAnnotationMetadata;
+    }
+
+    protected final AbstractGroovyElement makeCopy() {
+        AbstractGroovyElement element = copyThis();
+        copyValues(element);
+        return element;
+    }
+
+    @Override
+    public io.micronaut.inject.ast.Element withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
+        AbstractGroovyElement element = makeCopy();
+        element.presetAnnotationMetadata = annotationMetadata;
+        return element;
     }
 
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
-        return annotationMetadata;
+        return getElementAnnotationMetadata().get();
+    }
+
+    @Override
+    public AnnotatedNode getNativeType() {
+        return annotatedNode;
     }
 
     @Override
@@ -93,85 +144,46 @@ public abstract class AbstractGroovyElement implements AnnotationMetadataDelegat
     @CompileStatic
     @Override
     public <T extends Annotation> Element annotate(@NonNull String annotationType, @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
-        ArgumentUtils.requireNonNull("annotationType", annotationType);
-        AnnotationValueBuilder<T> builder = AnnotationValue.builder(annotationType);
-        //noinspection ConstantConditions
-        if (consumer != null) {
-
-            consumer.accept(builder);
-            AnnotationValue<T> av = builder.build();
-            this.annotationMetadata = new GroovyAnnotationMetadataBuilder(sourceUnit, compilationUnit).annotate(
-                    this.annotationMetadata,
-                    av
-            );
-            updateAnnotationCaches();
-        }
+        getElementAnnotationMetadata().annotate(annotationType, consumer);
         return this;
     }
 
     @Override
     public <T extends Annotation> Element annotate(AnnotationValue<T> annotationValue) {
-        ArgumentUtils.requireNonNull("annotationValue", annotationValue);
-        this.annotationMetadata = new GroovyAnnotationMetadataBuilder(sourceUnit, compilationUnit).annotate(
-                this.annotationMetadata,
-                annotationValue
-        );
-        updateAnnotationCaches();
+        getElementAnnotationMetadata().annotate(annotationValue);
         return this;
     }
 
     @Override
     public Element removeAnnotation(@NonNull String annotationType) {
-        ArgumentUtils.requireNonNull("annotationType", annotationType);
-        this.annotationMetadata = new GroovyAnnotationMetadataBuilder(sourceUnit, compilationUnit).removeAnnotation(
-                this.annotationMetadata, annotationType
-        );
-        updateAnnotationCaches();
+        getElementAnnotationMetadata().removeAnnotation(annotationType);
         return this;
     }
 
     @Override
     public <T extends Annotation> Element removeAnnotationIf(@NonNull Predicate<AnnotationValue<T>> predicate) {
-        ArgumentUtils.requireNonNull("predicate", predicate);
-        this.annotationMetadata = new GroovyAnnotationMetadataBuilder(sourceUnit, compilationUnit).removeAnnotationIf(
-                this.annotationMetadata, predicate
-        );
-        updateAnnotationCaches();
+        getElementAnnotationMetadata().removeAnnotationIf(predicate);
         return this;
-
     }
 
     @Override
     public Element removeStereotype(@NonNull String annotationType) {
-        ArgumentUtils.requireNonNull("annotationType", annotationType);
-        this.annotationMetadata = new GroovyAnnotationMetadataBuilder(sourceUnit, compilationUnit).removeStereotype(
-                this.annotationMetadata, annotationType
-        );
-        updateAnnotationCaches();
+        getElementAnnotationMetadata().removeStereotype(annotationType);
         return this;
-    }
-
-    private void updateAnnotationCaches() {
-        String declaringTypeName = this instanceof MemberElement ? ((MemberElement) this).getOwningType().getName() : getName();
-        AbstractAnnotationMetadataBuilder.addMutatedMetadata(
-                declaringTypeName,
-                annotatedNode,
-                this.annotationMetadata
-        );
-        AstAnnotationUtils.invalidateCache(annotatedNode);
     }
 
     /**
      * Align the given generic types.
+     *
      * @param genericsTypes The generic types
      * @param redirectTypes The redirect types
-     * @param genericsSpec The current generics spec
+     * @param genericsSpec  The current generics spec
      * @return The new generic spec
      */
     protected Map<String, ClassNode> alignNewGenericsInfo(
-            @NonNull GenericsType[] genericsTypes,
-            @NonNull GenericsType[] redirectTypes,
-            @NonNull Map<String, ClassNode> genericsSpec) {
+        @NonNull GenericsType[] genericsTypes,
+        @NonNull GenericsType[] redirectTypes,
+        @NonNull Map<String, ClassNode> genericsSpec) {
         if (redirectTypes == null || redirectTypes.length != genericsTypes.length) {
             return Collections.emptyMap();
         } else {
@@ -273,18 +285,19 @@ public abstract class AbstractGroovyElement implements AnnotationMetadataDelegat
 
     /**
      * Get a generic element for the given element and data.
-     * @param sourceUnit The source unit
-     * @param type The type
-     * @param rawElement A raw element to fall back to
+     *
+     * @param sourceUnit   The source unit
+     * @param type         The type
+     * @param rawElement   A raw element to fall back to
      * @param genericsSpec The generics spec
      * @return The element, never null.
      */
     @NonNull
     protected ClassElement getGenericElement(
-            @NonNull SourceUnit sourceUnit,
-            @NonNull ClassNode type,
-            @NonNull ClassElement rawElement,
-            @NonNull Map<String, ClassNode> genericsSpec) {
+        @NonNull SourceUnit sourceUnit,
+        @NonNull ClassNode type,
+        @NonNull ClassElement rawElement,
+        @NonNull Map<String, ClassNode> genericsSpec) {
         if (CollectionUtils.isNotEmpty(genericsSpec)) {
             ClassElement classNode = resolveGenericType(genericsSpec, type);
             if (classNode != null) {
@@ -294,9 +307,9 @@ public abstract class AbstractGroovyElement implements AnnotationMetadataDelegat
                 GenericsType[] redirectTypes = type.redirect().getGenericsTypes();
                 if (genericsTypes != null && redirectTypes != null) {
                     genericsSpec = alignNewGenericsInfo(genericsTypes, redirectTypes, genericsSpec);
-                    return new GroovyClassElement(visitorContext, type, annotationMetadata, Collections.singletonMap(
-                            type.getName(),
-                            genericsSpec
+                    return new GroovyClassElement(visitorContext, type, elementAnnotationMetadataFactory, Collections.singletonMap(
+                        type.getName(),
+                        genericsSpec
                     ), 0);
                 }
             }
@@ -312,9 +325,8 @@ public abstract class AbstractGroovyElement implements AnnotationMetadataDelegat
                 if (classNode.isGenericsPlaceHolder() && classNode != returnType) {
                     return resolveGenericType(typeGenericInfo, classNode);
                 } else {
-                    AnnotationMetadata annotationMetadata = resolveAnnotationMetadata(classNode);
                     return this.visitorContext.getElementFactory().newClassElement(
-                            classNode, annotationMetadata
+                        classNode, resolveElementAnnotationMetadataFactory(classNode)
                     );
                 }
             }
@@ -328,9 +340,8 @@ public abstract class AbstractGroovyElement implements AnnotationMetadataDelegat
                         return resolveGenericType(typeGenericInfo, classNode);
                     } else {
                         ClassNode cn = classNode.makeArray();
-                        AnnotationMetadata annotationMetadata = resolveAnnotationMetadata(cn);
                         return this.visitorContext.getElementFactory().newClassElement(
-                                cn, annotationMetadata
+                            cn, resolveElementAnnotationMetadataFactory(cn)
                         );
                     }
                 }
@@ -347,19 +358,15 @@ public abstract class AbstractGroovyElement implements AnnotationMetadataDelegat
         return Optional.of(JAVADOC_PATTERN.matcher(annotatedNode.getGroovydoc().getContent()).replaceAll(StringUtils.EMPTY_STRING).trim());
     }
 
-    /**
-     * Resolves the annotation metadata for the given type.
-     * @param type The type
-     * @return The annotation metadata
-     */
-    protected @NonNull AnnotationMetadata resolveAnnotationMetadata(@NonNull ClassNode type) {
-        AnnotationMetadata annotationMetadata;
+    protected final @NonNull ElementAnnotationMetadataFactory resolveElementAnnotationMetadataFactory(Object nativeType) {
         if (visitorContext.getConfiguration().includeTypeLevelAnnotationsInGenericArguments()) {
-            annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, type);
-        } else {
-            annotationMetadata = AnnotationMetadata.EMPTY_METADATA;
+            return elementAnnotationMetadataFactory;
         }
-        return annotationMetadata;
+        return emptyAnnotationsForNativeType(nativeType);
+    }
+
+    protected final ElementAnnotationMetadataFactory emptyAnnotationsForNativeType(Object nativeType) {
+        return elementAnnotationMetadataFactory.overrideForNativeType(nativeType, element -> elementAnnotationMetadataFactory.build(element, AnnotationMetadata.EMPTY_METADATA));
     }
 
     @Override
@@ -381,6 +388,7 @@ public abstract class AbstractGroovyElement implements AnnotationMetadataDelegat
 
     /**
      * Resolve modifiers for a method node.
+     *
      * @param methodNode The method node
      * @return The modifiers
      */
@@ -390,6 +398,7 @@ public abstract class AbstractGroovyElement implements AnnotationMetadataDelegat
 
     /**
      * Resolve modifiers for a field node.
+     *
      * @param fieldNode The field node
      * @return The modifiers
      */
@@ -399,6 +408,7 @@ public abstract class AbstractGroovyElement implements AnnotationMetadataDelegat
 
     /**
      * Resolve modifiers for a class node.
+     *
      * @param classNode The class node
      * @return The modifiers
      */

@@ -967,7 +967,8 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     }
 
     private void pushAnnotationMetadata(ClassWriter classWriter, GeneratorAdapter staticInit, AnnotationMetadata annotationMetadata) {
-        if (annotationMetadata == AnnotationMetadata.EMPTY_METADATA || annotationMetadata.isEmpty()) {
+        annotationMetadata = annotationMetadata.unwrap();
+        if (annotationMetadata.isEmpty()) {
             staticInit.push((String) null);
         } else if (annotationMetadata instanceof AnnotationMetadataReference) {
             AnnotationMetadataReference reference = (AnnotationMetadataReference) annotationMetadata;
@@ -990,7 +991,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
                     defaults,
                     loadTypeMethods);
         } else {
-            staticInit.push((String) null);
+            throw new IllegalStateException("Unknown annotation metadata:  " + annotationMetadata);
         }
     }
 

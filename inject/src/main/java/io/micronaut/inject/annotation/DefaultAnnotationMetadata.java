@@ -85,10 +85,12 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     Map<String, List<String>> annotationsByStereotype;
     @Nullable
     Map<String, Map<CharSequence, Object>> annotationDefaultValues;
+    @Nullable
     Map<String, String> repeated = null;
-
+    @Nullable
+    Set<String> sourceRetentionAnnotations;
     private Map<String, List> annotationValuesByType = new ConcurrentHashMap<>(2);
-    private Set<String> sourceRetentionAnnotations;
+
     private final boolean hasPropertyExpressions;
     // This should be removed in the next major version
     private final boolean useRepeatableDefaults;
@@ -229,22 +231,22 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     }
 
     @Override
-    public <E extends Enum> Optional<E> enumValue(@NonNull String annotation, Class<E> enumType) {
+    public <E extends Enum<E>> Optional<E> enumValue(@NonNull String annotation, Class<E> enumType) {
         return enumValue(annotation, VALUE_MEMBER, enumType, null);
     }
 
     @Override
-    public <E extends Enum> Optional<E> enumValue(@NonNull String annotation, @NonNull String member, Class<E> enumType) {
+    public <E extends Enum<E>> Optional<E> enumValue(@NonNull String annotation, @NonNull String member, Class<E> enumType) {
         return enumValue(annotation, member, enumType, null);
     }
 
     @Override
-    public <E extends Enum> Optional<E> enumValue(@NonNull Class<? extends Annotation> annotation, Class<E> enumType) {
+    public <E extends Enum<E>> Optional<E> enumValue(@NonNull Class<? extends Annotation> annotation, Class<E> enumType) {
         return enumValue(annotation, VALUE_MEMBER, enumType);
     }
 
     @Override
-    public <E extends Enum> Optional<E> enumValue(@NonNull Class<? extends Annotation> annotation, @NonNull String member, Class<E> enumType) {
+    public <E extends Enum<E>> Optional<E> enumValue(@NonNull Class<? extends Annotation> annotation, @NonNull String member, Class<E> enumType) {
         return enumValue(annotation, member, enumType, null);
     }
 
@@ -260,7 +262,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      */
     @Override
     @Internal
-    public <E extends Enum> Optional<E> enumValue(@NonNull Class<? extends Annotation> annotation, @NonNull String member, Class<E> enumType, @Nullable Function<Object, Object> valueMapper) {
+    public <E extends Enum<E>> Optional<E> enumValue(@NonNull Class<? extends Annotation> annotation, @NonNull String member, Class<E> enumType, @Nullable Function<Object, Object> valueMapper) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
         final Repeatable repeatable = annotation.getAnnotation(Repeatable.class);
@@ -276,27 +278,27 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     }
 
     @Override
-    public <E extends Enum> E[] enumValues(@NonNull String annotation, Class<E> enumType) {
+    public <E extends Enum<E>> E[] enumValues(@NonNull String annotation, Class<E> enumType) {
         return enumValues(annotation, VALUE_MEMBER, enumType, null);
     }
 
     @Override
-    public <E extends Enum> E[] enumValues(@NonNull String annotation, @NonNull String member, Class<E> enumType) {
+    public <E extends Enum<E>> E[] enumValues(@NonNull String annotation, @NonNull String member, Class<E> enumType) {
         return enumValues(annotation, member, enumType, null);
     }
 
     @Override
-    public <E extends Enum> E[] enumValues(@NonNull Class<? extends Annotation> annotation, Class<E> enumType) {
+    public <E extends Enum<E>> E[] enumValues(@NonNull Class<? extends Annotation> annotation, Class<E> enumType) {
         return enumValues(annotation, VALUE_MEMBER, enumType, null);
     }
 
     @Override
-    public <E extends Enum> E[] enumValues(@NonNull Class<? extends Annotation> annotation, @NonNull String member, Class<E> enumType) {
+    public <E extends Enum<E>> E[] enumValues(@NonNull Class<? extends Annotation> annotation, @NonNull String member, Class<E> enumType) {
         return enumValues(annotation, member, enumType, null);
     }
 
     @Override
-    public <E extends Enum> E[] enumValues(@NonNull Class<? extends Annotation> annotation, @NonNull String member, Class<E> enumType, @Nullable Function<Object, Object> valueMapper) {
+    public <E extends Enum<E>> E[] enumValues(@NonNull Class<? extends Annotation> annotation, @NonNull String member, Class<E> enumType, @Nullable Function<Object, Object> valueMapper) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("enumType", enumType);
         final Repeatable repeatable = annotation.getAnnotation(Repeatable.class);
@@ -313,7 +315,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     }
 
     @Override
-    public <E extends Enum> E[] enumValues(@NonNull String annotation, @NonNull String member, Class<E> enumType, @Nullable Function<Object, Object> valueMapper) {
+    public <E extends Enum<E>> E[] enumValues(@NonNull String annotation, @NonNull String member, Class<E> enumType, @Nullable Function<Object, Object> valueMapper) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("enumType", enumType);
         Object v = getRawValue(annotation, member);
@@ -332,18 +334,18 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      */
     @Override
     @Internal
-    public <E extends Enum> Optional<E> enumValue(@NonNull String annotation, @NonNull String member, Class<E> enumType, @Nullable Function<Object, Object> valueMapper) {
+    public <E extends Enum<E>> Optional<E> enumValue(@NonNull String annotation, @NonNull String member, Class<E> enumType, @Nullable Function<Object, Object> valueMapper) {
         Object rawValue = getRawSingleValue(annotation, member, valueMapper);
         return enumValueOf(enumType, rawValue);
     }
 
-    private <E extends Enum> Optional<E> enumValueOf(Class<E> enumType, Object rawValue) {
+    private <E extends Enum<E>> Optional<E> enumValueOf(Class<E> enumType, Object rawValue) {
         if (rawValue != null) {
             if (enumType.isInstance(rawValue)) {
                 return Optional.of((E) rawValue);
             } else {
                 try {
-                    return Optional.of((E) Enum.valueOf(enumType, rawValue.toString()));
+                    return Optional.of(Enum.valueOf(enumType, rawValue.toString()));
                 } catch (Exception e) {
                     return Optional.empty();
                 }
@@ -1428,6 +1430,11 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     }
 
     @Override
+    public AnnotationMetadata copy() {
+        return clone();
+    }
+
+    @Override
     public DefaultAnnotationMetadata clone() {
         DefaultAnnotationMetadata cloned = new DefaultAnnotationMetadata(
                 declaredAnnotations != null ? cloneMapOfMapValue(declaredAnnotations) : null,
@@ -1440,39 +1447,41 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         if (repeated != null) {
             cloned.repeated = new HashMap<>(repeated);
         }
+        if (sourceRetentionAnnotations != null) {
+            cloned.sourceRetentionAnnotations = new HashSet<>(sourceRetentionAnnotations);
+        }
+        if (annotationDefaultValues != null) {
+            cloned.annotationDefaultValues = cloneMapOfMapValue(annotationDefaultValues);
+        }
         return cloned;
     }
 
     protected final <X, Y, K> Map<K, Map<X, Y>> cloneMapOfMapValue(Map<K, Map<X, Y>> toClone) {
         return toClone.entrySet().stream()
                 .map(e -> new AbstractMap.SimpleEntry<>(e.getKey(), cloneMap(e.getValue())))
-                .collect(Collectors.toMap(AbstractMap.SimpleEntry::getKey, AbstractMap.SimpleEntry::getValue, (a, b) -> a, () -> {
-                    if (toClone instanceof HashMap) {
-                        return new HashMap<>();
-                    }
-                    return new LinkedHashMap<>();
-                }));
+                .collect(Collectors.toMap(AbstractMap.SimpleEntry::getKey, AbstractMap.SimpleEntry::getValue, (a, b) -> a, () -> new LinkedHashMap<>()));
     }
 
     protected final <K, V> Map<K, List<V>> cloneMapOfListValue(Map<K, List<V>> toClone) {
         return toClone.entrySet().stream()
                 .map(e -> new AbstractMap.SimpleEntry<>(e.getKey(), new ArrayList<>(e.getValue())))
-                .collect(Collectors.toMap(AbstractMap.SimpleEntry::getKey, AbstractMap.SimpleEntry::getValue, (a, b) -> a, () -> {
-                    if (toClone instanceof HashMap) {
-                        return new HashMap<>();
-                    }
-                    return new LinkedHashMap<>();
-                }));
+                .collect(Collectors.toMap(AbstractMap.SimpleEntry::getKey, AbstractMap.SimpleEntry::getValue, (a, b) -> a, () -> new LinkedHashMap<>()));
     }
 
     protected final <K, V> Map<K, V> cloneMap(Map<K, V> map) {
-        if (map instanceof HashMap) {
-            return (Map<K, V>) ((HashMap<K, V>) map).clone();
-        }
+        Map<K, V> newMap;
         if (map instanceof LinkedHashMap) {
-            return (Map<K, V>) ((LinkedHashMap<K, V>) map).clone();
+            newMap = (Map<K, V>) ((LinkedHashMap<K, V>) map).clone();
+        } else {
+            newMap = new LinkedHashMap<>(map);
         }
-        return new HashMap<>(map);
+        for (Map.Entry<K, V> entry : newMap.entrySet()) {
+            if (entry.getValue() instanceof Set) {
+                LinkedHashSet<Object> newValue = new LinkedHashSet<>((Collection) entry.getValue());
+                entry.setValue((V) newValue);
+            }
+        }
+        return new HashMap<>(newMap);
     }
 
     /**
@@ -2137,6 +2146,86 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     }
 
     /**
+     * Include the annotation metadata from the other instance of {@link DefaultAnnotationMetadata}.
+     * @param annotationMetadata The annotation metadata
+     * @since 4.0.0
+     */
+    @Internal
+    protected void addAnnotationMetadata(DefaultAnnotationMetadata annotationMetadata) {
+        if (annotationMetadata.declaredAnnotations != null && !annotationMetadata.declaredAnnotations.isEmpty()) {
+            if (declaredAnnotations == null) {
+                declaredAnnotations = new LinkedHashMap<>();
+            }
+            for (Map.Entry<String, Map<CharSequence, Object>> entry : annotationMetadata.declaredAnnotations.entrySet()) {
+                putValues(entry.getKey(), entry.getValue(), declaredAnnotations);
+            }
+        }
+        if (annotationMetadata.declaredStereotypes != null && !annotationMetadata.declaredStereotypes.isEmpty()) {
+            if (declaredStereotypes == null) {
+                declaredStereotypes = new LinkedHashMap<>();
+            }
+            for (Map.Entry<String, Map<CharSequence, Object>> entry : annotationMetadata.declaredStereotypes.entrySet()) {
+                putValues(entry.getKey(), entry.getValue(), declaredStereotypes);
+            }
+        }
+        if (annotationMetadata.allStereotypes != null && !annotationMetadata.allStereotypes.isEmpty()) {
+            if (allStereotypes == null) {
+                allStereotypes = new LinkedHashMap<>();
+            }
+            for (Map.Entry<String, Map<CharSequence, Object>> entry : annotationMetadata.allStereotypes.entrySet()) {
+                putValues(entry.getKey(), entry.getValue(), allStereotypes);
+            }
+        }
+        if (annotationMetadata.allAnnotations != null && !annotationMetadata.allAnnotations.isEmpty()) {
+            if (allAnnotations == null) {
+                allAnnotations = new LinkedHashMap<>();
+            }
+            for (Map.Entry<String, Map<CharSequence, Object>> entry : annotationMetadata.allAnnotations.entrySet()) {
+                putValues(entry.getKey(), entry.getValue(), allAnnotations);
+            }
+        }
+        Map<String, List<String>> source = annotationMetadata.annotationsByStereotype;
+        if (source != null && !source.isEmpty()) {
+            if (annotationsByStereotype == null) {
+                annotationsByStereotype = new LinkedHashMap<>();
+            }
+            for (Map.Entry<String, List<String>> entry : source.entrySet()) {
+                String ann = entry.getKey();
+                List<String> prevValues = annotationsByStereotype.get(ann);
+                if (prevValues == null) {
+                    annotationsByStereotype.put(ann, new ArrayList<>(entry.getValue()));
+                } else {
+                    Set<String> prevValuesSet = new LinkedHashSet<>(prevValues);
+                    prevValuesSet.addAll(entry.getValue());
+                    annotationsByStereotype.put(ann, new ArrayList<>(prevValuesSet));
+                }
+            }
+        }
+        if (annotationMetadata.repeated != null) {
+            if (repeated == null) {
+                repeated = new LinkedHashMap<>(annotationMetadata.repeated);
+            } else {
+                repeated.putAll(annotationMetadata.repeated);
+            }
+        }
+        if (annotationMetadata.sourceRetentionAnnotations != null) {
+            if (sourceRetentionAnnotations == null) {
+                sourceRetentionAnnotations = new HashSet<>(annotationMetadata.sourceRetentionAnnotations);
+            } else {
+                sourceRetentionAnnotations.addAll(annotationMetadata.sourceRetentionAnnotations);
+            }
+        }
+        if (annotationMetadata.annotationDefaultValues != null) {
+            if (annotationDefaultValues == null) {
+                annotationDefaultValues = new LinkedHashMap<>(annotationMetadata.annotationDefaultValues);
+            } else {
+                // No need to merge values
+                annotationDefaultValues.putAll(annotationMetadata.annotationDefaultValues);
+            }
+        }
+    }
+
+    /**
      * Contributes defaults to the given target.
      *
      * <p>WARNING: for internal use only be the framework</p>
@@ -2146,8 +2235,9 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      */
     @Internal
     public static void contributeDefaults(AnnotationMetadata target, AnnotationMetadata source) {
+        source = source.unwrap();
         if (source instanceof AnnotationMetadataHierarchy) {
-            source = source.getDeclaredMetadata();
+            source = ((AnnotationMetadataHierarchy) source).merge();
         }
         if (target instanceof DefaultAnnotationMetadata && source instanceof DefaultAnnotationMetadata) {
             DefaultAnnotationMetadata damTarget = (DefaultAnnotationMetadata) target;
@@ -2180,8 +2270,9 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      */
     @Internal
     public static void contributeRepeatable(AnnotationMetadata target, AnnotationMetadata source) {
+        source = source.unwrap();
         if (source instanceof AnnotationMetadataHierarchy) {
-            source = source.getDeclaredMetadata();
+            source = ((AnnotationMetadataHierarchy) source).merge();
         }
         if (target instanceof DefaultAnnotationMetadata && source instanceof DefaultAnnotationMetadata) {
             DefaultAnnotationMetadata damTarget = (DefaultAnnotationMetadata) target;

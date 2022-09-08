@@ -20,7 +20,13 @@ import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.reflect.ReflectionUtils;
 
 import java.lang.reflect.Array;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.function.IntFunction;
 
 /**
@@ -276,6 +282,25 @@ public class ArrayUtils {
                 Array.set(arr, i, wrapperArray[i]);
             }
             return arr;
+        }
+    }
+
+    /**
+     * Reverse the order of items in array.
+     *
+     * @param input The array
+     * @param <T>   The array type
+     * @since 4.0.0
+     */
+    public static <T> void reverse(T[] input) {
+        final int len = input.length;
+        if (len > 1) {
+            for (int i = 0; i < len / 2; i++) {
+                T temp = input[i];
+                final int pos = len - i - 1;
+                input[i] = input[pos];
+                input[pos] = temp;
+            }
         }
     }
 

@@ -46,7 +46,7 @@ import io.micronaut.inject.annotation.Outer;
 
 @Outer.Inner
 class Test {
-    
+
 }
 """)
 
@@ -255,7 +255,7 @@ public @interface EnumAnn {
 enum MyEnum {
     ONE,
     TWO;
-    
+
     @Override
     public String toString() {
         return this == ONE ? "1" : "2";
@@ -391,14 +391,14 @@ class Test {
 
     void "test basic argument metadata"() {
         given:
-        AnnotationMetadata metadata = buildFieldAnnotationMetadata("annmetawriter12.Test", '''
+        AnnotationMetadata metadata = buildParameterAnnotationMetadata("annmetawriter12.Test", '''
 package annmetawriter12;
 
 @javax.inject.Singleton
 class Test {
 
     void test(@javax.inject.Named("foo") String id) {
-    
+
     }
 }
 ''', 'test', 'id')
@@ -412,7 +412,7 @@ class Test {
 
     void "test argument metadata inheritance"() {
         given:
-        AnnotationMetadata metadata = buildFieldAnnotationMetadata("annmetawriter13.Test", '''
+        AnnotationMetadata metadata = buildParameterAnnotationMetadata("annmetawriter13.Test", '''
 package annmetawriter13;
 
 import java.lang.annotation.*;
@@ -423,7 +423,7 @@ class Test implements TestApi {
     @jakarta.annotation.PostConstruct
     @java.lang.Override
     public void test(String id) {
-    
+
     }
 }
 
@@ -435,7 +435,7 @@ interface TestApi {
 
 @Inherited
 @Retention(RetentionPolicy.RUNTIME)
-@jakarta.inject.Named("foo") 
+@jakarta.inject.Named("foo")
 @interface MyAnn {}
 ''', 'test', 'id')
 

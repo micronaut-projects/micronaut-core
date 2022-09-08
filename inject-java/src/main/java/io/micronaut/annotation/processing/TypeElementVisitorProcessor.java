@@ -15,38 +15,51 @@
  */
 package io.micronaut.annotation.processing;
 
+import io.micronaut.annotation.processing.visitor.JavaClassElement;
+import io.micronaut.annotation.processing.visitor.JavaElementFactory;
 import io.micronaut.annotation.processing.visitor.LoadedVisitor;
 import io.micronaut.aop.Introduction;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Generated;
 import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.version.VersionUtils;
-import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
+import io.micronaut.inject.ProcessingException;
+import io.micronaut.inject.ast.ConstructorElement;
+import io.micronaut.inject.ast.EnumConstantElement;
+import io.micronaut.inject.ast.FieldElement;
+import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
 
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedOptions;
 import javax.lang.model.element.Element;
+import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.ElementScanner8;
-
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -60,11 +73,11 @@ import static javax.lang.model.element.ElementKind.FIELD;
  * @since 1.0
  */
 @SupportedOptions({
-        AbstractInjectAnnotationProcessor.MICRONAUT_PROCESSING_INCREMENTAL,
-        AbstractInjectAnnotationProcessor.MICRONAUT_PROCESSING_ANNOTATIONS,
-        VisitorContext.MICRONAUT_PROCESSING_PROJECT_DIR,
-        VisitorContext.MICRONAUT_PROCESSING_GROUP,
-        VisitorContext.MICRONAUT_PROCESSING_MODULE
+    AbstractInjectAnnotationProcessor.MICRONAUT_PROCESSING_INCREMENTAL,
+    AbstractInjectAnnotationProcessor.MICRONAUT_PROCESSING_ANNOTATIONS,
+    VisitorContext.MICRONAUT_PROCESSING_PROJECT_DIR,
+    VisitorContext.MICRONAUT_PROCESSING_GROUP,
+    VisitorContext.MICRONAUT_PROCESSING_MODULE
 })
 public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcessor {
     private static final SoftServiceLoader<TypeElementVisitor> SERVICE_LOADER = SoftServiceLoader.load(TypeElementVisitor.class, TypeElementVisitorProcessor.class.getClassLoader()).disableFork();
@@ -95,11 +108,13 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
             VISITOR_WARNINGS = Collections.unmodifiableSet(warnings);
         }
     }
+
     private List<LoadedVisitor> loadedVisitors;
     private Collection<TypeElementVisitor> typeElementVisitors;
 
     /**
      * The visited annotation names.
+     *
      * @return The names of all the visited annotations.
      */
     static Set<String> getVisitedAnnotationNames() {
@@ -108,7 +123,6 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
     @Override
     public synchronized void init(ProcessingEnvironment processingEnv) {
-
         super.init(processingEnv);
 
         this.typeElementVisitors = findTypeElementVisitors();
@@ -127,17 +141,11 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
             if (incrementalProcessorKind == visitorKind) {
                 try {
-                    loadedVisitors.add(new LoadedVisitor(
-                            visitor,
-                            javaVisitorContext,
-                            genericUtils,
-                            processingEnv
-                    ));
+                    loadedVisitors.add(new LoadedVisitor(visitor, genericUtils, processingEnv));
                 } catch (TypeNotPresentException | NoClassDefFoundError e) {
                     // ignored, means annotations referenced are not on the classpath
                 }
             }
-
         }
 
         OrderUtil.reverseSort(loadedVisitors);
@@ -149,11 +157,11 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                 error("Error initializing type visitor [%s]: %s", loadedVisitor.getVisitor(), e.getMessage());
             }
         }
-
     }
 
     /**
      * Does this process have any visitors.
+     *
      * @return True if visitors are present.
      */
     protected boolean hasVisitors() {
@@ -173,7 +181,6 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
     }
 
     /**
-     *
      * @return The incremental processor type.
      * @see #GRADLE_PROCESSING_AGGREGATING
      * @see #GRADLE_PROCESSING_ISOLATING
@@ -199,25 +206,24 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
     public Set<String> getSupportedOptions() {
         Stream<String> baseOption = super.getSupportedOptions().stream();
         Stream<String> visitorsOptions = typeElementVisitors
-                .stream()
-                .map(TypeElementVisitor::getSupportedOptions)
-                .flatMap(Collection::stream);
+            .stream()
+            .map(TypeElementVisitor::getSupportedOptions)
+            .flatMap(Collection::stream);
         Stream<String> visitorsAnnotationsOptions = typeElementVisitors
-                .stream()
-                .filter(tev -> tev.getClass().isAnnotationPresent(SupportedOptions.class))
-                .map(TypeElementVisitor::getClass)
-                .map(cls -> (SupportedOptions) cls.getAnnotation(SupportedOptions.class))
-                .flatMap((SupportedOptions supportedOptions) -> Arrays.stream(supportedOptions.value()));
+            .stream()
+            .filter(tev -> tev.getClass().isAnnotationPresent(SupportedOptions.class))
+            .map(TypeElementVisitor::getClass)
+            .map(cls -> (SupportedOptions) cls.getAnnotation(SupportedOptions.class))
+            .flatMap((SupportedOptions supportedOptions) -> Arrays.stream(supportedOptions.value()));
         return Stream.of(baseOption, visitorsAnnotationsOptions, visitorsOptions)
-                .flatMap(Stream::sequential)
-                .collect(Collectors.toSet());
+            .flatMap(Stream::sequential)
+            .collect(Collectors.toSet());
     }
 
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
-
         if (!loadedVisitors.isEmpty() && !(annotations.size() == 1
-                && Generated.class.getName().equals(annotations.iterator().next().getQualifiedName().toString()))) {
+            && Generated.class.getName().equals(annotations.iterator().next().getQualifiedName().toString()))) {
 
             TypeElement groovyObjectTypeElement = elementUtils.getTypeElement("groovy.lang.GroovyObject");
             TypeMirror groovyObjectType = groovyObjectTypeElement != null ? groovyObjectTypeElement.asType() : null;
@@ -236,6 +242,9 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
             if (!elements.isEmpty()) {
 
+                JavaElementFactory elementFactory = javaVisitorContext.getElementFactory();
+                JavaElementAnnotationMetadataFactory elementAnnotationMetadataFactory = javaVisitorContext.getElementAnnotationMetadataFactory();
+
                 // The visitor X with a higher priority should process elements of A before
                 // the visitor Y which is processing elements of B but also using elements A
 
@@ -244,11 +253,22 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
                 for (LoadedVisitor loadedVisitor : loadedVisitors) {
                     for (TypeElement typeElement : elements) {
-                        if (!loadedVisitor.matches(typeElement)) {
+                        try {
+                            JavaClassElement javaClassElement = elementFactory.newSourceClassElement(
+                                typeElement,
+                                elementAnnotationMetadataFactory
+                            );
+                            if (!loadedVisitor.matchesClass(javaClassElement)) {
+                                continue;
+                            }
+                            String className = typeElement.getQualifiedName().toString();
+                            typeElement.accept(new ElementVisitor(javaClassElement, typeElement, Collections.singletonList(loadedVisitor)), className);
+                        } catch (ProcessingException e) {
+                            error((Element) e.getOriginatingElement(), e.getMessage());
+                        } catch (PostponeToNextRoundException e) {
+                            // Ignore
                             continue;
                         }
-                        String className = typeElement.getQualifiedName().toString();
-                        typeElement.accept(new ElementVisitor(typeElement, Collections.singletonList(loadedVisitor)), className);
                     }
                 }
             }
@@ -283,14 +303,13 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
     private void includeElements(Set<TypeElement> target,
                                  Set<? extends Element> annotatedElements, TypeMirror groovyObjectType) {
         annotatedElements
-                .stream()
-                .filter(element -> JavaModelUtils.isClassOrInterface(element) || JavaModelUtils.isEnum(element) || JavaModelUtils.isRecord(element))
-                .map(modelUtils::classElementFor)
-                .filter(Objects::nonNull)
-                .filter(element -> element.getAnnotation(Generated.class) == null)
-                .filter(typeElement -> groovyObjectType == null || !typeUtils.isAssignable(typeElement.asType(),
-                                                                                           groovyObjectType))
-                .forEach(target::add);
+            .stream()
+            .filter(element -> JavaModelUtils.isClassOrInterface(element) || JavaModelUtils.isEnum(element) || JavaModelUtils.isRecord(element))
+            .map(modelUtils::classElementFor)
+            .filter(Objects::nonNull)
+            .filter(element -> element.getAnnotation(Generated.class) == null)
+            .filter(typeElement -> groovyObjectType == null || !typeUtils.isAssignable(typeElement.asType(), groovyObjectType))
+            .forEach(target::add);
     }
 
     /**
@@ -320,31 +339,31 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
     private static @NonNull
     Collection<TypeElementVisitor> findCoreTypeElementVisitors(
-            @Nullable Set<String> warnings) {
+        @Nullable Set<String> warnings) {
         return SERVICE_LOADER.collectAll(visitor -> {
-            if (!visitor.isEnabled()) {
-                return false;
-            }
+                if (!visitor.isEnabled()) {
+                    return false;
+                }
 
-            final Requires requires = visitor.getClass().getAnnotation(Requires.class);
-            if (requires != null) {
-                final Requires.Sdk sdk = requires.sdk();
-                if (sdk == Requires.Sdk.MICRONAUT) {
-                    final String version = requires.version();
-                    if (StringUtils.isNotEmpty(version) && !VersionUtils.isAtLeastMicronautVersion(version)) {
-                        try {
-                            if (warnings != null) {
-                                warnings.add("TypeElementVisitor [" + visitor.getClass().getName() + "] will be ignored because Micronaut version [" + VersionUtils.MICRONAUT_VERSION + "] must be at least " + version);
+                final Requires requires = visitor.getClass().getAnnotation(Requires.class);
+                if (requires != null) {
+                    final Requires.Sdk sdk = requires.sdk();
+                    if (sdk == Requires.Sdk.MICRONAUT) {
+                        final String version = requires.version();
+                        if (StringUtils.isNotEmpty(version) && !VersionUtils.isAtLeastMicronautVersion(version)) {
+                            try {
+                                if (warnings != null) {
+                                    warnings.add("TypeElementVisitor [" + visitor.getClass().getName() + "] will be ignored because Micronaut version [" + VersionUtils.MICRONAUT_VERSION + "] must be at least " + version);
+                                }
+                                return false;
+                            } catch (IllegalArgumentException e) {
+                                // shouldn't happen, thrown when invalid version encountered
                             }
-                            return false;
-                        } catch (IllegalArgumentException e) {
-                            // shouldn't happen, thrown when invalid version encountered
                         }
                     }
                 }
-            }
-            return true;
-        }).stream()
+                return true;
+            }).stream()
             // remove duplicate classes
             .collect(Collectors.toMap(v -> v.getClass(), v -> v, (a, b) -> a)).values();
     }
@@ -356,8 +375,10 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
         private final TypeElement concreteClass;
         private final List<LoadedVisitor> visitors;
+        private JavaClassElement javaClassElement;
 
-        ElementVisitor(TypeElement concreteClass, List<LoadedVisitor> visitors) {
+        ElementVisitor(JavaClassElement javaClassElement, TypeElement concreteClass, List<LoadedVisitor> visitors) {
+            this.javaClassElement = javaClassElement;
             this.concreteClass = concreteClass;
             this.visitors = visitors;
         }
@@ -370,28 +391,29 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
         @Override
         public Object visitType(TypeElement classElement, Object o) {
-
-            AnnotationMetadata typeAnnotationMetadata = annotationUtils.getAnnotationMetadata(classElement);
+            if (!classElement.equals(javaClassElement.getNativeTypeElement())) {
+                javaClassElement = javaVisitorContext.getElementFactory().newSourceClassElement(
+                    classElement,
+                    javaVisitorContext.getElementAnnotationMetadataFactory()
+                );
+            }
             for (LoadedVisitor visitor : visitors) {
-                final io.micronaut.inject.ast.Element resultingElement = visitor.visit(classElement, typeAnnotationMetadata);
-                if (resultingElement != null) {
-                    typeAnnotationMetadata = resultingElement.getAnnotationMetadata();
-                }
+                visitor.getVisitor().visitClass(javaClassElement, javaVisitorContext);
             }
 
             Element enclosingElement = classElement.getEnclosingElement();
             // don't process inner class unless this is the visitor for it
             boolean shouldVisit = !JavaModelUtils.isClass(enclosingElement) ||
-                    concreteClass.getQualifiedName().equals(classElement.getQualifiedName());
+                concreteClass.getQualifiedName().equals(classElement.getQualifiedName());
             if (shouldVisit) {
-                if (typeAnnotationMetadata.hasStereotype(Introduction.class) || (typeAnnotationMetadata.hasStereotype(Introspected.class) && modelUtils.isAbstract(classElement))) {
+                if (javaClassElement.hasStereotype(Introduction.class) || (javaClassElement.hasStereotype(Introspected.class) && javaClassElement.isAbstract())) {
                     classElement.asType().accept(new PublicAbstractMethodVisitor<Object, Object>(classElement, javaVisitorContext) {
                         @Override
                         protected void accept(DeclaredType type, Element element, Object o) {
                             if (element instanceof ExecutableElement) {
                                 ElementVisitor.this.visitExecutable(
-                                        (ExecutableElement) element,
-                                        o
+                                    (ExecutableElement) element,
+                                    o
                                 );
                             }
                         }
@@ -400,23 +422,14 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                 } else if (JavaModelUtils.isEnum(classElement)) {
                     return scan(classElement.getEnclosedElements(), o);
                 } else {
-                    List<TypeElement> classes = new ArrayList<>();
                     List<? extends Element> elements = enclosedElements(classElement);
                     Object value = null;
                     for (Element element : elements) {
                         if (element instanceof TypeElement) {
-                            classes.add((TypeElement) element);
+                            // Ignore any inner classes, annotation processor will process them if needed
+                            continue;
                         } else {
                             value = scan(element, o);
-                        }
-                    }
-                    // TypeElementVisitor needs to process type's methods first and then all inner classes
-                    for (TypeElement typeElement : classes) {
-                        value = scan(typeElement, o);
-                        for (LoadedVisitor visitor : visitors) {
-                            if (visitor.matches(typeElement)) {
-                                value = scan(enclosedElements(typeElement), o);
-                            }
                         }
                     }
                     return value;
@@ -432,7 +445,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
             // collect fields and methods, skip overrides
             while (superClass != null && !modelUtils.isObjectClass(superClass)) {
                 List<? extends Element> elements = superClass.getEnclosedElements();
-                for (Element elt1: elements) {
+                for (Element elt1 : elements) {
                     if (elt1 instanceof ExecutableElement) {
                         checkMethodOverride(enclosedElements, elt1);
                     } else if (elt1 instanceof VariableElement) {
@@ -446,8 +459,8 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
         private void checkFieldHide(List<Element> enclosedElements, Element elt1) {
             boolean hides = false;
-            for (Element elt2: enclosedElements) {
-                if (elt1.equals(elt2) || ! (elt2 instanceof VariableElement)) {
+            for (Element elt2 : enclosedElements) {
+                if (elt1.equals(elt2) || !(elt2 instanceof VariableElement)) {
                     continue;
                 }
                 if (elementUtils.hides(elt2, elt1)) {
@@ -455,62 +468,59 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                     break;
                 }
             }
-            if (! hides) {
+            if (!hides) {
                 enclosedElements.add(elt1);
             }
         }
 
         private void checkMethodOverride(List<Element> enclosedElements, Element elt1) {
             boolean overrides = false;
-            for (Element elt2: enclosedElements) {
-                if (elt1.equals(elt2) || ! (elt2 instanceof ExecutableElement)) {
+            for (Element elt2 : enclosedElements) {
+                if (elt1.equals(elt2) || !(elt2 instanceof ExecutableElement)) {
                     continue;
                 }
-                if (elementUtils.overrides((ExecutableElement) elt2, (ExecutableElement) elt1,  modelUtils.classElementFor(elt2))) {
+                if (elementUtils.overrides((ExecutableElement) elt2, (ExecutableElement) elt1, modelUtils.classElementFor(elt2))) {
                     overrides = true;
                     break;
                 }
             }
-            if (! overrides) {
+            if (!overrides) {
                 enclosedElements.add(elt1);
             }
         }
 
         @Override
         public Object visitExecutable(ExecutableElement executableElement, Object o) {
-            final AnnotationMetadata resolvedMethodMetadata = annotationUtils.getAnnotationMetadata(executableElement);
-
-            AnnotationMetadata methodAnnotationMetadata;
-
-            if (resolvedMethodMetadata instanceof AnnotationMetadataHierarchy) {
-                methodAnnotationMetadata = resolvedMethodMetadata;
-            } else {
-                methodAnnotationMetadata = new AnnotationMetadataHierarchy(
-                        annotationUtils.getAnnotationMetadata(executableElement.getEnclosingElement()),
-                        resolvedMethodMetadata
-                );
+            if (javaClassElement == null) {
+                return null;
             }
             if (executableElement.getSimpleName().toString().equals("<init>")) {
+                ConstructorElement constructorElement = javaVisitorContext.getElementFactory().newConstructorElement(
+                    javaClassElement,
+                    executableElement,
+                    javaVisitorContext.getElementAnnotationMetadataFactory()
+                );
                 for (LoadedVisitor visitor : visitors) {
-                    final io.micronaut.inject.ast.Element resultingElement = visitor.visit(executableElement, methodAnnotationMetadata);
-                    if (resultingElement != null) {
-                        methodAnnotationMetadata = resultingElement.getAnnotationMetadata();
+                    if (visitor.matchesElement(constructorElement)) {
+                        visitor.getVisitor().visitConstructor(constructorElement, javaVisitorContext);
                     }
                 }
-            } else {
-
-                for (LoadedVisitor visitor : visitors) {
-                    if (visitor.matches(methodAnnotationMetadata)) {
-                        final io.micronaut.inject.ast.Element resultingElement = visitor.visit(executableElement, methodAnnotationMetadata);
-                        if (resultingElement != null) {
-                            methodAnnotationMetadata = resultingElement.getAnnotationMetadata();
-                        }
-                    }
+                return constructorElement;
+            }
+            MethodElement methodElement = javaVisitorContext.getElementFactory().newSourceMethodElement(
+                javaClassElement,
+                executableElement,
+                javaVisitorContext.getElementAnnotationMetadataFactory()
+            );
+            if (methodElement.getDeclaringType().isAssignable(Enum.class)) {
+                return null;
+            }
+            for (LoadedVisitor visitor : visitors) {
+                if (visitor.matchesElement(methodElement)) {
+                    visitor.getVisitor().visitMethod(methodElement, javaVisitorContext);
                 }
             }
-
-
-            return null;
+            return methodElement;
         }
 
         @Override
@@ -519,19 +529,31 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
             if (variable.getKind() != FIELD) {
                 return null;
             }
-
-            AnnotationMetadata fieldAnnotationMetadata = annotationUtils.getAnnotationMetadata(variable);
-
-            for (LoadedVisitor visitor : visitors) {
-                if (visitor.matches(fieldAnnotationMetadata)) {
-                    final io.micronaut.inject.ast.Element resultingElement = visitor.visit(variable, fieldAnnotationMetadata);
-                    if (resultingElement != null) {
-                        fieldAnnotationMetadata = resultingElement.getAnnotationMetadata();
+            if (variable.getKind() == ElementKind.ENUM_CONSTANT) {
+                EnumConstantElement constantElement = javaVisitorContext.getElementFactory().newEnumConstantElement(
+                    javaClassElement,
+                    variable,
+                    javaVisitorContext.getElementAnnotationMetadataFactory()
+                );
+                for (LoadedVisitor visitor : visitors) {
+                    if (visitor.matchesElement(constantElement)) {
+                        visitor.getVisitor().visitEnumConstant(constantElement, javaVisitorContext);
                     }
                 }
+                return constantElement;
             }
-
-            return null;
+            FieldElement fieldElement = javaVisitorContext.getElementFactory()
+                .newFieldElement(
+                    javaClassElement,
+                    variable,
+                    javaVisitorContext.getElementAnnotationMetadataFactory()
+                );
+            for (LoadedVisitor visitor : visitors) {
+                if (visitor.matchesElement(fieldElement)) {
+                    visitor.getVisitor().visitField(fieldElement, javaVisitorContext);
+                }
+            }
+            return fieldElement;
         }
     }
 }

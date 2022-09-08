@@ -15,8 +15,8 @@
  */
 package io.micronaut.annotation.processing.visitor;
 
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
 
 import javax.lang.model.element.PackageElement;
 
@@ -32,16 +32,20 @@ public class JavaPackageElement extends AbstractJavaElement implements io.micron
     private final PackageElement element;
 
     /**
-     * @param element            The {@link PackageElement}
-     * @param annotationMetadata The Annotation metadata
-     * @param visitorContext     The Java visitor context
+     * @param element                   The {@link PackageElement}
+     * @param annotationMetadataFactory The annotation metadata factory
+     * @param visitorContext            The Java visitor context
      */
-    public JavaPackageElement(
-            PackageElement element,
-            AnnotationMetadata annotationMetadata,
-            JavaVisitorContext visitorContext) {
-        super(element, annotationMetadata, visitorContext);
+    public JavaPackageElement(PackageElement element,
+                              ElementAnnotationMetadataFactory annotationMetadataFactory,
+                              JavaVisitorContext visitorContext) {
+        super(element, annotationMetadataFactory, visitorContext);
         this.element = element;
+    }
+
+    @Override
+    protected AbstractJavaElement copyThis() {
+        return new JavaPackageElement(element, elementAnnotationMetadataFactory, visitorContext);
     }
 
     @Override
@@ -52,5 +56,10 @@ public class JavaPackageElement extends AbstractJavaElement implements io.micron
     @Override
     public String getSimpleName() {
         return element.getSimpleName().toString();
+    }
+
+    @Override
+    public boolean isUnnamed() {
+        return element.isUnnamed();
     }
 }

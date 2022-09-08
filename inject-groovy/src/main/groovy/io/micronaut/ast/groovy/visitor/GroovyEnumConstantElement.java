@@ -15,17 +15,18 @@
  */
 package io.micronaut.ast.groovy.visitor;
 
-import java.util.Set;
-
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.ElementModifier;
 import io.micronaut.inject.ast.EnumConstantElement;
-
+import io.micronaut.inject.ast.MemberElement;
 import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.FieldNode;
+
+import java.util.Set;
 
 /**
  * A enum constant element returning data from a {@link org.codehaus.groovy.ast.Variable}.
@@ -39,19 +40,29 @@ public final class GroovyEnumConstantElement extends AbstractGroovyElement imple
     private final FieldNode variable;
 
     /**
-     * @param declaringEnum      The declaring enum
-     * @param visitorContext     The visitor context
-     * @param variable           The {@link org.codehaus.groovy.ast.Variable}
-     * @param annotatedNode      The annotated node
-     * @param annotationMetadata The annotation medatada
+     * @param declaringEnum             The declaring enum
+     * @param visitorContext            The visitor context
+     * @param variable                  The {@link org.codehaus.groovy.ast.Variable}
+     * @param annotatedNode             The annotated node
+     * @param annotationMetadataFactory The annotation medatada
      */
-    GroovyEnumConstantElement(
-            GroovyClassElement declaringEnum,
-            GroovyVisitorContext visitorContext,
-            FieldNode variable, AnnotatedNode annotatedNode, AnnotationMetadata annotationMetadata) {
-        super(visitorContext, annotatedNode, annotationMetadata);
+    GroovyEnumConstantElement(GroovyClassElement declaringEnum,
+                              GroovyVisitorContext visitorContext,
+                              FieldNode variable, AnnotatedNode annotatedNode,
+                              ElementAnnotationMetadataFactory annotationMetadataFactory) {
+        super(visitorContext, annotatedNode, annotationMetadataFactory);
         this.declaringEnum = declaringEnum;
         this.variable = variable;
+    }
+
+    @Override
+    protected AbstractGroovyElement copyThis() {
+        return new GroovyEnumConstantElement(declaringEnum, visitorContext, variable, getNativeType(), elementAnnotationMetadataFactory);
+    }
+
+    @Override
+    public MemberElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
+        return (MemberElement) super.withAnnotationMetadata(annotationMetadata);
     }
 
     @Override
@@ -121,7 +132,7 @@ public final class GroovyEnumConstantElement extends AbstractGroovyElement imple
     }
 
     @Override
-    public Object getNativeType() {
+    public FieldNode getNativeType() {
         return variable;
     }
 

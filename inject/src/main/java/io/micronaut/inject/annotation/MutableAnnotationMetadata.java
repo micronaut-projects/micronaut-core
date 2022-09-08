@@ -16,6 +16,7 @@
 package io.micronaut.inject.annotation;
 
 import io.micronaut.context.env.DefaultPropertyPlaceholderResolver;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -25,6 +26,7 @@ import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -63,6 +65,30 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
         this.hasPropertyExpressions = hasPropertyExpressions;
     }
 
+    public static MutableAnnotationMetadata of(AnnotationMetadata annotationMetadata) {
+        if (annotationMetadata.isEmpty()) {
+            return new MutableAnnotationMetadata();
+        }
+        annotationMetadata = annotationMetadata.unwrap();
+        if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
+            return  ((AnnotationMetadataHierarchy) annotationMetadata).merge();
+        } else if (annotationMetadata instanceof MutableAnnotationMetadata) {
+            return  ((MutableAnnotationMetadata) annotationMetadata).clone();
+        } else if (annotationMetadata instanceof DefaultAnnotationMetadata) {
+            MutableAnnotationMetadata metadata = new MutableAnnotationMetadata();
+            metadata.addAnnotationMetadata((DefaultAnnotationMetadata) annotationMetadata);
+            return metadata;
+        } else {
+            throw new IllegalStateException("Unknown annotation metadata: " + annotationMetadata);
+        }
+    }
+
+    @Override
+    protected void addAnnotationMetadata(DefaultAnnotationMetadata annotationMetadata) {
+        hasPropertyExpressions |= annotationMetadata.hasPropertyExpressions();
+        super.addAnnotationMetadata(annotationMetadata);
+    }
+
     @Override
     public boolean hasPropertyExpressions() {
         return hasPropertyExpressions;
@@ -84,6 +110,13 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
         if (repeated != null) {
             cloned.repeated = new HashMap<>(repeated);
         }
+        if (sourceRetentionAnnotations != null) {
+            cloned.sourceRetentionAnnotations = new HashSet<>(sourceRetentionAnnotations);
+        }
+        if (annotationDefaultValues != null) {
+            cloned.annotationDefaultValues = cloneMapOfMapValue(annotationDefaultValues);
+        }
+        cloned.hasPropertyExpressions = hasPropertyExpressions;
         return cloned;
     }
 

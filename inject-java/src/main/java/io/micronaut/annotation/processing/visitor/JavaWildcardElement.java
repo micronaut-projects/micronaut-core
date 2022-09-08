@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ArrayableClassElement;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.WildcardElement;
 
 import javax.lang.model.type.WildcardType;
@@ -38,13 +39,16 @@ final class JavaWildcardElement extends JavaClassElement implements WildcardElem
     private final List<JavaClassElement> upperBounds;
     private final List<JavaClassElement> lowerBounds;
 
-    JavaWildcardElement(@NonNull WildcardType wildcardType, @NonNull List<JavaClassElement> upperBounds, @NonNull List<JavaClassElement> lowerBounds) {
+    JavaWildcardElement(ElementAnnotationMetadataFactory elementAnnotationMetadataFactory,
+                        @NonNull WildcardType wildcardType,
+                        @NonNull List<JavaClassElement> upperBounds,
+                        @NonNull List<JavaClassElement> lowerBounds) {
         super(
-                upperBounds.get(0).classElement,
-                upperBounds.get(0).getAnnotationMetadata(),
-                upperBounds.get(0).visitorContext,
-                upperBounds.get(0).typeArguments,
-                upperBounds.get(0).getGenericTypeInfo()
+            upperBounds.get(0).classElement,
+            elementAnnotationMetadataFactory,
+            upperBounds.get(0).visitorContext,
+            upperBounds.get(0).typeArguments,
+            upperBounds.get(0).getGenericTypeInfo()
         );
         this.wildcardType = wildcardType;
         this.upperBounds = upperBounds;
@@ -80,7 +84,7 @@ final class JavaWildcardElement extends JavaClassElement implements WildcardElem
     public ClassElement foldBoundGenericTypes(@NonNull Function<ClassElement, ClassElement> fold) {
         List<JavaClassElement> upperBounds = this.upperBounds.stream().map(ele -> toJavaClassElement(ele.foldBoundGenericTypes(fold))).collect(Collectors.toList());
         List<JavaClassElement> lowerBounds = this.lowerBounds.stream().map(ele -> toJavaClassElement(ele.foldBoundGenericTypes(fold))).collect(Collectors.toList());
-        return fold.apply(upperBounds.contains(null) || lowerBounds.contains(null) ? null : new JavaWildcardElement(wildcardType, upperBounds, lowerBounds));
+        return fold.apply(upperBounds.contains(null) || lowerBounds.contains(null) ? null : new JavaWildcardElement(elementAnnotationMetadataFactory, wildcardType, upperBounds, lowerBounds));
     }
 
     private JavaClassElement toJavaClassElement(ClassElement element) {
@@ -90,10 +94,10 @@ final class JavaWildcardElement extends JavaClassElement implements WildcardElem
             if (element.isWildcard() || element.isGenericPlaceholder()) {
                 throw new UnsupportedOperationException("Cannot convert wildcard / free type variable to JavaClassElement");
             } else {
-                return (JavaClassElement) ((ArrayableClassElement) visitorContext.getClassElement(element.getName())
-                        .orElseThrow(() -> new UnsupportedOperationException("Cannot convert ClassElement to JavaClassElement, class was not found on the visitor context")))
-                        .withArrayDimensions(element.getArrayDimensions())
-                        .withBoundGenericTypes(element.getBoundGenericTypes());
+                return (JavaClassElement) ((ArrayableClassElement) visitorContext.getClassElement(element.getName(), elementAnnotationMetadataFactory)
+                    .orElseThrow(() -> new UnsupportedOperationException("Cannot convert ClassElement to JavaClassElement, class was not found on the visitor context")))
+                    .withArrayDimensions(element.getArrayDimensions())
+                    .withBoundGenericTypes(element.getBoundGenericTypes());
             }
         }
     }

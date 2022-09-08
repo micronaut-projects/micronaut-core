@@ -38,22 +38,22 @@ final class EmptyAnnotationMetadata implements AnnotationMetadata {
     }
 
     @Override
-    public <E extends Enum> E[] enumValues(@NonNull String annotation, Class<E> enumType) {
+    public <E extends Enum<E>> E[] enumValues(@NonNull String annotation, Class<E> enumType) {
         return (E[]) Array.newInstance(enumType, 0);
     }
 
     @Override
-    public <E extends Enum> E[] enumValues(@NonNull String annotation, @NonNull String member, Class<E> enumType) {
+    public <E extends Enum<E>> E[] enumValues(@NonNull String annotation, @NonNull String member, Class<E> enumType) {
         return (E[]) Array.newInstance(enumType, 0);
     }
 
     @Override
-    public <E extends Enum> E[] enumValues(@NonNull Class<? extends Annotation> annotation, Class<E> enumType) {
+    public <E extends Enum<E>> E[] enumValues(@NonNull Class<? extends Annotation> annotation, Class<E> enumType) {
         return (E[]) Array.newInstance(enumType, 0);
     }
 
     @Override
-    public <E extends Enum> E[] enumValues(@NonNull Class<? extends Annotation> annotation, @NonNull String member, Class<E> enumType) {
+    public <E extends Enum<E>> E[] enumValues(@NonNull Class<? extends Annotation> annotation, @NonNull String member, Class<E> enumType) {
         return (E[]) Array.newInstance(enumType, 0);
     }
 
@@ -277,22 +277,22 @@ final class EmptyAnnotationMetadata implements AnnotationMetadata {
     }
 
     @Override
-    public <E extends Enum> Optional<E> enumValue(@NonNull String annotation, Class<E> enumType) {
+    public <E extends Enum<E>> Optional<E> enumValue(@NonNull String annotation, Class<E> enumType) {
         return Optional.empty();
     }
 
     @Override
-    public <E extends Enum> Optional<E> enumValue(@NonNull String annotation, @NonNull String member, Class<E> enumType) {
+    public <E extends Enum<E>> Optional<E> enumValue(@NonNull String annotation, @NonNull String member, Class<E> enumType) {
         return Optional.empty();
     }
 
     @Override
-    public <E extends Enum> Optional<E> enumValue(@NonNull Class<? extends Annotation> annotation, Class<E> enumType) {
+    public <E extends Enum<E>> Optional<E> enumValue(@NonNull Class<? extends Annotation> annotation, Class<E> enumType) {
         return Optional.empty();
     }
 
     @Override
-    public <E extends Enum> Optional<E> enumValue(@NonNull Class<? extends Annotation> annotation, @NonNull String member, Class<E> enumType) {
+    public <E extends Enum<E>> Optional<E> enumValue(@NonNull Class<? extends Annotation> annotation, @NonNull String member, Class<E> enumType) {
         return Optional.empty();
     }
 
@@ -557,5 +557,10 @@ final class EmptyAnnotationMetadata implements AnnotationMetadata {
     @Override
     public boolean isEmpty() {
         return true;
+    }
+
+    @Override
+    public AnnotationMetadata copy() {
+        return this;
     }
 }

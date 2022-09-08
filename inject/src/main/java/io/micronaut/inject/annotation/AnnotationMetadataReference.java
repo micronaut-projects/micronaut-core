@@ -52,4 +52,10 @@ public class AnnotationMetadataReference implements AnnotationMetadataDelegate {
     public String getClassName() {
         return className;
     }
+
+    @Override
+    public AnnotationMetadata unwrap() {
+        // Don't unwrap the reference
+        return this;
+    }
 }

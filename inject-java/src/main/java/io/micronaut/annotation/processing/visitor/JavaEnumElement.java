@@ -15,9 +15,9 @@
  */
 package io.micronaut.annotation.processing.visitor;
 
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.EnumConstantElement;
 import io.micronaut.inject.ast.EnumElement;
 
@@ -25,7 +25,6 @@ import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -43,22 +42,27 @@ class JavaEnumElement extends JavaClassElement implements EnumElement {
     protected List<String> values;
 
     /**
-     * @param classElement       The {@link TypeElement}
-     * @param annotationMetadata The annotation metadata
-     * @param visitorContext The visitor context
+     * @param classElement              The {@link TypeElement}
+     * @param annotationMetadataFactory The annotation metadata factory
+     * @param visitorContext            The visitor context
      */
-    JavaEnumElement(TypeElement classElement, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext) {
-        this(classElement, annotationMetadata, visitorContext, 0);
+    JavaEnumElement(TypeElement classElement,
+                    ElementAnnotationMetadataFactory annotationMetadataFactory,
+                    JavaVisitorContext visitorContext) {
+        this(classElement, annotationMetadataFactory, visitorContext, 0);
     }
 
     /**
-     * @param classElement       The {@link TypeElement}
-     * @param annotationMetadata The annotation metadata
-     * @param visitorContext     The visitor context
-     * @param arrayDimensions    The number of array dimensions
+     * @param classElement              The {@link TypeElement}
+     * @param annotationMetadataFactory The annotation metadata factory
+     * @param visitorContext            The visitor context
+     * @param arrayDimensions           The number of array dimensions
      */
-    JavaEnumElement(TypeElement classElement, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext, int arrayDimensions) {
-        super(classElement, annotationMetadata, visitorContext, Collections.emptyList(), Collections.emptyMap(), arrayDimensions, false);
+    JavaEnumElement(TypeElement classElement,
+                    ElementAnnotationMetadataFactory annotationMetadataFactory,
+                    JavaVisitorContext visitorContext,
+                    int arrayDimensions) {
+        super(classElement, annotationMetadataFactory, visitorContext, Collections.emptyList(), Collections.emptyMap(), arrayDimensions, false);
     }
 
     @Override
@@ -86,9 +90,13 @@ class JavaEnumElement extends JavaClassElement implements EnumElement {
         for (Element element : nativeType.getEnclosedElements()) {
             if (element.getKind() == ElementKind.ENUM_CONSTANT) {
                 values.add(element.getSimpleName().toString());
-                enumConstants.add(new JavaEnumConstantElement(this, (VariableElement) element,
-                        visitorContext.getAnnotationUtils().newAnnotationBuilder().build(element),
-                        visitorContext));
+                enumConstants.add(
+                    new JavaEnumConstantElement(
+                        this,
+                        (VariableElement) element,
+                        elementAnnotationMetadataFactory,
+                        visitorContext)
+                );
             }
         }
         values = Collections.unmodifiableList(values);
@@ -97,6 +105,6 @@ class JavaEnumElement extends JavaClassElement implements EnumElement {
 
     @Override
     public ClassElement withArrayDimensions(int arrayDimensions) {
-        return new JavaEnumElement(classElement, getAnnotationMetadata(), visitorContext, arrayDimensions);
+        return new JavaEnumElement(classElement, elementAnnotationMetadataFactory, visitorContext, arrayDimensions);
     }
 }

@@ -22,3 +22,10 @@ tasks.named("shadowJar") {
     relocate "org.objectweb.asm", "io.micronaut.asm"
 }
 
+micronautBuild {
+    binaryCompatibility {
+        // Enable before Micronaut 4 release
+        enabled.set(false)
+    }
+}
+

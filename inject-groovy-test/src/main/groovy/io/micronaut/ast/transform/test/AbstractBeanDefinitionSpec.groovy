@@ -18,8 +18,6 @@ package io.micronaut.ast.transform.test
 import groovy.transform.CompileStatic
 import io.micronaut.aop.internal.InterceptorRegistryBean
 import io.micronaut.ast.groovy.annotation.GroovyAnnotationMetadataBuilder
-import io.micronaut.ast.groovy.utils.AstAnnotationUtils
-import io.micronaut.ast.groovy.utils.ExtendedParameter
 import io.micronaut.ast.groovy.utils.InMemoryByteCodeGroovyClassLoader
 import io.micronaut.ast.groovy.visitor.GroovyElementFactory
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
@@ -71,9 +69,9 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
             def cc = new CompilerConfiguration()
             def sourceUnit = new SourceUnit("test", source, cc, new GroovyClassLoader(), new ErrorCollector(cc))
             def compilationUnit = new CompilationUnit()
-            def metadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, cn)
-            def elementFactory = new GroovyElementFactory(new GroovyVisitorContext(sourceUnit, compilationUnit))
-            return elementFactory.newClassElement(cn, metadata)
+            def visitorContext = new GroovyVisitorContext(sourceUnit, compilationUnit)
+            def elementFactory = new GroovyElementFactory(visitorContext)
+            return elementFactory.newClassElement(cn, visitorContext.getElementAnnotationMetadataFactory())
         } else {
             throw new IllegalArgumentException("No class found in passed source code")
         }
@@ -87,9 +85,9 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
                     def cc = new CompilerConfiguration()
                     def sourceUnit = new SourceUnit("test", source, cc, new GroovyClassLoader(), new ErrorCollector(cc))
                     def compilationUnit = new CompilationUnit()
-                    def metadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, node)
-                    def elementFactory = new GroovyElementFactory(new GroovyVisitorContext(sourceUnit, compilationUnit))
-                    return elementFactory.newClassElement(node, metadata)
+                    def visitorContext = new GroovyVisitorContext(sourceUnit, compilationUnit)
+                    def elementFactory = new GroovyElementFactory(visitorContext)
+                    return elementFactory.newClassElement(node, visitorContext.getElementAnnotationMetadataFactory())
                 }
             }
         }
@@ -187,7 +185,7 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
         def sourceUnit = Mock(SourceUnit)
         sourceUnit.getErrorCollector() >> new ErrorCollector(new CompilerConfiguration())
         GroovyAnnotationMetadataBuilder builder = new GroovyAnnotationMetadataBuilder(sourceUnit, null)
-        AnnotationMetadata metadata = element != null ? builder.build(element) : null
+        AnnotationMetadata metadata = element != null ? builder.lookupOrBuildForType(element) : null
         AbstractAnnotationMetadataBuilder.copyToRuntime()
         return metadata
     }
@@ -198,17 +196,17 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
         GroovyAnnotationMetadataBuilder builder = new GroovyAnnotationMetadataBuilder(Stub(SourceUnit) {
             getErrorCollector() >> null
         }, null)
-        AnnotationMetadata metadata = method != null ? builder.build(method) : null
+        AnnotationMetadata metadata = method != null ? builder.lookupOrBuildForMethod(element,  method) : null
         AbstractAnnotationMetadataBuilder.copyToRuntime()
         return metadata
     }
 
-    AnnotationMetadata buildFieldAnnotationMetadata(String cls, @Language("groovy") String source, String methodName, String fieldName) {
+    AnnotationMetadata buildParameterAnnotationMetadata(String cls, @Language("groovy") String source, String methodName, String fieldName) {
         ClassNode element = buildClassNode(source, cls)
         MethodNode method = element.getMethods(methodName)[0]
         Parameter parameter = Arrays.asList(method.getParameters()).find { it.name == fieldName }
         GroovyAnnotationMetadataBuilder builder = new GroovyAnnotationMetadataBuilder(null, null)
-        AnnotationMetadata metadata = method != null ? builder.build(new ExtendedParameter(method, parameter)) : null
+        AnnotationMetadata metadata = method != null ? builder.lookupOrBuildForParameter(element, method, parameter) : null
         AbstractAnnotationMetadataBuilder.copyToRuntime()
         return metadata
     }

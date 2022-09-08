@@ -50,11 +50,14 @@ class Parent {
 
         expect:
         introspection != null
-        allClassesVisitor.visitedClassElements[0].beanProperties.size() == 2
-        allClassesVisitor.visitedClassElements[0].beanProperties[0].name == 'name'
-        allClassesVisitor.visitedClassElements[0].beanProperties[0].declaringType.name == 'test.Test'
-        allClassesVisitor.visitedClassElements[0].beanProperties[1].name == 'bar'
-        allClassesVisitor.visitedClassElements[0].beanProperties[1].declaringType.name == 'test.Parent'
+        def properties = allClassesVisitor.visitedClassElements[0].beanProperties
+        properties.size() == 2
+        def nameProp = properties.find { it.name == "name"}
+        nameProp.name == 'name'
+        nameProp.declaringType.name == 'test.Test'
+        def barProp = properties.find { it.name == "bar"}
+        barProp.name == 'bar'
+        barProp.declaringType.name == 'test.Parent'
         // result is 6 because the Parent is visited through Test and by itself
         allClassesVisitor.visitedMethodElements.size() == 6
     }

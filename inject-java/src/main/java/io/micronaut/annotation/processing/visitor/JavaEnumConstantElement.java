@@ -15,15 +15,16 @@
  */
 package io.micronaut.annotation.processing.visitor;
 
-import java.util.Set;
-
-import javax.lang.model.element.VariableElement;
-
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.ElementModifier;
 import io.micronaut.inject.ast.EnumConstantElement;
+import io.micronaut.inject.ast.MemberElement;
+
+import javax.lang.model.element.VariableElement;
+import java.util.Set;
 
 /**
  * Implements the {@link io.micronaut.inject.ast.EnumElement} interface for Java.
@@ -35,21 +36,33 @@ final class JavaEnumConstantElement extends AbstractJavaElement implements EnumC
 
     private final JavaVisitorContext visitorContext;
     private final VariableElement variableElement;
-    private final JavaClassElement declaringEnum;
+    private final JavaEnumElement declaringEnum;
 
     /**
-     * @param declaringEnum      The declaring enum element
-     * @param variableElement    The {@link javax.lang.model.element.ExecutableElement}
-     * @param annotationMetadata The annotation metadata
-     * @param visitorContext     The visitor context
+     * @param declaringEnum             The declaring enum element
+     * @param variableElement           The {@link javax.lang.model.element.ExecutableElement}
+     * @param annotationMetadataFactory The annotation metadata factory
+     * @param visitorContext            The visitor context
      */
-    JavaEnumConstantElement(JavaEnumElement declaringEnum, VariableElement variableElement,
-                            AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext) {
-        super(variableElement, annotationMetadata, visitorContext);
+    JavaEnumConstantElement(JavaEnumElement declaringEnum,
+                            VariableElement variableElement,
+                            ElementAnnotationMetadataFactory annotationMetadataFactory,
+                            JavaVisitorContext visitorContext) {
+        super(variableElement, annotationMetadataFactory, visitorContext);
 
         this.declaringEnum = declaringEnum;
         this.variableElement = variableElement;
         this.visitorContext = visitorContext;
+    }
+
+    @Override
+    protected AbstractJavaElement copyThis() {
+        return new JavaEnumConstantElement(declaringEnum, variableElement, elementAnnotationMetadataFactory, visitorContext);
+    }
+
+    @Override
+    public MemberElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
+        return (MemberElement) super.withAnnotationMetadata(annotationMetadata);
     }
 
     @Override

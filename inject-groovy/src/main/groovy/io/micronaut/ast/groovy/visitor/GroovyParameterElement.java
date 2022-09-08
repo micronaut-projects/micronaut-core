@@ -15,15 +15,14 @@
  */
 package io.micronaut.ast.groovy.visitor;
 
-import io.micronaut.ast.groovy.utils.AstAnnotationUtils;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.ParameterElement;
-import org.codehaus.groovy.ast.Parameter;
-
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
+import io.micronaut.inject.ast.ParameterElement;
+import org.codehaus.groovy.ast.Parameter;
 
 /**
  * Implementation of {@link ParameterElement} for Groovy.
@@ -42,15 +41,28 @@ public class GroovyParameterElement extends AbstractGroovyElement implements Par
     /**
      * Default constructor.
      *
-     * @param methodElement      The parent method element
-     * @param visitorContext     The visitor context
-     * @param parameter          The parameter
-     * @param annotationMetadata The annotation metadata
+     * @param methodElement             The parent method element
+     * @param visitorContext            The visitor context
+     * @param parameter                 The parameter
+     * @param elementAnnotationMetadata The annotation metadata
      */
-    GroovyParameterElement(GroovyMethodElement methodElement, GroovyVisitorContext visitorContext, Parameter parameter, AnnotationMetadata annotationMetadata) {
-        super(visitorContext, parameter, annotationMetadata);
+    GroovyParameterElement(GroovyMethodElement methodElement,
+                           GroovyVisitorContext visitorContext,
+                           Parameter parameter,
+                           ElementAnnotationMetadataFactory elementAnnotationMetadata) {
+        super(visitorContext, parameter, elementAnnotationMetadata);
         this.parameter = parameter;
         this.methodElement = methodElement;
+    }
+
+    @Override
+    protected AbstractGroovyElement copyThis() {
+        return new GroovyParameterElement(methodElement, visitorContext, parameter, elementAnnotationMetadataFactory);
+    }
+
+    @Override
+    public ParameterElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
+        return (ParameterElement) super.withAnnotationMetadata(annotationMetadata);
     }
 
     @Override
@@ -94,16 +106,22 @@ public class GroovyParameterElement extends AbstractGroovyElement implements Par
     }
 
     @Override
-    public Object getNativeType() {
+    public Parameter getNativeType() {
         return parameter;
+    }
+
+    @Override
+    public GroovyMethodElement getMethodElement() {
+        return methodElement;
     }
 
     @NonNull
     @Override
     public ClassElement getType() {
         if (this.typeElement == null) {
-            this.typeElement = visitorContext.getElementFactory().newClassElement(parameter.getType(), AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, parameter.getType()));
+            this.typeElement = visitorContext.getElementFactory().newClassElement(parameter.getType(), elementAnnotationMetadataFactory);
         }
         return this.typeElement;
     }
+
 }

@@ -13,7 +13,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package io.micronaut.core.annotation;
+
+import java.lang.annotation.Documented;
+import java.lang.annotation.Inherited;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+
 /**
- * Package to organize classes responsible for validating executable methods at compile time.
+ * Documents the code change that needs to be done in the next major version.
+ *
+ * @author Denis Stepanov
+ * @since 4.0.0
  */
-package io.micronaut.validation.executable;
+@Retention(RetentionPolicy.SOURCE)
+@Documented
+@Inherited
+public @interface NextMajorVersion {
+
+    /**
+     * @return the message
+     */
+    String value();
+
+}

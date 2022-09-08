@@ -22,17 +22,17 @@ import io.micronaut.inject.BeanFactory
 
 class VisibilityIssuesSpec extends AbstractBeanDefinitionSpec {
 
-    void "test extending a class with protected method in a different package fails compilation"() {
+    void "test extending a class with protected method in a different package"() {
         given:
         BeanDefinition beanDefinition = buildBeanDefinition("io.micronaut.inject.configproperties.ChildConfigProperties", """
             package io.micronaut.inject.configproperties;
-            
+
             import io.micronaut.context.annotation.ConfigurationProperties;
             import io.micronaut.inject.configproperties.other.ParentConfigProperties;
-            
+
             @ConfigurationProperties("child")
             class ChildConfigProperties extends ParentConfigProperties {
-                
+
                 Integer age
             }
         """)
@@ -45,7 +45,7 @@ class VisibilityIssuesSpec extends AbstractBeanDefinitionSpec {
         def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
 
         then:
-        instance.getName() == "Sally"
+            instance.getName() == null //methods that require reflection are not injected
         instance.getAge() == 22
         instance.getBuilder().build().getManufacturer() == 'Chevy'
 
@@ -53,31 +53,15 @@ class VisibilityIssuesSpec extends AbstractBeanDefinitionSpec {
         context.close()
     }
 
-    void "test extending a class with protected field in a different package fails compilation"() {
-        given:
-        BeanDefinition beanDefinition = buildBeanDefinition("io.micronaut.inject.configproperties.ChildConfigProperties", """
-            package io.micronaut.inject.configproperties;
-            
-            import io.micronaut.context.annotation.ConfigurationProperties;
-            import io.micronaut.inject.configproperties.other.ParentConfigProperties;
-            
-            @ConfigurationProperties("child")
-            class ChildConfigProperties extends ParentConfigProperties {
-                
-                protected void setName(String name) {
-                    super.setName(name)
-                }
- 
-            }
-        """)
-
+    void "test extending a class with protected field in a different package"() {
         when:
-        //not configured with parent.child.name because non public methods are ignored
-        def context = ApplicationContext.run('parent.nationality': 'Italian', 'parent.name': 'Sally')
-        def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
+        // Micronaut 3: not configured with parent.child.name because non public methods are ignored
+        // Micronaut 4: correctly using parent.child.name
+        def context = ApplicationContext.run('parent.nationality': 'Italian', 'parent.child.name': 'Sally')
+        def instance = context.getBean(ChildConfigProperties)
 
         then:
-        instance.nationality == "Italian"
+        instance.nationality == "Italian" //fields that require reflection are injected
         instance.getName() == 'Sally'
 
         cleanup:

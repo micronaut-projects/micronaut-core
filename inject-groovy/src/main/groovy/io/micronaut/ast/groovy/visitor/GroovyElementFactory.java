@@ -15,15 +15,23 @@
  */
 package io.micronaut.ast.groovy.visitor;
 
-import io.micronaut.ast.groovy.config.GroovyConfigurationMetadataBuilder;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import io.micronaut.ast.groovy.annotation.GroovyElementAnnotationMetadataFactory;
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.inject.ast.*;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ConstructorElement;
+import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
+import io.micronaut.inject.ast.ElementFactory;
+import io.micronaut.inject.ast.EnumConstantElement;
+import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
-import org.codehaus.groovy.ast.*;
-import org.codehaus.groovy.control.CompilationUnit;
-import org.codehaus.groovy.control.SourceUnit;
+import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
+import org.codehaus.groovy.ast.AnnotatedNode;
+import org.codehaus.groovy.ast.ClassHelper;
+import org.codehaus.groovy.ast.ClassNode;
+import org.codehaus.groovy.ast.ConstructorNode;
+import org.codehaus.groovy.ast.FieldNode;
+import org.codehaus.groovy.ast.MethodNode;
 
 import java.util.Map;
 
@@ -34,60 +42,56 @@ import java.util.Map;
  * @since 2.3.0
  */
 public class GroovyElementFactory implements ElementFactory<AnnotatedNode, ClassNode, MethodNode, FieldNode> {
-    private final SourceUnit sourceUnit;
-    private final CompilationUnit compilationUnit;
     private final GroovyVisitorContext visitorContext;
 
     public GroovyElementFactory(GroovyVisitorContext groovyVisitorContext) {
-        this.visitorContext =  groovyVisitorContext;
-        this.sourceUnit = groovyVisitorContext.getSourceUnit();
-        this.compilationUnit = groovyVisitorContext.getCompilationUnit();
+        this.visitorContext = groovyVisitorContext;
     }
 
-    @NonNull
+    private ElementAnnotationMetadataFactory defaultAnnotationMetadata(Object nativeType,
+                                                                       AnnotationMetadata annotationMetadata) {
+        GroovyElementAnnotationMetadataFactory elementAnnotationMetadataFactory = visitorContext.getElementAnnotationMetadataFactory();
+        return elementAnnotationMetadataFactory.overrideForNativeType(nativeType, element -> elementAnnotationMetadataFactory.build(element, annotationMetadata));
+    }
+
     @Override
-    public ClassElement newClassElement(@NonNull ClassNode classNode, @NonNull AnnotationMetadata annotationMetadata) {
+    public ClassElement newClassElement(ClassNode classNode, ElementAnnotationMetadataFactory annotationMetadataFactory) {
         if (classNode.isArray()) {
             ClassNode componentType = classNode.getComponentType();
-            ClassElement componentElement = newClassElement(componentType, annotationMetadata);
+            ClassElement componentElement = newClassElement(componentType, annotationMetadataFactory);
             return componentElement.toArray();
-        } else if (ClassHelper.isPrimitiveType(classNode)) {
+        }
+        if (ClassHelper.isPrimitiveType(classNode)) {
             return PrimitiveElement.valueOf(classNode.getName());
-        } else if (classNode.isEnum()) {
-            return new GroovyEnumElement(visitorContext, classNode, annotationMetadata);
-        } else if (classNode.isAnnotationDefinition()) {
-            return new GroovyAnnotationElement(visitorContext, classNode, annotationMetadata);
-        } else if (classNode.isGenericsPlaceHolder()) {
-            return new GroovyGenericPlaceholderElement(visitorContext, classNode, annotationMetadata, 0);
+        }
+        if (classNode.isEnum()) {
+            return new GroovyEnumElement(visitorContext, classNode, annotationMetadataFactory);
+        }
+        if (classNode.isAnnotationDefinition()) {
+            return new GroovyAnnotationElement(visitorContext, classNode, annotationMetadataFactory);
+        }
+        if (classNode.isGenericsPlaceHolder()) {
+            return new GroovyGenericPlaceholderElement(visitorContext, classNode, annotationMetadataFactory, 0);
         } else {
-            return new GroovyClassElement(visitorContext, classNode, annotationMetadata);
+            return new GroovyClassElement(visitorContext, classNode, annotationMetadataFactory);
         }
     }
 
     @NonNull
     @Override
-    public ClassElement newClassElement(@NonNull ClassNode classNode, @NonNull AnnotationMetadata annotationMetadata, @NonNull Map<String, ClassElement> resolvedGenerics) {
+    public ClassElement newClassElement(ClassNode classNode,
+                                        ElementAnnotationMetadataFactory annotationMetadataFactory,
+                                        Map<String, ClassElement> resolvedGenerics) {
         if (classNode.isArray()) {
             ClassNode componentType = classNode.getComponentType();
-            ClassElement componentElement = newClassElement(componentType, annotationMetadata);
+            ClassElement componentElement = newClassElement(componentType, annotationMetadataFactory);
             return componentElement.toArray();
-        } else if (ClassHelper.isPrimitiveType(classNode)) {
+        }
+        if (ClassHelper.isPrimitiveType(classNode)) {
             return PrimitiveElement.valueOf(classNode.getName());
-        } else if (classNode.isEnum()) {
-            return new GroovyEnumElement(visitorContext, classNode, annotationMetadata) {
-                @NonNull
-                @Override
-                public Map<String, ClassElement> getTypeArguments() {
-                    if (resolvedGenerics != null) {
-                        return resolvedGenerics;
-                    }
-                    return super.getTypeArguments();
-                }
-            };
-        } else if (classNode.isAnnotationDefinition()) {
-            return new GroovyAnnotationElement(visitorContext, classNode, annotationMetadata);
-        } else {
-            return new GroovyClassElement(visitorContext, classNode, annotationMetadata) {
+        }
+        if (classNode.isEnum()) {
+            return new GroovyEnumElement(visitorContext, classNode, annotationMetadataFactory) {
                 @NonNull
                 @Override
                 public Map<String, ClassElement> getTypeArguments() {
@@ -98,80 +102,99 @@ public class GroovyElementFactory implements ElementFactory<AnnotatedNode, Class
                 }
             };
         }
+        if (classNode.isAnnotationDefinition()) {
+            return new GroovyAnnotationElement(visitorContext, classNode, annotationMetadataFactory);
+        }
+        return new GroovyClassElement(visitorContext, classNode, annotationMetadataFactory) {
+            @NonNull
+            @Override
+            public Map<String, ClassElement> getTypeArguments() {
+                if (resolvedGenerics != null) {
+                    return resolvedGenerics;
+                }
+                return super.getTypeArguments();
+            }
+        };
     }
 
     @NonNull
     @Override
-    public MethodElement newMethodElement(ClassElement declaringClass, @NonNull MethodNode method, @NonNull AnnotationMetadata annotationMetadata) {
-        if (!(declaringClass instanceof GroovyClassElement)) {
+    public GroovyMethodElement newMethodElement(ClassElement owningType,
+                                                MethodNode method,
+                                                ElementAnnotationMetadataFactory elementAnnotationMetadataFactory) {
+        if (!(owningType instanceof GroovyClassElement)) {
             throw new IllegalArgumentException("Declaring class must be a GroovyClassElement");
         }
         return new GroovyMethodElement(
-                (GroovyClassElement) declaringClass,
-                visitorContext,
-                method,
-                annotationMetadata
+            (GroovyClassElement) owningType,
+            visitorContext,
+            method,
+            elementAnnotationMetadataFactory
         );
     }
 
     @NonNull
     @Override
-    public ClassElement newSourceClassElement(@NonNull ClassNode classNode, @NonNull AnnotationMetadata annotationMetadata) {
+    public ClassElement newSourceClassElement(ClassNode classNode, ElementAnnotationMetadataFactory annotationMetadataFactory) {
         if (classNode.isArray()) {
             ClassNode componentType = classNode.getComponentType();
-            ClassElement componentElement = newSourceClassElement(componentType, annotationMetadata);
+            ClassElement componentElement = newSourceClassElement(componentType, annotationMetadataFactory);
             return componentElement.toArray();
         } else if (ClassHelper.isPrimitiveType(classNode)) {
             return PrimitiveElement.valueOf(classNode.getName());
         } else if (classNode.isEnum()) {
-            return new GroovyEnumElement(visitorContext, classNode, annotationMetadata) {
+            return new GroovyEnumElement(visitorContext, classNode, annotationMetadataFactory) {
                 @NonNull
                 @Override
                 public BeanElementBuilder addAssociatedBean(@NonNull ClassElement type) {
                     return new GroovyBeanDefinitionBuilder(
-                            this,
-                            type,
-                            new GroovyConfigurationMetadataBuilder(sourceUnit, compilationUnit),
-                            visitorContext
+                        this,
+                        type,
+                        ConfigurationMetadataBuilder.INSTANCE,
+                        annotationMetadataFactory,
+                        visitorContext
                     );
                 }
             };
         } else {
-            return new GroovyClassElement(visitorContext, classNode, annotationMetadata) {
+            return new GroovyClassElement(visitorContext, classNode, annotationMetadataFactory) {
                 @NonNull
                 @Override
                 public BeanElementBuilder addAssociatedBean(@NonNull ClassElement type) {
                     return new GroovyBeanDefinitionBuilder(
-                            this,
-                            type,
-                            new GroovyConfigurationMetadataBuilder(sourceUnit, compilationUnit),
-                            visitorContext
+                        this,
+                        type,
+                        ConfigurationMetadataBuilder.INSTANCE,
+                        annotationMetadataFactory,
+                        visitorContext
                     );
                 }
             };
         }
     }
 
-    @NonNull
     @Override
-    public MethodElement newSourceMethodElement(ClassElement declaringClass, @NonNull MethodNode method, @NonNull AnnotationMetadata annotationMetadata) {
-        if (!(declaringClass instanceof GroovyClassElement)) {
+    public GroovyMethodElement newSourceMethodElement(ClassElement owningType,
+                                                MethodNode method,
+                                                ElementAnnotationMetadataFactory elementAnnotationMetadataFactory) {
+        if (!(owningType instanceof GroovyClassElement)) {
             throw new IllegalArgumentException("Declaring class must be a GroovyClassElement");
         }
         return new GroovyMethodElement(
-                (GroovyClassElement) declaringClass,
-                visitorContext,
-                method,
-                annotationMetadata
+            (GroovyClassElement) owningType,
+            visitorContext,
+            method,
+            elementAnnotationMetadataFactory
         ) {
             @NonNull
             @Override
             public BeanElementBuilder addAssociatedBean(@NonNull ClassElement type) {
                 return new GroovyBeanDefinitionBuilder(
-                        this,
-                        type,
-                        new GroovyConfigurationMetadataBuilder(sourceUnit, compilationUnit),
-                        visitorContext
+                    this,
+                    type,
+                    ConfigurationMetadataBuilder.INSTANCE,
+                    elementAnnotationMetadataFactory,
+                    visitorContext
                 );
             }
         };
@@ -179,7 +202,9 @@ public class GroovyElementFactory implements ElementFactory<AnnotatedNode, Class
 
     @NonNull
     @Override
-    public ConstructorElement newConstructorElement(ClassElement declaringClass, @NonNull MethodNode constructor, @NonNull AnnotationMetadata annotationMetadata) {
+    public ConstructorElement newConstructorElement(ClassElement declaringClass,
+                                                    MethodNode constructor,
+                                                    ElementAnnotationMetadataFactory annotationMetadataFactory) {
         if (!(declaringClass instanceof GroovyClassElement)) {
             throw new IllegalArgumentException("Declaring class must be a GroovyClassElement");
         }
@@ -187,91 +212,38 @@ public class GroovyElementFactory implements ElementFactory<AnnotatedNode, Class
             throw new IllegalArgumentException("Constructor must be a ConstructorNode");
         }
         return new GroovyConstructorElement(
-                (GroovyClassElement) declaringClass,
-                visitorContext,
-                (ConstructorNode) constructor,
-                annotationMetadata
+            (GroovyClassElement) declaringClass,
+            visitorContext,
+            (ConstructorNode) constructor,
+            annotationMetadataFactory
         );
     }
 
     @Override
-    public EnumConstantElement newEnumConstantElement(ClassElement declaringClass, FieldNode enumConstant, AnnotationMetadata annotationMetadata) {
+    public EnumConstantElement newEnumConstantElement(ClassElement declaringClass,
+                                                      FieldNode enumConstant,
+                                                      ElementAnnotationMetadataFactory annotationMetadataFactory) {
         if (!(declaringClass instanceof GroovyClassElement)) {
             throw new IllegalArgumentException("Declaring class must be a GroovyEnumElement");
         }
         return new GroovyEnumConstantElement(
-                (GroovyClassElement) declaringClass,
-                visitorContext,
-                enumConstant,
-                enumConstant,
-                annotationMetadata
+            (GroovyClassElement) declaringClass,
+            visitorContext,
+            enumConstant,
+            enumConstant,
+            annotationMetadataFactory
         );
     }
 
     @NonNull
     @Override
-    public FieldElement newFieldElement(ClassElement declaringClass, @NonNull FieldNode field, @NonNull AnnotationMetadata annotationMetadata) {
-        if (!(declaringClass instanceof GroovyClassElement)) {
+    public GroovyFieldElement newFieldElement(ClassElement owningType,
+                                              FieldNode field,
+                                              ElementAnnotationMetadataFactory annotationMetadataFactory) {
+        if (!(owningType instanceof GroovyClassElement)) {
             throw new IllegalArgumentException("Declaring class must be a GroovyClassElement");
         }
-        return new GroovyFieldElement(
-                visitorContext,
-                field,
-                field,
-                annotationMetadata
-        );
-    }
-
-    @NonNull
-    @Override
-    public FieldElement newFieldElement(@NonNull FieldNode field, @NonNull AnnotationMetadata annotationMetadata) {
-        return new GroovyFieldElement(
-                visitorContext,
-                field,
-                field,
-                annotationMetadata
-        );
-    }
-
-    /**
-     * Builds a new field element for the given property.
-     *
-     * @param property              The property
-     * @param annotationMetadata The resolved annotation metadata
-     * @return The field element
-     */
-    public FieldElement newFieldElement(@NonNull PropertyNode property, @NonNull AnnotationMetadata annotationMetadata) {
-        return new GroovyFieldElement(
-                visitorContext,
-                property,
-                property,
-                annotationMetadata
-        );
-    }
-
-    /**
-     * Constructs a new {@link ParameterElement} for the given field element and metadata.
-     * @param field The field
-     * @param annotationMetadata The metadata
-     * @return The parameter element
-     */
-    public ParameterElement newParameterElement(@NonNull FieldElement field, @NonNull AnnotationMetadata annotationMetadata) {
-        if (!(field instanceof GroovyFieldElement)) {
-            throw new IllegalArgumentException("Field must be a GroovyFieldElement");
-        }
-        FieldNode fieldNode = (FieldNode) field.getNativeType();
-        return new GroovyParameterElement(
-                null,
-                visitorContext,
-                new Parameter(fieldNode.getType(), fieldNode.getName()),
-                annotationMetadata
-        ) {
-            @Nullable
-            @Override
-            public ClassElement getGenericType() {
-                return field.getGenericType();
-            }
-        };
+        return new GroovyFieldElement(visitorContext, (GroovyClassElement) owningType, field, annotationMetadataFactory);
     }
 
 }

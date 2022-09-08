@@ -13,8 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package io.micronaut.inject.annotation;
+
+import io.micronaut.core.annotation.Internal;
+
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+
+import static java.lang.annotation.RetentionPolicy.SOURCE;
+
 /**
- * Package to organize classes responsible for validating
- * extensions of internal APIs.
+ * Internal method marks a type, method or a field for validation.
+ *
+ * @author Denis Stepanov
+ * @since 4.0.0
  */
-package io.micronaut.validation.internal;
+@Documented
+@Retention(SOURCE)
+@Target({ElementType.METHOD, ElementType.TYPE, ElementType.FIELD})
+@Internal
+public @interface RequiresValidation {
+}

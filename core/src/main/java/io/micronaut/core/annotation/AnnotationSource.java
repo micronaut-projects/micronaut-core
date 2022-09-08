@@ -299,4 +299,13 @@ public interface AnnotationSource {
         ArgumentUtils.requireNonNull("annotationClass", annotationName);
         return false;
     }
+
+    /**
+     * Unwraps possible delegate or provider.
+     * @return unwrapped
+     * @since 4.0.0
+     */
+    default AnnotationSource unwrap() {
+        return this;
+    }
 }

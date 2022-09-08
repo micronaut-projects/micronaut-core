@@ -29,6 +29,7 @@ import java.util.*;
  * @since 1.0
  */
 public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, AnnotationMetadata {
+
     @Override
     default Set<String> getStereotypeAnnotationNames() {
         return getAnnotationMetadata().getStereotypeAnnotationNames();
@@ -37,6 +38,21 @@ public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, 
     @Override
     default Set<String> getDeclaredStereotypeAnnotationNames() {
         return getAnnotationMetadata().getDeclaredStereotypeAnnotationNames();
+    }
+
+    @Override
+    default <T extends Annotation> List<AnnotationValue<T>> getDeclaredAnnotationValuesByName(String annotationType) {
+        return getAnnotationMetadata().getDeclaredAnnotationValuesByName(annotationType);
+    }
+
+    @Override
+    default <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByName(String annotationType) {
+        return getAnnotationMetadata().getAnnotationValuesByName(annotationType);
+    }
+
+    @Override
+    default <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByStereotype(String stereotype) {
+        return getAnnotationMetadata().getAnnotationValuesByStereotype(stereotype);
     }
 
     @NonNull
@@ -61,22 +77,22 @@ public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, 
     }
 
     @Override
-    default <E extends Enum> E[] enumValues(@NonNull String annotation, Class<E> enumType) {
+    default <E extends Enum<E>> E[] enumValues(@NonNull String annotation, Class<E> enumType) {
         return getAnnotationMetadata().enumValues(annotation, enumType);
     }
 
     @Override
-    default <E extends Enum> E[] enumValues(@NonNull String annotation, @NonNull String member, Class<E> enumType) {
+    default <E extends Enum<E>> E[] enumValues(@NonNull String annotation, @NonNull String member, Class<E> enumType) {
         return getAnnotationMetadata().enumValues(annotation, member, enumType);
     }
 
     @Override
-    default <E extends Enum> E[] enumValues(@NonNull Class<? extends Annotation> annotation, Class<E> enumType) {
+    default <E extends Enum<E>> E[] enumValues(@NonNull Class<? extends Annotation> annotation, Class<E> enumType) {
         return getAnnotationMetadata().enumValues(annotation, enumType);
     }
 
     @Override
-    default <E extends Enum> E[] enumValues(@NonNull Class<? extends Annotation> annotation, @NonNull String member, Class<E> enumType) {
+    default <E extends Enum<E>> E[] enumValues(@NonNull Class<? extends Annotation> annotation, @NonNull String member, Class<E> enumType) {
         return getAnnotationMetadata().enumValues(annotation, member, enumType);
     }
 
@@ -101,22 +117,22 @@ public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, 
     }
 
     @Override
-    default <E extends Enum> Optional<E> enumValue(@NonNull String annotation, Class<E> enumType) {
+    default <E extends Enum<E>> Optional<E> enumValue(@NonNull String annotation, Class<E> enumType) {
         return getAnnotationMetadata().enumValue(annotation, enumType);
     }
 
     @Override
-    default <E extends Enum> Optional<E> enumValue(@NonNull String annotation, @NonNull String member, Class<E> enumType) {
+    default <E extends Enum<E>> Optional<E> enumValue(@NonNull String annotation, @NonNull String member, Class<E> enumType) {
         return getAnnotationMetadata().enumValue(annotation, member, enumType);
     }
 
     @Override
-    default <E extends Enum> Optional<E> enumValue(@NonNull Class<? extends Annotation> annotation, Class<E> enumType) {
+    default <E extends Enum<E>> Optional<E> enumValue(@NonNull Class<? extends Annotation> annotation, Class<E> enumType) {
         return getAnnotationMetadata().enumValue(annotation, enumType);
     }
 
     @Override
-    default <E extends Enum> Optional<E> enumValue(@NonNull Class<? extends Annotation> annotation, @NonNull String member, Class<E> enumType) {
+    default <E extends Enum<E>> Optional<E> enumValue(@NonNull Class<? extends Annotation> annotation, @NonNull String member, Class<E> enumType) {
         return getAnnotationMetadata().enumValue(annotation, member, enumType);
     }
 
@@ -648,5 +664,15 @@ public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, 
     @Override
     default Optional<String> findRepeatableAnnotation(String annotation) {
         return getAnnotationMetadata().findRepeatableAnnotation(annotation);
+    }
+
+    @Override
+    default AnnotationMetadata copy() {
+        return getAnnotationMetadata().copy();
+    }
+
+    @Override
+    default AnnotationMetadata unwrap() {
+        return getAnnotationMetadata().unwrap();
     }
 }

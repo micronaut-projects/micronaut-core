@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ArrayableClassElement;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.WildcardElement;
 
 import java.util.List;
@@ -36,13 +37,15 @@ final class GroovyWildcardElement extends GroovyClassElement implements Wildcard
     private final List<GroovyClassElement> upperBounds;
     private final List<GroovyClassElement> lowerBounds;
 
-    GroovyWildcardElement(@NonNull List<GroovyClassElement> upperBounds, @NonNull List<GroovyClassElement> lowerBounds) {
+    GroovyWildcardElement(@NonNull List<GroovyClassElement> upperBounds,
+                          @NonNull List<GroovyClassElement> lowerBounds,
+                          ElementAnnotationMetadataFactory annotationMetadataFactory) {
         super(
-                upperBounds.get(0).visitorContext,
-                upperBounds.get(0).classNode,
-                upperBounds.get(0).getAnnotationMetadata(),
-                upperBounds.get(0).getGenericTypeInfo(),
-                0
+            upperBounds.get(0).visitorContext,
+            upperBounds.get(0).classNode,
+            annotationMetadataFactory,
+            upperBounds.get(0).getGenericTypeInfo(),
+            0
         );
         this.upperBounds = upperBounds;
         this.lowerBounds = lowerBounds;
@@ -72,7 +75,7 @@ final class GroovyWildcardElement extends GroovyClassElement implements Wildcard
     public ClassElement foldBoundGenericTypes(@NonNull Function<ClassElement, ClassElement> fold) {
         List<GroovyClassElement> upperBounds = this.upperBounds.stream().map(ele -> toGroovyClassElement(ele.foldBoundGenericTypes(fold))).collect(Collectors.toList());
         List<GroovyClassElement> lowerBounds = this.lowerBounds.stream().map(ele -> toGroovyClassElement(ele.foldBoundGenericTypes(fold))).collect(Collectors.toList());
-        return fold.apply(upperBounds.contains(null) || lowerBounds.contains(null) ? null : new GroovyWildcardElement(upperBounds, lowerBounds));
+        return fold.apply(upperBounds.contains(null) || lowerBounds.contains(null) ? null : new GroovyWildcardElement(upperBounds, lowerBounds, elementAnnotationMetadataFactory));
     }
 
     private GroovyClassElement toGroovyClassElement(ClassElement element) {
@@ -82,10 +85,10 @@ final class GroovyWildcardElement extends GroovyClassElement implements Wildcard
             if (element.isWildcard() || element.isGenericPlaceholder()) {
                 throw new UnsupportedOperationException("Cannot convert wildcard / free type variable to GroovyClassElement");
             } else {
-                return (GroovyClassElement) ((ArrayableClassElement) visitorContext.getClassElement(element.getName())
-                        .orElseThrow(() -> new UnsupportedOperationException("Cannot convert ClassElement to GroovyClassElement, class was not found on the visitor context")))
-                        .withArrayDimensions(element.getArrayDimensions())
-                        .withBoundGenericTypes(element.getBoundGenericTypes());
+                return (GroovyClassElement) ((ArrayableClassElement) visitorContext.getClassElement(element.getName(), elementAnnotationMetadataFactory)
+                    .orElseThrow(() -> new UnsupportedOperationException("Cannot convert ClassElement to GroovyClassElement, class was not found on the visitor context")))
+                    .withArrayDimensions(element.getArrayDimensions())
+                    .withBoundGenericTypes(element.getBoundGenericTypes());
             }
         }
     }

@@ -19,8 +19,10 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
+import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.ElementFactory;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import io.micronaut.inject.writer.GeneratedFile;
@@ -50,10 +52,18 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
 
     /**
      * Gets the element factory for this visitor context.
+     *
      * @return The element factory
      * @since 2.3.0
      */
-    @NonNull ElementFactory<?, ?, ?, ?> getElementFactory();
+    @NonNull
+    ElementFactory<?, ?, ?, ?> getElementFactory();
+
+    @NonNull
+    ElementAnnotationMetadataFactory getElementAnnotationMetadataFactory();
+
+    @NonNull
+    AbstractAnnotationMetadataBuilder<?, ?> getAnnotationMetadataBuilder();
 
     /**
      * Allows printing informational messages.
@@ -101,7 +111,7 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      */
     @Override
     @Experimental
-    Optional<GeneratedFile> visitMetaInfFile(String path, Element...originatingElements);
+    Optional<GeneratedFile> visitMetaInfFile(String path, Element... originatingElements);
 
     /**
      * Visit a file that will be located within the generated source directory.
@@ -195,6 +205,18 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     /**
      * This method will lookup another class element by name. If it cannot be found an empty optional will be returned.
      *
+     * @param name                      The name
+     * @param annotationMetadataFactory The element annotation metadata factory
+     * @return The class element
+     * @since 4.0.0
+     */
+    default Optional<ClassElement> getClassElement(String name, ElementAnnotationMetadataFactory annotationMetadataFactory) {
+        return Optional.empty();
+    }
+
+    /**
+     * This method will lookup another class element by name. If it cannot be found an empty optional will be returned.
+     *
      * @param type The name
      * @return The class element
      */
@@ -207,7 +229,8 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
 
     /**
      * Find all the classes within the given package and having the given annotation.
-     * @param aPackage The package
+     *
+     * @param aPackage    The package
      * @param stereotypes The stereotypes
      * @return The class elements
      */
@@ -218,6 +241,7 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     /**
      * The annotation processor environment custom options.
      * <p><b>All options names MUST start with {@link VisitorContext#MICRONAUT_BASE_OPTION_NAME}</b></p>
+     *
      * @return A Map with annotation processor runtime options
      * @see javax.annotation.processing.ProcessingEnvironment#getOptions()
      */

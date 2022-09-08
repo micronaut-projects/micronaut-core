@@ -34,7 +34,7 @@ import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.Element;
-import io.micronaut.inject.ast.ElementFactory;
+import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.ElementModifier;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
@@ -97,8 +97,9 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
             }
         }
     };
-    protected final ConfigurationMetadataBuilder<?> metadataBuilder;
+    protected final ConfigurationMetadataBuilder metadataBuilder;
     protected final VisitorContext visitorContext;
+    protected final ElementAnnotationMetadataFactory elementAnnotationMetadataFactory;
     private final Element originatingElement;
     private final ClassElement originatingType;
     private final ClassElement beanType;
@@ -118,17 +119,21 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
 
     /**
      * Default constructor.
-     * @param originatingElement The originating element
-     * @param beanType The bean type
-     * @param metadataBuilder the metadata builder
-     * @param visitorContext the visitor context
+     *
+     * @param originatingElement               The originating element
+     * @param beanType                         The bean type
+     * @param metadataBuilder                  the metadata builder
+     * @param visitorContext                   the visitor context
+     * @param elementAnnotationMetadataFactory The element annotation metadata factory
      */
     protected AbstractBeanDefinitionBuilder(
-            Element originatingElement,
-            ClassElement beanType,
-            ConfigurationMetadataBuilder<?> metadataBuilder,
-            VisitorContext visitorContext) {
+        Element originatingElement,
+        ClassElement beanType,
+        ConfigurationMetadataBuilder metadataBuilder,
+        VisitorContext visitorContext,
+        ElementAnnotationMetadataFactory elementAnnotationMetadataFactory) {
         this.originatingElement = originatingElement;
+        this.elementAnnotationMetadataFactory = elementAnnotationMetadataFactory;
         if (originatingElement instanceof MethodElement) {
             this.originatingType = ((MethodElement) originatingElement).getDeclaringType();
         } else if (originatingElement instanceof ClassElement) {
@@ -141,12 +146,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         this.visitorContext = visitorContext;
         this.identifier = BEAN_COUNTER.computeIfAbsent(beanType.getName(), (s) -> new AtomicInteger(0))
                                       .getAndIncrement();
-        final AnnotationMetadata annotationMetadata = beanType.getAnnotationMetadata();
-        if (annotationMetadata instanceof MutableAnnotationMetadata) {
-            this.annotationMetadata = ((MutableAnnotationMetadata) annotationMetadata).clone();
-        } else {
-            this.annotationMetadata = new MutableAnnotationMetadata();
-        }
+        this.annotationMetadata = MutableAnnotationMetadata.of(beanType.getAnnotationMetadata());
         this.annotationMetadata.addDeclaredAnnotation(Bean.class.getName(), Collections.emptyMap());
         this.constructorElement = initConstructor(beanType);
     }
@@ -565,14 +565,10 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
 
     @SuppressWarnings({"rawtypes", "unchecked"})
     private void handleMethod(ClassElement beanClass, MethodElement method, BiConsumer<TypedElement, MethodElement> consumer) {
-        ElementFactory elementFactory = visitorContext.getElementFactory();
-        AnnotationMetadataHierarchy fusedMetadata = new AnnotationMetadataHierarchy(getAnnotationMetadata(), method.getAnnotationMetadata());
-        MethodElement finalMethod = elementFactory.newMethodElement(
-                beanClass,
-                method.getNativeType(),
-                fusedMetadata
+        consumer.accept(
+            beanClass,
+            method.withAnnotationMetadata(new AnnotationMetadataHierarchy(getAnnotationMetadata(), method.getAnnotationMetadata()))
         );
-        consumer.accept(beanClass, finalMethod);
     }
 
     /**
@@ -810,7 +806,6 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         return new BeanDefinitionWriter(
                 this,
                 OriginatingElements.of(originatingElement),
-                metadataBuilder,
                 visitorContext,
                 identifier
         );
@@ -823,8 +818,8 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
             beanDefinitionWriter.visitFieldValue(
                     injectedField.getDeclaringType(),
                     injectedField,
-                    ibf.isReflectionRequired(),
-                    ibf.isDeclaredNullable()
+                    ibf.isDeclaredNullable(),
+                    ibf.isReflectionRequired()
             );
         } else {
             beanDefinitionWriter.visitFieldInjectionPoint(
@@ -880,18 +875,13 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
      * @param <E> The element type
      */
     private abstract class InternalBeanElement<E extends Element> implements Element {
+        protected AnnotationMetadata currentMetadata;
         private final E element;
         private final MutableAnnotationMetadata elementMetadata;
-        private AnnotationMetadata currentMetadata;
 
-        private InternalBeanElement(E element) {
+        private InternalBeanElement(E element, MutableAnnotationMetadata elementMetadata) {
             this.element = element;
-            final AnnotationMetadata annotationMetadata = element.getAnnotationMetadata();
-            if (annotationMetadata instanceof MutableAnnotationMetadata) {
-                this.elementMetadata = ((MutableAnnotationMetadata) annotationMetadata).clone();
-            } else {
-                this.elementMetadata = new MutableAnnotationMetadata();
-            }
+            this.elementMetadata = elementMetadata;
         }
 
         @Override
@@ -1000,7 +990,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         private InternalBeanElementMethod(MethodElement methodElement,
                                           boolean requiresReflection,
                                           BeanParameterElement[] beanParameters) {
-            super(methodElement);
+            super(methodElement, MutableAnnotationMetadata.of(methodElement.getAnnotationMetadata().getDeclaredMetadata()));
             this.methodElement = methodElement;
             this.requiresReflection = requiresReflection;
             this.beanParameters = beanParameters;
@@ -1133,8 +1123,14 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
 
         @NonNull
         @Override
-        public MethodElement withNewParameters(@NonNull ParameterElement... newParameters) {
-            this.beanParameters = initBeanParameters(ArrayUtils.concat(beanParameters, newParameters));
+        public MethodElement withParameters(@NonNull ParameterElement... newParameters) {
+            this.beanParameters = initBeanParameters(newParameters);
+            return this;
+        }
+
+        @Override
+        public MethodElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
+            this.currentMetadata = annotationMetadata;
             return this;
         }
 
@@ -1162,7 +1158,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         private InternalBeanConstructorElement(MethodElement methodElement,
                                           boolean requiresReflection,
                                           BeanParameterElement[] beanParameters) {
-            super(methodElement);
+            super(methodElement, MutableAnnotationMetadata.of(methodElement.getAnnotationMetadata()));
             this.methodElement = methodElement;
             this.requiresReflection = requiresReflection;
             this.beanParameters = beanParameters;
@@ -1237,8 +1233,8 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
 
         @NonNull
         @Override
-        public MethodElement withNewParameters(@NonNull ParameterElement... newParameters) {
-            this.beanParameters = initBeanParameters(ArrayUtils.concat(beanParameters, newParameters));
+        public MethodElement withParameters(@NonNull ParameterElement... newParameters) {
+            this.beanParameters = initBeanParameters(newParameters);
             return this;
         }
 
@@ -1262,7 +1258,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         private ClassElement genericType;
 
         private InternalBeanElementField(FieldElement element, boolean requiresReflection) {
-            super(element);
+            super(element, MutableAnnotationMetadata.of(element.getAnnotationMetadata()));
             this.fieldElement = element;
             this.requiresReflection = requiresReflection;
         }
@@ -1319,13 +1315,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
             final Map<String, ClassElement> typeArguments = genericType.getTypeArguments();
             final Map<String, ClassElement> resolved = resolveTypeArguments(typeArguments, types);
             if (resolved != null) {
-                final String typeName = genericType.getName();
-                this.genericType = ClassElement.of(
-                        typeName,
-                        genericType.isInterface(),
-                        getAnnotationMetadata(),
-                        resolved
-                );
+                this.genericType = genericType.withTypeArguments(resolved).withAnnotationMetadata(getAnnotationMetadata());
             }
             return this;
         }
@@ -1340,7 +1330,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         private ClassElement genericType;
 
         private InternalBeanParameter(ParameterElement element) {
-            super(element);
+            super(element, MutableAnnotationMetadata.of(element.getAnnotationMetadata()));
             parameterElement = element;
         }
 
@@ -1368,13 +1358,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
             final Map<String, ClassElement> typeArguments = genericType.getTypeArguments();
             final Map<String, ClassElement> resolved = resolveTypeArguments(typeArguments, types);
             if (resolved != null) {
-
-                final ElementFactory elementFactory = visitorContext.getElementFactory();
-                this.genericType = elementFactory.newClassElement(
-                        genericType.getNativeType(),
-                        getAnnotationMetadata(),
-                        resolved
-                );
+                this.genericType = genericType.withTypeArguments(resolved).withAnnotationMetadata(getAnnotationMetadata());
             }
             return this;
         }

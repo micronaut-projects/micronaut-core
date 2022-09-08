@@ -212,11 +212,13 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
      *
      * @param declaringType      The declaring type
      * @param methodElement      The method element
+     * @param annotationMetadata The annotationMetadata
      * @param requiresReflection Whether the setter requires reflection
      * @param isOptional         Whether the setter is optional
      */
     void visitSetterValue(TypedElement declaringType,
                           MethodElement methodElement,
+                          AnnotationMetadata annotationMetadata,
                           boolean requiresReflection,
                           boolean isOptional);
 
@@ -301,13 +303,12 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
      *
      * @param declaringType      The declaring type. Either a Class or a string representing the name of the type
      * @param fieldElement       The field element
-     * @param requiresReflection Whether accessing the field requires reflection
      * @param isOptional         Is the value optional
+     * @param requiresReflection Whether accessing the field requires reflection
      */
     void visitFieldValue(TypedElement declaringType,
                          FieldElement fieldElement,
-                         boolean requiresReflection,
-                         boolean isOptional);
+                         boolean isOptional, boolean requiresReflection);
 
     /**
      * @return The package name of the bean
@@ -338,7 +339,7 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
             ClassElement type,
             String field,
             AnnotationMetadata annotationMetadata,
-            ConfigurationMetadataBuilder<?> metadataBuilder,
+            ConfigurationMetadataBuilder metadataBuilder,
             boolean isInterface);
 
     /**
@@ -355,42 +356,40 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
             ClassElement type,
             String methodName,
             AnnotationMetadata annotationMetadata,
-            ConfigurationMetadataBuilder<?> metadataBuilder,
+            ConfigurationMetadataBuilder metadataBuilder,
             boolean isInterface);
 
     /**
      * Visit a configuration builder method.
      *
-     * @param prefix     The prefix used for the method
-     * @param returnType The return type
-     * @param methodName The method name
-     * @param paramType  The method type
-     * @param generics   The generic types of the method
-     * @param path       The property path
+     * @param propertyName The property name
+     * @param returnType   The return type
+     * @param methodName   The method name
+     * @param paramType    The method type
+     * @param generics     The generic types of the method
+     * @param path         The property path
      * @see io.micronaut.context.annotation.ConfigurationBuilder
      */
-    void visitConfigBuilderMethod(
-            String prefix,
-            ClassElement returnType,
-            String methodName,
-            @Nullable ClassElement paramType,
-            Map<String, ClassElement> generics,
-            String path);
+    void visitConfigBuilderMethod(String propertyName,
+                                  ClassElement returnType,
+                                  String methodName,
+                                  @Nullable ClassElement paramType,
+                                  Map<String, ClassElement> generics,
+                                  String path);
 
     /**
      * Visit a configuration builder method that accepts a long and a TimeUnit.
      *
-     * @param prefix     The prefix used for the method
-     * @param returnType The return type
-     * @param methodName The method name
-     * @param path       The property path
+     * @param propertyName The property name
+     * @param returnType   The return type
+     * @param methodName   The method name
+     * @param path         The property path
      * @see io.micronaut.context.annotation.ConfigurationBuilder
      */
-    void visitConfigBuilderDurationMethod(
-            String prefix,
-            ClassElement returnType,
-            String methodName,
-            String path);
+    void visitConfigBuilderDurationMethod(String propertyName,
+                                          ClassElement returnType,
+                                          String methodName,
+                                          String path);
 
     /**
      * Finalize a configuration builder field.

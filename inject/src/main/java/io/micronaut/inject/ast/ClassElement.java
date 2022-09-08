@@ -16,6 +16,8 @@
 package io.micronaut.inject.ast;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.Creator;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
@@ -37,6 +39,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -52,6 +55,7 @@ import static io.micronaut.inject.writer.BeanDefinitionVisitor.PROXY_SUFFIX;
 public interface ClassElement extends TypedElement {
     /**
      * Constant for an empty class element array.
+     *
      * @since 3.1.0
      */
     ClassElement[] ZERO_CLASS_ELEMENTS = new ClassElement[0];
@@ -76,8 +80,8 @@ public interface ClassElement extends TypedElement {
     }
 
     /**
-     * @see GenericPlaceholderElement
      * @return Whether this is a generic placeholder.
+     * @see GenericPlaceholderElement
      * @since 3.1.0
      */
     @Experimental
@@ -86,8 +90,8 @@ public interface ClassElement extends TypedElement {
     }
 
     /**
-     * @see WildcardElement
      * @return Whether this is a wildcard.
+     * @see WildcardElement
      */
     @Experimental
     default boolean isWildcard() {
@@ -140,6 +144,7 @@ public interface ClassElement extends TypedElement {
 
     /**
      * Is this type an inner class.
+     *
      * @return True if it is an inner class
      * @since 2.1.2
      */
@@ -149,6 +154,7 @@ public interface ClassElement extends TypedElement {
 
     /**
      * Whether this element is an enum.
+     *
      * @return True if it is an enum
      */
     default boolean isEnum() {
@@ -169,7 +175,31 @@ public interface ClassElement extends TypedElement {
      * @return The primary constructor if one is present
      */
     default @NonNull Optional<MethodElement> getPrimaryConstructor() {
-        return Optional.empty();
+        Optional<MethodElement> staticCreator = findStaticCreator();
+        if (staticCreator.isPresent()) {
+            return staticCreator;
+        }
+        if (isInner() && !isStatic()) {
+            // only static inner classes can be constructed
+            return Optional.empty();
+        }
+        List<ConstructorElement> constructors = findConstructors();
+        if (constructors.isEmpty()) {
+            return Optional.empty();
+        }
+        if (constructors.size() == 1) {
+            return Optional.of(constructors.get(0));
+        }
+        Optional<ConstructorElement> annotatedConstructor = constructors.stream()
+            .filter(c -> c.hasStereotype(AnnotationUtil.INJECT) || c.hasStereotype(Creator.class))
+            .findFirst();
+        if (annotatedConstructor.isPresent()) {
+            return annotatedConstructor.map(c -> c);
+        }
+        return constructors.stream()
+            .filter(io.micronaut.inject.ast.Element::isPublic)
+            .<MethodElement>map(c -> c)
+            .findFirst();
     }
 
     /**
@@ -178,8 +208,117 @@ public interface ClassElement extends TypedElement {
      *
      * @return The default constructor if one is present
      */
-    default @NonNull Optional<MethodElement> getDefaultConstructor() {
-        return Optional.empty();
+    default Optional<MethodElement> getDefaultConstructor() {
+        Optional<MethodElement> staticCreator = findDefaultStaticCreator();
+        if (staticCreator.isPresent()) {
+            return staticCreator;
+        }
+        if (isInner() && !isStatic()) {
+            // only static inner classes can be constructed
+            return Optional.empty();
+        }
+        List<ConstructorElement> constructors = findConstructors()
+            .stream()
+            .filter(ctor -> ctor.getParameters().length == 0)
+            .collect(Collectors.toList());
+        if (constructors.isEmpty()) {
+            return Optional.empty();
+        }
+        if (constructors.size() == 1) {
+            return Optional.of(constructors.get(0));
+        }
+        return constructors.stream()
+            .filter(Element::isPublic)
+            .<MethodElement>map(c -> c)
+            .findFirst();
+
+    }
+
+    /**
+     * Find static creator.
+     *
+     * @return a static creator
+     * @since 4.0.0
+     */
+    default Optional<MethodElement> findStaticCreator() {
+        List<MethodElement> staticCreators = findStaticCreators();
+        if (staticCreators.isEmpty()) {
+            return Optional.empty();
+        }
+        if (staticCreators.size() == 1) {
+            return Optional.of(staticCreators.get(0));
+        }
+        //Can be multiple static @Creator methods. Prefer one with args here. The no arg method (if present) will
+        //be picked up by staticDefaultCreatorFor
+        List<MethodElement> withArgs = staticCreators.stream().filter(method -> method.getParameters().length > 0).collect(Collectors.toList());
+        if (withArgs.size() == 1) {
+            return Optional.of(withArgs.get(0));
+        } else {
+            staticCreators = withArgs;
+        }
+        return staticCreators.stream().filter(Element::isPublic).findFirst();
+    }
+
+    /**
+     * Find default static creator.
+     *
+     * @return a static creator
+     * @since 4.0.0
+     */
+    default Optional<MethodElement> findDefaultStaticCreator() {
+        List<MethodElement> staticCreators = findStaticCreators()
+            .stream()
+            .filter(c -> c.getParameters().length == 0)
+            .collect(Collectors.toList());
+        if (staticCreators.isEmpty()) {
+            return Optional.empty();
+        }
+        if (staticCreators.size() == 1) {
+            return Optional.of(staticCreators.get(0));
+        }
+        return staticCreators.stream().filter(Element::isPublic).findFirst();
+    }
+
+    /**
+     * Find accessible constructors.
+     *
+     * @return accessible constructors
+     * @since 4.0.0
+     */
+    default List<ConstructorElement> findConstructors() {
+        return getEnclosedElements(ElementQuery.CONSTRUCTORS)
+            .stream()
+            .filter(ctor -> !ctor.isPrivate())
+            .collect(Collectors.toList());
+    }
+
+    /**
+     * Find static creators.
+     *
+     * @return static creators
+     * @since 4.0.0
+     */
+    default List<MethodElement> findStaticCreators() {
+        List<MethodElement> creators = getEnclosedElements(ElementQuery.ALL_METHODS
+            .onlyDeclared()
+            .onlyStatic()
+            .onlyAccessible()
+            .annotated(annotationMetadata -> annotationMetadata.hasStereotype(Creator.class))
+        )
+            .stream()
+            .filter(method -> method.getReturnType().isAssignable(this))
+            .collect(Collectors.toList());
+        if (creators.isEmpty() && isEnum()) {
+            return getEnclosedElements(ElementQuery.ALL_METHODS
+                .named("valueOf")
+                .onlyStatic()
+                .onlyAccessible()
+            )
+                .stream()
+                .filter(method -> method.getReturnType().isAssignable(this))
+                .collect(Collectors.toList());
+        }
+        return creators;
     }
 
     /**
@@ -243,6 +382,27 @@ public interface ClassElement extends TypedElement {
     }
 
     /**
+     * Returns the native bean properties (synthetic getters and setters) for this class element..
+     *
+     * @return The bean properties for this class element
+     * @since 4.0.0
+     */
+    default List<PropertyElement> getNativeBeanProperties() {
+        return Collections.emptyList();
+    }
+
+    /**
+     * Returns the bean properties (getters and setters) for this class element based on custom configuration.
+     *
+     * @param configuration The configuration
+     * @return The bean properties for this class element
+     * @since 4.0.0
+     */
+    default List<PropertyElement> getBeanProperties(BeanPropertiesConfiguration configuration) {
+        return Collections.emptyList();
+    }
+
+    /**
      * Return all the fields of this class element.
      *
      * @return The fields
@@ -255,7 +415,7 @@ public interface ClassElement extends TypedElement {
      * Return the elements that match the given query.
      *
      * @param query The query to use.
-     * @param <T>  The element type
+     * @param <T>   The element type
      * @return The fields
      * @since 2.3.0
      */
@@ -277,7 +437,7 @@ public interface ClassElement extends TypedElement {
      * Return the first enclosed element matching the given query.
      *
      * @param query The query to use.
-     * @param <T>  The element type
+     * @param <T>   The element type
      * @return The fields
      * @since 2.3.0
      */
@@ -380,7 +540,6 @@ public interface ClassElement extends TypedElement {
      *
      * <p>This also means that this method may return {@code null} if the top-level fold operation returned {@code null}.</p>
      *
-     *
      * @param fold The fold operation to apply recursively to all component types.
      * @return The folded type.
      * @since 3.1.0
@@ -456,7 +615,8 @@ public interface ClassElement extends TypedElement {
      *
      * @return A new class element
      */
-    @NonNull ClassElement toArray();
+    @NonNull
+    ClassElement toArray();
 
     /**
      * Dereference a class element denoting an array type by converting it to its element type.
@@ -465,13 +625,15 @@ public interface ClassElement extends TypedElement {
      * @return A new class element
      * @throws IllegalStateException if this class element doesn't denote an array type
      */
-    @NonNull ClassElement fromArray();
+    @NonNull
+    ClassElement fromArray();
 
     /**
      * This method adds an associated bean using this class element as the originating element.
      *
      * <p>Note that this method can only be called on classes being directly compiled by Micronaut. If the ClassElement is
      * loaded from pre-compiled code an {@link UnsupportedOperationException} will be thrown.</p>
+     *
      * @param type The type of the bean
      * @return A bean builder
      */
@@ -480,14 +642,31 @@ public interface ClassElement extends TypedElement {
         throw new UnsupportedOperationException("Element of type [" + getClass() + "] does not support adding associated beans at compilation time");
     }
 
+    @Override
+    default ClassElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
+        return (ClassElement) TypedElement.super.withAnnotationMetadata(annotationMetadata);
+    }
+
+    /**
+     * Copies this element and overrides its type arguments.
+     *
+     * @param typeArguments The type arguments
+     * @return A new element
+     * @since 4.0.0
+     */
+    default ClassElement withTypeArguments(Map<String, ClassElement> typeArguments) {
+        throw new UnsupportedOperationException("Element of type [" + getClass() + "] does not support copy constructor");
+    }
+
     /**
      * Create a class element for the given simple type.
+     *
      * @param type The type
      * @return The class element
      */
     static @NonNull ClassElement of(@NonNull Class<?> type) {
         return new ReflectClassElement(
-                Objects.requireNonNull(type, "Type cannot be null")
+            Objects.requireNonNull(type, "Type cannot be null")
         );
     }
 
@@ -517,8 +696,8 @@ public interface ClassElement extends TypedElement {
                 @Override
                 public List<? extends ClassElement> getBoundGenericTypes() {
                     return Arrays.stream(pType.getActualTypeArguments())
-                            .map(ClassElement::of)
-                            .collect(Collectors.toList());
+                        .map(ClassElement::of)
+                        .collect(Collectors.toList());
                 }
             };
         } else if (type instanceof GenericArrayType) {
@@ -530,20 +709,21 @@ public interface ClassElement extends TypedElement {
 
     /**
      * Create a class element for the given simple type.
-     * @param type The type
+     *
+     * @param type               The type
      * @param annotationMetadata The annotation metadata
-     * @param typeArguments The type arguments
+     * @param typeArguments      The type arguments
      * @return The class element
      * @since 2.4.0
      */
     static @NonNull ClassElement of(
-            @NonNull Class<?> type,
-            @NonNull AnnotationMetadata annotationMetadata,
-            @NonNull Map<String, ClassElement> typeArguments) {
+        @NonNull Class<?> type,
+        @NonNull AnnotationMetadata annotationMetadata,
+        @NonNull Map<String, ClassElement> typeArguments) {
         Objects.requireNonNull(annotationMetadata, "Annotation metadata cannot be null");
         Objects.requireNonNull(typeArguments, "Type arguments cannot be null");
         return new ReflectClassElement(
-                Objects.requireNonNull(type, "Type cannot be null")
+            Objects.requireNonNull(type, "Type cannot be null")
         ) {
             @Override
             public AnnotationMetadata getAnnotationMetadata() {
@@ -559,14 +739,15 @@ public interface ClassElement extends TypedElement {
             @Override
             public List<? extends ClassElement> getBoundGenericTypes() {
                 return getDeclaredGenericPlaceholders().stream()
-                        .map(tv -> typeArguments.get(tv.getVariableName()))
-                        .collect(Collectors.toList());
+                    .map(tv -> typeArguments.get(tv.getVariableName()))
+                    .collect(Collectors.toList());
             }
         };
     }
 
     /**
      * Create a class element for the given simple type.
+     *
      * @param typeName The type
      * @return The class element
      */
@@ -577,8 +758,9 @@ public interface ClassElement extends TypedElement {
 
     /**
      * Create a class element for the given simple type.
-     * @param typeName The type
-     * @param isInterface Is the type an interface
+     *
+     * @param typeName           The type
+     * @param isInterface        Is the type an interface
      * @param annotationMetadata The annotation metadata
      * @return The class element
      */
@@ -589,10 +771,11 @@ public interface ClassElement extends TypedElement {
 
     /**
      * Create a class element for the given simple type.
-     * @param typeName The type
-     * @param isInterface Is the type an interface
+     *
+     * @param typeName           The type
+     * @param isInterface        Is the type an interface
      * @param annotationMetadata The annotation metadata
-     * @param typeArguments The type arguments
+     * @param typeArguments      The type arguments
      * @return The class element
      */
     @Internal

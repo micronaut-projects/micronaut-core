@@ -15,9 +15,9 @@
  */
 package io.micronaut.ast.groovy.visitor;
 
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.PackageElement;
 import org.codehaus.groovy.ast.PackageNode;
 
@@ -34,13 +34,20 @@ public class GroovyPackageElement extends AbstractGroovyElement implements Packa
     /**
      * Default constructor.
      *
-     * @param visitorContext The visitor context
-     * @param packageNode      The annotated node
-     * @param annotationMetadata The annotation metadata
+     * @param visitorContext            The visitor context
+     * @param packageNode               The annotated node
+     * @param annotationMetadataFactory The annotation metadata
      */
-    public GroovyPackageElement(GroovyVisitorContext visitorContext, PackageNode packageNode, AnnotationMetadata annotationMetadata) {
-        super(visitorContext, packageNode, annotationMetadata);
+    public GroovyPackageElement(GroovyVisitorContext visitorContext,
+                                PackageNode packageNode,
+                                ElementAnnotationMetadataFactory annotationMetadataFactory) {
+        super(visitorContext, packageNode, annotationMetadataFactory);
         this.packageNode = packageNode;
+    }
+
+    @Override
+    protected AbstractGroovyElement copyThis() {
+        return new GroovyPackageElement(visitorContext, packageNode, elementAnnotationMetadataFactory);
     }
 
     @NonNull
@@ -75,7 +82,8 @@ public class GroovyPackageElement extends AbstractGroovyElement implements Packa
 
     @NonNull
     @Override
-    public Object getNativeType() {
+    public PackageNode getNativeType() {
         return packageNode;
     }
+
 }

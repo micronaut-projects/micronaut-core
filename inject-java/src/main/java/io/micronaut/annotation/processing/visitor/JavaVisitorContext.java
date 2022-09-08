@@ -15,15 +15,15 @@
  */
 package io.micronaut.annotation.processing.visitor;
 
-import io.micronaut.annotation.processing.JavaConfigurationMetadataBuilder;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.annotation.processing.AnnotationProcessingOutputVisitor;
 import io.micronaut.annotation.processing.AnnotationUtils;
 import io.micronaut.annotation.processing.GenericUtils;
+import io.micronaut.annotation.processing.JavaAnnotationMetadataBuilder;
+import io.micronaut.annotation.processing.JavaElementAnnotationMetadataFactory;
 import io.micronaut.annotation.processing.ModelUtils;
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -31,8 +31,10 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.beans.BeanElement;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
+import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.util.VisitorContextUtils;
 import io.micronaut.inject.visitor.BeanElementVisitorContext;
 import io.micronaut.inject.visitor.TypeElementVisitor;
@@ -55,7 +57,15 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.reflect.Method;
 import java.net.URL;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Enumeration;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -83,6 +93,8 @@ public class JavaVisitorContext implements VisitorContext, BeanElementVisitorCon
     private final TypeElementVisitor.VisitorKind visitorKind;
     private @Nullable
     JavaFileManager standardFileManager;
+    private final JavaAnnotationMetadataBuilder annotationMetadataBuilder;
+    private final JavaElementAnnotationMetadataFactory elementAnnotationMetadataFactory;
 
     /**
      * The default constructor.
@@ -99,16 +111,16 @@ public class JavaVisitorContext implements VisitorContext, BeanElementVisitorCon
      * @param visitorKind       The visitor kind
      */
     public JavaVisitorContext(
-            ProcessingEnvironment processingEnv,
-            Messager messager,
-            Elements elements,
-            AnnotationUtils annotationUtils,
-            Types types,
-            ModelUtils modelUtils,
-            GenericUtils genericUtils,
-            Filer filer,
-            MutableConvertibleValues<Object> visitorAttributes,
-            TypeElementVisitor.VisitorKind visitorKind) {
+        ProcessingEnvironment processingEnv,
+        Messager messager,
+        Elements elements,
+        AnnotationUtils annotationUtils,
+        Types types,
+        ModelUtils modelUtils,
+        GenericUtils genericUtils,
+        Filer filer,
+        MutableConvertibleValues<Object> visitorAttributes,
+        TypeElementVisitor.VisitorKind visitorKind) {
         this.messager = messager;
         this.elements = elements;
         this.annotationUtils = annotationUtils;
@@ -120,6 +132,8 @@ public class JavaVisitorContext implements VisitorContext, BeanElementVisitorCon
         this.processingEnv = processingEnv;
         this.elementFactory = new JavaElementFactory(this);
         this.visitorKind = visitorKind;
+        this.annotationMetadataBuilder = new JavaAnnotationMetadataBuilder(elements, messager, annotationUtils, modelUtils);
+        this.elementAnnotationMetadataFactory = new JavaElementAnnotationMetadataFactory(false, this.annotationMetadataBuilder);
     }
 
     /**
@@ -146,7 +160,7 @@ public class JavaVisitorContext implements VisitorContext, BeanElementVisitorCon
         if (standardFileManager != null) {
             try {
                 final ClassLoader classLoader = standardFileManager
-                        .getClassLoader(StandardLocation.CLASS_PATH);
+                    .getClassLoader(StandardLocation.CLASS_PATH);
 
                 if (classLoader != null) {
                     final Enumeration<URL> resources = classLoader.getResources(path);
@@ -161,14 +175,18 @@ public class JavaVisitorContext implements VisitorContext, BeanElementVisitorCon
 
     @Override
     public Optional<ClassElement> getClassElement(String name) {
+        return getClassElement(name, elementAnnotationMetadataFactory);
+    }
+
+    @Override
+    public Optional<ClassElement> getClassElement(String name, ElementAnnotationMetadataFactory annotationMetadataFactory) {
         TypeElement typeElement = elements.getTypeElement(name);
         if (typeElement == null) {
             // maybe inner class?
             typeElement = elements.getTypeElement(name.replace('$', '.'));
         }
-        return Optional.ofNullable(typeElement).map(typeElement1 ->
-                elementFactory.newClassElement(typeElement1, annotationUtils.getAnnotationMetadata(typeElement1))
-        );
+        return Optional.ofNullable(typeElement)
+            .map(typeElement1 -> elementFactory.newClassElement(typeElement1, annotationMetadataFactory));
     }
 
     @Override
@@ -190,6 +208,16 @@ public class JavaVisitorContext implements VisitorContext, BeanElementVisitorCon
     @Override
     public JavaElementFactory getElementFactory() {
         return elementFactory;
+    }
+
+    @Override
+    public JavaElementAnnotationMetadataFactory getElementAnnotationMetadataFactory() {
+        return elementAnnotationMetadataFactory;
+    }
+
+    @Override
+    public JavaAnnotationMetadataBuilder getAnnotationMetadataBuilder() {
+        return annotationMetadataBuilder;
     }
 
     @Override
@@ -230,7 +258,7 @@ public class JavaVisitorContext implements VisitorContext, BeanElementVisitorCon
 
     @Override
     public OutputStream visitClass(String classname, @Nullable io.micronaut.inject.ast.Element originatingElement) throws IOException {
-        return outputVisitor.visitClass(classname, new io.micronaut.inject.ast.Element[]{ originatingElement });
+        return outputVisitor.visitClass(classname, new io.micronaut.inject.ast.Element[]{originatingElement});
     }
 
     @Override
@@ -331,11 +359,11 @@ public class JavaVisitorContext implements VisitorContext, BeanElementVisitorCon
         Map<String, String> systemPropsOptions = VisitorContextUtils.getSystemOptions();
         // Merge both options, with system props overriding on duplications
         return Stream.of(processorOptions, systemPropsOptions)
-                .flatMap(map -> map.entrySet().stream())
-                .collect(Collectors.toMap(
-                        Map.Entry::getKey,
-                        Map.Entry::getValue,
-                        (v1, v2) -> StringUtils.isNotEmpty(v2) ? v2 : v1));
+            .flatMap(map -> map.entrySet().stream())
+            .collect(Collectors.toMap(
+                Map.Entry::getKey,
+                Map.Entry::getValue,
+                (v1, v2) -> StringUtils.isNotEmpty(v2) ? v2 : v1));
     }
 
     @Override
@@ -373,13 +401,11 @@ public class JavaVisitorContext implements VisitorContext, BeanElementVisitorCon
 
     private void populateClassElements(@NonNull String[] stereotypes, PackageElement packageElement, List<ClassElement> classElements) {
         final List<? extends Element> enclosedElements = packageElement.getEnclosedElements();
-        boolean includeAll = Arrays.equals(stereotypes, new String[] { "*" });
+        boolean includeAll = Arrays.equals(stereotypes, new String[]{"*"});
         for (Element enclosedElement : enclosedElements) {
             if (enclosedElement instanceof TypeElement) {
-                final AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(enclosedElement);
-                if (includeAll || Arrays.stream(stereotypes).anyMatch(annotationMetadata::hasStereotype)) {
-                    JavaClassElement classElement = elementFactory.newClassElement((TypeElement) enclosedElement, annotationMetadata);
-
+                JavaClassElement classElement = elementFactory.newClassElement((TypeElement) enclosedElement, elementAnnotationMetadataFactory);
+                if (includeAll || Arrays.stream(stereotypes).anyMatch(classElement::hasStereotype)) {
                     if (!classElement.isAbstract()) {
                         classElements.add(classElement);
                     }
@@ -401,7 +427,7 @@ public class JavaVisitorContext implements VisitorContext, BeanElementVisitorCon
 
                         final Optional<Method> getMethod = ReflectionUtils.getMethod(context.getClass(), "get", Class.class);
                         this.standardFileManager = (JavaFileManager)
-                                getMethod.map(method -> ReflectionUtils.invokeMethod(context, method, JavaFileManager.class)).orElse(null);
+                            getMethod.map(method -> ReflectionUtils.invokeMethod(context, method, JavaFileManager.class)).orElse(null);
                     }
                 } catch (Exception e) {
                     // ignore
@@ -433,6 +459,7 @@ public class JavaVisitorContext implements VisitorContext, BeanElementVisitorCon
 
     /**
      * Adds a java bean definition builder.
+     *
      * @param javaBeanDefinitionBuilder The bean builder
      */
     @Internal
@@ -442,12 +469,12 @@ public class JavaVisitorContext implements VisitorContext, BeanElementVisitorCon
 
     @Override
     public BeanElementBuilder addAssociatedBean(io.micronaut.inject.ast.Element originatingElement, ClassElement type) {
-        JavaBeanDefinitionBuilder javaBeanDefinitionBuilder = new JavaBeanDefinitionBuilder(
-                originatingElement,
-                type,
-                new JavaConfigurationMetadataBuilder(elements, types, annotationUtils),
-                this
+        return new JavaBeanDefinitionBuilder(
+            originatingElement,
+            type,
+            ConfigurationMetadataBuilder.INSTANCE,
+            type instanceof AbstractJavaElement ? ((AbstractJavaElement) type).elementAnnotationMetadataFactory : elementAnnotationMetadataFactory,
+            this
         );
-        return javaBeanDefinitionBuilder;
     }
 }

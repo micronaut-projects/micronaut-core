@@ -17,10 +17,12 @@ package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
+import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 
-import io.micronaut.core.annotation.NonNull;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.TypeMirror;
 import java.util.Map;
@@ -35,22 +37,41 @@ import java.util.Map;
 class JavaParameterElement extends AbstractJavaElement implements ParameterElement {
 
     private final JavaVisitorContext visitorContext;
-    private final JavaClassElement declaringClass;
+    private final JavaClassElement owningType;
+    private final MethodElement methodElement;
+    private final VariableElement variableElement;
     private ClassElement typeElement;
     private ClassElement genericTypeElement;
 
     /**
      * Default constructor.
      *
-     * @param declaringClass     The declaring class
-     * @param element            The variable element
-     * @param annotationMetadata The annotation metadata
-     * @param visitorContext     The visitor context
+     * @param owningType                The owning class
+     * @param methodElement             The method element
+     * @param element                   The variable element
+     * @param annotationMetadataFactory The annotation metadata factory
+     * @param visitorContext            The visitor context
      */
-    JavaParameterElement(JavaClassElement declaringClass, VariableElement element, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext) {
-        super(element, annotationMetadata, visitorContext);
-        this.declaringClass = declaringClass;
+    JavaParameterElement(JavaClassElement owningType,
+                         MethodElement methodElement,
+                         VariableElement element,
+                         ElementAnnotationMetadataFactory annotationMetadataFactory,
+                         JavaVisitorContext visitorContext) {
+        super(element, annotationMetadataFactory, visitorContext);
+        this.owningType = owningType;
+        this.methodElement = methodElement;
+        this.variableElement = element;
         this.visitorContext = visitorContext;
+    }
+
+    @Override
+    protected AbstractJavaElement copyThis() {
+        return new JavaParameterElement(owningType, methodElement, variableElement, elementAnnotationMetadataFactory, visitorContext);
+    }
+
+    @Override
+    public ParameterElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
+        return (ParameterElement) super.withAnnotationMetadata(annotationMetadata);
     }
 
     @Override
@@ -83,14 +104,20 @@ class JavaParameterElement extends AbstractJavaElement implements ParameterEleme
     public ClassElement getGenericType() {
         if (this.genericTypeElement == null) {
             TypeMirror returnType = getNativeType().asType();
-            Map<String, Map<String, TypeMirror>> declaredGenericInfo = declaringClass.getGenericTypeInfo();
+            Map<String, Map<String, TypeMirror>> declaredGenericInfo = owningType.getGenericTypeInfo();
             this.genericTypeElement = parameterizedClassElement(returnType, visitorContext, declaredGenericInfo);
         }
         return this.genericTypeElement;
     }
 
     @Override
+    public MethodElement getMethodElement() {
+        return methodElement;
+    }
+
+    @Override
     public VariableElement getNativeType() {
         return (VariableElement) super.getNativeType();
     }
+
 }

@@ -364,13 +364,19 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
         Type typeReference = JavaModelUtils.getTypeReference(declaringType.getType());
         staticInit.push(typeReference);
         // 2: annotationMetadata
-        AnnotationMetadata annotationMetadata = methodElement.getAnnotationMetadata();
+        AnnotationMetadata annotationMetadata = methodElement.getAnnotationMetadata().unwrap();
 
         if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
-            annotationMetadata = new AnnotationMetadataHierarchy(
-                    new AnnotationMetadataReference(beanDefinitionReferenceClassName, annotationMetadata),
+            AnnotationMetadataHierarchy hierarchy = (AnnotationMetadataHierarchy) annotationMetadata;
+            if (hierarchy.size() != 2) {
+                throw new IllegalStateException("Expected the size of 2");
+            }
+            if (hierarchy.getRootMetadata().equals(methodElement.getOwningType())) {
+                annotationMetadata = new AnnotationMetadataHierarchy(
+                    new AnnotationMetadataReference(beanDefinitionReferenceClassName, methodElement.getOwningType()),
                     annotationMetadata.getDeclaredMetadata()
-            );
+                );
+            }
         }
 
         pushAnnotationMetadata(classWriter, staticInit, annotationMetadata);
@@ -435,7 +441,7 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
                     defaultsStorage,
                     loadTypeMethods);
         } else {
-            staticInit.push((String) null);
+            throw new IllegalStateException("Unknown metadata: " + annotationMetadata);
         }
     }
 }

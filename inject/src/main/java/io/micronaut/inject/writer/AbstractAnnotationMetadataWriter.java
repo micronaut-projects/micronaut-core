@@ -16,8 +16,9 @@
 package io.micronaut.inject.writer;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.annotation.AnnotationMetadataWriter;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
@@ -26,8 +27,6 @@ import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
-
-import io.micronaut.core.annotation.NonNull;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -65,7 +64,7 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
             boolean writeAnnotationDefaults) {
         super(originatingElements);
         this.targetClassType = getTypeReferenceForName(className);
-        this.annotationMetadata = annotationMetadata;
+        this.annotationMetadata = annotationMetadata.unwrap();
         this.writeAnnotationDefault = writeAnnotationDefaults;
     }
 
@@ -82,7 +81,7 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
             boolean writeAnnotationDefaults) {
         super(new Element[]{ originatingElement });
         this.targetClassType = getTypeReferenceForName(className);
-        this.annotationMetadata = annotationMetadata;
+        this.annotationMetadata = annotationMetadata.unwrap();
         this.writeAnnotationDefault = writeAnnotationDefaults;
     }
 
@@ -95,7 +94,8 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
 
         // in order to save memory of a method doesn't have any annotations of its own but merely references class metadata
         // then we setup an annotation metadata reference from the method to the class (or inherited method) metadata
-        if (annotationMetadata == AnnotationMetadata.EMPTY_METADATA) {
+        AnnotationMetadata annotationMetadata = this.annotationMetadata.unwrap();
+        if (annotationMetadata.isEmpty()) {
             annotationMetadataMethod.getStatic(Type.getType(AnnotationMetadata.class), "EMPTY_METADATA", Type.getType(AnnotationMetadata.class));
         } else if (annotationMetadata instanceof AnnotationMetadataReference) {
             AnnotationMetadataReference reference = (AnnotationMetadataReference) annotationMetadata;
@@ -137,16 +137,28 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
             // write the static initializers for the annotation metadata
             GeneratorAdapter staticInit = visitStaticInitializer(classWriter);
             staticInit.visitCode();
-            if (writeAnnotationDefault && annotationMetadata instanceof DefaultAnnotationMetadata) {
-                DefaultAnnotationMetadata dam = (DefaultAnnotationMetadata) annotationMetadata;
-                AnnotationMetadataWriter.writeAnnotationDefaults(
-                        targetClassType,
-                        classWriter,
-                        staticInit,
-                        dam,
-                        defaults,
-                        loadTypeMethods
-                );
+            if (writeAnnotationDefault) {
+                AnnotationMetadata annotationMetadata = this.annotationMetadata.unwrap();
+                if (annotationMetadata.isEmpty()) {
+                    staticInit.getStatic(Type.getType(AnnotationMetadata.class), "EMPTY_METADATA", Type.getType(AnnotationMetadata.class));
+                } else {
+                    if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
+                        annotationMetadata = ((AnnotationMetadataHierarchy) annotationMetadata).merge();
+                    }
+                    if (annotationMetadata instanceof DefaultAnnotationMetadata) {
+                        DefaultAnnotationMetadata dam = (DefaultAnnotationMetadata) annotationMetadata;
+                        AnnotationMetadataWriter.writeAnnotationDefaults(
+                            targetClassType,
+                            classWriter,
+                            staticInit,
+                            dam,
+                            defaults,
+                            loadTypeMethods
+                        );
+                    } else {
+                        throw new IllegalStateException("Unknown annotation metadata: " + annotationMetadata);
+                    }
+                }
             }
             staticInit.visitLabel(new Label());
             initializeAnnotationMetadata(staticInit, classWriter, defaults);
@@ -165,7 +177,10 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
         Type annotationMetadataType = Type.getType(AnnotationMetadata.class);
         classWriter.visitField(ACC_PUBLIC | ACC_FINAL | ACC_STATIC, FIELD_ANNOTATION_METADATA, annotationMetadataType.getDescriptor(), null, null);
 
-        if (annotationMetadata instanceof DefaultAnnotationMetadata) {
+        AnnotationMetadata annotationMetadata = this.annotationMetadata.unwrap();
+        if (annotationMetadata.isEmpty()) {
+            staticInit.getStatic(Type.getType(AnnotationMetadata.class), "EMPTY_METADATA", Type.getType(AnnotationMetadata.class));
+        } else if (annotationMetadata instanceof DefaultAnnotationMetadata) {
             AnnotationMetadataWriter.instantiateNewMetadata(
                     targetClassType,
                     classWriter,
@@ -184,7 +199,7 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
                     loadTypeMethods
             );
         } else {
-            staticInit.getStatic(Type.getType(AnnotationMetadata.class), "EMPTY_METADATA", Type.getType(AnnotationMetadata.class));
+            throw new IllegalStateException("Unknown annotation metadata: " + annotationMetadata);
         }
 
         staticInit.putStatic(targetClassType, FIELD_ANNOTATION_METADATA, annotationMetadataType);

@@ -35,7 +35,7 @@ import java.util.Optional;
 public class JsonConfigurationMetadataWriter implements ConfigurationMetadataWriter {
 
     @Override
-    public void write(ConfigurationMetadataBuilder<?> metadataBuilder, ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {
+    public void write(ConfigurationMetadataBuilder metadataBuilder, ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {
         Optional<GeneratedFile> opt = classWriterOutputVisitor.visitMetaInfFile(getFileName(), metadataBuilder.getOriginatingElements());
         if (opt.isPresent()) {
             GeneratedFile file = opt.get();

@@ -51,7 +51,7 @@ public @interface ConfigurationProperties {
      *
      * @return The prefix to use to resolve the properties
      */
-    @AliasFor(annotation = ConfigurationReader.class, member = "value")
+    @AliasFor(annotation = ConfigurationReader.class, member = ConfigurationReader.PREFIX)
     String value();
 
     /**
@@ -68,12 +68,14 @@ public @interface ConfigurationProperties {
      * @return The names of the properties to include
      */
     @AliasFor(annotation = ConfigurationReader.class, member = "includes")
+    @AliasFor(annotation = BeanProperties.class, member = BeanProperties.INCLUDES)
     String[] includes() default {};
 
     /**
      * @return The names of the properties to exclude
      */
     @AliasFor(annotation = ConfigurationReader.class, member = "excludes")
+    @AliasFor(annotation = BeanProperties.class, member = BeanProperties.EXCLUDES)
     String[] excludes() default {};
 
 }

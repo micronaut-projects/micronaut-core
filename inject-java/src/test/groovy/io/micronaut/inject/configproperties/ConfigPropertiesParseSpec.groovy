@@ -4,6 +4,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
 import io.micronaut.context.annotation.ConfigurationReader
 import io.micronaut.context.annotation.Property
+import io.micronaut.context.annotation.PropertySource
 import io.micronaut.core.convert.format.ReadableBytes
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
@@ -32,7 +33,7 @@ class MyConfig {
     public void setHost(String host) {
         this.host = host;
     }
-    
+
     @ConfigurationProperties("baz")
     static class ChildConfig extends ParentConfig {
         protected String stuff;
@@ -41,7 +42,7 @@ class MyConfig {
 
 class ParentConfig {
     private String foo;
-    
+
     public void setFoo(String foo) {
         this.foo = foo;
     }
@@ -80,7 +81,7 @@ class MyConfig {
     public void setHost(String host) {
         this.host = host;
     }
-    
+
     @ConfigurationProperties("baz")
     static class ChildConfig {
         protected String stuff;
@@ -116,15 +117,15 @@ class MyConfig {
     public void setHost(String host) {
         this.host = host;
     }
-    
+
     @ConfigurationProperties("baz")
     static class ChildConfig {
         String stuff;
-    
+
         public String getStuff() {
             return stuff;
         }
-    
+
         public void setStuff(String stuff) {
             this.stuff = stuff;
         }
@@ -160,27 +161,27 @@ class MyConfig {
     public void setHost(String host) {
         this.host = host;
     }
-    
+
     @ConfigurationProperties("baz")
     static class ChildConfig {
         String stuff;
-    
+
         public String getStuff() {
             return stuff;
         }
-    
+
         public void setStuff(String stuff) {
             this.stuff = stuff;
         }
-        
+
         @ConfigurationProperties("more")
         static class MoreConfig {
             String stuff;
-        
+
             public String getStuff() {
                 return stuff;
             }
-        
+
             public void setStuff(String stuff) {
                 this.stuff = stuff;
             }
@@ -216,15 +217,15 @@ class MyConfig extends ParentConfig {
     public void setHost(String host) {
         this.host = host;
     }
-    
+
     @ConfigurationProperties("baz")
     static class ChildConfig {
         String stuff;
-    
+
         public String getStuff() {
             return stuff;
         }
-    
+
         public void setStuff(String stuff) {
             this.stuff = stuff;
         }
@@ -379,7 +380,7 @@ import java.time.Duration;
 @ConfigurationProperties("http.client")
 public class HttpClientConfiguration {
     private int maxContentLength = 1024 * 1024 * 10; // 10MB;
-    
+
     void setMaxContentLength(@ReadableBytes int maxContentLength) {
         this.maxContentLength = maxContentLength;
     }
@@ -407,7 +408,7 @@ import java.time.Duration;
 @ConfigurationProperties("http.client")
 public class HttpClientConfiguration {
     private int maxContentLength = 1024 * 1024 * 10; // 10MB;
-    
+
     public void setMaxContentLength(@ReadableBytes int maxContentLength) {
         this.maxContentLength = maxContentLength;
     }
@@ -420,8 +421,10 @@ public class HttpClientConfiguration {
         then:
         beanDefinition.injectedFields.size() == 0
         beanDefinition.injectedMethods.size() == 1
-        beanDefinition.injectedMethods[0].arguments[0].synthesizeAll().size() == 1
+        beanDefinition.injectedMethods[0].arguments[0].synthesizeAll().size() == 2
         beanDefinition.injectedMethods[0].arguments[0].synthesize(ReadableBytes)
+        // This should be removed in Micronaut 4
+        beanDefinition.injectedMethods[0].arguments[0].synthesize(PropertySource)
     }
 
     void "test different inject types for config properties"() {
@@ -441,8 +444,8 @@ class MyProperties {
     public void setSetterTest(String s) {
         this.internalField = s;
     }
-    
-    public String getSetter() { return this.internalField; } 
+
+    public String getSetter() { return this.internalField; }
 }
 ''')
         then:
@@ -492,18 +495,18 @@ class MyProperties extends Parent {
     public void setSetterTest(String s) {
         this.internalField = s;
     }
-    
-    public String getSetter() { return this.internalField; } 
+
+    public String getSetter() { return this.internalField; }
 }
 
 class Parent {
     private String parentField;
-    
+
     public void setParentTest(String s) {
         this.parentField = s;
     }
-    
-    public String getParentTest() { return this.parentField; } 
+
+    public String getParentTest() { return this.parentField; }
 }
 ''')
         then:
@@ -560,12 +563,12 @@ public class FooConfigurationProperties {
     public void setIssuer(String issuer) {
         this.issuer = issuer;
     }
-    
+
     //isEnabled field maps to setEnabled method
     public void setEnabled(boolean enabled) {
         this.isEnabled = enabled;
     }
-    
+
     //isOther field does not map to setOther method because its the class and not primitive
     public void setOther(Boolean other) {
         this.isOther = other;
@@ -612,7 +615,7 @@ class MyConfig {
 package test;
 
 import io.micronaut.context.annotation.*;
-        
+
 @ConfigurationProperties(value = "foo", includes = {"publicField", "parentPublicField"})
 class MyProperties extends Parent {
     public String publicField;
@@ -719,16 +722,16 @@ import io.micronaut.inject.configuration.Engine;
 @ConfigurationProperties(value = "foo", excludes = {"engine", "engine2"})
 class MyProperties extends Parent {
 
-    @ConfigurationBuilder(prefixes = "with") 
+    @ConfigurationBuilder(prefixes = "with")
     Engine.Builder engine = Engine.builder();
-    
+
     private Engine.Builder engine2 = Engine.builder();
-    
-    @ConfigurationBuilder(configurationPrefix = "two", prefixes = "with") 
+
+    @ConfigurationBuilder(configurationPrefix = "two", prefixes = "with")
     public void setEngine2(Engine.Builder engine3) {
         this.engine2 = engine3;
     }
-    
+
     public Engine.Builder getEngine2() {
         return engine2;
     }
@@ -885,16 +888,16 @@ import jakarta.annotation.PostConstruct;
 public class EntityProperties {
 
     private String prop;
-    
+
     @PostConstruct
     public void init() {
         System.out.println("prop = " + prop);
     }
-    
+
     public String getProp() {
         return prop;
     }
-    
+
     public void setProp(String prop) {
         this.prop = prop;
     }
