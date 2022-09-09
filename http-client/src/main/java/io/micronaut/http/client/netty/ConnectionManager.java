@@ -91,6 +91,7 @@ import java.net.Proxy;
 import java.net.SocketAddress;
 import java.time.Duration;
 import java.util.Collection;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -110,12 +111,12 @@ final class ConnectionManager {
     @Nullable
     final Long readTimeoutMillis;
     @Nullable
-    final Long connectionTimeAliveMillis;
+    private final Long connectionTimeAliveMillis;
     final HttpVersion httpVersion;
     final SslContext sslContext;
-    final NettyClientCustomizer clientCustomizer;
-    final Collection<ChannelPipelineListener> pipelineListeners;
-    final String informationalServiceId;
+    private final NettyClientCustomizer clientCustomizer;
+    private final Collection<ChannelPipelineListener> pipelineListeners;
+    private final String informationalServiceId;
 
     ConnectionManager(
         DefaultHttpClient httpClient,
@@ -193,6 +194,31 @@ final class ConnectionManager {
             }
         } else {
             this.poolMap = null;
+        }
+    }
+
+    public void shutdown() {
+        if (poolMap instanceof Iterable) {
+            Iterable<Map.Entry<DefaultHttpClient.RequestKey, ChannelPool>> i = (Iterable) poolMap;
+            for (Map.Entry<DefaultHttpClient.RequestKey, ChannelPool> entry : i) {
+                ChannelPool cp = entry.getValue();
+                try {
+                    if (cp instanceof SimpleChannelPool) {
+                        httpClient.addInstrumentedListener(((SimpleChannelPool) cp).closeAsync(), future -> {
+                            if (!future.isSuccess()) {
+                                final Throwable cause = future.cause();
+                                if (cause != null) {
+                                    log.error("Error shutting down HTTP client connection pool: " + cause.getMessage(), cause);
+                                }
+                            }
+                        });
+                    } else {
+                        cp.close();
+                    }
+                } catch (Exception cause) {
+                    log.error("Error shutting down HTTP client connection pool: " + cause.getMessage(), cause);
+                }
+            }
         }
     }
 
@@ -1108,6 +1134,10 @@ final class ConnectionManager {
                 // just close it to prevent any future reads without a handler registered
                 channel.close();
             }
+        }
+
+        public boolean canReturn() {
+            return canReturn;
         }
     }
 }

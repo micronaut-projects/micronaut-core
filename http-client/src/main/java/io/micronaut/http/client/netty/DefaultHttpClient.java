@@ -121,8 +121,6 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.MultithreadEventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.pool.ChannelHealthChecker;
-import io.netty.channel.pool.ChannelPool;
-import io.netty.channel.pool.SimpleChannelPool;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.TooLongFrameException;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
@@ -501,29 +499,7 @@ public class DefaultHttpClient implements
     @Override
     public HttpClient stop() {
         if (isRunning()) {
-            if (connectionManager.poolMap instanceof Iterable) {
-                Iterable<Map.Entry<RequestKey, ChannelPool>> i = (Iterable) connectionManager.poolMap;
-                for (Map.Entry<RequestKey, ChannelPool> entry : i) {
-                    ChannelPool cp = entry.getValue();
-                    try {
-                        if (cp instanceof SimpleChannelPool) {
-                            addInstrumentedListener(((SimpleChannelPool) cp).closeAsync(), future -> {
-                                if (!future.isSuccess()) {
-                                    final Throwable cause = future.cause();
-                                    if (cause != null) {
-                                        log.error("Error shutting down HTTP client connection pool: " + cause.getMessage(), cause);
-                                    }
-                                }
-                            });
-                        } else {
-                            cp.close();
-                        }
-                    } catch (Exception cause) {
-                        log.error("Error shutting down HTTP client connection pool: " + cause.getMessage(), cause);
-                    }
-
-                }
-            }
+            connectionManager.shutdown();
             if (shutdownGroup) {
                 Duration shutdownTimeout = configuration.getShutdownTimeout()
                     .orElse(Duration.ofMillis(DEFAULT_SHUTDOWN_TIMEOUT_MILLISECONDS));
@@ -1313,26 +1289,6 @@ public class DefaultHttpClient implements
         return group;
     }
 
-    /**
-     * Builds an {@link SslContext} for the given URI if necessary.
-     *
-     * @param uriObject The URI
-     * @return The {@link SslContext} instance
-     */
-    protected SslContext buildSslContext(URI uriObject) {
-        final SslContext sslCtx;
-        if (isSecureScheme(uriObject.getScheme())) {
-            sslCtx = connectionManager.sslContext;
-            //Allow https requests to be sent if SSL is disabled but a proxy is present
-            if (sslCtx == null && !configuration.getProxyAddress().isPresent()) {
-                throw customizeException(new HttpClientException("Cannot send HTTPS request. SSL is disabled"));
-            }
-        } else {
-            sslCtx = null;
-        }
-        return sslCtx;
-    }
-
     private <I, O, R extends io.micronaut.http.HttpResponse<O>> Publisher<R> applyFilterToResponsePublisher(
             io.micronaut.http.HttpRequest<?> parentRequest,
             io.micronaut.http.HttpRequest<I> request,
@@ -1640,7 +1596,7 @@ public class DefaultHttpClient implements
                 finalRequest,
                 nettyRequest,
                 permitsBody,
-            connectionManager.poolMap == null
+                !poolHandle.canReturn()
         );
 
         if (log.isDebugEnabled()) {
