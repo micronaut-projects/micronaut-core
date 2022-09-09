@@ -87,7 +87,6 @@ import io.micronaut.http.netty.stream.DefaultStreamedHttpResponse;
 import io.micronaut.http.netty.stream.JsonSubscriber;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
-import io.micronaut.http.netty.stream.StreamingInboundHttp2ToHttpAdapter;
 import io.micronaut.http.sse.Event;
 import io.micronaut.http.uri.UriBuilder;
 import io.micronaut.http.uri.UriTemplate;
@@ -126,7 +125,6 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.pool.ChannelHealthChecker;
 import io.netty.channel.pool.ChannelPool;
 import io.netty.channel.pool.SimpleChannelPool;
-import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.TooLongFrameException;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
@@ -137,8 +135,6 @@ import io.netty.handler.codec.http.DefaultLastHttpContent;
 import io.netty.handler.codec.http.EmptyHttpHeaders;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.FullHttpResponse;
-import io.netty.handler.codec.http.HttpClientCodec;
-import io.netty.handler.codec.http.HttpClientUpgradeHandler;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
@@ -157,20 +153,11 @@ import io.netty.handler.codec.http.multipart.HttpPostRequestEncoder;
 import io.netty.handler.codec.http.multipart.InterfaceHttpData;
 import io.netty.handler.codec.http.websocketx.WebSocketClientHandshakerFactory;
 import io.netty.handler.codec.http.websocketx.WebSocketVersion;
-import io.netty.handler.codec.http2.DelegatingDecompressorFrameListener;
-import io.netty.handler.codec.http2.Http2ClientUpgradeCodec;
-import io.netty.handler.codec.http2.Http2Connection;
-import io.netty.handler.codec.http2.Http2FrameListener;
 import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.codec.http2.Http2Stream;
 import io.netty.handler.codec.http2.HttpConversionUtil;
-import io.netty.handler.codec.http2.HttpToHttp2ConnectionHandler;
-import io.netty.handler.codec.http2.HttpToHttp2ConnectionHandlerBuilder;
-import io.netty.handler.codec.http2.InboundHttp2ToHttpAdapterBuilder;
 import io.netty.handler.proxy.HttpProxyHandler;
 import io.netty.handler.proxy.Socks5ProxyHandler;
-import io.netty.handler.ssl.ApplicationProtocolNames;
-import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.stream.ChunkedWriteHandler;
 import io.netty.handler.timeout.ReadTimeoutHandler;
@@ -1605,152 +1592,6 @@ public class DefaultHttpClient implements
         return new NettyRequestWriter(requestURI.getScheme(), nettyRequest, postRequestEncoder, closeChannelAfterWrite);
     }
 
-    /**
-     * Configures HTTP/2 for the channel when SSL is enabled.
-     *
-     * @param httpClientInitializer The client initializer
-     * @param ch                    The channel
-     * @param sslCtx                The SSL context
-     * @param host                  The host
-     * @param port                  The port
-     * @param connectionHandler     The connection handler
-     */
-    protected void configureHttp2Ssl(
-            ConnectionManager.HttpClientInitializer httpClientInitializer,
-            @NonNull SocketChannel ch,
-            @NonNull SslContext sslCtx,
-            String host,
-            int port,
-            HttpToHttp2ConnectionHandler connectionHandler) {
-        ChannelPipeline pipeline = ch.pipeline();
-        // Specify Host in SSLContext New Handler to add TLS SNI Extension
-        pipeline.addLast(ChannelPipelineCustomizer.HANDLER_SSL, sslCtx.newHandler(ch.alloc(), host, port));
-        // We must wait for the handshake to finish and the protocol to be negotiated before configuring
-        // the HTTP/2 components of the pipeline.
-        pipeline.addLast(
-                ChannelPipelineCustomizer.HANDLER_HTTP2_PROTOCOL_NEGOTIATOR,
-                new ApplicationProtocolNegotiationHandler(ApplicationProtocolNames.HTTP_2) {
-
-            @Override
-            public void handlerRemoved(ChannelHandlerContext ctx) {
-                // the logic to send the request should only be executed once the HTTP/2
-                // Connection Preface request has been sent. Once the Preface has been sent and
-                // removed then this handler is removed so we invoke the remaining logic once
-                // this handler removed
-                final Consumer<ChannelHandlerContext> contextConsumer =
-                        httpClientInitializer.contextConsumer;
-                if (contextConsumer != null) {
-                    contextConsumer.accept(ctx);
-                }
-            }
-
-            @Override
-            protected void configurePipeline(ChannelHandlerContext ctx, String protocol) {
-                if (ApplicationProtocolNames.HTTP_2.equals(protocol)) {
-                    ChannelPipeline p = ctx.pipeline();
-                    if (httpClientInitializer.stream) {
-                        // stream consumer manages backpressure and reads
-                        ctx.channel().config().setAutoRead(false);
-                    }
-                    p.addLast(
-                            ChannelPipelineCustomizer.HANDLER_HTTP2_SETTINGS,
-                            new Http2SettingsHandler(ch.newPromise())
-                    );
-                    httpClientInitializer.addEventStreamHandlerIfNecessary(p);
-                    httpClientInitializer.addFinalHandler(p);
-                    for (ChannelPipelineListener pipelineListener : connectionManager.pipelineListeners) {
-                        pipelineListener.onConnect(p);
-                    }
-                } else if (ApplicationProtocolNames.HTTP_1_1.equals(protocol)) {
-                    ChannelPipeline p = ctx.pipeline();
-                    httpClientInitializer.addHttp1Handlers(p);
-                } else {
-                    ctx.close();
-                    throw customizeException(new HttpClientException("Unknown Protocol: " + protocol));
-                }
-                httpClientInitializer.onStreamPipelineBuilt();
-            }
-        });
-
-        pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION, connectionHandler);
-    }
-
-    /**
-     * Configures HTTP/2 handling for plaintext (non-SSL) connections.
-     *
-     * @param httpClientInitializer The client initializer
-     * @param ch                    The channel
-     * @param connectionHandler     The connection handler
-     */
-    protected void configureHttp2ClearText(
-            ConnectionManager.HttpClientInitializer httpClientInitializer,
-            @NonNull SocketChannel ch,
-            @NonNull HttpToHttp2ConnectionHandler connectionHandler) {
-        HttpClientCodec sourceCodec = new HttpClientCodec();
-        Http2ClientUpgradeCodec upgradeCodec = new Http2ClientUpgradeCodec(ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION, connectionHandler);
-        HttpClientUpgradeHandler upgradeHandler = new HttpClientUpgradeHandler(sourceCodec, upgradeCodec, 65536);
-
-        final ChannelPipeline pipeline = ch.pipeline();
-        pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC, sourceCodec);
-        httpClientInitializer.settingsHandler = new Http2SettingsHandler(ch.newPromise());
-        pipeline.addLast(upgradeHandler);
-        pipeline.addLast(new ChannelInboundHandlerAdapter() {
-            @Override
-            public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
-                ctx.fireUserEventTriggered(evt);
-                if (evt instanceof HttpClientUpgradeHandler.UpgradeEvent) {
-                    httpClientInitializer.onStreamPipelineBuilt();
-                    ctx.pipeline().remove(this);
-                }
-            }
-        });
-        pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_UPGRADE_REQUEST, new UpgradeRequestHandler(httpClientInitializer) {
-            @Override
-            public void handlerRemoved(ChannelHandlerContext ctx) {
-                final Consumer<ChannelHandlerContext> contextConsumer = httpClientInitializer.contextConsumer;
-                if (contextConsumer != null) {
-                    contextConsumer.accept(ctx);
-                }
-            }
-        });
-    }
-
-    /**
-     * Creates a new {@link HttpToHttp2ConnectionHandlerBuilder} for the given HTTP/2 connection object and config.
-     *
-     * @param connection    The connection
-     * @param configuration The configuration
-     * @param stream        Whether this is a stream request
-     * @return The {@link HttpToHttp2ConnectionHandlerBuilder}
-     */
-    protected @NonNull
-    HttpToHttp2ConnectionHandlerBuilder newHttp2ConnectionHandlerBuilder(
-            @NonNull Http2Connection connection, @NonNull HttpClientConfiguration configuration, boolean stream) {
-        final HttpToHttp2ConnectionHandlerBuilder builder = new HttpToHttp2ConnectionHandlerBuilder();
-        builder.validateHeaders(true);
-        final Http2FrameListener http2ToHttpAdapter;
-
-        if (!stream) {
-            http2ToHttpAdapter = new InboundHttp2ToHttpAdapterBuilder(connection)
-                    .maxContentLength(configuration.getMaxContentLength())
-                    .validateHttpHeaders(true)
-                    .propagateSettings(true)
-                    .build();
-
-        } else {
-            http2ToHttpAdapter = new StreamingInboundHttp2ToHttpAdapter(
-                    connection,
-                    configuration.getMaxContentLength()
-            );
-        }
-        return builder
-                .connection(connection)
-                .frameListener(new DelegatingDecompressorFrameListener(
-                        connection,
-                        http2ToHttpAdapter));
-
-    }
-
     private Flux<MutableHttpResponse<Object>> readBodyOnError(@Nullable Argument<?> errorType, @NonNull Flux<MutableHttpResponse<Object>> publisher) {
         if (errorType != null && errorType != HttpClient.DEFAULT_ERROR_TYPE) {
             return publisher.onErrorResume(clientException -> {
@@ -2367,7 +2208,7 @@ public class DefaultHttpClient implements
     /**
      * A handler that triggers the cleartext upgrade to HTTP/2 by sending an initial HTTP request.
      */
-    private class UpgradeRequestHandler extends ChannelInboundHandlerAdapter {
+    class UpgradeRequestHandler extends ChannelInboundHandlerAdapter {
 
         private final ConnectionManager.HttpClientInitializer initializer;
         private final Http2SettingsHandler settingsHandler;
