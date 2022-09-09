@@ -77,7 +77,9 @@ import io.netty.util.Attribute;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.Promise;
 import org.slf4j.Logger;
+import reactor.core.CorePublisher;
 import reactor.core.Disposable;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 
@@ -90,6 +92,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
+import static io.micronaut.http.netty.channel.ChannelPipelineCustomizer.HANDLER_HTTP2_SETTINGS;
 import static io.micronaut.http.netty.channel.ChannelPipelineCustomizer.HANDLER_IDLE_STATE;
 
 final class ConnectionManager {
@@ -275,7 +278,7 @@ final class ConnectionManager {
     }
 
     Mono<PoolHandle> connectForExchange(DefaultHttpClient.RequestKey requestKey, boolean multipart, boolean acceptEvents) {
-        return Mono.create(emitter -> {
+        return Mono.<PoolHandle>create(emitter -> {
             if (poolMap != null && !multipart) {
                 try {
                     Future<PoolHandle> channelFuture = acquireChannelFromPool(requestKey);
@@ -311,11 +314,30 @@ final class ConnectionManager {
                     }
                 });
             }
+        }).delayUntil(this::delayUntilHttp2Ready);
+    }
+
+    @NonNull
+    private CorePublisher<?> delayUntilHttp2Ready(PoolHandle poolHandle) {
+        Http2SettingsHandler settingsHandler = (Http2SettingsHandler) poolHandle.channel.pipeline().get(HANDLER_HTTP2_SETTINGS);
+        if (settingsHandler == null) {
+            return Flux.empty();
+        }
+        Sinks.Empty<?> empty = Sinks.empty();
+        httpClient.addInstrumentedListener(settingsHandler.promise, future -> {
+            if (future.isSuccess()) {
+                empty.tryEmitEmpty();
+            } else {
+                poolHandle.taint();
+                poolHandle.release();
+                empty.tryEmitError(future.cause());
+            }
         });
+        return empty.asMono();
     }
 
     Mono<Channel> connectForStream(DefaultHttpClient.RequestKey requestKey, boolean isProxy, boolean acceptEvents) {
-        return Mono.create(emitter -> {
+        return Mono.<Channel>create(emitter -> {
             ChannelFuture channelFuture;
             try {
                 if (httpVersion == HttpVersion.HTTP_2_0) {
@@ -349,7 +371,7 @@ final class ConnectionManager {
             Disposable disposable = buildDisposableChannel(channelFuture);
             emitter.onDispose(disposable);
             emitter.onCancel(disposable);
-        });
+        }).delayUntil(channel -> delayUntilHttp2Ready(mockPoolHandle(channel)));
     }
 
     Mono<?> connectForWebsocket(DefaultHttpClient.RequestKey requestKey, ChannelHandler handler) {
@@ -714,7 +736,7 @@ final class ConnectionManager {
     /**
      * Reads the first {@link Http2Settings} object and notifies a {@link io.netty.channel.ChannelPromise}.
      */
-    class Http2SettingsHandler extends
+    private class Http2SettingsHandler extends
             SimpleChannelInboundHandlerInstrumented<Http2Settings> {
         final ChannelPromise promise;
 
@@ -734,6 +756,22 @@ final class ConnectionManager {
 
             // Only care about the first settings message
             ctx.pipeline().remove(this);
+        }
+
+        @Override
+        public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+            super.channelInactive(ctx);
+            if (!promise.isDone()) {
+                promise.tryFailure(new HttpClientException("Channel became inactive before settings frame was received"));
+            }
+        }
+
+        @Override
+        public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
+            super.handlerRemoved(ctx);
+            if (!promise.isDone()) {
+                promise.tryFailure(new HttpClientException("Handler was removed before settings frame was received"));
+            }
         }
     }
 

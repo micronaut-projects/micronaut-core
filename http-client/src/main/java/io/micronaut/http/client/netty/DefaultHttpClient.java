@@ -209,7 +209,6 @@ import java.util.stream.Collectors;
 
 import static io.micronaut.http.client.HttpClientConfiguration.DEFAULT_SHUTDOWN_QUIET_PERIOD_MILLISECONDS;
 import static io.micronaut.http.client.HttpClientConfiguration.DEFAULT_SHUTDOWN_TIMEOUT_MILLISECONDS;
-import static io.micronaut.http.netty.channel.ChannelPipelineCustomizer.HANDLER_HTTP2_SETTINGS;
 import static io.micronaut.scheduling.instrument.InvocationInstrumenter.NOOP;
 
 /**
@@ -1664,29 +1663,6 @@ public class DefaultHttpClient implements
     }
 
     private <I, O, E> void sendRequestThroughChannel(
-        io.micronaut.http.HttpRequest<I> finalRequest,
-        Argument<O> bodyType,
-        Argument<E> errorType,
-        FluxSink<? super HttpResponse<O>> emitter,
-        Channel channel,
-        boolean secure,
-        ConnectionManager.PoolHandle poolHandle) throws HttpPostRequestEncoder.ErrorDataEncoderException {
-        try {
-            sendRequestThroughChannel0(
-                finalRequest,
-                bodyType,
-                errorType,
-                emitter,
-                channel,
-                secure,
-                poolHandle
-            );
-        } catch (Exception e) {
-            emitter.error(e);
-        }
-    }
-
-    private <I, O, E> void sendRequestThroughChannel0(
             io.micronaut.http.HttpRequest<I> finalRequest,
             Argument<O> bodyType,
             Argument<E> errorType,
@@ -1895,25 +1871,11 @@ public class DefaultHttpClient implements
     private void addReadTimeoutHandler(ChannelPipeline pipeline) {
         if (connectionManager.readTimeoutMillis != null) {
             if (connectionManager.httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0) {
-                ConnectionManager.Http2SettingsHandler settingsHandler = (ConnectionManager.Http2SettingsHandler) pipeline.get(HANDLER_HTTP2_SETTINGS);
-                if (settingsHandler != null) {
-                    addInstrumentedListener(settingsHandler.promise, future -> {
-                        if (future.isSuccess()) {
-                            pipeline.addBefore(
-                                    ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION,
-                                    ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT,
-                                    new ReadTimeoutHandler(connectionManager.readTimeoutMillis, TimeUnit.MILLISECONDS)
-                            );
-                        }
-
-                    });
-                } else {
-                    pipeline.addBefore(
-                            ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION,
-                            ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT,
-                            new ReadTimeoutHandler(connectionManager.readTimeoutMillis, TimeUnit.MILLISECONDS)
-                    );
-                }
+                pipeline.addBefore(
+                    ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION,
+                    ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT,
+                    new ReadTimeoutHandler(connectionManager.readTimeoutMillis, TimeUnit.MILLISECONDS)
+                );
             } else {
                 pipeline.addBefore(
                         ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC,
@@ -2288,33 +2250,6 @@ public class DefaultHttpClient implements
                     nettyRequest.headers().add(AbstractNettyHttpRequest.HTTP2_SCHEME, HttpScheme.HTTPS);
                 } else {
                     nettyRequest.headers().add(AbstractNettyHttpRequest.HTTP2_SCHEME, HttpScheme.HTTP);
-                }
-
-                // for HTTP/2 over cleartext we have to wait for the protocol upgrade to complete
-                // so we get the Http2SettingsHandler and await receiving the Http2Settings object
-                // which indicates the protocol negotiation has completed successfully
-                final ConnectionManager.UpgradeRequestHandler upgradeRequestHandler =
-                        (ConnectionManager.UpgradeRequestHandler) pipeline.get(ChannelPipelineCustomizer.HANDLER_HTTP2_UPGRADE_REQUEST);
-                final ConnectionManager.Http2SettingsHandler settingsHandler;
-                if (upgradeRequestHandler != null) {
-                    settingsHandler = upgradeRequestHandler.getSettingsHandler();
-                } else {
-                    // upgrade request already received to handler must have been removed
-                    // therefore the Http2SettingsHandler is in the pipeline
-                    settingsHandler = (ConnectionManager.Http2SettingsHandler) pipeline.get(ChannelPipelineCustomizer.HANDLER_HTTP2_SETTINGS);
-                }
-                // if the settings handler is null and no longer in the pipeline, fall through
-                // since this means the HTTP/2 clear text upgrade completed, otherwise
-                // add a listener to the future that writes once the upgrade completes
-                if (settingsHandler != null) {
-                    addInstrumentedListener(settingsHandler.promise, future -> {
-                        if (future.isSuccess()) {
-                            processRequestWrite(channel, poolHandle, emitter, pipeline);
-                        } else {
-                            throw customizeException(new HttpClientException("HTTP/2 clear text upgrade failed to complete", future.cause()));
-                        }
-                    });
-                    return;
                 }
             }
             processRequestWrite(channel, poolHandle, emitter, pipeline);
