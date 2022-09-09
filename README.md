@@ -1,4 +1,4 @@
-# Micronaut 
+# Micronaut
 
 [![Build Status](https://github.com/micronaut-projects/micronaut-core/workflows/Java%20CI/badge.svg)](https://github.com/micronaut-projects/micronaut-core/actions)
 [![Revved up by Gradle Enterprise](https://img.shields.io/badge/Revved%20up%20by-Gradle%20Enterprise-06A0CE?logo=Gradle&labelColor=02303A)](https://ge.micronaut.io/scans)
@@ -32,7 +32,7 @@ At the same time Micronaut aims to avoid the downsides of frameworks like Spring
 
 This is achieved by pre-computing the framework infrastructure at compilation time which reduces the logic required at runtime for the application to work.
 
-For more information on using Micronaut see the documentation at [micronaut.io](http://micronaut.io)
+For more information on using Micronaut see the documentation at [micronaut.io](https://micronaut.io)
 
 ## Example Applications
 
@@ -58,7 +58,7 @@ Micronaut is using Semantic Versioning 2.0.0. To understand what that means, ple
 
 ## CI
 
-[Github Actions](https://github.com/micronaut-projects/micronaut-core/actions) are used to build Micronaut. If a build fails in `master`, check the [test reports](https://micronaut-projects.github.io/micronaut-core/index.html). 
+[Github Actions](https://github.com/micronaut-projects/micronaut-core/actions) are used to build Micronaut. If a build fails in `master`, check the [test reports](https://micronaut-projects.github.io/micronaut-core/index.html).
 
 
 

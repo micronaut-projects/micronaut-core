@@ -186,9 +186,6 @@ The following table summarizes the core Micronaut annotations and which are inhe
 |ann:scheduling.annotation.ExecuteOn[]                                | ❌
 |ann:scheduling.annotation.Scheduled[]                                | ❌
 |ann:session.annotation.SessionValue[]                                | ✅
-|ann:tracing.annotation.ContinueSpan[]                                | ✅
-|ann:tracing.annotation.NewSpan[]                                     | ✅
-|ann:tracing.annotation.SpanTag[]                                     | ✅
 |ann:validation.Validated[]                                           | ✅
 |ann:websocket.annotation.ClientWebSocket[]                           | ❌
 |ann:websocket.annotation.OnClose[]                                   | ✅
