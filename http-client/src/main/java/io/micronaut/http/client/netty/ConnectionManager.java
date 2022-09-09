@@ -31,6 +31,7 @@ import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketCl
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.handler.timeout.ReadTimeoutHandler;
+import io.netty.resolver.NoopAddressResolverGroup;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.Promise;
 import org.slf4j.Logger;
@@ -38,10 +39,12 @@ import reactor.core.Disposable;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 
+import java.net.Proxy;
 import java.time.Duration;
 import java.util.Collection;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 final class ConnectionManager {
@@ -102,7 +105,7 @@ final class ConnectionManager {
                     @Override
                     protected ChannelPool newPool(DefaultHttpClient.RequestKey key) {
                         Bootstrap newBootstrap = bootstrap.clone(group);
-                        httpClient.initBootstrapForProxy(newBootstrap, key.isSecure(), key.getHost(), key.getPort());
+                        initBootstrapForProxy(newBootstrap, key.isSecure(), key.getHost(), key.getPort());
                         newBootstrap.remoteAddress(key.getRemoteAddress());
 
                         AbstractChannelPoolHandler channelPoolHandler = httpClient.newPoolHandler(key);
@@ -124,7 +127,7 @@ final class ConnectionManager {
                     @Override
                     protected ChannelPool newPool(DefaultHttpClient.RequestKey key) {
                         Bootstrap newBootstrap = bootstrap.clone(group);
-                        httpClient.initBootstrapForProxy(newBootstrap, key.isSecure(), key.getHost(), key.getPort());
+                        initBootstrapForProxy(newBootstrap, key.isSecure(), key.getHost(), key.getPort());
                         newBootstrap.remoteAddress(key.getRemoteAddress());
 
                         AbstractChannelPoolHandler channelPoolHandler = httpClient.newPoolHandler(key);
@@ -163,7 +166,7 @@ final class ConnectionManager {
         String host = requestKey.getHost();
         int port = requestKey.getPort();
         Bootstrap localBootstrap = bootstrap.clone();
-        httpClient.initBootstrapForProxy(localBootstrap, sslCtx != null, host, port);
+        initBootstrapForProxy(localBootstrap, sslCtx != null, host, port);
         localBootstrap.handler(httpClient.new HttpClientInitializer(
             sslCtx,
             host,
@@ -174,6 +177,13 @@ final class ConnectionManager {
             contextConsumer)
         );
         return localBootstrap.connect(host, port);
+    }
+
+    private void initBootstrapForProxy(Bootstrap localBootstrap, boolean sslCtx, String host, int port) {
+        Proxy proxy = configuration.resolveProxy(sslCtx, host, port);
+        if (proxy.type() != Proxy.Type.DIRECT) {
+            localBootstrap.resolver(NoopAddressResolverGroup.INSTANCE);
+        }
     }
 
     static boolean isAcceptEvents(HttpRequest<?> request) {
@@ -219,7 +229,7 @@ final class ConnectionManager {
         return new PoolHandle(null, channel);
     }
 
-    <I> Mono<PoolHandle> connectForExchange(DefaultHttpClient.RequestKey requestKey, boolean multipart, boolean acceptEvents) {
+    Mono<PoolHandle> connectForExchange(DefaultHttpClient.RequestKey requestKey, boolean multipart, boolean acceptEvents) {
         return Mono.create(emitter -> {
             if (poolMap != null && !multipart) {
                 try {
@@ -291,20 +301,20 @@ final class ConnectionManager {
                 return;
             }
 
-            Disposable disposable = httpClient.buildDisposableChannel(channelFuture);
+            Disposable disposable = buildDisposableChannel(channelFuture);
             emitter.onDispose(disposable);
             emitter.onCancel(disposable);
         });
     }
 
-    Mono<Object> connectForWebsocket(DefaultHttpClient.RequestKey requestKey, ChannelHandler handler) {
+    Mono<?> connectForWebsocket(DefaultHttpClient.RequestKey requestKey, ChannelHandler handler) {
         Sinks.Empty<Object> initial = Sinks.empty();
 
         Bootstrap bootstrap = this.bootstrap.clone();
         SslContext sslContext = buildSslContext(requestKey);
 
         bootstrap.remoteAddress(requestKey.getHost(), requestKey.getPort());
-        httpClient.initBootstrapForProxy(bootstrap, sslContext != null, requestKey.getHost(), requestKey.getPort());
+        initBootstrapForProxy(bootstrap, sslContext != null, requestKey.getHost(), requestKey.getPort());
         bootstrap.handler(httpClient.new HttpClientInitializer(
             sslContext,
             requestKey.getHost(),
@@ -347,6 +357,27 @@ final class ConnectionManager {
         });
 
         return initial.asMono();
+    }
+
+    private Disposable buildDisposableChannel(ChannelFuture channelFuture) {
+        return new Disposable() {
+            private final AtomicBoolean disposed = new AtomicBoolean(false);
+
+            @Override
+            public void dispose() {
+                if (disposed.compareAndSet(false, true)) {
+                    Channel channel = channelFuture.channel();
+                    if (channel.isOpen()) {
+                        httpClient.closeChannelAsync(channel);
+                    }
+                }
+            }
+
+            @Override
+            public boolean isDisposed() {
+                return disposed.get();
+            }
+        };
     }
 
     class PoolHandle {

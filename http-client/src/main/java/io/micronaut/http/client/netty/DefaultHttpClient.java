@@ -109,7 +109,6 @@ import io.micronaut.websocket.annotation.ClientWebSocket;
 import io.micronaut.websocket.annotation.OnMessage;
 import io.micronaut.websocket.context.WebSocketBean;
 import io.micronaut.websocket.context.WebSocketBeanRegistry;
-import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBufUtil;
@@ -192,7 +191,6 @@ import io.netty.handler.stream.ChunkedWriteHandler;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.handler.timeout.ReadTimeoutHandler;
-import io.netty.resolver.NoopAddressResolverGroup;
 import io.netty.util.Attribute;
 import io.netty.util.AttributeKey;
 import io.netty.util.CharsetUtil;
@@ -239,7 +237,6 @@ import java.util.OptionalInt;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -318,7 +315,7 @@ public class DefaultHttpClient implements
     private final ThreadFactory threadFactory;
     private final boolean shutdownGroup;
     private final Charset defaultCharset;
-    private final ConnectionManager connectionManager;
+    final ConnectionManager connectionManager;
     private final Logger log;
     private final HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver;
     final WebSocketBeanRegistry webSocketRegistry;
@@ -1328,13 +1325,6 @@ public class DefaultHttpClient implements
         return null;
     }
 
-    void initBootstrapForProxy(Bootstrap bootstrap, boolean ssl, String host, int port) {
-        Proxy proxy = configuration.resolveProxy(ssl, host, port);
-        if (proxy.type() != Type.DIRECT) {
-            bootstrap.resolver(NoopAddressResolverGroup.INSTANCE);
-        }
-    }
-
     /**
      * Creates the {@link NioEventLoopGroup} for this client.
      *
@@ -2317,27 +2307,6 @@ public class DefaultHttpClient implements
         io.netty.handler.codec.http.HttpRequest nettyRequest = requestWriter.getNettyRequest();
         prepareHttpHeaders(requestURI, request, nettyRequest, permitsBody, true);
         return requestWriter;
-    }
-
-    Disposable buildDisposableChannel(ChannelFuture channelFuture) {
-        return new Disposable() {
-            private AtomicBoolean disposed = new AtomicBoolean(false);
-
-            @Override
-            public void dispose() {
-                if (disposed.compareAndSet(false, true)) {
-                    Channel channel = channelFuture.channel();
-                    if (channel.isOpen()) {
-                        closeChannelAsync(channel);
-                    }
-                }
-            }
-
-            @Override
-            public boolean isDisposed() {
-                return disposed.get();
-            }
-        };
     }
 
     AbstractChannelPoolHandler newPoolHandler(RequestKey key) {
