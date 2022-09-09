@@ -17,6 +17,7 @@ import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.EventLoopGroup;
@@ -46,6 +47,8 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+
+import static io.micronaut.http.netty.channel.ChannelPipelineCustomizer.HANDLER_IDLE_STATE;
 
 final class ConnectionManager {
     private final DefaultHttpClient httpClient; // TODO
@@ -108,7 +111,7 @@ final class ConnectionManager {
                         initBootstrapForProxy(newBootstrap, key.isSecure(), key.getHost(), key.getPort());
                         newBootstrap.remoteAddress(key.getRemoteAddress());
 
-                        AbstractChannelPoolHandler channelPoolHandler = httpClient.newPoolHandler(key);
+                        AbstractChannelPoolHandler channelPoolHandler = newPoolHandler(key, httpClient);
                         final long acquireTimeoutMillis = connectionPoolConfiguration.getAcquireTimeout().map(Duration::toMillis).orElse(-1L);
                         return new FixedChannelPool(
                             newBootstrap,
@@ -130,7 +133,7 @@ final class ConnectionManager {
                         initBootstrapForProxy(newBootstrap, key.isSecure(), key.getHost(), key.getPort());
                         newBootstrap.remoteAddress(key.getRemoteAddress());
 
-                        AbstractChannelPoolHandler channelPoolHandler = httpClient.newPoolHandler(key);
+                        AbstractChannelPoolHandler channelPoolHandler = newPoolHandler(key, httpClient);
                         return new SimpleChannelPool(
                             newBootstrap,
                             channelPoolHandler,
@@ -376,6 +379,97 @@ final class ConnectionManager {
             @Override
             public boolean isDisposed() {
                 return disposed.get();
+            }
+        };
+    }
+
+    private AbstractChannelPoolHandler newPoolHandler(DefaultHttpClient.RequestKey key, DefaultHttpClient httpClient) {
+        return new AbstractChannelPoolHandler() {
+            @Override
+            public void channelCreated(Channel ch) {
+                Promise<?> streamPipelineBuilt = ch.newPromise();
+                ch.attr(DefaultHttpClient.STREAM_CHANNEL_INITIALIZED).set(streamPipelineBuilt);
+
+                // make sure the future completes eventually
+                ChannelHandler failureHandler = new ChannelInboundHandlerAdapter() {
+                    @Override
+                    public void handlerRemoved(ChannelHandlerContext ctx) {
+                        streamPipelineBuilt.trySuccess(null);
+                    }
+
+                    @Override
+                    public void channelInactive(ChannelHandlerContext ctx) {
+                        streamPipelineBuilt.trySuccess(null);
+                        ctx.fireChannelInactive();
+                    }
+                };
+                ch.pipeline().addLast(failureHandler);
+
+                ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_INIT, httpClient.new HttpClientInitializer(
+                    key.isSecure() ? sslContext : null,
+                    key.getHost(),
+                    key.getPort(),
+                    false,
+                    false,
+                    false,
+                    null
+                ) {
+                    @Override
+                    protected void addFinalHandler(ChannelPipeline pipeline) {
+                        // no-op, don't add the stream handler which is not supported
+                        // in the connection pooled scenario
+                    }
+
+                    @Override
+                    void onStreamPipelineBuilt() {
+                        super.onStreamPipelineBuilt();
+                        streamPipelineBuilt.trySuccess(null);
+                        ch.pipeline().remove(failureHandler);
+                        ch.attr(DefaultHttpClient.STREAM_CHANNEL_INITIALIZED).set(null);
+                    }
+                });
+
+                if (connectionTimeAliveMillis != null) {
+                    ch.pipeline()
+                            .addLast(
+                                    ChannelPipelineCustomizer.HANDLER_CONNECT_TTL,
+                                    new ConnectTTLHandler(connectionTimeAliveMillis)
+                            );
+                }
+            }
+
+            @Override
+            public void channelReleased(Channel ch) {
+                Duration idleTimeout = configuration.getConnectionPoolIdleTimeout().orElse(Duration.ofNanos(0));
+                ChannelPipeline pipeline = ch.pipeline();
+                if (ch.isOpen()) {
+                    ch.config().setAutoRead(true);
+                    pipeline.addLast(IdlingConnectionHandler.INSTANCE);
+                    if (idleTimeout.toNanos() > 0) {
+                        pipeline.addLast(HANDLER_IDLE_STATE, new IdleStateHandler(idleTimeout.toNanos(), idleTimeout.toNanos(), 0, TimeUnit.NANOSECONDS));
+                        pipeline.addLast(IdleTimeoutHandler.INSTANCE);
+                    }
+                }
+
+                if (ConnectTTLHandler.isChannelExpired(ch) && ch.isOpen() && !ch.eventLoop().isShuttingDown()) {
+                    ch.close();
+                }
+
+                httpClient.removeReadTimeoutHandler(pipeline);
+            }
+
+            @Override
+            public void channelAcquired(Channel ch) throws Exception {
+                ChannelPipeline pipeline = ch.pipeline();
+                if (pipeline.context(IdlingConnectionHandler.INSTANCE) != null) {
+                    pipeline.remove(IdlingConnectionHandler.INSTANCE);
+                }
+                if (pipeline.context(HANDLER_IDLE_STATE) != null) {
+                    pipeline.remove(HANDLER_IDLE_STATE);
+                }
+                if (pipeline.context(IdleTimeoutHandler.INSTANCE) != null) {
+                    pipeline.remove(IdleTimeoutHandler.INSTANCE);
+                }
             }
         };
     }

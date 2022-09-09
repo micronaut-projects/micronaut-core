@@ -118,7 +118,6 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFactory;
 import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
@@ -128,7 +127,6 @@ import io.netty.channel.ChannelPromise;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.MultithreadEventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.channel.pool.AbstractChannelPoolHandler;
 import io.netty.channel.pool.ChannelHealthChecker;
 import io.netty.channel.pool.ChannelPool;
 import io.netty.channel.pool.SimpleChannelPool;
@@ -247,7 +245,6 @@ import java.util.stream.Collectors;
 import static io.micronaut.http.client.HttpClientConfiguration.DEFAULT_SHUTDOWN_QUIET_PERIOD_MILLISECONDS;
 import static io.micronaut.http.client.HttpClientConfiguration.DEFAULT_SHUTDOWN_TIMEOUT_MILLISECONDS;
 import static io.micronaut.http.netty.channel.ChannelPipelineCustomizer.HANDLER_HTTP2_SETTINGS;
-import static io.micronaut.http.netty.channel.ChannelPipelineCustomizer.HANDLER_IDLE_STATE;
 import static io.micronaut.scheduling.instrument.InvocationInstrumenter.NOOP;
 
 /**
@@ -2307,97 +2304,6 @@ public class DefaultHttpClient implements
         io.netty.handler.codec.http.HttpRequest nettyRequest = requestWriter.getNettyRequest();
         prepareHttpHeaders(requestURI, request, nettyRequest, permitsBody, true);
         return requestWriter;
-    }
-
-    AbstractChannelPoolHandler newPoolHandler(RequestKey key) {
-        return new AbstractChannelPoolHandler() {
-            @Override
-            public void channelCreated(Channel ch) {
-                Promise<?> streamPipelineBuilt = ch.newPromise();
-                ch.attr(STREAM_CHANNEL_INITIALIZED).set(streamPipelineBuilt);
-
-                // make sure the future completes eventually
-                ChannelHandler failureHandler = new ChannelInboundHandlerAdapter() {
-                    @Override
-                    public void handlerRemoved(ChannelHandlerContext ctx) {
-                        streamPipelineBuilt.trySuccess(null);
-                    }
-
-                    @Override
-                    public void channelInactive(ChannelHandlerContext ctx) {
-                        streamPipelineBuilt.trySuccess(null);
-                        ctx.fireChannelInactive();
-                    }
-                };
-                ch.pipeline().addLast(failureHandler);
-
-                ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_INIT, new HttpClientInitializer(
-                        key.isSecure() ? connectionManager.sslContext : null,
-                        key.getHost(),
-                        key.getPort(),
-                        false,
-                        false,
-                        false,
-                        null
-                ) {
-                    @Override
-                    protected void addFinalHandler(ChannelPipeline pipeline) {
-                        // no-op, don't add the stream handler which is not supported
-                        // in the connection pooled scenario
-                    }
-
-                    @Override
-                    void onStreamPipelineBuilt() {
-                        super.onStreamPipelineBuilt();
-                        streamPipelineBuilt.trySuccess(null);
-                        ch.pipeline().remove(failureHandler);
-                        ch.attr(STREAM_CHANNEL_INITIALIZED).set(null);
-                    }
-                });
-
-                if (connectionManager.connectionTimeAliveMillis != null) {
-                    ch.pipeline()
-                            .addLast(
-                                    ChannelPipelineCustomizer.HANDLER_CONNECT_TTL,
-                                    new ConnectTTLHandler(connectionManager.connectionTimeAliveMillis)
-                            );
-                }
-            }
-
-            @Override
-            public void channelReleased(Channel ch) {
-                Duration idleTimeout = configuration.getConnectionPoolIdleTimeout().orElse(Duration.ofNanos(0));
-                ChannelPipeline pipeline = ch.pipeline();
-                if (ch.isOpen()) {
-                    ch.config().setAutoRead(true);
-                    pipeline.addLast(IdlingConnectionHandler.INSTANCE);
-                    if (idleTimeout.toNanos() > 0) {
-                        pipeline.addLast(HANDLER_IDLE_STATE, new IdleStateHandler(idleTimeout.toNanos(), idleTimeout.toNanos(), 0, TimeUnit.NANOSECONDS));
-                        pipeline.addLast(IdleTimeoutHandler.INSTANCE);
-                    }
-                }
-
-                if (ConnectTTLHandler.isChannelExpired(ch) && ch.isOpen() && !ch.eventLoop().isShuttingDown()) {
-                    ch.close();
-                }
-
-                removeReadTimeoutHandler(pipeline);
-            }
-
-            @Override
-            public void channelAcquired(Channel ch) throws Exception {
-                ChannelPipeline pipeline = ch.pipeline();
-                if (pipeline.context(IdlingConnectionHandler.INSTANCE) != null) {
-                    pipeline.remove(IdlingConnectionHandler.INSTANCE);
-                }
-                if (pipeline.context(HANDLER_IDLE_STATE) != null) {
-                    pipeline.remove(HANDLER_IDLE_STATE);
-                }
-                if (pipeline.context(IdleTimeoutHandler.INSTANCE) != null) {
-                    pipeline.remove(IdleTimeoutHandler.INSTANCE);
-                }
-            }
-        };
     }
 
     /**
