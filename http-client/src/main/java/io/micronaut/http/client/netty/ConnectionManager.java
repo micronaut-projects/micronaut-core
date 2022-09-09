@@ -2,6 +2,7 @@ package io.micronaut.http.client.netty;
 
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.MediaType;
@@ -65,6 +66,8 @@ import io.netty.handler.codec.http2.HttpToHttp2ConnectionHandler;
 import io.netty.handler.codec.http2.HttpToHttp2ConnectionHandlerBuilder;
 import io.netty.handler.codec.http2.InboundHttp2ToHttpAdapterBuilder;
 import io.netty.handler.logging.LoggingHandler;
+import io.netty.handler.proxy.HttpProxyHandler;
+import io.netty.handler.proxy.Socks5ProxyHandler;
 import io.netty.handler.ssl.ApplicationProtocolNames;
 import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler;
 import io.netty.handler.ssl.SslContext;
@@ -85,6 +88,7 @@ import reactor.core.publisher.Sinks;
 
 import java.net.InetSocketAddress;
 import java.net.Proxy;
+import java.net.SocketAddress;
 import java.time.Duration;
 import java.util.Collection;
 import java.util.Optional;
@@ -685,9 +689,62 @@ final class ConnectionManager {
     }
 
     /**
+     * Configures the HTTP proxy for the pipeline.
+     *
+     * @param pipeline   The pipeline
+     * @param proxy      The proxy
+     */
+    private void configureProxy(ChannelPipeline pipeline, Proxy proxy) {
+        configureProxy(pipeline, proxy.type(), proxy.address());
+    }
+
+    /**
+     * Configures the HTTP proxy for the pipeline.
+     *
+     * @param pipeline     The pipeline
+     * @param proxyType    The proxy type
+     * @param proxyAddress The proxy address
+     */
+    private void configureProxy(ChannelPipeline pipeline, Proxy.Type proxyType, SocketAddress proxyAddress) {
+        String username = configuration.getProxyUsername().orElse(null);
+        String password = configuration.getProxyPassword().orElse(null);
+
+        if (proxyAddress instanceof InetSocketAddress) {
+            InetSocketAddress isa = (InetSocketAddress) proxyAddress;
+            if (isa.isUnresolved()) {
+                proxyAddress = new InetSocketAddress(isa.getHostString(), isa.getPort());
+            }
+        }
+
+        if (StringUtils.isNotEmpty(username) && StringUtils.isNotEmpty(password)) {
+            switch (proxyType) {
+                case HTTP:
+                    pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_PROXY, new HttpProxyHandler(proxyAddress, username, password));
+                    break;
+                case SOCKS:
+                    pipeline.addLast(ChannelPipelineCustomizer.HANDLER_SOCKS_5_PROXY, new Socks5ProxyHandler(proxyAddress, username, password));
+                    break;
+                default:
+                    // no-op
+            }
+        } else {
+            switch (proxyType) {
+                case HTTP:
+                    pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_PROXY, new HttpProxyHandler(proxyAddress));
+                    break;
+                case SOCKS:
+                    pipeline.addLast(ChannelPipelineCustomizer.HANDLER_SOCKS_5_PROXY, new Socks5ProxyHandler(proxyAddress));
+                    break;
+                default:
+                    // no-op
+            }
+        }
+    }
+
+    /**
      * A handler that triggers the cleartext upgrade to HTTP/2 by sending an initial HTTP request.
      */
-    static class UpgradeRequestHandler extends ChannelInboundHandlerAdapter {
+    private static class UpgradeRequestHandler extends ChannelInboundHandlerAdapter {
 
         private final HttpClientInitializer initializer;
         private final Http2SettingsHandler settingsHandler;
@@ -827,7 +884,7 @@ final class ConnectionManager {
 
             Proxy proxy = configuration.resolveProxy(sslContext != null, host, port);
             if (!Proxy.NO_PROXY.equals(proxy)) {
-                httpClient.configureProxy(p, proxy);
+                configureProxy(p, proxy);
             }
 
             if (httpVersion == HttpVersion.HTTP_2_0) {

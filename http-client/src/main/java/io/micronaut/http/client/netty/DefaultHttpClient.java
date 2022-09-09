@@ -150,8 +150,6 @@ import io.netty.handler.codec.http.websocketx.WebSocketClientHandshakerFactory;
 import io.netty.handler.codec.http.websocketx.WebSocketVersion;
 import io.netty.handler.codec.http2.Http2Stream;
 import io.netty.handler.codec.http2.HttpConversionUtil;
-import io.netty.handler.proxy.HttpProxyHandler;
-import io.netty.handler.proxy.Socks5ProxyHandler;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.stream.ChunkedWriteHandler;
 import io.netty.handler.timeout.ReadTimeoutHandler;
@@ -181,9 +179,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
-import java.net.Proxy;
-import java.net.Proxy.Type;
-import java.net.SocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.Charset;
@@ -1336,59 +1331,6 @@ public class DefaultHttpClient implements
             sslCtx = null;
         }
         return sslCtx;
-    }
-
-    /**
-     * Configures the HTTP proxy for the pipeline.
-     *
-     * @param pipeline The pipeline
-     * @param proxy    The proxy
-     */
-    protected void configureProxy(ChannelPipeline pipeline, Proxy proxy) {
-        configureProxy(pipeline, proxy.type(), proxy.address());
-    }
-
-    /**
-     * Configures the HTTP proxy for the pipeline.
-     *
-     * @param pipeline     The pipeline
-     * @param proxyType    The proxy type
-     * @param proxyAddress The proxy address
-     */
-    protected void configureProxy(ChannelPipeline pipeline, Type proxyType, SocketAddress proxyAddress) {
-        String username = configuration.getProxyUsername().orElse(null);
-        String password = configuration.getProxyPassword().orElse(null);
-
-        if (proxyAddress instanceof InetSocketAddress) {
-            InetSocketAddress isa = (InetSocketAddress) proxyAddress;
-            if (isa.isUnresolved()) {
-                proxyAddress = new InetSocketAddress(isa.getHostString(), isa.getPort());
-            }
-        }
-
-        if (StringUtils.isNotEmpty(username) && StringUtils.isNotEmpty(password)) {
-            switch (proxyType) {
-                case HTTP:
-                    pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_PROXY, new HttpProxyHandler(proxyAddress, username, password));
-                    break;
-                case SOCKS:
-                    pipeline.addLast(ChannelPipelineCustomizer.HANDLER_SOCKS_5_PROXY, new Socks5ProxyHandler(proxyAddress, username, password));
-                    break;
-                default:
-                    // no-op
-            }
-        } else {
-            switch (proxyType) {
-                case HTTP:
-                    pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_PROXY, new HttpProxyHandler(proxyAddress));
-                    break;
-                case SOCKS:
-                    pipeline.addLast(ChannelPipelineCustomizer.HANDLER_SOCKS_5_PROXY, new Socks5ProxyHandler(proxyAddress));
-                    break;
-                default:
-                    // no-op
-            }
-        }
     }
 
     private <I, O, R extends io.micronaut.http.HttpResponse<O>> Publisher<R> applyFilterToResponsePublisher(
