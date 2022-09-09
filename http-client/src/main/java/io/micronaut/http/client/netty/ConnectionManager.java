@@ -26,6 +26,7 @@ import io.netty.handler.ssl.SslContext;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.Promise;
 import org.slf4j.Logger;
+import reactor.core.publisher.Mono;
 
 import java.time.Duration;
 import java.util.Collection;
@@ -132,7 +133,6 @@ final class ConnectionManager {
      * Creates an initial connection to the given remote host.
      *
      * @param requestKey
-     * @param sslCtx          The SslContext instance
      * @param isStream        Is the connection a stream connection
      * @param isProxy         Is this a streaming proxy
      * @param acceptsEvents
@@ -205,6 +205,46 @@ final class ConnectionManager {
     PoolHandle mockPoolHandle(Channel channel) {
         // TODO: delete
         return new PoolHandle(null, channel);
+    }
+
+    <I> Mono<PoolHandle> connectForExchange(DefaultHttpClient.RequestKey requestKey, boolean multipart, boolean acceptEvents) {
+        return Mono.create(emitter -> {
+            if (poolMap != null && !multipart) {
+                try {
+                    Future<PoolHandle> channelFuture = acquireChannelFromPool(requestKey);
+                    httpClient.addInstrumentedListener(channelFuture, future -> {
+                        if (future.isSuccess()) {
+                            PoolHandle poolHandle = future.get();
+                            Channel channel = poolHandle.channel;
+                            Future<?> initFuture = channel.attr(DefaultHttpClient.STREAM_CHANNEL_INITIALIZED).get();
+                            if (initFuture == null) {
+                                emitter.success(poolHandle);
+                            } else {
+                                // we should wait until the handshake completes
+                                httpClient.addInstrumentedListener(initFuture, f -> {
+                                    emitter.success(poolHandle);
+                                });
+                            }
+                        } else {
+                            Throwable cause = future.cause();
+                            emitter.error(httpClient.customizeException(new HttpClientException("Connect Error: " + cause.getMessage(), cause)));
+                        }
+                    });
+                } catch (HttpClientException e) {
+                    emitter.error(e);
+                }
+            } else {
+                ChannelFuture connectionFuture = doConnect(requestKey, false, false, acceptEvents, null);
+                httpClient.addInstrumentedListener(connectionFuture, future -> {
+                    if (!future.isSuccess()) {
+                        Throwable cause = future.cause();
+                        emitter.error(httpClient.customizeException(new HttpClientException("Connect Error: " + cause.getMessage(), cause)));
+                    } else {
+                        emitter.success(mockPoolHandle(connectionFuture.channel()));
+                    }
+                });
+            }
+        });
     }
 
     class PoolHandle {

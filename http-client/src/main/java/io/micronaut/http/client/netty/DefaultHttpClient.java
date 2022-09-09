@@ -284,7 +284,7 @@ public class DefaultHttpClient implements
      * TLS handshake has completed). If unset, then no handshake is needed or it has already
      * completed.
      */
-    private static final AttributeKey<Future<?>> STREAM_CHANNEL_INITIALIZED =
+    static final AttributeKey<Future<?>> STREAM_CHANNEL_INITIALIZED =
         AttributeKey.valueOf("micronaut.http.streamChannelInitialized");
     private static final int DEFAULT_HTTP_PORT = 80;
     private static final int DEFAULT_HTTPS_PORT = 443;
@@ -1274,44 +1274,7 @@ public class DefaultHttpClient implements
             return Flux.error(e);
         }
 
-        Mono<ConnectionManager.PoolHandle> handlePublisher = Mono.create(emitter -> {
-            boolean multipart = MediaType.MULTIPART_FORM_DATA_TYPE.equals(request.getContentType().orElse(null));
-            if (connectionManager.poolMap != null && !multipart) {
-                try {
-                    Future<ConnectionManager.PoolHandle> channelFuture = connectionManager.acquireChannelFromPool(requestKey);
-                    addInstrumentedListener(channelFuture, future -> {
-                        if (future.isSuccess()) {
-                            ConnectionManager.PoolHandle poolHandle = future.get();
-                            Channel channel = poolHandle.channel;
-                            Future<?> initFuture = channel.attr(STREAM_CHANNEL_INITIALIZED).get();
-                            if (initFuture == null) {
-                                emitter.success(poolHandle);
-                            } else {
-                                // we should wait until the handshake completes
-                                addInstrumentedListener(initFuture, f -> {
-                                    emitter.success(poolHandle);
-                                });
-                            }
-                        } else {
-                            Throwable cause = future.cause();
-                            emitter.error(customizeException(new HttpClientException("Connect Error: " + cause.getMessage(), cause)));
-                        }
-                    });
-                } catch (HttpClientException e) {
-                    emitter.error(e);
-                }
-            } else {
-                ChannelFuture connectionFuture = connectionManager.doConnect(new RequestKey(this, requestURI), false, false, ConnectionManager.isAcceptEvents(request), null);
-                addInstrumentedListener(connectionFuture, future -> {
-                    if (!future.isSuccess()) {
-                        Throwable cause = future.cause();
-                        emitter.error(customizeException(new HttpClientException("Connect Error: " + cause.getMessage(), cause)));
-                    } else {
-                        emitter.success(connectionManager.mockPoolHandle(connectionFuture.channel()));
-                    }
-                });
-            }
-        });
+        Mono<ConnectionManager.PoolHandle> handlePublisher = connectionManager.connectForExchange(requestKey, MediaType.MULTIPART_FORM_DATA_TYPE.equals(request.getContentType().orElse(null)), ConnectionManager.isAcceptEvents(request));
 
         Flux<io.micronaut.http.HttpResponse<O>> responsePublisher = handlePublisher.flatMapMany(poolHandle -> {
             return Flux.create(emitter -> {
@@ -2561,7 +2524,7 @@ public class DefaultHttpClient implements
      * @param <C> the future type
      * @return a Netty listener that is instrumented
      */
-    private <V, C extends Future<V>> Future<V> addInstrumentedListener(
+    <V, C extends Future<V>> Future<V> addInstrumentedListener(
             Future<V> channelFuture, GenericFutureListener<C> listener
     ) {
         return channelFuture.addListener(f -> {
