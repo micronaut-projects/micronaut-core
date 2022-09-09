@@ -115,10 +115,8 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelFactory;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelPipeline;
-import io.netty.channel.ChannelPromise;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.MultithreadEventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
@@ -127,7 +125,6 @@ import io.netty.channel.pool.ChannelPool;
 import io.netty.channel.pool.SimpleChannelPool;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.TooLongFrameException;
-import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.DefaultHttpContent;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
@@ -140,12 +137,10 @@ import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpMessage;
-import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpScheme;
 import io.netty.handler.codec.http.HttpUtil;
-import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.multipart.DefaultHttpDataFactory;
 import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.handler.codec.http.multipart.HttpDataFactory;
@@ -153,7 +148,6 @@ import io.netty.handler.codec.http.multipart.HttpPostRequestEncoder;
 import io.netty.handler.codec.http.multipart.InterfaceHttpData;
 import io.netty.handler.codec.http.websocketx.WebSocketClientHandshakerFactory;
 import io.netty.handler.codec.http.websocketx.WebSocketVersion;
-import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.codec.http2.Http2Stream;
 import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.handler.proxy.HttpProxyHandler;
@@ -1901,7 +1895,7 @@ public class DefaultHttpClient implements
     private void addReadTimeoutHandler(ChannelPipeline pipeline) {
         if (connectionManager.readTimeoutMillis != null) {
             if (connectionManager.httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0) {
-                Http2SettingsHandler settingsHandler = (Http2SettingsHandler) pipeline.get(HANDLER_HTTP2_SETTINGS);
+                ConnectionManager.Http2SettingsHandler settingsHandler = (ConnectionManager.Http2SettingsHandler) pipeline.get(HANDLER_HTTP2_SETTINGS);
                 if (settingsHandler != null) {
                     addInstrumentedListener(settingsHandler.promise, future -> {
                         if (future.isSuccess()) {
@@ -2180,81 +2174,6 @@ public class DefaultHttpClient implements
     }
 
     /**
-     * Reads the first {@link Http2Settings} object and notifies a {@link io.netty.channel.ChannelPromise}.
-     */
-    final class Http2SettingsHandler extends
-            SimpleChannelInboundHandlerInstrumented<Http2Settings> {
-        private final ChannelPromise promise;
-
-        /**
-         * Create new instance.
-         *
-         * @param promise Promise object used to notify when first settings are received
-         */
-        Http2SettingsHandler(ChannelPromise promise) {
-            super(connectionManager.instrumenter);
-            this.promise = promise;
-        }
-
-        @Override
-        protected void channelReadInstrumented(ChannelHandlerContext ctx, Http2Settings msg) {
-            promise.setSuccess();
-
-            // Only care about the first settings message
-            ctx.pipeline().remove(this);
-        }
-    }
-
-    /**
-     * A handler that triggers the cleartext upgrade to HTTP/2 by sending an initial HTTP request.
-     */
-    class UpgradeRequestHandler extends ChannelInboundHandlerAdapter {
-
-        private final ConnectionManager.HttpClientInitializer initializer;
-        private final Http2SettingsHandler settingsHandler;
-
-        /**
-         * Default constructor.
-         *
-         * @param initializer The initializer
-         */
-        public UpgradeRequestHandler(ConnectionManager.HttpClientInitializer initializer) {
-            this.initializer = initializer;
-            this.settingsHandler = initializer.settingsHandler;
-        }
-
-        /**
-         * @return The settings handler
-         */
-        public Http2SettingsHandler getSettingsHandler() {
-            return settingsHandler;
-        }
-
-        @Override
-        public void channelActive(ChannelHandlerContext ctx) {
-            // Done with this handler, remove it from the pipeline.
-            final ChannelPipeline pipeline = ctx.pipeline();
-
-            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_SETTINGS, initializer.settingsHandler);
-            DefaultFullHttpRequest upgradeRequest =
-                    new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/", Unpooled.EMPTY_BUFFER);
-
-            // Set HOST header as the remote peer may require it.
-            InetSocketAddress remote = (InetSocketAddress) ctx.channel().remoteAddress();
-            String hostString = remote.getHostString();
-            if (hostString == null) {
-                hostString = remote.getAddress().getHostAddress();
-            }
-            upgradeRequest.headers().set(HttpHeaderNames.HOST, hostString + ':' + remote.getPort());
-            ctx.writeAndFlush(upgradeRequest);
-
-            ctx.fireChannelActive();
-            pipeline.remove(this);
-            initializer.addFinalHandler(pipeline);
-        }
-    }
-
-    /**
      * Key used for connection pooling and determining host/port.
      */
     static final class RequestKey {
@@ -2374,15 +2293,15 @@ public class DefaultHttpClient implements
                 // for HTTP/2 over cleartext we have to wait for the protocol upgrade to complete
                 // so we get the Http2SettingsHandler and await receiving the Http2Settings object
                 // which indicates the protocol negotiation has completed successfully
-                final UpgradeRequestHandler upgradeRequestHandler =
-                        (UpgradeRequestHandler) pipeline.get(ChannelPipelineCustomizer.HANDLER_HTTP2_UPGRADE_REQUEST);
-                final Http2SettingsHandler settingsHandler;
+                final ConnectionManager.UpgradeRequestHandler upgradeRequestHandler =
+                        (ConnectionManager.UpgradeRequestHandler) pipeline.get(ChannelPipelineCustomizer.HANDLER_HTTP2_UPGRADE_REQUEST);
+                final ConnectionManager.Http2SettingsHandler settingsHandler;
                 if (upgradeRequestHandler != null) {
                     settingsHandler = upgradeRequestHandler.getSettingsHandler();
                 } else {
                     // upgrade request already received to handler must have been removed
                     // therefore the Http2SettingsHandler is in the pipeline
-                    settingsHandler = (Http2SettingsHandler) pipeline.get(ChannelPipelineCustomizer.HANDLER_HTTP2_SETTINGS);
+                    settingsHandler = (ConnectionManager.Http2SettingsHandler) pipeline.get(ChannelPipelineCustomizer.HANDLER_HTTP2_SETTINGS);
                 }
                 // if the settings handler is null and no longer in the pipeline, fall through
                 // since this means the HTTP/2 clear text upgrade completed, otherwise

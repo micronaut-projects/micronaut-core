@@ -17,6 +17,7 @@ import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.micronaut.websocket.exceptions.WebSocketSessionException;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFactory;
 import io.netty.channel.ChannelFuture;
@@ -27,6 +28,7 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelPipeline;
+import io.netty.channel.ChannelPromise;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.pool.AbstractChannelPoolHandler;
 import io.netty.channel.pool.AbstractChannelPoolMap;
@@ -37,13 +39,16 @@ import io.netty.channel.pool.FixedChannelPool;
 import io.netty.channel.pool.SimpleChannelPool;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.LineBasedFrameDecoder;
+import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.DefaultHttpContent;
 import io.netty.handler.codec.http.FullHttpMessage;
 import io.netty.handler.codec.http.HttpClientCodec;
 import io.netty.handler.codec.http.HttpClientUpgradeHandler;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpContentDecompressor;
+import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpMessage;
+import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.LastHttpContent;
@@ -54,6 +59,7 @@ import io.netty.handler.codec.http2.Http2ClientUpgradeCodec;
 import io.netty.handler.codec.http2.Http2Connection;
 import io.netty.handler.codec.http2.Http2FrameListener;
 import io.netty.handler.codec.http2.Http2FrameLogger;
+import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.codec.http2.Http2Stream;
 import io.netty.handler.codec.http2.HttpToHttp2ConnectionHandler;
 import io.netty.handler.codec.http2.HttpToHttp2ConnectionHandlerBuilder;
@@ -75,6 +81,7 @@ import reactor.core.Disposable;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 
+import java.net.InetSocketAddress;
 import java.net.Proxy;
 import java.time.Duration;
 import java.util.Collection;
@@ -558,7 +565,7 @@ final class ConnectionManager {
                     }
                     p.addLast(
                             ChannelPipelineCustomizer.HANDLER_HTTP2_SETTINGS,
-                        httpClient.new Http2SettingsHandler(ch.newPromise())
+                        new Http2SettingsHandler(ch.newPromise())
                     );
                     httpClientInitializer.addEventStreamHandlerIfNecessary(p);
                     httpClientInitializer.addFinalHandler(p);
@@ -596,7 +603,7 @@ final class ConnectionManager {
 
         final ChannelPipeline pipeline = ch.pipeline();
         pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC, sourceCodec);
-        httpClientInitializer.settingsHandler = httpClient.new Http2SettingsHandler(ch.newPromise());
+        httpClientInitializer.settingsHandler = new Http2SettingsHandler(ch.newPromise());
         pipeline.addLast(upgradeHandler);
         pipeline.addLast(new ChannelInboundHandlerAdapter() {
             @Override
@@ -608,7 +615,7 @@ final class ConnectionManager {
                 }
             }
         });
-        pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_UPGRADE_REQUEST, httpClient.new UpgradeRequestHandler(httpClientInitializer) {
+        pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_UPGRADE_REQUEST, new UpgradeRequestHandler(httpClientInitializer) {
             @Override
             public void handlerRemoved(ChannelHandlerContext ctx) {
                 final Consumer<ChannelHandlerContext> contextConsumer = httpClientInitializer.contextConsumer;
@@ -656,6 +663,81 @@ final class ConnectionManager {
     }
 
     /**
+     * A handler that triggers the cleartext upgrade to HTTP/2 by sending an initial HTTP request.
+     */
+    static class UpgradeRequestHandler extends ChannelInboundHandlerAdapter {
+
+        private final HttpClientInitializer initializer;
+        private final Http2SettingsHandler settingsHandler;
+
+        /**
+         * Default constructor.
+         *
+         * @param initializer The initializer
+         */
+        public UpgradeRequestHandler(HttpClientInitializer initializer) {
+            this.initializer = initializer;
+            this.settingsHandler = initializer.settingsHandler;
+        }
+
+        /**
+         * @return The settings handler
+         */
+        public Http2SettingsHandler getSettingsHandler() {
+            return settingsHandler;
+        }
+
+        @Override
+        public void channelActive(ChannelHandlerContext ctx) {
+            // Done with this handler, remove it from the pipeline.
+            final ChannelPipeline pipeline = ctx.pipeline();
+
+            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_SETTINGS, initializer.settingsHandler);
+            DefaultFullHttpRequest upgradeRequest =
+                    new DefaultFullHttpRequest(io.netty.handler.codec.http.HttpVersion.HTTP_1_1, HttpMethod.GET, "/", Unpooled.EMPTY_BUFFER);
+
+            // Set HOST header as the remote peer may require it.
+            InetSocketAddress remote = (InetSocketAddress) ctx.channel().remoteAddress();
+            String hostString = remote.getHostString();
+            if (hostString == null) {
+                hostString = remote.getAddress().getHostAddress();
+            }
+            upgradeRequest.headers().set(HttpHeaderNames.HOST, hostString + ':' + remote.getPort());
+            ctx.writeAndFlush(upgradeRequest);
+
+            ctx.fireChannelActive();
+            pipeline.remove(this);
+            initializer.addFinalHandler(pipeline);
+        }
+    }
+
+    /**
+     * Reads the first {@link Http2Settings} object and notifies a {@link io.netty.channel.ChannelPromise}.
+     */
+    class Http2SettingsHandler extends
+            SimpleChannelInboundHandlerInstrumented<Http2Settings> {
+        final ChannelPromise promise;
+
+        /**
+         * Create new instance.
+         *
+         * @param promise Promise object used to notify when first settings are received
+         */
+        Http2SettingsHandler(ChannelPromise promise) {
+            super(instrumenter);
+            this.promise = promise;
+        }
+
+        @Override
+        protected void channelReadInstrumented(ChannelHandlerContext ctx, Http2Settings msg) {
+            promise.setSuccess();
+
+            // Only care about the first settings message
+            ctx.pipeline().remove(this);
+        }
+    }
+
+    /**
      * Initializes the HTTP client channel.
      */
     protected class HttpClientInitializer extends ChannelInitializer<SocketChannel> {
@@ -666,7 +748,7 @@ final class ConnectionManager {
         final boolean stream;
         final boolean proxy;
         final boolean acceptsEvents;
-        DefaultHttpClient.Http2SettingsHandler settingsHandler;
+        Http2SettingsHandler settingsHandler;
         final Consumer<ChannelHandlerContext> contextConsumer;
         private NettyClientCustomizer channelCustomizer;
 
@@ -812,7 +894,7 @@ final class ConnectionManager {
             }
             addEventStreamHandlerIfNecessary(p);
             addFinalHandler(p);
-            for (ChannelPipelineListener pipelineListener : httpClient.connectionManager.pipelineListeners) {
+            for (ChannelPipelineListener pipelineListener : pipelineListeners) {
                 pipelineListener.onConnect(p);
             }
         }
