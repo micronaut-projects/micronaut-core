@@ -618,20 +618,28 @@ public class AnnotationUtil {
 
             int nameHashCode = member.getKey().hashCode();
 
-            int valueHashCode =
-                    !value.getClass().isArray() ? value.hashCode() :
-                            value.getClass() == boolean[].class ? Arrays.hashCode((boolean[]) value) :
-                                    value.getClass() == byte[].class ? Arrays.hashCode((byte[]) value) :
-                                            value.getClass() == char[].class ? Arrays.hashCode((char[]) value) :
-                                                    value.getClass() == double[].class ? Arrays.hashCode((double[]) value) :
-                                                            value.getClass() == float[].class ? Arrays.hashCode((float[]) value) :
-                                                                    value.getClass() == int[].class ? Arrays.hashCode((int[]) value) :
-                                                                            value.getClass() == long[].class ? Arrays.hashCode(
-                                                                                    (long[]) value
-                                                                            ) :
-                                                                                    value.getClass() == short[].class ? Arrays
-                                                                                            .hashCode((short[]) value) :
-                                                                                            Arrays.hashCode((Object[]) value);
+            int valueHashCode;
+            if (!value.getClass().isArray()) {
+                valueHashCode = value.hashCode();
+            } else if (value.getClass() == boolean[].class) {
+                valueHashCode = Arrays.hashCode((boolean[]) value);
+            } else if (value.getClass() == byte[].class) {
+                valueHashCode = Arrays.hashCode((byte[]) value);
+            } else if (value.getClass() == char[].class) {
+                valueHashCode = Arrays.hashCode((char[]) value);
+            } else if (value.getClass() == double[].class) {
+                valueHashCode = Arrays.hashCode((double[]) value);
+            } else if (value.getClass() == float[].class) {
+                valueHashCode = Arrays.hashCode((float[]) value);
+            } else if (value.getClass() == int[].class) {
+                valueHashCode = Arrays.hashCode((int[]) value);
+            } else if (value.getClass() == long[].class) {
+                valueHashCode = Arrays.hashCode((long[]) value);
+            } else if (value.getClass() == short[].class) {
+                valueHashCode = Arrays.hashCode((short[]) value);
+            } else {
+                valueHashCode = Arrays.hashCode((Object[]) value);
+            }
 
             hashCode += 127 * nameHashCode ^ valueHashCode;
         }
