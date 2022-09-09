@@ -1267,12 +1267,17 @@ public class DefaultHttpClient implements
             @NonNull Argument<E> errorType) {
         AtomicReference<io.micronaut.http.HttpRequest<?>> requestWrapper = new AtomicReference<>(request);
 
-        Flux<io.micronaut.http.HttpResponse<O>> responsePublisher = Flux.create(emitter -> {
+        RequestKey requestKey;
+        try {
+            requestKey = new RequestKey(this, requestURI);
+        } catch (HttpClientException e) {
+            return Flux.error(e);
+        }
 
+        Mono<ConnectionManager.PoolHandle> handlePublisher = Mono.create(emitter -> {
             boolean multipart = MediaType.MULTIPART_FORM_DATA_TYPE.equals(request.getContentType().orElse(null));
             if (connectionManager.poolMap != null && !multipart) {
                 try {
-                    RequestKey requestKey = new RequestKey(this, requestURI);
                     Future<ConnectionManager.PoolHandle> channelFuture = connectionManager.acquireChannelFromPool(requestKey);
                     addInstrumentedListener(channelFuture, future -> {
                         if (future.isSuccess()) {
@@ -1280,35 +1285,11 @@ public class DefaultHttpClient implements
                             Channel channel = poolHandle.channel;
                             Future<?> initFuture = channel.attr(STREAM_CHANNEL_INITIALIZED).get();
                             if (initFuture == null) {
-                                try {
-                                    sendRequestThroughChannel(
-                                        requestWrapper.get(),
-                                        bodyType,
-                                        errorType,
-                                        emitter,
-                                        channel,
-                                        requestKey.isSecure(),
-                                        poolHandle
-                                    );
-                                } catch (Exception e) {
-                                    emitter.error(e);
-                                }
+                                emitter.success(poolHandle);
                             } else {
                                 // we should wait until the handshake completes
                                 addInstrumentedListener(initFuture, f -> {
-                                    try {
-                                        sendRequestThroughChannel(
-                                            requestWrapper.get(),
-                                            bodyType,
-                                            errorType,
-                                            emitter,
-                                            channel,
-                                            requestKey.isSecure(),
-                                            poolHandle
-                                        );
-                                    } catch (Exception e) {
-                                        emitter.error(e);
-                                    }
+                                    emitter.success(poolHandle);
                                 });
                             }
                         } else {
@@ -1324,29 +1305,31 @@ public class DefaultHttpClient implements
                 addInstrumentedListener(connectionFuture, future -> {
                     if (!future.isSuccess()) {
                         Throwable cause = future.cause();
-                        if (emitter.isCancelled()) {
-                            log.trace("Connection to {} failed, but emitter already cancelled.", requestURI, cause);
-                        } else {
-                            emitter.error(customizeException(new HttpClientException("Connect Error: " + cause.getMessage(), cause)));
-                        }
+                        emitter.error(customizeException(new HttpClientException("Connect Error: " + cause.getMessage(), cause)));
                     } else {
-                        try {
-                            sendRequestThroughChannel(
-                                    requestWrapper.get(),
-                                    bodyType,
-                                    errorType,
-                                    emitter,
-                                    connectionFuture.channel(),
-                                    buildSslContext(requestURI) != null,
-                                    connectionManager.mockPoolHandle(connectionFuture.channel()));
-                        } catch (Exception e) {
-                            emitter.error(e);
-                        }
+                        emitter.success(connectionManager.mockPoolHandle(connectionFuture.channel()));
                     }
                 });
             }
+        });
 
-        }, FluxSink.OverflowStrategy.ERROR);
+        Flux<io.micronaut.http.HttpResponse<O>> responsePublisher = handlePublisher.flatMapMany(poolHandle -> {
+            return Flux.create(emitter -> {
+                try {
+                    sendRequestThroughChannel(
+                        requestWrapper.get(),
+                        bodyType,
+                        errorType,
+                        emitter,
+                        poolHandle.channel,
+                        requestKey.isSecure(),
+                        poolHandle
+                    );
+                } catch (Exception e) {
+                    emitter.error(e);
+                }
+            });
+        });
 
         Publisher<io.micronaut.http.HttpResponse<O>> finalPublisher = applyFilterToResponsePublisher(
                 parentRequest,
