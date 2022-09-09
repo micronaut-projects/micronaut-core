@@ -120,7 +120,6 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFactory;
 import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
@@ -1207,53 +1206,21 @@ public class DefaultHttpClient implements
             boolean isProxy,
             boolean failOnError
     ) {
-        return Flux.create(emitter -> {
-            ChannelFuture channelFuture;
-            try {
-                if (connectionManager.httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0) {
-
-                    channelFuture = connectionManager.doConnect(new RequestKey(this, requestURI), true, isProxy, ConnectionManager.isAcceptEvents(request), channelHandlerContext -> {
-                        try {
-                            final Channel channel = channelHandlerContext.channel();
-                            request.setAttribute(NettyClientHttpRequest.CHANNEL, channel);
-                            this.streamRequestThroughChannel(
-                                    parentRequest,
-                                    requestWrapper.get(),
-                                    channel,
-                                    failOnError
-                            ).subscribe(new ForwardingSubscriber<>(emitter));
-                        } catch (Exception e) {
-                            emitter.error(e);
-                        }
-                    });
-                } else {
-                    channelFuture = connectionManager.doConnect(new RequestKey(this, requestURI), true, isProxy, ConnectionManager.isAcceptEvents(request), null);
-                    addInstrumentedListener(channelFuture,
-                            (ChannelFutureListener) f -> {
-                                if (f.isSuccess()) {
-                                    Channel channel = f.channel();
-                                    request.setAttribute(NettyClientHttpRequest.CHANNEL, channel);
-                                    this.streamRequestThroughChannel(
-                                            parentRequest,
-                                            requestWrapper.get(),
-                                            channel,
-                                            failOnError
-                                    ).subscribe(new ForwardingSubscriber<>(emitter));
-                                } else {
-                                    Throwable cause = f.cause();
-                                    emitter.error(customizeException(new HttpClientException("Connect error:" + cause.getMessage(), cause)));
-                                }
-                            });
-                }
-            } catch (HttpClientException e) {
-                emitter.error(e);
-                return;
-            }
-
-            Disposable disposable = buildDisposableChannel(channelFuture);
-            emitter.onDispose(disposable);
-            emitter.onCancel(disposable);
-        }, FluxSink.OverflowStrategy.BUFFER);
+        RequestKey requestKey;
+        try {
+            requestKey = new RequestKey(this, requestURI);
+        } catch (Exception e) {
+            return Flux.error(e);
+        }
+        return connectionManager.connectForStream(requestKey, isProxy, ConnectionManager.isAcceptEvents(request)).flatMapMany(channel -> {
+            request.setAttribute(NettyClientHttpRequest.CHANNEL, channel);
+            return this.streamRequestThroughChannel(
+                parentRequest,
+                requestWrapper.get(),
+                channel,
+                failOnError
+            );
+        });
     }
 
     /**
@@ -2402,7 +2369,7 @@ public class DefaultHttpClient implements
         return requestWriter;
     }
 
-    private Disposable buildDisposableChannel(ChannelFuture channelFuture) {
+    Disposable buildDisposableChannel(ChannelFuture channelFuture) {
         return new Disposable() {
             private AtomicBoolean disposed = new AtomicBoolean(false);
 

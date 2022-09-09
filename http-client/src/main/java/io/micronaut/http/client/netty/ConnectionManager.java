@@ -12,6 +12,7 @@ import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFactory;
 import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
@@ -26,6 +27,7 @@ import io.netty.handler.ssl.SslContext;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.Promise;
 import org.slf4j.Logger;
+import reactor.core.Disposable;
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
@@ -244,6 +246,44 @@ final class ConnectionManager {
                     }
                 });
             }
+        });
+    }
+
+    Mono<Channel> connectForStream(DefaultHttpClient.RequestKey requestKey, boolean isProxy, boolean acceptEvents) {
+        return Mono.create(emitter -> {
+            ChannelFuture channelFuture;
+            try {
+                if (httpVersion == HttpVersion.HTTP_2_0) {
+
+                    channelFuture = doConnect(requestKey, true, isProxy, acceptEvents, channelHandlerContext -> {
+                        try {
+                            final Channel channel = channelHandlerContext.channel();
+                            emitter.success(channel);
+                        } catch (Exception e) {
+                            emitter.error(e);
+                        }
+                    });
+                } else {
+                    channelFuture = doConnect(requestKey, true, isProxy, acceptEvents, null);
+                    httpClient.addInstrumentedListener(channelFuture,
+                        (ChannelFutureListener) f -> {
+                            if (f.isSuccess()) {
+                                Channel channel = f.channel();
+                                emitter.success(channel);
+                            } else {
+                                Throwable cause = f.cause();
+                                emitter.error(httpClient.customizeException(new HttpClientException("Connect error:" + cause.getMessage(), cause)));
+                            }
+                        });
+                }
+            } catch (HttpClientException e) {
+                emitter.error(e);
+                return;
+            }
+
+            Disposable disposable = httpClient.buildDisposableChannel(channelFuture);
+            emitter.onDispose(disposable);
+            emitter.onCancel(disposable);
         });
     }
 
