@@ -31,4 +31,15 @@ class InjectWithWildcardSpec extends Specification {
         cleanup:
         context.close()
     }
+
+    void "lombok generated wild card injection doesn't produce a ClassNotFoundException: <any>"() {
+        given:
+        ApplicationContext context = ApplicationContext.run()
+
+        expect:
+        context.getBean(WildCardWithInheritanceLombokInject) instanceof WildCardWithInheritanceLombokInject
+
+        cleanup:
+        context.close()
+    }
 }

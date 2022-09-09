@@ -1,5 +1,7 @@
 plugins {
     id "io.micronaut.build.internal.convention-library"
+
+    id 'io.freefair.lombok' version '6.4.1'
 }
 
 micronautBuild {
@@ -23,6 +25,7 @@ dependencies {
     testImplementation project(":inject-java-test")
     testImplementation project(":inject-test-utils")
     testImplementation project(":runtime")
+    testImplementation('org.projectlombok:lombok:1.18.22')
 
     testImplementation libs.managed.reactor
 
