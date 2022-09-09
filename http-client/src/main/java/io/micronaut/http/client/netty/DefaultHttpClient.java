@@ -109,7 +109,6 @@ import io.micronaut.websocket.annotation.ClientWebSocket;
 import io.micronaut.websocket.annotation.OnMessage;
 import io.micronaut.websocket.context.WebSocketBean;
 import io.micronaut.websocket.context.WebSocketBeanRegistry;
-import io.micronaut.websocket.exceptions.WebSocketSessionException;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
@@ -170,7 +169,6 @@ import io.netty.handler.codec.http.multipart.HttpPostRequestEncoder;
 import io.netty.handler.codec.http.multipart.InterfaceHttpData;
 import io.netty.handler.codec.http.websocketx.WebSocketClientHandshakerFactory;
 import io.netty.handler.codec.http.websocketx.WebSocketVersion;
-import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketClientCompressionHandler;
 import io.netty.handler.codec.http2.DefaultHttp2Connection;
 import io.netty.handler.codec.http2.DelegatingDecompressorFrameListener;
 import io.netty.handler.codec.http2.Http2ClientUpgradeCodec;
@@ -323,7 +321,7 @@ public class DefaultHttpClient implements
     private final ConnectionManager connectionManager;
     private final Logger log;
     private final HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver;
-    private final WebSocketBeanRegistry webSocketRegistry;
+    final WebSocketBeanRegistry webSocketRegistry;
     private final RequestBinderRegistry requestBinderRegistry;
     private final List<InvocationInstrumenterFactory> invocationInstrumenterFactories;
     private final String informationalServiceId;
@@ -945,96 +943,48 @@ public class DefaultHttpClient implements
         stop();
     }
 
-    private <T> Flux<T> connectWebSocket(URI uri, MutableHttpRequest<?> request, Class<T> clientEndpointType, WebSocketBean<T> webSocketBean) {
-        Bootstrap bootstrap = connectionManager.bootstrap.clone();
+    private <T> Publisher<T> connectWebSocket(URI uri, MutableHttpRequest<?> request, Class<T> clientEndpointType, WebSocketBean<T> webSocketBean) {
+        RequestKey requestKey;
+        try {
+            requestKey = new RequestKey(this, uri);
+        } catch (HttpClientException e) {
+            return Flux.error(e);
+        }
+
         if (webSocketBean == null) {
             webSocketBean = webSocketRegistry.getWebSocket(clientEndpointType);
         }
 
-        WebSocketBean<T> finalWebSocketBean = webSocketBean;
-        return Flux.create(emitter -> {
-            SslContext sslContext = buildSslContext(uri);
-            WebSocketVersion protocolVersion = finalWebSocketBean.getBeanDefinition().enumValue(ClientWebSocket.class, "version", WebSocketVersion.class).orElse(WebSocketVersion.V13);
-            int maxFramePayloadLength = finalWebSocketBean.messageMethod()
-                    .map(m -> m.intValue(OnMessage.class, "maxPayloadLength")
-                            .orElse(65536)).orElse(65536);
-            String subprotocol = finalWebSocketBean.getBeanDefinition().stringValue(ClientWebSocket.class, "subprotocol").orElse(StringUtils.EMPTY_STRING);
+        WebSocketVersion protocolVersion = webSocketBean.getBeanDefinition().enumValue(ClientWebSocket.class, "version", WebSocketVersion.class).orElse(WebSocketVersion.V13);
+        int maxFramePayloadLength = webSocketBean.messageMethod()
+            .map(m -> m.intValue(OnMessage.class, "maxPayloadLength")
+                .orElse(65536)).orElse(65536);
+        String subprotocol = webSocketBean.getBeanDefinition().stringValue(ClientWebSocket.class, "subprotocol").orElse(StringUtils.EMPTY_STRING);
+        URI webSocketURL = UriBuilder.of(uri)
+            .scheme(!requestKey.isSecure() ? "ws" : "wss")
+            .host(requestKey.getHost())
+            .port(requestKey.getPort())
+            .build();
 
-            RequestKey requestKey;
-            try {
-                requestKey = new RequestKey(this, uri);
-            } catch (HttpClientException e) {
-                emitter.error(e);
-                return;
-            }
+        MutableHttpHeaders headers = request.getHeaders();
+        HttpHeaders customHeaders = EmptyHttpHeaders.INSTANCE;
+        if (headers instanceof NettyHttpHeaders) {
+            customHeaders = ((NettyHttpHeaders) headers).getNettyHeaders();
+        }
+        if (StringUtils.isNotEmpty(subprotocol)) {
+            customHeaders.add("Sec-WebSocket-Protocol", subprotocol);
+        }
 
-            bootstrap.remoteAddress(requestKey.getHost(), requestKey.getPort());
-            initBootstrapForProxy(bootstrap, sslContext != null, requestKey.getHost(), requestKey.getPort());
-            bootstrap.handler(new HttpClientInitializer(
-                    sslContext,
-                    requestKey.getHost(),
-                    requestKey.getPort(),
-                    false,
-                    false,
-                    false,
-                    null
-            ) {
-                @Override
-                protected void addFinalHandler(ChannelPipeline pipeline) {
-                    pipeline.remove(ChannelPipelineCustomizer.HANDLER_HTTP_DECODER);
-                    ReadTimeoutHandler readTimeoutHandler = pipeline.get(ReadTimeoutHandler.class);
-                    if (readTimeoutHandler != null) {
-                        pipeline.remove(readTimeoutHandler);
-                    }
+        NettyWebSocketClientHandler<T> handler = new NettyWebSocketClientHandler<>(
+            request,
+            webSocketBean,
+            WebSocketClientHandshakerFactory.newHandshaker(
+                webSocketURL, protocolVersion, subprotocol, true, customHeaders, maxFramePayloadLength),
+            requestBinderRegistry,
+            mediaTypeCodecRegistry);
 
-                    Optional<Duration> readIdleTime = configuration.getReadIdleTimeout();
-                    if (readIdleTime.isPresent()) {
-                        Duration duration = readIdleTime.get();
-                        if (!duration.isNegative()) {
-                            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_IDLE_STATE, new IdleStateHandler(duration.toMillis(), duration.toMillis(), duration.toMillis(), TimeUnit.MILLISECONDS));
-                        }
-                    }
-
-                    final NettyWebSocketClientHandler webSocketHandler;
-                    try {
-                        String scheme =  (sslContext == null) ? "ws" : "wss";
-                        URI webSocketURL = UriBuilder.of(uri)
-                                .scheme(scheme)
-                                .host(host)
-                                .port(port)
-                                .build();
-
-                        MutableHttpHeaders headers = request.getHeaders();
-                        HttpHeaders customHeaders = EmptyHttpHeaders.INSTANCE;
-                        if (headers instanceof NettyHttpHeaders) {
-                            customHeaders = ((NettyHttpHeaders) headers).getNettyHeaders();
-                        }
-                        if (StringUtils.isNotEmpty(subprotocol)) {
-                            customHeaders.add("Sec-WebSocket-Protocol", subprotocol);
-                        }
-
-                        webSocketHandler = new NettyWebSocketClientHandler<>(
-                                request,
-                                finalWebSocketBean,
-                                WebSocketClientHandshakerFactory.newHandshaker(
-                                        webSocketURL, protocolVersion, subprotocol, true, customHeaders, maxFramePayloadLength),
-                                requestBinderRegistry,
-                                mediaTypeCodecRegistry,
-                                emitter);
-                        pipeline.addLast(WebSocketClientCompressionHandler.INSTANCE);
-                        pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_WEBSOCKET_CLIENT, webSocketHandler);
-                    } catch (Throwable e) {
-                        emitter.error(new WebSocketSessionException("Error opening WebSocket client session: " + e.getMessage(), e));
-                    }
-                }
-            });
-
-            addInstrumentedListener(bootstrap.connect(), future -> {
-                if (!future.isSuccess()) {
-                    emitter.error(future.cause());
-                }
-            });
-        }, FluxSink.OverflowStrategy.ERROR);
+        return connectionManager.connectForWebsocket(requestKey, handler)
+            .then(handler.getHandshakeCompletedMono());
     }
 
     private <I> Flux<HttpResponse<ByteBuffer<?>>> exchangeStreamImpl(io.micronaut.http.HttpRequest<Object> parentRequest, io.micronaut.http.HttpRequest<I> request, Argument<?> errorType, URI requestURI) {

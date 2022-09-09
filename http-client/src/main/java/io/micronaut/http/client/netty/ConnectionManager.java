@@ -6,15 +6,19 @@ import io.micronaut.http.HttpVersion;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.exceptions.HttpClientException;
+import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.channel.ChannelPipelineListener;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
+import io.micronaut.websocket.exceptions.WebSocketSessionException;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFactory;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelOption;
+import io.netty.channel.ChannelPipeline;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.pool.AbstractChannelPoolHandler;
 import io.netty.channel.pool.AbstractChannelPoolMap;
@@ -23,15 +27,21 @@ import io.netty.channel.pool.ChannelPool;
 import io.netty.channel.pool.ChannelPoolMap;
 import io.netty.channel.pool.FixedChannelPool;
 import io.netty.channel.pool.SimpleChannelPool;
+import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketClientCompressionHandler;
 import io.netty.handler.ssl.SslContext;
+import io.netty.handler.timeout.IdleStateHandler;
+import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.Promise;
 import org.slf4j.Logger;
 import reactor.core.Disposable;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.Sinks;
 
 import java.time.Duration;
 import java.util.Collection;
+import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 final class ConnectionManager {
@@ -142,7 +152,7 @@ final class ConnectionManager {
      * @return A ChannelFuture
      * @throws HttpClientException If the URI is invalid
      */
-    ChannelFuture doConnect(
+    private ChannelFuture doConnect(
         DefaultHttpClient.RequestKey requestKey,
         boolean isStream,
         boolean isProxy,
@@ -190,7 +200,7 @@ final class ConnectionManager {
         return sslCtx;
     }
 
-    Future<PoolHandle> acquireChannelFromPool(DefaultHttpClient.RequestKey requestKey) {
+    private Future<PoolHandle> acquireChannelFromPool(DefaultHttpClient.RequestKey requestKey) {
         ChannelPool channelPool = poolMap.get(requestKey);
         Future<Channel> channelFuture = channelPool.acquire();
         Promise<PoolHandle> promise = group.next().newPromise();
@@ -204,7 +214,7 @@ final class ConnectionManager {
         return promise;
     }
 
-    PoolHandle mockPoolHandle(Channel channel) {
+    private PoolHandle mockPoolHandle(Channel channel) {
         // TODO: delete
         return new PoolHandle(null, channel);
     }
@@ -285,6 +295,58 @@ final class ConnectionManager {
             emitter.onDispose(disposable);
             emitter.onCancel(disposable);
         });
+    }
+
+    Mono<Object> connectForWebsocket(DefaultHttpClient.RequestKey requestKey, ChannelHandler handler) {
+        Sinks.Empty<Object> initial = Sinks.empty();
+
+        Bootstrap bootstrap = this.bootstrap.clone();
+        SslContext sslContext = buildSslContext(requestKey);
+
+        bootstrap.remoteAddress(requestKey.getHost(), requestKey.getPort());
+        httpClient.initBootstrapForProxy(bootstrap, sslContext != null, requestKey.getHost(), requestKey.getPort());
+        bootstrap.handler(httpClient.new HttpClientInitializer(
+            sslContext,
+            requestKey.getHost(),
+            requestKey.getPort(),
+            false,
+            false,
+            false,
+            null
+        ) {
+            @Override
+            protected void addFinalHandler(ChannelPipeline pipeline) {
+                pipeline.remove(ChannelPipelineCustomizer.HANDLER_HTTP_DECODER);
+                ReadTimeoutHandler readTimeoutHandler = pipeline.get(ReadTimeoutHandler.class);
+                if (readTimeoutHandler != null) {
+                    pipeline.remove(readTimeoutHandler);
+                }
+
+                Optional<Duration> readIdleTime = configuration.getReadIdleTimeout();
+                if (readIdleTime.isPresent()) {
+                    Duration duration = readIdleTime.get();
+                    if (!duration.isNegative()) {
+                        pipeline.addLast(ChannelPipelineCustomizer.HANDLER_IDLE_STATE, new IdleStateHandler(duration.toMillis(), duration.toMillis(), duration.toMillis(), TimeUnit.MILLISECONDS));
+                    }
+                }
+
+                try {
+                    pipeline.addLast(WebSocketClientCompressionHandler.INSTANCE);
+                    pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_WEBSOCKET_CLIENT, handler);
+                    initial.tryEmitEmpty();
+                } catch (Throwable e) {
+                    initial.tryEmitError(new WebSocketSessionException("Error opening WebSocket client session: " + e.getMessage(), e));
+                }
+            }
+        });
+
+        httpClient.addInstrumentedListener(bootstrap.connect(), future -> {
+            if (!future.isSuccess()) {
+                initial.tryEmitError(future.cause());
+            }
+        });
+
+        return initial.asMono();
     }
 
     class PoolHandle {

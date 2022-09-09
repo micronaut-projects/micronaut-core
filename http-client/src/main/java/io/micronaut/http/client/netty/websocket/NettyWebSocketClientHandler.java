@@ -54,7 +54,8 @@ import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.FluxSink;
+import reactor.core.publisher.Mono;
+import reactor.core.publisher.Sinks;
 
 import java.util.Collections;
 import java.util.List;
@@ -74,7 +75,7 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
      * Generic version of {@link #webSocketBean}.
      */
     private final WebSocketBean<T> genericWebSocketBean;
-    private final FluxSink<T> emitter;
+    private final Sinks.One<T> completion = Sinks.one();
     private final UriMatchInfo matchInfo;
     private final MediaTypeCodecRegistry codecRegistry;
     private ChannelPromise handshakeFuture;
@@ -91,20 +92,17 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
      * @param handshaker The handshaker
      * @param requestBinderRegistry The request binder registry
      * @param mediaTypeCodecRegistry The media type codec registry
-     * @param emitter The socket emitter
      */
     public NettyWebSocketClientHandler(
             MutableHttpRequest<?> request,
             WebSocketBean<T> webSocketBean,
             final WebSocketClientHandshaker handshaker,
             RequestBinderRegistry requestBinderRegistry,
-            MediaTypeCodecRegistry mediaTypeCodecRegistry,
-            FluxSink<T> emitter) {
+            MediaTypeCodecRegistry mediaTypeCodecRegistry) {
         super(null, requestBinderRegistry, mediaTypeCodecRegistry, webSocketBean, request, Collections.emptyMap(), handshaker.version(), handshaker.actualSubprotocol(), null);
         this.codecRegistry = mediaTypeCodecRegistry;
         this.handshaker = handshaker;
         this.genericWebSocketBean = webSocketBean;
-        this.emitter = emitter;
         this.webSocketStateBinderRegistry = new WebSocketStateBinderRegistry(requestBinderRegistry != null ? requestBinderRegistry : new DefaultRequestBinderRegistry(ConversionService.SHARED));
         String clientPath = webSocketBean.getBeanDefinition().stringValue(ClientWebSocket.class).orElse("");
         UriMatchTemplate matchTemplate = UriMatchTemplate.of(clientPath);
@@ -162,7 +160,7 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
                 handshaker.finishHandshake(ch, res);
             } catch (Exception e) {
                 try {
-                    emitter.error(new WebSocketClientException("Error finishing WebSocket handshake: " + e.getMessage(), e));
+                    completion.tryEmitError(new WebSocketClientException("Error finishing WebSocket handshake: " + e.getMessage(), e));
                 } finally {
                     // clientSession isn't set yet, so we do the close manually instead of through session.close
                     ch.writeAndFlush(new CloseWebSocketFrame(CloseReason.INTERNAL_ERROR.getCode(), CloseReason.INTERNAL_ERROR.getReason()));
@@ -191,7 +189,7 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
                 this.clientBodyArgument = null;
 
                 try {
-                    emitter.error(new WebSocketClientException("WebSocket @OnMessage method " + targetBean.getClass().getSimpleName() + "." + messageHandler.getExecutableMethod() + " should define exactly 1 message parameter, but found 2 possible candidates: " + unboundArguments));
+                    completion.tryEmitError(new WebSocketClientException("WebSocket @OnMessage method " + targetBean.getClass().getSimpleName() + "." + messageHandler.getExecutableMethod() + " should define exactly 1 message parameter, but found 2 possible candidates: " + unboundArguments));
                 } finally {
                     if (getSession().isOpen()) {
                         getSession().close(CloseReason.INTERNAL_ERROR);
@@ -210,7 +208,7 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
                     this.clientPongArgument = null;
 
                     try {
-                        emitter.error(new WebSocketClientException("WebSocket @OnMessage pong handler method " + targetBean.getClass().getSimpleName() + "." + messageHandler.getExecutableMethod() + " should define exactly 1 pong message parameter, but found: " + unboundArguments));
+                        completion.tryEmitError(new WebSocketClientException("WebSocket @OnMessage pong handler method " + targetBean.getClass().getSimpleName() + "." + messageHandler.getExecutableMethod() + " should define exactly 1 pong message parameter, but found: " + unboundArguments));
                     } finally {
                         if (getSession().isOpen()) {
                             getSession().close(CloseReason.INTERNAL_ERROR);
@@ -234,25 +232,22 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
                         Publisher<?> reactiveSequence = Publishers.convertPublisher(result, Publisher.class);
                         Flux.from(reactiveSequence).subscribe(
                                 o -> { },
-                                error -> emitter.error(new WebSocketSessionException("Error opening WebSocket client session: " + error.getMessage(), error)),
+                                error -> completion.tryEmitError(new WebSocketSessionException("Error opening WebSocket client session: " + error.getMessage(), error)),
                                 () -> {
-                                    emitter.next(targetBean);
-                                    emitter.complete();
+                                    completion.tryEmitValue(targetBean);
                                 }
                         );
                     } else {
-                        emitter.next(targetBean);
-                        emitter.complete();
+                        completion.tryEmitValue(targetBean);
                     }
                 } catch (Throwable e) {
-                    emitter.error(new WebSocketClientException("Error opening WebSocket client session: " + e.getMessage(), e));
+                    completion.tryEmitError(new WebSocketClientException("Error opening WebSocket client session: " + e.getMessage(), e));
                     if (getSession().isOpen()) {
                         getSession().close(CloseReason.INTERNAL_ERROR);
                     }
                 }
             } else {
-                emitter.next(targetBean);
-                emitter.complete();
+                completion.tryEmitValue(targetBean);
             }
             return;
         }
@@ -298,4 +293,7 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
         super.exceptionCaught(ctx, cause);
     }
 
+    public Mono<T> getHandshakeCompletedMono() {
+        return completion.asMono();
+    }
 }
