@@ -83,10 +83,7 @@ import io.micronaut.http.netty.NettyHttpResponseBuilder;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.channel.ChannelPipelineListener;
 import io.micronaut.http.netty.channel.NettyThreadFactory;
-import io.micronaut.http.netty.stream.DefaultHttp2Content;
 import io.micronaut.http.netty.stream.DefaultStreamedHttpResponse;
-import io.micronaut.http.netty.stream.Http2Content;
-import io.micronaut.http.netty.stream.HttpStreamsClientHandler;
 import io.micronaut.http.netty.stream.JsonSubscriber;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
@@ -120,7 +117,6 @@ import io.netty.channel.ChannelFactory;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
-import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.ChannelPromise;
@@ -132,7 +128,6 @@ import io.netty.channel.pool.ChannelPool;
 import io.netty.channel.pool.SimpleChannelPool;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
-import io.netty.handler.codec.LineBasedFrameDecoder;
 import io.netty.handler.codec.TooLongFrameException;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
@@ -140,25 +135,21 @@ import io.netty.handler.codec.http.DefaultHttpContent;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.DefaultLastHttpContent;
 import io.netty.handler.codec.http.EmptyHttpHeaders;
-import io.netty.handler.codec.http.FullHttpMessage;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpClientCodec;
 import io.netty.handler.codec.http.HttpClientUpgradeHandler;
 import io.netty.handler.codec.http.HttpContent;
-import io.netty.handler.codec.http.HttpContentDecompressor;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpMessage;
 import io.netty.handler.codec.http.HttpMethod;
-import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpScheme;
 import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.HttpVersion;
-import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.codec.http.multipart.DefaultHttpDataFactory;
 import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.handler.codec.http.multipart.HttpDataFactory;
@@ -166,30 +157,23 @@ import io.netty.handler.codec.http.multipart.HttpPostRequestEncoder;
 import io.netty.handler.codec.http.multipart.InterfaceHttpData;
 import io.netty.handler.codec.http.websocketx.WebSocketClientHandshakerFactory;
 import io.netty.handler.codec.http.websocketx.WebSocketVersion;
-import io.netty.handler.codec.http2.DefaultHttp2Connection;
 import io.netty.handler.codec.http2.DelegatingDecompressorFrameListener;
 import io.netty.handler.codec.http2.Http2ClientUpgradeCodec;
 import io.netty.handler.codec.http2.Http2Connection;
 import io.netty.handler.codec.http2.Http2FrameListener;
-import io.netty.handler.codec.http2.Http2FrameLogger;
 import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.codec.http2.Http2Stream;
 import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.handler.codec.http2.HttpToHttp2ConnectionHandler;
 import io.netty.handler.codec.http2.HttpToHttp2ConnectionHandlerBuilder;
 import io.netty.handler.codec.http2.InboundHttp2ToHttpAdapterBuilder;
-import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.proxy.HttpProxyHandler;
 import io.netty.handler.proxy.Socks5ProxyHandler;
 import io.netty.handler.ssl.ApplicationProtocolNames;
 import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler;
 import io.netty.handler.ssl.SslContext;
-import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.stream.ChunkedWriteHandler;
-import io.netty.handler.timeout.IdleStateEvent;
-import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.handler.timeout.ReadTimeoutHandler;
-import io.netty.util.Attribute;
 import io.netty.util.AttributeKey;
 import io.netty.util.CharsetUtil;
 import io.netty.util.ReferenceCountUtil;
@@ -267,8 +251,8 @@ public class DefaultHttpClient implements
      * Default logger, use {@link #log} where possible.
      */
     private static final Logger DEFAULT_LOG = LoggerFactory.getLogger(DefaultHttpClient.class);
-    private static final AttributeKey<Http2Stream> STREAM_KEY = AttributeKey.valueOf("micronaut.http2.stream");
-    private static final AttributeKey<NettyClientCustomizer> CHANNEL_CUSTOMIZER_KEY =
+    static final AttributeKey<Http2Stream> STREAM_KEY = AttributeKey.valueOf("micronaut.http2.stream");
+    static final AttributeKey<NettyClientCustomizer> CHANNEL_CUSTOMIZER_KEY =
         AttributeKey.valueOf("micronaut.http.customizer");
     /**
      * Future on a pooled channel that will be completed when the channel has fully connected (e.g.
@@ -1632,7 +1616,7 @@ public class DefaultHttpClient implements
      * @param connectionHandler     The connection handler
      */
     protected void configureHttp2Ssl(
-            HttpClientInitializer httpClientInitializer,
+            ConnectionManager.HttpClientInitializer httpClientInitializer,
             @NonNull SocketChannel ch,
             @NonNull SslContext sslCtx,
             String host,
@@ -1699,7 +1683,7 @@ public class DefaultHttpClient implements
      * @param connectionHandler     The connection handler
      */
     protected void configureHttp2ClearText(
-            HttpClientInitializer httpClientInitializer,
+            ConnectionManager.HttpClientInitializer httpClientInitializer,
             @NonNull SocketChannel ch,
             @NonNull HttpToHttp2ConnectionHandler connectionHandler) {
         HttpClientCodec sourceCodec = new HttpClientCodec();
@@ -2055,7 +2039,7 @@ public class DefaultHttpClient implements
     /**
      * Note: caller must ensure this is only called for plaintext HTTP, not TLS HTTP2.
      */
-    private boolean discardH2cStream(HttpMessage message) {
+    boolean discardH2cStream(HttpMessage message) {
         // only applies to h2c
         if (connectionManager.httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0) {
             int streamId = message.headers().getInt(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text(), -1);
@@ -2355,257 +2339,9 @@ public class DefaultHttpClient implements
     }
 
     /**
-     * Initializes the HTTP client channel.
-     */
-    protected class HttpClientInitializer extends ChannelInitializer<SocketChannel> {
-
-        final SslContext sslContext;
-        final String host;
-        final int port;
-        final boolean stream;
-        final boolean proxy;
-        final boolean acceptsEvents;
-        Http2SettingsHandler settingsHandler;
-        private final Consumer<ChannelHandlerContext> contextConsumer;
-        private NettyClientCustomizer channelCustomizer;
-
-        /**
-         * @param sslContext      The ssl context
-         * @param host            The host
-         * @param port            The port
-         * @param stream          Whether is stream
-         * @param proxy           Is this a streaming proxy
-         * @param acceptsEvents   Whether an event stream is accepted
-         * @param contextConsumer The context consumer
-         */
-        protected HttpClientInitializer(
-                SslContext sslContext,
-                String host,
-                int port,
-                boolean stream,
-                boolean proxy,
-                boolean acceptsEvents,
-                Consumer<ChannelHandlerContext> contextConsumer) {
-            this.sslContext = sslContext;
-            this.stream = stream;
-            this.host = host;
-            this.port = port;
-            this.proxy = proxy;
-            this.acceptsEvents = acceptsEvents;
-            this.contextConsumer = contextConsumer;
-        }
-
-        /**
-         * @param ch The channel
-         */
-        @Override
-        protected void initChannel(SocketChannel ch) {
-            channelCustomizer = connectionManager.clientCustomizer.specializeForChannel(ch, NettyClientCustomizer.ChannelRole.CONNECTION);
-            ch.attr(CHANNEL_CUSTOMIZER_KEY).set(channelCustomizer);
-
-            ChannelPipeline p = ch.pipeline();
-
-            Proxy proxy = configuration.resolveProxy(sslContext != null, host, port);
-            if (!Proxy.NO_PROXY.equals(proxy)) {
-                configureProxy(p, proxy);
-            }
-
-            if (connectionManager.httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0) {
-                final Http2Connection connection = new DefaultHttp2Connection(false);
-                final HttpToHttp2ConnectionHandlerBuilder builder =
-                        newHttp2ConnectionHandlerBuilder(connection, configuration, stream);
-
-                configuration.getLogLevel().ifPresent(logLevel -> {
-                    try {
-                        final io.netty.handler.logging.LogLevel nettyLevel = io.netty.handler.logging.LogLevel.valueOf(
-                                logLevel.name()
-                        );
-                        builder.frameLogger(new Http2FrameLogger(nettyLevel, DefaultHttpClient.class));
-                    } catch (IllegalArgumentException e) {
-                        throw customizeException(new HttpClientException("Unsupported log level: " + logLevel));
-                    }
-                });
-                HttpToHttp2ConnectionHandler connectionHandler = builder
-                        .build();
-                if (sslContext != null) {
-                    configureHttp2Ssl(this, ch, sslContext, host, port, connectionHandler);
-                } else {
-                    configureHttp2ClearText(this, ch, connectionHandler);
-                }
-                channelCustomizer.onInitialPipelineBuilt();
-            } else {
-                if (stream) {
-                    // for streaming responses we disable auto read
-                    // so that the consumer is in charge of back pressure
-                    ch.config().setAutoRead(false);
-                }
-
-                configuration.getLogLevel().ifPresent(logLevel -> {
-                    try {
-                        final io.netty.handler.logging.LogLevel nettyLevel = io.netty.handler.logging.LogLevel.valueOf(
-                                logLevel.name()
-                        );
-                        p.addLast(new LoggingHandler(DefaultHttpClient.class, nettyLevel));
-                    } catch (IllegalArgumentException e) {
-                        throw customizeException(new HttpClientException("Unsupported log level: " + logLevel));
-                    }
-                });
-
-                if (sslContext != null) {
-                    SslHandler sslHandler = sslContext.newHandler(ch.alloc(), host, port);
-                    sslHandler.setHandshakeTimeoutMillis(configuration.getSslConfiguration().getHandshakeTimeout().toMillis());
-                    p.addLast(ChannelPipelineCustomizer.HANDLER_SSL, sslHandler);
-                }
-
-                // Pool connections require alternative timeout handling
-                if (connectionManager.poolMap == null) {
-                    // read timeout settings are not applied to streamed requests.
-                    // instead idle timeout settings are applied.
-                    if (stream) {
-                        Optional<Duration> readIdleTime = configuration.getReadIdleTimeout();
-                        if (readIdleTime.isPresent()) {
-                            Duration duration = readIdleTime.get();
-                            if (!duration.isNegative()) {
-                                p.addLast(ChannelPipelineCustomizer.HANDLER_IDLE_STATE, new IdleStateHandler(
-                                        duration.toMillis(),
-                                        duration.toMillis(),
-                                        duration.toMillis(),
-                                        TimeUnit.MILLISECONDS
-                                ));
-                            }
-                        }
-                    }
-                }
-
-                addHttp1Handlers(p);
-                channelCustomizer.onInitialPipelineBuilt();
-                onStreamPipelineBuilt();
-            }
-        }
-
-        /**
-         * Called when the stream pipeline is fully set up (all handshakes completed) and we can
-         * start processing requests.
-         */
-        void onStreamPipelineBuilt() {
-            channelCustomizer.onStreamPipelineBuilt();
-        }
-
-        private void addHttp1Handlers(ChannelPipeline p) {
-            p.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC, new HttpClientCodec());
-
-            p.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECODER, new HttpContentDecompressor());
-
-            int maxContentLength = configuration.getMaxContentLength();
-
-            if (!stream) {
-                p.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_AGGREGATOR, new HttpObjectAggregator(maxContentLength) {
-                    @Override
-                    protected void finishAggregation(FullHttpMessage aggregated) throws Exception {
-                        if (!HttpUtil.isContentLengthSet(aggregated)) {
-                            if (aggregated.content().readableBytes() > 0) {
-                                super.finishAggregation(aggregated);
-                            }
-                        }
-                    }
-                });
-            }
-            addEventStreamHandlerIfNecessary(p);
-            addFinalHandler(p);
-            for (ChannelPipelineListener pipelineListener : connectionManager.pipelineListeners) {
-                pipelineListener.onConnect(p);
-            }
-        }
-
-        private void addEventStreamHandlerIfNecessary(ChannelPipeline p) {
-            // if the content type is a SSE event stream we add a decoder
-            // to delimit the content by lines (unless we are proxying the stream)
-            if (acceptsEventStream() && !proxy) {
-                p.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_SSE_EVENT_STREAM, new LineBasedFrameDecoder(configuration.getMaxContentLength(), true, true) {
-
-                    @Override
-                    public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-                        if (msg instanceof HttpContent) {
-                            if (msg instanceof LastHttpContent) {
-                                super.channelRead(ctx, msg);
-                            } else {
-                                Attribute<Http2Stream> streamKey = ctx.channel().attr(STREAM_KEY);
-                                if (msg instanceof Http2Content) {
-                                    streamKey.set(((Http2Content) msg).stream());
-                                }
-                                try {
-                                    super.channelRead(ctx, ((HttpContent) msg).content());
-                                } finally {
-                                    streamKey.set(null);
-                                }
-                            }
-                        } else {
-                            super.channelRead(ctx, msg);
-                        }
-                    }
-                });
-
-                p.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_SSE_CONTENT, new SimpleChannelInboundHandlerInstrumented<ByteBuf>(connectionManager.instrumenter, false) {
-
-                    @Override
-                    public boolean acceptInboundMessage(Object msg) {
-                        return msg instanceof ByteBuf;
-                    }
-
-                    @Override
-                    protected void channelReadInstrumented(ChannelHandlerContext ctx, ByteBuf msg) {
-                        try {
-                            Attribute<Http2Stream> streamKey = ctx.channel().attr(STREAM_KEY);
-                            Http2Stream http2Stream = streamKey.get();
-                            if (http2Stream != null) {
-                                ctx.fireChannelRead(new DefaultHttp2Content(msg.copy(), http2Stream));
-                            } else {
-                                ctx.fireChannelRead(new DefaultHttpContent(msg.copy()));
-                            }
-                        } finally {
-                            msg.release();
-                        }
-                    }
-                });
-
-            }
-        }
-
-        /**
-         * Allows overriding the final handler added to the pipeline.
-         *
-         * @param pipeline The pipeline
-         */
-        protected void addFinalHandler(ChannelPipeline pipeline) {
-            pipeline.addLast(
-                    ChannelPipelineCustomizer.HANDLER_HTTP_STREAM,
-                    new HttpStreamsClientHandler() {
-                @Override
-                public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
-                    if (evt instanceof IdleStateEvent) {
-                        // close the connection if it is idle for too long
-                        ctx.close();
-                    }
-                    super.userEventTriggered(ctx, evt);
-                }
-
-                @Override
-                protected boolean isValidInMessage(Object msg) {
-                    // ignore data on stream 1, that is the response to our initial upgrade request
-                    return super.isValidInMessage(msg) && (sslContext != null || !discardH2cStream((HttpMessage) msg));
-                }
-            });
-        }
-
-        private boolean acceptsEventStream() {
-            return this.acceptsEvents;
-        }
-    }
-
-    /**
      * Reads the first {@link Http2Settings} object and notifies a {@link io.netty.channel.ChannelPromise}.
      */
-    private final class Http2SettingsHandler extends
+    final class Http2SettingsHandler extends
             SimpleChannelInboundHandlerInstrumented<Http2Settings> {
         private final ChannelPromise promise;
 
@@ -2633,7 +2369,7 @@ public class DefaultHttpClient implements
      */
     private class UpgradeRequestHandler extends ChannelInboundHandlerAdapter {
 
-        private final HttpClientInitializer initializer;
+        private final ConnectionManager.HttpClientInitializer initializer;
         private final Http2SettingsHandler settingsHandler;
 
         /**
@@ -2641,7 +2377,7 @@ public class DefaultHttpClient implements
          *
          * @param initializer The initializer
          */
-        public UpgradeRequestHandler(HttpClientInitializer initializer) {
+        public UpgradeRequestHandler(ConnectionManager.HttpClientInitializer initializer) {
             this.initializer = initializer;
             this.settingsHandler = initializer.settingsHandler;
         }
