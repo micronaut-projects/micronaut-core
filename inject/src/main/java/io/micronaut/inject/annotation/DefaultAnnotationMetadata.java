@@ -1962,7 +1962,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
             }
         } else {
             if (!hasValues) {
-                existing = existing == null ? Collections.emptyMap() : existing;
+                existing = existing == null ? new LinkedHashMap<>(3) : existing;
             } else {
                 existing = new LinkedHashMap<>(values.size());
                 existing.putAll(values);
