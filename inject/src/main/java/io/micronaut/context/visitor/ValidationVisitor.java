@@ -17,6 +17,10 @@ package io.micronaut.context.visitor;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ConstructorElement;
+import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
@@ -34,13 +38,21 @@ import java.util.Set;
 @Internal
 public class ValidationVisitor implements TypeElementVisitor<Object, Object> {
 
+    public static final String ANN_REQUIRES_VALIDATION = "io.micronaut.validation.RequiresValidation";
     private static final String ANN_CONSTRAINT = "javax.validation.Constraint";
     private static final String ANN_VALID = "javax.validation.Valid";
     private static final String ANN_VALIDATED = "io.micronaut.validation.Validated";
 
+    private ClassElement classElement;
+
     @Override
     public Set<String> getSupportedAnnotationNames() {
         return new HashSet<>(Arrays.asList(ANN_CONSTRAINT, ANN_VALIDATED));
+    }
+
+    @Override
+    public int getOrder() {
+        return 10; // Should run before ConfigurationReaderVisitor
     }
 
     @NonNull
@@ -50,16 +62,48 @@ public class ValidationVisitor implements TypeElementVisitor<Object, Object> {
     }
 
     @Override
-    public void visitMethod(MethodElement element, VisitorContext context) {
-        if (element.isAnnotationPresent(ANN_VALIDATED)) {
+    public void visitClass(ClassElement element, VisitorContext context) {
+        classElement = element;
+    }
+
+    @Override
+    public void visitConstructor(ConstructorElement element, VisitorContext context) {
+        if (classElement == null) {
             return;
         }
-        if (Arrays.stream(element.getParameters()).anyMatch(p -> p.hasStereotype(ANN_VALID) || p.hasStereotype(ANN_CONSTRAINT))) {
-            if (element.isPrivate()) {
-                context.fail("Method annotated with constraints but is declared private. Change the method to be non-private in order for AOP advice to be applied.", element);
-                return;
-            }
-            element.annotate(ANN_VALIDATED);
+        if (requiresValidation(element) || parametersRequireValidation(element)) {
+            element.annotate(ANN_REQUIRES_VALIDATION);
+            classElement.annotate(ANN_REQUIRES_VALIDATION);
         }
+    }
+
+    @Override
+    public void visitMethod(MethodElement element, VisitorContext context) {
+        if (classElement == null) {
+            return;
+        }
+        if (requiresValidation(element) || parametersRequireValidation(element)) {
+            element.annotate(ANN_REQUIRES_VALIDATION);
+            classElement.annotate(ANN_REQUIRES_VALIDATION);
+        }
+    }
+
+    @Override
+    public void visitField(FieldElement element, VisitorContext context) {
+        if (classElement == null) {
+            return;
+        }
+        if (requiresValidation(element)) {
+            // Annotate the class for fields validation
+            classElement.annotate(ANN_REQUIRES_VALIDATION);
+        }
+    }
+
+    private boolean parametersRequireValidation(MethodElement element) {
+        return Arrays.stream(element.getParameters()).anyMatch(this::requiresValidation);
+    }
+
+    private boolean requiresValidation(Element e) {
+        return e.hasStereotype(ANN_VALID) || e.hasStereotype(ANN_CONSTRAINT);
     }
 }
