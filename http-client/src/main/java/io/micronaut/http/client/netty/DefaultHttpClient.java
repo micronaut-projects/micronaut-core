@@ -97,7 +97,6 @@ import io.micronaut.json.codec.JsonStreamMediaTypeCodec;
 import io.micronaut.json.codec.MapperMediaTypeCodec;
 import io.micronaut.json.tree.JsonNode;
 import io.micronaut.runtime.ApplicationConfiguration;
-import io.micronaut.scheduling.instrument.Instrumentation;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.micronaut.scheduling.instrument.InvocationInstrumenterFactory;
 import io.micronaut.websocket.WebSocketClient;
@@ -155,7 +154,6 @@ import io.netty.util.CharsetUtil;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import io.netty.util.concurrent.Future;
-import io.netty.util.concurrent.GenericFutureListener;
 import io.netty.util.concurrent.Promise;
 import org.reactivestreams.Processor;
 import org.reactivestreams.Publisher;
@@ -496,7 +494,7 @@ public class DefaultHttpClient implements
                         shutdownTimeout.toMillis(),
                         TimeUnit.MILLISECONDS
                 );
-                addInstrumentedListener(future, f -> {
+                connectionManager.addInstrumentedListener(future, f -> {
                     if (!f.isSuccess() && log.isErrorEnabled()) {
                         Throwable cause = f.cause();
                         log.error("Error shutting down HTTP client: " + cause.getMessage(), cause);
@@ -1970,26 +1968,6 @@ public class DefaultHttpClient implements
         return requestWriter;
     }
 
-    /**
-     * Adds a Netty listener that is instrumented by instrumenters given by managed or provided collection of
-     * the {@link InvocationInstrumenterFactory}.
-     *
-     * @param channelFuture The channel future
-     * @param listener The listener logic
-     * @param <V> the type of value returned by the future
-     * @param <C> the future type
-     * @return a Netty listener that is instrumented
-     */
-    <V, C extends Future<V>> Future<V> addInstrumentedListener(
-            Future<V> channelFuture, GenericFutureListener<C> listener
-    ) {
-        return channelFuture.addListener(f -> {
-            try (Instrumentation ignored = connectionManager.instrumenter.newInstrumentation()) {
-                listener.operationComplete((C) f);
-            }
-        });
-    }
-
     private @NonNull InvocationInstrumenter combineFactories() {
         if (CollectionUtils.isEmpty(invocationInstrumenterFactories)) {
             return NOOP;
@@ -2161,7 +2139,7 @@ public class DefaultHttpClient implements
                 FluxSink<?> emitter,
                 ChannelFuture channelFuture,
                 boolean closeChannelAfterWrite) {
-            addInstrumentedListener(channelFuture, f -> {
+            connectionManager.addInstrumentedListener(channelFuture, f -> {
                 try {
                     if (!f.isSuccess()) {
                         if (!emitter.isCancelled()) {

@@ -14,7 +14,9 @@ import io.micronaut.http.netty.stream.DefaultHttp2Content;
 import io.micronaut.http.netty.stream.Http2Content;
 import io.micronaut.http.netty.stream.HttpStreamsClientHandler;
 import io.micronaut.http.netty.stream.StreamingInboundHttp2ToHttpAdapter;
+import io.micronaut.scheduling.instrument.Instrumentation;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
+import io.micronaut.scheduling.instrument.InvocationInstrumenterFactory;
 import io.micronaut.websocket.exceptions.WebSocketSessionException;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
@@ -78,6 +80,7 @@ import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.resolver.NoopAddressResolverGroup;
 import io.netty.util.Attribute;
 import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.GenericFutureListener;
 import io.netty.util.concurrent.Promise;
 import org.slf4j.Logger;
 import reactor.core.CorePublisher;
@@ -218,7 +221,7 @@ final class ConnectionManager {
                 ChannelPool cp = entry.getValue();
                 try {
                     if (cp instanceof SimpleChannelPool) {
-                        httpClient.addInstrumentedListener(((SimpleChannelPool) cp).closeAsync(), future -> {
+                        addInstrumentedListener(((SimpleChannelPool) cp).closeAsync(), future -> {
                             if (!future.isSuccess()) {
                                 final Throwable cause = future.cause();
                                 if (cause != null) {
@@ -326,7 +329,7 @@ final class ConnectionManager {
             if (poolMap != null && !multipart) {
                 try {
                     Future<PoolHandle> channelFuture = acquireChannelFromPool(requestKey);
-                    httpClient.addInstrumentedListener(channelFuture, future -> {
+                    addInstrumentedListener(channelFuture, future -> {
                         if (future.isSuccess()) {
                             PoolHandle poolHandle = future.get();
                             Channel channel = poolHandle.channel;
@@ -335,7 +338,7 @@ final class ConnectionManager {
                                 emitter.success(poolHandle);
                             } else {
                                 // we should wait until the handshake completes
-                                httpClient.addInstrumentedListener(initFuture, f -> {
+                                addInstrumentedListener(initFuture, f -> {
                                     emitter.success(poolHandle);
                                 });
                             }
@@ -349,7 +352,7 @@ final class ConnectionManager {
                 }
             } else {
                 ChannelFuture connectionFuture = doConnect(requestKey, false, false, acceptEvents, null);
-                httpClient.addInstrumentedListener(connectionFuture, future -> {
+                addInstrumentedListener(connectionFuture, future -> {
                     if (!future.isSuccess()) {
                         Throwable cause = future.cause();
                         emitter.error(httpClient.customizeException(new HttpClientException("Connect Error: " + cause.getMessage(), cause)));
@@ -368,7 +371,7 @@ final class ConnectionManager {
             return Flux.empty();
         }
         Sinks.Empty<?> empty = Sinks.empty();
-        httpClient.addInstrumentedListener(settingsHandler.promise, future -> {
+        addInstrumentedListener(settingsHandler.promise, future -> {
             if (future.isSuccess()) {
                 empty.tryEmitEmpty();
             } else {
@@ -396,7 +399,7 @@ final class ConnectionManager {
                     });
                 } else {
                     channelFuture = doConnect(requestKey, true, isProxy, acceptEvents, null);
-                    httpClient.addInstrumentedListener(channelFuture,
+                    addInstrumentedListener(channelFuture,
                         (ChannelFutureListener) f -> {
                             if (f.isSuccess()) {
                                 Channel channel = f.channel();
@@ -461,7 +464,7 @@ final class ConnectionManager {
             }
         });
 
-        httpClient.addInstrumentedListener(bootstrap.connect(), future -> {
+        addInstrumentedListener(bootstrap.connect(), future -> {
             if (!future.isSuccess()) {
                 initial.tryEmitError(future.cause());
             }
@@ -782,6 +785,23 @@ final class ConnectionManager {
     }
 
     /**
+     * Adds a Netty listener that is instrumented by instrumenters given by managed or provided collection of
+     * the {@link InvocationInstrumenterFactory}.
+     *
+     * @param channelFuture The channel future
+     * @param listener      The listener logic
+     * @return a Netty listener that is instrumented
+     */
+    <V, C extends Future<V>> Future<V> addInstrumentedListener(
+            Future<V> channelFuture, GenericFutureListener<C> listener) {
+        return channelFuture.addListener(f -> {
+            try (Instrumentation ignored = instrumenter.newInstrumentation()) {
+                listener.operationComplete((C) f);
+            }
+        });
+    }
+
+    /**
      * A handler that triggers the cleartext upgrade to HTTP/2 by sending an initial HTTP request.
      */
     private static class UpgradeRequestHandler extends ChannelInboundHandlerAdapter {
@@ -1062,7 +1082,7 @@ final class ConnectionManager {
                     }
                 });
 
-                p.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_SSE_CONTENT, new SimpleChannelInboundHandlerInstrumented<ByteBuf>(httpClient.connectionManager.instrumenter, false) {
+                p.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_SSE_CONTENT, new SimpleChannelInboundHandlerInstrumented<ByteBuf>(instrumenter, false) {
 
                     @Override
                     public boolean acceptInboundMessage(Object msg) {
