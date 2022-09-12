@@ -20,20 +20,14 @@ import groovy.transform.CompileStatic
 import groovy.transform.PackageScope
 import io.micronaut.aop.Introduction
 import io.micronaut.ast.groovy.utils.AstAnnotationUtils
-import io.micronaut.ast.groovy.utils.AstMessageUtils
-import io.micronaut.ast.groovy.utils.PublicAbstractMethodVisitor
 import io.micronaut.ast.groovy.utils.PublicMethodVisitor
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.ast.groovy.visitor.LoadedVisitor
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.Generated
 import io.micronaut.core.annotation.Introspected
-import io.micronaut.core.io.service.ServiceDefinition
-import io.micronaut.core.io.service.SoftServiceLoader
 import io.micronaut.core.order.OrderUtil
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
-import io.micronaut.inject.ast.Element
-import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.AnnotatedNode
@@ -54,7 +48,6 @@ import org.codehaus.groovy.transform.GroovyASTTransformation
 import java.lang.reflect.Modifier
 
 import static org.codehaus.groovy.ast.ClassHelper.makeCached
-
 /**
  * Executes type element visitors.
  *
@@ -80,27 +73,37 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
         if (visitors == null) return
 
         GroovyVisitorContext visitorContext = new GroovyVisitorContext(source, compilationUnit)
-        for (ClassNode classNode in classes) {
-            if (!(classNode instanceof InnerClassNode && !Modifier.isStatic(classNode.getModifiers())) && classNode.getAnnotations(generatedNode).empty) {
-                Collection<LoadedVisitor> matchedVisitors = visitors.values().findAll { v ->
-                    v.matches(classNode)
-                }
 
-                List<LoadedVisitor> values = new ArrayList<>(matchedVisitors)
-                OrderUtil.reverseSort(values)
-                def annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(source, compilationUnit, classNode)
-                def isIntroduction = annotationMetadata.hasStereotype(Introduction.class)
-                def visitor = new ElementVisitor(source, compilationUnit, classNode, values, visitorContext, !isIntroduction)
-                if (isIntroduction || (annotationMetadata.hasStereotype(Introspected.class) && classNode.isAbstract())) {
-                    visitor.visitClass(classNode)
-                    new PublicMethodVisitor(source) {
-                        @Override
-                        void accept(ClassNode cn, MethodNode methodNode) {
-                            visitor.doVisitMethod(methodNode)
-                        }
-                    }.accept(classNode)
-                } else {
-                    visitor.visitClass(classNode)
+        List<LoadedVisitor> sortedVisitors = new ArrayList<>(visitors.values())
+        OrderUtil.reverseSort(sortedVisitors)
+
+        // The visitor X with a higher priority should process elements of A before
+        // the visitor Y which is processing elements of B but also using elements A
+
+        // Micronaut Data use-case: EntityMapper with a higher priority needs to process entities first
+        // before RepositoryMapper is going to process repositories and read entities
+
+        for (LoadedVisitor loadedVisitor : sortedVisitors) {
+            for (ClassNode classNode in classes) {
+                if (!(classNode instanceof InnerClassNode && !Modifier.isStatic(classNode.getModifiers())) && classNode.getAnnotations(generatedNode).empty) {
+                    if (!loadedVisitor.matches(classNode)) {
+                        continue
+                    }
+
+                    def annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(source, compilationUnit, classNode)
+                    def isIntroduction = annotationMetadata.hasStereotype(Introduction.class)
+                    def visitor = new ElementVisitor(source, compilationUnit, classNode, [loadedVisitor], visitorContext, !isIntroduction)
+                    if (isIntroduction || (annotationMetadata.hasStereotype(Introspected.class) && classNode.isAbstract())) {
+                        visitor.visitClass(classNode)
+                        new PublicMethodVisitor(source) {
+                            @Override
+                            void accept(ClassNode cn, MethodNode methodNode) {
+                                visitor.doVisitMethod(methodNode)
+                            }
+                        }.accept(classNode)
+                    } else {
+                        visitor.visitClass(classNode)
+                    }
                 }
             }
         }

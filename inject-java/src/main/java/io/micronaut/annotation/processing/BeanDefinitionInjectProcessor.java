@@ -158,6 +158,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             am.hasStereotype(ANN_CONSTRAINT) || am.hasStereotype(ANN_VALID);
     private static final String ANN_CONFIGURATION_ADVICE = "io.micronaut.runtime.context.env.ConfigurationAdvice";
     private static final String ANN_VALIDATED = "io.micronaut.validation.Validated";
+    private static final String ANN_REQUIRES_VALIDATION = "io.micronaut.validation.RequiresValidation";
 
     private JavaConfigurationMetadataBuilder metadataBuilder;
     private Set<String> beanDefinitions;
@@ -995,14 +996,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         }
 
         private boolean isValidatedMethod(AnnotationMetadata methodAnnotationMetadata, JavaMethodElement javaMethodElement) {
-            if (methodAnnotationMetadata.hasStereotype(ANN_VALIDATED)) {
-                return false;
-            }
-            return requiresValidation(javaMethodElement) || Arrays.stream(javaMethodElement.getParameters()).anyMatch(this::requiresValidation);
-        }
 
-        private boolean requiresValidation(io.micronaut.inject.ast.Element p) {
-            return p.hasStereotype(ANN_CONSTRAINT) || p.hasStereotype(ANN_VALID);
+            return methodAnnotationMetadata.hasStereotype(ANN_REQUIRES_VALIDATION);
         }
 
         private void visitConfigurationPropertySetter(ExecutableElement method) {
