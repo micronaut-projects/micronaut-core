@@ -2043,28 +2043,17 @@ public class DefaultHttpClient implements
         }
 
         private void processRequestWrite(Channel channel, ConnectionManager.PoolHandle poolHandle, FluxSink<?> emitter, ChannelPipeline pipeline) {
-            ChannelFuture channelFuture;
+            ChannelFuture writeFuture;
             if (encoder != null && encoder.isChunked()) {
                 channel.attr(AttributeKey.valueOf(ChannelPipelineCustomizer.HANDLER_HTTP_CHUNK)).set(true);
                 pipeline.addAfter(ChannelPipelineCustomizer.HANDLER_HTTP_STREAM, ChannelPipelineCustomizer.HANDLER_HTTP_CHUNK, new ChunkedWriteHandler());
                 channel.write(nettyRequest);
-                channelFuture = channel.writeAndFlush(encoder);
+                writeFuture = channel.writeAndFlush(encoder);
             } else {
-                channelFuture = channel.writeAndFlush(nettyRequest);
+                writeFuture = channel.writeAndFlush(nettyRequest);
             }
 
-            if (poolHandle != null) {
-                closeChannelIfNecessary(channel, emitter, channelFuture);
-            } else {
-                closeChannelIfNecessary(channel, emitter, channelFuture);
-            }
-        }
-
-        private void closeChannelIfNecessary(
-                Channel channel,
-                FluxSink<?> emitter,
-                ChannelFuture channelFuture) {
-            connectionManager.addInstrumentedListener(channelFuture, f -> {
+            connectionManager.addInstrumentedListener(writeFuture, f -> {
                 try {
                     if (!f.isSuccess()) {
                         if (!emitter.isCancelled()) {
