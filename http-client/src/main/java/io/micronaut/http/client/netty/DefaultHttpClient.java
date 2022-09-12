@@ -1152,22 +1152,6 @@ public class DefaultHttpClient implements
     }
 
     /**
-     * @param channel The channel to close asynchronously
-     */
-    protected void closeChannelAsync(Channel channel) {
-        if (channel.isOpen()) {
-
-            ChannelFuture closeFuture = channel.closeFuture();
-            closeFuture.addListener(f2 -> {
-                if (!f2.isSuccess() && log.isErrorEnabled()) {
-                    Throwable cause = f2.cause();
-                    log.error("Error closing request connection: " + cause.getMessage(), cause);
-                }
-            });
-        }
-    }
-
-    /**
      * @param request The request
      * @param <I>     The input type
      * @return A {@link Publisher} with the resolved URI
@@ -1321,7 +1305,6 @@ public class DefaultHttpClient implements
      * @param permitsBody            Whether permits body
      * @param bodyType               The body type
      * @param onError                Called when the body publisher encounters an error
-     * @param closeChannelAfterWrite Whether to close the channel. For stream requests we don't close the channel until disposed of.
      * @return A {@link NettyRequestWriter}
      * @throws HttpPostRequestEncoder.ErrorDataEncoderException if there is an encoder exception
      */
@@ -1331,8 +1314,7 @@ public class DefaultHttpClient implements
             MediaType requestContentType,
             boolean permitsBody,
             @Nullable Argument<?> bodyType,
-            Consumer<? super Throwable> onError,
-            boolean closeChannelAfterWrite) throws HttpPostRequestEncoder.ErrorDataEncoderException {
+            Consumer<? super Throwable> onError) throws HttpPostRequestEncoder.ErrorDataEncoderException {
 
         io.netty.handler.codec.http.HttpRequest nettyRequest;
         HttpPostRequestEncoder postRequestEncoder = null;
@@ -1427,7 +1409,7 @@ public class DefaultHttpClient implements
                         } catch (MalformedURLException e) {
                             //should never happen
                         }
-                        return new NettyRequestWriter(requestURI.getScheme(), nettyRequest, null, closeChannelAfterWrite);
+                        return new NettyRequestWriter(requestURI.getScheme(), nettyRequest, null);
                     } else if (bodyValue instanceof CharSequence) {
                         bodyContent = charSequenceToByteBuf((CharSequence) bodyValue, requestContentType);
                     } else if (mediaTypeCodecRegistry != null) {
@@ -1463,7 +1445,7 @@ public class DefaultHttpClient implements
         } catch (MalformedURLException e) {
             //should never happen
         }
-        return new NettyRequestWriter(requestURI.getScheme(), nettyRequest, postRequestEncoder, closeChannelAfterWrite);
+        return new NettyRequestWriter(requestURI.getScheme(), nettyRequest, postRequestEncoder);
     }
 
     private Flux<MutableHttpResponse<Object>> readBodyOnError(@Nullable Argument<?> errorType, @NonNull Flux<MutableHttpResponse<Object>> publisher) {
@@ -1569,8 +1551,7 @@ public class DefaultHttpClient implements
                     if (!emitter.isCancelled()) {
                         emitter.error(throwable);
                     }
-                },
-                true
+                }
         );
         HttpRequest nettyRequest = requestWriter.getNettyRequest();
 
@@ -1638,8 +1619,7 @@ public class DefaultHttpClient implements
         NettyRequestWriter requestWriter = prepareRequest(
                 finalRequest,
                 finalRequest.getUri(),
-                emitter,
-                false
+                emitter
         );
         HttpRequest nettyRequest = requestWriter.getNettyRequest();
         Promise<HttpResponse<?>> responsePromise = channel.eventLoop().newPromise();
@@ -1938,8 +1918,7 @@ public class DefaultHttpClient implements
     private <I> NettyRequestWriter prepareRequest(
             io.micronaut.http.HttpRequest<I> request,
             URI requestURI,
-            FluxSink<HttpResponse<Object>> emitter,
-            boolean closeChannelAfterWrite) throws HttpPostRequestEncoder.ErrorDataEncoderException {
+            FluxSink<HttpResponse<Object>> emitter) throws HttpPostRequestEncoder.ErrorDataEncoderException {
         MediaType requestContentType = request
                 .getContentType()
                 .orElse(MediaType.APPLICATION_JSON_TYPE);
@@ -1960,8 +1939,7 @@ public class DefaultHttpClient implements
                     if (!emitter.isCancelled()) {
                         emitter.error(throwable);
                     }
-                },
-                closeChannelAfterWrite
+                }
         );
         io.netty.handler.codec.http.HttpRequest nettyRequest = requestWriter.getNettyRequest();
         prepareHttpHeaders(requestURI, request, nettyRequest, permitsBody, true);
@@ -2087,19 +2065,16 @@ public class DefaultHttpClient implements
         private final HttpRequest nettyRequest;
         private final HttpPostRequestEncoder encoder;
         private final String scheme;
-        private final boolean closeChannelAfterWrite;
 
         /**
          * @param scheme                 The scheme
          * @param nettyRequest           The Netty request
          * @param encoder                The encoder
-         * @param closeChannelAfterWrite Whether to close the after write
          */
-        NettyRequestWriter(String scheme, HttpRequest nettyRequest, HttpPostRequestEncoder encoder, boolean closeChannelAfterWrite) {
+        NettyRequestWriter(String scheme, HttpRequest nettyRequest, HttpPostRequestEncoder encoder) {
             this.nettyRequest = nettyRequest;
             this.encoder = encoder;
             this.scheme = scheme;
-            this.closeChannelAfterWrite = closeChannelAfterWrite;
         }
 
         /**
@@ -2132,17 +2107,16 @@ public class DefaultHttpClient implements
             }
 
             if (poolHandle != null) {
-                closeChannelIfNecessary(channel, emitter, channelFuture, false);
+                closeChannelIfNecessary(channel, emitter, channelFuture);
             } else {
-                closeChannelIfNecessary(channel, emitter, channelFuture, closeChannelAfterWrite);
+                closeChannelIfNecessary(channel, emitter, channelFuture);
             }
         }
 
         private void closeChannelIfNecessary(
                 Channel channel,
                 FluxSink<?> emitter,
-                ChannelFuture channelFuture,
-                boolean closeChannelAfterWrite) {
+                ChannelFuture channelFuture) {
             connectionManager.addInstrumentedListener(channelFuture, f -> {
                 try {
                     if (!f.isSuccess()) {
@@ -2158,9 +2132,6 @@ public class DefaultHttpClient implements
                         encoder.cleanFiles();
                     }
                     channel.attr(AttributeKey.valueOf(ChannelPipelineCustomizer.HANDLER_HTTP_CHUNK)).set(null);
-                    if (closeChannelAfterWrite) {
-                        closeChannelAsync(channel);
-                    }
                 }
             });
         }

@@ -84,7 +84,6 @@ import io.netty.util.concurrent.GenericFutureListener;
 import io.netty.util.concurrent.Promise;
 import org.slf4j.Logger;
 import reactor.core.CorePublisher;
-import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
@@ -97,7 +96,6 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 import static io.micronaut.http.netty.channel.ChannelPipelineCustomizer.HANDLER_HTTP2_SETTINGS;
@@ -415,9 +413,7 @@ final class ConnectionManager {
                 return;
             }
 
-            Disposable disposable = buildDisposableChannel(channelFuture);
-            emitter.onDispose(disposable);
-            emitter.onCancel(disposable);
+            // todo: on emitter dispose/cancel, close channel
         }).delayUntil(channel -> delayUntilHttp2Ready(mockPoolHandle(channel)));
     }
 
@@ -471,27 +467,6 @@ final class ConnectionManager {
         });
 
         return initial.asMono();
-    }
-
-    private Disposable buildDisposableChannel(ChannelFuture channelFuture) {
-        return new Disposable() {
-            private final AtomicBoolean disposed = new AtomicBoolean(false);
-
-            @Override
-            public void dispose() {
-                if (disposed.compareAndSet(false, true)) {
-                    Channel channel = channelFuture.channel();
-                    if (channel.isOpen()) {
-                        httpClient.closeChannelAsync(channel);
-                    }
-                }
-            }
-
-            @Override
-            public boolean isDisposed() {
-                return disposed.get();
-            }
-        };
     }
 
     private AbstractChannelPoolHandler newPoolHandler(DefaultHttpClient.RequestKey key, DefaultHttpClient httpClient) {
