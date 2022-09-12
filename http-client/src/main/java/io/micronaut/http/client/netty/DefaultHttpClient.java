@@ -132,7 +132,6 @@ import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpHeaders;
-import io.netty.handler.codec.http.HttpMessage;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpScheme;
@@ -145,7 +144,6 @@ import io.netty.handler.codec.http.multipart.InterfaceHttpData;
 import io.netty.handler.codec.http.websocketx.WebSocketClientHandshakerFactory;
 import io.netty.handler.codec.http.websocketx.WebSocketVersion;
 import io.netty.handler.codec.http2.Http2Stream;
-import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.stream.ChunkedWriteHandler;
 import io.netty.handler.timeout.ReadTimeoutHandler;
@@ -1708,27 +1706,6 @@ public class DefaultHttpClient implements
         }
     }
 
-    /**
-     * Note: caller must ensure this is only called for plaintext HTTP, not TLS HTTP2.
-     */
-    boolean discardH2cStream(HttpMessage message) {
-        // only applies to h2c
-        if (connectionManager.httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0) {
-            int streamId = message.headers().getInt(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text(), -1);
-            if (streamId == 1) {
-                // ignore this message
-                if (log.isDebugEnabled()) {
-                    log.debug("Received response on HTTP2 stream 1, the stream used to respond to the initial upgrade request. Ignoring.");
-                }
-                return true;
-            } else {
-                return false;
-            }
-        } else {
-            return false;
-        }
-    }
-
     private void addReadTimeoutHandler(ChannelPipeline pipeline) {
         if (connectionManager.readTimeoutMillis != null) {
             if (connectionManager.httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0) {
@@ -2283,7 +2260,7 @@ public class DefaultHttpClient implements
 
         @Override
         public boolean acceptInboundMessage(Object msg) {
-            return msg instanceof FullHttpResponse && (secure || !discardH2cStream((HttpMessage) msg));
+            return msg instanceof FullHttpResponse;
         }
 
         @Override

@@ -64,6 +64,7 @@ import io.netty.handler.codec.http2.Http2FrameListener;
 import io.netty.handler.codec.http2.Http2FrameLogger;
 import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.codec.http2.Http2Stream;
+import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.handler.codec.http2.HttpToHttp2ConnectionHandler;
 import io.netty.handler.codec.http2.HttpToHttp2ConnectionHandlerBuilder;
 import io.netty.handler.codec.http2.InboundHttp2ToHttpAdapterBuilder;
@@ -79,6 +80,7 @@ import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.resolver.NoopAddressResolverGroup;
 import io.netty.util.Attribute;
+import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 import io.netty.util.concurrent.Promise;
@@ -659,15 +661,7 @@ final class ConnectionManager {
                 }
             }
         });
-        pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_UPGRADE_REQUEST, new UpgradeRequestHandler(httpClientInitializer) {
-            @Override
-            public void handlerRemoved(ChannelHandlerContext ctx) {
-                final Consumer<ChannelHandlerContext> contextConsumer = httpClientInitializer.contextConsumer;
-                if (contextConsumer != null) {
-                    contextConsumer.accept(ctx);
-                }
-            }
-        });
+        pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_UPGRADE_REQUEST, new H2cUpgradeRequestHandler(httpClientInitializer));
     }
 
     /**
@@ -784,26 +778,17 @@ final class ConnectionManager {
     /**
      * A handler that triggers the cleartext upgrade to HTTP/2 by sending an initial HTTP request.
      */
-    private static class UpgradeRequestHandler extends ChannelInboundHandlerAdapter {
+    private class H2cUpgradeRequestHandler extends ChannelInboundHandlerAdapter {
 
         private final HttpClientInitializer initializer;
-        private final Http2SettingsHandler settingsHandler;
 
         /**
          * Default constructor.
          *
          * @param initializer The initializer
          */
-        public UpgradeRequestHandler(HttpClientInitializer initializer) {
+        public H2cUpgradeRequestHandler(HttpClientInitializer initializer) {
             this.initializer = initializer;
-            this.settingsHandler = initializer.settingsHandler;
-        }
-
-        /**
-         * @return The settings handler
-         */
-        public Http2SettingsHandler getSettingsHandler() {
-            return settingsHandler;
         }
 
         @Override
@@ -825,8 +810,30 @@ final class ConnectionManager {
             ctx.writeAndFlush(upgradeRequest);
 
             ctx.fireChannelActive();
-            pipeline.remove(this);
+            if (initializer.contextConsumer != null) {
+                initializer.contextConsumer.accept(ctx);
+            }
             initializer.addFinalHandler(pipeline);
+        }
+
+        @Override
+        public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+            if (msg instanceof HttpMessage) {
+                int streamId = ((HttpMessage) msg).headers().getInt(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text(), -1);
+                if (streamId == 1) {
+                    // ignore this message
+                    if (log.isDebugEnabled()) {
+                        log.debug("Received response on HTTP2 stream 1, the stream used to respond to the initial upgrade request. Ignoring.");
+                    }
+                    ReferenceCountUtil.release(msg);
+                    if (msg instanceof LastHttpContent) {
+                        ctx.pipeline().remove(this);
+                    }
+                    return;
+                }
+            }
+
+            super.channelRead(ctx, msg);
         }
     }
 
@@ -1104,12 +1111,6 @@ final class ConnectionManager {
                         ctx.close();
                     }
                     super.userEventTriggered(ctx, evt);
-                }
-
-                @Override
-                protected boolean isValidInMessage(Object msg) {
-                    // ignore data on stream 1, that is the response to our initial upgrade request
-                    return super.isValidInMessage(msg) && (sslContext != null || !httpClient.discardH2cStream((HttpMessage) msg));
                 }
             });
         }
