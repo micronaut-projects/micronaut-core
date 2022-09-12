@@ -491,12 +491,6 @@ public class DefaultHttpClient implements
                         shutdownTimeout.toMillis(),
                         TimeUnit.MILLISECONDS
                 );
-                connectionManager.addInstrumentedListener(future, f -> {
-                    if (!f.isSuccess() && log.isErrorEnabled()) {
-                        Throwable cause = f.cause();
-                        log.error("Error shutting down HTTP client: " + cause.getMessage(), cause);
-                    }
-                });
                 try {
                     future.await(shutdownTimeout.toMillis());
                 } catch (InterruptedException e) {
