@@ -297,7 +297,7 @@ final class ConnectionManager {
             sslCtx = sslContext;
             //Allow https requests to be sent if SSL is disabled but a proxy is present
             if (sslCtx == null && !configuration.getProxyAddress().isPresent()) {
-                throw httpClient.customizeException(new HttpClientException("Cannot send HTTPS request. SSL is disabled"));
+                throw customizeException(new HttpClientException("Cannot send HTTPS request. SSL is disabled"));
             }
         } else {
             sslCtx = null;
@@ -344,7 +344,7 @@ final class ConnectionManager {
                             }
                         } else {
                             Throwable cause = future.cause();
-                            emitter.error(httpClient.customizeException(new HttpClientException("Connect Error: " + cause.getMessage(), cause)));
+                            emitter.error(customizeException(new HttpClientException("Connect Error: " + cause.getMessage(), cause)));
                         }
                     });
                 } catch (HttpClientException e) {
@@ -355,7 +355,7 @@ final class ConnectionManager {
                 addInstrumentedListener(connectionFuture, future -> {
                     if (!future.isSuccess()) {
                         Throwable cause = future.cause();
-                        emitter.error(httpClient.customizeException(new HttpClientException("Connect Error: " + cause.getMessage(), cause)));
+                        emitter.error(customizeException(new HttpClientException("Connect Error: " + cause.getMessage(), cause)));
                     } else {
                         emitter.success(mockPoolHandle(connectionFuture.channel()));
                     }
@@ -406,7 +406,7 @@ final class ConnectionManager {
                                 emitter.success(channel);
                             } else {
                                 Throwable cause = f.cause();
-                                emitter.error(httpClient.customizeException(new HttpClientException("Connect error:" + cause.getMessage(), cause)));
+                                emitter.error(customizeException(new HttpClientException("Connect error:" + cause.getMessage(), cause)));
                             }
                         });
                 }
@@ -646,7 +646,7 @@ final class ConnectionManager {
                     httpClientInitializer.addHttp1Handlers(p);
                 } else {
                     ctx.close();
-                    throw httpClient.customizeException(new HttpClientException("Unknown Protocol: " + protocol));
+                    throw customizeException(new HttpClientException("Unknown Protocol: " + protocol));
                 }
                 httpClientInitializer.onStreamPipelineBuilt();
             }
@@ -799,6 +799,11 @@ final class ConnectionManager {
                 listener.operationComplete((C) f);
             }
         });
+    }
+
+    private <E extends HttpClientException> E customizeException(E exc) {
+        DefaultHttpClient.customizeException0(configuration, informationalServiceId, exc);
+        return exc;
     }
 
     /**
@@ -959,7 +964,7 @@ final class ConnectionManager {
                         );
                         builder.frameLogger(new Http2FrameLogger(nettyLevel, DefaultHttpClient.class));
                     } catch (IllegalArgumentException e) {
-                        throw httpClient.customizeException(new HttpClientException("Unsupported log level: " + logLevel));
+                        throw customizeException(new HttpClientException("Unsupported log level: " + logLevel));
                     }
                 });
                 HttpToHttp2ConnectionHandler connectionHandler = builder
@@ -984,7 +989,7 @@ final class ConnectionManager {
                         );
                         p.addLast(new LoggingHandler(DefaultHttpClient.class, nettyLevel));
                     } catch (IllegalArgumentException e) {
-                        throw httpClient.customizeException(new HttpClientException("Unsupported log level: " + logLevel));
+                        throw customizeException(new HttpClientException("Unsupported log level: " + logLevel));
                     }
                 });
 

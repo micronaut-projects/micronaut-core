@@ -1982,13 +1982,17 @@ public class DefaultHttpClient implements
         return io.micronaut.http.HttpRequest.SCHEME_HTTPS.equalsIgnoreCase(scheme) || SCHEME_WSS.equalsIgnoreCase(scheme);
     }
 
-    <E extends HttpClientException> E customizeException(E exc) {
+    private <E extends HttpClientException> E customizeException(E exc) {
+        customizeException0(configuration, informationalServiceId, exc);
+        return exc;
+    }
+
+    static void customizeException0(HttpClientConfiguration configuration, String informationalServiceId, HttpClientException exc) {
         if (informationalServiceId != null) {
             exc.setServiceId(informationalServiceId);
         } else if (configuration instanceof ServiceHttpClientConfiguration) {
             exc.setServiceId(((ServiceHttpClientConfiguration) configuration).getServiceId());
         }
-        return exc;
     }
 
     @FunctionalInterface
