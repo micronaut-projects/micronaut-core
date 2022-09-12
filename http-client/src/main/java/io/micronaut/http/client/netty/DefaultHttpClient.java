@@ -115,7 +115,6 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelFactory;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.MultithreadEventLoopGroup;
@@ -412,20 +411,6 @@ public class DefaultHttpClient implements
         this.informationalServiceId = informationalServiceId;
 
         this.connectionManager = new ConnectionManager(this, log, group, configuration, httpVersionN, combineFactories(), socketChannelFactory, readTimeoutMillis, connectionTimeAliveMillis, sslContext, clientCustomizer, pipelineListeners, informationalServiceId);
-
-        Optional<Duration> connectTimeout = configuration.getConnectTimeout();
-        connectTimeout.ifPresent(duration -> connectionManager.bootstrap.option(
-            ChannelOption.CONNECT_TIMEOUT_MILLIS,
-            (int) duration.toMillis()
-        ));
-
-        for (Map.Entry<String, Object> entry : configuration.getChannelOptions().entrySet()) {
-            Object v = entry.getValue();
-            if (v != null) {
-                String channelOption = entry.getKey();
-                connectionManager.bootstrap.option(ChannelOption.valueOf(channelOption), v);
-            }
-        }
     }
 
     /**

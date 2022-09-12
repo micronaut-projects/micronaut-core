@@ -104,7 +104,7 @@ final class ConnectionManager {
     private final DefaultHttpClient httpClient; // TODO
     private final Logger log;
     EventLoopGroup group;
-    final Bootstrap bootstrap;
+    private final Bootstrap bootstrap;
     final ChannelPoolMap<DefaultHttpClient.RequestKey, ChannelPool> poolMap;
     private final HttpClientConfiguration configuration;
     final InvocationInstrumenter instrumenter;
@@ -194,6 +194,20 @@ final class ConnectionManager {
             }
         } else {
             this.poolMap = null;
+        }
+
+        Optional<Duration> connectTimeout = configuration.getConnectTimeout();
+        connectTimeout.ifPresent(duration -> bootstrap.option(
+            ChannelOption.CONNECT_TIMEOUT_MILLIS,
+            (int) duration.toMillis()
+        ));
+
+        for (Map.Entry<String, Object> entry : configuration.getChannelOptions().entrySet()) {
+            Object v = entry.getValue();
+            if (v != null) {
+                String channelOption = entry.getKey();
+                bootstrap.option(ChannelOption.valueOf(channelOption), v);
+            }
         }
     }
 
