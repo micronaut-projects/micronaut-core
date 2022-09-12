@@ -96,6 +96,7 @@ public class ValidationVisitor implements TypeElementVisitor<Object, Object> {
         if (requiresValidation(element)) {
             // Annotate the class for fields validation
             classElement.annotate(ANN_REQUIRES_VALIDATION);
+            System.out.println("XXX" + classElement + " " + element);
         }
     }
 

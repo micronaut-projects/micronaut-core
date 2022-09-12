@@ -39,7 +39,13 @@ public class ConfigurationReaderVisitor implements TypeElementVisitor<Configurat
     }
 
     @Override
+    public int getOrder() {
+        return 0;
+    }
+
+    @Override
     public void visitClass(ClassElement element, VisitorContext context) {
+        System.out.println("LLLL" + element);
         if (!element.hasStereotype(ConfigurationReader.class)) {
             return;
         }
@@ -48,6 +54,7 @@ public class ConfigurationReaderVisitor implements TypeElementVisitor<Configurat
         }
         if (element.hasStereotype(ValidationVisitor.ANN_REQUIRES_VALIDATION)) {
             element.annotate(Introspected.class);
+            System.out.println("BBB" + element);
         }
     }
 
