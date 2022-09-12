@@ -104,7 +104,6 @@ import static io.micronaut.http.netty.channel.ChannelPipelineCustomizer.HANDLER_
 import static io.micronaut.http.netty.channel.ChannelPipelineCustomizer.HANDLER_IDLE_STATE;
 
 final class ConnectionManager {
-    private final DefaultHttpClient httpClient; // TODO
     private final Logger log;
     EventLoopGroup group;
     private final Bootstrap bootstrap;
@@ -112,7 +111,7 @@ final class ConnectionManager {
     private final HttpClientConfiguration configuration;
     final InvocationInstrumenter instrumenter;
     @Nullable
-    final Long readTimeoutMillis;
+    private final Long readTimeoutMillis;
     @Nullable
     private final Long connectionTimeAliveMillis;
     final HttpVersion httpVersion;
@@ -122,8 +121,8 @@ final class ConnectionManager {
     private final String informationalServiceId;
 
     ConnectionManager(
-        DefaultHttpClient httpClient,
-        Logger log, EventLoopGroup group,
+        Logger log,
+        EventLoopGroup group,
         HttpClientConfiguration configuration,
         HttpVersion httpVersion,
         InvocationInstrumenter instrumenter,
@@ -132,8 +131,8 @@ final class ConnectionManager {
         @Nullable Long connectionTimeAliveMillis,
         SslContext sslContext,
         NettyClientCustomizer clientCustomizer,
-        Collection<ChannelPipelineListener> pipelineListeners, String informationalServiceId) {
-        this.httpClient = httpClient;
+        Collection<ChannelPipelineListener> pipelineListeners,
+        String informationalServiceId) {
         this.log = log;
         this.httpVersion = httpVersion;
         this.group = group;
@@ -164,7 +163,7 @@ final class ConnectionManager {
                         initBootstrapForProxy(newBootstrap, key.isSecure(), key.getHost(), key.getPort());
                         newBootstrap.remoteAddress(key.getRemoteAddress());
 
-                        AbstractChannelPoolHandler channelPoolHandler = newPoolHandler(key, httpClient);
+                        AbstractChannelPoolHandler channelPoolHandler = newPoolHandler(key);
                         final long acquireTimeoutMillis = connectionPoolConfiguration.getAcquireTimeout().map(Duration::toMillis).orElse(-1L);
                         return new FixedChannelPool(
                             newBootstrap,
@@ -186,7 +185,7 @@ final class ConnectionManager {
                         initBootstrapForProxy(newBootstrap, key.isSecure(), key.getHost(), key.getPort());
                         newBootstrap.remoteAddress(key.getRemoteAddress());
 
-                        AbstractChannelPoolHandler channelPoolHandler = newPoolHandler(key, httpClient);
+                        AbstractChannelPoolHandler channelPoolHandler = newPoolHandler(key);
                         return new SimpleChannelPool(
                             newBootstrap,
                             channelPoolHandler,
@@ -361,7 +360,12 @@ final class ConnectionManager {
                     }
                 });
             }
-        }).delayUntil(this::delayUntilHttp2Ready);
+        })
+            .delayUntil(this::delayUntilHttp2Ready)
+            .map(poolHandle -> {
+                addReadTimeoutHandler(poolHandle.channel.pipeline());
+                return poolHandle;
+            });
     }
 
     @NonNull
@@ -416,7 +420,13 @@ final class ConnectionManager {
             }
 
             // todo: on emitter dispose/cancel, close channel
-        }).delayUntil(channel -> delayUntilHttp2Ready(mockPoolHandle(channel)));
+        })
+            .delayUntil(channel -> delayUntilHttp2Ready(mockPoolHandle(channel)))
+            .map(channel -> {
+                // todo: if this is ever reused, remove this handler
+                addReadTimeoutHandler(channel.pipeline());
+                return channel;
+            });
     }
 
     Mono<?> connectForWebsocket(DefaultHttpClient.RequestKey requestKey, ChannelHandler handler) {
@@ -471,7 +481,7 @@ final class ConnectionManager {
         return initial.asMono();
     }
 
-    private AbstractChannelPoolHandler newPoolHandler(DefaultHttpClient.RequestKey key, DefaultHttpClient httpClient) {
+    private AbstractChannelPoolHandler newPoolHandler(DefaultHttpClient.RequestKey key) {
         return new AbstractChannelPoolHandler() {
             @Override
             public void channelCreated(Channel ch) {
@@ -543,7 +553,7 @@ final class ConnectionManager {
                     ch.close();
                 }
 
-                httpClient.removeReadTimeoutHandler(pipeline);
+                removeReadTimeoutHandler(pipeline);
             }
 
             @Override
@@ -773,6 +783,29 @@ final class ConnectionManager {
     private <E extends HttpClientException> E customizeException(E exc) {
         DefaultHttpClient.customizeException0(configuration, informationalServiceId, exc);
         return exc;
+    }
+
+    private void addReadTimeoutHandler(ChannelPipeline pipeline) {
+        if (readTimeoutMillis != null) {
+            if (httpVersion == HttpVersion.HTTP_2_0) {
+                pipeline.addBefore(
+                    ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION,
+                    ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT,
+                    new ReadTimeoutHandler(readTimeoutMillis, TimeUnit.MILLISECONDS)
+                );
+            } else {
+                pipeline.addBefore(
+                        ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC,
+                        ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT,
+                        new ReadTimeoutHandler(readTimeoutMillis, TimeUnit.MILLISECONDS));
+            }
+        }
+    }
+
+    private void removeReadTimeoutHandler(ChannelPipeline pipeline) {
+        if (readTimeoutMillis != null && pipeline.context(ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT) != null) {
+            pipeline.remove(ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT);
+        }
     }
 
     /**
@@ -1137,7 +1170,7 @@ final class ConnectionManager {
 
         void release() {
             if (channelPool != null) {
-                httpClient.removeReadTimeoutHandler(channel.pipeline());
+                removeReadTimeoutHandler(channel.pipeline());
                 if (!canReturn) {
                     channel.closeFuture().addListener((future ->
                         channelPool.release(channel)

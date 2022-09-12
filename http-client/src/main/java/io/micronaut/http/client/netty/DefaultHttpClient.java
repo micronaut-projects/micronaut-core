@@ -146,7 +146,6 @@ import io.netty.handler.codec.http.websocketx.WebSocketVersion;
 import io.netty.handler.codec.http2.Http2Stream;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.stream.ChunkedWriteHandler;
-import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.util.AttributeKey;
 import io.netty.util.CharsetUtil;
 import io.netty.util.ReferenceCountUtil;
@@ -406,7 +405,7 @@ public class DefaultHttpClient implements
         this.requestBinderRegistry = requestBinderRegistry;
         this.informationalServiceId = informationalServiceId;
 
-        this.connectionManager = new ConnectionManager(this, log, group, configuration, httpVersionN, combineFactories(), socketChannelFactory, readTimeoutMillis, connectionTimeAliveMillis, sslContext, clientCustomizer, pipelineListeners, informationalServiceId);
+        this.connectionManager = new ConnectionManager(log, group, configuration, httpVersionN, combineFactories(), socketChannelFactory, readTimeoutMillis, connectionTimeAliveMillis, sslContext, clientCustomizer, pipelineListeners, informationalServiceId);
     }
 
     /**
@@ -1706,29 +1705,6 @@ public class DefaultHttpClient implements
         }
     }
 
-    private void addReadTimeoutHandler(ChannelPipeline pipeline) {
-        if (connectionManager.readTimeoutMillis != null) {
-            if (connectionManager.httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0) {
-                pipeline.addBefore(
-                    ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION,
-                    ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT,
-                    new ReadTimeoutHandler(connectionManager.readTimeoutMillis, TimeUnit.MILLISECONDS)
-                );
-            } else {
-                pipeline.addBefore(
-                        ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC,
-                        ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT,
-                        new ReadTimeoutHandler(connectionManager.readTimeoutMillis, TimeUnit.MILLISECONDS));
-            }
-        }
-    }
-
-    void removeReadTimeoutHandler(ChannelPipeline pipeline) {
-        if (connectionManager.readTimeoutMillis != null && pipeline.context(ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT) != null) {
-            pipeline.remove(ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT);
-        }
-    }
-
     private ClientFilterChain buildChain(AtomicReference<io.micronaut.http.HttpRequest<?>> requestWrapper, List<HttpClientFilter> filters) {
         AtomicInteger integer = new AtomicInteger();
         int len = filters.size();
@@ -2412,11 +2388,6 @@ public class DefaultHttpClient implements
         }
 
         @Override
-        public void handlerAdded(ChannelHandlerContext ctx) {
-            addReadTimeoutHandler(ctx.pipeline());
-        }
-
-        @Override
         public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
             super.exceptionCaught(ctx, cause);
             poolHandle.taint();
@@ -2449,18 +2420,6 @@ public class DefaultHttpClient implements
                     bodyPublisher
             );
             promise.trySuccess(new NettyStreamedHttpResponse<>(nettyResponse, httpStatus));
-        }
-
-        @Override
-        public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
-            super.handlerAdded(ctx);
-            addReadTimeoutHandler(ctx.pipeline());
-        }
-
-        @Override
-        public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
-            super.handlerRemoved(ctx);
-            removeReadTimeoutHandler(ctx.pipeline());
         }
 
         @Override
