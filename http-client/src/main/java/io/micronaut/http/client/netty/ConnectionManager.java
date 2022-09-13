@@ -1,3 +1,18 @@
+/*
+ * Copyright 2017-2022 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.http.client.netty;
 
 import io.micronaut.core.annotation.NonNull;
@@ -19,7 +34,6 @@ import io.micronaut.http.netty.stream.HttpStreamsClientHandler;
 import io.micronaut.http.netty.stream.StreamingInboundHttp2ToHttpAdapter;
 import io.micronaut.scheduling.instrument.Instrumentation;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
-import io.micronaut.scheduling.instrument.InvocationInstrumenterFactory;
 import io.micronaut.websocket.exceptions.WebSocketSessionException;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
@@ -120,19 +134,21 @@ final class ConnectionManager {
     private static final AttributeKey<Future<?>> STREAM_CHANNEL_INITIALIZED =
         AttributeKey.valueOf("micronaut.http.streamChannelInitialized");
     private static final AttributeKey<Http2Stream> STREAM_KEY = AttributeKey.valueOf("micronaut.http2.stream");
+
+    final ChannelPoolMap<DefaultHttpClient.RequestKey, ChannelPool> poolMap;
+    final InvocationInstrumenter instrumenter;
+    final HttpVersion httpVersion;
+
     private final Logger log;
     private EventLoopGroup group;
     private final boolean shutdownGroup;
     private final ThreadFactory threadFactory;
     private final Bootstrap bootstrap;
-    final ChannelPoolMap<DefaultHttpClient.RequestKey, ChannelPool> poolMap;
     private final HttpClientConfiguration configuration;
-    final InvocationInstrumenter instrumenter;
     @Nullable
     private final Long readTimeoutMillis;
     @Nullable
     private final Long connectionTimeAliveMillis;
-    final HttpVersion httpVersion;
     private final SslContext sslContext;
     private final NettyClientCustomizer clientCustomizer;
     private final Collection<ChannelPipelineListener> pipelineListeners;
@@ -417,7 +433,6 @@ final class ConnectionManager {
     }
 
     private PoolHandle mockPoolHandle(Channel channel) {
-        // TODO: delete
         return new PoolHandle(null, channel);
     }
 
@@ -860,14 +875,6 @@ final class ConnectionManager {
         }
     }
 
-    /**
-     * Adds a Netty listener that is instrumented by instrumenters given by managed or provided collection of
-     * the {@link InvocationInstrumenterFactory}.
-     *
-     * @param channelFuture The channel future
-     * @param listener      The listener logic
-     * @return a Netty listener that is instrumented
-     */
     <V, C extends Future<V>> Future<V> addInstrumentedListener(
             Future<V> channelFuture, GenericFutureListener<C> listener) {
         return channelFuture.addListener(f -> {
@@ -1250,7 +1257,7 @@ final class ConnectionManager {
         }
     }
 
-    class PoolHandle {
+    final class PoolHandle {
         final Channel channel;
         private final ChannelPool channelPool;
         private boolean canReturn;

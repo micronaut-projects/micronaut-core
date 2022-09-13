@@ -78,7 +78,7 @@ public class ConnectTTLHandler extends ChannelDuplexHandler {
     }
 
     /**
-     * Indicates whether the channels connection ttl has expired
+     * Indicates whether the channels connection ttl has expired.
      * @param channel The channel to check
      * @return true if the channels ttl has expired
      */

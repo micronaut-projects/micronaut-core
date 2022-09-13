@@ -293,7 +293,7 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
         super.exceptionCaught(ctx, cause);
     }
 
-    public Mono<T> getHandshakeCompletedMono() {
+    public final Mono<T> getHandshakeCompletedMono() {
         return completion.asMono();
     }
 }

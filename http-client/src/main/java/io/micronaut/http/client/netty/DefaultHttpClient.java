@@ -232,15 +232,16 @@ public class DefaultHttpClient implements
     protected MediaTypeCodecRegistry mediaTypeCodecRegistry;
     protected ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory = new NettyByteBufferFactory();
 
+    final ConnectionManager connectionManager;
+
     private final List<HttpFilterResolver.FilterEntry<HttpClientFilter>> clientFilterEntries;
     private final LoadBalancer loadBalancer;
     private final HttpClientConfiguration configuration;
     private final String contextPath;
     private final Charset defaultCharset;
-    final ConnectionManager connectionManager;
     private final Logger log;
     private final HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver;
-    final WebSocketBeanRegistry webSocketRegistry;
+    private final WebSocketBeanRegistry webSocketRegistry;
     private final RequestBinderRegistry requestBinderRegistry;
     private final List<InvocationInstrumenterFactory> invocationInstrumenterFactories;
     private final String informationalServiceId;
