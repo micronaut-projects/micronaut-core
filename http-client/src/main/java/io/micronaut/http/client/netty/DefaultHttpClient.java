@@ -115,7 +115,6 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.MultithreadEventLoopGroup;
-import io.netty.channel.pool.ChannelHealthChecker;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.TooLongFrameException;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
@@ -141,7 +140,6 @@ import io.netty.handler.codec.http.multipart.InterfaceHttpData;
 import io.netty.handler.codec.http.websocketx.WebSocketClientHandshakerFactory;
 import io.netty.handler.codec.http.websocketx.WebSocketVersion;
 import io.netty.handler.codec.http2.Http2Stream;
-import io.netty.handler.ssl.SslContext;
 import io.netty.handler.stream.ChunkedWriteHandler;
 import io.netty.util.AttributeKey;
 import io.netty.util.CharsetUtil;
@@ -302,7 +300,7 @@ public class DefaultHttpClient implements
     /**
      * Construct a client for the given arguments.
      *  @param loadBalancer                    The {@link LoadBalancer} to use for selecting servers
-     * @param httpVersion                     The HTTP version to use. Can be null and defaults to {@link io.micronaut.http.HttpVersion#HTTP_1_1}
+     * @param explicitHttpVersion                     The HTTP version to use. Can be null and defaults to {@link io.micronaut.http.HttpVersion#HTTP_1_1}
      * @param configuration                   The {@link HttpClientConfiguration} object
      * @param contextPath                     The base URI to prepend to request uris
      * @param filterResolver                  The http client filter resolver
@@ -320,7 +318,7 @@ public class DefaultHttpClient implements
      * @param informationalServiceId          Optional service ID that will be passed to exceptions created by this client
      */
     public DefaultHttpClient(@Nullable LoadBalancer loadBalancer,
-                             @Nullable io.micronaut.http.HttpVersion httpVersion,
+                             @Nullable io.micronaut.http.HttpVersion explicitHttpVersion,
                              @NonNull HttpClientConfiguration configuration,
                              @Nullable String contextPath,
                              @NonNull HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver,
@@ -345,7 +343,6 @@ public class DefaultHttpClient implements
         ArgumentUtils.requireNonNull("filterResolver", filterResolver);
         ArgumentUtils.requireNonNull("socketChannelFactory", socketChannelFactory);
         this.loadBalancer = loadBalancer;
-        io.micronaut.http.HttpVersion httpVersionN = httpVersion != null ? httpVersion : configuration.getHttpVersion();
         this.defaultCharset = configuration.getDefaultCharset();
         if (StringUtils.isNotEmpty(contextPath)) {
             if (contextPath.charAt(0) != '/') {
@@ -356,14 +353,6 @@ public class DefaultHttpClient implements
             this.contextPath = null;
         }
         this.configuration = configuration;
-        SslContext sslContext = nettyClientSslBuilder.build(configuration.getSslConfiguration(), httpVersionN).orElse(null);
-
-        Optional<Duration> readTimeout = configuration.getReadTimeout();
-        Long readTimeoutMillis = readTimeout.map(duration -> !duration.isNegative() ? duration.toMillis() : null).orElse(null);
-
-        Optional<Duration> connectTtl = configuration.getConnectTtl();
-        Long connectionTimeAliveMillis = connectTtl.map(duration -> !duration.isNegative() ? duration.toMillis() : null).orElse(null);
-        final ChannelHealthChecker channelHealthChecker = channel -> channel.eventLoop().newSucceededFuture(channel.isActive() && !ConnectTTLHandler.isChannelExpired(channel));
 
         this.invocationInstrumenterFactories =
                 invocationInstrumenterFactories == null ? Collections.emptyList() : invocationInstrumenterFactories;
@@ -387,12 +376,10 @@ public class DefaultHttpClient implements
             eventLoopGroup,
             threadFactory,
             configuration,
-            httpVersionN,
+            explicitHttpVersion,
             combineFactories(),
             socketChannelFactory,
-            readTimeoutMillis,
-            connectionTimeAliveMillis,
-            sslContext,
+            nettyClientSslBuilder,
             clientCustomizer,
             pipelineListeners,
             informationalServiceId);

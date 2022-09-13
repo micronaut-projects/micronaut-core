@@ -9,6 +9,7 @@ import io.micronaut.http.HttpVersion;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.exceptions.HttpClientException;
+import io.micronaut.http.client.netty.ssl.NettyClientSslBuilder;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.channel.ChannelPipelineListener;
 import io.micronaut.http.netty.channel.NettyThreadFactory;
@@ -139,24 +140,31 @@ final class ConnectionManager {
         HttpVersion httpVersion,
         InvocationInstrumenter instrumenter,
         ChannelFactory<? extends Channel> socketChannelFactory,
-        @Nullable Long readTimeoutMillis,
-        @Nullable Long connectionTimeAliveMillis,
-        SslContext sslContext,
+        NettyClientSslBuilder nettyClientSslBuilder,
         NettyClientCustomizer clientCustomizer,
         Collection<ChannelPipelineListener> pipelineListeners,
         String informationalServiceId) {
 
+        if (httpVersion == null) {
+            httpVersion = configuration.getHttpVersion();
+        }
+
         this.log = log;
         this.httpVersion = httpVersion;
         this.threadFactory = threadFactory;
-        this.sslContext = sslContext;
         this.configuration = configuration;
         this.instrumenter = instrumenter;
-        this.readTimeoutMillis = readTimeoutMillis;
-        this.connectionTimeAliveMillis = connectionTimeAliveMillis;
         this.clientCustomizer = clientCustomizer;
         this.pipelineListeners = pipelineListeners;
         this.informationalServiceId = informationalServiceId;
+
+        this.connectionTimeAliveMillis = configuration.getConnectTtl()
+            .map(duration -> !duration.isNegative() ? duration.toMillis() : null)
+            .orElse(null);
+        this.readTimeoutMillis = configuration.getReadTimeout()
+            .map(duration -> !duration.isNegative() ? duration.toMillis() : null)
+            .orElse(null);
+        this.sslContext = nettyClientSslBuilder.build(configuration.getSslConfiguration(), httpVersion).orElse(null);
 
         if (eventLoopGroup != null) {
             group = eventLoopGroup;
