@@ -428,4 +428,23 @@ public class ReflectionUtils {
             throw new InvocationException("Exception occurred setting field [" + field + "]: " + e.getMessage(), e);
         }
     }
+
+    /**
+     * Gets the value of the given field reflectively.
+     * @param clazz The class
+     * @param fieldName The fieldName
+     * @param instance The instance
+     * @since 3.7.0
+     */
+    @UsedByGeneratedCode
+    public static Object getField(@NonNull Class clazz, @NonNull String fieldName, @NonNull Object instance) {
+        try {
+            ClassUtils.REFLECTION_LOGGER.debug("Reflectively getting field {} of class {} and instance {}", fieldName, clazz, instance);
+            Field field = getRequiredField(clazz, fieldName);
+            field.setAccessible(true);
+            return field.get(instance);
+        } catch (Throwable e) {
+            throw new InvocationException("Exception occurred getting a field [" + fieldName + "] of class [" + clazz + "]: " + e.getMessage(), e);
+        }
+    }
 }

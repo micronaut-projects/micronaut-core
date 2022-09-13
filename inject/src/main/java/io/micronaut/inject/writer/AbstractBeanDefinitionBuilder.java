@@ -1012,6 +1012,11 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         }
 
         @Override
+        public boolean isReflectionRequired(ClassElement callingType) {
+            return requiresReflection;
+        }
+
+        @Override
         public boolean isPackagePrivate() {
             return methodElement.isPackagePrivate();
         }
