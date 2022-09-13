@@ -415,6 +415,11 @@ public class DefaultHttpClient implements
                 invocationInstrumenterFactories);
     }
 
+    static boolean isAcceptEvents(io.micronaut.http.HttpRequest<?> request) {
+        String acceptHeader = request.getHeaders().get(io.micronaut.http.HttpHeaders.ACCEPT);
+        return acceptHeader != null && acceptHeader.equalsIgnoreCase(MediaType.TEXT_EVENT_STREAM);
+    }
+
     /**
      * @return The configuration used by this client
      */
@@ -1014,7 +1019,7 @@ public class DefaultHttpClient implements
         } catch (Exception e) {
             return Flux.error(e);
         }
-        return connectionManager.connectForStream(requestKey, isProxy, ConnectionManager.isAcceptEvents(request)).flatMapMany(poolHandle -> {
+        return connectionManager.connectForStream(requestKey, isProxy, isAcceptEvents(request)).flatMapMany(poolHandle -> {
             request.setAttribute(NettyClientHttpRequest.CHANNEL, poolHandle.channel);
             return this.streamRequestThroughChannel(
                 parentRequest,
@@ -1044,7 +1049,7 @@ public class DefaultHttpClient implements
             return Flux.error(e);
         }
 
-        Mono<ConnectionManager.PoolHandle> handlePublisher = connectionManager.connectForExchange(requestKey, MediaType.MULTIPART_FORM_DATA_TYPE.equals(request.getContentType().orElse(null)), ConnectionManager.isAcceptEvents(request));
+        Mono<ConnectionManager.PoolHandle> handlePublisher = connectionManager.connectForExchange(requestKey, MediaType.MULTIPART_FORM_DATA_TYPE.equals(request.getContentType().orElse(null)), isAcceptEvents(request));
 
         Flux<io.micronaut.http.HttpResponse<O>> responsePublisher = handlePublisher.flatMapMany(poolHandle -> {
             return Flux.create(emitter -> {

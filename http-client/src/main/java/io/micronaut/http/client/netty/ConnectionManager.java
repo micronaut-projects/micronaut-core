@@ -19,9 +19,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpVersion;
-import io.micronaut.http.MediaType;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.netty.ssl.NettyClientSslBuilder;
@@ -392,11 +390,6 @@ final class ConnectionManager {
         if (proxy.type() != Proxy.Type.DIRECT) {
             localBootstrap.resolver(NoopAddressResolverGroup.INSTANCE);
         }
-    }
-
-    static boolean isAcceptEvents(HttpRequest<?> request) {
-        String acceptHeader = request.getHeaders().get(io.micronaut.http.HttpHeaders.ACCEPT);
-        return acceptHeader != null && acceptHeader.equalsIgnoreCase(MediaType.TEXT_EVENT_STREAM);
     }
 
     /**
