@@ -84,6 +84,7 @@ import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.resolver.NoopAddressResolverGroup;
 import io.netty.util.Attribute;
+import io.netty.util.AttributeKey;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
@@ -114,6 +115,14 @@ import static io.micronaut.http.netty.channel.ChannelPipelineCustomizer.HANDLER_
 import static io.micronaut.http.netty.channel.ChannelPipelineCustomizer.HANDLER_IDLE_STATE;
 
 final class ConnectionManager {
+    /**
+     * Future on a pooled channel that will be completed when the channel has fully connected (e.g.
+     * TLS handshake has completed). If unset, then no handshake is needed or it has already
+     * completed.
+     */
+    private static final AttributeKey<Future<?>> STREAM_CHANNEL_INITIALIZED =
+        AttributeKey.valueOf("micronaut.http.streamChannelInitialized");
+    private static final AttributeKey<Http2Stream> STREAM_KEY = AttributeKey.valueOf("micronaut.http2.stream");
     private final Logger log;
     private EventLoopGroup group;
     private final boolean shutdownGroup;
@@ -424,7 +433,7 @@ final class ConnectionManager {
                         if (future.isSuccess()) {
                             PoolHandle poolHandle = future.get();
                             Channel channel = poolHandle.channel;
-                            Future<?> initFuture = channel.attr(DefaultHttpClient.STREAM_CHANNEL_INITIALIZED).get();
+                            Future<?> initFuture = channel.attr(STREAM_CHANNEL_INITIALIZED).get();
                             if (initFuture == null) {
                                 emitter.success(poolHandle);
                             } else {
@@ -578,7 +587,7 @@ final class ConnectionManager {
             @Override
             public void channelCreated(Channel ch) {
                 Promise<?> streamPipelineBuilt = ch.newPromise();
-                ch.attr(DefaultHttpClient.STREAM_CHANNEL_INITIALIZED).set(streamPipelineBuilt);
+                ch.attr(STREAM_CHANNEL_INITIALIZED).set(streamPipelineBuilt);
 
                 // make sure the future completes eventually
                 ChannelHandler failureHandler = new ChannelInboundHandlerAdapter() {
@@ -615,7 +624,7 @@ final class ConnectionManager {
                         super.onStreamPipelineBuilt();
                         streamPipelineBuilt.trySuccess(null);
                         ch.pipeline().remove(failureHandler);
-                        ch.attr(DefaultHttpClient.STREAM_CHANNEL_INITIALIZED).set(null);
+                        ch.attr(STREAM_CHANNEL_INITIALIZED).set(null);
                     }
                 });
 
@@ -1178,7 +1187,7 @@ final class ConnectionManager {
                             if (msg instanceof LastHttpContent) {
                                 super.channelRead(ctx, msg);
                             } else {
-                                Attribute<Http2Stream> streamKey = ctx.channel().attr(DefaultHttpClient.STREAM_KEY);
+                                Attribute<Http2Stream> streamKey = ctx.channel().attr(STREAM_KEY);
                                 if (msg instanceof Http2Content) {
                                     streamKey.set(((Http2Content) msg).stream());
                                 }
@@ -1204,7 +1213,7 @@ final class ConnectionManager {
                     @Override
                     protected void channelReadInstrumented(ChannelHandlerContext ctx, ByteBuf msg) {
                         try {
-                            Attribute<Http2Stream> streamKey = ctx.channel().attr(DefaultHttpClient.STREAM_KEY);
+                            Attribute<Http2Stream> streamKey = ctx.channel().attr(STREAM_KEY);
                             Http2Stream http2Stream = streamKey.get();
                             if (http2Stream != null) {
                                 ctx.fireChannelRead(new DefaultHttp2Content(msg.copy(), http2Stream));
