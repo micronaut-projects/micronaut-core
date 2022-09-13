@@ -411,20 +411,6 @@ final class ConnectionManager {
         return sslCtx;
     }
 
-    private Future<PoolHandle> acquireChannelFromPool(DefaultHttpClient.RequestKey requestKey) {
-        ChannelPool channelPool = poolMap.get(requestKey);
-        Future<Channel> channelFuture = channelPool.acquire();
-        Promise<PoolHandle> promise = group.next().newPromise();
-        channelFuture.addListener(f -> {
-            if (channelFuture.isSuccess()) {
-                promise.setSuccess(new PoolHandle(channelPool, channelFuture.getNow()));
-            } else {
-                promise.setFailure(channelFuture.cause());
-            }
-        });
-        return promise;
-    }
-
     private PoolHandle mockPoolHandle(Channel channel) {
         return new PoolHandle(null, channel);
     }
@@ -433,11 +419,11 @@ final class ConnectionManager {
         return Mono.<PoolHandle>create(emitter -> {
             if (poolMap != null && !multipart) {
                 try {
-                    Future<PoolHandle> channelFuture = acquireChannelFromPool(requestKey);
-                    addInstrumentedListener(channelFuture, future -> {
+                    ChannelPool channelPool = poolMap.get(requestKey);
+                    addInstrumentedListener(channelPool.acquire(), future -> {
                         if (future.isSuccess()) {
-                            PoolHandle poolHandle = future.get();
-                            Channel channel = poolHandle.channel;
+                            Channel channel = future.get();
+                            PoolHandle poolHandle = new PoolHandle(channelPool, channel);
                             Future<?> initFuture = channel.attr(STREAM_CHANNEL_INITIALIZED).get();
                             if (initFuture == null) {
                                 emitter.success(poolHandle);
