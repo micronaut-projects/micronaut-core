@@ -101,8 +101,8 @@ import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 import io.netty.util.concurrent.Promise;
+import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
-import reactor.core.CorePublisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
@@ -460,8 +460,7 @@ final class ConnectionManager {
             });
     }
 
-    @NonNull
-    private CorePublisher<?> delayUntilHttp2Ready(PoolHandle poolHandle) {
+    private Publisher<?> delayUntilHttp2Ready(PoolHandle poolHandle) {
         Http2SettingsHandler settingsHandler = (Http2SettingsHandler) poolHandle.channel.pipeline().get(ChannelPipelineCustomizer.HANDLER_HTTP2_SETTINGS);
         if (settingsHandler == null) {
             return Flux.empty();
@@ -801,24 +800,13 @@ final class ConnectionManager {
 
     }
 
-    /**
-     * Configures the HTTP proxy for the pipeline.
-     *
-     * @param pipeline   The pipeline
-     * @param proxy      The proxy
-     */
-    private void configureProxy(ChannelPipeline pipeline, Proxy proxy) {
-        configureProxy(pipeline, proxy.type(), proxy.address());
-    }
-
-    /**
-     * Configures the HTTP proxy for the pipeline.
-     *
-     * @param pipeline     The pipeline
-     * @param proxyType    The proxy type
-     * @param proxyAddress The proxy address
-     */
-    private void configureProxy(ChannelPipeline pipeline, Proxy.Type proxyType, SocketAddress proxyAddress) {
+    private void configureProxy(ChannelPipeline pipeline, boolean secure, String host, int port) {
+        Proxy proxy = configuration.resolveProxy(secure, host, port);
+        if (Proxy.NO_PROXY.equals(proxy)) {
+            return;
+        }
+        Proxy.Type proxyType = proxy.type();
+        SocketAddress proxyAddress = proxy.address();
         String username = configuration.getProxyUsername().orElse(null);
         String password = configuration.getProxyPassword().orElse(null);
 
@@ -1045,10 +1033,7 @@ final class ConnectionManager {
 
             ChannelPipeline p = ch.pipeline();
 
-            Proxy proxy = configuration.resolveProxy(sslContext != null, host, port);
-            if (!Proxy.NO_PROXY.equals(proxy)) {
-                configureProxy(p, proxy);
-            }
+            configureProxy(p, sslContext != null, host, port);
 
             if (httpVersion == HttpVersion.HTTP_2_0) {
                 final Http2Connection connection = new DefaultHttp2Connection(false);
