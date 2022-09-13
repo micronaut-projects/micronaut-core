@@ -115,7 +115,7 @@ final class ConnectionManager {
     @Nullable
     private final Long connectionTimeAliveMillis;
     final HttpVersion httpVersion;
-    final SslContext sslContext;
+    private final SslContext sslContext;
     private final NettyClientCustomizer clientCustomizer;
     private final Collection<ChannelPipelineListener> pipelineListeners;
     private final String informationalServiceId;

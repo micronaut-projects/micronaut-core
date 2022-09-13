@@ -1071,7 +1071,8 @@ public class DefaultHttpClient implements
                 parentRequest,
                 requestWrapper.get(),
                 channel,
-                failOnError
+                failOnError,
+                requestKey.isSecure()
             );
         });
     }
@@ -1400,7 +1401,7 @@ public class DefaultHttpClient implements
                         } catch (MalformedURLException e) {
                             //should never happen
                         }
-                        return new NettyRequestWriter(requestURI.getScheme(), nettyRequest, null);
+                        return new NettyRequestWriter(nettyRequest, null);
                     } else if (bodyValue instanceof CharSequence) {
                         bodyContent = charSequenceToByteBuf((CharSequence) bodyValue, requestContentType);
                     } else if (mediaTypeCodecRegistry != null) {
@@ -1436,7 +1437,7 @@ public class DefaultHttpClient implements
         } catch (MalformedURLException e) {
             //should never happen
         }
-        return new NettyRequestWriter(requestURI.getScheme(), nettyRequest, postRequestEncoder);
+        return new NettyRequestWriter(nettyRequest, postRequestEncoder);
     }
 
     private Flux<MutableHttpResponse<Object>> readBodyOnError(@Nullable Argument<?> errorType, @NonNull Flux<MutableHttpResponse<Object>> publisher) {
@@ -1573,17 +1574,18 @@ public class DefaultHttpClient implements
         }
         publisher.subscribe(new ForwardingSubscriber<>(emitter));
 
-        requestWriter.writeAndClose(channel, poolHandle, emitter);
+        requestWriter.writeAndClose(channel, secure, emitter);
     }
 
     private Flux<MutableHttpResponse<Object>> streamRequestThroughChannel(
             io.micronaut.http.HttpRequest<?> parentRequest,
             io.micronaut.http.HttpRequest<?> request,
             Channel channel,
-            boolean failOnError) {
+            boolean failOnError,
+            boolean secure) {
         return Flux.<MutableHttpResponse<Object>>create(sink -> {
             try {
-                streamRequestThroughChannel0(parentRequest, request, sink, channel);
+                streamRequestThroughChannel0(parentRequest, request, sink, channel, secure);
             } catch (HttpPostRequestEncoder.ErrorDataEncoderException e) {
                 sink.error(e);
             }
@@ -1606,7 +1608,8 @@ public class DefaultHttpClient implements
             io.micronaut.http.HttpRequest<?> parentRequest,
             final io.micronaut.http.HttpRequest<?> finalRequest,
             FluxSink emitter,
-            Channel channel) throws HttpPostRequestEncoder.ErrorDataEncoderException {
+            Channel channel,
+            boolean secure) throws HttpPostRequestEncoder.ErrorDataEncoderException {
         NettyRequestWriter requestWriter = prepareRequest(
                 finalRequest,
                 finalRequest.getUri(),
@@ -1627,7 +1630,7 @@ public class DefaultHttpClient implements
             traceRequest(finalRequest, nettyRequest);
         }
 
-        requestWriter.writeAndClose(channel, null, emitter);
+        requestWriter.writeAndClose(channel, secure, emitter);
         responsePromise.addListener(future -> {
             if (future.isSuccess()) {
                 emitter.next(future.getNow());
@@ -2011,17 +2014,15 @@ public class DefaultHttpClient implements
 
         private final HttpRequest nettyRequest;
         private final HttpPostRequestEncoder encoder;
-        private final String scheme;
 
         /**
          * @param scheme                 The scheme
          * @param nettyRequest           The Netty request
          * @param encoder                The encoder
          */
-        NettyRequestWriter(String scheme, HttpRequest nettyRequest, HttpPostRequestEncoder encoder) {
+        NettyRequestWriter(HttpRequest nettyRequest, HttpPostRequestEncoder encoder) {
             this.nettyRequest = nettyRequest;
             this.encoder = encoder;
-            this.scheme = scheme;
         }
 
         /**
@@ -2029,20 +2030,19 @@ public class DefaultHttpClient implements
          * @param channelPool The channel pool
          * @param emitter     The emitter
          */
-        protected void writeAndClose(Channel channel, ConnectionManager.PoolHandle poolHandle, FluxSink<?> emitter) {
+        protected void writeAndClose(Channel channel, boolean isSecure, FluxSink<?> emitter) {
             final ChannelPipeline pipeline = channel.pipeline();
             if (connectionManager.httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0) {
-                final boolean isSecure = connectionManager.sslContext != null && isSecureScheme(scheme);
                 if (isSecure) {
                     nettyRequest.headers().add(AbstractNettyHttpRequest.HTTP2_SCHEME, HttpScheme.HTTPS);
                 } else {
                     nettyRequest.headers().add(AbstractNettyHttpRequest.HTTP2_SCHEME, HttpScheme.HTTP);
                 }
             }
-            processRequestWrite(channel, poolHandle, emitter, pipeline);
+            processRequestWrite(channel, emitter, pipeline);
         }
 
-        private void processRequestWrite(Channel channel, ConnectionManager.PoolHandle poolHandle, FluxSink<?> emitter, ChannelPipeline pipeline) {
+        private void processRequestWrite(Channel channel, FluxSink<?> emitter, ChannelPipeline pipeline) {
             ChannelFuture writeFuture;
             if (encoder != null && encoder.isChunked()) {
                 channel.attr(AttributeKey.valueOf(ChannelPipelineCustomizer.HANDLER_HTTP_CHUNK)).set(true);
