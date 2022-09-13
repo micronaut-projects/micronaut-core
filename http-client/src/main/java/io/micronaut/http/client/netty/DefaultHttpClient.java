@@ -29,7 +29,6 @@ import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.order.OrderUtil;
-import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
@@ -82,7 +81,6 @@ import io.micronaut.http.netty.NettyHttpRequestBuilder;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.channel.ChannelPipelineListener;
-import io.micronaut.http.netty.channel.NettyThreadFactory;
 import io.micronaut.http.netty.stream.DefaultStreamedHttpResponse;
 import io.micronaut.http.netty.stream.JsonSubscriber;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
@@ -117,7 +115,6 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.MultithreadEventLoopGroup;
-import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.pool.ChannelHealthChecker;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.TooLongFrameException;
@@ -162,8 +159,6 @@ import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Scheduler;
-import reactor.core.scheduler.Schedulers;
 
 import java.io.Closeable;
 import java.io.File;
@@ -183,9 +178,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.OptionalInt;
 import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -194,8 +187,6 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
-import static io.micronaut.http.client.HttpClientConfiguration.DEFAULT_SHUTDOWN_QUIET_PERIOD_MILLISECONDS;
-import static io.micronaut.http.client.HttpClientConfiguration.DEFAULT_SHUTDOWN_TIMEOUT_MILLISECONDS;
 import static io.micronaut.scheduling.instrument.InvocationInstrumenter.NOOP;
 
 /**
@@ -256,12 +247,9 @@ public class DefaultHttpClient implements
     protected ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory = new NettyByteBufferFactory();
 
     private final List<HttpFilterResolver.FilterEntry<HttpClientFilter>> clientFilterEntries;
-    private final Scheduler scheduler;
     private final LoadBalancer loadBalancer;
     private final HttpClientConfiguration configuration;
     private final String contextPath;
-    private final ThreadFactory threadFactory;
-    private final boolean shutdownGroup;
     private final Charset defaultCharset;
     final ConnectionManager connectionManager;
     private final Logger log;
@@ -369,17 +357,6 @@ public class DefaultHttpClient implements
         }
         this.configuration = configuration;
         SslContext sslContext = nettyClientSslBuilder.build(configuration.getSslConfiguration(), httpVersionN).orElse(null);
-        EventLoopGroup group;
-        if (eventLoopGroup != null) {
-            group = eventLoopGroup;
-            this.shutdownGroup = false;
-        } else {
-            group = createEventLoopGroup(configuration, threadFactory);
-            this.shutdownGroup = true;
-        }
-
-        this.scheduler = Schedulers.fromExecutorService(group);
-        this.threadFactory = threadFactory;
 
         Optional<Duration> readTimeout = configuration.getReadTimeout();
         Long readTimeoutMillis = readTimeout.map(duration -> !duration.isNegative() ? duration.toMillis() : null).orElse(null);
@@ -405,7 +382,20 @@ public class DefaultHttpClient implements
         this.requestBinderRegistry = requestBinderRegistry;
         this.informationalServiceId = informationalServiceId;
 
-        this.connectionManager = new ConnectionManager(log, group, configuration, httpVersionN, combineFactories(), socketChannelFactory, readTimeoutMillis, connectionTimeAliveMillis, sslContext, clientCustomizer, pipelineListeners, informationalServiceId);
+        this.connectionManager = new ConnectionManager(
+            log,
+            eventLoopGroup,
+            threadFactory,
+            configuration,
+            httpVersionN,
+            combineFactories(),
+            socketChannelFactory,
+            readTimeoutMillis,
+            connectionTimeAliveMillis,
+            sslContext,
+            clientCustomizer,
+            pipelineListeners,
+            informationalServiceId);
     }
 
     /**
@@ -466,37 +456,20 @@ public class DefaultHttpClient implements
     @Override
     public HttpClient start() {
         if (!isRunning()) {
-            connectionManager.group = createEventLoopGroup(configuration, threadFactory);
+            connectionManager.start();
         }
         return this;
     }
 
     @Override
     public boolean isRunning() {
-        return !connectionManager.group.isShutdown();
+        return connectionManager.isRunning();
     }
 
     @Override
     public HttpClient stop() {
         if (isRunning()) {
             connectionManager.shutdown();
-            if (shutdownGroup) {
-                Duration shutdownTimeout = configuration.getShutdownTimeout()
-                    .orElse(Duration.ofMillis(DEFAULT_SHUTDOWN_TIMEOUT_MILLISECONDS));
-                Duration shutdownQuietPeriod = configuration.getShutdownQuietPeriod()
-                    .orElse(Duration.ofMillis(DEFAULT_SHUTDOWN_QUIET_PERIOD_MILLISECONDS));
-
-                Future<?> future = connectionManager.group.shutdownGracefully(
-                        shutdownQuietPeriod.toMillis(),
-                        shutdownTimeout.toMillis(),
-                        TimeUnit.MILLISECONDS
-                );
-                try {
-                    future.await(shutdownTimeout.toMillis());
-                } catch (InterruptedException e) {
-                    // ignore
-                }
-            }
         }
         return this;
     }
@@ -1014,7 +987,7 @@ public class DefaultHttpClient implements
                 applyFilterToResponsePublisher(parentRequest, request, requestURI, requestWrapper, streamResponsePublisher)
         );
 
-        return streamResponsePublisher.subscribeOn(scheduler);
+        return streamResponsePublisher.subscribeOn(connectionManager.getEventLoopScheduler());
     }
 
     @Override
@@ -1214,38 +1187,6 @@ public class DefaultHttpClient implements
      */
     protected Object getLoadBalancerDiscriminator() {
         return null;
-    }
-
-    /**
-     * Creates the {@link NioEventLoopGroup} for this client.
-     *
-     * @param configuration The configuration
-     * @param threadFactory The thread factory
-     * @return The group
-     */
-    protected NioEventLoopGroup createEventLoopGroup(HttpClientConfiguration configuration, ThreadFactory threadFactory) {
-        OptionalInt numOfThreads = configuration.getNumOfThreads();
-        Optional<Class<? extends ThreadFactory>> threadFactoryType = configuration.getThreadFactory();
-        boolean hasThreads = numOfThreads.isPresent();
-        boolean hasFactory = threadFactoryType.isPresent();
-        NioEventLoopGroup group;
-        if (hasThreads && hasFactory) {
-            group = new NioEventLoopGroup(numOfThreads.getAsInt(), InstantiationUtils.instantiate(threadFactoryType.get()));
-        } else if (hasThreads) {
-            if (threadFactory != null) {
-                group = new NioEventLoopGroup(numOfThreads.getAsInt(), threadFactory);
-            } else {
-                group = new NioEventLoopGroup(numOfThreads.getAsInt());
-            }
-        } else {
-            if (threadFactory != null) {
-                group = new NioEventLoopGroup(NettyThreadFactory.DEFAULT_EVENT_LOOP_THREADS, threadFactory);
-            } else {
-
-                group = new NioEventLoopGroup();
-            }
-        }
-        return group;
     }
 
     private <I, O, R extends io.micronaut.http.HttpResponse<O>> Publisher<R> applyFilterToResponsePublisher(

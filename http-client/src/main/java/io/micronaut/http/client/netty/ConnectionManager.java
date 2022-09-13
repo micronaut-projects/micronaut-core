@@ -2,6 +2,7 @@ package io.micronaut.http.client.netty;
 
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpVersion;
@@ -10,6 +11,7 @@ import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.channel.ChannelPipelineListener;
+import io.micronaut.http.netty.channel.NettyThreadFactory;
 import io.micronaut.http.netty.stream.DefaultHttp2Content;
 import io.micronaut.http.netty.stream.Http2Content;
 import io.micronaut.http.netty.stream.HttpStreamsClientHandler;
@@ -33,6 +35,7 @@ import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.ChannelPromise;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.pool.AbstractChannelPoolHandler;
 import io.netty.channel.pool.AbstractChannelPoolMap;
 import io.netty.channel.pool.ChannelHealthChecker;
@@ -89,6 +92,8 @@ import reactor.core.CorePublisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
+import reactor.core.scheduler.Scheduler;
+import reactor.core.scheduler.Schedulers;
 
 import java.net.InetSocketAddress;
 import java.net.Proxy;
@@ -97,15 +102,21 @@ import java.time.Duration;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalInt;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
+import static io.micronaut.http.client.HttpClientConfiguration.DEFAULT_SHUTDOWN_QUIET_PERIOD_MILLISECONDS;
+import static io.micronaut.http.client.HttpClientConfiguration.DEFAULT_SHUTDOWN_TIMEOUT_MILLISECONDS;
 import static io.micronaut.http.netty.channel.ChannelPipelineCustomizer.HANDLER_HTTP2_SETTINGS;
 import static io.micronaut.http.netty.channel.ChannelPipelineCustomizer.HANDLER_IDLE_STATE;
 
 final class ConnectionManager {
     private final Logger log;
-    EventLoopGroup group;
+    private EventLoopGroup group;
+    private final boolean shutdownGroup;
+    private final ThreadFactory threadFactory;
     private final Bootstrap bootstrap;
     final ChannelPoolMap<DefaultHttpClient.RequestKey, ChannelPool> poolMap;
     private final HttpClientConfiguration configuration;
@@ -122,7 +133,8 @@ final class ConnectionManager {
 
     ConnectionManager(
         Logger log,
-        EventLoopGroup group,
+        @Nullable EventLoopGroup eventLoopGroup,
+        ThreadFactory threadFactory,
         HttpClientConfiguration configuration,
         HttpVersion httpVersion,
         InvocationInstrumenter instrumenter,
@@ -133,9 +145,10 @@ final class ConnectionManager {
         NettyClientCustomizer clientCustomizer,
         Collection<ChannelPipelineListener> pipelineListeners,
         String informationalServiceId) {
+
         this.log = log;
         this.httpVersion = httpVersion;
-        this.group = group;
+        this.threadFactory = threadFactory;
         this.sslContext = sslContext;
         this.configuration = configuration;
         this.instrumenter = instrumenter;
@@ -144,6 +157,15 @@ final class ConnectionManager {
         this.clientCustomizer = clientCustomizer;
         this.pipelineListeners = pipelineListeners;
         this.informationalServiceId = informationalServiceId;
+
+        if (eventLoopGroup != null) {
+            group = eventLoopGroup;
+            shutdownGroup = false;
+        } else {
+            group = createEventLoopGroup(configuration, threadFactory);
+            shutdownGroup = true;
+        }
+
         this.bootstrap = new Bootstrap();
         this.bootstrap.group(group)
             .channelFactory(socketChannelFactory)
@@ -213,6 +235,43 @@ final class ConnectionManager {
         }
     }
 
+    /**
+     * Creates the {@link NioEventLoopGroup} for this client.
+     *
+     * @param configuration The configuration
+     * @param threadFactory The thread factory
+     * @return The group
+     */
+    private static NioEventLoopGroup createEventLoopGroup(HttpClientConfiguration configuration, ThreadFactory threadFactory) {
+        OptionalInt numOfThreads = configuration.getNumOfThreads();
+        Optional<Class<? extends ThreadFactory>> threadFactoryType = configuration.getThreadFactory();
+        boolean hasThreads = numOfThreads.isPresent();
+        boolean hasFactory = threadFactoryType.isPresent();
+        NioEventLoopGroup group;
+        if (hasThreads && hasFactory) {
+            group = new NioEventLoopGroup(numOfThreads.getAsInt(), InstantiationUtils.instantiate(threadFactoryType.get()));
+        } else if (hasThreads) {
+            if (threadFactory != null) {
+                group = new NioEventLoopGroup(numOfThreads.getAsInt(), threadFactory);
+            } else {
+                group = new NioEventLoopGroup(numOfThreads.getAsInt());
+            }
+        } else {
+            if (threadFactory != null) {
+                group = new NioEventLoopGroup(NettyThreadFactory.DEFAULT_EVENT_LOOP_THREADS, threadFactory);
+            } else {
+
+                group = new NioEventLoopGroup();
+            }
+        }
+        return group;
+    }
+
+    public void start() {
+        group = createEventLoopGroup(configuration, threadFactory);
+        bootstrap.group(group);
+    }
+
     public void shutdown() {
         if (poolMap instanceof Iterable) {
             Iterable<Map.Entry<DefaultHttpClient.RequestKey, ChannelPool>> i = (Iterable) poolMap;
@@ -236,6 +295,31 @@ final class ConnectionManager {
                 }
             }
         }
+        if (shutdownGroup) {
+            Duration shutdownTimeout = configuration.getShutdownTimeout()
+                .orElse(Duration.ofMillis(DEFAULT_SHUTDOWN_TIMEOUT_MILLISECONDS));
+            Duration shutdownQuietPeriod = configuration.getShutdownQuietPeriod()
+                .orElse(Duration.ofMillis(DEFAULT_SHUTDOWN_QUIET_PERIOD_MILLISECONDS));
+
+            Future<?> future = group.shutdownGracefully(
+                shutdownQuietPeriod.toMillis(),
+                shutdownTimeout.toMillis(),
+                TimeUnit.MILLISECONDS
+            );
+            try {
+                future.await(shutdownTimeout.toMillis());
+            } catch (InterruptedException e) {
+                // ignore
+            }
+        }
+    }
+
+    public boolean isRunning() {
+        return !group.isShutdown();
+    }
+
+    public Scheduler getEventLoopScheduler() {
+        return Schedulers.fromExecutor(group);
     }
 
     /**
