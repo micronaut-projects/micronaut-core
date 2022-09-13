@@ -109,12 +109,9 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
-import static io.micronaut.http.client.HttpClientConfiguration.DEFAULT_SHUTDOWN_QUIET_PERIOD_MILLISECONDS;
-import static io.micronaut.http.client.HttpClientConfiguration.DEFAULT_SHUTDOWN_TIMEOUT_MILLISECONDS;
-import static io.micronaut.http.netty.channel.ChannelPipelineCustomizer.HANDLER_HTTP2_SETTINGS;
-import static io.micronaut.http.netty.channel.ChannelPipelineCustomizer.HANDLER_IDLE_STATE;
-
 final class ConnectionManager {
+    private static final AttributeKey<NettyClientCustomizer> CHANNEL_CUSTOMIZER_KEY =
+        AttributeKey.valueOf("micronaut.http.customizer");
     /**
      * Future on a pooled channel that will be completed when the channel has fully connected (e.g.
      * TLS handshake has completed). If unset, then no handshake is needed or it has already
@@ -314,9 +311,9 @@ final class ConnectionManager {
         }
         if (shutdownGroup) {
             Duration shutdownTimeout = configuration.getShutdownTimeout()
-                .orElse(Duration.ofMillis(DEFAULT_SHUTDOWN_TIMEOUT_MILLISECONDS));
+                .orElse(Duration.ofMillis(HttpClientConfiguration.DEFAULT_SHUTDOWN_TIMEOUT_MILLISECONDS));
             Duration shutdownQuietPeriod = configuration.getShutdownQuietPeriod()
-                .orElse(Duration.ofMillis(DEFAULT_SHUTDOWN_QUIET_PERIOD_MILLISECONDS));
+                .orElse(Duration.ofMillis(HttpClientConfiguration.DEFAULT_SHUTDOWN_QUIET_PERIOD_MILLISECONDS));
 
             Future<?> future = group.shutdownGracefully(
                 shutdownQuietPeriod.toMillis(),
@@ -471,7 +468,7 @@ final class ConnectionManager {
 
     @NonNull
     private CorePublisher<?> delayUntilHttp2Ready(PoolHandle poolHandle) {
-        Http2SettingsHandler settingsHandler = (Http2SettingsHandler) poolHandle.channel.pipeline().get(HANDLER_HTTP2_SETTINGS);
+        Http2SettingsHandler settingsHandler = (Http2SettingsHandler) poolHandle.channel.pipeline().get(ChannelPipelineCustomizer.HANDLER_HTTP2_SETTINGS);
         if (settingsHandler == null) {
             return Flux.empty();
         }
@@ -488,8 +485,8 @@ final class ConnectionManager {
         return empty.asMono();
     }
 
-    Mono<Channel> connectForStream(DefaultHttpClient.RequestKey requestKey, boolean isProxy, boolean acceptEvents) {
-        return Mono.<Channel>create(emitter -> {
+    Mono<PoolHandle> connectForStream(DefaultHttpClient.RequestKey requestKey, boolean isProxy, boolean acceptEvents) {
+        return Mono.<PoolHandle>create(emitter -> {
             ChannelFuture channelFuture;
             try {
                 if (httpVersion == HttpVersion.HTTP_2_0) {
@@ -497,7 +494,7 @@ final class ConnectionManager {
                     channelFuture = doConnect(requestKey, true, isProxy, acceptEvents, channelHandlerContext -> {
                         try {
                             final Channel channel = channelHandlerContext.channel();
-                            emitter.success(channel);
+                            emitter.success(mockPoolHandle(channel));
                         } catch (Exception e) {
                             emitter.error(e);
                         }
@@ -508,7 +505,7 @@ final class ConnectionManager {
                         (ChannelFutureListener) f -> {
                             if (f.isSuccess()) {
                                 Channel channel = f.channel();
-                                emitter.success(channel);
+                                emitter.success(mockPoolHandle(channel));
                             } else {
                                 Throwable cause = f.cause();
                                 emitter.error(customizeException(new HttpClientException("Connect error:" + cause.getMessage(), cause)));
@@ -522,11 +519,10 @@ final class ConnectionManager {
 
             // todo: on emitter dispose/cancel, close channel
         })
-            .delayUntil(channel -> delayUntilHttp2Ready(mockPoolHandle(channel)))
-            .map(channel -> {
-                // todo: if this is ever reused, remove this handler
-                addReadTimeoutHandler(channel.pipeline());
-                return channel;
+            .delayUntil(this::delayUntilHttp2Ready)
+            .map(poolHandle -> {
+                addReadTimeoutHandler(poolHandle.channel.pipeline());
+                return poolHandle;
             });
     }
 
@@ -645,7 +641,7 @@ final class ConnectionManager {
                     ch.config().setAutoRead(true);
                     pipeline.addLast(IdlingConnectionHandler.INSTANCE);
                     if (idleTimeout.toNanos() > 0) {
-                        pipeline.addLast(HANDLER_IDLE_STATE, new IdleStateHandler(idleTimeout.toNanos(), idleTimeout.toNanos(), 0, TimeUnit.NANOSECONDS));
+                        pipeline.addLast(ChannelPipelineCustomizer.HANDLER_IDLE_STATE, new IdleStateHandler(idleTimeout.toNanos(), idleTimeout.toNanos(), 0, TimeUnit.NANOSECONDS));
                         pipeline.addLast(IdleTimeoutHandler.INSTANCE);
                     }
                 }
@@ -663,8 +659,8 @@ final class ConnectionManager {
                 if (pipeline.context(IdlingConnectionHandler.INSTANCE) != null) {
                     pipeline.remove(IdlingConnectionHandler.INSTANCE);
                 }
-                if (pipeline.context(HANDLER_IDLE_STATE) != null) {
-                    pipeline.remove(HANDLER_IDLE_STATE);
+                if (pipeline.context(ChannelPipelineCustomizer.HANDLER_IDLE_STATE) != null) {
+                    pipeline.remove(ChannelPipelineCustomizer.HANDLER_IDLE_STATE);
                 }
                 if (pipeline.context(IdleTimeoutHandler.INSTANCE) != null) {
                     pipeline.remove(IdleTimeoutHandler.INSTANCE);
@@ -1059,7 +1055,7 @@ final class ConnectionManager {
         @Override
         protected void initChannel(SocketChannel ch) {
             channelCustomizer = clientCustomizer.specializeForChannel(ch, NettyClientCustomizer.ChannelRole.CONNECTION);
-            ch.attr(DefaultHttpClient.CHANNEL_CUSTOMIZER_KEY).set(channelCustomizer);
+            ch.attr(CHANNEL_CUSTOMIZER_KEY).set(channelCustomizer);
 
             ChannelPipeline p = ch.pipeline();
 
@@ -1124,7 +1120,7 @@ final class ConnectionManager {
                         if (readIdleTime.isPresent()) {
                             Duration duration = readIdleTime.get();
                             if (!duration.isNegative()) {
-                                p.addLast(HANDLER_IDLE_STATE, new IdleStateHandler(
+                                p.addLast(ChannelPipelineCustomizer.HANDLER_IDLE_STATE, new IdleStateHandler(
                                         duration.toMillis(),
                                         duration.toMillis(),
                                         duration.toMillis(),
@@ -1287,6 +1283,10 @@ final class ConnectionManager {
 
         public boolean canReturn() {
             return canReturn;
+        }
+
+        void notifyRequestPipelineBuilt() {
+            channel.attr(CHANNEL_CUSTOMIZER_KEY).get().onRequestPipelineBuilt();
         }
     }
 }

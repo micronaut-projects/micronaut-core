@@ -205,8 +205,6 @@ public class DefaultHttpClient implements
      * Default logger, use {@link #log} where possible.
      */
     private static final Logger DEFAULT_LOG = LoggerFactory.getLogger(DefaultHttpClient.class);
-    static final AttributeKey<NettyClientCustomizer> CHANNEL_CUSTOMIZER_KEY =
-        AttributeKey.valueOf("micronaut.http.customizer");
     private static final int DEFAULT_HTTP_PORT = 80;
     private static final int DEFAULT_HTTPS_PORT = 443;
 
@@ -1015,12 +1013,12 @@ public class DefaultHttpClient implements
         } catch (Exception e) {
             return Flux.error(e);
         }
-        return connectionManager.connectForStream(requestKey, isProxy, ConnectionManager.isAcceptEvents(request)).flatMapMany(channel -> {
-            request.setAttribute(NettyClientHttpRequest.CHANNEL, channel);
+        return connectionManager.connectForStream(requestKey, isProxy, ConnectionManager.isAcceptEvents(request)).flatMapMany(poolHandle -> {
+            request.setAttribute(NettyClientHttpRequest.CHANNEL, poolHandle.channel);
             return this.streamRequestThroughChannel(
                 parentRequest,
                 requestWrapper.get(),
-                channel,
+                poolHandle,
                 failOnError,
                 requestKey.isSecure()
             );
@@ -1484,7 +1482,7 @@ public class DefaultHttpClient implements
         Promise<HttpResponse<O>> responsePromise = channel.eventLoop().newPromise();
         channel.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_FULL_HTTP_RESPONSE,
                 new FullHttpResponseHandler<>(responsePromise, poolHandle, secure, finalRequest, bodyType, errorType));
-        channel.attr(CHANNEL_CUSTOMIZER_KEY).get().onRequestPipelineBuilt();
+        poolHandle.notifyRequestPipelineBuilt();
         Publisher<HttpResponse<O>> publisher = new NettyFuturePublisher<>(responsePromise, true);
         if (bodyType != null && bodyType.isVoid()) {
             // don't emit response if bodyType is void
@@ -1492,18 +1490,18 @@ public class DefaultHttpClient implements
         }
         publisher.subscribe(new ForwardingSubscriber<>(emitter));
 
-        requestWriter.writeAndClose(channel, secure, emitter);
+        requestWriter.write(channel, secure, emitter);
     }
 
     private Flux<MutableHttpResponse<Object>> streamRequestThroughChannel(
             io.micronaut.http.HttpRequest<?> parentRequest,
             io.micronaut.http.HttpRequest<?> request,
-            Channel channel,
+            ConnectionManager.PoolHandle poolHandle,
             boolean failOnError,
             boolean secure) {
         return Flux.<MutableHttpResponse<Object>>create(sink -> {
             try {
-                streamRequestThroughChannel0(parentRequest, request, sink, channel, secure);
+                streamRequestThroughChannel0(parentRequest, request, sink, poolHandle, secure);
             } catch (HttpPostRequestEncoder.ErrorDataEncoderException e) {
                 sink.error(e);
             }
@@ -1526,7 +1524,7 @@ public class DefaultHttpClient implements
             io.micronaut.http.HttpRequest<?> parentRequest,
             final io.micronaut.http.HttpRequest<?> finalRequest,
             FluxSink emitter,
-            Channel channel,
+            ConnectionManager.PoolHandle poolHandle,
             boolean secure) throws HttpPostRequestEncoder.ErrorDataEncoderException {
         NettyRequestWriter requestWriter = prepareRequest(
                 finalRequest,
@@ -1534,11 +1532,11 @@ public class DefaultHttpClient implements
                 emitter
         );
         HttpRequest nettyRequest = requestWriter.getNettyRequest();
-        Promise<HttpResponse<?>> responsePromise = channel.eventLoop().newPromise();
-        ChannelPipeline pipeline = channel.pipeline();
+        Promise<HttpResponse<?>> responsePromise = poolHandle.channel.eventLoop().newPromise();
+        ChannelPipeline pipeline = poolHandle.channel.pipeline();
         pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE_FULL, new StreamFullHttpResponseHandler(responsePromise, parentRequest, finalRequest));
         pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE_STREAM, new StreamStreamHttpResponseHandler(responsePromise, parentRequest, finalRequest));
-        channel.attr(CHANNEL_CUSTOMIZER_KEY).get().onRequestPipelineBuilt();
+        poolHandle.notifyRequestPipelineBuilt();
 
         if (log.isDebugEnabled()) {
             debugRequest(finalRequest.getUri(), nettyRequest);
@@ -1548,7 +1546,7 @@ public class DefaultHttpClient implements
             traceRequest(finalRequest, nettyRequest);
         }
 
-        requestWriter.writeAndClose(channel, secure, emitter);
+        requestWriter.write(poolHandle.channel, secure, emitter);
         responsePromise.addListener(future -> {
             if (future.isSuccess()) {
                 emitter.next(future.getNow());
@@ -1948,7 +1946,7 @@ public class DefaultHttpClient implements
          * @param channelPool The channel pool
          * @param emitter     The emitter
          */
-        protected void writeAndClose(Channel channel, boolean isSecure, FluxSink<?> emitter) {
+        protected void write(Channel channel, boolean isSecure, FluxSink<?> emitter) {
             final ChannelPipeline pipeline = channel.pipeline();
             if (connectionManager.httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0) {
                 if (isSecure) {
