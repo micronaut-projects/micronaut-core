@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client.netty;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.reflect.InstantiationUtils;
@@ -121,6 +122,11 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
+/**
+ * Connection manager for {@link DefaultHttpClient}. This class manages the lifecycle of netty
+ * channels (wrapped in {@link PoolHandle}s), including pooling and timeouts.
+ */
+@Internal
 final class ConnectionManager {
     private static final AttributeKey<NettyClientCustomizer> CHANNEL_CUSTOMIZER_KEY =
         AttributeKey.valueOf("micronaut.http.customizer");
@@ -295,11 +301,17 @@ final class ConnectionManager {
         return group;
     }
 
+    /**
+     * @see DefaultHttpClient#start()
+     */
     public void start() {
         group = createEventLoopGroup(configuration, threadFactory);
         bootstrap.group(group);
     }
 
+    /**
+     * @see DefaultHttpClient#stop()
+     */
     public void shutdown() {
         if (poolMap instanceof Iterable) {
             Iterable<Map.Entry<DefaultHttpClient.RequestKey, ChannelPool>> i = (Iterable) poolMap;
@@ -342,10 +354,20 @@ final class ConnectionManager {
         }
     }
 
+    /**
+     * @see DefaultHttpClient#isRunning()
+     *
+     * @return Whether this connection manager is still running and can serve requests
+     */
     public boolean isRunning() {
         return !group.isShutdown();
     }
 
+    /**
+     * Get a reactive scheduler that runs on the event loop group of this connection manager.
+     *
+     * @return A scheduler that runs on the event loop
+     */
     public Scheduler getEventLoopScheduler() {
         return Schedulers.fromExecutor(group);
     }
@@ -353,10 +375,10 @@ final class ConnectionManager {
     /**
      * Creates an initial connection to the given remote host.
      *
-     * @param requestKey
+     * @param requestKey      The request key to connect to
      * @param isStream        Is the connection a stream connection
      * @param isProxy         Is this a streaming proxy
-     * @param acceptsEvents
+     * @param acceptsEvents   Whether the connection will accept events
      * @param contextConsumer The logic to run once the channel is configured correctly
      * @return A ChannelFuture
      * @throws HttpClientException If the URI is invalid
@@ -415,6 +437,14 @@ final class ConnectionManager {
         return new PoolHandle(null, channel);
     }
 
+    /**
+     * Get a connection for exchange-like (non-streaming) http client methods.
+     *
+     * @param requestKey The remote to connect to
+     * @param multipart Whether the request should be multipart
+     * @param acceptEvents Whether the response may be an event stream
+     * @return A mono that will complete once the channel is ready for transmission
+     */
     Mono<PoolHandle> connectForExchange(DefaultHttpClient.RequestKey requestKey, boolean multipart, boolean acceptEvents) {
         return Mono.<PoolHandle>create(emitter -> {
             if (poolMap != null && !multipart) {
@@ -478,6 +508,14 @@ final class ConnectionManager {
         return empty.asMono();
     }
 
+    /**
+     * Get a connection for streaming http client methods.
+     *
+     * @param requestKey The remote to connect to
+     * @param isProxy Whether the request is for a {@link io.micronaut.http.client.ProxyHttpClient} call
+     * @param acceptEvents Whether the response may be an event stream
+     * @return A mono that will complete once the channel is ready for transmission
+     */
     Mono<PoolHandle> connectForStream(DefaultHttpClient.RequestKey requestKey, boolean isProxy, boolean acceptEvents) {
         return Mono.<PoolHandle>create(emitter -> {
             ChannelFuture channelFuture;
@@ -519,6 +557,14 @@ final class ConnectionManager {
             });
     }
 
+    /**
+     * Connect to a remote websocket. The given {@link ChannelHandler} is added to the pipeline
+     * when the handshakes complete.
+     *
+     * @param requestKey The remote to connect to
+     * @param handler The websocket message handler
+     * @return A mono that will complete when the handshakes complete
+     */
     Mono<?> connectForWebsocket(DefaultHttpClient.RequestKey requestKey, ChannelHandler handler) {
         Sinks.Empty<Object> initial = Sinks.empty();
 
@@ -986,7 +1032,7 @@ final class ConnectionManager {
     /**
      * Initializes the HTTP client channel.
      */
-    protected class HttpClientInitializer extends ChannelInitializer<SocketChannel> {
+    private class HttpClientInitializer extends ChannelInitializer<SocketChannel> {
 
         final SslContext sslContext;
         final String host;
@@ -1232,10 +1278,16 @@ final class ConnectionManager {
             this.canReturn = channelPool != null;
         }
 
+        /**
+         * Prevent this connection from being reused.
+         */
         void taint() {
             canReturn = false;
         }
 
+        /**
+         * Close this connection or release it back to the pool.
+         */
         void release() {
             if (channelPool != null) {
                 removeReadTimeoutHandler(channel.pipeline());
@@ -1252,10 +1304,19 @@ final class ConnectionManager {
             }
         }
 
+        /**
+         * Whether this connection may be returned to a connection pool (i.e. should be kept
+         * keepalive).
+         *
+         * @return Whether this connection may be reused
+         */
         public boolean canReturn() {
             return canReturn;
         }
 
+        /**
+         * Notify any {@link NettyClientCustomizer} that the request pipeline has been built.
+         */
         void notifyRequestPipelineBuilt() {
             channel.attr(CHANNEL_CUSTOMIZER_KEY).get().onRequestPipelineBuilt();
         }
