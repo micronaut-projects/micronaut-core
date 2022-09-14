@@ -72,6 +72,7 @@ managed-micronaut-azure = "3.4.0"
 managed-micronaut-cache = "3.5.0"
 managed-micronaut-cassandra = "5.1.1"
 managed-micronaut-coherence = "3.5.1"
+managed-micronaut-crac = "1.0.0"
 managed-micronaut-data = "3.7.3"
 managed-micronaut-discovery = "3.2.0"
 managed-micronaut-elasticsearch = "4.3.0"
@@ -149,6 +150,7 @@ boms-micronaut-aws = { module = "io.micronaut.aws:micronaut-aws-bom", version.re
 boms-micronaut-azure = { module = "io.micronaut.azure:micronaut-azure-bom", version.ref = "managed-micronaut-azure" }
 boms-micronaut-cache = { module = "io.micronaut.cache:micronaut-cache-bom", version.ref = "managed-micronaut-cache" }
 boms-micronaut-coherence = { module = "io.micronaut.coherence:micronaut-coherence-bom", version.ref = "managed-micronaut-coherence" }
+boms-micronaut-crac = { module = "io.micronaut.crac:micronaut-crac-bom", version.ref = "managed-micronaut-crac" }
 boms-micronaut-email = { module = "io.micronaut.email:micronaut-email-bom", version.ref = "managed-micronaut-email" }
 boms-micronaut-data = { module = "io.micronaut.data:micronaut-data-bom", version.ref = "managed-micronaut-data" }
 boms-micronaut-gcp = { module = "io.micronaut.gcp:micronaut-gcp-bom", version.ref = "managed-micronaut-gcp" }
