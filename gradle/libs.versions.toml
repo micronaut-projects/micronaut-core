@@ -5,7 +5,7 @@ bcpkix = "1.70"
 blaze = "1.6.7"
 caffeine = "2.9.3"
 compile-testing = "0.19"
-geb = "3.4.1"
+#geb = "3.4.1"
 hibernate = "5.5.9.Final"
 hibernate-validator = "6.1.6.Final"
 htmlSanityCheck = "1.1.6"
@@ -363,7 +363,7 @@ caffeine = { module = "com.github.ben-manes.caffeine:caffeine", version.ref = "c
 
 compile-testing = { module = "com.google.testing.compile:compile-testing", version.ref = "compile-testing" }
 
-geb-spock = { module = "org.gebish:geb-spock", version.ref = "geb" }
+#geb-spock = { module = "org.gebish:geb-spock", version.ref = "geb" }
 
 groovy-test-junit5 = { module = "org.apache.groovy:groovy-test-junit5", version.ref = "managed-groovy" }
 
