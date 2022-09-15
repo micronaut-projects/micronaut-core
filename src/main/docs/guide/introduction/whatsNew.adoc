@@ -240,7 +240,7 @@ It is now possible to configure the default Netty buffer allocator. See the http
 
 === Improved Flexibility in Class Style
 
-Many features of the Micronaut framework rely on the convention of getters and setters. Due to things like records and builders, the method names we look for are now configurable with the ann:core.annotation.AccessorStyle[] annotation. For example, the annotation can be placed on ann:context.annotation.ConfigurationProperties[] beans to allow for binding configuration to methods that do not begin with `set`. It can also be used with classes annotated with ann:core.annotation.Introspected[].
+Many features of the Micronaut framework rely on the convention of getters and setters. Due to things like records and builders, the method names we look for are now configurable with the ann:core.annotation.AccessorsStyle[] annotation. For example, the annotation can be placed on ann:context.annotation.ConfigurationProperties[] beans to allow for binding configuration to methods that do not begin with `set`. It can also be used with classes annotated with ann:core.annotation.Introspected[].
 
 === Access Log Exclusions
 

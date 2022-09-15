@@ -259,6 +259,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     }
 
     @Override
+    @NonNull
     public synchronized NettyEmbeddedServer start() {
         if (!isRunning()) {
             if (isDefault && !applicationContext.isRunning()) {
@@ -317,10 +318,22 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     }
 
     @Override
+    @NonNull
     public synchronized NettyEmbeddedServer stop() {
+        return stop(true);
+    }
+
+    @Override
+    @NonNull
+    public NettyEmbeddedServer stopServerOnly() {
+        return stop(false);
+    }
+
+    @NonNull
+    private NettyEmbeddedServer stop(boolean stopApplicationContext) {
         if (isRunning() && workerGroup != null) {
             if (running.compareAndSet(true, false)) {
-                stopInternal();
+                stopInternal(stopApplicationContext);
             }
         }
         return this;
@@ -524,7 +537,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                     LOG.error("Error starting Micronaut server: " + e.getMessage(), e);
                 }
             }
-            stopInternal();
+            stopInternal(true);
             throw new ServerStartupException("Unable to start Micronaut server on " + displayAddress(cfg), e);
         }
     }
@@ -584,7 +597,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         }
     }
 
-    private void stopInternal() {
+    private void stopInternal(boolean stopApplicationContext) {
         try {
             if (shutdownParent) {
                 EventLoopGroupConfiguration parent = serverConfiguration.getParent();
@@ -608,7 +621,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 applicationContext.getEventPublisher(ServiceStoppedEvent.class)
                         .publishEvent(new ServiceStoppedEvent(serviceInstance));
             }
-            if (isDefault && applicationContext.isRunning()) {
+            if (isDefault && applicationContext.isRunning() && stopApplicationContext) {
                 applicationContext.stop();
             }
             serverConfiguration.getMultipart().getLocation().ifPresent(dir -> DiskFileUpload.baseDirectory = null);
