@@ -234,9 +234,9 @@ class HttpResponseSpec extends AbstractMicronautSpec {
 
     void "test keep alive connection header is not set by default for > 499 response"() {
         when:
-        EmbeddedServer server = applicationContext.run(EmbeddedServer, [(SPEC_NAME_PROPERTY):getClass().simpleName])
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['micronaut.server.dateHeader': false, (SPEC_NAME_PROPERTY):getClass().simpleName])
         ApplicationContext ctx = server.getApplicationContext()
-        HttpClient client = applicationContext.createBean(HttpClient, embeddedServer.getURL())
+        HttpClient client = ctx.createBean(HttpClient, server.getURL())
 
         Flux.from(client.exchange(
           HttpRequest.GET('/test-header/fail')
@@ -256,14 +256,16 @@ class HttpResponseSpec extends AbstractMicronautSpec {
     void "test connection header is defaulted to keep-alive when configured to true for > 499 response"() {
         when:
         DefaultHttpClientConfiguration config = new DefaultHttpClientConfiguration()
+
         // The client will explicitly request "Connection: close" unless using a connection pool, so set it up
         config.connectionPoolConfiguration.enabled = true
-        EmbeddedServer server = applicationContext.run(EmbeddedServer, [
+
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
           (SPEC_NAME_PROPERTY):getClass().simpleName,
           'micronaut.server.netty.keepAliveOnServerError':true
         ])
         def ctx = server.getApplicationContext()
-        HttpClient client = applicationContext.createBean(HttpClient, embeddedServer.getURL(), config)
+        HttpClient client = ctx.createBean(HttpClient, embeddedServer.getURL(), config)
 
         Flux.from(client.exchange(
           HttpRequest.GET('/test-header/fail')
