@@ -79,6 +79,11 @@ import jakarta.inject.Singleton
 class Config
 {
     Boolean boolProperty
+
+    // TODO: Why do we need this?  Groovy bug?
+    Boolean isBoolProperty() {
+        return boolProperty
+    }
 }
 
 @Singleton
@@ -111,6 +116,11 @@ import jakarta.inject.Singleton
 class Config
 {
     Boolean boolProperty
+
+    // TODO: Why do we need this?  Groovy bug?
+    Boolean isBoolProperty() {
+        return boolProperty
+    }
 }
 
 @Singleton
@@ -143,11 +153,11 @@ import jakarta.inject.Singleton
 @ConfigurationProperties("config.properties")
 class Config {
     private String property
-    
+
     public String getProperty() {
         return property;
     }
-    
+
     public void setProperty(String property) {
         this.property = property;
     }
@@ -561,7 +571,7 @@ class Config
 {
     Integer intProperty
     String stringProperty
-    
+
     @ConfigurationProperties("inner")
     static class InnerConfig {
         String innerProperty = "default value"
@@ -615,7 +625,7 @@ interface Configuration extends Toggleable {}
 class ConfigurationImpl implements Configuration
 {
     boolean enabled = false;
-    
+
     @Override
     boolean isEnabled() {
         return enabled;
