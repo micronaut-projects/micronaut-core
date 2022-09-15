@@ -66,6 +66,7 @@ public final class JsonNodeTreeCodec {
      *
      * @param p The stream to parse.
      * @return The parsed json node.
+     * @throws IOException IOException
      */
     public JsonNode readTree(JsonParser p) throws IOException {
         switch (p.hasCurrentToken() ? p.currentToken() : p.nextToken()) {
@@ -120,6 +121,7 @@ public final class JsonNodeTreeCodec {
      *
      * @param generator The output json stream.
      * @param tree      The node to write.
+     * @throws IOException IOException
      */
     public void writeTree(JsonGenerator generator, JsonNode tree) throws IOException {
         if (tree.isObject()) {

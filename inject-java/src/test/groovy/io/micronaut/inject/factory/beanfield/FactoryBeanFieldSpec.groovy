@@ -121,7 +121,7 @@ class MyBean {
     MyBean(@Named $primitiveType[] totals) {
         this.totals = totals;
     }
-    
+
     @Inject
     void setTotals(@Named $primitiveType[] totals) {
         this.totalsFromMethod = totals;
@@ -172,7 +172,7 @@ class MyBean {
     MyBean(@Named $primitiveType[][] totals) {
         this.totals = totals;
     }
-    
+
     @Inject
     void setTotals(@Named $primitiveType[][] totals) {
         this.totalsFromMethod = totals;
@@ -223,7 +223,7 @@ class MyBean {
     MyBean(@Named $primitiveType total) {
         this.total = total;
     }
-    
+
     @Inject
     void setTotal(@Named $primitiveType total) {
         this.totalFromMethod = total;
@@ -265,21 +265,21 @@ class TestFactory$TestField {
     @Bean
     @io.micronaut.context.annotation.Primary
     Foo one = new Foo("one");
-    
+
     // final fields are implicitly singleton
     @Bean
     @Named("two")
     final Foo two = new Foo("two");
-    
+
     // non-final fields are prototype
     @Bean
     @Named("three")
     Foo three = new Foo("three");
-    
+
     @SomeMeta
     @Bean
     Foo four = new Foo("four");
-    
+
     @Bean
     @Mutating
     Bar bar = new Bar();
@@ -316,14 +316,14 @@ class Foo {
 class TestConstructInterceptor implements ConstructorInterceptor<Object> {
     boolean invoked = false;
     Object[] parameters;
-    
+
     @Override
     public Object intercept(ConstructorInvocationContext<Object> context) {
         invoked = true;
         parameters = context.getParameterValues();
         return context.proceed();
     }
-} 
+}
 
 @InterceptorBean(Mutating.class)
 class TestInterceptor implements MethodInterceptor<Object, Object> {
@@ -381,7 +381,7 @@ class Test {}
         e.message.contains(modifier)
 
         where:
-        modifier << ['private', 'protected', 'static']
+        modifier << ['private', 'protected']
     }
 
     void "if a factory field bean defines Bean and Prototype scopes and the original bean type scope is Singleton BeanDefinition getScope returns Prototype and BeanDefinition getAnnotationNamesByStereotype for javax.inject.Scope returns Prototype The original qualifier is not present if the factory field bean does not define a Qualifier"() {
@@ -803,7 +803,7 @@ class TestFactory$TestField {
     @Xyz
     @Prototype
     Bar7 bar7 = new Bar7();
-    
+
     @Bean
     @Xyz
     @Prototype
@@ -857,5 +857,101 @@ class Bar8 {
 
         cleanup:
         context.close()
+    }
+
+
+    void "test preDestroy continues if an exception is thrown in the disposal method"() {
+        given:
+        ApplicationContext context = buildContext('test.Implementation2', '''\
+package test;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import java.lang.annotation.Documented;
+import java.lang.annotation.Retention;import java.util.concurrent.atomic.AtomicInteger;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.aop.*;
+import io.micronaut.context.annotation.*;
+import jakarta.inject.Singleton;
+
+@Factory
+class FactoryClass {
+
+   @Bean(preDestroy = "close")
+   @Singleton
+   Interface build() {
+       return new Implementation1();
+   }
+
+    @Bean(preDestroy="close")
+    @Singleton
+    Test testBean() {
+        return new Test();
+    }
+}
+
+class Test {
+    public static AtomicInteger closed = new AtomicInteger(0);
+
+    public void close() {
+        closed.incrementAndGet();
+        throw new RuntimeException("Test");
+    }
+}
+
+interface Interface {
+    void close();
+}
+
+interface SubInterface extends Interface {
+}
+
+class Implementation1 implements SubInterface {
+    public static AtomicInteger closed = new AtomicInteger(0);
+
+    @Override
+    public void close() {
+        closed.incrementAndGet();
+        throw new RuntimeException("Implementation 1");
+    }
+}
+
+@Singleton
+public class Implementation2 implements Interface {
+    public static AtomicInteger closed = new AtomicInteger(0);
+
+    @Override
+    public void close() {
+        closed.incrementAndGet();
+        throw new RuntimeException("Implementation 2");
+    }
+}
+''')
+        when:
+        def implementation = getBean(context, 'test.Interface')
+        def test = getBean(context, 'test.Test')
+
+        def implementation2Class = context.classLoader.loadClass('test.Implementation2')
+
+        then:
+        implementation.class.simpleName == "Implementation1"
+        implementation.closed.intValue() == 0
+
+        and:
+        implementation2Class.getDeclaredField('closed').get(null).intValue() == 0
+
+        and:
+        test.class.simpleName == "Test"
+        test.closed.intValue() == 0
+
+        when:
+        try { context.close() } catch(e) { println "Caught $e.message" }
+
+        then: 'the non-factory bean wasnt closed'
+        implementation2Class.getDeclaredField('closed').get(null).intValue() == 0
+
+        and: 'the factory beans were all closed'
+        implementation.closed.intValue() == 1
+        test.closed.intValue() == 1
     }
 }

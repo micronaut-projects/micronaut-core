@@ -8,7 +8,7 @@ The following example demonstrates how to define a <<factories, Factory Bean>> t
 snippet::io.micronaut.docs.http.server.secondary.SecondaryNettyServer[tags="imports,class", indent=0, title="Programmatically creating Secondary servers"]
 
 <1> Define a unique name for the server
-<2> Define a ann:annotation.annotation.Context[] scoped bean using the server name and including `preDestroy="close"` to ensure the server is shutdown when the context is closed
+<2> Define a ann:context.annotation.Context[] scoped bean using the server name and including `preDestroy="close"` to ensure the server is shutdown when the context is closed
 <3> Inject the api:http.server.netty.NettyEmbeddedServerFactory[] into a <<factories, Factory Bean>>
 <4> Programmatically create the api:http.server.netty.configuration.NettyHttpServerConfiguration[]
 <5> Optionally create the api:http.ssl.ServerSslConfiguration[]

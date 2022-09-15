@@ -275,6 +275,20 @@ public class JavaElementFactory implements ElementFactory<Element, TypeElement, 
 
     @NonNull
     @Override
+    public JavaEnumConstantElement newEnumConstantElement(ClassElement declaringClass, @NonNull VariableElement enumConstant, @NonNull AnnotationMetadata annotationMetadata) {
+        if (!(declaringClass instanceof JavaEnumElement)) {
+            throw new IllegalArgumentException("Declaring class must be a JavaEnumElement");
+        }
+        return new JavaEnumConstantElement(
+                (JavaEnumElement) declaringClass,
+                enumConstant,
+                annotationMetadata,
+                visitorContext
+        );
+    }
+
+    @NonNull
+    @Override
     public JavaFieldElement newFieldElement(ClassElement declaringClass, @NonNull VariableElement field, @NonNull AnnotationMetadata annotationMetadata) {
         return new JavaFieldElement(
                 (JavaClassElement) declaringClass,

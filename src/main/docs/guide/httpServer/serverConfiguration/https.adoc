@@ -45,7 +45,7 @@ Now modify your configuration:
 micronaut:
   ssl:
     enabled: true
-    keyStore:
+    key-store:
       path: classpath:server.p12 # <1>
       password: mypassword # <2>
       type: PKCS12
@@ -100,7 +100,7 @@ Now modify your configuration:
 micronaut:
   ssl:
     enabled: true
-    keyStore:
+    key-store:
       path: classpath:server.keystore
       password: newPassword
       type: JKS

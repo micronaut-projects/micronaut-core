@@ -202,7 +202,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * <p>For example consider the following annotation definition:</p>
      *
      * <pre class="code">
-     * &#064;PropertySource({ @Property(name="one",value="1"), @Property(name="two", value="2")})
+     * &#064;PropertySource({ @Property(name = "one", value = "1"), @Property(name = "two", value = "2")})
      * public class MyBean {
      *        ...
      * }</pre>

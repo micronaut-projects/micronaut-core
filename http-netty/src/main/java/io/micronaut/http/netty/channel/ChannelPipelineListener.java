@@ -23,7 +23,9 @@ import io.netty.channel.ChannelPipeline;
  *
  * @author graemerocher
  * @since 2.0.0
+ * @deprecated Use NettyClientCustomizer or NettyServerCustomizer instead.
  */
+@Deprecated
 @FunctionalInterface
 public interface ChannelPipelineListener {
 

@@ -15,6 +15,8 @@
  */
 package io.micronaut.inject;
 
+import io.micronaut.core.annotation.Internal;
+
 /**
  * An interface for a {@link ExecutableMethod} that is associated with a {@link BeanDefinitionReference}.
  *
@@ -23,6 +25,7 @@ package io.micronaut.inject;
  * @author graemerocher
  * @since 1.0
  */
+@Internal
 public interface BeanDefinitionMethodReference<T, R> extends ExecutableMethod<T, R> {
 
     /**

@@ -89,7 +89,7 @@ public class IOUtils {
                     // try to match FileSystems.newFileSystem(URI) semantics for zipfs here.
                     // Basically ignores anything after the !/ if it exists, and uses the part
                     // before as the jar path to extract.
-                    String jarUri = uri.getSchemeSpecificPart();
+                    String jarUri = uri.getRawSchemeSpecificPart();
                     int sep = jarUri.lastIndexOf("!/");
                     if (sep != -1) {
                         jarUri = jarUri.substring(0, sep);
@@ -136,6 +136,11 @@ public class IOUtils {
             return Paths.get(URI.create(jarUri));
         }
         Path jarPath = loadNestedJarUri(toClose, jarUri.substring(0, sep));
+        if (Files.isDirectory(jarPath)) {
+            // spring boot creates weird jar URLs, like 'jar:file:/xyz.jar!/BOOT-INF/classes!/abc'
+            // This check makes our class loading resilient to that
+            return jarPath;
+        }
         FileSystem zipfs;
         try {
             // can't use newFileSystem(Path) here (without CL) because it doesn't exist on java 8

@@ -396,7 +396,7 @@ public interface ClassElement extends TypedElement {
      * {@code null} has special meaning here. Returning {@code null} from a fold operation will try to make the
      * surrounding type a raw type. For example, for {@code Map<String, Object>}, returning {@code null} for the fold
      * on {@code Object} will lead to the parameterized {@code Map<String, null>} type being replaced by {@code Map}.
-     * <p>
+     * </p>
      *
      * <p>This also means that this method may return {@code null} if the top-level fold operation returned {@code null}.</p>
      *

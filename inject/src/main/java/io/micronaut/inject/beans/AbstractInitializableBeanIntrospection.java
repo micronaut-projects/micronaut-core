@@ -163,7 +163,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements BeanI
 
     /**
      * Get all the bean properties annotated for the given type.
-     * Nullable result method version of {@see getIndexedProperty}.
+     * Nullable result method version of {@link #getIndexedProperty(Class, String)}.
      *
      * @param annotationType  The annotation type
      * @param annotationValue The annotation value

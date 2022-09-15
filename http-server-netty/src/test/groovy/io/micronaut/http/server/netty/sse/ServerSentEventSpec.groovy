@@ -85,7 +85,7 @@ class ServerSentEventSpec extends Specification {
         then:
         def ex = thrown(HttpClientResponseException)
         ex.status == HttpStatus.INTERNAL_SERVER_ERROR
-        ex.message == "Internal Server Error"
+        ex.message == "Client '/sse': Internal Server Error"
     }
 
     @Client('/sse')

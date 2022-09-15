@@ -223,7 +223,9 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
 
     /**
      * @return The read timeout setting for the server
+     * @deprecated This setting does nothing
      */
+    @Deprecated
     public Optional<Integer> getReadTimeout() {
         return Optional.ofNullable(readTimeout);
     }
@@ -367,7 +369,9 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
      * Sets the default read timeout.
      *
      * @param readTimeout The read timeout
+     * @deprecated This setting does nothing
      */
+    @Deprecated
     public void setReadTimeout(Integer readTimeout) {
         this.readTimeout = readTimeout;
     }
@@ -382,7 +386,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     }
 
     /**
-     * Sets the maximum request size. Default value ({@value #DEFAULT_MAX_REQUEST_SIZE} => // 10MB)
+     * Sets the maximum request size. Default value ({@value #DEFAULT_MAX_REQUEST_SIZE} =&gt; // 10MB)
      *
      * @param maxRequestSize The max request size
      */
@@ -608,7 +612,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
         }
 
         /**
-         * Sets the max file size. Default value ({@value #DEFAULT_MAX_FILE_SIZE} => 1MB).
+         * Sets the max file size. Default value ({@value #DEFAULT_MAX_FILE_SIZE} =&gt; 1MB).
          * @param maxFileSize The max file size
          */
         public void setMaxFileSize(@ReadableBytes long maxFileSize) {
@@ -787,7 +791,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
 
         /**
          * @param portInHost True if the host header supports a port
-         *                   appended with {@code :}. Default value ({@value #DEFAULT_PORT_IN_HOST}).
+         *                   appended with {@code :}. Default value ({@link #DEFAULT_PORT_IN_HOST}).
          */
         public void setPortInHost(boolean portInHost) {
             this.portInHost = portInHost;

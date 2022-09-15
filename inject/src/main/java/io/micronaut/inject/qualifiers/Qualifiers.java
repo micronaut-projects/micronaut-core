@@ -153,8 +153,8 @@ public class Qualifiers {
      * circumstances:</p>
      *
      * <ul>
-     * <li>If the <tt>type</tt> parameter is {@link Named} then the value of the {@link Named} annotation within the metadata is used to match the candidate by name</li>
-     * <li>If the <tt>type</tt> parameter is {@link Type} then the value of the {@link Type} annotation is used to match the candidate by type</li>
+     * <li>If the {@code type} parameter is {@link Named} then the value of the {@link Named} annotation within the metadata is used to match the candidate by name</li>
+     * <li>If the {@code type} parameter is {@link Type} then the value of the {@link Type} annotation is used to match the candidate by type</li>
      * </ul>
      *
      * @param metadata The metadata

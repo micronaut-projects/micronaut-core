@@ -25,7 +25,7 @@ import java.util.List;
 class Bean {
     List<Foo> foos;
 
-    public Bean(@Type({One.class,Two.class}) Foo[] foos) {
+    public Bean(@Type({One.class, Two.class}) Foo[] foos) {
         this.foos = Arrays.asList(foos);
     }
 

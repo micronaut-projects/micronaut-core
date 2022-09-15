@@ -7,6 +7,62 @@ import io.micronaut.core.annotation.AnnotationUtil
 
 class FactoryBeanMethodSpec extends AbstractTypeElementSpec {
 
+    void "test a factory bean with static method or field"() {
+        given:
+        ApplicationContext context = buildContext('test.TestFactory', '''\
+package test;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import java.lang.annotation.Documented;
+import java.lang.annotation.Retention;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.aop.*;
+import io.micronaut.context.annotation.*;
+import jakarta.inject.*;
+import jakarta.inject.Singleton;
+
+@Factory
+class TestFactory {
+
+    @Bean
+    @Prototype
+    static Bar1 bar() {
+        return new Bar1();
+    }
+
+    @Bean
+    @Prototype
+    static Bar2 bar = new Bar2();
+}
+
+class Bar1 {
+}
+
+class Bar2 {
+}
+
+
+''')
+
+        when:
+        def bar1BeanDefinition = context.getBeanDefinitions(context.classLoader.loadClass('test.Bar1'))
+                .find {it.getDeclaringType().get().simpleName.contains("TestFactory")}
+
+                .find {it.getDeclaringType().get().simpleName.contains("TestFactory")}
+
+        def bar1 = getBean(context, 'test.Bar1')
+        def bar2 = getBean(context, 'test.Bar2')
+
+        then:
+        bar1 != null
+        bar2 != null
+        bar1BeanDefinition.getScope().get() == Prototype.class
+
+        cleanup:
+        context.close()
+    }
+
     void "test a factory method bean with existing scope and qualifier"() {
         given:
             ApplicationContext context = buildContext('test.TestFactory$TestMethod', '''\
@@ -31,50 +87,50 @@ class TestFactory$TestMethod {
     Bar1 bar() {
         return new Bar1();
     }
-    
+
     @Bean
     @Singleton
     Bar2 bar2() {
         return new Bar2();
     }
-    
+
     @Bean
     @Xyz
     Bar3 bar3() {
-        return new Bar3();    
+        return new Bar3();
     }
-    
+
     @Bean
     Bar4 bar4() {
-        return new Bar4();    
+        return new Bar4();
     }
-    
+
     @Bean
     @Xyz
     Bar5 bar5() {
-        return new Bar5();    
+        return new Bar5();
     }
-    
+
     @Bean
     @Xyz
     @Prototype
     Bar6 bar6() {
-        return new Bar6();    
+        return new Bar6();
     }
-    
+
     @io.micronaut.inject.factory.RemappedAnnotation
     @Bean
     @Xyz
     @Prototype
     Bar7 bar7() {
-        return new Bar7();    
+        return new Bar7();
     }
-    
+
     @Bean
     @Xyz
     @Prototype
     Bar8 bar8() {
-        return new Bar8();    
+        return new Bar8();
     }
 }
 

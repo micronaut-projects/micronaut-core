@@ -104,7 +104,7 @@ class ServerErrorSpec extends Specification {
 
         then:
         response.body.isPresent()
-        response.body.get() == "Internal Server Error"
+        response.body.get() == "Client '/server-errors': Internal Server Error"
     }
 
     @Requires(property = 'spec.name', value = 'ServerErrorSpec')
