@@ -128,11 +128,11 @@ Some parameters are recognized by their type instead of their annotation. The fo
 |Adds multiple headers to the request
 |`HttpHeaders headers`
 
-|api:http.Cookies[]
+|api:http.cookie.Cookies[]
 |Adds multiple cookies to the request
 |`Cookies cookies`
 
-|api:http.Cookie[]
+|api:http.cookie.Cookie[]
 |Adds a cookie to the request
 |`Cookie cookie`
 

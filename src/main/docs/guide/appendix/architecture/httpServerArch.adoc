@@ -38,7 +38,7 @@ The api:http.server.netty.NettyHttpServer[] reads the <<serverConfiguration, Ser
 
 * api:http.server.netty.configuration.NettyHttpServerConfiguration[] - An extended version of api:http.server.HttpServerConfiguration[] which defines Netty-specific configuration options beyond the host, port etc.
 * api:http.netty.channel.EventLoopGroupConfiguration[] - configures one or more Netty https://netty.io/4.1/api/io/netty/channel/EventLoopGroup.html[EventLoopGroup] that can be configured to be either unique to the server or shared with one or more HTTP clients.
-* api:http.ssl.ServerSslConfiguration[] - Provides configuration for the api:http.server.netty.ssl.ServerSslBuilder[] for to configure the Netty https://netty.io/4.1/api/io/netty/handler/ssl/SslContext.html[SslContext] to use for HTTPS. 
+* api:http.ssl.ServerSslConfiguration[] - Provides configuration for the api:http.server.netty.ssl.ServerSslBuilder[] for to configure the Netty https://netty.io/4.1/api/io/netty/handler/ssl/SslContext.html[SslContext] to use for HTTPS.
 
 === Server Configuration Security Considerations
 
@@ -65,7 +65,7 @@ A `NettyHttpServerInitializer` class is used to initialize the https://netty.io/
 
 === ChannelPipeline Security Considerations
 
-The `ChannelPipeline` can be customized by the user by implementing a bean that implements the api:http.netty.ChannelPipelineCustomizer[] interface and adding a new Netty https://netty.io/4.1/api/io/netty/channel/ChannelHandler.html[ChannelHandler] to the pipeline.
+The `ChannelPipeline` can be customized by the user by implementing a bean that implements the api:http.netty.channel.ChannelPipelineCustomizer[] interface and adding a new Netty https://netty.io/4.1/api/io/netty/channel/ChannelHandler.html[ChannelHandler] to the pipeline.
 
 Adding a `ChannelHandler` allows performing tasks such as wire-level logging of incoming and outgoing data packets and may be used when wire-level security requirements are required such as validating the bytes of the incoming request body or outgoing response body.
 
@@ -84,9 +84,9 @@ An incoming request is received by Netty and a `ChannelPipeline` initialized by 
 The `NettyHttpRequest` is passed through the chain of Netty https://netty.io/4.1/api/io/netty/channel/ChannelHandler.html[ChannelHandler] instances until it arrives at `RoutingInBoundHandler` which uses the aforementioned api:web.router.Router[] to match the request a method of an annotated ann:http.annotation.Controller[] type.
 
 
-The `RoutingInBoundHandler` delegates to api:http.server.RouteExecutor[] for actual execution of the route, which deals with all the logic to dispatch to a method of an annotated ann:http.annotation.Controller[] type. 
+The `RoutingInBoundHandler` delegates to api:http.server.RouteExecutor[] for actual execution of the route, which deals with all the logic to dispatch to a method of an annotated ann:http.annotation.Controller[] type.
 
-Once executed, if the return value is not `null` an appropriate api:http.codec.MediaTypeCodec[] is looked up from the api:http.codec.MediaTypeCodecRegistry[] for the response https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Type[Content-Type] (defaulting to `application/json`). The `MediaTypeCodec` is used to encode the return value into a `byte[]` and include it as the body of the resulting api:http.HttpResponse[].  
+Once executed, if the return value is not `null` an appropriate api:http.codec.MediaTypeCodec[] is looked up from the api:http.codec.MediaTypeCodecRegistry[] for the response https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Type[Content-Type] (defaulting to `application/json`). The `MediaTypeCodec` is used to encode the return value into a `byte[]` and include it as the body of the resulting api:http.HttpResponse[].
 
 The following diagram illustrates this flow for an incoming request:
 
