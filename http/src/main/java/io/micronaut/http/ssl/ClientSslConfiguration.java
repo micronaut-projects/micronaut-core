@@ -104,6 +104,7 @@ public class ClientSslConfiguration extends AbstractClientSslConfiguration {
      */
     @SuppressWarnings("WeakerAccess")
     @ConfigurationProperties(KeyConfiguration.PREFIX)
+    @BootstrapContextCompatible
     @Requires(property = ClientSslConfiguration.PREFIX + "." + KeyConfiguration.PREFIX)
     public static class DefaultKeyConfiguration extends KeyConfiguration {
     }
@@ -113,6 +114,7 @@ public class ClientSslConfiguration extends AbstractClientSslConfiguration {
      */
     @SuppressWarnings("WeakerAccess")
     @ConfigurationProperties(KeyStoreConfiguration.PREFIX)
+    @BootstrapContextCompatible
     @Requires(property = ClientSslConfiguration.PREFIX + "." + KeyStoreConfiguration.PREFIX)
     public static class DefaultKeyStoreConfiguration extends KeyStoreConfiguration {
     }
@@ -122,6 +124,7 @@ public class ClientSslConfiguration extends AbstractClientSslConfiguration {
      */
     @SuppressWarnings("WeakerAccess")
     @ConfigurationProperties(TrustStoreConfiguration.PREFIX)
+    @BootstrapContextCompatible
     @Requires(property = ClientSslConfiguration.PREFIX + "." + TrustStoreConfiguration.PREFIX)
     public static class DefaultTrustStoreConfiguration extends TrustStoreConfiguration {
     }
