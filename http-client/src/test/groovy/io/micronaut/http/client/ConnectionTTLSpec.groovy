@@ -1,4 +1,4 @@
-package io.micronaut.http.client;
+package io.micronaut.http.client
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
@@ -9,7 +9,6 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.runtime.server.EmbeddedServer
 import io.netty.channel.Channel
 import io.netty.channel.pool.AbstractChannelPoolMap
-import reactor.core.publisher.Flux
 import spock.lang.AutoCleanup
 import spock.lang.Retry
 import spock.lang.Shared
@@ -151,7 +150,7 @@ class ConnectionTTLSpec extends Specification {
   }
 
   Deque getQueuedChannels(HttpClient client) {
-    AbstractChannelPoolMap poolMap = client.poolMap
+    AbstractChannelPoolMap poolMap = client.connectionManager.poolMap
     Field mapField = AbstractChannelPoolMap.getDeclaredField("map")
     mapField.setAccessible(true)
     Map innerMap = mapField.get(poolMap)
