@@ -56,6 +56,7 @@ dependencies {
         exclude module: 'micronaut-runtime'
     }
     testImplementation libs.managed.groovy.json
+    testImplementation libs.managed.groovy.templates
     // tag::testcontainers-dependencies[]
     testImplementation libs.testcontainers.spock
     // end::testcontainers-dependencies[]
@@ -91,6 +92,7 @@ dependencies {
 
     testFixturesApi libs.managed.spock
     testFixturesApi libs.managed.groovy
+    testFixturesApi libs.jetbrains.annotations
 }
 
 //tasks.withType(Test).configureEach {

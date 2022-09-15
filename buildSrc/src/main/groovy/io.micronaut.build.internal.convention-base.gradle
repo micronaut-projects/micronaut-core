@@ -46,6 +46,14 @@ tasks.withType(Jar).configureEach {
     preserveFileTimestamps = false
 }
 
+configurations.all {
+    resolutionStrategy.dependencySubstitution {
+        substitute(module("org.codehaus.groovy:groovy")).using(module("org.apache.groovy:groovy:${libs.versions.managed.groovy.get()}"))
+        substitute(module("org.codehaus.groovy:groovy-test")).using(module("org.apache.groovy:groovy-test:${libs.versions.managed.groovy.get()}"))
+        substitute(module("org.codehaus.groovy:groovy-bom")).using(module("org.apache.groovy:groovy-bom:${libs.versions.managed.groovy.get()}"))
+    }
+}
+
 dependencies {
     annotationProcessor libs.bundles.asm
     annotationProcessor(libs.micronaut.docs.map {
