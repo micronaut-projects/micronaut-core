@@ -1,5 +1,9 @@
 [
-
+  {
+    "type": "io.micronaut.http.client.netty.DefaultHttpClient$HttpClientInitializer",
+    "member": "Constructor io.micronaut.http.client.netty.DefaultHttpClient$HttpClientInitializer(io.micronaut.http.client.netty.DefaultHttpClient,io.netty.handler.ssl.SslContext,java.lang.String,int,boolean,boolean,boolean,java.util.function.Consumer)",
+    "reason": "4.0.0 Release.  All bets are off"
+  },
   {
     "type": "io.micronaut.ast.groovy.visitor.AbstractGroovyElement",
     "member": "Class io.micronaut.ast.groovy.visitor.AbstractGroovyElement",
@@ -34,7 +38,7 @@
       "type": "io.micronaut.inject.visitor.TypeElementVisitor",
       "member": "Method io.micronaut.inject.visitor.TypeElementVisitor.visitEnumConstant(io.micronaut.inject.ast.EnumConstantElement,io.micronaut.inject.visitor.VisitorContext)",
       "reason": "Added EnumConstantElement. Added EnumElement.elements() method to collect enum constant elements"
-  },  
+  },
   {
     "type": "io.micronaut.scheduling.TaskScheduler",
     "member": "Method io.micronaut.scheduling.TaskScheduler.schedule(java.lang.String,java.lang.String,java.lang.Runnable)",
