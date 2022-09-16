@@ -53,4 +53,9 @@ public class JavaPackageElement extends AbstractJavaElement implements io.micron
     public String getSimpleName() {
         return element.getSimpleName().toString();
     }
+
+    @Override
+    public boolean isUnnamed() {
+        return element.isUnnamed();
+    }
 }

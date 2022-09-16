@@ -62,7 +62,7 @@ class JavaBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
      * @param metadataBuilder    the metadata builder
      * @param visitorContext     the visitor context
      */
-    JavaBeanDefinitionBuilder(Element originatingElement, ClassElement beanType, ConfigurationMetadataBuilder<?> metadataBuilder, JavaVisitorContext visitorContext) {
+    JavaBeanDefinitionBuilder(Element originatingElement, ClassElement beanType, ConfigurationMetadataBuilder metadataBuilder, JavaVisitorContext visitorContext) {
         super(originatingElement, beanType, metadataBuilder, visitorContext);
         this.javaVisitorContext = visitorContext;
         if (visitorContext.getVisitorKind() == TypeElementVisitor.VisitorKind.ISOLATING) {
@@ -119,7 +119,7 @@ class JavaBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
         return new AopProxyWriter(
                 beanDefinitionWriter,
                 annotationMetadata.getValues(Around.class, Boolean.class),
-                ConfigurationMetadataBuilder.getConfigurationMetadataBuilder().orElse(null),
+                ConfigurationMetadataBuilder.INSTANCE,
                 visitorContext,
                 interceptorTypes
         );

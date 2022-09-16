@@ -15,13 +15,27 @@
  */
 package io.micronaut.ast.groovy.visitor;
 
-import io.micronaut.ast.groovy.config.GroovyConfigurationMetadataBuilder;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.inject.ast.*;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ConstructorElement;
+import io.micronaut.inject.ast.ElementFactory;
+import io.micronaut.inject.ast.EnumConstantElement;
+import io.micronaut.inject.ast.FieldElement;
+import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
-import org.codehaus.groovy.ast.*;
+import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
+import org.codehaus.groovy.ast.AnnotatedNode;
+import org.codehaus.groovy.ast.ClassHelper;
+import org.codehaus.groovy.ast.ClassNode;
+import org.codehaus.groovy.ast.ConstructorNode;
+import org.codehaus.groovy.ast.FieldNode;
+import org.codehaus.groovy.ast.MethodNode;
+import org.codehaus.groovy.ast.Parameter;
+import org.codehaus.groovy.ast.PropertyNode;
 import org.codehaus.groovy.control.CompilationUnit;
 import org.codehaus.groovy.control.SourceUnit;
 
@@ -131,7 +145,7 @@ public class GroovyElementFactory implements ElementFactory<AnnotatedNode, Class
                     return new GroovyBeanDefinitionBuilder(
                             this,
                             type,
-                            new GroovyConfigurationMetadataBuilder(sourceUnit, compilationUnit),
+                            ConfigurationMetadataBuilder.INSTANCE,
                             visitorContext
                     );
                 }
@@ -144,7 +158,7 @@ public class GroovyElementFactory implements ElementFactory<AnnotatedNode, Class
                     return new GroovyBeanDefinitionBuilder(
                             this,
                             type,
-                            new GroovyConfigurationMetadataBuilder(sourceUnit, compilationUnit),
+                            ConfigurationMetadataBuilder.INSTANCE,
                             visitorContext
                     );
                 }
@@ -170,7 +184,7 @@ public class GroovyElementFactory implements ElementFactory<AnnotatedNode, Class
                 return new GroovyBeanDefinitionBuilder(
                         this,
                         type,
-                        new GroovyConfigurationMetadataBuilder(sourceUnit, compilationUnit),
+                        ConfigurationMetadataBuilder.INSTANCE,
                         visitorContext
                 );
             }

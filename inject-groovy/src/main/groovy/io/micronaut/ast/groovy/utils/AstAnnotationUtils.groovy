@@ -22,17 +22,16 @@ import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.Internal
 import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
-import io.micronaut.inject.annotation.AnnotationMetadataSupport
 import org.codehaus.groovy.ast.AnnotatedNode
 import org.codehaus.groovy.ast.AnnotationNode
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.MethodNode
+import org.codehaus.groovy.ast.PackageNode
 import org.codehaus.groovy.ast.expr.Expression
 import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.SourceUnit
 
 import java.lang.annotation.Annotation
-
 /**
  * Utility methods for dealing with annotations within the context of AST
  *
@@ -42,28 +41,50 @@ import java.lang.annotation.Annotation
 @CompileStatic
 class AstAnnotationUtils {
 
-    private static final Map<AnnotatedNode, AnnotationMetadata> annotationMetadataCache = new ConcurrentLinkedHashMap.Builder<AnnotatedNode, AnnotationMetadata>().maximumWeightedCapacity(100).build()
+    private static final Map<Key, AnnotationMetadata> annotationMetadataCache = new ConcurrentLinkedHashMap.Builder<Key, AnnotationMetadata>().maximumWeightedCapacity(100).build()
 
     /**
      * Get the {@link AnnotationMetadata} for the given annotated node
      *
+     * @param packageNode The node
+     * @return The metadata
+     */
+    static AnnotationMetadata getAnnotationMetadata(SourceUnit sourceUnit, CompilationUnit compilationUnit, PackageNode packageNode) {
+        return getAnnotationMetadata(sourceUnit, compilationUnit, packageNode, packageNode)
+    }
+
+    /**
+     * Get the {@link AnnotationMetadata} for the given annotated node
+     *
+     * @param classNode The node
+     * @return The metadata
+     */
+    static AnnotationMetadata getAnnotationMetadata(SourceUnit sourceUnit, CompilationUnit compilationUnit, ClassNode classNode) {
+        return getAnnotationMetadata(sourceUnit, compilationUnit, classNode, classNode)
+    }
+
+    /**
+     * Get the {@link AnnotationMetadata} for the given annotated node
+     *
+     * @param owner         The owner
      * @param annotatedNode The node
      * @return The metadata
      */
-    static AnnotationMetadata getAnnotationMetadata(SourceUnit sourceUnit, CompilationUnit compilationUnit, AnnotatedNode annotatedNode) {
-        return annotationMetadataCache.computeIfAbsent(annotatedNode, { AnnotatedNode annotatedNode1 ->
-            new GroovyAnnotationMetadataBuilder(sourceUnit, compilationUnit).build(annotatedNode1)
+    static AnnotationMetadata getAnnotationMetadata(SourceUnit sourceUnit, CompilationUnit compilationUnit, AnnotatedNode owner, AnnotatedNode annotatedNode) {
+        return annotationMetadataCache.computeIfAbsent(new Key(owner, annotatedNode), { AnnotatedNode annotatedNode1 ->
+            new GroovyAnnotationMetadataBuilder(sourceUnit, compilationUnit).build(owner, annotatedNode1)
         })
     }
 
     /**
      * Get the {@link AnnotationMetadata} for the given method node node
      *
+     * @param owner         The owner
      * @param annotatedNode The node
      * @return The metadata
      */
-    static AnnotationMetadata getMethodAnnotationMetadata(SourceUnit sourceUnit, CompilationUnit compilationUnit, MethodNode annotatedNode) {
-        return new GroovyAnnotationMetadataBuilder(sourceUnit, compilationUnit).buildOverridden(annotatedNode)
+    static AnnotationMetadata getMethodAnnotationMetadata(SourceUnit sourceUnit, CompilationUnit compilationUnit, AnnotatedNode owner, MethodNode annotatedNode) {
+        return new GroovyAnnotationMetadataBuilder(sourceUnit, compilationUnit).buildOverridden(owner, annotatedNode)
     }
 
     /**
@@ -116,77 +137,6 @@ class AstAnnotationUtils {
     static void invalidateCache(AnnotatedNode node) {
         if (node)
             annotationMetadataCache.remove(node)
-    }
-
-    /**
-     * Return whether the given annotated node has the given stereotype
-     *
-     * @param annotatedNode The annotated node
-     * @param stereotype The stereotype
-     * @return True if it does
-     */
-    static boolean hasStereotype(SourceUnit sourceUnit, CompilationUnit compilationUnit, AnnotatedNode annotatedNode, String stereotype) {
-        return getAnnotationMetadata(sourceUnit, compilationUnit, annotatedNode).hasStereotype(stereotype)
-    }
-    /**
-     * Return whether the given annotated node has the given stereotype
-     *
-     * @param annotatedNode The annotated node
-     * @param stereotype The stereotype
-     * @return True if it does
-     */
-    static boolean hasStereotype(SourceUnit sourceUnit, CompilationUnit compilationUnit, AnnotatedNode annotatedNode, Class<? extends Annotation> stereotype) {
-        return hasStereotype(sourceUnit, compilationUnit, annotatedNode, stereotype.getName())
-    }
-
-    /**
-     * Return whether the given element is annotated with any of the given annotation stereotypes.
-     *
-     * @param element     The element
-     * @param stereotypes The stereotypes
-     * @return True if it is
-     */
-    static boolean hasStereotype(SourceUnit sourceUnit, CompilationUnit compilationUnit, AnnotatedNode annotatedNode, List<String> stereotypes) {
-        if (annotatedNode == null) {
-            return false
-        }
-        AnnotationMetadata annotationMetadata = getAnnotationMetadata(sourceUnit, compilationUnit, annotatedNode)
-        for (String stereotype : stereotypes) {
-            if (annotationMetadata.hasStereotype(stereotype)) {
-                return true
-            }
-        }
-        return false
-    }
-
-    /**
-     * Whether the node is annotated with any non internal annotations
-     *
-     * @param declaringType The declaring type
-     * @param annotatedNode The annotated node
-     * @return True if it is
-     */
-    static boolean isAnnotated(String declaringType, AnnotatedNode annotatedNode) {
-        if (AbstractAnnotationMetadataBuilder.isMetadataMutated(declaringType, annotatedNode)) {
-            return true
-        }
-        for (ann in annotatedNode.annotations) {
-            if (!AnnotationUtil.INTERNAL_ANNOTATION_NAMES.contains(ann.classNode.name)) {
-                return true
-            }
-        }
-        return false
-    }
-    /**
-     * Finds an annotation for the given annotated node and type
-     *
-     * @param annotatedNode The annotated node
-     * @param annotationName The annotation type
-     * @return The annotation or null
-     */
-    static AnnotationNode findAnnotation(AnnotatedNode annotatedNode, Class<?> type) {
-        String annotationName = type.name
-        return findAnnotation(annotatedNode, annotationName)
     }
 
     /**
@@ -281,5 +231,34 @@ class AstAnnotationUtils {
             copyOfAnnotationNode.addMember(entry.getKey(), entry.getValue())
         }
         return copyOfAnnotationNode
+    }
+
+    private static final class Key {
+        private final AnnotatedNode owningType
+        private final AnnotatedNode element
+        private final int hashCode
+
+        private Key(AnnotatedNode owningType, AnnotatedNode element) {
+            this.owningType = owningType
+            this.element = element
+            this.hashCode = Objects.hash(owningType, element)
+        }
+
+        @Override
+        boolean equals(Object o) {
+            if (this == o) {
+                return true
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false
+            }
+            Key key = (Key) o
+            return hashCode == key.hashCode && Objects.equals(owningType, key.owningType) && Objects.equals(element, key.element)
+        }
+
+        @Override
+        int hashCode() {
+            return hashCode
+        }
     }
 }

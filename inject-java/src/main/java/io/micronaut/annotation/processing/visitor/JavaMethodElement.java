@@ -160,12 +160,12 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
             List<ParameterElement> elts = new ArrayList<>(parameters.size());
             for (Iterator<? extends VariableElement> i = parameters.iterator(); i.hasNext();) {
                 VariableElement variableElement = i.next();
-                if (! i.hasNext() && isSuspend(variableElement)) {
+                if (!i.hasNext() && isSuspend(variableElement)) {
                     this.continuationParameter = newParameterElement(variableElement, AnnotationMetadata.EMPTY_METADATA);
                     continue;
                 }
                 AnnotationMetadata annotationMetadata = visitorContext.getAnnotationUtils()
-                        .getAnnotationMetadata(getFieldElementForWriter(), variableElement);
+                        .getCombinedAnnotationMetadata(getFieldElementForWriter(), variableElement);
                 JavaParameterElement javaParameterElement = newParameterElement(variableElement, annotationMetadata);
                 if (annotationMetadata.hasDeclaredAnnotation("org.jetbrains.annotations.Nullable")) {
                     javaParameterElement.annotate("javax.annotation.Nullable").getAnnotationMetadata();

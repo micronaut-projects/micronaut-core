@@ -187,7 +187,7 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
         def sourceUnit = Mock(SourceUnit)
         sourceUnit.getErrorCollector() >> new ErrorCollector(new CompilerConfiguration())
         GroovyAnnotationMetadataBuilder builder = new GroovyAnnotationMetadataBuilder(sourceUnit, null)
-        AnnotationMetadata metadata = element != null ? builder.build(element) : null
+        AnnotationMetadata metadata = element != null ? builder.build(element.getDeclaringClass(), element) : null
         AbstractAnnotationMetadataBuilder.copyToRuntime()
         return metadata
     }
@@ -198,7 +198,7 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
         GroovyAnnotationMetadataBuilder builder = new GroovyAnnotationMetadataBuilder(Stub(SourceUnit) {
             getErrorCollector() >> null
         }, null)
-        AnnotationMetadata metadata = method != null ? builder.build(method) : null
+        AnnotationMetadata metadata = method != null ? builder.build(element,  method) : null
         AbstractAnnotationMetadataBuilder.copyToRuntime()
         return metadata
     }
@@ -208,7 +208,7 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
         MethodNode method = element.getMethods(methodName)[0]
         Parameter parameter = Arrays.asList(method.getParameters()).find { it.name == fieldName }
         GroovyAnnotationMetadataBuilder builder = new GroovyAnnotationMetadataBuilder(null, null)
-        AnnotationMetadata metadata = method != null ? builder.build(new ExtendedParameter(method, parameter)) : null
+        AnnotationMetadata metadata = method != null ? builder.build(element, new ExtendedParameter(method, parameter)) : null
         AbstractAnnotationMetadataBuilder.copyToRuntime()
         return metadata
     }

@@ -338,7 +338,7 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
             ClassElement type,
             String field,
             AnnotationMetadata annotationMetadata,
-            ConfigurationMetadataBuilder<?> metadataBuilder,
+            ConfigurationMetadataBuilder metadataBuilder,
             boolean isInterface);
 
     /**
@@ -355,7 +355,7 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
             ClassElement type,
             String methodName,
             AnnotationMetadata annotationMetadata,
-            ConfigurationMetadataBuilder<?> metadataBuilder,
+            ConfigurationMetadataBuilder metadataBuilder,
             boolean isInterface);
 
     /**

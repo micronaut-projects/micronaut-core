@@ -51,7 +51,7 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
 
         ClassNode element = nodes ? nodes.find { it instanceof ClassNode && it.name == cls } : null
         GroovyAnnotationMetadataBuilder builder = new GroovyAnnotationMetadataBuilder()
-        AnnotationMetadata metadata = element != null ? builder.build(element) : null
+        AnnotationMetadata metadata = element != null ? builder.buildForType(element) : null
         return metadata
     }
 
@@ -59,7 +59,7 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
         ClassNode element = buildClassNode(source, cls)
         MethodNode method = element.getMethods(methodName)[0]
         GroovyAnnotationMetadataBuilder builder = new GroovyAnnotationMetadataBuilder()
-        AnnotationMetadata metadata = method != null ? builder.build(method) : null
+        AnnotationMetadata metadata = method != null ? builder.build(element, method) : null
         return metadata
     }
 

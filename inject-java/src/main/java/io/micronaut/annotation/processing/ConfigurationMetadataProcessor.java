@@ -19,6 +19,7 @@ import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.inject.configuration.ConfigurationMetadataBuilderX;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.configuration.ConfigurationMetadataWriter;
 import io.micronaut.inject.visitor.TypeElementVisitor;
@@ -66,27 +67,26 @@ public class ConfigurationMetadataProcessor extends AbstractInjectAnnotationProc
     }
 
     private void writeConfigurationMetadata() {
-        ConfigurationMetadataBuilder.getConfigurationMetadataBuilder().ifPresent(builder -> {
-            try {
-                if (builder.hasMetadata()) {
-                    ServiceLoader<ConfigurationMetadataWriter> writers = ServiceLoader.load(ConfigurationMetadataWriter.class, getClass().getClassLoader());
+        try {
+            ConfigurationMetadataBuilder builder = ConfigurationMetadataBuilder.INSTANCE;
+            if (builder.hasMetadata()) {
+                ServiceLoader<ConfigurationMetadataWriter> writers = ServiceLoader.load(ConfigurationMetadataWriter.class, getClass().getClassLoader());
 
-                    try {
-                        for (ConfigurationMetadataWriter writer : writers) {
-                            writeConfigurationMetadata(builder, writer);
-                        }
-                    } catch (ServiceConfigurationError e) {
-                        warning("Unable to load ConfigurationMetadataWriter due to : %s", e.getMessage());
+                try {
+                    for (ConfigurationMetadataWriter writer : writers) {
+                        writeConfigurationMetadata(builder, writer);
                     }
+                } catch (ServiceConfigurationError e) {
+                    warning("Unable to load ConfigurationMetadataWriter due to : %s", e.getMessage());
                 }
-            } finally {
-                ConfigurationMetadataBuilder.setConfigurationMetadataBuilder(null);
             }
-        });
+        } finally {
+            ConfigurationMetadataBuilderX.setConfigurationMetadataBuilder(null);
+        }
 
     }
 
-    private void writeConfigurationMetadata(ConfigurationMetadataBuilder<?> metadataBuilder, ConfigurationMetadataWriter writer) {
+    private void writeConfigurationMetadata(ConfigurationMetadataBuilder metadataBuilder, ConfigurationMetadataWriter writer) {
         try {
             writer.write(metadataBuilder, classWriterOutputVisitor);
         } catch (IOException e) {

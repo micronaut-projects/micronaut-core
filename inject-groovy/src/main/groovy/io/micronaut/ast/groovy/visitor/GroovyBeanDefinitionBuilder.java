@@ -66,7 +66,7 @@ class GroovyBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
     GroovyBeanDefinitionBuilder(
             Element originatingElement,
             ClassElement beanType,
-            ConfigurationMetadataBuilder<?> metadataBuilder,
+            ConfigurationMetadataBuilder metadataBuilder,
             GroovyVisitorContext visitorContext) {
         super(originatingElement, beanType, metadataBuilder, visitorContext);
         if (getClass() == GroovyBeanDefinitionBuilder.class) {
@@ -248,7 +248,7 @@ class GroovyBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
         return new AopProxyWriter(
                 beanDefinitionWriter,
                 annotationMetadata.getValues(Around.class, Boolean.class),
-                ConfigurationMetadataBuilder.getConfigurationMetadataBuilder().orElse(null),
+                ConfigurationMetadataBuilder.INSTANCE,
                 visitorContext,
                 interceptorTypes
         );

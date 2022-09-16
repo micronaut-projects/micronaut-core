@@ -97,7 +97,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
             }
         }
     };
-    protected final ConfigurationMetadataBuilder<?> metadataBuilder;
+    protected final ConfigurationMetadataBuilder metadataBuilder;
     protected final VisitorContext visitorContext;
     private final Element originatingElement;
     private final ClassElement originatingType;
@@ -126,7 +126,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
     protected AbstractBeanDefinitionBuilder(
             Element originatingElement,
             ClassElement beanType,
-            ConfigurationMetadataBuilder<?> metadataBuilder,
+            ConfigurationMetadataBuilder metadataBuilder,
             VisitorContext visitorContext) {
         this.originatingElement = originatingElement;
         if (originatingElement instanceof MethodElement) {

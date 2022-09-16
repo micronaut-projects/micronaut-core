@@ -17,7 +17,6 @@ package io.micronaut.ast.groovy
 
 import groovy.transform.CompilationUnitAware
 import groovy.transform.CompileStatic
-import io.micronaut.ast.groovy.config.GroovyConfigurationMetadataBuilder
 import io.micronaut.ast.groovy.utils.AstAnnotationUtils
 import io.micronaut.ast.groovy.utils.AstMessageUtils
 import io.micronaut.ast.groovy.utils.InMemoryByteCodeGroovyClassLoader
@@ -28,10 +27,23 @@ import io.micronaut.context.annotation.Configuration
 import io.micronaut.context.annotation.ConfigurationReader
 import io.micronaut.context.annotation.Context
 import io.micronaut.core.annotation.AnnotationMetadata
-
+import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder
-import io.micronaut.inject.writer.*
-import org.codehaus.groovy.ast.*
+import io.micronaut.inject.processing.gen.AbstractBeanBuilder
+import io.micronaut.inject.processing.gen.ProcessingException
+import io.micronaut.inject.visitor.VisitorConfiguration
+import io.micronaut.inject.writer.BeanConfigurationWriter
+import io.micronaut.inject.writer.BeanDefinitionReferenceWriter
+import io.micronaut.inject.writer.BeanDefinitionVisitor
+import io.micronaut.inject.writer.ClassWriterOutputVisitor
+import io.micronaut.inject.writer.DirectoryClassWriterOutputVisitor
+import org.codehaus.groovy.ast.ASTNode
+import org.codehaus.groovy.ast.AnnotatedNode
+import org.codehaus.groovy.ast.ClassCodeVisitorSupport
+import org.codehaus.groovy.ast.ClassNode
+import org.codehaus.groovy.ast.InnerClassNode
+import org.codehaus.groovy.ast.ModuleNode
+import org.codehaus.groovy.ast.PackageNode
 import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.CompilePhase
 import org.codehaus.groovy.control.SourceUnit
@@ -60,11 +72,10 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         am.hasStereotype(InjectTransform.ANN_CONSTRAINT) || am.hasStereotype(InjectTransform.ANN_VALID)
     }
     CompilationUnit unit
-    ConfigurationMetadataBuilder<ClassNode> configurationMetadataBuilder
+    ConfigurationMetadataBuilder configurationMetadataBuilder = ConfigurationMetadataBuilder.INSTANCE
 
     @Override
     void visit(ASTNode[] nodes, SourceUnit source) {
-        configurationMetadataBuilder = new GroovyConfigurationMetadataBuilder(source, unit)
         ModuleNode moduleNode = source.getAST()
         Map<AnnotatedNode, BeanDefinitionVisitor> beanDefinitionWriters = [:]
         File classesDir = source.configuration.targetDirectory
@@ -85,8 +96,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             ClassNode classNode = classes[0]
             if (classNode.nameWithoutPackage == 'package-info') {
                 PackageNode packageNode = classNode.getPackage()
-                if (AstAnnotationUtils.hasStereotype(source, unit, packageNode, Configuration)) {
-                    def annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(source, unit, packageNode)
+                def annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(source, unit, packageNode)
+                if (annotationMetadata.hasStereotype(Configuration)) {
                     GroovyVisitorContext visitorContext = new GroovyVisitorContext(source, unit)
                     BeanConfigurationWriter writer = new BeanConfigurationWriter(
                             classNode.packageName,
@@ -109,17 +120,58 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             if ((classNode instanceof InnerClassNode && !Modifier.isStatic(classNode.getModifiers()))) {
                 continue
             } else {
-                if (classNode.isInterface()) {
-                    if (AstAnnotationUtils.hasStereotype(source, unit, classNode, InjectVisitor.INTRODUCTION_TYPE) ||
-                            AstAnnotationUtils.hasStereotype(source, unit, classNode, ConfigurationReader.class)) {
-                        InjectVisitor injectVisitor = new InjectVisitor(source, unit, classNode, configurationMetadataBuilder)
-                        injectVisitor.visitClass(classNode)
-                        beanDefinitionWriters.putAll(injectVisitor.beanDefinitionWriters)
+
+                GroovyVisitorContext groovyVisitorContext = new GroovyVisitorContext(source, unit) {
+                    @Override
+                    VisitorConfiguration getConfiguration() {
+                        new VisitorConfiguration() {
+                            @Override
+                            boolean includeTypeLevelAnnotationsInGenericArguments() {
+                                return false
+                            }
+                        }
                     }
-                } else {
-                    InjectVisitor injectVisitor = new InjectVisitor(source, unit, classNode, configurationMetadataBuilder)
-                    injectVisitor.visitClass(classNode)
-                    beanDefinitionWriters.putAll(injectVisitor.beanDefinitionWriters)
+                }
+
+                def classNodeAnnotationMetadata = AstAnnotationUtils.getAnnotationMetadata(source, unit, classNode)
+
+                if (!classNode.isInterface() || classNode.isInterface() && (classNodeAnnotationMetadata.hasStereotype(AnnotationUtil.ANN_INTRODUCTION) ||
+                        classNodeAnnotationMetadata.hasStereotype(ConfigurationReader.class))) {
+
+                    try {
+                        new ClassCodeVisitorSupport() {
+
+                            @Override
+                            void visitClass(ClassNode node) {
+
+                                def annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(source, unit, node)
+                                def classElement = groovyVisitorContext.getElementFactory().newClassElement(node, annotationMetadata)
+
+                                AbstractBeanBuilder beanBuilder = AbstractBeanBuilder.of(classElement, groovyVisitorContext);
+                                if (beanBuilder != null) {
+                                    beanBuilder.build()
+                                    beanBuilder.getBeanDefinitionWriters().forEach(writer -> {
+                                        if (writer.getBeanTypeName() == node.getName()) {
+                                            beanDefinitionWriters.put(node, writer)
+                                        } else {
+                                            beanDefinitionWriters.put(new AnnotatedNode(), writer)
+                                        }
+                                    })
+                                }
+
+                                super.visitClass(node)
+                            }
+
+                            @Override
+                            protected SourceUnit getSourceUnit() {
+                                return sourceUnit
+                            }
+
+                        }.visitClass(classNode)
+
+                    } catch (ProcessingException ex) {
+                        groovyVisitorContext.fail(ex.getMessage(), ex.getElement());
+                    }
                 }
             }
         }

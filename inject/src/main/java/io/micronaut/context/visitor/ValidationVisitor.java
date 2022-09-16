@@ -41,13 +41,12 @@ public class ValidationVisitor implements TypeElementVisitor<Object, Object> {
     public static final String ANN_REQUIRES_VALIDATION = "io.micronaut.validation.RequiresValidation";
     private static final String ANN_CONSTRAINT = "javax.validation.Constraint";
     private static final String ANN_VALID = "javax.validation.Valid";
-    private static final String ANN_VALIDATED = "io.micronaut.validation.Validated";
 
     private ClassElement classElement;
 
     @Override
     public Set<String> getSupportedAnnotationNames() {
-        return new HashSet<>(Arrays.asList(ANN_CONSTRAINT, ANN_VALIDATED));
+        return new HashSet<>(Arrays.asList(ANN_CONSTRAINT, ANN_VALID));
     }
 
     @Override
@@ -94,7 +93,7 @@ public class ValidationVisitor implements TypeElementVisitor<Object, Object> {
             return;
         }
         if (requiresValidation(element)) {
-            // Annotate the class for fields validation
+            element.annotate(ANN_REQUIRES_VALIDATION);
             classElement.annotate(ANN_REQUIRES_VALIDATION);
         }
     }

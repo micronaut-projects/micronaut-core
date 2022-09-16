@@ -15,9 +15,9 @@
  */
 package io.micronaut.inject.ast;
 
-import java.util.Objects;
-
 import io.micronaut.core.annotation.NonNull;
+
+import java.util.Objects;
 
 /**
  * Models a package in source code.
@@ -40,5 +40,15 @@ public interface PackageElement extends Element {
         Objects.requireNonNull(name, "Name cannot be null");
 
         return new SimplePackageElement(name);
+    }
+
+    /**
+     * Is unnamed package?
+     *
+     * @return true if unnamed
+     * @since 3.7.0
+     */
+    default boolean isUnnamed() {
+        return false;
     }
 }

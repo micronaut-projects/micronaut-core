@@ -15,10 +15,11 @@
  */
 package io.micronaut.inject.visitor;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
+import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementFactory;
@@ -54,6 +55,9 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      * @since 2.3.0
      */
     @NonNull ElementFactory<?, ?, ?, ?> getElementFactory();
+
+    @NonNull
+    AbstractAnnotationMetadataBuilder<Object, Object> newAnnotationBuilder();
 
     /**
      * Allows printing informational messages.

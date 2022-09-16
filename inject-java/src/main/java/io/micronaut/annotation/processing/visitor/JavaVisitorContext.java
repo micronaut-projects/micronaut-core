@@ -15,24 +15,25 @@
  */
 package io.micronaut.annotation.processing.visitor;
 
-import io.micronaut.annotation.processing.JavaConfigurationMetadataBuilder;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.annotation.processing.AnnotationProcessingOutputVisitor;
 import io.micronaut.annotation.processing.AnnotationUtils;
 import io.micronaut.annotation.processing.GenericUtils;
 import io.micronaut.annotation.processing.ModelUtils;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.beans.BeanElement;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
+import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.util.VisitorContextUtils;
 import io.micronaut.inject.visitor.BeanElementVisitorContext;
 import io.micronaut.inject.visitor.TypeElementVisitor;
@@ -55,7 +56,15 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.reflect.Method;
 import java.net.URL;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Enumeration;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -190,6 +199,11 @@ public class JavaVisitorContext implements VisitorContext, BeanElementVisitorCon
     @Override
     public JavaElementFactory getElementFactory() {
         return elementFactory;
+    }
+
+    @Override
+    public AbstractAnnotationMetadataBuilder newAnnotationBuilder() {
+        return annotationUtils.newAnnotationBuilder();
     }
 
     @Override
@@ -376,7 +390,7 @@ public class JavaVisitorContext implements VisitorContext, BeanElementVisitorCon
         boolean includeAll = Arrays.equals(stereotypes, new String[] { "*" });
         for (Element enclosedElement : enclosedElements) {
             if (enclosedElement instanceof TypeElement) {
-                final AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(enclosedElement);
+                final AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata((TypeElement) enclosedElement);
                 if (includeAll || Arrays.stream(stereotypes).anyMatch(annotationMetadata::hasStereotype)) {
                     JavaClassElement classElement = elementFactory.newClassElement((TypeElement) enclosedElement, annotationMetadata);
 
@@ -445,7 +459,7 @@ public class JavaVisitorContext implements VisitorContext, BeanElementVisitorCon
         JavaBeanDefinitionBuilder javaBeanDefinitionBuilder = new JavaBeanDefinitionBuilder(
                 originatingElement,
                 type,
-                new JavaConfigurationMetadataBuilder(elements, types, annotationUtils),
+                ConfigurationMetadataBuilder.INSTANCE,
                 this
         );
         return javaBeanDefinitionBuilder;

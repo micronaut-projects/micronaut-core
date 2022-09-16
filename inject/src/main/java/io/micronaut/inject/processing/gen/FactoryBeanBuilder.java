@@ -1,0 +1,235 @@
+package io.micronaut.inject.processing.gen;
+
+import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.context.annotation.Value;
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.util.StringUtils;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
+import io.micronaut.inject.annotation.MutableAnnotationMetadata;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ElementQuery;
+import io.micronaut.inject.ast.FieldElement;
+import io.micronaut.inject.ast.MemberElement;
+import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.visitor.VisitorContext;
+import io.micronaut.inject.writer.BeanDefinitionVisitor;
+import io.micronaut.inject.writer.BeanDefinitionWriter;
+import io.micronaut.inject.writer.OriginatingElements;
+
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
+
+public class FactoryBeanBuilder extends SimpleBeanBuilder {
+
+    private final AtomicInteger factoryMethodIndex = new AtomicInteger();
+
+    protected FactoryBeanBuilder(ClassElement classElement, VisitorContext visitorContext) {
+        super(classElement, visitorContext);
+    }
+
+    @Override
+    protected boolean visitMethod(BeanDefinitionVisitor visitor, MethodElement methodElement) {
+        if (methodElement.hasDeclaredStereotype(Bean.class.getName(), AnnotationUtil.SCOPE)) {
+            visitBeanFactoryElement(visitor, methodElement.getGenericReturnType(), methodElement);
+            return true;
+        }
+        return super.visitMethod(visitor, methodElement);
+    }
+
+    @Override
+    protected boolean visitField(BeanDefinitionVisitor visitor, FieldElement fieldElement) {
+        if (fieldElement.hasDeclaredStereotype(Bean.class.getName())) {
+            if (!fieldElement.isAccessible(classElement)) {
+                throw new ProcessingException(fieldElement, "Beans produced from fields cannot be private");
+            }
+            visitBeanFactoryElement(visitor, fieldElement.getGenericType(), fieldElement);
+            return true;
+        }
+        return super.visitField(visitor, fieldElement);
+    }
+
+    void visitBeanFactoryElement(BeanDefinitionVisitor visitor, ClassElement producedType, MemberElement producingElement) {
+
+        AnnotationMetadata producedAnnotationMetadata;
+
+        if (producedType.isPrimitive()) {
+            producedAnnotationMetadata = getElementAnnotationMetadata(producingElement);
+        } else {
+            // Original logic is to combine producing element annotation metadata (method or field) with the produced type's annotation metadata
+            producedAnnotationMetadata = visitorContext.newAnnotationBuilder().buildForParent(
+                producedType.getNativeType(),
+                producingElement.getNativeType()
+            );
+            AnnotationMetadata producedTypeAnnotationMetadata = producedType.getAnnotationMetadata();
+            AnnotationMetadata elementAnnotationMetadata = getElementAnnotationMetadata(producingElement);
+
+            cleanupScopeAndQualifierAnnotations((MutableAnnotationMetadata) producedAnnotationMetadata, producedTypeAnnotationMetadata, elementAnnotationMetadata);
+        }
+
+        MutableAnnotationMetadata factoryClassAnnotationMetadata = ((MutableAnnotationMetadata) classElement.getAnnotationMetadata()).clone();
+
+        boolean modifiedFactoryClassAnnotationMetadata = false;
+        if (classElement.hasStereotype(AnnotationUtil.QUALIFIER)) {
+            // Don't propagate any qualifiers to the factories
+            for (String scope : classElement.getAnnotationNamesByStereotype(AnnotationUtil.QUALIFIER)) {
+                if (!producedAnnotationMetadata.hasStereotype(scope)) {
+                    factoryClassAnnotationMetadata.removeAnnotation(scope);
+                    modifiedFactoryClassAnnotationMetadata = true;
+                }
+            }
+        }
+
+        if (modifiedFactoryClassAnnotationMetadata) {
+            producingElement.replaceAnnotations(new AnnotationMetadataHierarchy(factoryClassAnnotationMetadata, producedAnnotationMetadata));
+        } else {
+            producingElement.replaceAnnotations(annotationMetadataCombineWithBeanMetadata(visitor, producedAnnotationMetadata));
+        }
+
+        buildProducedBeanDefinition(producedType, producingElement, producedAnnotationMetadata);
+    }
+
+    private void buildProducedBeanDefinition(ClassElement producedType,
+                                             MemberElement producingElement,
+                                             AnnotationMetadata producedAnnotationMetadata) {
+
+        BeanDefinitionWriter producedBeanDefinitionWriter = new BeanDefinitionWriter(producingElement,
+            OriginatingElements.of(producingElement),
+            metadataBuilder,
+            visitorContext,
+            factoryMethodIndex.getAndIncrement()
+        );
+
+        visitAnnotationMetadata(producedBeanDefinitionWriter, producedAnnotationMetadata);
+        producedBeanDefinitionWriter.visitTypeArguments(producedType.getAllTypeArguments());
+
+        beanDefinitionWriters.add(producedBeanDefinitionWriter);
+
+        if (producingElement instanceof MethodElement) {
+            producedBeanDefinitionWriter.visitBeanFactoryMethod(classElement, (MethodElement) producingElement);
+        } else {
+            producedBeanDefinitionWriter.visitBeanFactoryField(classElement, (FieldElement) producingElement);
+        }
+
+        if (producedAnnotationMetadata.hasStereotype(AnnotationUtil.ANN_AROUND) && !classElement.isAbstract()) {
+            if (producedType.isPrimitive()) {
+                throw new ProcessingException(producingElement, "Cannot apply AOP advice to primitive beans");
+            }
+            if (producedType.isArray()) {
+                throw new ProcessingException(producingElement, "Cannot apply AOP advice to arrays");
+            }
+            if (producedType.isFinal()) {
+                throw new ProcessingException(producingElement, "Cannot apply AOP advice to final class. Class must be made non-final to support proxying: " + producedType.getName());
+            }
+
+            MethodElement constructor = producedType.getPrimaryConstructor().orElse(null);
+            if (!producedType.isInterface() && constructor != null && constructor.getParameters().length > 0) {
+                final String proxyTargetMode = producedAnnotationMetadata.stringValue(AnnotationUtil.ANN_AROUND, "proxyTargetMode").orElse("ERROR");
+                switch (proxyTargetMode) {
+                    case "ALLOW":
+                        allowProxyConstruction(constructor);
+                        break;
+                    case "WARN":
+                        allowProxyConstruction(constructor);
+                        visitorContext.warn("The produced type of a @Factory method has constructor arguments and is proxied. " +
+                            "This can lead to unexpected behaviour. See the javadoc for Around.ProxyTargetConstructorMode for more information: " + producingElement.getName(), producingElement);
+                        break;
+                    case "ERROR":
+                    default:
+                        throw new ProcessingException(producingElement, "The produced type from a factory which has AOP proxy advice specified must define an accessible no arguments constructor. " +
+                            "Proxying types with constructor arguments can lead to unexpected behaviour. See the javadoc for for Around.ProxyTargetConstructorMode for more information and possible solutions: " + producingElement.getName());
+                }
+
+            }
+
+            BeanDefinitionVisitor aopProxyWriter = aopHelper.createAopProxyWriter(producedBeanDefinitionWriter, producedAnnotationMetadata, metadataBuilder, visitorContext, false);
+
+            MethodElement constructorElement = findConstructorElement(classElement).orElse(null);
+            if (constructorElement != null) {
+                aopProxyWriter.visitBeanDefinitionConstructor(constructorElement, constructorElement.isReflectionRequired(), visitorContext);
+            } else {
+                aopProxyWriter.visitDefaultConstructor(AnnotationMetadata.EMPTY_METADATA, visitorContext);
+            }
+            aopProxyWriter.visitSuperBeanDefinitionFactory(producedBeanDefinitionWriter.getBeanDefinitionName());
+            aopProxyWriter.visitTypeArguments(producedType.getAllTypeArguments());
+
+            beanDefinitionWriters.add(aopProxyWriter);
+
+            producedType.getEnclosedElements(ElementQuery.ALL_METHODS)
+                .forEach(methodElement -> aopHelper.visitAroundMethod(aopProxyWriter, methodElement.getDeclaringType(), methodElement));
+
+        } else if (producedAnnotationMetadata.hasStereotype(Executable.class)) {
+            if (producedType.isPrimitive()) {
+                throw new ProcessingException(producingElement, "Using '@Executable' is not allowed on primitive type beans");
+            }
+            if (producedType.isArray()) {
+                throw new ProcessingException(producingElement, "Using '@Executable' is not allowed on array type beans");
+            }
+            producedType.getEnclosedElements(ElementQuery.ALL_METHODS.onlyAccessible())
+                .forEach(methodElement -> producedBeanDefinitionWriter.visitExecutableMethod(methodElement.getDeclaringType(), methodElement, visitorContext));
+        }
+
+        if (producedAnnotationMetadata.isPresent(Bean.class, "preDestroy")) {
+            if (producedType.isPrimitive()) {
+                throw new ProcessingException(producingElement, "Using 'preDestroy' is not allowed on primitive type beans");
+            }
+            if (producedType.isArray()) {
+                throw new ProcessingException(producingElement, "Using 'preDestroy' is not allowed on array type beans");
+            }
+
+            producedAnnotationMetadata.getValue(Bean.class, "preDestroy", String.class).ifPresent(destroyMethodName -> {
+                if (StringUtils.isNotEmpty(destroyMethodName)) {
+                    final Optional<MethodElement> destroyMethod = producedType.getEnclosedElement(ElementQuery.ALL_METHODS.onlyAccessible(classElement)
+                        .onlyInstance()
+                        .named(destroyMethodName)
+                        .filter((e) -> !e.hasParameters()));
+                    if (destroyMethod.isPresent()) {
+                        MethodElement destroyMethodElement = destroyMethod.get();
+                        producedBeanDefinitionWriter.visitPreDestroyMethod(producedType, destroyMethodElement, false, visitorContext);
+                    } else {
+                        throw new ProcessingException(producingElement, "@Bean method defines a preDestroy method that does not exist or is not public: " + destroyMethodName);
+                    }
+                }
+            });
+        }
+    }
+
+    private void allowProxyConstruction(MethodElement constructor) {
+        final ParameterElement[] parameters = constructor.getParameters();
+        for (ParameterElement parameter : parameters) {
+            if (parameter.isPrimitive() && !parameter.isArray()) {
+                final String name = parameter.getType().getName();
+                if ("boolean".equals(name)) {
+                    parameter.annotate(Value.class, (builder) -> builder.value(false));
+                } else {
+                    parameter.annotate(Value.class, (builder) -> builder.value(0));
+                }
+            } else {
+                // allow null
+                parameter.annotate(AnnotationUtil.NULLABLE);
+                parameter.removeAnnotation(AnnotationUtil.NON_NULL);
+            }
+        }
+    }
+
+    private void cleanupScopeAndQualifierAnnotations(MutableAnnotationMetadata producedAnnotationMetadata, AnnotationMetadata producedTypeAnnotationMetadata, AnnotationMetadata producingElementAnnotationMetadata) {
+        // If the producing element defines a scope don't inherit it from the type
+        if (producingElementAnnotationMetadata.hasStereotype(AnnotationUtil.SCOPE) || producingElementAnnotationMetadata.hasStereotype(AnnotationUtil.QUALIFIER)) {
+            // The producing element is declaring the scope then we should remove the scope defined by the type
+            for (String scope : producedTypeAnnotationMetadata.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE)) {
+                if (!producingElementAnnotationMetadata.hasStereotype(scope)) {
+                    producedAnnotationMetadata.removeAnnotation(scope);
+                }
+            }
+            // Remove any qualifier coming from the type
+            for (String qualifier : producedTypeAnnotationMetadata.getAnnotationNamesByStereotype(AnnotationUtil.QUALIFIER)) {
+                if (!producingElementAnnotationMetadata.hasStereotype(qualifier)) {
+                    producedAnnotationMetadata.removeAnnotation(qualifier);
+                }
+            }
+        }
+    }
+
+}

@@ -87,7 +87,7 @@ class JavaEnumElement extends JavaClassElement implements EnumElement {
             if (element.getKind() == ElementKind.ENUM_CONSTANT) {
                 values.add(element.getSimpleName().toString());
                 enumConstants.add(new JavaEnumConstantElement(this, (VariableElement) element,
-                        visitorContext.getAnnotationUtils().newAnnotationBuilder().build(element),
+                        visitorContext.getAnnotationUtils().newAnnotationBuilder().build(nativeType, element),
                         visitorContext));
             }
         }

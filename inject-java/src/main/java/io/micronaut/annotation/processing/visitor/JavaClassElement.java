@@ -197,6 +197,10 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         return JavaModelUtils.isRecord(classElement);
     }
 
+    public TypeElement getNativeTypeElement() {
+        return classElement;
+    }
+
     @NonNull
     @Override
     public Map<String, ClassElement> getTypeArguments(@NonNull String type) {
@@ -454,16 +458,19 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                         if (value.setter != null) {
                             parents.add(value.setter);
                         }
+
+                        ClassElement declaringElement = value.declaringType == null ? this : value.declaringType;
+
                         if (!parents.isEmpty()) {
                             annotationMetadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(parents, value.getter);
                         } else {
                             annotationMetadata = visitorContext
                                     .getAnnotationUtils()
-                                    .newAnnotationBuilder().buildForMethod(value.getter);
+                                    .newAnnotationBuilder().buildForMethod((Element) declaringElement.getNativeType(), value.getter);
                         }
 
                         JavaPropertyElement propertyElement = new JavaPropertyElement(
-                                value.declaringType == null ? this : value.declaringType,
+                                declaringElement,
                                 value.getter,
                                 annotationMetadata,
                                 propertyName,
@@ -500,10 +507,11 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                             @Override
                             public Optional<MethodElement> getWriteMethod() {
                                 if (value.setter != null) {
+                                    JavaClassElement declaringClass = JavaClassElement.this;
                                     return Optional.of(new JavaMethodElement(
-                                            JavaClassElement.this,
+                                        declaringClass,
                                             value.setter,
-                                            visitorContext.getAnnotationUtils().newAnnotationBuilder().buildForMethod(value.setter),
+                                            visitorContext.getAnnotationUtils().newAnnotationBuilder().buildForMethod(declaringClass.getNativeTypeElement(), value.setter),
                                             visitorContext
                                     ));
                                 }
@@ -541,155 +549,31 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         ElementQuery.Result<T> result = query.result();
         ElementKind kind = getElementKind(result.getElementType());
         List<T> resultingElements = new ArrayList<>();
-        List<Element> enclosedElements = new ArrayList<>(getDeclaredEnclosedElements());
 
-        boolean onlyDeclared = result.isOnlyDeclared();
-        boolean onlyAbstract = result.isOnlyAbstract();
-        boolean onlyConcrete = result.isOnlyConcrete();
-        boolean onlyInstance = result.isOnlyInstance();
-        boolean includeEnumConstants = result.isIncludeEnumConstants();
-        boolean includeOverriddenMethods = result.isIncludeOverriddenMethods();
-        boolean includeHiddenElements = result.isIncludeHiddenElements();
+        List<Element> collectedElements = new ArrayList<>(getDeclaredEnclosedElements());
 
-        if (!onlyDeclared) {
+        if (!result.isOnlyDeclared()) {
             Elements elements = visitorContext.getElements();
 
-            TypeMirror superclass = classElement.getSuperclass();
-            // traverse the super class true and add elements that are not overridden
-            while (superclass instanceof DeclaredType) {
-                DeclaredType dt = (DeclaredType) superclass;
-                TypeElement element = (TypeElement) dt.asElement();
-                // reached non-accessible class like Object, Enum, Record etc.
-                if (element.getQualifiedName().toString().startsWith("java.lang.")) {
-                    break;
-                }
-                List<? extends Element> superElements = element.getEnclosedElements();
+            collectFromSubtypes(result, kind, elements, collectedElements);
+            collectFromInterfaces(result, kind, elements, collectedElements);
 
-                List<Element> elementsToAdd = new ArrayList<>(superElements.size());
-                superElements:
-                for (Element superElement : superElements) {
-                    ElementKind superKind = superElement.getKind();
-                    if (superKind == kind) {
-                        for (Element enclosedElement : enclosedElements) {
-                            if (!includeHiddenElements && elements.hides(enclosedElement, superElement)) {
-                                continue superElements;
-                            } else if (enclosedElement.getKind() == ElementKind.METHOD && superElement.getKind() == ElementKind.METHOD) {
-                                final ExecutableElement methodCandidate = (ExecutableElement) superElement;
-                                if (!includeOverriddenMethods && elements.overrides((ExecutableElement) enclosedElement, methodCandidate, this.classElement)) {
-                                    continue superElements;
-                                }
-                            }
-                        }
-                        // dependency injection method resolution requires extended overrides checks
-                        if (result.isOnlyInjected() && superElement.getKind() == ElementKind.METHOD) {
-                            final ExecutableElement methodCandidate = (ExecutableElement) superElement;
-                            // check for extended override
-                            final String thisClassName = this.classElement.getQualifiedName().toString();
-                            final String declaringClassName = element.getQualifiedName().toString();
-                            boolean isParent = !declaringClassName.equals(thisClassName);
-                            final ModelUtils javaModelUtils = visitorContext.getModelUtils();
-                            final ExecutableElement overridingMethod = javaModelUtils
-                                    .overridingOrHidingMethod(methodCandidate, this.classElement, false)
-                                    .orElse(methodCandidate);
-                            TypeElement overridingClass = javaModelUtils.classElementFor(overridingMethod);
-                            boolean overridden = isParent && overridingClass != null &&
-                                    !overridingClass.getQualifiedName().toString().equals(declaringClassName);
-
-                            boolean isPackagePrivate = javaModelUtils.isPackagePrivate(methodCandidate);
-                            boolean isPrivate = methodCandidate.getModifiers().contains(Modifier.PRIVATE);
-                            if (overridden && !(isPrivate || isPackagePrivate)) {
-                                // bail out if the method has been overridden, since it will have already been handled
-                                continue;
-                            }
-                            if (isParent && overridden) {
-
-                                boolean overriddenInjected = overridden && visitorContext.getAnnotationUtils()
-                                        .getAnnotationMetadata(overridingMethod).hasDeclaredAnnotation(
-                                                AnnotationUtil.INJECT);
-                                String packageOfOverridingClass = visitorContext.getElements().getPackageOf(overridingMethod).getQualifiedName().toString();
-                                String packageOfDeclaringClass = visitorContext.getElements().getPackageOf(element).getQualifiedName().toString();
-                                boolean isPackagePrivateAndPackagesDiffer = overridden && isPackagePrivate &&
-                                        !packageOfOverridingClass.equals(packageOfDeclaringClass);
-                                if (!overriddenInjected && !isPackagePrivateAndPackagesDiffer && !isPrivate) {
-                                    // bail out if the overridden method is package private and in the same package
-                                    // and is not annotated with @Inject
-                                    continue;
-                                }
-                            }
-                        }
-
-                        if (onlyAbstract && !superElement.getModifiers().contains(Modifier.ABSTRACT)) {
-                            continue;
-                        } else if (onlyConcrete && superElement.getModifiers().contains(Modifier.ABSTRACT)) {
-                            continue;
-                        } else if (onlyInstance && superElement.getModifiers().contains(Modifier.STATIC)) {
-                            continue;
-                        }
-                        elementsToAdd.add(superElement);
-                    }
-                }
-                enclosedElements.addAll(elementsToAdd);
-                superclass = element.getSuperclass();
-            }
-
-            if (kind == ElementKind.METHOD || kind == ElementKind.FIELD) {
-                // if the element kind is interfaces then we need to go through interfaces as well
-                Set<TypeElement> allInterfaces = visitorContext.getModelUtils().getAllInterfaces(this.classElement);
-                Collection<TypeElement> interfacesToProcess = new ArrayList<>(allInterfaces.size());
-                // Remove duplicates
-                outer:
-                for (TypeElement el : allInterfaces) {
-                    for (TypeElement existingEl : interfacesToProcess) {
-                        Name qualifiedName = existingEl.getQualifiedName();
-                        if (qualifiedName.equals(el.getQualifiedName())) {
-                            continue outer;
-                        }
-                    }
-                    interfacesToProcess.add(el);
-                }
-                List<Element> elementsToAdd = new ArrayList<>(allInterfaces.size());
-                for (TypeElement itfe : interfacesToProcess) {
-                    List<? extends Element> interfaceElements = itfe.getEnclosedElements();
-                    interfaceElements:
-                    for (Element interfaceElement : interfaceElements) {
-                        if (interfaceElement.getKind() == ElementKind.METHOD) {
-                            ExecutableElement ee = (ExecutableElement) interfaceElement;
-                            if (onlyAbstract && ee.getModifiers().contains(Modifier.DEFAULT)) {
-                                continue;
-                            } else if (onlyConcrete && !ee.getModifiers().contains(Modifier.DEFAULT)) {
-                                continue;
-                            }
-
-                            for (Element enclosedElement : enclosedElements) {
-                                if (enclosedElement.getKind() == ElementKind.METHOD) {
-                                    if (!includeOverriddenMethods && elements.overrides((ExecutableElement) enclosedElement, ee, this.classElement)) {
-                                        continue interfaceElements;
-                                    }
-                                }
-                            }
-                        }
-                        elementsToAdd.add(interfaceElement);
-                    }
-                }
-                enclosedElements.addAll(elementsToAdd);
-                elementsToAdd.clear();
-            }
-            if (onlyAbstract) {
+            if (result.isOnlyAbstract()) {
                 if (isInterface()) {
-                    enclosedElements.removeIf((e) -> e.getModifiers().contains(Modifier.DEFAULT));
+                    collectedElements.removeIf((e) -> e.getModifiers().contains(Modifier.DEFAULT));
                 } else {
-                    enclosedElements.removeIf((e) -> !e.getModifiers().contains(Modifier.ABSTRACT));
+                    collectedElements.removeIf((e) -> !e.getModifiers().contains(Modifier.ABSTRACT));
                 }
-            } else if (onlyConcrete) {
+            } else if (result.isOnlyConcrete()) {
                 if (isInterface()) {
-                    enclosedElements.removeIf((e) -> !e.getModifiers().contains(Modifier.DEFAULT));
+                    collectedElements.removeIf((e) -> !e.getModifiers().contains(Modifier.DEFAULT));
                 } else {
-                    enclosedElements.removeIf((e) -> e.getModifiers().contains(Modifier.ABSTRACT));
+                    collectedElements.removeIf((e) -> e.getModifiers().contains(Modifier.ABSTRACT));
                 }
             }
         }
-        if (onlyInstance) {
-            enclosedElements.removeIf((e) -> e.getModifiers().contains(Modifier.STATIC));
+        if (result.isOnlyInstance()) {
+            collectedElements.removeIf((e) -> e.getModifiers().contains(Modifier.STATIC));
         }
         List<Predicate<Set<ElementModifier>>> modifierPredicates = result.getModifierPredicates();
         List<Predicate<String>> namePredicates = result.getNamePredicates();
@@ -700,10 +584,11 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         boolean hasAnnotationPredicates = !annotationPredicates.isEmpty();
         boolean hasTypePredicates = !typePredicates.isEmpty();
         boolean onlyAccessible = result.isOnlyAccessible();
+        boolean includeEnumConstants = result.isIncludeEnumConstants();
         final JavaElementFactory elementFactory = visitorContext.getElementFactory();
 
         elementLoop:
-        for (Element enclosedElement : enclosedElements) {
+        for (Element enclosedElement : collectedElements) {
             ElementKind enclosedElementKind = enclosedElement.getKind();
             if (enclosedElementKind == kind
                     || includeEnumConstants && kind == ElementKind.FIELD && enclosedElementKind == ElementKind.ENUM_CONSTANT
@@ -752,7 +637,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                     }
                 }
 
-                final AnnotationMetadata metadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(enclosedElement);
+                final AnnotationMetadata metadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(classElement, enclosedElement);
                 if (hasAnnotationPredicates) {
                     for (Predicate<AnnotationMetadata> annotationPredicate : annotationPredicates) {
                         if (!annotationPredicate.test(metadata)) {
@@ -844,6 +729,146 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         return Collections.unmodifiableList(resultingElements);
     }
 
+    private <T extends io.micronaut.inject.ast.Element> void collectFromInterfaces(ElementQuery.Result<T> result,
+                                                                                   ElementKind kind,
+                                                                                   Elements elements,
+                                                                                   List<Element> enclosedElements) {
+        boolean onlyAbstract = result.isOnlyAbstract();
+        boolean onlyConcrete = result.isOnlyConcrete();
+        boolean includeOverriddenMethods = result.isIncludeOverriddenMethods();
+
+        if (kind == ElementKind.METHOD || kind == ElementKind.FIELD) {
+            // if the element kind is interfaces then we need to go through interfaces as well
+            Set<TypeElement> allInterfaces = visitorContext.getModelUtils().getAllInterfaces(this.classElement);
+            Collection<TypeElement> interfacesToProcess = new ArrayList<>(allInterfaces.size());
+            // Remove duplicates
+            outer:
+            for (TypeElement el : allInterfaces) {
+                for (TypeElement existingEl : interfacesToProcess) {
+                    Name qualifiedName = existingEl.getQualifiedName();
+                    if (qualifiedName.equals(el.getQualifiedName())) {
+                        continue outer;
+                    }
+                }
+                interfacesToProcess.add(el);
+            }
+            List<Element> elementsToAdd = new ArrayList<>(allInterfaces.size());
+            for (TypeElement itfe : interfacesToProcess) {
+                List<? extends Element> interfaceElements = itfe.getEnclosedElements();
+                interfaceElements:
+                for (Element interfaceElement : interfaceElements) {
+                    if (interfaceElement.getKind() == ElementKind.METHOD) {
+                        ExecutableElement ee = (ExecutableElement) interfaceElement;
+                        if (onlyAbstract && ee.getModifiers().contains(Modifier.DEFAULT)) {
+                            continue;
+                        } else if (onlyConcrete && !ee.getModifiers().contains(Modifier.DEFAULT)) {
+                            continue;
+                        }
+
+                        for (Element enclosedElement : enclosedElements) {
+                            if (enclosedElement.getKind() == ElementKind.METHOD) {
+                                if (!includeOverriddenMethods && elements.overrides((ExecutableElement) enclosedElement, ee, this.classElement)) {
+                                    continue interfaceElements;
+                                }
+                            }
+                        }
+                    }
+                    elementsToAdd.add(interfaceElement);
+                }
+            }
+            enclosedElements.addAll(elementsToAdd);
+            elementsToAdd.clear();
+        }
+    }
+
+    private <T extends io.micronaut.inject.ast.Element> void collectFromSubtypes(ElementQuery.Result<T> result,
+                                                                                 ElementKind kind,
+                                                                                 Elements elements,
+                                                                                 List<Element> enclosedElements) {
+        boolean onlyAbstract = result.isOnlyAbstract();
+        boolean onlyConcrete = result.isOnlyConcrete();
+        boolean onlyInstance = result.isOnlyInstance();
+        boolean includeOverriddenMethods = result.isIncludeOverriddenMethods();
+        boolean includeHiddenElements = result.isIncludeHiddenElements();
+
+        TypeMirror superclass = classElement.getSuperclass();
+        // traverse the super class true and add elements that are not overridden
+        while (superclass instanceof DeclaredType) {
+            DeclaredType dt = (DeclaredType) superclass;
+            TypeElement element = (TypeElement) dt.asElement();
+            // reached non-accessible class like Object, Enum, Record etc.
+            if (element.getQualifiedName().toString().startsWith("java.lang.")) {
+                break;
+            }
+            List<? extends Element> superElements = element.getEnclosedElements();
+
+            List<Element> elementsToAdd = new ArrayList<>(superElements.size());
+            superElements:
+            for (Element superElement : superElements) {
+                ElementKind superKind = superElement.getKind();
+                if (superKind == kind) {
+                    for (Element enclosedElement : enclosedElements) {
+                        if (!includeHiddenElements && elements.hides(enclosedElement, superElement)) {
+                            continue superElements;
+                        } else if (enclosedElement.getKind() == ElementKind.METHOD && superElement.getKind() == ElementKind.METHOD) {
+                            final ExecutableElement methodCandidate = (ExecutableElement) superElement;
+                            if (!includeOverriddenMethods && elements.overrides((ExecutableElement) enclosedElement, methodCandidate, this.classElement)) {
+                                continue superElements;
+                            }
+                        }
+                    }
+                    // dependency injection method resolution requires extended overrides checks
+                    if (result.isOnlyInjected() && superElement.getKind() == ElementKind.METHOD) {
+                        final ExecutableElement methodCandidate = (ExecutableElement) superElement;
+                        // check for extended override
+                        final String thisClassName = this.classElement.getQualifiedName().toString();
+                        final String declaringClassName = element.getQualifiedName().toString();
+                        boolean isParent = !declaringClassName.equals(thisClassName);
+                        final ModelUtils javaModelUtils = visitorContext.getModelUtils();
+                        final ExecutableElement overridingMethod = javaModelUtils
+                                .overridingOrHidingMethod(methodCandidate, this.classElement, false)
+                                .orElse(methodCandidate);
+                        TypeElement overridingClass = javaModelUtils.classElementFor(overridingMethod);
+                        boolean overridden = isParent && overridingClass != null &&
+                                !overridingClass.getQualifiedName().toString().equals(declaringClassName);
+
+                        boolean isPackagePrivate = javaModelUtils.isPackagePrivate(methodCandidate);
+                        boolean isPrivate = methodCandidate.getModifiers().contains(Modifier.PRIVATE);
+                        if (overridden && !(isPrivate || isPackagePrivate)) {
+                            // bail out if the method has been overridden, since it will have already been handled
+                            continue;
+                        }
+                        if (isParent && overridden) {
+
+                            boolean overriddenInjected = overridden && visitorContext.getAnnotationUtils()
+                                    .getAnnotationMetadata(classElement, overridingMethod).hasDeclaredAnnotation(AnnotationUtil.INJECT);
+                            String packageOfOverridingClass = visitorContext.getElements().getPackageOf(overridingMethod).getQualifiedName().toString();
+                            String packageOfDeclaringClass = visitorContext.getElements().getPackageOf(element).getQualifiedName().toString();
+                            boolean isPackagePrivateAndPackagesDiffer = overridden && isPackagePrivate &&
+                                    !packageOfOverridingClass.equals(packageOfDeclaringClass);
+                            if (!overriddenInjected && !isPackagePrivateAndPackagesDiffer && !isPrivate) {
+                                // bail out if the overridden method is package private and in the same package
+                                // and is not annotated with @Inject
+                                continue;
+                            }
+                        }
+                    }
+
+                    if (onlyAbstract && !superElement.getModifiers().contains(Modifier.ABSTRACT)) {
+                        continue;
+                    } else if (onlyConcrete && superElement.getModifiers().contains(Modifier.ABSTRACT)) {
+                        continue;
+                    } else if (onlyInstance && superElement.getModifiers().contains(Modifier.STATIC)) {
+                        continue;
+                    }
+                    elementsToAdd.add(superElement);
+                }
+            }
+            enclosedElements.addAll(elementsToAdd);
+            superclass = element.getSuperclass();
+        }
+    }
+
     private List<? extends Element> getDeclaredEnclosedElements() {
         if (this.enclosedElements == null) {
             this.enclosedElements = classElement.getEnclosedElements();
@@ -913,9 +938,10 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             enclosingElement = enclosingElement.getEnclosingElement();
         }
         if (enclosingElement instanceof javax.lang.model.element.PackageElement) {
+            javax.lang.model.element.PackageElement packageElement = (javax.lang.model.element.PackageElement) enclosingElement;
             return new JavaPackageElement(
-                    ((javax.lang.model.element.PackageElement) enclosingElement),
-                    visitorContext.getAnnotationUtils().getAnnotationMetadata(enclosingElement),
+                    packageElement,
+                    visitorContext.getAnnotationUtils().getAnnotationMetadata(packageElement),
                     visitorContext
             );
         } else {
@@ -989,9 +1015,10 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         if (isInner()) {
             Element enclosingElement = this.classElement.getEnclosingElement();
             if (enclosingElement instanceof TypeElement) {
+                TypeElement typeElement = (TypeElement) enclosingElement;
                 return Optional.of(visitorContext.getElementFactory().newClassElement(
-                        ((TypeElement) enclosingElement),
-                        visitorContext.getAnnotationUtils().getAnnotationMetadata(enclosingElement)
+                        typeElement,
+                        visitorContext.getAnnotationUtils().getAnnotationMetadata(typeElement)
                 ));
             }
         }
@@ -1000,7 +1027,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
 
     private Optional<MethodElement> createMethodElement(AnnotationUtils annotationUtils, ExecutableElement method) {
         return Optional.ofNullable(method).map(executableElement -> {
-            final AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(executableElement);
+            final AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(classElement, executableElement);
             if (executableElement.getKind() == ElementKind.CONSTRUCTOR) {
                 return new JavaConstructorElement(this, executableElement, annotationMetadata, visitorContext);
             } else {

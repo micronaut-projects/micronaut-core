@@ -51,7 +51,7 @@ public @interface ConfigurationProperties {
      *
      * @return The prefix to use to resolve the properties
      */
-    @AliasFor(annotation = ConfigurationReader.class, member = "value")
+    @AliasFor(annotation = ConfigurationReader.class, member = ConfigurationReader.PREFIX)
     String value();
 
     /**

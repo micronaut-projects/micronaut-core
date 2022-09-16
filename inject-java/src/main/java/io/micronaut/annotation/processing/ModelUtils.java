@@ -201,7 +201,7 @@ public class ModelUtils {
         if (JavaModelUtils.isRecord(classElement)) {
             final List<ExecutableElement> constructors = ElementFilter
                     .constructorsIn(classElement.getEnclosedElements());
-            Optional<ExecutableElement> element = findAnnotatedConstructor(annotationUtils, constructors);
+            Optional<ExecutableElement> element = findAnnotatedConstructor(classElement, annotationUtils, constructors);
             if (element.isPresent()) {
                  return element.get();
             } else {
@@ -218,7 +218,7 @@ public class ModelUtils {
                 return constructors.get(0);
             }
 
-            Optional<ExecutableElement> element = findAnnotatedConstructor(annotationUtils, constructors);
+            Optional<ExecutableElement> element = findAnnotatedConstructor(classElement, annotationUtils, constructors);
             if (!element.isPresent()) {
                 element = constructors.stream().filter(ctor ->
                         ctor.getModifiers().contains(PUBLIC)
@@ -228,9 +228,11 @@ public class ModelUtils {
         }
     }
 
-    private Optional<ExecutableElement> findAnnotatedConstructor(AnnotationUtils annotationUtils, List<ExecutableElement> constructors) {
+    private Optional<ExecutableElement> findAnnotatedConstructor(TypeElement owningClassElement,
+                                                                 AnnotationUtils annotationUtils,
+                                                                 List<ExecutableElement> constructors) {
         return constructors.stream().filter(ctor -> {
-                    final AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(ctor);
+                    final AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(owningClassElement, ctor);
                     return annotationMetadata.hasStereotype(AnnotationUtil.INJECT) || annotationMetadata.hasStereotype(Creator.class);
                 }
         ).findFirst();
@@ -337,7 +339,7 @@ public class ModelUtils {
                 .filter(method -> !method.getModifiers().contains(PRIVATE))
                 .filter(method -> typeUtils.isAssignable(typeUtils.erasure(method.getReturnType()), classElement.asType()))
                 .filter(method -> {
-                    final AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(method);
+                    final AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(classElement, method);
                     return annotationMetadata.hasStereotype(Creator.class);
                 })
                 .collect(Collectors.toList());
@@ -355,7 +357,7 @@ public class ModelUtils {
                         .filter(method -> !method.getModifiers().contains(PRIVATE))
                         .filter(method -> method.getReturnType().equals(classElement.asType()))
                         .filter(method -> {
-                            final AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(method);
+                            final AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(classElement, method);
                             return annotationMetadata.hasStereotype(Creator.class);
                         })
                         .collect(Collectors.toList());

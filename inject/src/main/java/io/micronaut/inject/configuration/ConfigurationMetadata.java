@@ -72,12 +72,12 @@ public class ConfigurationMetadata implements Writable {
     @Override
     public void writeTo(Writer out) throws IOException {
         out.write('{');
-        ConfigurationMetadataBuilder.writeAttribute(out, "name", name);
+        ConfigurationMetadataBuilderX.writeAttribute(out, "name", name);
         out.write(',');
-        ConfigurationMetadataBuilder.writeAttribute(out, "type", type);
+        ConfigurationMetadataBuilderX.writeAttribute(out, "type", type);
         if (description != null) {
             out.write(',');
-            ConfigurationMetadataBuilder.writeAttribute(out, "description", description);
+            ConfigurationMetadataBuilderX.writeAttribute(out, "description", description);
         }
         out.write('}');
     }

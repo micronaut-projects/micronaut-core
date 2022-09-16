@@ -23,7 +23,7 @@ import io.micronaut.context.annotation.EachProperty
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.util.StringUtils
 import io.micronaut.inject.ast.Element
-import io.micronaut.inject.configuration.ConfigurationMetadataBuilder
+import io.micronaut.inject.configuration.ConfigurationMetadataBuilderX
 import org.codehaus.groovy.ast.ClassHelper
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.InnerClassNode
@@ -39,7 +39,7 @@ import java.util.function.Function
  * @since 1.0
  */
 @CompileStatic
-class GroovyConfigurationMetadataBuilder extends ConfigurationMetadataBuilder<ClassNode> {
+class GroovyConfigurationMetadataBuilder extends ConfigurationMetadataBuilderX<ClassNode> {
 
     final SourceUnit sourceUnit
     final CompilationUnit compilationUnit

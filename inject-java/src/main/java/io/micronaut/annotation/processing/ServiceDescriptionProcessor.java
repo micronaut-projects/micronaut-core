@@ -15,22 +15,6 @@
  */
 package io.micronaut.annotation.processing;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-
-import javax.annotation.processing.RoundEnvironment;
-import javax.annotation.processing.SupportedOptions;
-import javax.lang.model.element.Element;
-import javax.lang.model.element.TypeElement;
-import javax.lang.model.type.DeclaredType;
-import javax.lang.model.type.TypeMirror;
-
 import io.micronaut.annotation.processing.visitor.JavaClassElement;
 import io.micronaut.context.ApplicationContextConfigurer;
 import io.micronaut.context.annotation.ContextConfigurer;
@@ -39,6 +23,21 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Generated;
 import io.micronaut.core.util.StringUtils;
+
+import javax.annotation.processing.RoundEnvironment;
+import javax.annotation.processing.SupportedOptions;
+import javax.lang.model.element.Element;
+import javax.lang.model.element.TypeElement;
+import javax.lang.model.type.DeclaredType;
+import javax.lang.model.type.TypeMirror;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
 /**
  * A separate aggregating annotation processor responsible for creating META-INF/services entries.
@@ -97,7 +96,7 @@ public class ServiceDescriptionProcessor extends AbstractInjectAnnotationProcess
     private void processContextConfigurerAnnotation(List<io.micronaut.inject.ast.Element> originatingElements,
                                                     Element element,
                                                     TypeElement typeElement) {
-        AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(element);
+        AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(typeElement);
         Optional<AnnotationValue<ContextConfigurer>> ann = annotationMetadata.findAnnotation(ContextConfigurer.class);
         if (ann.isPresent()) {
             JavaClassElement javaClassElement = javaVisitorContext.getElementFactory()

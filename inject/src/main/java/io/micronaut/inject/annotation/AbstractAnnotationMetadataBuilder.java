@@ -183,46 +183,54 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @param element The element
      * @return The {@link AnnotationMetadata}
      */
-    public AnnotationMetadata buildOverridden(T element) {
-        final AnnotationMetadata existing = MUTATED_ANNOTATION_METADATA.get(new MetadataKey(getDeclaringType(element), element));
+    public AnnotationMetadata buildOverridden(T owningType, T element) {
+        final AnnotationMetadata existing = MUTATED_ANNOTATION_METADATA.get(new MetadataKey(getDeclaringType(owningType), element));
         if (existing != null) {
             return existing;
-        } else {
-
-            DefaultAnnotationMetadata annotationMetadata = new MutableAnnotationMetadata();
-
-            try {
-                AnnotationMetadata metadata = buildInternal(null, element, annotationMetadata, false, false, true);
-                if (metadata.isEmpty()) {
-                    return AnnotationMetadata.EMPTY_METADATA;
-                }
-                return metadata;
-            } catch (RuntimeException e) {
-                return metadataForError(e);
+        }
+        DefaultAnnotationMetadata annotationMetadata = new MutableAnnotationMetadata();
+        try {
+            AnnotationMetadata metadata = buildInternal(null, element, annotationMetadata, false, false, true);
+            if (metadata.isEmpty()) {
+                return AnnotationMetadata.EMPTY_METADATA;
             }
+            return metadata;
+        } catch (RuntimeException e) {
+            return metadataForError(e);
         }
     }
 
     /**
      * Build the meta data for the given element. If the element is a method the class metadata will be included.
      *
-     * @param element The element
+     * @param owningType The owning type
+     * @param element    The element
      * @return The {@link AnnotationMetadata}
      */
-    public AnnotationMetadata build(T element) {
-        String declaringType = getDeclaringType(element);
-        return build(declaringType, element);
+    public AnnotationMetadata build(T owningType, T element) {
+        String owningTypeName = getTypeName(owningType);
+        return build(owningTypeName, element);
     }
 
     /**
      * Build the meta data for the given element. If the element is a method the class metadata will be included.
      *
-     * @param declaringType The declaring type
+     * @param element    The element
+     * @return The {@link AnnotationMetadata}
+     */
+    public AnnotationMetadata buildForType(T element) {
+        return build(getTypeName(element), element);
+    }
+
+    /**
+     * Build the meta data for the given element. If the element is a method the class metadata will be included.
+     *
+     * @param owningType The owning type
      * @param element       The element
      * @return The {@link AnnotationMetadata}
      */
-    public AnnotationMetadata build(String declaringType, T element) {
-        final AnnotationMetadata existing = lookupExisting(declaringType, element);
+    public AnnotationMetadata build(String owningType, T element) {
+        final AnnotationMetadata existing = lookupExisting(owningType, element);
         if (existing != null) {
             return existing;
         } else {
@@ -255,8 +263,17 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @param element The element
      * @return The declaring type
      */
-    protected abstract @Nullable
-    String getDeclaringType(@NonNull T element);
+    @Nullable
+    protected abstract String getDeclaringType(@NonNull T element);
+
+    /**
+     * Obtains the owning type name.
+     *
+     * @param element The element
+     * @return The owning type name
+     */
+    @Nullable
+    protected abstract String getTypeName(@NonNull T element);
 
     /**
      * Build the meta data for the given method element excluding any class metadata.
@@ -264,9 +281,9 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @param element The element
      * @return The {@link AnnotationMetadata}
      */
-    public AnnotationMetadata buildForMethod(T element) {
-        String declaringType = getDeclaringType(element);
-        final AnnotationMetadata existing = lookupExisting(declaringType, element);
+    public AnnotationMetadata buildForMethod(T owningType, T element) {
+        String owningTypeName = getTypeName(owningType);
+        final AnnotationMetadata existing = lookupExisting(owningTypeName, element);
         if (existing != null) {
             return existing;
         } else {
@@ -321,13 +338,13 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     /**
      * Build the meta data for the given parents and method element excluding any class metadata.
      *
-     * @param declaringType The declaring type
-     * @param parents       The parent elements
-     * @param element       The element
+     * @param owningTypeName The owning type name
+     * @param parents        The parent elements
+     * @param element        The element
      * @return The {@link AnnotationMetadata}
      */
-    public AnnotationMetadata buildForParents(String declaringType, List<T> parents, T element) {
-        final AnnotationMetadata existing = lookupExisting(declaringType, element);
+    public AnnotationMetadata buildForParents(String owningTypeName, List<T> parents, T element) {
+        final AnnotationMetadata existing = lookupExisting(owningTypeName, element);
         DefaultAnnotationMetadata annotationMetadata;
         if (existing instanceof DefaultAnnotationMetadata) {
             // ugly, but will have to do
@@ -2170,28 +2187,28 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     /**
      * Used to store metadata mutations at compilation time. Not for public consumption.
      *
-     * @param declaringType The declaring type
+     * @param owningType The owning type
      * @param element       The element
      * @param metadata      The metadata
      */
     @Internal
-    public static void addMutatedMetadata(String declaringType, Object element, AnnotationMetadata metadata) {
+    public static void addMutatedMetadata(String owningType, Object element, AnnotationMetadata metadata) {
         if (element != null && metadata != null) {
-            MUTATED_ANNOTATION_METADATA.put(new MetadataKey(declaringType, element), metadata);
+            MUTATED_ANNOTATION_METADATA.put(new MetadataKey(owningType, element), metadata);
         }
     }
 
     /**
      * Used to store metadata mutations at compilation time. Not for public consumption.
      *
-     * @param declaringType The declaring type
+     * @param owningType    The owning type
      * @param element       The element
      * @return True if the annotation metadata was mutated
      */
     @Internal
-    public static boolean isMetadataMutated(String declaringType, Object element) {
+    public static boolean isMetadataMutated(String owningType, Object element) {
         if (element != null) {
-            return MUTATED_ANNOTATION_METADATA.containsKey(new MetadataKey(declaringType, element));
+            return MUTATED_ANNOTATION_METADATA.containsKey(new MetadataKey(owningType, element));
         }
         return false;
     }

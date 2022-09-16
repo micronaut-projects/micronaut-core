@@ -198,6 +198,14 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
     }
 
     @Override
+    protected String getTypeName(AnnotatedNode element) {
+        if (element instanceof ClassNode) {
+            return ((ClassNode) element).getName();
+        }
+        throw new IllegalStateException();
+    }
+
+    @Override
     protected boolean hasAnnotation(AnnotatedNode element, Class<? extends Annotation> annotation) {
         return !element.getAnnotations(ClassHelper.makeCached(annotation)).isEmpty();
     }

@@ -502,7 +502,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private final boolean isInterface;
     private final boolean isAbstract;
     private final boolean isConfigurationProperties;
-    private final ConfigurationMetadataBuilder<?> metadataBuilder;
+    private final ConfigurationMetadataBuilder metadataBuilder;
     private final Element beanProducingElement;
     private final ClassElement beanTypeElement;
     private final VisitorContext visitorContext;
@@ -559,7 +559,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
      * @param visitorContext  The visitor context
      */
     public BeanDefinitionWriter(ClassElement classElement,
-                                ConfigurationMetadataBuilder<?> metadataBuilder,
+                                ConfigurationMetadataBuilder metadataBuilder,
                                 VisitorContext visitorContext) {
         this(classElement, OriginatingElements.of(classElement), metadataBuilder, visitorContext, null);
     }
@@ -574,7 +574,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
      */
     public BeanDefinitionWriter(ClassElement classElement,
                                 OriginatingElements originatingElements,
-                                ConfigurationMetadataBuilder<?> metadataBuilder,
+                                ConfigurationMetadataBuilder metadataBuilder,
                                 VisitorContext visitorContext) {
         this(classElement, originatingElements, metadataBuilder, visitorContext, null);
     }
@@ -590,7 +590,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
      */
     public BeanDefinitionWriter(Element beanProducingElement,
                                 OriginatingElements originatingElements,
-                                ConfigurationMetadataBuilder<?> metadataBuilder,
+                                ConfigurationMetadataBuilder metadataBuilder,
                                 VisitorContext visitorContext,
                                 @Nullable Integer uniqueIdentifier) {
         super(originatingElements);
@@ -1668,7 +1668,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 field,
                 false,
                 annotationMetadata,
-                metadataBuilder,
                 isInterface);
     }
 
@@ -1706,7 +1705,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             ));
         }
 
-        this.currentConfigBuilderState = new ConfigBuilderState(type, methodName, true, annotationMetadata, metadataBuilder, isInterface);
+        this.currentConfigBuilderState = new ConfigBuilderState(type, methodName, true, annotationMetadata, isInterface);
     }
 
     @Override

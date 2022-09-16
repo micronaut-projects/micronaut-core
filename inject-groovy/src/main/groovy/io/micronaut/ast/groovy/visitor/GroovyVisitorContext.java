@@ -15,6 +15,7 @@
  */
 package io.micronaut.ast.groovy.visitor;
 
+import io.micronaut.ast.groovy.annotation.GroovyAnnotationMetadataBuilder;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -28,6 +29,7 @@ import io.micronaut.ast.groovy.scan.ClassPathAnnotationScanner;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.util.VisitorContextUtils;
@@ -160,6 +162,11 @@ public class GroovyVisitorContext implements VisitorContext {
     @Override
     public GroovyElementFactory getElementFactory() {
         return groovyElementFactory;
+    }
+
+    @Override
+    public AbstractAnnotationMetadataBuilder newAnnotationBuilder() {
+        return new GroovyAnnotationMetadataBuilder(sourceUnit, compilationUnit);
     }
 
     @Override

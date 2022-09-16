@@ -15,12 +15,14 @@
  */
 package io.micronaut.annotation.processing;
 
+import io.micronaut.annotation.processing.visitor.JavaClassElement;
 import io.micronaut.annotation.processing.visitor.LoadedVisitor;
 import io.micronaut.aop.Introduction;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Generated;
 import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.order.OrderUtil;
@@ -31,7 +33,6 @@ import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
 
 import javax.annotation.processing.ProcessingEnvironment;
@@ -44,9 +45,16 @@ import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.ElementScanner8;
-
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -400,23 +408,14 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                 } else if (JavaModelUtils.isEnum(classElement)) {
                     return scan(classElement.getEnclosedElements(), o);
                 } else {
-                    List<TypeElement> classes = new ArrayList<>();
                     List<? extends Element> elements = enclosedElements(classElement);
                     Object value = null;
                     for (Element element : elements) {
                         if (element instanceof TypeElement) {
-                            classes.add((TypeElement) element);
+                            // Ignore any inner classes, annotation processor will process them if needed
+                            continue;
                         } else {
                             value = scan(element, o);
-                        }
-                    }
-                    // TypeElementVisitor needs to process type's methods first and then all inner classes
-                    for (TypeElement typeElement : classes) {
-                        value = scan(typeElement, o);
-                        for (LoadedVisitor visitor : visitors) {
-                            if (visitor.matches(typeElement)) {
-                                value = scan(enclosedElements(typeElement), o);
-                            }
                         }
                     }
                     return value;
@@ -478,28 +477,22 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
         @Override
         public Object visitExecutable(ExecutableElement executableElement, Object o) {
-            final AnnotationMetadata resolvedMethodMetadata = annotationUtils.getAnnotationMetadata(executableElement);
-
-            AnnotationMetadata methodAnnotationMetadata;
-
-            if (resolvedMethodMetadata instanceof AnnotationMetadataHierarchy) {
-                methodAnnotationMetadata = resolvedMethodMetadata;
-            } else {
-                methodAnnotationMetadata = new AnnotationMetadataHierarchy(
-                        annotationUtils.getAnnotationMetadata(executableElement.getEnclosingElement()),
-                        resolvedMethodMetadata
-                );
-            }
+            AnnotationMetadata methodAnnotationMetadata = null;
             if (executableElement.getSimpleName().toString().equals("<init>")) {
                 for (LoadedVisitor visitor : visitors) {
+                    if (methodAnnotationMetadata == null) {
+                        methodAnnotationMetadata = resolveAnnotationMetadata(executableElement, visitor.getRootClassElement(), true);
+                    }
                     final io.micronaut.inject.ast.Element resultingElement = visitor.visit(executableElement, methodAnnotationMetadata);
                     if (resultingElement != null) {
                         methodAnnotationMetadata = resultingElement.getAnnotationMetadata();
                     }
                 }
             } else {
-
                 for (LoadedVisitor visitor : visitors) {
+                    if (methodAnnotationMetadata == null) {
+                        methodAnnotationMetadata = resolveAnnotationMetadata(executableElement, visitor.getRootClassElement(), true);
+                    }
                     if (visitor.matches(methodAnnotationMetadata)) {
                         final io.micronaut.inject.ast.Element resultingElement = visitor.visit(executableElement, methodAnnotationMetadata);
                         if (resultingElement != null) {
@@ -508,7 +501,6 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                     }
                 }
             }
-
 
             return null;
         }
@@ -520,9 +512,11 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                 return null;
             }
 
-            AnnotationMetadata fieldAnnotationMetadata = annotationUtils.getAnnotationMetadata(variable);
-
+            AnnotationMetadata fieldAnnotationMetadata = null;
             for (LoadedVisitor visitor : visitors) {
+                if (fieldAnnotationMetadata == null) {
+                    fieldAnnotationMetadata = resolveAnnotationMetadata(variable, visitor.getRootClassElement(), false);
+                }
                 if (visitor.matches(fieldAnnotationMetadata)) {
                     final io.micronaut.inject.ast.Element resultingElement = visitor.visit(variable, fieldAnnotationMetadata);
                     if (resultingElement != null) {
@@ -532,6 +526,23 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
             }
 
             return null;
+        }
+
+        private AnnotationMetadata resolveAnnotationMetadata(Element element, JavaClassElement classElement, boolean addClassAnnotationMetadata) {
+            final AnnotationMetadata resolvedMethodMetadata = annotationUtils.getAnnotationMetadata(classElement.getNativeTypeElement(), element);
+            if (!addClassAnnotationMetadata) {
+                return resolvedMethodMetadata;
+            }
+            AnnotationMetadata methodAnnotationMetadata;
+            if (resolvedMethodMetadata instanceof AnnotationMetadataHierarchy) {
+                methodAnnotationMetadata = resolvedMethodMetadata;
+            } else {
+                methodAnnotationMetadata = new AnnotationMetadataHierarchy(
+                    annotationUtils.getAnnotationMetadata(classElement.getNativeTypeElement()),
+                    resolvedMethodMetadata
+                );
+            }
+            return methodAnnotationMetadata;
         }
     }
 }

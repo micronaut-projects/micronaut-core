@@ -123,7 +123,7 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
     }
 
     @Override
-    public Object getNativeType() {
+    public MethodNode getNativeType() {
         return methodNode;
     }
 
@@ -210,12 +210,16 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
     @Override
     public ClassElement getDeclaringType() {
         if (this.declaringElement == null) {
+            ClassNode methodDeclaringClass = methodNode.getDeclaringClass();
+            if (methodDeclaringClass == null) {
+                return declaringClass;
+            }
             this.declaringElement = visitorContext.getElementFactory().newClassElement(
-                    methodNode.getDeclaringClass(),
+                methodDeclaringClass,
                     AstAnnotationUtils.getAnnotationMetadata(
                             sourceUnit,
                             compilationUnit,
-                            methodNode.getDeclaringClass()
+                        methodDeclaringClass
                     )
             );
         }

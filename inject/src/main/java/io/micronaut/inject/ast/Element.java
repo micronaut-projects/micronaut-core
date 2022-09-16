@@ -16,6 +16,7 @@
 package io.micronaut.inject.ast;
 
 import io.micronaut.core.annotation.AnnotatedElement;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
@@ -212,6 +213,19 @@ public interface Element extends AnnotationMetadataDelegate, AnnotatedElement, D
      */
     @NonNull
     default <T extends Annotation> Element annotate(@NonNull AnnotationValue<T> annotationValue) {
+        throw new UnsupportedOperationException("Element of type [" + getClass() + "] does not support adding annotations at compilation time");
+    }
+
+    /**
+     * Replaces existing annotations metadata of the element.
+     *
+     * @param annotationMetadata The annotation metadata to replace
+     * @param <T> The annotation generic type
+     * @return This element
+     * @since 3.7.0
+     */
+    @NonNull
+    default <T extends Annotation> Element replaceAnnotations(@NonNull AnnotationMetadata annotationMetadata) {
         throw new UnsupportedOperationException("Element of type [" + getClass() + "] does not support adding annotations at compilation time");
     }
 

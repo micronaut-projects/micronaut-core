@@ -79,18 +79,18 @@ public class PropertyMetadata implements Writable {
     @Override
     public void writeTo(Writer out) throws IOException {
         out.write('{');
-        ConfigurationMetadataBuilder.writeAttribute(out, "name", path);
+        ConfigurationMetadataBuilderX.writeAttribute(out, "name", path);
         out.write(',');
-        ConfigurationMetadataBuilder.writeAttribute(out, "type", type);
+        ConfigurationMetadataBuilderX.writeAttribute(out, "type", type);
         out.write(',');
-        ConfigurationMetadataBuilder.writeAttribute(out, "sourceType", declaringType);
+        ConfigurationMetadataBuilderX.writeAttribute(out, "sourceType", declaringType);
         if (description != null) {
             out.write(',');
-            ConfigurationMetadataBuilder.writeAttribute(out, "description", description);
+            ConfigurationMetadataBuilderX.writeAttribute(out, "description", description);
         }
         if (defaultValue != null) {
             out.write(',');
-            ConfigurationMetadataBuilder.writeAttribute(out, "defaultValue", defaultValue);
+            ConfigurationMetadataBuilderX.writeAttribute(out, "defaultValue", defaultValue);
         }
         out.write('}');
     }

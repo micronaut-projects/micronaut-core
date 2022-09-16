@@ -35,7 +35,7 @@ import java.util.Map;
 class AnnotatedFieldWithSetter {
     @MapFormat(keyFormat = StringConvention.RAW)
     private Map<String, String> animals;
-    
+
     public void setAnimals(Map<String, String> animals) {
         this.animals = animals;
     }
@@ -77,7 +77,7 @@ class AnnotatedFieldWithSetter {
         }
 
         JavaAnnotationMetadataBuilder builder = newJavaAnnotationBuilder()
-        AnnotationMetadata methodAnnotationMetadata = builder.build(method)
+        AnnotationMetadata methodAnnotationMetadata = builder.build(element, method)
 
         String[] writerPrefixes = methodAnnotationMetadata
                     .getValue(AccessorsStyle.class, "writePrefixes", String[].class)

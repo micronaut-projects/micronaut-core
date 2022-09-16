@@ -22,7 +22,7 @@ import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
+import io.micronaut.inject.configuration.ConfigurationMetadataBuilderX;
 
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
@@ -38,13 +38,13 @@ import java.util.Optional;
 import java.util.function.Function;
 
 /**
- * Implementation of {@link ConfigurationMetadataBuilder} for Java.
+ * Implementation of {@link ConfigurationMetadataBuilderX} for Java.
  *
  * @author Graeme Rocher
- * @see ConfigurationMetadataBuilder
+ * @see ConfigurationMetadataBuilderX
  * @since 1.0
  */
-public class JavaConfigurationMetadataBuilder extends ConfigurationMetadataBuilder<TypeElement> {
+public class JavaConfigurationMetadataBuilder extends ConfigurationMetadataBuilderX<TypeElement> {
 
     private final AnnotationUtils annotationUtils;
     private final ModelUtils modelUtils;
@@ -166,7 +166,6 @@ public class JavaConfigurationMetadataBuilder extends ConfigurationMetadataBuild
     }
 
     private String calculateInitialPath(TypeElement owningType, AnnotationMetadata annotationMetadata) {
-
         Function<String, String> evaluatePathFunction = pathEvaluationFunctionForMetadata(annotationMetadata);
         return annotationMetadata.getValue(ConfigurationReader.class, String.class)
             .map(evaluatePathFunction)
@@ -258,10 +257,11 @@ public class JavaConfigurationMetadataBuilder extends ConfigurationMetadataBuild
     }
 
     private DeclaredType resolveSuperInterface(TypeElement declaringType) {
-        return declaringType.getInterfaces().stream().filter(tm ->
-            tm instanceof DeclaredType &&
-                    annotationUtils.getAnnotationMetadata(((DeclaredType) tm).asElement()).hasStereotype(ConfigurationReader.class)
-        ).map(dt -> (DeclaredType) dt).findFirst().orElse(null);
+        return null;
+//        return declaringType.getInterfaces().stream().filter(tm ->
+//            tm instanceof DeclaredType &&
+//                    annotationUtils.getAnnotationMetadata(((DeclaredType) tm).asElement()).hasStereotype(ConfigurationReader.class)
+//        ).map(dt -> (DeclaredType) dt).findFirst().orElse(null);
     }
 
 }

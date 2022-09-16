@@ -237,6 +237,11 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     }
 
     @Override
+    protected String getTypeName(Element element) {
+        return element.getSimpleName().toString();
+    }
+
+    @Override
     protected Element getTypeForAnnotation(AnnotationMirror annotationMirror) {
         return annotationMirror.getAnnotationType().asElement();
     }

@@ -82,9 +82,9 @@ public class PackageConfigurationInjectProcessor extends AbstractInjectAnnotatio
         @Override
         public Object visitPackage(PackageElement packageElement, Object p) {
             Object aPackage = super.visitPackage(packageElement, p);
-            if (annotationUtils.hasStereotype(packageElement, Configuration.class)) {
+            AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(packageElement);
+            if (annotationMetadata.hasStereotype(Configuration.class)) {
                 String packageName = packageElement.getQualifiedName().toString();
-                AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(packageElement);
                 BeanConfigurationWriter writer = new BeanConfigurationWriter(
                     packageName,
                     new JavaPackageElement(packageElement, annotationMetadata, javaVisitorContext),

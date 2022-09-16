@@ -15,12 +15,12 @@
  */
 package io.micronaut.context.annotation;
 
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * <p>A meta annotation for use with other annotations to indicate that the annotation reads configuration.</p>
@@ -35,10 +35,16 @@ import java.lang.annotation.Target;
 public @interface ConfigurationReader {
 
     /**
+     * The prefix name.
+     */
+    String PREFIX = "prefix";
+
+    /**
      * The prefix to use when resolving properties. The prefix should be defined in kebab case. Example: my-app.foo.
      *
      * @return The configuration entry to read
      */
+    @AliasFor(member = PREFIX)
     String value() default "";
 
     /**

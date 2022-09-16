@@ -15,15 +15,19 @@
  */
 package io.micronaut.annotation.processing.visitor;
 
-import io.micronaut.annotation.processing.JavaConfigurationMetadataBuilder;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.inject.ast.*;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ElementFactory;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
+import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 
-import javax.lang.model.element.*;
 import javax.lang.model.element.Element;
+import javax.lang.model.element.ElementKind;
+import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.TypeMirror;
 import java.util.Map;
 import java.util.Objects;
@@ -126,11 +130,7 @@ public class JavaElementFactory implements ElementFactory<Element, TypeElement, 
                     return new JavaBeanDefinitionBuilder(
                             this,
                             type,
-                            new JavaConfigurationMetadataBuilder(
-                                    visitorContext.getElements(),
-                                    visitorContext.getTypes(),
-                                    visitorContext.getAnnotationUtils()
-                            ),
+                            ConfigurationMetadataBuilder.INSTANCE,
                             visitorContext
                     );
                 }
@@ -147,11 +147,7 @@ public class JavaElementFactory implements ElementFactory<Element, TypeElement, 
                     return new JavaBeanDefinitionBuilder(
                             this,
                             type,
-                            new JavaConfigurationMetadataBuilder(
-                                    visitorContext.getElements(),
-                                    visitorContext.getTypes(),
-                                    visitorContext.getAnnotationUtils()
-                            ),
+                            ConfigurationMetadataBuilder.INSTANCE,
                             visitorContext
                     );
                 }
@@ -177,11 +173,7 @@ public class JavaElementFactory implements ElementFactory<Element, TypeElement, 
                 return new JavaBeanDefinitionBuilder(
                         this,
                         type,
-                        new JavaConfigurationMetadataBuilder(
-                                visitorContext.getElements(),
-                                visitorContext.getTypes(),
-                                visitorContext.getAnnotationUtils()
-                        ),
+                        ConfigurationMetadataBuilder.INSTANCE,
                         visitorContext
                 );
             }

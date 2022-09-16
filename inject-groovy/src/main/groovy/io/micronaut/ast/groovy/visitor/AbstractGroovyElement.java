@@ -151,6 +151,14 @@ public abstract class AbstractGroovyElement implements AnnotationMetadataDelegat
         return this;
     }
 
+    @Override
+    public <T extends Annotation> Element replaceAnnotations(AnnotationMetadata annotationMetadata) {
+        ArgumentUtils.requireNonNull("annotationType", annotationMetadata);
+        this.annotationMetadata = annotationMetadata;
+        updateAnnotationCaches();
+        return this;
+    }
+
     private void updateAnnotationCaches() {
         String declaringTypeName = this instanceof MemberElement ? ((MemberElement) this).getOwningType().getName() : getName();
         AbstractAnnotationMetadataBuilder.addMutatedMetadata(

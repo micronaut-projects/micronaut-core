@@ -127,4 +127,9 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
         }
         return resolvedDeclaringClass;
     }
+
+    @Override
+    public ClassElement getOwningType() {
+        return declaringElement;
+    }
 }

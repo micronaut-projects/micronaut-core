@@ -28,11 +28,11 @@ import java.io.IOException;
 public interface ConfigurationMetadataWriter {
 
     /**
-     * An interface for classes that can write metadata produced by a {@link ConfigurationMetadataBuilder}.
+     * An interface for classes that can write metadata produced by a {@link ConfigurationMetadataBuilderX}.
      *
      * @param metadataBuilder          The metadata builder
      * @param classWriterOutputVisitor The class output visitor
      * @throws IOException If an error occurred writing output
      */
-    void write(ConfigurationMetadataBuilder<?> metadataBuilder, ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException;
+    void write(ConfigurationMetadataBuilder metadataBuilder, ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException;
 }

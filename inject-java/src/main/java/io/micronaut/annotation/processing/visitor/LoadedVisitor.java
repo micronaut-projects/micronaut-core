@@ -18,13 +18,17 @@ package io.micronaut.annotation.processing.visitor;
 import io.micronaut.annotation.processing.GenericUtils;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 
-import io.micronaut.core.annotation.Nullable;
 import javax.annotation.processing.ProcessingEnvironment;
-import javax.lang.model.element.*;
+import javax.lang.model.element.Element;
+import javax.lang.model.element.ElementKind;
+import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.TypeMirror;
 import java.util.List;
 
@@ -103,6 +107,10 @@ public class LoadedVisitor implements Ordered {
     @Override
     public int getOrder() {
         return visitor.getOrder();
+    }
+
+    public JavaClassElement getRootClassElement() {
+        return rootClassElement;
     }
 
     /**

@@ -761,7 +761,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     }
 
     @Override
-    public Object getNativeType() {
+    public ClassNode getNativeType() {
         return classNode;
     }
 
@@ -1047,14 +1047,15 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                     if (value.setter != null) {
                         parents.add(value.setter);
                     }
+                    GroovyClassElement declaringType = value.declaringType;
                     if (!parents.isEmpty()) {
                         annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, parents, value.getter);
                     } else {
-                        annotationMetadata = groovyAnnotationMetadataBuilder.buildForMethod(value.getter);
+                        annotationMetadata = groovyAnnotationMetadataBuilder.buildForMethod((AnnotatedNode) declaringType.getNativeType(), value.getter);
                     }
                     GroovyPropertyElement propertyElement = new GroovyPropertyElement(
                             visitorContext,
-                            value.declaringType,
+                            declaringType,
                             value.getter,
                             annotationMetadata,
                             propertyName,
@@ -1067,7 +1068,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                                         thisElement,
                                         visitorContext,
                                         value.setter,
-                                        groovyAnnotationMetadataBuilder.buildForMethod(value.setter)
+                                        groovyAnnotationMetadataBuilder.buildForMethod(thisElement.getNativeType(), value.setter)
                                 ));
                             }
                             return Optional.empty();
