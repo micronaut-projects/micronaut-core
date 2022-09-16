@@ -6,6 +6,7 @@ import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
@@ -29,6 +30,11 @@ public class SimpleBeanBuilder extends AbstractBeanBuilder {
 
     @Override
     public final void build() {
+        build(createBeanDefinitionVisitor());
+    }
+
+    @NonNull
+    protected BeanDefinitionVisitor createBeanDefinitionVisitor() {
         BeanDefinitionVisitor beanDefinitionWriter = new BeanDefinitionWriter(classElement, metadataBuilder, visitorContext);
         beanDefinitionWriters.add(beanDefinitionWriter);
         beanDefinitionWriter.visitTypeArguments(classElement.getAllTypeArguments());
@@ -39,7 +45,7 @@ public class SimpleBeanBuilder extends AbstractBeanBuilder {
         } else {
             beanDefinitionWriter.visitDefaultConstructor(AnnotationMetadata.EMPTY_METADATA, visitorContext);
         }
-        build(beanDefinitionWriter);
+        return beanDefinitionWriter;
     }
 
     protected void build(BeanDefinitionVisitor visitor) {
@@ -79,7 +85,6 @@ public class SimpleBeanBuilder extends AbstractBeanBuilder {
     }
 
     private void visitMethodInternal(BeanDefinitionVisitor visitor, MethodElement methodElement) {
-        // TODO: eliminate the need to do the adjustment in the future
         adjustMethodToIncludeClassMetadata(visitor, methodElement);
         if (methodElement.hasAnnotation(ANN_REQUIRES_VALIDATION)) {
             methodElement.annotate(ANN_VALIDATED);

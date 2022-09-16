@@ -752,7 +752,6 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                 }
                 interfacesToProcess.add(el);
             }
-            List<Element> elementsToAdd = new ArrayList<>(allInterfaces.size());
             for (TypeElement itfe : interfacesToProcess) {
                 List<? extends Element> interfaceElements = itfe.getEnclosedElements();
                 interfaceElements:
@@ -773,11 +772,9 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                             }
                         }
                     }
-                    elementsToAdd.add(interfaceElement);
+                    enclosedElements.add(interfaceElement);
                 }
             }
-            enclosedElements.addAll(elementsToAdd);
-            elementsToAdd.clear();
         }
     }
 

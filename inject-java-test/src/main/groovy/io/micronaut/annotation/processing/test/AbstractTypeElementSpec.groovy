@@ -130,7 +130,7 @@ abstract class AbstractTypeElementSpec extends Specification {
         ExecutableElement method = (ExecutableElement)element.getEnclosedElements().find() { it.simpleName.toString() == methodName }
         VariableElement argument = method.parameters.find() { it.simpleName.toString() == argumentName }
         JavaAnnotationMetadataBuilder builder = newJavaAnnotationBuilder()
-        AnnotationMetadata metadata = argument != null ? builder.build(argument) : null
+        AnnotationMetadata metadata = argument != null ? builder.build(element, argument) : null
         AbstractAnnotationMetadataBuilder.copyToRuntime()
         return metadata
     }

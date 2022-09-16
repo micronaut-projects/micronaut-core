@@ -15,21 +15,22 @@ public interface AopHelper {
 
     @Nullable
     BeanDefinitionVisitor visitAdaptedMethod(ClassElement classElement,
-                                                                MethodElement sourceMethod,
-                                                                ConfigurationMetadataBuilder metadataBuilder,
-                                                                AtomicInteger adaptedMethodIndex,
-                                                                VisitorContext visitorContext);
+                                             MethodElement sourceMethod,
+                                             ConfigurationMetadataBuilder metadataBuilder,
+                                             AtomicInteger adaptedMethodIndex,
+                                             VisitorContext visitorContext);
 
-    BeanDefinitionVisitor createIntroductionAdviceWriter(ClassElement typeElement,
-                                                         ConfigurationMetadataBuilder metadataBuilder,
-                                                         VisitorContext visitorContext);
+    BeanDefinitionVisitor createIntroductionAopProxyWriter(ClassElement typeElement,
+                                                           ConfigurationMetadataBuilder metadataBuilder,
+                                                           VisitorContext visitorContext);
 
+    BeanDefinitionVisitor createAroundAopProxyWriter(BeanDefinitionVisitor existingWriter,
+                                                     AnnotationMetadata producedAnnotationMetadata,
+                                                     ConfigurationMetadataBuilder metadataBuilder,
+                                                     VisitorContext visitorContext,
+                                                     boolean forceProxyTarget);
 
-    boolean isAopProxyWriter(BeanDefinitionVisitor existingWriter);
+    boolean visitIntrospectedMethod(BeanDefinitionVisitor visitor, ClassElement typeElement, MethodElement methodElement);
 
-    BeanDefinitionVisitor createAopProxyWriter(BeanDefinitionVisitor existingWriter,
-                                               AnnotationMetadata producedAnnotationMetadata,
-                                               ConfigurationMetadataBuilder metadataBuilder,
-                                               VisitorContext visitorContext, boolean isMethod);
-    void visitAroundMethod(BeanDefinitionVisitor existingWriter, TypedElement beanType, MethodElement methodElement);
+        void visitAroundMethod(BeanDefinitionVisitor existingWriter, TypedElement beanType, MethodElement methodElement);
 }

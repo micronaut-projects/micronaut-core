@@ -5,7 +5,9 @@ import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.DefaultScope;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
@@ -18,6 +20,7 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementFactory;
 import io.micronaut.inject.ast.ElementQuery;
+import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
@@ -76,21 +79,30 @@ public abstract class AbstractBeanBuilder {
     }
 
     public static AbstractBeanBuilder of(ClassElement classElement, VisitorContext visitorContext) {
-        if (classElement.hasStereotype(AnnotationUtil.ANN_INTRODUCTION)) {
-            return new IntroductionBeanBuilder(classElement, visitorContext);
-        }
-        boolean declaredBean = isDeclaredBean(classElement);
-        if (declaredBean) {
-            if (classElement.hasStereotype(Factory.class)) {
-                return new FactoryBeanBuilder(classElement, visitorContext);
+        boolean isIntroduction = classElement.hasStereotype(AnnotationUtil.ANN_INTRODUCTION);
+        if (ConfigurationPropertiesBeanBuilder.isConfigurationProperties(classElement)) {
+            if (classElement.isInterface()) {
+                return new IntroductionInterfaceBeanBuilder(classElement, visitorContext);
             }
-            if (ConfigurationPropertiesBeanBuilder.isConfigurationProperties(classElement)) {
-                return new ConfigurationPropertiesBeanBuilder(classElement, visitorContext);
-            }
-            return new AopProxySupportedBeanBuilder(classElement, visitorContext, false);
+            return new ConfigurationPropertiesBeanBuilder(classElement, visitorContext);
         }
-        if (isAopProxyType(classElement) || containsInjectMethod(classElement)) {
-            return new AopProxySupportedBeanBuilder(classElement, visitorContext, true);
+        if (classElement.hasStereotype(Factory.class)) {
+            return new FactoryBeanBuilder(classElement, visitorContext);
+        }
+        if (isAopProxyType(classElement)) {
+            if (isIntroduction) {
+                return new AopIntroductionProxySupportedBeanBuilder(classElement, visitorContext, true);
+            }
+            return new AopAroundProxySupportedBeanBuilder(classElement, visitorContext, true);
+        }
+        if (isIntroduction) {
+            if (classElement.isInterface()) {
+                return new IntroductionInterfaceBeanBuilder(classElement, visitorContext);
+            }
+            return new AopIntroductionProxySupportedBeanBuilder(classElement, visitorContext, false);
+        }
+        if (isDeclaredBean(classElement) || containsInjectMethod(classElement) || containsInjectField(classElement)) {
+            return new AopAroundProxySupportedBeanBuilder(classElement, visitorContext, false);
         }
         return null;
     }
@@ -104,13 +116,26 @@ public abstract class AbstractBeanBuilder {
             findConstructorElement(classElement).map(constructor -> constructor.hasStereotype(AnnotationUtil.INJECT)).orElse(false);
     }
 
-    // TODO: deprecate in Micronaut 4
     private static boolean containsInjectMethod(ClassElement classElement) {
         return classElement.getEnclosedElement(
             ElementQuery.ALL_METHODS.onlyConcrete()
                 .onlyDeclared()
                 .annotated(annotationMetadata -> annotationMetadata.hasDeclaredAnnotation(AnnotationUtil.INJECT))
         ).isPresent();
+    }
+
+    private static boolean containsInjectField(ClassElement classElement) {
+        return classElement.getEnclosedElement(
+            ElementQuery.ALL_FIELDS
+                .onlyDeclared()
+                .annotated(AbstractBeanBuilder::containsInjectPoint)
+        ).isPresent();
+    }
+
+    private static boolean containsInjectPoint(AnnotationMetadata annotationMetadata) {
+        return annotationMetadata.hasStereotype(AnnotationUtil.INJECT)
+            || annotationMetadata.hasStereotype(Value.class)
+            || annotationMetadata.hasStereotype(Property.class);
     }
 
     private static boolean isAopProxyType(ClassElement classElement) {
@@ -127,6 +152,7 @@ public abstract class AbstractBeanBuilder {
 
     /**
      * Does the given metadata have AOP advice declared.
+     *
      * @param annotationMetadata The annotation metadata
      * @return True if it does
      */
@@ -138,6 +164,7 @@ public abstract class AbstractBeanBuilder {
 
     /**
      * Does the given metadata have declared AOP advice.
+     *
      * @param annotationMetadata The annotation metadata
      * @return True if it does
      */
@@ -215,12 +242,21 @@ public abstract class AbstractBeanBuilder {
     }
 
     protected void adjustMethodToIncludeClassMetadata(BeanDefinitionVisitor beanDefinitionVisitor, MethodElement methodElement) {
+        // TODO: eliminate the need to do the adjustment in the future
         AnnotationMetadata methodAnnotationMetadata = getElementAnnotationMetadata(methodElement);
         methodElement.replaceAnnotations(annotationMetadataCombineWithBeanMetadata(beanDefinitionVisitor, methodAnnotationMetadata));
     }
 
     protected void methodAnnotationsGuard(MethodElement methodElement, Consumer<MethodElement> consumer) {
         methodAnnotationsGuard(visitorContext, methodElement, consumer);
+    }
+
+    protected void fieldAnnotationsGuard(FieldElement fieldElement, Consumer<FieldElement> consumer) {
+        fieldAnnotationsGuard(visitorContext, fieldElement, consumer);
+    }
+
+    protected void classAnnotationsGuard(ClassElement classElement, Consumer<ClassElement> consumer) {
+        classAnnotationsGuard(visitorContext, classElement, consumer);
     }
 
     public static void adjustMethodToIncludeClassMetadata(MethodElement methodElement) {
@@ -258,6 +294,44 @@ public abstract class AbstractBeanBuilder {
         // Previous modifications will modify the shared annotation cache of this method
         // We need to put original values into the cache
         methodElement.replaceAnnotations(methodElement.getAnnotationMetadata());
+    }
+
+    public static void fieldAnnotationsGuard(VisitorContext visitorContext, FieldElement fieldElement, Consumer<FieldElement> consumer) {
+        ElementFactory elementFactory = visitorContext.getElementFactory();
+        // Because of the shared method's annotation cache we need to make a copy of the method.
+        // The method is going to be stored in the visitor till the write process
+        // We need to make sure we don't reuse the same instance for other adapters, and we don't override
+        // added annotations.
+        FieldElement targetField = elementFactory.newFieldElement(
+            fieldElement.getDeclaringType(),
+            fieldElement.getNativeType(),
+            fieldElement.getAnnotationMetadata()
+        );
+        consumer.accept(targetField);
+        // Previous modifications will modify the shared annotation cache of this method
+        // We need to put original values into the cache
+        fieldElement.replaceAnnotations(fieldElement.getAnnotationMetadata());
+    }
+
+    public static void classAnnotationsGuard(VisitorContext visitorContext, ClassElement classElement, Consumer<ClassElement> consumer) {
+        if (classElement.isPrimitive()) {
+            consumer.accept(classElement);
+            return;
+        }
+        ElementFactory elementFactory = visitorContext.getElementFactory();
+        // Because of the shared method's annotation cache we need to make a copy of the class.
+        // The class is going to be stored in the visitor till the write process
+        // We need to make sure we don't reuse the same instance for other adapters, and we don't override
+        // added annotations.
+        ClassElement newClassElement = elementFactory.newClassElement(
+            classElement.getNativeType(),
+            classElement.getAnnotationMetadata(),
+            classElement.getTypeArguments()
+        );
+        consumer.accept(newClassElement);
+        // Previous modifications will modify the shared annotation cache of this class
+        // We need to put original values into the cache
+        classElement.replaceAnnotations(classElement.getAnnotationMetadata());
     }
 
 }

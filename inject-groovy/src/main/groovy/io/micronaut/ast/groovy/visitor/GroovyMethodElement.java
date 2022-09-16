@@ -188,7 +188,7 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
                             this,
                             visitorContext,
                             parameter,
-                            AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, new ExtendedParameter(methodNode, parameter))
+                            AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, declaringClass.getNativeType(), new ExtendedParameter(methodNode, parameter))
                     )
             ).toArray(ParameterElement[]::new);
         }

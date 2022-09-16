@@ -6,7 +6,6 @@ import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
@@ -52,43 +51,53 @@ public class FactoryBeanBuilder extends SimpleBeanBuilder {
     }
 
     void visitBeanFactoryElement(BeanDefinitionVisitor visitor, ClassElement producedType, MemberElement producingElement) {
-
-        AnnotationMetadata producedAnnotationMetadata;
-
         if (producedType.isPrimitive()) {
-            producedAnnotationMetadata = getElementAnnotationMetadata(producingElement);
+            buildProducedBeanDefinition(producedType, producingElement, producingElement.getAnnotationMetadata());
         } else {
-            // Original logic is to combine producing element annotation metadata (method or field) with the produced type's annotation metadata
-            producedAnnotationMetadata = visitorContext.newAnnotationBuilder().buildForParent(
-                producedType.getNativeType(),
-                producingElement.getNativeType()
-            );
-            AnnotationMetadata producedTypeAnnotationMetadata = producedType.getAnnotationMetadata();
-            AnnotationMetadata elementAnnotationMetadata = getElementAnnotationMetadata(producingElement);
+            classAnnotationsGuard(producedType, newType -> {
+                mergeAndAddAnnotations(visitor, newType, producingElement);
 
-            cleanupScopeAndQualifierAnnotations((MutableAnnotationMetadata) producedAnnotationMetadata, producedTypeAnnotationMetadata, elementAnnotationMetadata);
+                if (producingElement instanceof MethodElement) {
+                    methodAnnotationsGuard((MethodElement) producingElement, methodElement -> {
+                        methodElement.replaceAnnotations(newType.getAnnotationMetadata());
+                        buildProducedBeanDefinition(newType, methodElement, newType.getAnnotationMetadata());
+                    });
+                } else if (producingElement instanceof FieldElement) {
+                    fieldAnnotationsGuard((FieldElement) producingElement, fieldElement -> {
+                        fieldElement.replaceAnnotations(newType.getAnnotationMetadata());
+                        buildProducedBeanDefinition(newType, fieldElement, newType.getAnnotationMetadata());
+                    });
+                }
+
+            });
         }
+    }
+
+    private void mergeAndAddAnnotations(BeanDefinitionVisitor visitor, ClassElement producedType, MemberElement producingElement) {
+        // Original logic is to combine producing element annotation metadata (method or field) with the produced type's annotation metadata
+        AnnotationMetadata producedAnnotationMetadata = visitorContext.newAnnotationBuilder().buildForParent(
+            producedType.getNativeType(),
+            producingElement.getNativeType()
+        );
+        AnnotationMetadata producedTypeAnnotationMetadata = producedType.getAnnotationMetadata();
+        AnnotationMetadata elementAnnotationMetadata = getElementAnnotationMetadata(producingElement);
+
+        cleanupScopeAndQualifierAnnotations((MutableAnnotationMetadata) producedAnnotationMetadata, producedTypeAnnotationMetadata, elementAnnotationMetadata);
 
         MutableAnnotationMetadata factoryClassAnnotationMetadata = ((MutableAnnotationMetadata) classElement.getAnnotationMetadata()).clone();
 
         boolean modifiedFactoryClassAnnotationMetadata = false;
         if (classElement.hasStereotype(AnnotationUtil.QUALIFIER)) {
             // Don't propagate any qualifiers to the factories
-            for (String scope : classElement.getAnnotationNamesByStereotype(AnnotationUtil.QUALIFIER)) {
-                if (!producedAnnotationMetadata.hasStereotype(scope)) {
-                    factoryClassAnnotationMetadata.removeAnnotation(scope);
+            for (String qualifier : classElement.getAnnotationNamesByStereotype(AnnotationUtil.QUALIFIER)) {
+                if (!producedAnnotationMetadata.hasStereotype(qualifier)) {
+                    factoryClassAnnotationMetadata.removeAnnotation(qualifier);
                     modifiedFactoryClassAnnotationMetadata = true;
                 }
             }
         }
 
-        if (modifiedFactoryClassAnnotationMetadata) {
-            producingElement.replaceAnnotations(new AnnotationMetadataHierarchy(factoryClassAnnotationMetadata, producedAnnotationMetadata));
-        } else {
-            producingElement.replaceAnnotations(annotationMetadataCombineWithBeanMetadata(visitor, producedAnnotationMetadata));
-        }
-
-        buildProducedBeanDefinition(producedType, producingElement, producedAnnotationMetadata);
+        producedType.replaceAnnotations(producedAnnotationMetadata);
     }
 
     private void buildProducedBeanDefinition(ClassElement producedType,
@@ -144,9 +153,9 @@ public class FactoryBeanBuilder extends SimpleBeanBuilder {
 
             }
 
-            BeanDefinitionVisitor aopProxyWriter = aopHelper.createAopProxyWriter(producedBeanDefinitionWriter, producedAnnotationMetadata, metadataBuilder, visitorContext, true);
+            BeanDefinitionVisitor aopProxyWriter = aopHelper.createAroundAopProxyWriter(producedBeanDefinitionWriter, producedAnnotationMetadata, metadataBuilder, visitorContext, true);
 
-            MethodElement constructorElement = findConstructorElement(classElement).orElse(null);
+            MethodElement constructorElement = findConstructorElement(producedType).orElse(null);
             if (constructorElement != null) {
                 aopProxyWriter.visitBeanDefinitionConstructor(constructorElement, constructorElement.isReflectionRequired(), visitorContext);
             } else {
@@ -154,14 +163,15 @@ public class FactoryBeanBuilder extends SimpleBeanBuilder {
             }
             aopProxyWriter.visitSuperBeanDefinitionFactory(producedBeanDefinitionWriter.getBeanDefinitionName());
             aopProxyWriter.visitTypeArguments(producedType.getAllTypeArguments());
-
             beanDefinitionWriters.add(aopProxyWriter);
 
             producedType.getEnclosedElements(ElementQuery.ALL_METHODS)
+                .stream()
+                .filter(m -> m.isPublic() && !m.isFinal() && !m.isStatic())
                 .forEach(m -> {
                     methodAnnotationsGuard(m, methodElement -> {
                         methodElement.replaceAnnotations(
-                            annotationMetadataCombineWithBeanMetadata(producedBeanDefinitionWriter, producedAnnotationMetadata)
+                            annotationMetadataCombineWithBeanMetadata(producedBeanDefinitionWriter, getElementAnnotationMetadata(methodElement))
                         );
                         aopHelper.visitAroundMethod(aopProxyWriter, methodElement.getDeclaringType(), methodElement);
                     });
@@ -178,7 +188,7 @@ public class FactoryBeanBuilder extends SimpleBeanBuilder {
                 .forEach(m -> {
                     methodAnnotationsGuard(m, methodElement -> {
                         methodElement.replaceAnnotations(
-                            annotationMetadataCombineWithBeanMetadata(producedBeanDefinitionWriter, producedAnnotationMetadata)
+                            annotationMetadataCombineWithBeanMetadata(producedBeanDefinitionWriter, producedType)
                         );
                         producedBeanDefinitionWriter.visitExecutableMethod(methodElement.getDeclaringType(), methodElement, visitorContext);
                     });
@@ -193,7 +203,7 @@ public class FactoryBeanBuilder extends SimpleBeanBuilder {
                 throw new ProcessingException(producingElement, "Using 'preDestroy' is not allowed on primitive type beans");
             }
 
-            producedAnnotationMetadata.getValue(Bean.class, "preDestroy", String.class).ifPresent(destroyMethodName -> {
+            producedType.getValue(Bean.class, "preDestroy", String.class).ifPresent(destroyMethodName -> {
                 if (StringUtils.isNotEmpty(destroyMethodName)) {
                     final Optional<MethodElement> destroyMethod = producedType.getEnclosedElement(ElementQuery.ALL_METHODS.onlyAccessible(classElement)
                         .onlyInstance()

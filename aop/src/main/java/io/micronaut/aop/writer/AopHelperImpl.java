@@ -5,7 +5,6 @@ import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.InterceptorKind;
 import io.micronaut.aop.Introduction;
 import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil;
-import io.micronaut.context.annotation.Executable;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
@@ -44,10 +43,10 @@ public class AopHelperImpl implements AopHelper {
 
     @Override
     public BeanDefinitionVisitor visitAdaptedMethod(ClassElement classElement,
-                                                                       MethodElement sourceMethod,
-                                                                       ConfigurationMetadataBuilder metadataBuilder,
-                                                                       AtomicInteger adaptedMethodIndex,
-                                                                       VisitorContext visitorContext) {
+                                                    MethodElement sourceMethod,
+                                                    ConfigurationMetadataBuilder metadataBuilder,
+                                                    AtomicInteger adaptedMethodIndex,
+                                                    VisitorContext visitorContext) {
 
         AnnotationMetadata methodAnnotationMetadata = getElementAnnotationMetadata(sourceMethod);
 
@@ -149,9 +148,25 @@ public class AopHelperImpl implements AopHelper {
     }
 
     @Override
-    public BeanDefinitionVisitor createIntroductionAdviceWriter(ClassElement typeElement,
-                                                                ConfigurationMetadataBuilder metadataBuilder,
-                                                                VisitorContext visitorContext) {
+    public boolean visitIntrospectedMethod(BeanDefinitionVisitor visitor, ClassElement typeElement, MethodElement methodElement) {
+        AopProxyWriter aopProxyWriter = (AopProxyWriter) visitor;
+
+        final AnnotationMetadata resolvedTypeMetadata = typeElement.getAnnotationMetadata();
+        final boolean resolvedTypeMetadataIsAopProxyType = InterceptedMethodUtil.hasDeclaredAroundAdvice(resolvedTypeMetadata);
+
+        if (methodElement.isAbstract()
+            || resolvedTypeMetadataIsAopProxyType
+            || InterceptedMethodUtil.hasDeclaredAroundAdvice(methodElement.getAnnotationMetadata())) {
+            addToIntroduction(aopProxyWriter, typeElement, methodElement);
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    public AopProxyWriter createIntroductionAopProxyWriter(ClassElement typeElement,
+                                                           ConfigurationMetadataBuilder metadataBuilder,
+                                                           VisitorContext visitorContext) {
         AnnotationMetadata annotationMetadata = typeElement.getAnnotationMetadata();
 
         String packageName = typeElement.getPackageName();
@@ -176,34 +191,6 @@ public class AopHelperImpl implements AopHelper {
             metadataBuilder,
             interceptorTypes);
 
-        aopProxyWriter.visitTypeArguments(typeElement.getAllTypeArguments());
-
-        MethodElement constructorElement = typeElement.getPrimaryConstructor().orElse(null);
-        if (constructorElement != null) {
-            aopProxyWriter.visitBeanDefinitionConstructor(constructorElement, constructorElement.isReflectionRequired(), visitorContext);
-        } else {
-            aopProxyWriter.visitDefaultConstructor(typeElement, visitorContext);
-        }
-
-        final AnnotationMetadata resolvedTypeMetadata = typeElement.getAnnotationMetadata();
-        final boolean resolvedTypeMetadataIsAopProxyType = InterceptedMethodUtil.hasDeclaredAroundAdvice(resolvedTypeMetadata);
-
-        for (MethodElement methodElement : typeElement.getEnclosedElements(ElementQuery.ALL_METHODS)) {
-            if (methodElement.isAbstract()
-                || resolvedTypeMetadataIsAopProxyType
-                || InterceptedMethodUtil.hasDeclaredAroundAdvice(methodElement.getAnnotationMetadata())) {
-                addToIntroduction(aopProxyWriter, typeElement, methodElement);
-            } else if (methodElement.hasStereotype(Executable.class)) {
-                boolean preprocess = methodElement.isTrue(Executable.class, "processOnStartup");
-                if (preprocess) {
-                    aopProxyWriter.setRequiresMethodProcessing(true);
-                }
-                if (methodElement.isAccessible(typeElement)) {
-                    aopProxyWriter.visitExecutableMethod(typeElement, methodElement, visitorContext);
-                }
-            }
-        }
-
         Arrays.stream(interfaceTypes)
             .flatMap(interfaceElement -> interfaceElement.getEnclosedElements(ElementQuery.ALL_METHODS).stream())
             .forEach(methodElement -> addToIntroduction(aopProxyWriter, typeElement, methodElement));
@@ -212,22 +199,18 @@ public class AopHelperImpl implements AopHelper {
     }
 
     @Override
-    public boolean isAopProxyWriter(BeanDefinitionVisitor existingWriter) {
-        return existingWriter instanceof AopProxyWriter;
-    }
-
-    @Override
-    public AopProxyWriter createAopProxyWriter(BeanDefinitionVisitor existingWriter,
-                                               AnnotationMetadata aopElementAnnotationProcessor,
-                                               ConfigurationMetadataBuilder metadataBuilder,
-                                               VisitorContext visitorContext, boolean isMethod) {
+    public AopProxyWriter createAroundAopProxyWriter(BeanDefinitionVisitor existingWriter,
+                                                     AnnotationMetadata aopElementAnnotationProcessor,
+                                                     ConfigurationMetadataBuilder metadataBuilder,
+                                                     VisitorContext visitorContext,
+                                                     boolean forceProxyTarget) {
         OptionalValues<Boolean> aroundSettings = aopElementAnnotationProcessor.getValues(AnnotationUtil.ANN_AROUND, Boolean.class);
         Map<CharSequence, Boolean> settings = new LinkedHashMap<>();
         for (CharSequence setting : aroundSettings) {
             Optional<Boolean> entry = aroundSettings.get(setting);
             entry.ifPresent(val -> settings.put(setting, val));
         }
-        if (isMethod) {
+        if (forceProxyTarget) {
             settings.put(Interceptor.PROXY_TARGET, true);
         }
         aroundSettings = OptionalValues.of(Boolean.class, settings);
@@ -254,7 +237,7 @@ public class AopHelperImpl implements AopHelper {
         ClassElement declaringType = methodElement.getDeclaringType();
         if (methodElement.isAbstract()) {
             aopProxyWriter.visitIntroductionMethod(declaringType, methodElement);
-        } else {
+        } else if (false) {
             boolean isInterface = methodElement.getDeclaringType().isInterface();
             boolean isDefault = methodElement.isDefault();
             if (isInterface && isDefault) {

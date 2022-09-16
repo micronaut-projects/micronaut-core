@@ -1,34 +1,34 @@
 package io.micronaut.inject.processing.gen;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.BeanDefinitionVisitor;
 
-public class AopProxySupportedBeanBuilder extends SimpleBeanBuilder {
+public class AopAroundProxySupportedBeanBuilder extends SimpleBeanBuilder {
 
     private final boolean isAopProxy;
-    private BeanDefinitionVisitor aopProxyVisitor;
+    protected BeanDefinitionVisitor aopProxyVisitor;
 
-    protected AopProxySupportedBeanBuilder(ClassElement classElement, VisitorContext visitorContext, boolean isAopProxy) {
+    protected AopAroundProxySupportedBeanBuilder(ClassElement classElement, VisitorContext visitorContext, boolean isAopProxy) {
         super(classElement, visitorContext);
         this.isAopProxy = isAopProxy;
     }
 
-    @Override
-    protected void build(BeanDefinitionVisitor visitor) {
-        super.build(visitor);
-    }
-
-    private BeanDefinitionVisitor getAopProxyVisitor(BeanDefinitionVisitor visitor, MethodElement methodElement) {
+    protected BeanDefinitionVisitor getAroundAopProxyVisitor(BeanDefinitionVisitor visitor, @Nullable MethodElement methodElement) {
         if (aopProxyVisitor == null) {
-            aopProxyVisitor = aopHelper.createAopProxyWriter(
+            if (classElement.isFinal()) {
+                throw new ProcessingException(classElement, "Cannot apply AOP advice to final class. Class must be made non-final to support proxying: " + classElement.getName());
+            }
+
+            aopProxyVisitor = aopHelper.createAroundAopProxyWriter(
                 visitor,
-                isAopProxy ? classElement.getAnnotationMetadata() : methodElement.getAnnotationMetadata(),
+                isAopProxy || methodElement == null ? classElement.getAnnotationMetadata() : methodElement.getAnnotationMetadata(),
                 metadataBuilder,
                 visitorContext,
-                isAopProxy? false : true
+                false
             );
             beanDefinitionWriters.add(aopProxyVisitor);
             MethodElement constructorElement = findConstructorElement(classElement).orElse(null);
@@ -51,19 +51,26 @@ public class AopProxySupportedBeanBuilder extends SimpleBeanBuilder {
 
     @Override
     protected boolean beforeExecutableMethod(BeanDefinitionVisitor visitor, MethodElement methodElement) {
-        boolean aopDefinedOnClassAndPublicMethod = isAopProxy && methodElement.isPublic();
-        if (aopDefinedOnClassAndPublicMethod || hasAroundStereotype(methodElement) && !classElement.isAbstract()) {
+        boolean aopDefinedOnClassAndPublicMethod = isAopProxy && (methodElement.isPublic() || methodElement.isPackagePrivate());
+        AnnotationMetadata methodAnnotationMetadata = getElementAnnotationMetadata(methodElement);
+        if (aopDefinedOnClassAndPublicMethod ||
+            !isAopProxy && hasAroundStereotype(methodAnnotationMetadata) ||
+            hasDeclaredAroundAdvice(methodAnnotationMetadata) && !classElement.isAbstract()) {
             if (methodElement.isFinal()) {
-                if (hasDeclaredAroundAdvice(methodElement)) {
+                if (hasDeclaredAroundAdvice(methodAnnotationMetadata)) {
                     throw new ProcessingException(methodElement, "Method defines AOP advice but is declared final. Change the method to be non-final in order for AOP advice to be applied.");
                 } else if (aopDefinedOnClassAndPublicMethod && isDeclaredInThisClass(methodElement)) {
                     throw new ProcessingException(methodElement, "Public method inherits AOP advice but is declared final. Either make the method non-public or apply AOP advice only to public methods declared on the class.");
                 }
-            } else {
-                BeanDefinitionVisitor aopProxyVisitor = getAopProxyVisitor(visitor, methodElement);
-                aopHelper.visitAroundMethod(aopProxyVisitor, classElement, methodElement);
-                return true;
+                return false;
+            } else if (methodElement.isPrivate()) {
+                throw new ProcessingException(methodElement, "Method annotated as executable but is declared private. Change the method to be non-private in order for AOP advice to be applied.");
+            } else if (methodElement.isStatic()) {
+                throw new ProcessingException(methodElement, "Method defines AOP advice but is declared static");
             }
+            BeanDefinitionVisitor aopProxyVisitor = getAroundAopProxyVisitor(visitor, methodElement);
+            aopHelper.visitAroundMethod(aopProxyVisitor, classElement, methodElement);
+            return true;
         }
         return false;
     }
