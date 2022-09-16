@@ -128,20 +128,21 @@ import java.util.function.Consumer;
  */
 @Internal
 final class ConnectionManager {
-    private static final AttributeKey<NettyClientCustomizer> CHANNEL_CUSTOMIZER_KEY =
+    final ChannelPoolMap<DefaultHttpClient.RequestKey, ChannelPool> poolMap;
+    final InvocationInstrumenter instrumenter;
+    final HttpVersion httpVersion;
+
+    // not static to avoid build-time initialization by native image
+    private final AttributeKey<NettyClientCustomizer> CHANNEL_CUSTOMIZER_KEY =
         AttributeKey.valueOf("micronaut.http.customizer");
     /**
      * Future on a pooled channel that will be completed when the channel has fully connected (e.g.
      * TLS handshake has completed). If unset, then no handshake is needed or it has already
      * completed.
      */
-    private static final AttributeKey<Future<?>> STREAM_CHANNEL_INITIALIZED =
+    private final AttributeKey<Future<?>> STREAM_CHANNEL_INITIALIZED =
         AttributeKey.valueOf("micronaut.http.streamChannelInitialized");
-    private static final AttributeKey<Http2Stream> STREAM_KEY = AttributeKey.valueOf("micronaut.http2.stream");
-
-    final ChannelPoolMap<DefaultHttpClient.RequestKey, ChannelPool> poolMap;
-    final InvocationInstrumenter instrumenter;
-    final HttpVersion httpVersion;
+    private final AttributeKey<Http2Stream> STREAM_KEY = AttributeKey.valueOf("micronaut.http2.stream");
 
     private final Logger log;
     private EventLoopGroup group;
