@@ -15,7 +15,6 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.ElementFactory;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.MethodElement;
@@ -88,76 +87,63 @@ public class AopHelperImpl implements AopHelper {
             throw new ProcessingException(sourceMethod, "Interface to adapt [" + interfaceToAdapt.getName() + "] is not a SAM type. More than one abstract method declared.");
         }
 
-        MethodElement originalTargetMethod = methods.iterator().next();
-        ElementFactory elementFactory = visitorContext.getElementFactory();
+        AbstractBeanBuilder.methodAnnotationsGuard(visitorContext, methods.iterator().next(), targetMethod -> {
 
-        // Because of the shared method's annotation cache we need to make a copy of the method.
-        // The method is going to be stored in the visitor till the write process
-        // We need to make sure we don't reuse the same instance for other adapters, and we don't override
-        // added annotations.
-        MethodElement targetMethod = elementFactory.newMethodElement(
-            originalTargetMethod.getDeclaringType(),
-            originalTargetMethod.getNativeType(),
-            originalTargetMethod.getAnnotationMetadata()
-        );
+            ParameterElement[] sourceParams = sourceMethod.getParameters();
+            ParameterElement[] targetParams = targetMethod.getParameters();
 
-        ParameterElement[] sourceParams = sourceMethod.getParameters();
-        ParameterElement[] targetParams = targetMethod.getParameters();
+            int paramLen = targetParams.length;
+            if (paramLen != sourceParams.length) {
+                throw new ProcessingException(sourceMethod, "Cannot adapt method [" + sourceMethod + "] to target method [" + targetMethod + "]. Argument lengths don't match.");
+            }
+            if (sourceMethod.isSuspend()) {
+                throw new ProcessingException(sourceMethod, "Cannot adapt method [" + sourceMethod + "] to target method [" + targetMethod + "]. Kotlin suspend method not supported here.");
+            }
 
-        int paramLen = targetParams.length;
-        if (paramLen != sourceParams.length) {
-            throw new ProcessingException(sourceMethod, "Cannot adapt method [" + sourceMethod + "] to target method [" + targetMethod + "]. Argument lengths don't match.");
-        }
-        if (sourceMethod.isSuspend()) {
-            throw new ProcessingException(sourceMethod, "Cannot adapt method [" + sourceMethod + "] to target method [" + targetMethod + "]. Kotlin suspend method not supported here.");
-        }
+            Map<String, ClassElement> typeVariables = interfaceToAdapt.getTypeArguments();
+            Map<String, ClassElement> genericTypes = new LinkedHashMap<>(paramLen);
+            for (int i = 0; i < paramLen; i++) {
+                ParameterElement targetParam = targetParams[i];
+                ParameterElement sourceParam = sourceParams[i];
 
-        Map<String, ClassElement> typeVariables = interfaceToAdapt.getTypeArguments();
-        Map<String, ClassElement> genericTypes = new LinkedHashMap<>(paramLen);
-        for (int i = 0; i < paramLen; i++) {
-            ParameterElement targetParam = targetParams[i];
-            ParameterElement sourceParam = sourceParams[i];
+                ClassElement targetType = targetParam.getGenericType();
+                ClassElement sourceType = sourceParam.getGenericType();
 
-            ClassElement targetType = targetParam.getGenericType();
-            ClassElement sourceType = sourceParam.getGenericType();
+                if (targetType instanceof GenericPlaceholderElement) {
+                    GenericPlaceholderElement genericPlaceholderElement = (GenericPlaceholderElement) targetType;
+                    String variableName = genericPlaceholderElement.getVariableName();
+                    if (typeVariables.containsKey(variableName)) {
+                        genericTypes.put(variableName, sourceType);
+                    }
+                }
 
-            if (targetType instanceof GenericPlaceholderElement) {
-                GenericPlaceholderElement genericPlaceholderElement = (GenericPlaceholderElement) targetType;
-                String variableName = genericPlaceholderElement.getVariableName();
-                if (typeVariables.containsKey(variableName)) {
-                    genericTypes.put(variableName, sourceType);
+                if (!sourceType.isAssignable(targetType.getName())) {
+                    throw new ProcessingException(sourceMethod, "Cannot adapt method [" + sourceMethod + "] to target method [" + targetMethod + "]. Type [" + sourceType.getName() + "] is not a subtype of type [" + targetType.getName() + "] for argument at position " + i);
                 }
             }
 
-            if (!sourceType.isAssignable(targetType.getName())) {
-                throw new ProcessingException(sourceMethod, "Cannot adapt method [" + sourceMethod + "] to target method [" + targetMethod + "]. Type [" + sourceType.getName() + "] is not a subtype of type [" + targetType.getName() + "] for argument at position " + i);
+            if (!genericTypes.isEmpty()) {
+                aopProxyWriter.visitTypeArguments(Collections.singletonMap(interfaceToAdapt.getName(), genericTypes));
             }
-        }
 
-        if (!genericTypes.isEmpty()) {
-            aopProxyWriter.visitTypeArguments(Collections.singletonMap(interfaceToAdapt.getName(), genericTypes));
-        }
-
-        AnnotationClassValue<?>[] adaptedArgumentTypes = Arrays.stream(sourceParams)
-            .map(p -> new AnnotationClassValue<>(JavaModelUtils.getClassname(p.getGenericType())))
-            .toArray(AnnotationClassValue[]::new);
+            AnnotationClassValue<?>[] adaptedArgumentTypes = Arrays.stream(sourceParams)
+                .map(p -> new AnnotationClassValue<>(JavaModelUtils.getClassname(p.getGenericType())))
+                .toArray(AnnotationClassValue[]::new);
 
 
-        targetMethod.annotate(Adapter.class, (builder) -> {
-            builder.member(Adapter.InternalAttributes.ADAPTED_BEAN, new AnnotationClassValue<>(JavaModelUtils.getClassname(classElement)));
-            builder.member(Adapter.InternalAttributes.ADAPTED_METHOD, sourceMethod.getName());
-            builder.member(Adapter.InternalAttributes.ADAPTED_ARGUMENT_TYPES, adaptedArgumentTypes);
-            String qualifier = classElement.stringValue(AnnotationUtil.NAMED).orElse(null);
-            if (StringUtils.isNotEmpty(qualifier)) {
-                builder.member(Adapter.InternalAttributes.ADAPTED_QUALIFIER, qualifier);
-            }
+            targetMethod.annotate(Adapter.class, (builder) -> {
+                builder.member(Adapter.InternalAttributes.ADAPTED_BEAN, new AnnotationClassValue<>(JavaModelUtils.getClassname(classElement)));
+                builder.member(Adapter.InternalAttributes.ADAPTED_METHOD, sourceMethod.getName());
+                builder.member(Adapter.InternalAttributes.ADAPTED_ARGUMENT_TYPES, adaptedArgumentTypes);
+                String qualifier = classElement.stringValue(AnnotationUtil.NAMED).orElse(null);
+                if (StringUtils.isNotEmpty(qualifier)) {
+                    builder.member(Adapter.InternalAttributes.ADAPTED_QUALIFIER, qualifier);
+                }
+            });
+
+            aopProxyWriter.visitAroundMethod(interfaceToAdapt, targetMethod);
+
         });
-
-        aopProxyWriter.visitAroundMethod(interfaceToAdapt, targetMethod);
-
-        // Previous modifications will modify the shared annotation cache of this method
-        // We need to put original values into the cache
-        originalTargetMethod.replaceAnnotations(originalTargetMethod.getAnnotationMetadata());
 
         return aopProxyWriter;
     }

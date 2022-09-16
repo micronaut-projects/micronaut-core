@@ -33,7 +33,7 @@ public class FactoryBeanBuilder extends SimpleBeanBuilder {
     @Override
     protected boolean visitMethod(BeanDefinitionVisitor visitor, MethodElement methodElement) {
         if (methodElement.hasDeclaredStereotype(Bean.class.getName(), AnnotationUtil.SCOPE)) {
-            visitBeanFactoryElement(visitor, methodElement.getGenericReturnType(), methodElement);
+            visitBeanFactoryElement(visitor, methodElement.getReturnType(), methodElement);
             return true;
         }
         return super.visitMethod(visitor, methodElement);
@@ -45,7 +45,7 @@ public class FactoryBeanBuilder extends SimpleBeanBuilder {
             if (!fieldElement.isAccessible(classElement)) {
                 throw new ProcessingException(fieldElement, "Beans produced from fields cannot be private");
             }
-            visitBeanFactoryElement(visitor, fieldElement.getGenericType(), fieldElement);
+            visitBeanFactoryElement(visitor, fieldElement.getType(), fieldElement);
             return true;
         }
         return super.visitField(visitor, fieldElement);
@@ -113,12 +113,12 @@ public class FactoryBeanBuilder extends SimpleBeanBuilder {
             producedBeanDefinitionWriter.visitBeanFactoryField(classElement, (FieldElement) producingElement);
         }
 
-        if (producedAnnotationMetadata.hasStereotype(AnnotationUtil.ANN_AROUND) && !classElement.isAbstract()) {
-            if (producedType.isPrimitive()) {
-                throw new ProcessingException(producingElement, "Cannot apply AOP advice to primitive beans");
-            }
+        if (hasAroundStereotype(producedAnnotationMetadata) && !classElement.isAbstract()) {
             if (producedType.isArray()) {
                 throw new ProcessingException(producingElement, "Cannot apply AOP advice to arrays");
+            }
+            if (producedType.isPrimitive()) {
+                throw new ProcessingException(producingElement, "Cannot apply AOP advice to primitive beans");
             }
             if (producedType.isFinal()) {
                 throw new ProcessingException(producingElement, "Cannot apply AOP advice to final class. Class must be made non-final to support proxying: " + producedType.getName());
@@ -144,7 +144,7 @@ public class FactoryBeanBuilder extends SimpleBeanBuilder {
 
             }
 
-            BeanDefinitionVisitor aopProxyWriter = aopHelper.createAopProxyWriter(producedBeanDefinitionWriter, producedAnnotationMetadata, metadataBuilder, visitorContext, false);
+            BeanDefinitionVisitor aopProxyWriter = aopHelper.createAopProxyWriter(producedBeanDefinitionWriter, producedAnnotationMetadata, metadataBuilder, visitorContext, true);
 
             MethodElement constructorElement = findConstructorElement(classElement).orElse(null);
             if (constructorElement != null) {
@@ -158,25 +158,39 @@ public class FactoryBeanBuilder extends SimpleBeanBuilder {
             beanDefinitionWriters.add(aopProxyWriter);
 
             producedType.getEnclosedElements(ElementQuery.ALL_METHODS)
-                .forEach(methodElement -> aopHelper.visitAroundMethod(aopProxyWriter, methodElement.getDeclaringType(), methodElement));
+                .forEach(m -> {
+                    methodAnnotationsGuard(m, methodElement -> {
+                        methodElement.replaceAnnotations(
+                            annotationMetadataCombineWithBeanMetadata(producedBeanDefinitionWriter, producedAnnotationMetadata)
+                        );
+                        aopHelper.visitAroundMethod(aopProxyWriter, methodElement.getDeclaringType(), methodElement);
+                    });
+                });
 
         } else if (producedAnnotationMetadata.hasStereotype(Executable.class)) {
-            if (producedType.isPrimitive()) {
-                throw new ProcessingException(producingElement, "Using '@Executable' is not allowed on primitive type beans");
-            }
             if (producedType.isArray()) {
                 throw new ProcessingException(producingElement, "Using '@Executable' is not allowed on array type beans");
             }
+            if (producedType.isPrimitive()) {
+                throw new ProcessingException(producingElement, "Using '@Executable' is not allowed on primitive type beans");
+            }
             producedType.getEnclosedElements(ElementQuery.ALL_METHODS.onlyAccessible())
-                .forEach(methodElement -> producedBeanDefinitionWriter.visitExecutableMethod(methodElement.getDeclaringType(), methodElement, visitorContext));
+                .forEach(m -> {
+                    methodAnnotationsGuard(m, methodElement -> {
+                        methodElement.replaceAnnotations(
+                            annotationMetadataCombineWithBeanMetadata(producedBeanDefinitionWriter, producedAnnotationMetadata)
+                        );
+                        producedBeanDefinitionWriter.visitExecutableMethod(methodElement.getDeclaringType(), methodElement, visitorContext);
+                    });
+                });
         }
 
         if (producedAnnotationMetadata.isPresent(Bean.class, "preDestroy")) {
-            if (producedType.isPrimitive()) {
-                throw new ProcessingException(producingElement, "Using 'preDestroy' is not allowed on primitive type beans");
-            }
             if (producedType.isArray()) {
                 throw new ProcessingException(producingElement, "Using 'preDestroy' is not allowed on array type beans");
+            }
+            if (producedType.isPrimitive()) {
+                throw new ProcessingException(producingElement, "Using 'preDestroy' is not allowed on primitive type beans");
             }
 
             producedAnnotationMetadata.getValue(Bean.class, "preDestroy", String.class).ifPresent(destroyMethodName -> {

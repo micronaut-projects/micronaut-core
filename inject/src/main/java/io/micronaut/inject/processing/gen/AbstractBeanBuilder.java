@@ -16,6 +16,7 @@ import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.ast.ElementFactory;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
@@ -28,6 +29,7 @@ import java.lang.annotation.Annotation;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
@@ -217,6 +219,10 @@ public abstract class AbstractBeanBuilder {
         methodElement.replaceAnnotations(annotationMetadataCombineWithBeanMetadata(beanDefinitionVisitor, methodAnnotationMetadata));
     }
 
+    protected void methodAnnotationsGuard(MethodElement methodElement, Consumer<MethodElement> consumer) {
+        methodAnnotationsGuard(visitorContext, methodElement, consumer);
+    }
+
     public static void adjustMethodToIncludeClassMetadata(MethodElement methodElement) {
         adjustMethodToIncludeClassMetadata(methodElement.getDeclaringType(), methodElement);
     }
@@ -235,6 +241,23 @@ public abstract class AbstractBeanBuilder {
             return annotationMetadata.getDeclaredMetadata();
         }
         return annotationMetadata;
+    }
+
+    public static void methodAnnotationsGuard(VisitorContext visitorContext, MethodElement methodElement, Consumer<MethodElement> consumer) {
+        ElementFactory elementFactory = visitorContext.getElementFactory();
+        // Because of the shared method's annotation cache we need to make a copy of the method.
+        // The method is going to be stored in the visitor till the write process
+        // We need to make sure we don't reuse the same instance for other adapters, and we don't override
+        // added annotations.
+        MethodElement targetMethod = elementFactory.newMethodElement(
+            methodElement.getDeclaringType(),
+            methodElement.getNativeType(),
+            methodElement.getAnnotationMetadata()
+        );
+        consumer.accept(targetMethod);
+        // Previous modifications will modify the shared annotation cache of this method
+        // We need to put original values into the cache
+        methodElement.replaceAnnotations(methodElement.getAnnotationMetadata());
     }
 
 }
