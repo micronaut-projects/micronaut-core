@@ -48,7 +48,7 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 @Internal
-class AnnotationMetadataQualifier<T> implements Qualifier<T> {
+final class AnnotationMetadataQualifier<T> implements Qualifier<T> {
 
     @NonNull
     final String annotationName;
