@@ -232,7 +232,7 @@ public class DefaultHttpClient implements
     protected MediaTypeCodecRegistry mediaTypeCodecRegistry;
     protected ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory = new NettyByteBufferFactory();
 
-    final ConnectionManager connectionManager;
+    ConnectionManager connectionManager;
 
     private final List<HttpFilterResolver.FilterEntry<HttpClientFilter>> clientFilterEntries;
     private final LoadBalancer loadBalancer;
@@ -1085,7 +1085,7 @@ public class DefaultHttpClient implements
             final Duration rt = readTimeout.get();
             if (!rt.isNegative()) {
                 Duration duration = rt.plus(Duration.ofSeconds(1));
-                finalReactiveSequence = finalReactiveSequence.timeout(duration)
+                finalReactiveSequence = finalReactiveSequence.timeout(duration) // todo: move to CM
                         .onErrorResume(throwable -> {
                             if (throwable instanceof TimeoutException) {
                                 return Flux.error(ReadTimeoutException.TIMEOUT_EXCEPTION);
