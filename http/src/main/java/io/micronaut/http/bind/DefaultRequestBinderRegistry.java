@@ -262,6 +262,9 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
         RequestBeanAnnotationBinder<Object> requestBeanAnnotationBinder = new RequestBeanAnnotationBinder<>(this, conversionService);
         byAnnotation.put(requestBeanAnnotationBinder.getAnnotationType(), requestBeanAnnotationBinder);
 
+        PartAnnotationBinder<Object> partAnnotationBinder = new PartAnnotationBinder<>(conversionService);
+        byAnnotation.put(partAnnotationBinder.getAnnotationType(), partAnnotationBinder);
+
         if (KOTLIN_COROUTINES_SUPPORTED) {
             ContinuationArgumentBinder continuationArgumentBinder = new ContinuationArgumentBinder();
             byType.put(continuationArgumentBinder.argumentType().typeHashCode(), continuationArgumentBinder);
