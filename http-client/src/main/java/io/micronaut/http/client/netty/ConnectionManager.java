@@ -481,6 +481,7 @@ class ConnectionManager {
     Mono<PoolHandle> connectForExchange(DefaultHttpClient.RequestKey requestKey, boolean multipart, boolean acceptEvents) {
         if (true) {
             Pool pool = pools.computeIfAbsent(requestKey, Pool::new);
+            // todo: aggregator
             return pool.acquire();
         }
         return Mono.<PoolHandle>create(emitter -> {
@@ -554,6 +555,27 @@ class ConnectionManager {
      * @return A mono that will complete once the channel is ready for transmission
      */
     Mono<PoolHandle> connectForStream(DefaultHttpClient.RequestKey requestKey, boolean isProxy, boolean acceptEvents) {
+        if (true) {
+            Pool pool = pools.computeIfAbsent(requestKey, Pool::new);
+            return pool.acquire()
+                .map(ph -> {
+                    // TODO: this sucks
+                    ph.channel.pipeline().addLast(
+                            ChannelPipelineCustomizer.HANDLER_HTTP_STREAM,
+                            new HttpStreamsClientHandler() {
+                                @Override
+                                public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+                                    if (evt instanceof IdleStateEvent) {
+                                        // close the connection if it is idle for too long
+                                        ctx.close();
+                                    }
+                                    super.userEventTriggered(ctx, evt);
+                                }
+                            }
+                    );
+                    return ph;
+                });
+        }
         return Mono.<PoolHandle>create(emitter -> {
             ChannelFuture channelFuture;
             try {
