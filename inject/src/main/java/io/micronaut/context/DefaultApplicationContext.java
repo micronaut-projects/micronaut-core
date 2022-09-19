@@ -134,7 +134,11 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
      */
     protected @NonNull
     Environment createEnvironment(@NonNull ApplicationContextConfiguration configuration) {
-        return new RuntimeConfiguredEnvironment(configuration, isBootstrapEnabled(configuration));
+        if (configuration.isEnableDefaultPropertySources()) {
+            return new RuntimeConfiguredEnvironment(configuration, isBootstrapEnabled(configuration));
+        } else {
+            return new DefaultEnvironment(configuration);
+        }
     }
 
     private boolean isBootstrapEnabled(ApplicationContextConfiguration configuration) {

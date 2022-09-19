@@ -66,6 +66,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     private ClassPathResourceLoader classPathResourceLoader;
     private boolean allowEmptyProviders = false;
     private Boolean bootstrapEnvironment = null;
+    private boolean enableDefaultPropertySources = true;
 
     /**
      * Default constructor.
@@ -85,6 +86,18 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     @Override
     public boolean isAllowEmptyProviders() {
         return allowEmptyProviders;
+    }
+
+    @Override
+    @NonNull 
+    public ApplicationContextBuilder enableDefaultPropertySources(boolean areEnabled) {
+        this.enableDefaultPropertySources = areEnabled;
+        return this;
+    }
+
+    @Override
+    public boolean isEnableDefaultPropertySources() {
+        return enableDefaultPropertySources;
     }
 
     @NonNull

@@ -55,6 +55,15 @@ public interface ApplicationContextConfiguration extends BeanContextConfiguratio
     }
 
     /**
+     * Whether to load the default set of property sources.
+     * @return Returns {@code true} if the default set of property sources should be loaded.
+     * @since 3.7.0
+     */
+    default boolean isEnableDefaultPropertySources() {
+        return true;
+    }
+
+    /**
      * @return True if environment variables should contribute to configuration
      */
     default boolean isEnvironmentPropertySource() {
