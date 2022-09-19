@@ -922,6 +922,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
         ClassNode classNode = this.classNode;
         while (classNode != null && !classNode.equals(ClassHelper.OBJECT_TYPE) && !classNode.equals(ClassHelper.Enum_Type)) {
 
+            ClassNode finalClassNode = classNode;
             classNode.visitContents(
                     new PublicMethodVisitor(null) {
 
@@ -932,7 +933,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
 
                         @Override
                         protected boolean isAcceptable(MethodNode node) {
-                            boolean validModifiers = node.isPublic() && !node.isStatic() && !node.isSynthetic() && !node.isAbstract();
+                            boolean validModifiers = node.isPublic() && !node.isStatic() && !node.isSynthetic() && (!node.isAbstract() || finalClassNode.isInterface());
                             if (validModifiers) {
                                 String methodName = node.getName();
                                 if (methodName.contains("$") || methodName.equals("getMetaClass")) {
