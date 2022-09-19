@@ -16,7 +16,7 @@ import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
-import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
+import io.micronaut.inject.configuration.ConfigurationUtils;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.BeanDefinitionVisitor;
 import io.micronaut.inject.writer.BeanDefinitionWriter;
@@ -140,7 +140,7 @@ public class FactoryBeanBuilder extends SimpleBeanBuilder {
         beanDefinitionWriters.add(producedBeanDefinitionWriter);
 
         if (producedType.hasStereotype(EachProperty.class)) {
-            producedType.annotate(ConfigurationReader.class, builder -> builder.member(ConfigurationReader.PREFIX, ConfigurationMetadataBuilder.getPath(producedType)));
+            producedType.annotate(ConfigurationReader.class, builder -> builder.member(ConfigurationReader.PREFIX, ConfigurationUtils.getRequiredTypePath(producedType)));
         }
 
         if (producingElement instanceof MethodElement) {

@@ -16,13 +16,10 @@
 package io.micronaut.inject.configuration;
 
 import io.micronaut.context.annotation.ConfigurationReader;
-import io.micronaut.context.annotation.EachProperty;
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.writer.OriginatingElements;
@@ -32,8 +29,9 @@ import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
+
+import static io.micronaut.inject.configuration.ConfigurationUtils.buildPropertyPath;
+import static io.micronaut.inject.configuration.ConfigurationUtils.getRequiredTypePath;
 
 /**
  * <p>A builder for producing metadata for the available {@link io.micronaut.context.annotation.ConfigurationProperties}.</p>
@@ -88,7 +86,8 @@ public class ConfigurationMetadataBuilder {
      * @return This {@link ConfigurationMetadata}
      */
     public ConfigurationMetadata visitProperties(ClassElement classElement) {
-        String path = buildTypePath(classElement, classElement);
+        originatingElements.addOriginatingElement(classElement);
+        String path = getRequiredTypePath(classElement);
         ConfigurationMetadata configurationMetadata = new ConfigurationMetadata();
         configurationMetadata.name = NameUtils.hyphenate(path, true);
         configurationMetadata.type = classElement.getType().getName();
@@ -116,6 +115,8 @@ public class ConfigurationMetadataBuilder {
                                           String name,
                                           @Nullable String description,
                                           @Nullable String defaultValue) {
+        originatingElements.addOriginatingElement(owningType);
+        originatingElements.addOriginatingElement(declaringType);
 
         PropertyMetadata metadata = new PropertyMetadata();
         metadata.declaringType = declaringType.getName();
@@ -158,98 +159,14 @@ public class ConfigurationMetadataBuilder {
         return null;
     }
 
-    private String buildPropertyPath(ClassElement owningType, ClassElement declaringType, String propertyName) {
-        // We assume owning and declaringType classes are already processed and correct prefix is calculated
-        return getPath(owningType, declaringType) + "." + propertyName;
-    }
-
-    private String getPath(ClassElement owningType, ClassElement declaringType) {
-        originatingElements.addOriginatingElement(owningType);
-        originatingElements.addOriginatingElement(declaringType);
-        return declaringType.stringValue(ConfigurationReader.class, ConfigurationReader.PREFIX)
-            .orElseGet(() -> getRequiredOwningTypePath(owningType));
-    }
-
-    private static String getRequiredOwningTypePath(ClassElement owningType) {
-        return owningType.stringValue(ConfigurationReader.class, ConfigurationReader.PREFIX)
-            .orElseThrow(() -> new IllegalStateException("Prefix is required for " + owningType));
-    }
-
-    private String buildTypePath(ClassElement owningType, ClassElement declaringType) {
-        originatingElements.addOriginatingElement(owningType);
-        originatingElements.addOriginatingElement(declaringType);
-
-        String path = getPath(owningType);
-        path = prependSuperclasses(declaringType, path);
-        if (owningType.isInner()) {
-            // We assume outer classes are already processed and correct prefix is calculated
-            ClassElement enclosingType = owningType.getEnclosingType().get();
-            String parentPrefix = enclosingType.stringValue(ConfigurationReader.class, ConfigurationReader.PREFIX).orElse("");
-            return combinePaths(parentPrefix, path);
-        }
-        return path;
-    }
-
-    private String combinePaths(String p1, String p2) {
-        if (StringUtils.isNotEmpty(p1) && StringUtils.isNotEmpty(p2)) {
-            return p1 + "." + p2;
-        }
-        if (StringUtils.isNotEmpty(p1)) {
-            return p1;
-        }
-        return p2;
-    }
-
-    public static String getPath(AnnotationMetadata annotationMetadata) {
-        String prefix = annotationMetadata.stringValue(ConfigurationReader.class, ConfigurationReader.PREFIX).orElse(null);
-        if (annotationMetadata.hasDeclaredAnnotation(EachProperty.class)) {
-            Objects.requireNonNull(prefix);
-            if (annotationMetadata.booleanValue(EachProperty.class, "list").orElse(false)) {
-                return prefix + "[*]";
-            } else {
-                return prefix + ".*";
-            }
-        }
-        if (prefix == null) {
-            return "";
-        }
-        return prefix;
-    }
-
-    private String prependSuperclasses(ClassElement declaringType, String path) {
-        if (declaringType.isInterface()) {
-            ClassElement superInterface = resolveSuperInterface(declaringType);
-            while (superInterface != null) {
-                Optional<String> parentConfig = superInterface.stringValue(ConfigurationReader.class, ConfigurationReader.PREFIX);
-                if (parentConfig.isPresent()) {
-                    path = combinePaths(parentConfig.get(), path);
-                }
-                superInterface = resolveSuperInterface(superInterface);
-            }
-        } else {
-            Optional<ClassElement> optionalSuperType = declaringType.getSuperType();
-            while (optionalSuperType.isPresent()) {
-                ClassElement superType = optionalSuperType.get();
-                Optional<String> parentConfig = superType.stringValue(ConfigurationReader.class, ConfigurationReader.PREFIX);
-                if (parentConfig.isPresent()) {
-                    path = combinePaths(parentConfig.get(), path);
-                }
-                optionalSuperType = superType.getSuperType();
-            }
-        }
-        return path;
-    }
-
-    private ClassElement resolveSuperInterface(ClassElement declaringType) {
-        return declaringType.getInterfaces().stream().filter(tm -> tm.hasStereotype(ConfigurationReader.class)).findFirst().orElse(null);
-    }
-
     /**
      * Quote a string.
      *
      * @param string The string to quote
      * @return The quoted string
+     * @deprecated Unused method will be removed
      */
+    @Deprecated
     @SuppressWarnings("MagicNumber")
     static String quote(String string) {
         if (string == null || string.length() == 0) {
@@ -312,7 +229,9 @@ public class ConfigurationMetadataBuilder {
      * @param name  The name of the attribute
      * @param value The value
      * @throws IOException If an error occurred writing output
+     * @deprecated Unused method will be removed
      */
+    @Deprecated
     static void writeAttribute(Writer out, String name, String value) throws IOException {
         out.write('"');
         out.write(name);
