@@ -7,6 +7,7 @@ import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
@@ -23,14 +24,22 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class SimpleBeanBuilder extends AbstractBeanBuilder {
 
     private final AtomicInteger adaptedMethodIndex = new AtomicInteger(0);
+    protected final boolean isAopProxy;
+    protected BeanDefinitionVisitor aopProxyVisitor;
 
-    protected SimpleBeanBuilder(ClassElement classElement, VisitorContext visitorContext) {
+    protected SimpleBeanBuilder(ClassElement classElement, VisitorContext visitorContext, boolean isAopProxy) {
         super(classElement, visitorContext);
+        this.isAopProxy = isAopProxy;
     }
 
     @Override
     public final void build() {
-        build(createBeanDefinitionVisitor());
+        BeanDefinitionVisitor beanDefinitionVisitor = createBeanDefinitionVisitor();
+        if (isAopProxy) {
+            // Always create AOP proxy
+            getAroundAopProxyVisitor(beanDefinitionVisitor, null);
+        }
+        build(beanDefinitionVisitor);
     }
 
     @NonNull
@@ -46,6 +55,38 @@ public class SimpleBeanBuilder extends AbstractBeanBuilder {
             beanDefinitionWriter.visitDefaultConstructor(AnnotationMetadata.EMPTY_METADATA, visitorContext);
         }
         return beanDefinitionWriter;
+    }
+
+    protected BeanDefinitionVisitor getAroundAopProxyVisitor(BeanDefinitionVisitor visitor, @Nullable MethodElement methodElement) {
+        if (aopProxyVisitor == null) {
+            if (classElement.isFinal()) {
+                throw new ProcessingException(classElement, "Cannot apply AOP advice to final class. Class must be made non-final to support proxying: " + classElement.getName());
+            }
+
+            aopProxyVisitor = aopHelper.createAroundAopProxyWriter(
+                visitor,
+                isAopProxy || methodElement == null ? classElement.getAnnotationMetadata() : methodElement.getAnnotationMetadata(),
+                metadataBuilder,
+                visitorContext,
+                false
+            );
+            beanDefinitionWriters.add(aopProxyVisitor);
+            MethodElement constructorElement = findConstructorElement(classElement).orElse(null);
+            if (constructorElement != null) {
+                aopProxyVisitor.visitBeanDefinitionConstructor(
+                    constructorElement,
+                    constructorElement.isPrivate(),
+                    visitorContext
+                );
+            } else {
+                aopProxyVisitor.visitDefaultConstructor(
+                    AnnotationMetadata.EMPTY_METADATA,
+                    visitorContext
+                );
+            }
+            aopProxyVisitor.visitSuperBeanDefinition(visitor.getBeanDefinitionName());
+        }
+        return aopProxyVisitor;
     }
 
     protected void build(BeanDefinitionVisitor visitor) {
@@ -97,6 +138,7 @@ public class SimpleBeanBuilder extends AbstractBeanBuilder {
 
     protected boolean visitMethod(BeanDefinitionVisitor visitor, MethodElement methodElement) {
         // All the cases above are using executable methods
+        boolean claimed = false;
         if (methodElement.hasDeclaredAnnotation(AnnotationUtil.POST_CONSTRUCT)) {
             staticMethodCheck(methodElement);
             // TODO: Require @ReflectiveAccess for private methods in Micronaut 4
@@ -106,7 +148,7 @@ public class SimpleBeanBuilder extends AbstractBeanBuilder {
                 methodElement.isReflectionRequired(classElement),
                 visitorContext
             );
-            return true;
+            claimed = true;
         }
         if (methodElement.hasDeclaredAnnotation(AnnotationUtil.PRE_DESTROY)) {
             staticMethodCheck(methodElement);
@@ -117,6 +159,9 @@ public class SimpleBeanBuilder extends AbstractBeanBuilder {
                 methodElement.isReflectionRequired(classElement),
                 visitorContext
             );
+            claimed = true;
+        }
+        if (claimed) {
             return true;
         }
         if (!methodElement.isStatic() && isInjectPointMethod(methodElement)) {
@@ -144,16 +189,34 @@ public class SimpleBeanBuilder extends AbstractBeanBuilder {
             visitAdaptedMethod(visitor, methodElement);
             return true;
         }
-        if (beforeExecutableMethod(visitor, methodElement)) {
+        if (visitAopMethod(visitor, methodElement)) {
             return true;
         }
-        if (methodElement.hasStereotype(Executable.class)) {
-            return visitExecutableMethod(visitor, methodElement);
-        }
-        return false;
+        return visitExecutableMethod(visitor, methodElement);
     }
 
-    protected boolean beforeExecutableMethod(BeanDefinitionVisitor visitor, MethodElement methodElement) {
+    protected boolean visitAopMethod(BeanDefinitionVisitor visitor, MethodElement methodElement) {
+        boolean aopDefinedOnClassAndPublicMethod = isAopProxy && (methodElement.isPublic() || methodElement.isPackagePrivate());
+        AnnotationMetadata methodAnnotationMetadata = getElementAnnotationMetadata(methodElement);
+        if (aopDefinedOnClassAndPublicMethod ||
+            !isAopProxy && hasAroundStereotype(methodAnnotationMetadata) ||
+            hasDeclaredAroundAdvice(methodAnnotationMetadata) && !classElement.isAbstract()) {
+            if (methodElement.isFinal()) {
+                if (hasDeclaredAroundAdvice(methodAnnotationMetadata)) {
+                    throw new ProcessingException(methodElement, "Method defines AOP advice but is declared final. Change the method to be non-final in order for AOP advice to be applied.");
+                } else if (aopDefinedOnClassAndPublicMethod && isDeclaredInThisClass(methodElement)) {
+                    throw new ProcessingException(methodElement, "Public method inherits AOP advice but is declared final. Either make the method non-public or apply AOP advice only to public methods declared on the class.");
+                }
+                return false;
+            } else if (methodElement.isPrivate()) {
+                throw new ProcessingException(methodElement, "Method annotated as executable but is declared private. Change the method to be non-private in order for AOP advice to be applied.");
+            } else if (methodElement.isStatic()) {
+                throw new ProcessingException(methodElement, "Method defines AOP advice but is declared static");
+            }
+            BeanDefinitionVisitor aopProxyVisitor = getAroundAopProxyVisitor(visitor, methodElement);
+            aopHelper.visitAroundMethod(aopProxyVisitor, classElement, methodElement);
+            return true;
+        }
         return false;
     }
 
@@ -203,61 +266,21 @@ public class SimpleBeanBuilder extends AbstractBeanBuilder {
 
     protected void addOriginatingElementIfNecessary(BeanDefinitionVisitor writer, MemberElement memberElement) {
         if (!isDeclaredInThisClass(memberElement)) {
-            writer.addOriginatingElement(memberElement);
+            writer.addOriginatingElement(memberElement.getDeclaringType());
         }
     }
 
-//    public BeanDefinitionVisitor getOrCreateBeanDefinitionWriter(TypeElement classElement, Name qualifiedName) {
-//        BeanDefinitionVisitor beanDefinitionWriter = beanDefinitionWriters.get(qualifiedName);
-//        if (beanDefinitionWriter == null) {
-//
-//            beanDefinitionWriter = createBeanDefinitionWriterFor(classElement);
-//            Name proxyKey = createProxyKey(beanDefinitionWriter.getBeanDefinitionName());
-//            beanDefinitionWriters.put(qualifiedName, beanDefinitionWriter);
-//
-//
-//            BeanDefinitionVisitor proxyWriter = beanDefinitionWriters.get(proxyKey);
-//            final AnnotationMetadata annotationMetadata = new AnnotationMetadataHierarchy(
-//                concreteClassMetadata,
-//                constructorAnnotationMetadata
-//            );
-//            if (proxyWriter != null) {
-//                if (constructorElement != null) {
-//                    proxyWriter.visitBeanDefinitionConstructor(
-//                        constructorElement,
-//                        constructorElement.isPrivate(),
-//                        javaVisitorContext
-//                    );
-//                } else {
-//                    proxyWriter.visitDefaultConstructor(
-//                        AnnotationMetadata.EMPTY_METADATA,
-//                        javaVisitorContext
-//                    );
-//                }
-//            }
-//
-//            if (constructorElement != null) {
-//                beanDefinitionWriter.visitBeanDefinitionConstructor(
-//                    constructorElement,
-//                    constructorElement.isPrivate(),
-//                    javaVisitorContext
-//                );
-//            } else {
-//                beanDefinitionWriter.visitDefaultConstructor(annotationMetadata, javaVisitorContext);
-//            }
-//        }
-//        return beanDefinitionWriter;
-//    }
-
     protected boolean visitExecutableMethod(BeanDefinitionVisitor visitor, MethodElement methodElement) {
-        if (methodElement.getAnnotationMetadata().getDeclaredMetadata().hasStereotype(Executable.class)) {
+        if (!methodElement.hasStereotype(Executable.class)) {
+            return false;
+        }
+        if (getElementAnnotationMetadata(methodElement).hasStereotype(Executable.class)) {
             // @Executable annotated on the method
             // Throw error if it cannot be accessed without the reflection
             if (!methodElement.isAccessible()) {
                 throw new ProcessingException(methodElement, "Method annotated as executable but is declared private. To invoke the method using reflection annotate it with @ReflectiveAccess");
             }
-        }
-        if (!isDeclaredInThisClass(methodElement)) {
+        } else if (!isDeclaredInThisClass(methodElement)) {
             // @Executable annotated on the parent class
             // Only include public methods
             if (!methodElement.isPublic()) {

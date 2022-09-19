@@ -200,7 +200,7 @@ public class ConfigurationMetadataBuilder {
         return p2;
     }
 
-    private String getPath(AnnotationMetadata annotationMetadata) {
+    public static String getPath(AnnotationMetadata annotationMetadata) {
         String prefix = annotationMetadata.stringValue(ConfigurationReader.class, ConfigurationReader.PREFIX).orElse(null);
         if (annotationMetadata.hasDeclaredAnnotation(EachProperty.class)) {
             Objects.requireNonNull(prefix);

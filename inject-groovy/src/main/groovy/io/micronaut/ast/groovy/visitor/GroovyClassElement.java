@@ -212,7 +212,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                     this,
                     visitorContext,
                     methodNode,
-                    AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, methodNode)
+                    AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, classNode, methodNode)
             )).collect(Collectors.toList());
 
             if (!typePredicates.isEmpty()) {
@@ -264,7 +264,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                     this,
                     visitorContext,
                     constructorNode,
-                    AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, constructorNode)
+                    AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, classNode, constructorNode)
             )).collect(Collectors.toList());
         } else if (elementType == FieldElement.class) {
             List<FieldNode> fields;
@@ -289,7 +289,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                     visitorContext,
                     fieldNode,
                     fieldNode,
-                    AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, fieldNode)
+                    AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, classNode, fieldNode)
             )).collect(Collectors.toList());
 
             if (!typePredicates.isEmpty()) {
@@ -488,7 +488,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     private Optional<MethodElement> createMethodElement(MethodNode method) {
         return Optional.ofNullable(method).map(executableElement -> {
 
-            final AnnotationMetadata annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, executableElement);
+            final AnnotationMetadata annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, classNode, executableElement);
             if (executableElement instanceof ConstructorNode) {
                 return new GroovyConstructorElement(this, visitorContext, (ConstructorNode) executableElement, annotationMetadata);
             } else {
@@ -852,7 +852,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                 final String propertyName = propertyNode.getName();
                 boolean readOnly = propertyNode.getField().isFinal();
                 final AnnotationMetadata annotationMetadata =
-                        AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, propertyNode.getField());
+                        AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, classNode, propertyNode.getField());
                 GroovyPropertyElement groovyPropertyElement = new GroovyPropertyElement(
                         visitorContext,
                         this,
@@ -1106,7 +1106,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
         } else {
             methodNode = nonPrivateConstructors.stream()
                     .filter(cn -> {
-                        AnnotationMetadata annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, cn);
+                        AnnotationMetadata annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, classNode, cn);
                         return annotationMetadata.hasAnnotation(AnnotationUtil.INJECT) ||
                                 annotationMetadata.hasAnnotation(Creator.class);
                     })

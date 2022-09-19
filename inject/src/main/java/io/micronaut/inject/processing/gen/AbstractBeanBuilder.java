@@ -79,30 +79,33 @@ public abstract class AbstractBeanBuilder {
     }
 
     public static AbstractBeanBuilder of(ClassElement classElement, VisitorContext visitorContext) {
+        boolean isAbstract = classElement.isAbstract();
         boolean isIntroduction = classElement.hasStereotype(AnnotationUtil.ANN_INTRODUCTION);
         if (ConfigurationPropertiesBeanBuilder.isConfigurationProperties(classElement)) {
             if (classElement.isInterface()) {
-                return new IntroductionInterfaceBeanBuilder(classElement, visitorContext);
+                return new IntroductionInterfaceBeanBuilder(classElement, visitorContext, null);
             }
             return new ConfigurationPropertiesBeanBuilder(classElement, visitorContext);
         }
-        if (classElement.hasStereotype(Factory.class)) {
-            return new FactoryBeanBuilder(classElement, visitorContext);
+        boolean aopProxyType = isAopProxyType(classElement);
+        if (!isAbstract && classElement.hasStereotype(Factory.class)) {
+            return new FactoryBeanBuilder(classElement, visitorContext, aopProxyType);
         }
-        if (isAopProxyType(classElement)) {
+        if (aopProxyType) {
             if (isIntroduction) {
                 return new AopIntroductionProxySupportedBeanBuilder(classElement, visitorContext, true);
             }
-            return new AopAroundProxySupportedBeanBuilder(classElement, visitorContext, true);
+            return new SimpleBeanBuilder(classElement, visitorContext, true);
         }
         if (isIntroduction) {
             if (classElement.isInterface()) {
-                return new IntroductionInterfaceBeanBuilder(classElement, visitorContext);
+                return new IntroductionInterfaceBeanBuilder(classElement, visitorContext, null);
             }
             return new AopIntroductionProxySupportedBeanBuilder(classElement, visitorContext, false);
         }
-        if (isDeclaredBean(classElement) || containsInjectMethod(classElement) || containsInjectField(classElement)) {
-            return new AopAroundProxySupportedBeanBuilder(classElement, visitorContext, false);
+        // NOTE: In Micronaut 3 abstract classes are allowed to be beans, but are not pickup to be beans just by having methods or fields with @Inject
+        if (isDeclaredBean(classElement) || (!isAbstract && (containsInjectMethod(classElement) || containsInjectField(classElement)))) {
+            return new SimpleBeanBuilder(classElement, visitorContext, false);
         }
         return null;
     }
@@ -110,9 +113,14 @@ public abstract class AbstractBeanBuilder {
     public abstract void build();
 
     private static boolean isDeclaredBean(ClassElement classElement) {
+        if (isDeclaredBeanInMetadata(classElement.getAnnotationMetadata())) {
+            return true;
+        }
+        if (classElement.isAbstract()) {
+            return false;
+        }
         return classElement.hasStereotype(Executable.class) ||
             classElement.hasStereotype(AnnotationUtil.QUALIFIER) ||
-            isDeclaredBeanInMetadata(classElement.getAnnotationMetadata()) ||
             findConstructorElement(classElement).map(constructor -> constructor.hasStereotype(AnnotationUtil.INJECT)).orElse(false);
     }
 
@@ -247,6 +255,16 @@ public abstract class AbstractBeanBuilder {
         methodElement.replaceAnnotations(annotationMetadataCombineWithBeanMetadata(beanDefinitionVisitor, methodAnnotationMetadata));
     }
 
+    protected void elementAnnotationsGuard(Element element, Consumer<MemberElement> consumer) {
+        if (element instanceof MethodElement) {
+            methodAnnotationsGuard((MethodElement) element, consumer::accept);
+        } else if (element instanceof FieldElement) {
+            fieldAnnotationsGuard((FieldElement) element, consumer::accept);
+        } else {
+            throw new IllegalStateException();
+        }
+    }
+
     protected void methodAnnotationsGuard(MethodElement methodElement, Consumer<MethodElement> consumer) {
         methodAnnotationsGuard(visitorContext, methodElement, consumer);
     }
@@ -286,7 +304,7 @@ public abstract class AbstractBeanBuilder {
         // We need to make sure we don't reuse the same instance for other adapters, and we don't override
         // added annotations.
         MethodElement targetMethod = elementFactory.newMethodElement(
-            methodElement.getDeclaringType(),
+            methodElement.getOwningType(),
             methodElement.getNativeType(),
             methodElement.getAnnotationMetadata()
         );
@@ -303,7 +321,7 @@ public abstract class AbstractBeanBuilder {
         // We need to make sure we don't reuse the same instance for other adapters, and we don't override
         // added annotations.
         FieldElement targetField = elementFactory.newFieldElement(
-            fieldElement.getDeclaringType(),
+            fieldElement.getOwningType(),
             fieldElement.getNativeType(),
             fieldElement.getAnnotationMetadata()
         );

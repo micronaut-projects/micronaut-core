@@ -8,8 +8,11 @@ import io.micronaut.inject.writer.BeanDefinitionVisitor;
 
 final class IntroductionInterfaceBeanBuilder extends AbstractBeanBuilder {
 
-    IntroductionInterfaceBeanBuilder(ClassElement classElement, VisitorContext visitorContext) {
+    private final String factoryBeanDefinitionName;
+
+    IntroductionInterfaceBeanBuilder(ClassElement classElement, VisitorContext visitorContext, String factoryBeanDefinitionName) {
         super(classElement, visitorContext);
+        this.factoryBeanDefinitionName = factoryBeanDefinitionName;
     }
 
     @Override
@@ -22,8 +25,12 @@ final class IntroductionInterfaceBeanBuilder extends AbstractBeanBuilder {
         } else {
             aopProxyWriter.visitDefaultConstructor(classElement, visitorContext);
         }
+        if (factoryBeanDefinitionName != null) {
+            aopProxyWriter.visitSuperBeanDefinitionFactory(factoryBeanDefinitionName);
+        }
 
-        for (MethodElement methodElement : classElement.getEnclosedElements(ElementQuery.ALL_METHODS)) {
+        // The introduction will include overridden methods* (find(List) <- find(Iterable)*) but ordinary class introduction doesn't
+        for (MethodElement methodElement : classElement.getEnclosedElements(ElementQuery.ALL_METHODS.includeHiddenElements().includeOverriddenMethods())) {
             if (aopHelper.visitIntrospectedMethod(aopProxyWriter, classElement, methodElement)) {
                 continue;
             }

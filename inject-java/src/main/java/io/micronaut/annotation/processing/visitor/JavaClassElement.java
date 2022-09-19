@@ -736,6 +736,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         boolean onlyAbstract = result.isOnlyAbstract();
         boolean onlyConcrete = result.isOnlyConcrete();
         boolean includeOverriddenMethods = result.isIncludeOverriddenMethods();
+        boolean includeHiddenElements = result.isIncludeHiddenElements();
 
         if (kind == ElementKind.METHOD || kind == ElementKind.FIELD) {
             // if the element kind is interfaces then we need to go through interfaces as well

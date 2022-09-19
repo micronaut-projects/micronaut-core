@@ -1,11 +1,14 @@
 package io.micronaut.inject.processing.gen;
 
 import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.ConfigurationReader;
+import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
@@ -13,11 +16,13 @@ import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.BeanDefinitionVisitor;
 import io.micronaut.inject.writer.BeanDefinitionWriter;
 import io.micronaut.inject.writer.OriginatingElements;
 
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -25,14 +30,14 @@ public class FactoryBeanBuilder extends SimpleBeanBuilder {
 
     private final AtomicInteger factoryMethodIndex = new AtomicInteger();
 
-    protected FactoryBeanBuilder(ClassElement classElement, VisitorContext visitorContext) {
-        super(classElement, visitorContext);
+    protected FactoryBeanBuilder(ClassElement classElement, VisitorContext visitorContext, boolean isAopProxy) {
+        super(classElement, visitorContext, isAopProxy);
     }
 
     @Override
     protected boolean visitMethod(BeanDefinitionVisitor visitor, MethodElement methodElement) {
         if (methodElement.hasDeclaredStereotype(Bean.class.getName(), AnnotationUtil.SCOPE)) {
-            visitBeanFactoryElement(visitor, methodElement.getReturnType(), methodElement);
+            visitBeanFactoryElement(visitor, methodElement.getGenericReturnType(), methodElement);
             return true;
         }
         return super.visitMethod(visitor, methodElement);
@@ -52,38 +57,45 @@ public class FactoryBeanBuilder extends SimpleBeanBuilder {
 
     void visitBeanFactoryElement(BeanDefinitionVisitor visitor, ClassElement producedType, MemberElement producingElement) {
         if (producedType.isPrimitive()) {
-            buildProducedBeanDefinition(producedType, producingElement, producingElement.getAnnotationMetadata());
+            BeanDefinitionWriter producedBeanDefinitionWriter = new BeanDefinitionWriter(producingElement,
+                OriginatingElements.of(producingElement),
+                metadataBuilder,
+                visitorContext,
+                factoryMethodIndex.getAndIncrement()
+            );
+            buildProducedBeanDefinition(producedBeanDefinitionWriter, producedType, producedType, producingElement, producingElement.getAnnotationMetadata(), producedType.getAllTypeArguments());
         } else {
+            AnnotationMetadata producedTypeAnnotationMetadata = createProducedTypeAnnotationMetadata(producedType, producingElement);
             classAnnotationsGuard(producedType, newType -> {
-                mergeAndAddAnnotations(visitor, newType, producingElement);
-
-                if (producingElement instanceof MethodElement) {
-                    methodAnnotationsGuard((MethodElement) producingElement, methodElement -> {
-                        methodElement.replaceAnnotations(newType.getAnnotationMetadata());
-                        buildProducedBeanDefinition(newType, methodElement, newType.getAnnotationMetadata());
+                newType.replaceAnnotations(producedTypeAnnotationMetadata);
+                elementAnnotationsGuard(producingElement, element1 -> {
+                    AnnotationMetadata producingElementAnnotationMetadata = createProducingElementAnnotationMetadata(visitor, producedTypeAnnotationMetadata);
+                    element1.replaceAnnotations(producingElementAnnotationMetadata);
+                    BeanDefinitionWriter producedBeanDefinitionWriter = new BeanDefinitionWriter(element1,
+                        OriginatingElements.of(element1),
+                        metadataBuilder,
+                        visitorContext,
+                        factoryMethodIndex.getAndIncrement()
+                    );
+                    elementAnnotationsGuard(producingElement, element2 -> {
+                        element2.replaceAnnotations(producedTypeAnnotationMetadata);
+                        buildProducedBeanDefinition(producedBeanDefinitionWriter, producedType, newType, element2, newType.getAnnotationMetadata(), producedType.getAllTypeArguments());
                     });
-                } else if (producingElement instanceof FieldElement) {
-                    fieldAnnotationsGuard((FieldElement) producingElement, fieldElement -> {
-                        fieldElement.replaceAnnotations(newType.getAnnotationMetadata());
-                        buildProducedBeanDefinition(newType, fieldElement, newType.getAnnotationMetadata());
-                    });
-                }
 
+                    if (element1 instanceof MethodElement) {
+                        MethodElement methodElement = (MethodElement) element1;
+
+                        if (isAopProxy && visitAopMethod(visitor, methodElement)) {
+                            return;
+                        }
+                        visitExecutableMethod(visitor, methodElement);
+                    }
+                });
             });
         }
     }
 
-    private void mergeAndAddAnnotations(BeanDefinitionVisitor visitor, ClassElement producedType, MemberElement producingElement) {
-        // Original logic is to combine producing element annotation metadata (method or field) with the produced type's annotation metadata
-        AnnotationMetadata producedAnnotationMetadata = visitorContext.newAnnotationBuilder().buildForParent(
-            producedType.getNativeType(),
-            producingElement.getNativeType()
-        );
-        AnnotationMetadata producedTypeAnnotationMetadata = producedType.getAnnotationMetadata();
-        AnnotationMetadata elementAnnotationMetadata = getElementAnnotationMetadata(producingElement);
-
-        cleanupScopeAndQualifierAnnotations((MutableAnnotationMetadata) producedAnnotationMetadata, producedTypeAnnotationMetadata, elementAnnotationMetadata);
-
+    private AnnotationMetadata createProducingElementAnnotationMetadata(BeanDefinitionVisitor visitor, AnnotationMetadata producedAnnotationMetadata) {
         MutableAnnotationMetadata factoryClassAnnotationMetadata = ((MutableAnnotationMetadata) classElement.getAnnotationMetadata()).clone();
 
         boolean modifiedFactoryClassAnnotationMetadata = false;
@@ -96,25 +108,40 @@ public class FactoryBeanBuilder extends SimpleBeanBuilder {
                 }
             }
         }
-
-        producedType.replaceAnnotations(producedAnnotationMetadata);
+        if (modifiedFactoryClassAnnotationMetadata) {
+            return new AnnotationMetadataHierarchy(factoryClassAnnotationMetadata, producedAnnotationMetadata);
+        }
+        return annotationMetadataCombineWithBeanMetadata(visitor, producedAnnotationMetadata);
     }
 
-    private void buildProducedBeanDefinition(ClassElement producedType,
-                                             MemberElement producingElement,
-                                             AnnotationMetadata producedAnnotationMetadata) {
-
-        BeanDefinitionWriter producedBeanDefinitionWriter = new BeanDefinitionWriter(producingElement,
-            OriginatingElements.of(producingElement),
-            metadataBuilder,
-            visitorContext,
-            factoryMethodIndex.getAndIncrement()
+    private AnnotationMetadata createProducedTypeAnnotationMetadata(ClassElement producedType, MemberElement producingElement) {
+        // Original logic is to combine producing element annotation metadata (method or field) with the produced type's annotation metadata
+        AnnotationMetadata producedAnnotationMetadata = visitorContext.newAnnotationBuilder().buildForParent(
+            producedType.getNativeType(),
+            producingElement.getNativeType()
         );
+        AnnotationMetadata producedTypeAnnotationMetadata = producedType.getAnnotationMetadata();
+        AnnotationMetadata elementAnnotationMetadata = getElementAnnotationMetadata(producingElement);
+
+        cleanupScopeAndQualifierAnnotations((MutableAnnotationMetadata) producedAnnotationMetadata, producedTypeAnnotationMetadata, elementAnnotationMetadata);
+        return producedAnnotationMetadata;
+    }
+
+    private void buildProducedBeanDefinition(BeanDefinitionWriter producedBeanDefinitionWriter,
+                                             ClassElement genericProducedType,
+                                             ClassElement producedType,
+                                             MemberElement producingElement,
+                                             AnnotationMetadata producedAnnotationMetadata,
+                                             Map<String, Map<String, ClassElement>> allTypeArguments) {
 
         visitAnnotationMetadata(producedBeanDefinitionWriter, producedAnnotationMetadata);
-        producedBeanDefinitionWriter.visitTypeArguments(producedType.getAllTypeArguments());
+        producedBeanDefinitionWriter.visitTypeArguments(allTypeArguments);
 
         beanDefinitionWriters.add(producedBeanDefinitionWriter);
+
+        if (producedType.hasStereotype(EachProperty.class)) {
+            producedType.annotate(ConfigurationReader.class, builder -> builder.member(ConfigurationReader.PREFIX, ConfigurationMetadataBuilder.getPath(producedType)));
+        }
 
         if (producingElement instanceof MethodElement) {
             producedBeanDefinitionWriter.visitBeanFactoryMethod(classElement, (MethodElement) producingElement);
@@ -162,10 +189,10 @@ public class FactoryBeanBuilder extends SimpleBeanBuilder {
                 aopProxyWriter.visitDefaultConstructor(AnnotationMetadata.EMPTY_METADATA, visitorContext);
             }
             aopProxyWriter.visitSuperBeanDefinitionFactory(producedBeanDefinitionWriter.getBeanDefinitionName());
-            aopProxyWriter.visitTypeArguments(producedType.getAllTypeArguments());
+            aopProxyWriter.visitTypeArguments(allTypeArguments);
             beanDefinitionWriters.add(aopProxyWriter);
 
-            producedType.getEnclosedElements(ElementQuery.ALL_METHODS)
+            genericProducedType.getEnclosedElements(ElementQuery.ALL_METHODS)
                 .stream()
                 .filter(m -> m.isPublic() && !m.isFinal() && !m.isStatic())
                 .forEach(m -> {
@@ -184,7 +211,7 @@ public class FactoryBeanBuilder extends SimpleBeanBuilder {
             if (producedType.isPrimitive()) {
                 throw new ProcessingException(producingElement, "Using '@Executable' is not allowed on primitive type beans");
             }
-            producedType.getEnclosedElements(ElementQuery.ALL_METHODS.onlyAccessible())
+            genericProducedType.getEnclosedElements(ElementQuery.ALL_METHODS)
                 .forEach(m -> {
                     methodAnnotationsGuard(m, methodElement -> {
                         methodElement.replaceAnnotations(

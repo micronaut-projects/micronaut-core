@@ -28,11 +28,16 @@ import java.util.concurrent.TimeUnit;
 public class ConfigurationPropertiesBeanBuilder extends SimpleBeanBuilder {
 
     protected ConfigurationPropertiesBeanBuilder(ClassElement classElement, VisitorContext visitorContext) {
-        super(classElement, visitorContext);
+        super(classElement, visitorContext, false);
     }
 
     public static boolean isConfigurationProperties(ClassElement classElement) {
         return classElement.hasStereotype(ConfigurationReader.class);
+    }
+
+    @Override
+    protected boolean visitAopMethod(BeanDefinitionVisitor visitor, MethodElement methodElement) {
+        return false;
     }
 
     @Override

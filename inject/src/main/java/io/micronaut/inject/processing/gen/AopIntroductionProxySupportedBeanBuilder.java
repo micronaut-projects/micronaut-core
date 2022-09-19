@@ -6,7 +6,7 @@ import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.BeanDefinitionVisitor;
 
-public class AopIntroductionProxySupportedBeanBuilder extends AopAroundProxySupportedBeanBuilder {
+public class AopIntroductionProxySupportedBeanBuilder extends SimpleBeanBuilder {
 
     protected AopIntroductionProxySupportedBeanBuilder(ClassElement classElement, VisitorContext visitorContext, boolean isAopProxy) {
         super(classElement, visitorContext, isAopProxy);
@@ -36,6 +36,11 @@ public class AopIntroductionProxySupportedBeanBuilder extends AopAroundProxySupp
     }
 
     @Override
+    protected BeanDefinitionVisitor getAroundAopProxyVisitor(BeanDefinitionVisitor visitor, MethodElement methodElement) {
+        return aopProxyVisitor;
+    }
+
+    @Override
     protected boolean visitMethod(BeanDefinitionVisitor visitor, MethodElement methodElement) {
         if (methodElement.isAbstract() && aopHelper.visitIntrospectedMethod(visitor, classElement, methodElement)) {
             return true;
@@ -43,8 +48,4 @@ public class AopIntroductionProxySupportedBeanBuilder extends AopAroundProxySupp
         return super.visitMethod(visitor, methodElement);
     }
 
-    @Override
-    protected BeanDefinitionVisitor getAroundAopProxyVisitor(BeanDefinitionVisitor visitor, MethodElement methodElement) {
-        return aopProxyVisitor;
-    }
 }

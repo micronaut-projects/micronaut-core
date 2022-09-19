@@ -234,6 +234,10 @@ public class AopHelperImpl implements AopHelper {
             );
         }
 
+        if (!classElement.getName().equals(methodElement.getDeclaringType().getName())) {
+            aopProxyWriter.addOriginatingElement(methodElement.getDeclaringType());
+        }
+
         ClassElement declaringType = methodElement.getDeclaringType();
         if (methodElement.isAbstract()) {
             aopProxyWriter.visitIntroductionMethod(declaringType, methodElement);

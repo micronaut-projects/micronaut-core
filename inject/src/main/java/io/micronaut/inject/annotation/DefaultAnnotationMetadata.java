@@ -85,7 +85,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     Map<String, List<String>> annotationsByStereotype;
     @Nullable
     Map<String, Map<CharSequence, Object>> annotationDefaultValues;
-    Map<String, String> repeated = null;
+    public Map<String, String> repeated = null;
 
     private Map<String, List> annotationValuesByType = new ConcurrentHashMap<>(2);
     private Set<String> sourceRetentionAnnotations;
@@ -1882,7 +1882,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      */
     @SuppressWarnings("unused")
     @Internal
-    void dump() {
+    public void dump() {
         System.out.println("declaredAnnotations = " + declaredAnnotations);
         System.out.println("declaredStereotypes = " + declaredStereotypes);
         System.out.println("allAnnotations = " + allAnnotations);

@@ -15,18 +15,17 @@
  */
 package io.micronaut.ast.groovy.visitor;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-
 import io.micronaut.ast.groovy.utils.AstAnnotationUtils;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.EnumConstantElement;
 import io.micronaut.inject.ast.EnumElement;
-
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.FieldNode;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * Implementation of {@link EnumElement} for Groovy.
@@ -89,6 +88,7 @@ class GroovyEnumElement extends GroovyClassElement implements EnumElement {
                 enumConstants.add(new GroovyEnumConstantElement(this, visitorContext, field, field, AstAnnotationUtils.getAnnotationMetadata(
                         sourceUnit,
                         compilationUnit,
+                        classNode,
                         field
                 )));
             }
