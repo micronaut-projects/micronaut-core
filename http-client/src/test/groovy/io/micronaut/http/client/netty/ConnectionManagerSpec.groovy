@@ -22,15 +22,12 @@ import io.netty.handler.codec.http.HttpServerCodec
 import io.netty.handler.codec.http2.DefaultHttp2DataFrame
 import io.netty.handler.codec.http2.DefaultHttp2Headers
 import io.netty.handler.codec.http2.DefaultHttp2HeadersFrame
-import io.netty.handler.codec.http2.DefaultHttp2SettingsFrame
 import io.netty.handler.codec.http2.Http2FrameCodecBuilder
+import io.netty.handler.codec.http2.Http2FrameStream
 import io.netty.handler.codec.http2.Http2Headers
 import io.netty.handler.codec.http2.Http2HeadersFrame
-import io.netty.handler.codec.http2.Http2Settings
 import io.netty.handler.codec.http2.Http2SettingsAckFrame
 import io.netty.handler.codec.http2.Http2SettingsFrame
-import io.netty.handler.logging.LogLevel
-import io.netty.handler.logging.LoggingHandler
 import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler
 import io.netty.handler.ssl.SslContextBuilder
 import io.netty.handler.ssl.util.SelfSignedCertificate
@@ -70,15 +67,8 @@ class ConnectionManagerSpec extends Specification {
         when:
         def future = Mono.from(client.exchange('https://example.com/foo')).toFuture()
         future.exceptionally(t -> t.printStackTrace())
-        conn.advance()
+        conn.exchangeSettings()
         then:
-        conn.serverChannel.readInbound() instanceof Http2SettingsFrame
-
-        when:
-        conn.serverChannel.writeOutbound(new DefaultHttp2SettingsFrame(Http2Settings.defaultSettings()))
-        conn.advance()
-        then:
-        conn.serverChannel.readInbound() instanceof Http2SettingsAckFrame
         Http2HeadersFrame request = conn.serverChannel.readInbound()
         request.headers().get(Http2Headers.PseudoHeaderName.PATH.value()) == '/foo'
         request.headers().get(Http2Headers.PseudoHeaderName.SCHEME.value()) == 'https'
@@ -86,9 +76,7 @@ class ConnectionManagerSpec extends Specification {
         request.headers().get(Http2Headers.PseudoHeaderName.METHOD.value()) == 'GET'
 
         when:
-        def responseHeaders = new DefaultHttp2Headers()
-        responseHeaders.add(Http2Headers.PseudoHeaderName.STATUS.value(), "200")
-        conn.serverChannel.writeOutbound(new DefaultHttp2HeadersFrame(responseHeaders, true).stream(request.stream()))
+        conn.respondOk(request.stream())
         conn.advance()
         then:
         def response = future.get()
@@ -117,15 +105,8 @@ class ConnectionManagerSpec extends Specification {
             .doOnError(t -> t.printStackTrace())
             .doOnComplete(() -> responseComplete = true)
             .subscribe(b -> responseData.add(b.toString(StandardCharsets.UTF_8)))
-        conn.advance()
+        conn.exchangeSettings()
         then:
-        conn.serverChannel.readInbound() instanceof Http2SettingsFrame
-
-        when:
-        conn.serverChannel.writeOutbound(new DefaultHttp2SettingsFrame(Http2Settings.defaultSettings()))
-        conn.advance()
-        then:
-        conn.serverChannel.readInbound() instanceof Http2SettingsAckFrame
         Http2HeadersFrame request = conn.serverChannel.readInbound()
         request.headers().get(Http2Headers.PseudoHeaderName.PATH.value()) == '/foo'
         request.headers().get(Http2Headers.PseudoHeaderName.SCHEME.value()) == 'https'
@@ -174,9 +155,7 @@ class ConnectionManagerSpec extends Specification {
         request.headers().get('host') == 'example.com'
 
         when:
-        def response = new DefaultHttpResponse(io.netty.handler.codec.http.HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
-        response.headers().add('content-length', 0)
-        conn.serverChannel.writeOutbound(response)
+        conn.respondOk()
         conn.advance()
         then:
         def mnResponse = future.get()
@@ -232,6 +211,73 @@ class ConnectionManagerSpec extends Specification {
         ctx.close()
     }
 
+    def 'http2 concurrent stream'() {
+        given:
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn1 = new EmbeddedTestConnection()
+        conn1.setupHttp2Tls()
+        def conn2 = new EmbeddedTestConnection()
+        conn2.setupHttp2Tls()
+        patch(client, conn1.clientChannel, conn2.clientChannel)
+
+        when:
+        // start two requests. this will open two connections
+        def f1 = Mono.from(client.exchange('https://example.com/r1')).toFuture()
+        f1.exceptionally(t -> t.printStackTrace())
+        def f2 = Mono.from(client.exchange('https://example.com/r2')).toFuture()
+        f2.exceptionally(t -> t.printStackTrace())
+
+        then:
+        // no data yet, haven't finished the handshake
+        conn1.serverChannel.readInbound() == null
+
+        when:
+        // finish handshake for first connection
+        conn1.exchangeSettings()
+        then:
+        // both requests immediately go to the first connection
+        def req1 = conn1.serverChannel.<Http2HeadersFrame> readInbound()
+        req1.headers().get(Http2Headers.PseudoHeaderName.PATH.value()) == '/r1'
+        def req2 = conn1.serverChannel.<Http2HeadersFrame> readInbound()
+        req2.stream().id() != req1.stream().id()
+        req2.headers().get(Http2Headers.PseudoHeaderName.PATH.value()) == '/r2'
+
+        when:
+        // start a third request, this should reuse the existing connection
+        def f3 = Mono.from(client.exchange('https://example.com/r3')).toFuture()
+        f3.exceptionally(t -> t.printStackTrace())
+        conn1.advance()
+        then:
+        def req3 = conn1.serverChannel.<Http2HeadersFrame> readInbound()
+        req3.stream().id() != req1.stream().id()
+        req3.stream().id() != req2.stream().id()
+        req3.headers().get(Http2Headers.PseudoHeaderName.PATH.value()) == '/r3'
+
+        // finish up the third request
+        when:
+        conn1.respondOk(req3.stream())
+        conn1.advance()
+        then:
+        f3.get().status() == HttpStatus.OK
+
+        // finish up the second and first request
+        when:
+        conn1.respondOk(req2.stream())
+        conn1.respondOk(req1.stream())
+        conn1.advance()
+        then:
+        f1.get().status() == HttpStatus.OK
+        f2.get().status() == HttpStatus.OK
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
     static class EmbeddedTestConnection {
         final EmbeddedChannel serverChannel
         final EmbeddedChannel clientChannel
@@ -258,19 +304,42 @@ class ConnectionManagerSpec extends Specification {
                         @Override
                         protected void configurePipeline(ChannelHandlerContext chtx, String protocol) throws Exception {
                             chtx.pipeline()
-                                    .addLast(Http2FrameCodecBuilder.forServer().build())
+                                    .addLast(Http2FrameCodecBuilder.forServer()
+                                            .autoAckSettingsFrame(false)
+                                            .build())
                         }
                     })
         }
 
         void setupHttp1() {
             serverChannel.pipeline()
-            .addLast(new LoggingHandler(LogLevel.INFO))
                     .addLast(new HttpServerCodec())
         }
 
         void advance() {
             EmbeddedTestUtil.advance(serverChannel, clientChannel)
+        }
+
+        void exchangeSettings() {
+            advance()
+            if (!(serverChannel.readInbound() instanceof Http2SettingsFrame)) {
+                throw new AssertionError()
+            }
+            if (!(serverChannel.readInbound() instanceof Http2SettingsAckFrame)) {
+                throw new AssertionError()
+            }
+        }
+
+        void respondOk(Http2FrameStream stream) {
+            def responseHeaders = new DefaultHttp2Headers()
+            responseHeaders.add(Http2Headers.PseudoHeaderName.STATUS.value(), "200")
+            serverChannel.writeOutbound(new DefaultHttp2HeadersFrame(responseHeaders, true).stream(stream))
+        }
+
+        void respondOk() {
+            def response = new DefaultHttpResponse(io.netty.handler.codec.http.HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
+            response.headers().add('content-length', 0)
+            serverChannel.writeOutbound(response)
         }
     }
 }
