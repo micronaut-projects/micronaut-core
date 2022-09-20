@@ -154,6 +154,23 @@ class ConnectionManagerSpec extends Specification {
         ctx.close()
     }
 
+    def 'simple http1 tls get'() {
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn = new EmbeddedTestConnectionHttp1()
+        conn.setupHttp1Tls()
+        patch(client, conn.clientChannel)
+
+        conn.testExchange(client)
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
     def 'http1 streaming get'() {
         def ctx = ApplicationContext.run()
         def client = ctx.getBean(DefaultHttpClient)
@@ -274,8 +291,23 @@ class ConnectionManagerSpec extends Specification {
     }
 
     static class EmbeddedTestConnectionHttp1 extends EmbeddedTestConnectionBase {
+        private String scheme
+
         void setupHttp1() {
+            scheme = 'http'
             serverChannel.pipeline()
+                    .addLast(new HttpServerCodec())
+        }
+
+        void setupHttp1Tls() {
+            def certificate = new SelfSignedCertificate()
+            def builder = SslContextBuilder.forServer(certificate.key(), certificate.cert())
+            CertificateProvidedSslBuilder.setupSslBuilder(builder, new SslConfiguration(), HttpVersion.HTTP_1_1);
+            def tlsHandler = builder.build().newHandler(ByteBufAllocator.DEFAULT)
+
+            scheme = 'https'
+            serverChannel.pipeline()
+                    .addLast(tlsHandler)
                     .addLast(new HttpServerCodec())
         }
 
@@ -286,7 +318,7 @@ class ConnectionManagerSpec extends Specification {
         }
 
         void testExchange(HttpClient client) {
-            def future = Mono.from(client.exchange('http://example.com/foo')).toFuture()
+            def future = Mono.from(client.exchange(scheme + '://example.com/foo')).toFuture()
             future.exceptionally(t -> t.printStackTrace())
             advance()
 
@@ -308,7 +340,7 @@ class ConnectionManagerSpec extends Specification {
         void testStreaming(StreamingHttpClient client) {
             def responseData = new ArrayDeque<String>()
             def responseComplete = false
-            Flux.from(client.dataStream(HttpRequest.GET('http://example.com/foo')))
+            Flux.from(client.dataStream(HttpRequest.GET(scheme + '://example.com/foo')))
                     .doOnError(t -> t.printStackTrace())
                     .doOnComplete(() -> responseComplete = true)
                     .subscribe(b -> responseData.add(b.toString(StandardCharsets.UTF_8)))

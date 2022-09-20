@@ -1405,8 +1405,9 @@ class ConnectionManager {
                                     .addLast(new Http2PriorKnowledgeInitializer(pool))
                                     .remove(initialErrorHandler);
                             } else if (ApplicationProtocolNames.HTTP_1_1.equals(protocol)) {
-                                // TODO
-                                throw new UnsupportedOperationException();
+                                ctx.pipeline()
+                                    .addLast(new Http1Initializer(pool, true, host, port))
+                                    .remove(initialErrorHandler);
                             } else {
                                 ctx.close();
                                 throw customizeException(new HttpClientException("Unknown Protocol: " + protocol));
