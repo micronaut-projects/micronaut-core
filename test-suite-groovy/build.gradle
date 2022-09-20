@@ -32,11 +32,8 @@ dependencies {
     testImplementation libs.managed.reactor
 }
 
-//tasks.withType(Test).configureEach {
-//    testLogging {
-//        showStandardStreams = true
-//        exceptionFormat = 'full'
-//    }
-//}
+tasks.withType(Test).configureEach {
+    jvmArgs("--add-opens", "java.base/sun.security.x509=ALL-UNNAMED")
+}
 
 //compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']
