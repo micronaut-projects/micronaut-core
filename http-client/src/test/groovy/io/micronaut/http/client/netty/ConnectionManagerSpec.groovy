@@ -4,6 +4,8 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.HttpVersion
+import io.micronaut.http.client.HttpClient
+import io.micronaut.http.client.StreamingHttpClient
 import io.micronaut.http.server.netty.ssl.CertificateProvidedSslBuilder
 import io.micronaut.http.ssl.SslConfiguration
 import io.netty.buffer.ByteBufAllocator
@@ -18,9 +20,9 @@ import io.netty.handler.codec.http.DefaultHttpContent
 import io.netty.handler.codec.http.DefaultHttpResponse
 import io.netty.handler.codec.http.DefaultLastHttpContent
 import io.netty.handler.codec.http.HttpMethod
-import io.netty.handler.codec.http.HttpObjectAggregator
 import io.netty.handler.codec.http.HttpResponseStatus
 import io.netty.handler.codec.http.HttpServerCodec
+import io.netty.handler.codec.http.LastHttpContent
 import io.netty.handler.codec.http2.DefaultHttp2DataFrame
 import io.netty.handler.codec.http2.DefaultHttp2Headers
 import io.netty.handler.codec.http2.DefaultHttp2HeadersFrame
@@ -62,7 +64,7 @@ class ConnectionManagerSpec extends Specification {
         ])
         def client = ctx.getBean(DefaultHttpClient)
 
-        def conn = new EmbeddedTestConnection()
+        def conn = new EmbeddedTestConnectionHttp2()
         conn.setupHttp2Tls()
         patch(client, conn.clientChannel)
 
@@ -96,7 +98,7 @@ class ConnectionManagerSpec extends Specification {
         ])
         def client = ctx.getBean(DefaultHttpClient)
 
-        def conn = new EmbeddedTestConnection()
+        def conn = new EmbeddedTestConnectionHttp2()
         conn.setupHttp2Tls()
         patch(client, conn.clientChannel)
 
@@ -138,30 +140,14 @@ class ConnectionManagerSpec extends Specification {
     }
 
     def 'simple http1 get'() {
-        given:
         def ctx = ApplicationContext.run()
         def client = ctx.getBean(DefaultHttpClient)
 
-        def conn = new EmbeddedTestConnection()
+        def conn = new EmbeddedTestConnectionHttp1()
         conn.setupHttp1()
         patch(client, conn.clientChannel)
 
-        when:
-        def future = Mono.from(client.exchange('http://example.com/foo')).toFuture()
-        future.exceptionally(t -> t.printStackTrace())
-        conn.advance()
-        then:
-        io.netty.handler.codec.http.HttpRequest request = conn.serverChannel.readInbound()
-        request.uri() == '/foo'
-        request.method() == HttpMethod.GET
-        request.headers().get('host') == 'example.com'
-
-        when:
-        conn.respondOk()
-        conn.advance()
-        then:
-        def mnResponse = future.get()
-        mnResponse.status() == HttpStatus.OK
+        conn.testExchange(client)
 
         cleanup:
         client.close()
@@ -169,44 +155,14 @@ class ConnectionManagerSpec extends Specification {
     }
 
     def 'http1 streaming get'() {
-        given:
         def ctx = ApplicationContext.run()
         def client = ctx.getBean(DefaultHttpClient)
 
-        def conn = new EmbeddedTestConnection()
+        def conn = new EmbeddedTestConnectionHttp1()
         conn.setupHttp1()
         patch(client, conn.clientChannel)
 
-        when:
-        def responseData = new ArrayDeque<String>()
-        def responseComplete = false
-        Flux.from(client.dataStream(HttpRequest.GET('http://example.com/foo')))
-                .doOnError(t -> t.printStackTrace())
-                .doOnComplete(() -> responseComplete = true)
-                .subscribe(b -> responseData.add(b.toString(StandardCharsets.UTF_8)))
-        conn.advance()
-        then:
-        io.netty.handler.codec.http.HttpRequest request = conn.serverChannel.readInbound()
-        request.uri() == '/foo'
-        request.method() == HttpMethod.GET
-        request.headers().get('host') == 'example.com'
-
-        when:
-        def response = new DefaultHttpResponse(io.netty.handler.codec.http.HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
-        response.headers().add('content-length', 6)
-        conn.serverChannel.writeOutbound(response)
-        conn.serverChannel.writeOutbound(new DefaultHttpContent(Unpooled.wrappedBuffer('foo'.bytes)))
-        conn.advance()
-        then:
-        responseData.poll() == 'foo'
-        !responseComplete
-
-        when:
-        conn.serverChannel.writeOutbound(new DefaultLastHttpContent(Unpooled.wrappedBuffer('bar'.bytes)))
-        conn.advance()
-        then:
-        responseData.poll() == 'bar'
-        responseComplete
+        conn.testStreaming(client)
 
         cleanup:
         client.close()
@@ -220,9 +176,9 @@ class ConnectionManagerSpec extends Specification {
         ])
         def client = ctx.getBean(DefaultHttpClient)
 
-        def conn1 = new EmbeddedTestConnection()
+        def conn1 = new EmbeddedTestConnectionHttp2()
         conn1.setupHttp2Tls()
-        def conn2 = new EmbeddedTestConnection()
+        def conn2 = new EmbeddedTestConnectionHttp2()
         conn2.setupHttp2Tls()
         patch(client, conn1.clientChannel, conn2.clientChannel)
 
@@ -281,53 +237,26 @@ class ConnectionManagerSpec extends Specification {
     }
 
     def 'http1 reuse'() {
-        given:
         def ctx = ApplicationContext.run()
         def client = ctx.getBean(DefaultHttpClient)
 
-        def conn = new EmbeddedTestConnection()
+        def conn = new EmbeddedTestConnectionHttp1()
         conn.setupHttp1()
-        conn.serverChannel.pipeline().addLast(new HttpObjectAggregator(1024))
         patch(client, conn.clientChannel)
 
-        when:
-        def f1 = Mono.from(client.exchange('http://example.com/r1')).toFuture()
-        f1.exceptionally(t -> t.printStackTrace())
-        conn.advance()
-        then:
-        io.netty.handler.codec.http.HttpRequest req1 = conn.serverChannel.readInbound()
-        req1.headers().get("connection") == "keep-alive"
-
-        when:
-        conn.respondOk()
-        conn.advance()
-        then:
-        f1.get().status() == HttpStatus.OK
-
-        when:
-        def f2 = Mono.from(client.exchange('http://example.com/r1')).toFuture()
-        f2.exceptionally(t -> t.printStackTrace())
-        conn.advance()
-        then:
-        io.netty.handler.codec.http.HttpRequest req2 = conn.serverChannel.readInbound()
-        req2.headers().get("connection") == "keep-alive"
-
-        when:
-        conn.respondOk()
-        conn.advance()
-        then:
-        f1.get().status() == HttpStatus.OK
+        conn.testExchange(client)
+        conn.testExchange(client)
 
         cleanup:
         client.close()
         ctx.close()
     }
 
-    static class EmbeddedTestConnection {
+    static class EmbeddedTestConnectionBase {
         final EmbeddedChannel serverChannel
         final EmbeddedChannel clientChannel
 
-        EmbeddedTestConnection() {
+        EmbeddedTestConnectionBase() {
             serverChannel = new EmbeddedChannel(new DummyChannelId('server'))
             serverChannel.freezeTime()
             serverChannel.config().setAutoRead(true)
@@ -337,6 +266,76 @@ class ConnectionManagerSpec extends Specification {
             EmbeddedTestUtil.connect(serverChannel, clientChannel)
         }
 
+        void advance() {
+            EmbeddedTestUtil.advance(serverChannel, clientChannel)
+        }
+    }
+
+    static class EmbeddedTestConnectionHttp1 extends EmbeddedTestConnectionBase {
+        void setupHttp1() {
+            serverChannel.pipeline()
+                    .addLast(new HttpServerCodec())
+        }
+
+        void respondOk() {
+            def response = new DefaultFullHttpResponse(io.netty.handler.codec.http.HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
+            response.headers().add('content-length', 0)
+            serverChannel.writeOutbound(response)
+        }
+
+        void testExchange(HttpClient client) {
+            def future = Mono.from(client.exchange('http://example.com/foo')).toFuture()
+            future.exceptionally(t -> t.printStackTrace())
+            advance()
+
+            io.netty.handler.codec.http.HttpRequest request = serverChannel.readInbound()
+            assert request.uri() == '/foo'
+            assert request.method() == HttpMethod.GET
+            assert request.headers().get('host') == 'example.com'
+            assert request.headers().get("connection") == "keep-alive"
+
+            def tail = serverChannel.readInbound()
+            assert tail == null || tail instanceof LastHttpContent
+
+            respondOk()
+            advance()
+
+            assert future.get().status() == HttpStatus.OK
+        }
+
+        void testStreaming(StreamingHttpClient client) {
+            def responseData = new ArrayDeque<String>()
+            def responseComplete = false
+            Flux.from(client.dataStream(HttpRequest.GET('http://example.com/foo')))
+                    .doOnError(t -> t.printStackTrace())
+                    .doOnComplete(() -> responseComplete = true)
+                    .subscribe(b -> responseData.add(b.toString(StandardCharsets.UTF_8)))
+            advance()
+
+            io.netty.handler.codec.http.HttpRequest request = serverChannel.readInbound()
+            assert request.uri() == '/foo'
+            assert request.method() == HttpMethod.GET
+            assert request.headers().get('host') == 'example.com'
+            //assert request.headers().get("connection") == "keep-alive"
+
+            def response = new DefaultHttpResponse(io.netty.handler.codec.http.HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
+            response.headers().add('content-length', 6)
+            serverChannel.writeOutbound(response)
+            serverChannel.writeOutbound(new DefaultHttpContent(Unpooled.wrappedBuffer('foo'.bytes)))
+            advance()
+
+            assert responseData.poll() == 'foo'
+            assert !responseComplete
+
+            serverChannel.writeOutbound(new DefaultLastHttpContent(Unpooled.wrappedBuffer('bar'.bytes)))
+            advance()
+
+            assert responseData.poll() == 'bar'
+            assert responseComplete
+        }
+    }
+
+    static class EmbeddedTestConnectionHttp2 extends EmbeddedTestConnectionBase {
         void setupHttp2Tls() {
             def certificate = new SelfSignedCertificate()
             def builder = SslContextBuilder.forServer(certificate.key(), certificate.cert())
@@ -356,15 +355,6 @@ class ConnectionManagerSpec extends Specification {
                     })
         }
 
-        void setupHttp1() {
-            serverChannel.pipeline()
-                    .addLast(new HttpServerCodec())
-        }
-
-        void advance() {
-            EmbeddedTestUtil.advance(serverChannel, clientChannel)
-        }
-
         void exchangeSettings() {
             advance()
             if (!(serverChannel.readInbound() instanceof Http2SettingsFrame)) {
@@ -379,12 +369,6 @@ class ConnectionManagerSpec extends Specification {
             def responseHeaders = new DefaultHttp2Headers()
             responseHeaders.add(Http2Headers.PseudoHeaderName.STATUS.value(), "200")
             serverChannel.writeOutbound(new DefaultHttp2HeadersFrame(responseHeaders, true).stream(stream))
-        }
-
-        void respondOk() {
-            def response = new DefaultFullHttpResponse(io.netty.handler.codec.http.HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
-            response.headers().add('content-length', 0)
-            serverChannel.writeOutbound(response)
         }
     }
 }
