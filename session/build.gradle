@@ -11,6 +11,7 @@ dependencies {
     compileOnly project(":http-server-netty")
 
     implementation libs.managed.reactor
+    implementation libs.caffeine
 
     testAnnotationProcessor project(":inject-java")
     testCompileOnly project(":inject-groovy")
