@@ -2,6 +2,8 @@ package io.micronaut.annotation.processing.test
 
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.version.SemanticVersion
+import spock.lang.Ignore
+import spock.lang.IgnoreIf
 import spock.lang.Requires
 import spock.util.environment.Jvm
 
@@ -10,6 +12,7 @@ import spock.util.environment.Jvm
     SemanticVersion.isAtLeastMajorMinor(GroovySystem.version, 4, 0) ||
             !Jvm.current.isJava16Compatible()
 })
+@IgnoreIf({ Jvm.current.isJava16Compatible() }) // Still fails even with https://issues.apache.org/jira/browse/GROOVY-10145 fixed ...
 class KotlinCompilerTest extends AbstractKotlinCompilerSpec {
     void "simple class"() {
         given:
@@ -53,7 +56,7 @@ class Foo {
 
 @Singleton
 class Bar {
-    
+
 }
 ''')
         def bean = getBean(context, "example.Foo")
