@@ -245,7 +245,9 @@ class ConnectionManagerSpec extends Specification {
         patch(client, conn.clientChannel)
 
         conn.testExchange(client)
+        conn.testStreaming(client)
         conn.testExchange(client)
+        conn.testStreaming(client)
 
         cleanup:
         client.close()
@@ -316,7 +318,10 @@ class ConnectionManagerSpec extends Specification {
             assert request.uri() == '/foo'
             assert request.method() == HttpMethod.GET
             assert request.headers().get('host') == 'example.com'
-            //assert request.headers().get("connection") == "keep-alive"
+            assert request.headers().get("connection") == "keep-alive"
+
+            def tail = serverChannel.readInbound()
+            assert tail == null || tail instanceof LastHttpContent
 
             def response = new DefaultHttpResponse(io.netty.handler.codec.http.HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
             response.headers().add('content-length', 6)

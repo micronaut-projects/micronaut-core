@@ -69,6 +69,8 @@ import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpMessage;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpObjectAggregator;
+import io.netty.handler.codec.http.HttpResponse;
+import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketClientCompressionHandler;
@@ -573,6 +575,30 @@ class ConnectionManager {
             return pool.acquire()
                 .map(ph -> {
                     // TODO: this sucks
+                    ph.channel.pipeline().addLast(new ChannelInboundHandlerAdapter() {
+                        boolean ignoreOneLast = false;
+
+                        @Override
+                        public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+                            if (msg instanceof HttpResponse &&
+                                ((HttpResponse) msg).status().equals(HttpResponseStatus.CONTINUE)) {
+                                ignoreOneLast = true;
+                            }
+
+                            super.channelRead(ctx, msg);
+
+                            if (msg instanceof LastHttpContent) {
+                                if (ignoreOneLast) {
+                                    ignoreOneLast = false;
+                                } else {
+                                    ctx.pipeline()
+                                        .remove(this)
+                                        .remove(ChannelPipelineCustomizer.HANDLER_HTTP_STREAM);
+                                    ph.release();
+                                }
+                            }
+                        }
+                    });
                     ph.channel.pipeline().addLast(
                             ChannelPipelineCustomizer.HANDLER_HTTP_STREAM,
                             new HttpStreamsClientHandler() {
@@ -580,7 +606,8 @@ class ConnectionManager {
                                 public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
                                     if (evt instanceof IdleStateEvent) {
                                         // close the connection if it is idle for too long
-                                        ctx.close();
+                                        ph.taint();
+                                        ph.release();
                                     }
                                     super.userEventTriggered(ctx, evt);
                                 }
@@ -1691,6 +1718,8 @@ class ConnectionManager {
                     return;
                 }
                 Sinks.EmitResult emitResult = sink.tryEmitValue(new PoolHandle(channel) {
+                    final ChannelHandlerContext lastContext = channel.pipeline().lastContext();
+
                     @Override
                     void taint() {
                         canReturn = false;
@@ -1698,8 +1727,19 @@ class ConnectionManager {
 
                     @Override
                     void release() {
-                        hasLiveRequest.set(false);
-                        // todo: claim a new request
+                        if (canReturn) {
+                            ChannelHandlerContext newLast = channel.pipeline().lastContext();
+                            if (lastContext != newLast) {
+                                log.warn("BUG - Handler not removed: {}", newLast);
+                                taint();
+                            }
+                        }
+                        if (canReturn) {
+                            hasLiveRequest.set(false);
+                            // todo: claim a new request
+                        } else {
+                            channel.close();
+                        }
                     }
 
                     @Override
