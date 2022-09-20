@@ -16,6 +16,9 @@
 package io.micronaut.inject.ast;
 
 import io.micronaut.core.annotation.NonNull;
+
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -53,5 +56,12 @@ public interface PropertyElement extends TypedElement, MemberElement {
      */
     default Optional<MethodElement> getReadMethod() {
         return Optional.empty();
+    }
+
+    /**
+     * @return The native parents that this property is representing (getter, setter, field)
+     */
+    default List<?> getNativeParents() {
+        return Collections.emptyList();
     }
 }

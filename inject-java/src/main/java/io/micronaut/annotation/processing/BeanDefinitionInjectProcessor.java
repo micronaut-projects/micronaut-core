@@ -21,7 +21,6 @@ import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.Context;
 import io.micronaut.context.annotation.DefaultScope;
-import io.micronaut.context.annotation.Property;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
@@ -30,7 +29,6 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
-import io.micronaut.inject.configuration.PropertyMetadata;
 import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.processing.gen.AbstractBeanBuilder;
 import io.micronaut.inject.processing.gen.ProcessingException;
@@ -152,7 +150,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         processingOver = roundEnv.processingOver();
 
         if (!processingOver) {
-
+            JavaAnnotationMetadataBuilder annotationMetadataBuilder = javaVisitorContext.getAnnotationMetadataBuilder();
             annotations = annotations
                 .stream()
                 .filter(ann -> {
@@ -160,7 +158,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     String packageName = NameUtils.getPackageName(name);
                     return !name.equals(AnnotationUtil.KOTLIN_METADATA) && !AnnotationUtil.STEREOTYPE_EXCLUDES.contains(packageName);
                 })
-                .filter(ann -> annotationUtils.getAnnotationMetadata(ann).hasStereotype(ANNOTATION_STEREOTYPES)
+                .filter(ann -> annotationMetadataBuilder.buildForType(ann).hasStereotype(ANNOTATION_STEREOTYPES)
                     || isProcessedAnnotation(ann.getQualifiedName().toString()))
                 .collect(Collectors.toSet());
 
@@ -178,7 +176,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             return;
                         }
                         if (element.getKind() == ENUM) {
-                            final AnnotationMetadata am = annotationUtils.getAnnotationMetadata(typeElement, element);
+                            final AnnotationMetadata am = annotationMetadataBuilder.buildForType(element);
                             if (isDeclaredBeanInMetadata(am)) {
                                 error(element, "Enum types cannot be defined as beans");
                             }
@@ -195,7 +193,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             if (!isInterface) {
                                 beanDefinitions.add(name);
                             } else {
-                                AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(typeElement);
+                                AnnotationMetadata annotationMetadata = annotationMetadataBuilder.buildForType(typeElement);
                                 if (annotationMetadata.hasStereotype(INTRODUCTION_TYPE) || annotationMetadata.hasStereotype(ConfigurationReader.class)) {
                                     beanDefinitions.add(name);
                                 }
@@ -235,8 +233,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                                         visitedTypes.add(classElementQualifiedName);
 
-                                        AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(typeElement);
-                                        JavaClassElement classElement = javaVisitorContext.getElementFactory().newClassElement(typeElement, annotationMetadata);
+                                        JavaClassElement classElement = javaVisitorContext.getElementFactory()
+                                            .newClassElement(typeElement, javaVisitorContext.getElementAnnotationMetadataFactory().readOnly());
 
                                         AbstractBeanBuilder beanBuilder = AbstractBeanBuilder.of(classElement, javaVisitorContext);
                                         if (beanBuilder != null) {
@@ -271,7 +269,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         }
                     }
                 });
-                AnnotationUtils.invalidateCache();
             }
         }
 
@@ -302,7 +299,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     }
                 }
             } finally {
-                AnnotationUtils.invalidateCache();
                 AbstractAnnotationMetadataBuilder.clearMutated();
                 JavaAnnotationMetadataBuilder.clearCaches();
             }
@@ -354,10 +350,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         } else {
             return modelUtils.resolveTypeName(valueType);
         }
-    }
-
-    private AnnotationMetadata addPropertyMetadata(io.micronaut.inject.ast.Element targetElement, PropertyMetadata propertyMetadata) {
-        return targetElement.annotate(Property.class, (builder) -> builder.member("name", propertyMetadata.getPath())).getAnnotationMetadata();
     }
 
     private boolean isDeclaredBeanInMetadata(AnnotationMetadata concreteClassMetadata) {

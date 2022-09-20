@@ -45,7 +45,7 @@ import static io.micronaut.inject.configuration.ConfigurationUtils.getRequiredTy
  */
 public class ConfigurationMetadataBuilder {
 
-    public static final ConfigurationMetadataBuilder INSTANCE = new ConfigurationMetadataBuilder();
+    public static ConfigurationMetadataBuilder INSTANCE = new ConfigurationMetadataBuilder();
 
     private final OriginatingElements originatingElements = OriginatingElements.of();
     private final List<PropertyMetadata> properties = new ArrayList<>();
@@ -164,9 +164,7 @@ public class ConfigurationMetadataBuilder {
      *
      * @param string The string to quote
      * @return The quoted string
-     * @deprecated Unused method will be removed
      */
-    @Deprecated
     @SuppressWarnings("MagicNumber")
     static String quote(String string) {
         if (string == null || string.length() == 0) {
@@ -229,9 +227,7 @@ public class ConfigurationMetadataBuilder {
      * @param name  The name of the attribute
      * @param value The value
      * @throws IOException If an error occurred writing output
-     * @deprecated Unused method will be removed
      */
-    @Deprecated
     static void writeAttribute(Writer out, String name, String value) throws IOException {
         out.write('"');
         out.write(name);

@@ -19,8 +19,6 @@ import io.micronaut.annotation.processing.visitor.JavaClassElement;
 import io.micronaut.context.ApplicationContextConfigurer;
 import io.micronaut.context.annotation.ContextConfigurer;
 import io.micronaut.context.visitor.ContextConfigurerVisitor;
-import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Generated;
 import io.micronaut.core.util.StringUtils;
 
@@ -36,7 +34,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -96,11 +93,11 @@ public class ServiceDescriptionProcessor extends AbstractInjectAnnotationProcess
     private void processContextConfigurerAnnotation(List<io.micronaut.inject.ast.Element> originatingElements,
                                                     Element element,
                                                     TypeElement typeElement) {
-        AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(typeElement);
-        Optional<AnnotationValue<ContextConfigurer>> ann = annotationMetadata.findAnnotation(ContextConfigurer.class);
-        if (ann.isPresent()) {
-            JavaClassElement javaClassElement = javaVisitorContext.getElementFactory()
-                    .newClassElement(typeElement, annotationMetadata);
+        JavaClassElement javaClassElement = javaVisitorContext.getElementFactory().newClassElement(
+            typeElement,
+            javaVisitorContext.getElementAnnotationMetadataFactory().readOnly()
+        );
+        if (javaClassElement.findAnnotation(ContextConfigurer.class).isPresent()) {
             ContextConfigurerVisitor.assertNoConstructorForContextAnnotation(javaClassElement);
             List<? extends TypeMirror> interfaces = typeElement.getInterfaces();
             for (TypeMirror interfaceType : interfaces) {
@@ -110,12 +107,15 @@ public class ServiceDescriptionProcessor extends AbstractInjectAnnotationProcess
                     if (SUPPORTED_SERVICE_TYPES.contains(serviceName)) {
                         serviceDescriptors.computeIfAbsent(serviceName, s1 -> new HashSet<>())
                                 .add(serviceImpl);
-                        originatingElements.add(new JavaClassElement(typeElement, AnnotationMetadata.EMPTY_METADATA, null));
+                        JavaClassElement serviceClassElement = javaVisitorContext.getElementFactory().newClassElement(
+                            typeElement,
+                            javaVisitorContext.getElementAnnotationMetadataFactory().readOnly()
+                        );
+                        originatingElements.add(serviceClassElement);
                     }
                 }
             }
         }
-        AnnotationUtils.invalidateCache();
     }
 
     private boolean processGeneratedAnnotation(List<io.micronaut.inject.ast.Element> originatingElements,
@@ -128,7 +128,11 @@ public class ServiceDescriptionProcessor extends AbstractInjectAnnotationProcess
             if (StringUtils.isNotEmpty(serviceName)) {
                 serviceDescriptors.computeIfAbsent(serviceName, s1 -> new HashSet<>())
                         .add(name);
-                originatingElements.add(new JavaClassElement(typeElement, AnnotationMetadata.EMPTY_METADATA, null));
+                JavaClassElement serviceClassElement = javaVisitorContext.getElementFactory().newClassElement(
+                    typeElement,
+                    javaVisitorContext.getElementAnnotationMetadataFactory().readOnly()
+                );
+                originatingElements.add(serviceClassElement);
             }
             return true;
         }

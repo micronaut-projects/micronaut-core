@@ -15,12 +15,12 @@
  */
 package io.micronaut.annotation.processing.visitor;
 
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.FieldElement;
 
-import io.micronaut.core.annotation.NonNull;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
@@ -43,27 +43,29 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
     private ClassElement resolvedDeclaringClass;
 
     /**
-     * @param variableElement    The {@link VariableElement}
-     * @param annotationMetadata The annotation metadata
-     * @param visitorContext     The visitor context
+     * @param variableElement           The {@link VariableElement}
+     * @param annotationMetadataFactory The annotation metadata factory
+     * @param visitorContext            The visitor context
      */
-    JavaFieldElement(VariableElement variableElement, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext) {
-        super(variableElement, annotationMetadata, visitorContext);
+    JavaFieldElement(VariableElement variableElement,
+                     ElementAnnotationMetadataFactory annotationMetadataFactory,
+                     JavaVisitorContext visitorContext) {
+        super(variableElement, annotationMetadataFactory, visitorContext);
         this.variableElement = variableElement;
         this.visitorContext = visitorContext;
     }
 
     /**
-     * @param declaringElement  The declaring element
-     * @param variableElement    The {@link VariableElement}
-     * @param annotationMetadata The annotation metadata
-     * @param visitorContext     The visitor context
+     * @param declaringElement          The declaring element
+     * @param variableElement           The {@link VariableElement}
+     * @param annotationMetadataFactory The annotation metadata factory
+     * @param visitorContext            The visitor context
      */
     JavaFieldElement(JavaClassElement declaringElement,
                      VariableElement variableElement,
-                     AnnotationMetadata annotationMetadata,
+                     ElementAnnotationMetadataFactory annotationMetadataFactory,
                      JavaVisitorContext visitorContext) {
-        this(variableElement, annotationMetadata, visitorContext);
+        this(variableElement, annotationMetadataFactory, visitorContext);
         this.declaringElement = declaringElement;
     }
 
@@ -74,10 +76,10 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
                 this.genericType = getType();
             } else {
                 this.genericType = mirrorToClassElement(
-                        variableElement.asType(),
-                        visitorContext,
-                        declaringElement.getGenericTypeInfo(),
-                        false
+                    variableElement.asType(),
+                    visitorContext,
+                    declaringElement.getGenericTypeInfo(),
+                    false
                 );
             }
         }
@@ -112,7 +114,6 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
     @Override
     public ClassElement getDeclaringType() {
         if (resolvedDeclaringClass == null) {
-
             Element enclosingElement = variableElement.getEnclosingElement();
             if (enclosingElement instanceof TypeElement) {
                 TypeElement te = (TypeElement) enclosingElement;

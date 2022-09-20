@@ -19,7 +19,6 @@ import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.inject.configuration.ConfigurationMetadataBuilderX;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.configuration.ConfigurationMetadataWriter;
 import io.micronaut.inject.visitor.TypeElementVisitor;
@@ -81,7 +80,7 @@ public class ConfigurationMetadataProcessor extends AbstractInjectAnnotationProc
                 }
             }
         } finally {
-            ConfigurationMetadataBuilderX.setConfigurationMetadataBuilder(null);
+            ConfigurationMetadataBuilder.INSTANCE = new ConfigurationMetadataBuilder();
         }
 
     }

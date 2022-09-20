@@ -18,7 +18,6 @@ package io.micronaut.ast.transform.test
 import groovy.transform.CompileStatic
 import io.micronaut.aop.internal.InterceptorRegistryBean
 import io.micronaut.ast.groovy.annotation.GroovyAnnotationMetadataBuilder
-import io.micronaut.ast.groovy.utils.AstAnnotationUtils
 import io.micronaut.ast.groovy.utils.ExtendedParameter
 import io.micronaut.ast.groovy.utils.InMemoryByteCodeGroovyClassLoader
 import io.micronaut.ast.groovy.visitor.GroovyElementFactory
@@ -71,9 +70,9 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
             def cc = new CompilerConfiguration()
             def sourceUnit = new SourceUnit("test", source, cc, new GroovyClassLoader(), new ErrorCollector(cc))
             def compilationUnit = new CompilationUnit()
-            def metadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, cn)
-            def elementFactory = new GroovyElementFactory(new GroovyVisitorContext(sourceUnit, compilationUnit))
-            return elementFactory.newClassElement(cn, metadata)
+            def visitorContext = new GroovyVisitorContext(sourceUnit, compilationUnit)
+            def elementFactory = new GroovyElementFactory(visitorContext)
+            return elementFactory.newClassElement(cn, visitorContext.getElementAnnotationMetadataFactory())
         } else {
             throw new IllegalArgumentException("No class found in passed source code")
         }
@@ -87,9 +86,9 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
                     def cc = new CompilerConfiguration()
                     def sourceUnit = new SourceUnit("test", source, cc, new GroovyClassLoader(), new ErrorCollector(cc))
                     def compilationUnit = new CompilationUnit()
-                    def metadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, node)
-                    def elementFactory = new GroovyElementFactory(new GroovyVisitorContext(sourceUnit, compilationUnit))
-                    return elementFactory.newClassElement(node, metadata)
+                    def visitorContext = new GroovyVisitorContext(sourceUnit, compilationUnit)
+                    def elementFactory = new GroovyElementFactory(visitorContext)
+                    return elementFactory.newClassElement(node, visitorContext.getElementAnnotationMetadataFactory())
                 }
             }
         }

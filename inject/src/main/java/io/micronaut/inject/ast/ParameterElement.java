@@ -44,6 +44,15 @@ public interface ParameterElement extends TypedElement {
     }
 
     /**
+     * Return method associated with this parameter.
+     *
+     * @return The method element
+     */
+    default MethodElement getMethodElement() {
+        throw new IllegalStateException("Method element is not supported!");
+    }
+
+    /**
      * Creates a parameter element for a simple type and name.
      *
      * @param type The type

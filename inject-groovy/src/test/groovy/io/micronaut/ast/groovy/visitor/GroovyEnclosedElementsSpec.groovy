@@ -15,7 +15,7 @@ class Test extends SuperType {
     static {}
 
     Test() {}
-    
+
     Test(int i) {}
 }
 
@@ -23,7 +23,7 @@ class SuperType {
     static {}
 
     SuperType() {}
-    
+
     SuperType(String s) {}
 }
 ''')

@@ -15,23 +15,23 @@
  */
 package io.micronaut.ast.groovy.visitor;
 
+import groovy.lang.GroovyClassLoader;
 import io.micronaut.ast.groovy.annotation.GroovyAnnotationMetadataBuilder;
+import io.micronaut.ast.groovy.annotation.GroovyElementAnnotationMetadataFactory;
+import io.micronaut.ast.groovy.scan.ClassPathAnnotationScanner;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
-import groovy.lang.GroovyClassLoader;
-import io.micronaut.ast.groovy.utils.AstAnnotationUtils;
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
-import io.micronaut.ast.groovy.scan.ClassPathAnnotationScanner;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.util.VisitorContextUtils;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
@@ -52,7 +52,14 @@ import org.codehaus.groovy.syntax.SyntaxException;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URL;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Enumeration;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
 /**
  * The visitor context when visiting Groovy code.
@@ -71,6 +78,7 @@ public class GroovyVisitorContext implements VisitorContext {
     private final List<String> generatedResources = new ArrayList<>();
     private final GroovyElementFactory groovyElementFactory;
     private final List<AbstractBeanDefinitionBuilder> beanDefinitionBuilders = new ArrayList<>();
+    private final GroovyElementAnnotationMetadataFactory elementAnnotationMetadataFactory;
 
     /**
      * @param sourceUnit      The source unit
@@ -92,6 +100,7 @@ public class GroovyVisitorContext implements VisitorContext {
         this.outputVisitor = outputVisitor;
         this.attributes = VISITOR_ATTRIBUTES;
         this.groovyElementFactory = new GroovyElementFactory(this);
+        this.elementAnnotationMetadataFactory = new GroovyElementAnnotationMetadataFactory(false, new GroovyAnnotationMetadataBuilder(sourceUnit, compilationUnit));
     }
 
     @NonNull
@@ -107,34 +116,32 @@ public class GroovyVisitorContext implements VisitorContext {
 
     @Override
     public Optional<ClassElement> getClassElement(String name) {
+        return getClassElement(name, getElementAnnotationMetadataFactory());
+    }
+
+    @Override
+    public Optional<ClassElement> getClassElement(String name, ElementAnnotationMetadataFactory annotationMetadataFactory) {
         if (name == null || compilationUnit == null) {
             return Optional.empty();
         }
-
         ClassNode classNode = Optional.ofNullable(compilationUnit.getClassNode(name))
-                .orElseGet(() -> {
-                    if (sourceUnit != null) {
-                        GroovyClassLoader classLoader = sourceUnit.getClassLoader();
-                        if (classLoader != null) {
-                            return ClassUtils.forName(name, classLoader).map(ClassHelper::make).orElse(null);
-                        }
+            .orElseGet(() -> {
+                if (sourceUnit != null) {
+                    GroovyClassLoader classLoader = sourceUnit.getClassLoader();
+                    if (classLoader != null) {
+                        return ClassUtils.forName(name, classLoader).map(ClassHelper::make).orElse(null);
                     }
-                    return null;
-                });
+                }
+                return null;
+            });
 
-        return Optional.ofNullable(classNode)
-                .map(cn -> groovyElementFactory.newClassElement(cn, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, cn)));
+        return Optional.ofNullable(classNode).map(cn -> groovyElementFactory.newClassElement(cn, annotationMetadataFactory));
     }
 
     @Override
     public Optional<ClassElement> getClassElement(Class<?> type) {
         final ClassNode classNode = ClassHelper.makeCached(type);
-        final AnnotationMetadata annotationMetadata = AstAnnotationUtils
-                .getAnnotationMetadata(sourceUnit, compilationUnit, classNode);
-        final ClassElement classElement = groovyElementFactory.newClassElement(classNode, annotationMetadata);
-        return Optional.of(
-                classElement
-        );
+        return Optional.of(groovyElementFactory.newClassElement(classNode, getElementAnnotationMetadataFactory()));
     }
 
     @NonNull
@@ -152,7 +159,7 @@ public class GroovyVisitorContext implements VisitorContext {
         for (String s : stereotypes) {
             scanner.scan(s, aPackage).forEach(aClass -> {
                 final ClassNode classNode = ClassHelper.make(aClass);
-                classElements.add(groovyElementFactory.newClassElement(classNode, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, classNode)));
+                classElements.add(groovyElementFactory.newClassElement(classNode, getElementAnnotationMetadataFactory()));
             });
         }
         return classElements.toArray(new ClassElement[0]);
@@ -164,8 +171,14 @@ public class GroovyVisitorContext implements VisitorContext {
         return groovyElementFactory;
     }
 
+    @NonNull
     @Override
-    public AbstractAnnotationMetadataBuilder newAnnotationBuilder() {
+    public GroovyElementAnnotationMetadataFactory getElementAnnotationMetadataFactory() {
+        return elementAnnotationMetadataFactory;
+    }
+
+    @Override
+    public AbstractAnnotationMetadataBuilder getAnnotationMetadataBuilder() {
         return new GroovyAnnotationMetadataBuilder(sourceUnit, compilationUnit);
     }
 

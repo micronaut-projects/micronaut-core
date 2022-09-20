@@ -17,7 +17,6 @@ package io.micronaut.ast.groovy
 
 import groovy.transform.CompilationUnitAware
 import groovy.transform.CompileStatic
-import io.micronaut.ast.groovy.utils.AstAnnotationUtils
 import io.micronaut.ast.groovy.utils.AstMessageUtils
 import io.micronaut.ast.groovy.utils.InMemoryByteCodeGroovyClassLoader
 import io.micronaut.ast.groovy.utils.InMemoryClassWriterOutputVisitor
@@ -96,13 +95,13 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             ClassNode classNode = classes[0]
             if (classNode.nameWithoutPackage == 'package-info') {
                 PackageNode packageNode = classNode.getPackage()
-                def annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(source, unit, packageNode)
-                if (annotationMetadata.hasStereotype(Configuration)) {
-                    GroovyVisitorContext visitorContext = new GroovyVisitorContext(source, unit)
+                GroovyVisitorContext visitorContext = new GroovyVisitorContext(source, unit)
+                GroovyPackageElement groovyPackageElement = new GroovyPackageElement(visitorContext, packageNode, visitorContext.getElementAnnotationMetadataFactory())
+                if (groovyPackageElement.hasStereotype(Configuration)) {
                     BeanConfigurationWriter writer = new BeanConfigurationWriter(
                             classNode.packageName,
-                            new GroovyPackageElement(visitorContext, packageNode, annotationMetadata),
-                            annotationMetadata
+                            groovyPackageElement,
+                            groovyPackageElement.getAnnotationMetadata()
                     )
                     try {
                         writer.accept(outputVisitor)
@@ -132,21 +131,19 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         }
                     }
                 }
-
-                def classNodeAnnotationMetadata = AstAnnotationUtils.getAnnotationMetadata(source, unit, classNode)
-
-                if (!classNode.isInterface() || classNode.isInterface() && (classNodeAnnotationMetadata.hasStereotype(AnnotationUtil.ANN_INTRODUCTION) ||
-                        classNodeAnnotationMetadata.hasStereotype(ConfigurationReader.class))) {
+                def elementAnnotationMetadataFactory = groovyVisitorContext
+                        .getElementAnnotationMetadataFactory()
+                        .readOnly()
+                def thisElement = groovyVisitorContext.getElementFactory().newClassElement(classNode, elementAnnotationMetadataFactory)
+                if (!classNode.isInterface() || classNode.isInterface() && (thisElement.hasStereotype(AnnotationUtil.ANN_INTRODUCTION) ||
+                        thisElement.hasStereotype(ConfigurationReader.class))) {
 
                     try {
                         new ClassCodeVisitorSupport() {
 
                             @Override
                             void visitClass(ClassNode node) {
-
-                                def annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(source, unit, node)
-                                def classElement = groovyVisitorContext.getElementFactory().newClassElement(node, annotationMetadata)
-
+                                def classElement = node == thisElement.getNativeType() ? thisElement : groovyVisitorContext.getElementFactory().newClassElement(node, groovyVisitorContext.getElementAnnotationMetadataFactory())
                                 AbstractBeanBuilder beanBuilder = AbstractBeanBuilder.of(classElement, groovyVisitorContext);
                                 if (beanBuilder != null) {
                                     beanBuilder.build()
@@ -215,8 +212,6 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 }
             }
         }
-
-        AstAnnotationUtils.invalidateCache()
     }
 
     @Override

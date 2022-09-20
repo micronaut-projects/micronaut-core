@@ -149,4 +149,8 @@ public class InMemoryByteCodeGroovyClassLoader extends GroovyClassLoader {
             return super.findResources(name);
         }
     }
+
+    public Map<String, byte[]> getGeneratedClasses() {
+        return generatedClasses;
+    }
 }

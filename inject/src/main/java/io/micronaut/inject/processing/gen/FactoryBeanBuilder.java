@@ -8,6 +8,7 @@ import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
@@ -116,7 +117,8 @@ public class FactoryBeanBuilder extends SimpleBeanBuilder {
 
     private AnnotationMetadata createProducedTypeAnnotationMetadata(ClassElement producedType, MemberElement producingElement) {
         // Original logic is to combine producing element annotation metadata (method or field) with the produced type's annotation metadata
-        AnnotationMetadata producedAnnotationMetadata = visitorContext.newAnnotationBuilder().buildForParent(
+        AbstractAnnotationMetadataBuilder annotationMetadataBuilder = visitorContext.getAnnotationMetadataBuilder();
+        AnnotationMetadata producedAnnotationMetadata = annotationMetadataBuilder.buildForParent(
             producedType.getNativeType(),
             producingElement.getNativeType()
         );

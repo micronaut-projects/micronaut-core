@@ -15,11 +15,11 @@
  */
 package io.micronaut.ast.groovy.visitor;
 
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
 import org.codehaus.groovy.ast.ClassNode;
 
@@ -37,8 +37,12 @@ import java.util.function.Function;
  */
 @Internal
 final class GroovyGenericPlaceholderElement extends GroovyClassElement implements GenericPlaceholderElement {
-    GroovyGenericPlaceholderElement(GroovyVisitorContext visitorContext, ClassNode classNode, AnnotationMetadata annotationMetadata, int arrayDimensions) {
-        super(visitorContext, classNode, annotationMetadata, null, arrayDimensions);
+
+    GroovyGenericPlaceholderElement(GroovyVisitorContext visitorContext,
+                                    ClassNode classNode,
+                                    ElementAnnotationMetadataFactory annotationMetadataFactory,
+                                    int arrayDimensions) {
+        super(visitorContext, classNode, annotationMetadataFactory, null, arrayDimensions);
     }
 
     @NonNull
@@ -63,7 +67,7 @@ final class GroovyGenericPlaceholderElement extends GroovyClassElement implement
 
     @Override
     public ClassElement withArrayDimensions(int arrayDimensions) {
-        return new GroovyGenericPlaceholderElement(visitorContext, classNode, getAnnotationMetadata(), arrayDimensions);
+        return new GroovyGenericPlaceholderElement(visitorContext, classNode, elementAnnotationMetadataFactory, arrayDimensions);
     }
 
     @Override

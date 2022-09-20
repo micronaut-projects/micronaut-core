@@ -1882,7 +1882,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      */
     @SuppressWarnings("unused")
     @Internal
-    public void dump() {
+    void dump() {
         System.out.println("declaredAnnotations = " + declaredAnnotations);
         System.out.println("declaredStereotypes = " + declaredStereotypes);
         System.out.println("allAnnotations = " + allAnnotations);

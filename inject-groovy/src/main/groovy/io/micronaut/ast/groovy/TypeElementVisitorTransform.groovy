@@ -19,21 +19,20 @@ import groovy.transform.CompilationUnitAware
 import groovy.transform.CompileStatic
 import groovy.transform.PackageScope
 import io.micronaut.aop.Introduction
-import io.micronaut.ast.groovy.utils.AstAnnotationUtils
 import io.micronaut.ast.groovy.utils.PublicMethodVisitor
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.ast.groovy.visitor.LoadedVisitor
-import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.Generated
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.order.OrderUtil
-import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
+import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.AnnotatedNode
 import org.codehaus.groovy.ast.ClassCodeVisitorSupport
 import org.codehaus.groovy.ast.ClassHelper
 import org.codehaus.groovy.ast.ClassNode
+import org.codehaus.groovy.ast.ConstructorNode
 import org.codehaus.groovy.ast.FieldNode
 import org.codehaus.groovy.ast.InnerClassNode
 import org.codehaus.groovy.ast.MethodNode
@@ -86,14 +85,14 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
         for (LoadedVisitor loadedVisitor : sortedVisitors) {
             for (ClassNode classNode in classes) {
                 if (!(classNode instanceof InnerClassNode && !Modifier.isStatic(classNode.getModifiers())) && classNode.getAnnotations(generatedNode).empty) {
-                    if (!loadedVisitor.matches(classNode)) {
+                    ClassElement targetClassElement = visitorContext.getElementFactory().newClassElement(classNode, visitorContext.getElementAnnotationMetadataFactory())
+                    if (!loadedVisitor.matches(targetClassElement)) {
                         continue
                     }
 
-                    def annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(source, compilationUnit, classNode)
-                    def isIntroduction = annotationMetadata.hasStereotype(Introduction.class)
-                    def visitor = new ElementVisitor(source, compilationUnit, classNode, [loadedVisitor], visitorContext, !isIntroduction)
-                    if (isIntroduction || (annotationMetadata.hasStereotype(Introspected.class) && classNode.isAbstract())) {
+                    def isIntroduction = targetClassElement.hasStereotype(Introduction.class)
+                    def visitor = new ElementVisitor(source, compilationUnit, classNode, [loadedVisitor], visitorContext, !isIntroduction, targetClassElement)
+                    if (isIntroduction || (targetClassElement.hasStereotype(Introspected.class) && classNode.isAbstract())) {
                         visitor.visitClass(classNode)
                         new PublicMethodVisitor(source) {
                             @Override
@@ -116,15 +115,17 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
         this.compilationUnit = unit
     }
 
+    @CompileStatic
     private static class ElementVisitor extends ClassCodeVisitorSupport {
 
         final SourceUnit sourceUnit
         final CompilationUnit compilationUnit
-        final AnnotationMetadata annotationMetadata
         final GroovyVisitorContext visitorContext
         final boolean visitMethods
         private final ClassNode concreteClass
         private final Collection<LoadedVisitor> typeElementVisitors
+
+        private ClassElement targetClassElement
 
         ElementVisitor(
                 SourceUnit sourceUnit,
@@ -132,12 +133,13 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
                 ClassNode targetClassNode,
                 Collection<LoadedVisitor> typeElementVisitors,
                 GroovyVisitorContext visitorContext,
-                boolean visitMethods = true) {
+                boolean visitMethods = true,
+                ClassElement targetClassElement) {
+            this.targetClassElement = targetClassElement;
             this.compilationUnit = compilationUnit
             this.typeElementVisitors = typeElementVisitors
             this.concreteClass = targetClassNode
             this.sourceUnit = sourceUnit
-            this.annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, targetClassNode)
             this.visitorContext = visitorContext
             this.visitMethods = visitMethods
         }
@@ -148,12 +150,12 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
 
         @Override
         void visitClass(ClassNode node) {
-            AnnotationMetadata annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, node)
+            if (targetClassElement.getNativeType() != node) {
+                targetClassElement = visitorContext.getElementFactory().newClassElement(node, visitorContext.getElementAnnotationMetadataFactory())
+            }
+
             typeElementVisitors.each {
-                def element = it.visit(node, annotationMetadata, visitorContext)
-                if (element != null) {
-                    annotationMetadata = element.annotationMetadata
-                }
+                it.getVisitor().visitClass(targetClassElement, visitorContext)
             }
 
             ClassNode superClass = node.getSuperClass()
@@ -179,18 +181,27 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
         }
 
         void doVisitMethod(MethodNode methodNode) {
-            AnnotationMetadata methodAnnotationMetadata = AstAnnotationUtils.getMethodAnnotationMetadata(sourceUnit, compilationUnit, methodNode)
-            if (!(methodAnnotationMetadata instanceof AnnotationMetadataHierarchy)) {
-                methodAnnotationMetadata = new AnnotationMetadataHierarchy(
-                        AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, methodNode.declaringClass),
-                        methodAnnotationMetadata
-                );
-            }
-            typeElementVisitors.findAll { it.matches(methodAnnotationMetadata) }.each {
-                def element = it.visit(methodNode, methodAnnotationMetadata, visitorContext)
-                if (element != null) {
-                    methodAnnotationMetadata = element.annotationMetadata
-                }
+            switch (methodNode.getClass()) {
+                case ConstructorNode:
+                    def e = visitorContext.getElementFactory()
+                            .newConstructorElement(targetClassElement, (ConstructorNode) methodNode, visitorContext.getElementAnnotationMetadataFactory())
+
+                    typeElementVisitors.findAll {
+                        if (it.matches(e.getAnnotationMetadata())) {
+                            it.getVisitor().visitConstructor(e, visitorContext)
+                        }
+                    }
+                    break
+                case MethodNode:
+                    def e = visitorContext.getElementFactory()
+                            .newSourceMethodElement(targetClassElement, (MethodNode) methodNode, visitorContext.getElementAnnotationMetadataFactory())
+
+                    typeElementVisitors.findAll {
+                        if (it.matches(e.getAnnotationMetadata())) {
+                            it.getVisitor().visitMethod(e, visitorContext)
+                        }
+                    }
+                    break
             }
         }
 
@@ -204,11 +215,21 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
             if (fieldNode.isSynthetic() && !isPackagePrivate(fieldNode, fieldNode.modifiers)) {
                 return
             }
-            AnnotationMetadata fieldAnnotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, fieldNode)
-            typeElementVisitors.findAll { it.matches(fieldAnnotationMetadata) }.each {
-                def element = it.visit(fieldNode, fieldAnnotationMetadata, visitorContext)
-                if (element != null) {
-                    fieldAnnotationMetadata = element.annotationMetadata
+            if (fieldNode.enum) {
+                def e = visitorContext.getElementFactory()
+                        .newEnumConstantElement(targetClassElement, fieldNode, visitorContext.getElementAnnotationMetadataFactory())
+                typeElementVisitors.findAll {
+                    if (it.matches(e.getAnnotationMetadata())) {
+                        it.getVisitor().visitEnumConstant(e, visitorContext)
+                    }
+                }
+            } else {
+                def e = visitorContext.getElementFactory()
+                        .newFieldElement(targetClassElement, fieldNode, visitorContext.getElementAnnotationMetadataFactory())
+                typeElementVisitors.findAll {
+                    if (it.matches(e.getAnnotationMetadata())) {
+                        it.getVisitor().visitField(e, visitorContext)
+                    }
                 }
             }
         }
@@ -221,11 +242,11 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
             if (Modifier.isFinal(modifiers) || Modifier.isStatic(modifiers)) {
                 return
             }
-            AnnotationMetadata fieldAnnotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, fieldNode)
-            typeElementVisitors.findAll { it.matches(fieldAnnotationMetadata) }.each {
-                def element = it.visit(fieldNode, fieldAnnotationMetadata, visitorContext)
-                if (element != null) {
-                    fieldAnnotationMetadata = element.annotationMetadata
+            def e = visitorContext.getElementFactory()
+                    .newFieldElement(propertyNode, visitorContext.getElementAnnotationMetadataFactory())
+            typeElementVisitors.findAll {
+                if (it.matches(e.getAnnotationMetadata())) {
+                    it.getVisitor().visitField(e, visitorContext)
                 }
             }
         }

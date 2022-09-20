@@ -85,7 +85,6 @@ abstract class AbstractTypeElementSpec extends Specification {
         GenericUtils genericUtils = new GenericUtils(elements, types, modelUtils) {}
         AnnotationUtils annotationUtils = new AnnotationUtils(processingEnv, elements, messager, types, modelUtils, genericUtils, processingEnv.filer) {
         }
-        AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(typeElement)
 
         JavaVisitorContext visitorContext = new JavaVisitorContext(
                 processingEnv,
@@ -100,7 +99,7 @@ abstract class AbstractTypeElementSpec extends Specification {
                 TypeElementVisitor.VisitorKind.ISOLATING
         )
 
-        return new JavaElementFactory(visitorContext).newClassElement(typeElement, annotationMetadata)
+        return new JavaElementFactory(visitorContext).newClassElement(typeElement, visitorContext.getElementAnnotationMetadataFactory())
     }
 
     /**

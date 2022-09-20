@@ -15,26 +15,17 @@
  */
 package io.micronaut.ast.groovy.visitor
 
-import io.micronaut.core.annotation.Nullable
 import groovy.transform.CompileStatic
-import io.micronaut.ast.groovy.utils.AstAnnotationUtils
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.Internal
 import io.micronaut.core.order.Ordered
 import io.micronaut.inject.ast.ClassElement
-import io.micronaut.inject.ast.Element
 import io.micronaut.inject.visitor.TypeElementVisitor
-import org.codehaus.groovy.ast.AnnotatedNode
 import org.codehaus.groovy.ast.ClassHelper
 import org.codehaus.groovy.ast.ClassNode
-import org.codehaus.groovy.ast.ConstructorNode
-import org.codehaus.groovy.ast.FieldNode
 import org.codehaus.groovy.ast.GenericsType
-import org.codehaus.groovy.ast.MethodNode
-import org.codehaus.groovy.ast.PropertyNode
 import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.SourceUnit
-
 /**
  * Used to store a reference to an underlying {@link TypeElementVisitor} and
  * optionally invoke the visit methods on the visitor if it matches the
@@ -114,17 +105,6 @@ class LoadedVisitor implements Ordered {
     String toString() {
         visitor.toString()
     }
-    /**
-     * @param classNode The class node
-     * @return True if the class node should be visited
-     */
-    boolean matches(ClassNode classNode) {
-        if (classAnnotation == ClassHelper.OBJECT) {
-            return true
-        }
-        AnnotationMetadata annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, classNode)
-        return annotationMetadata.hasStereotype(classAnnotation)
-    }
 
     /**
      * @param annotationMetadata The annotation data
@@ -135,51 +115,6 @@ class LoadedVisitor implements Ordered {
             return true
         }
         return annotationMetadata.hasStereotype(elementAnnotation)
-    }
-
-    /**
-     * Invoke the underlying visitor for the given node.
-     *
-     * @param annotatedNode The node to visit
-     * @param annotationMetadata The annotation data for the node
-     * @param visitorContext the Groovy visitor context
-     */
-    @Nullable Element visit(AnnotatedNode annotatedNode, AnnotationMetadata annotationMetadata, GroovyVisitorContext visitorContext) {
-        switch (annotatedNode.getClass()) {
-            case PropertyNode:
-                def e = visitorContext.getElementFactory().newFieldElement((PropertyNode) annotatedNode, annotationMetadata)
-                visitor.visitField(e, visitorContext)
-                return e
-            case FieldNode:
-                def field = (FieldNode) annotatedNode;
-                if (field.enum) {
-                    def e = visitorContext.getElementFactory().newEnumConstantElement(currentClassElement, (FieldNode) annotatedNode, annotationMetadata)
-                    visitor.visitEnumConstant(e, visitorContext)
-                    return e
-                } else {
-                    def e = visitorContext.getElementFactory().newFieldElement(currentClassElement, (FieldNode) annotatedNode, annotationMetadata)
-                    visitor.visitField(e, visitorContext)
-                    return e
-                }
-            case ConstructorNode:
-                def e = visitorContext.getElementFactory().newConstructorElement(currentClassElement, (ConstructorNode) annotatedNode, annotationMetadata)
-                visitor.visitConstructor(e, visitorContext)
-                return e
-            case MethodNode:
-                if (currentClassElement != null) {
-                    def e = visitorContext.getElementFactory().newSourceMethodElement(currentClassElement, (MethodNode) annotatedNode, annotationMetadata)
-                    visitor.visitMethod(e, visitorContext)
-                    return e
-                }
-                break
-            case ClassNode:
-                ClassNode cn = (ClassNode) annotatedNode
-                currentClassElement = visitorContext.getElementFactory().newSourceClassElement(cn, annotationMetadata)
-                visitor.visitClass(currentClassElement, visitorContext)
-                return currentClassElement
-        }
-
-        return null
     }
 
     void start(GroovyVisitorContext visitorContext) {

@@ -50,7 +50,8 @@ public class AopHelperImpl implements AopHelper {
 
         AnnotationMetadata methodAnnotationMetadata = getElementAnnotationMetadata(sourceMethod);
 
-        Optional<ClassElement> interfaceToAdaptValue = methodAnnotationMetadata.getValue(Adapter.class, String.class).flatMap(visitorContext::getClassElement);
+        Optional<ClassElement> interfaceToAdaptValue = methodAnnotationMetadata.getValue(Adapter.class, String.class)
+            .flatMap(clazz -> visitorContext.getClassElement(clazz, visitorContext.getElementAnnotationMetadataFactory().readOnly()));
 
         if (!interfaceToAdaptValue.isPresent()) {
             return null;
@@ -86,7 +87,9 @@ public class AopHelperImpl implements AopHelper {
             throw new ProcessingException(sourceMethod, "Interface to adapt [" + interfaceToAdapt.getName() + "] is not a SAM type. More than one abstract method declared.");
         }
 
-        AbstractBeanBuilder.methodAnnotationsGuard(visitorContext, methods.iterator().next(), targetMethod -> {
+        MethodElement next = methods.iterator().next();
+
+        AbstractBeanBuilder.methodAnnotationsGuard(visitorContext, next, targetMethod -> {
 
             ParameterElement[] sourceParams = sourceMethod.getParameters();
             ParameterElement[] targetParams = targetMethod.getParameters();
@@ -105,10 +108,17 @@ public class AopHelperImpl implements AopHelper {
                 ParameterElement targetParam = targetParams[i];
                 ParameterElement sourceParam = sourceParams[i];
 
-                ClassElement targetType = targetParam.getGenericType();
+                ClassElement targetType = targetParam.getType();
+                ClassElement targetGenericType = targetParam.getGenericType();
                 ClassElement sourceType = sourceParam.getGenericType();
 
-                if (targetType instanceof GenericPlaceholderElement) {
+                if (targetGenericType instanceof GenericPlaceholderElement) {
+                    GenericPlaceholderElement genericPlaceholderElement = (GenericPlaceholderElement) targetGenericType;
+                    String variableName = genericPlaceholderElement.getVariableName();
+                    if (typeVariables.containsKey(variableName)) {
+                        genericTypes.put(variableName, sourceType);
+                    }
+                } else if (targetType instanceof GenericPlaceholderElement) { // TODO: correct Groovy handling
                     GenericPlaceholderElement genericPlaceholderElement = (GenericPlaceholderElement) targetType;
                     String variableName = genericPlaceholderElement.getVariableName();
                     if (typeVariables.containsKey(variableName)) {
@@ -116,8 +126,8 @@ public class AopHelperImpl implements AopHelper {
                     }
                 }
 
-                if (!sourceType.isAssignable(targetType.getName())) {
-                    throw new ProcessingException(sourceMethod, "Cannot adapt method [" + sourceMethod + "] to target method [" + targetMethod + "]. Type [" + sourceType.getName() + "] is not a subtype of type [" + targetType.getName() + "] for argument at position " + i);
+                if (!sourceType.isAssignable(targetGenericType.getName())) {
+                    throw new ProcessingException(sourceMethod, "Cannot adapt method [" + sourceMethod + "] to target method [" + targetMethod + "]. Type [" + sourceType.getName() + "] is not a subtype of type [" + targetGenericType.getName() + "] for argument at position " + i);
                 }
             }
 
@@ -176,7 +186,9 @@ public class AopHelperImpl implements AopHelper {
         io.micronaut.core.annotation.AnnotationValue<?>[] introductionInterceptors = InterceptedMethodUtil.resolveInterceptorBinding(annotationMetadata, InterceptorKind.INTRODUCTION);
 
         ClassElement[] interfaceTypes = Arrays.stream(annotationMetadata.getValue(Introduction.class, "interfaces", String[].class).orElse(new String[0]))
-            .map(v -> visitorContext.getClassElement(v).get()).toArray(ClassElement[]::new);
+            .map(v -> visitorContext.getClassElement(v, visitorContext.getElementAnnotationMetadataFactory().readOnly())
+                .orElseThrow(() -> new ProcessingException(typeElement, "Cannot find interface: " + v))
+            ).toArray(ClassElement[]::new);
 
         io.micronaut.core.annotation.AnnotationValue<?>[] interceptorTypes = ArrayUtils.concat(aroundInterceptors, introductionInterceptors);
         boolean isInterface = typeElement.isInterface();

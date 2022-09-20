@@ -15,19 +15,16 @@
  */
 package io.micronaut.annotation.processing.visitor;
 
-import io.micronaut.annotation.processing.AnnotationUtils;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.util.ArgumentUtils;
-import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ElementAnnotationMetadata;
+import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.ElementModifier;
-import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.PrimitiveElement;
 
-import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.Modifier;
@@ -69,157 +66,56 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
 
     private final Element element;
     private final JavaVisitorContext visitorContext;
-    private AnnotationMetadata annotationMetadata;
+    protected final ElementAnnotationMetadataFactory elementAnnotationMetadataFactory;
+    private final ElementAnnotationMetadata elementAnnotationMetadata;
 
     /**
-     * @param element            The {@link Element}
-     * @param annotationMetadata The Annotation metadata
-     * @param visitorContext     The Java visitor context
+     * @param element                   The {@link Element}
+     * @param annotationMetadataFactory The annotation metadata factory
+     * @param visitorContext            The Java visitor context
      */
-    AbstractJavaElement(Element element, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext) {
+    AbstractJavaElement(Element element, ElementAnnotationMetadataFactory annotationMetadataFactory, JavaVisitorContext visitorContext) {
         this.element = element;
-        this.annotationMetadata = annotationMetadata;
+        this.elementAnnotationMetadataFactory = annotationMetadataFactory;
+        this.elementAnnotationMetadata = annotationMetadataFactory.build(this);
         this.visitorContext = visitorContext;
     }
 
     @NonNull
     @Override
     public <T extends Annotation> io.micronaut.inject.ast.Element annotate(@NonNull String annotationType, @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
-        ArgumentUtils.requireNonNull("annotationType", annotationType);
-        ArgumentUtils.requireNonNull("consumer", consumer);
-
-        final AnnotationValueBuilder<T> builder = AnnotationValue.builder(annotationType);
-        consumer.accept(builder);
-        final AnnotationValue<T> av = builder.build();
-        AnnotationUtils annotationUtils = visitorContext
-            .getAnnotationUtils();
-        annotationMetadata = annotationUtils
-            .newAnnotationBuilder()
-            .annotate(annotationMetadata, av);
-
-        updateMetadataCaches();
+        elementAnnotationMetadata.annotate(annotationType, consumer);
         return this;
     }
 
     @Override
     public <T extends Annotation> io.micronaut.inject.ast.Element annotate(AnnotationValue<T> annotationValue) {
-        ArgumentUtils.requireNonNull("annotationValue", annotationValue);
-
-        AnnotationUtils annotationUtils = visitorContext
-            .getAnnotationUtils();
-        annotationMetadata = annotationUtils
-            .newAnnotationBuilder()
-            .annotate(annotationMetadata, annotationValue);
-
-        updateMetadataCaches();
+        elementAnnotationMetadata.annotate(annotationValue);
         return this;
     }
 
     @Override
     public io.micronaut.inject.ast.Element removeAnnotation(@NonNull String annotationType) {
-        ArgumentUtils.requireNonNull("annotationType", annotationType);
-        try {
-            AnnotationUtils annotationUtils = visitorContext
-                .getAnnotationUtils();
-            annotationMetadata = annotationUtils
-                .newAnnotationBuilder()
-                .removeAnnotation(annotationMetadata, annotationType);
-            return this;
-        } finally {
-            updateMetadataCaches();
-        }
+        elementAnnotationMetadata.removeAnnotation(annotationType);
+        return this;
     }
 
     @Override
     public <T extends Annotation> io.micronaut.inject.ast.Element removeAnnotationIf(@NonNull Predicate<AnnotationValue<T>> predicate) {
-        //noinspection ConstantConditions
-        if (predicate != null) {
-            try {
-                AnnotationUtils annotationUtils = visitorContext
-                    .getAnnotationUtils();
-                annotationMetadata = annotationUtils
-                    .newAnnotationBuilder()
-                    .removeAnnotationIf(annotationMetadata, predicate);
-                return this;
-            } finally {
-                updateMetadataCaches();
-            }
-        }
+        elementAnnotationMetadata.removeAnnotationIf(predicate);
         return this;
     }
 
     @Override
     public io.micronaut.inject.ast.Element removeStereotype(@NonNull String annotationType) {
-        ArgumentUtils.requireNonNull("annotationType", annotationType);
-        try {
-            AnnotationUtils annotationUtils = visitorContext
-                .getAnnotationUtils();
-            annotationMetadata = annotationUtils
-                .newAnnotationBuilder()
-                .removeStereotype(annotationMetadata, annotationType);
-            return this;
-        } finally {
-            updateMetadataCaches();
-        }
+        elementAnnotationMetadata.removeStereotype(annotationType);
+        return this;
     }
 
     @Override
-    public <T extends Annotation> io.micronaut.inject.ast.Element replaceAnnotations(AnnotationMetadata annotationMetadata) {
-        ArgumentUtils.requireNonNull("annotationMetadata", annotationMetadata);
-        try {
-            this.annotationMetadata = annotationMetadata;
-            return this;
-        } finally {
-            updateMetadataCaches();
-        }
-    }
-
-    private void updateMetadataCaches() {
-        String owningTypeName = getOwningTypeName();
-        AbstractAnnotationMetadataBuilder.addMutatedMetadata(owningTypeName, element, annotationMetadata);
-        TypeElement typeElement;
-        if (this instanceof MemberElement) {
-            final JavaClassElement owningType = (JavaClassElement) ((MemberElement) this).getOwningType();
-            typeElement = owningType.getNativeTypeElement();
-        } else if (this instanceof JavaClassElement) {
-            typeElement = ((JavaClassElement) this).getNativeTypeElement();
-        } else if (this instanceof JavaParameterElement) {
-            // Parameters are never cached - getCombinedAnnotationMetadata
-            return;
-        } else {
-            throw new IllegalStateException("Cannot determine owning type name from: " + this.getNativeType());
-        }
-        AnnotationUtils.invalidateMetadata(typeElement, element);
-    }
-
-    private String getOwningTypeName() {
-        String declaringTypeName;
-        if (this instanceof MemberElement) {
-            final ClassElement owningType = ((MemberElement) this).getOwningType();
-            final Element nativeType = (Element) owningType.getNativeType();
-            declaringTypeName = resolveCanonicalName(nativeType);
-        } else {
-            final Object nativeType = getNativeType();
-            if (nativeType instanceof TypeVariable) {
-                declaringTypeName = resolveCanonicalName(((TypeVariable) nativeType).asElement());
-            } else if (nativeType instanceof Element) {
-                declaringTypeName = resolveCanonicalName((Element) nativeType);
-            } else {
-                throw new IllegalStateException("Cannot determine type name from: " + nativeType);
-            }
-        }
-        return declaringTypeName;
-    }
-
-    private String resolveCanonicalName(Element nativeType) {
-        String declaringTypeName;
-        TypeElement typeElement = visitorContext.getModelUtils().classElementFor(nativeType);
-        if (typeElement == null) {
-            declaringTypeName = getName();
-        } else {
-            declaringTypeName = typeElement.getQualifiedName().toString();
-        }
-        return declaringTypeName;
+    public io.micronaut.inject.ast.Element replaceAnnotations(AnnotationMetadata annotationMetadata) {
+        elementAnnotationMetadata.replaceAnnotations(annotationMetadata);
+        return this;
     }
 
     @Override
@@ -286,7 +182,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
 
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
-        return annotationMetadata;
+        return elementAnnotationMetadata.get();
     }
 
     @Override
@@ -379,23 +275,13 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
                 if (e instanceof TypeElement) {
                     TypeElement typeElement = (TypeElement) e;
                     Map<String, TypeMirror> boundGenerics = resolveBoundGenerics(visitorContext, genericsInfo);
-                    AnnotationUtils annotationUtils = visitorContext
-                        .getAnnotationUtils();
-                    AnnotationMetadata newAnnotationMetadata;
-                    List<? extends AnnotationMirror> annotationMirrors = dt.getAnnotationMirrors();
-                    if (!annotationMirrors.isEmpty()) {
-                        newAnnotationMetadata = annotationUtils.newAnnotationBuilder().buildDeclared(typeElement, annotationMirrors, includeTypeAnnotations);
-                    } else {
-                        newAnnotationMetadata = includeTypeAnnotations ? annotationUtils.getAnnotationMetadata(typeElement) : AnnotationMetadata.EMPTY_METADATA;
-                    }
                     if (visitorContext.getModelUtils().resolveKind(typeElement, ElementKind.ENUM).isPresent()) {
                         return new JavaEnumElement(
                             typeElement,
-                            newAnnotationMetadata,
+                            resolveElementAnnotationMetadataFactory(typeElement),
                             visitorContext
                         );
                     } else {
-
                         genericsInfo = visitorContext.getGenericUtils().alignNewGenericsInfo(
                             typeElement,
                             typeArguments,
@@ -403,7 +289,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
                         );
                         return new JavaClassElement(
                             typeElement,
-                            newAnnotationMetadata,
+                            resolveElementAnnotationMetadataFactory(typeElement),
                             visitorContext,
                             typeArguments,
                             genericsInfo,
@@ -460,6 +346,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
                 upperBounds = Stream.of(extendsBound);
             }
             return new JavaWildcardElement(
+                elementAnnotationMetadataFactory,
                 wt,
                 upperBounds
                     .map(tm -> (JavaClassElement) mirrorToClassElement(tm, visitorContext, finalGenericsInfo, includeTypeAnnotations))
@@ -470,6 +357,14 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
             );
         }
         return PrimitiveElement.VOID;
+    }
+
+    @NonNull
+    private ElementAnnotationMetadataFactory resolveElementAnnotationMetadataFactory(Object nativeType) {
+        if (visitorContext.getConfiguration().includeTypeLevelAnnotationsInGenericArguments()) {
+            return elementAnnotationMetadataFactory;
+        }
+        return elementAnnotationMetadataFactory.overrideForNativeType(nativeType, element -> elementAnnotationMetadataFactory.build(element, AnnotationMetadata.EMPTY_METADATA));
     }
 
     private ClassElement resolveTypeVariable(JavaVisitorContext visitorContext,
@@ -494,7 +389,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
                     genericsInfo,
                     includeTypeAnnotations))
                 .collect(Collectors.toList());
-            return new JavaGenericPlaceholderElement(tv, bounds, 0);
+            return new JavaGenericPlaceholderElement(tv, bounds, elementAnnotationMetadataFactory, 0);
         }
     }
 

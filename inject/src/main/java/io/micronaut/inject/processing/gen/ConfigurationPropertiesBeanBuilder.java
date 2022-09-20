@@ -55,14 +55,15 @@ public class ConfigurationPropertiesBeanBuilder extends SimpleBeanBuilder {
             return true;
         }
         if (methodElement.hasAnnotation(ConfigurationSetter.class)) {
+            if (methodElement.getParameters().length == 0) {
+                throw new RuntimeException(classElement + " " + methodElement);
+            }
             visitor.setValidated(visitor.isValidated() || methodElement.hasAnnotation(ANN_REQUIRES_VALIDATION));
             visitor.visitSetterValue(methodElement.getDeclaringType(), methodElement, methodElement.isReflectionRequired(classElement), true);
-//            System.out.println("SETTER" + classElement + " " + methodElement + " " + getClass().getSimpleName() + " " + isInjectPointMethod(methodElement));
             return true;
         }
         if (methodElement.hasAnnotation(ConfigurationGetter.class)) {
             visitor.setValidated(visitor.isValidated() || methodElement.hasAnnotation(ANN_REQUIRES_VALIDATION));
-//            System.out.println("GETTER" + classElement + " " + methodElement + " " + getClass().getSimpleName() + " " + isInjectPointMethod(methodElement));
             return true;
         }
         return super.visitMethod(visitor, methodElement);

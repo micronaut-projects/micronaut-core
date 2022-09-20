@@ -197,7 +197,7 @@ public class ConfigurationReaderVisitor implements TypeElementVisitor<Configurat
                 null
             ).getPath();
 
-            method.annotate(Property.class, (builder) -> builder.member("name", path)).getAnnotationMetadata();
+            method.annotate(Property.class, (builder) -> builder.member("name", path));
             method.annotate(ConfigurationSetter.class);
         } else if (isGetter(methodName)) {
             method.annotate(ConfigurationGetter.class);
@@ -275,7 +275,6 @@ public class ConfigurationReaderVisitor implements TypeElementVisitor<Configurat
                 field.getDocumentation().orElse(null),
                 null
             ).getPath();
-
             field.annotate(Property.class, (builder) -> builder.member("name", path));
             field.annotate(ConfigurationSetter.class);
         }

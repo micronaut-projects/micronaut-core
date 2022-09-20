@@ -15,15 +15,15 @@
  */
 package io.micronaut.ast.groovy.visitor;
 
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.ElementModifier;
 import io.micronaut.inject.ast.PropertyElement;
 import org.codehaus.groovy.ast.AnnotatedNode;
 
 import java.util.Collections;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -36,33 +36,36 @@ import java.util.Set;
 abstract class GroovyPropertyElement extends AbstractGroovyElement implements PropertyElement {
     private final String name;
     private final boolean readOnly;
-    private final Object nativeType;
+    private final AnnotatedNode nativeType;
     private final GroovyClassElement declaringElement;
+    private final List<AnnotatedNode> parents;
 
     /**
      * Default constructor.
      *
-     * @param visitorContext The visitor context
-     * @param declaringElement The declaring element
-     * @param annotatedNode    The annotated node
-     * @param annotationMetadata the annotation metadata
-     * @param name the name
-     * @param readOnly Whether it is read only
-     * @param nativeType the native underlying type
+     * @param visitorContext            The visitor context
+     * @param declaringElement          The declaring element
+     * @param annotatedNode             The annotated node
+     * @param parents                   The parents
+     * @param annotationMetadataFactory the annotation metadata
+     * @param name                      the name
+     * @param readOnly                  Whether it is read only
+     * @param nativeType                the native underlying type
      */
-    GroovyPropertyElement(
-            GroovyVisitorContext visitorContext,
-            GroovyClassElement declaringElement,
-            AnnotatedNode annotatedNode,
-            AnnotationMetadata annotationMetadata,
-            String name,
-            boolean readOnly,
-            Object nativeType) {
-        super(visitorContext, annotatedNode, annotationMetadata);
+    GroovyPropertyElement(GroovyVisitorContext visitorContext,
+                          GroovyClassElement declaringElement,
+                          List<AnnotatedNode> parents,
+                          AnnotatedNode annotatedNode,
+                          ElementAnnotationMetadataFactory annotationMetadataFactory,
+                          String name,
+                          boolean readOnly,
+                          AnnotatedNode nativeType) {
+        super(visitorContext, annotatedNode, annotationMetadataFactory);
         this.name = name;
         this.readOnly = readOnly;
         this.nativeType = nativeType;
         this.declaringElement = declaringElement;
+        this.parents = parents;
     }
 
     @Override
@@ -95,8 +98,12 @@ abstract class GroovyPropertyElement extends AbstractGroovyElement implements Pr
     }
 
     @Override
-    public Object getNativeType() {
+    public AnnotatedNode getNativeType() {
         return nativeType;
+    }
+
+    public List<AnnotatedNode> getParents() {
+        return parents;
     }
 
     @Override
@@ -105,7 +112,12 @@ abstract class GroovyPropertyElement extends AbstractGroovyElement implements Pr
     }
 
     @Override
-    public ClassElement getDeclaringType() {
+    public GroovyClassElement getDeclaringType() {
+        return declaringElement;
+    }
+
+    @Override
+    public GroovyClassElement getOwningType() {
         return declaringElement;
     }
 }

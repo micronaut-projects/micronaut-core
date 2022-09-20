@@ -18,35 +18,31 @@ package io.micronaut.ast.groovy.visitor;
 import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
 import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.FieldNode;
-import org.codehaus.groovy.ast.Variable;
+import org.codehaus.groovy.ast.PropertyNode;
 
 /**
- * A field element returning data from a {@link Variable}. The
- * variable could be a field or property node.
- *
- * @author James Kleeh
- * @since 1.0
+ * A field element.
  */
-public class GroovyFieldElement extends AbstractGroovyVariableElement {
+public class GroovyVarPropertyElement extends AbstractGroovyVariableElement {
 
-    private final FieldNode fieldNode;
+    private final PropertyNode propertyNode;
 
     /**
      * @param visitorContext            The visitor context
-     * @param fieldNode                  The {@link FieldNode}
+     * @param propertyNode                  The {@link FieldNode}
      * @param annotatedNode             The annotated ndoe
      * @param annotationMetadataFactory The annotation metadata
      */
-    GroovyFieldElement(GroovyVisitorContext visitorContext,
-                       FieldNode fieldNode,
-                       AnnotatedNode annotatedNode,
-                       ElementAnnotationMetadataFactory annotationMetadataFactory) {
-        super(visitorContext, fieldNode, annotatedNode, annotationMetadataFactory);
-        this.fieldNode = fieldNode;
+    GroovyVarPropertyElement(GroovyVisitorContext visitorContext,
+                             PropertyNode propertyNode,
+                             AnnotatedNode annotatedNode,
+                             ElementAnnotationMetadataFactory annotationMetadataFactory) {
+        super(visitorContext, propertyNode, annotatedNode, annotationMetadataFactory);
+        this.propertyNode = propertyNode;
     }
 
     @Override
-    public FieldNode getNativeType() {
-        return fieldNode;
+    public PropertyNode getNativeType() {
+        return propertyNode;
     }
 }
