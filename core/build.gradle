@@ -1,3 +1,6 @@
+import me.champeau.gradle.japicmp.JapicmpTask
+import io.micronaut.build.internal.japicmp.RemovedPackages
+
 plugins {
     id "io.micronaut.build.internal.convention-core-library"
 }
@@ -42,3 +45,10 @@ def versionInfo = tasks.register("micronautVersionInfo", WriteProperties) {
 tasks.named("processResources") {
     from(versionInfo)
 }
+
+tasks.withType(JapicmpTask).configureEach {
+   richReport {
+       addViolationTransformer(RemovedPackages, [prefixes: ['io.micronaut.caffeine'], exact: []])
+   }
+}
+
