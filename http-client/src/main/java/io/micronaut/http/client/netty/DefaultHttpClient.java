@@ -2290,6 +2290,7 @@ public class DefaultHttpClient implements
 
         @Override
         public void handlerRemoved(ChannelHandlerContext ctx) {
+            ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_HTTP_AGGREGATOR);
             poolHandle.release();
         }
 

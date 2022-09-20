@@ -1656,6 +1656,7 @@ class ConnectionManager {
                     @Override
                     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
                         super.channelInactive(ctx);
+                        http1Connections.remove(Http1ConnectionHolder.this);
                         canReturn = false;
                     }
                 });
@@ -1667,6 +1668,7 @@ class ConnectionManager {
                     hasLiveRequest.set(true);
                     satisfy0(pendingRequest);
                 }
+                http1Connections.add(this);
                 pendingConnectionCount.decrementAndGet();
             }
 

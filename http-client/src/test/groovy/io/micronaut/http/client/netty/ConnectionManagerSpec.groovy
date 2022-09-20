@@ -13,10 +13,12 @@ import io.netty.channel.ChannelFuture
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.ChannelInitializer
 import io.netty.channel.embedded.EmbeddedChannel
+import io.netty.handler.codec.http.DefaultFullHttpResponse
 import io.netty.handler.codec.http.DefaultHttpContent
 import io.netty.handler.codec.http.DefaultHttpResponse
 import io.netty.handler.codec.http.DefaultLastHttpContent
 import io.netty.handler.codec.http.HttpMethod
+import io.netty.handler.codec.http.HttpObjectAggregator
 import io.netty.handler.codec.http.HttpResponseStatus
 import io.netty.handler.codec.http.HttpServerCodec
 import io.netty.handler.codec.http2.DefaultHttp2DataFrame
@@ -278,6 +280,49 @@ class ConnectionManagerSpec extends Specification {
         ctx.close()
     }
 
+    def 'http1 reuse'() {
+        given:
+        def ctx = ApplicationContext.run()
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn = new EmbeddedTestConnection()
+        conn.setupHttp1()
+        conn.serverChannel.pipeline().addLast(new HttpObjectAggregator(1024))
+        patch(client, conn.clientChannel)
+
+        when:
+        def f1 = Mono.from(client.exchange('http://example.com/r1')).toFuture()
+        f1.exceptionally(t -> t.printStackTrace())
+        conn.advance()
+        then:
+        io.netty.handler.codec.http.HttpRequest req1 = conn.serverChannel.readInbound()
+        req1.headers().get("connection") == "keep-alive"
+
+        when:
+        conn.respondOk()
+        conn.advance()
+        then:
+        f1.get().status() == HttpStatus.OK
+
+        when:
+        def f2 = Mono.from(client.exchange('http://example.com/r1')).toFuture()
+        f2.exceptionally(t -> t.printStackTrace())
+        conn.advance()
+        then:
+        io.netty.handler.codec.http.HttpRequest req2 = conn.serverChannel.readInbound()
+        req2.headers().get("connection") == "keep-alive"
+
+        when:
+        conn.respondOk()
+        conn.advance()
+        then:
+        f1.get().status() == HttpStatus.OK
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
     static class EmbeddedTestConnection {
         final EmbeddedChannel serverChannel
         final EmbeddedChannel clientChannel
@@ -337,7 +382,7 @@ class ConnectionManagerSpec extends Specification {
         }
 
         void respondOk() {
-            def response = new DefaultHttpResponse(io.netty.handler.codec.http.HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
+            def response = new DefaultFullHttpResponse(io.netty.handler.codec.http.HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
             response.headers().add('content-length', 0)
             serverChannel.writeOutbound(response)
         }
