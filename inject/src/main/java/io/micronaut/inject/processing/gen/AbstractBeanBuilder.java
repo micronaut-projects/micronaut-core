@@ -30,7 +30,6 @@ import io.micronaut.inject.writer.BeanDefinitionVisitor;
 import java.lang.annotation.Annotation;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -120,7 +119,7 @@ public abstract class AbstractBeanBuilder {
         }
         return classElement.hasStereotype(Executable.class) ||
             classElement.hasStereotype(AnnotationUtil.QUALIFIER) ||
-            findConstructorElement(classElement).map(constructor -> constructor.hasStereotype(AnnotationUtil.INJECT)).orElse(false);
+            classElement.getPrimaryConstructor().map(constructor -> constructor.hasStereotype(AnnotationUtil.INJECT)).orElse(false);
     }
 
     private static boolean containsInjectMethod(ClassElement classElement) {
@@ -212,28 +211,6 @@ public abstract class AbstractBeanBuilder {
                         });
                 });
         }
-    }
-
-    protected static void postponeIfParametersContainErrors(Element executableElement) {
-        // TODO:
-//        boolean processingOver = true;
-//        if (executableElement != null && !processingOver) {
-//            List<? extends VariableElement> parameters = executableElement.getParameters();
-//            for (VariableElement parameter : parameters) {
-//                TypeMirror typeMirror = parameter.asType();
-//                if ((typeMirror.getKind() == TypeKind.ERROR)) {
-//                    throw new PostponeToNextRoundException();
-//                }
-//            }
-//        }
-    }
-
-    protected static Optional<MethodElement> findConstructorElement(ClassElement classElement) {
-        return classElement.getPrimaryConstructor()
-            .map(methodElement -> {
-                postponeIfParametersContainErrors(methodElement);
-                return methodElement;
-            });
     }
 
     public List<BeanDefinitionVisitor> getBeanDefinitionWriters() {

@@ -19,7 +19,7 @@ public class AopIntroductionProxySupportedBeanBuilder extends SimpleBeanBuilder 
         }
         aopProxyVisitor = aopHelper.createIntroductionAopProxyWriter(classElement, metadataBuilder, visitorContext);
         beanDefinitionWriters.add(aopProxyVisitor);
-        MethodElement constructorElement = findConstructorElement(classElement).orElse(null);
+        MethodElement constructorElement = classElement.getPrimaryConstructor().orElse(null);
         if (constructorElement != null) {
             aopProxyVisitor.visitBeanDefinitionConstructor(
                 constructorElement,

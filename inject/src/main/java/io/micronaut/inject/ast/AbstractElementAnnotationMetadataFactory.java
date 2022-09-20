@@ -35,6 +35,10 @@ public class AbstractElementAnnotationMetadataFactory<K, A> implements ElementAn
             ClassElement classElement = (ClassElement) element;
             return buildForClass(defaultAnnotationMetadata, classElement);
         }
+        if (element instanceof ConstructorElement) {
+            ConstructorElement constructorElement = (ConstructorElement) element;
+            return buildForConstructor(defaultAnnotationMetadata, constructorElement);
+        }
         if (element instanceof MethodElement) {
             MethodElement methodElement = (MethodElement) element;
             return buildForMethod(defaultAnnotationMetadata, methodElement);
@@ -208,8 +212,11 @@ public class AbstractElementAnnotationMetadataFactory<K, A> implements ElementAn
 
             @Override
             protected AnnotationMetadata createOnMissing(K nativeOwnerType, K nativeType) {
-                AnnotationMetadata typeAnnotations = metadataBuilder.buildForType(nativeOwnerType);
                 AnnotationMetadata methodAnnotations = metadataBuilder.buildForMethod(nativeOwnerType, nativeType);
+                if (methodAnnotations instanceof AnnotationMetadataHierarchy) {
+                    return methodAnnotations;
+                }
+                AnnotationMetadata typeAnnotations = metadataBuilder.buildForType(nativeOwnerType);
                 return new AnnotationMetadataHierarchy(typeAnnotations, methodAnnotations);
             }
 
@@ -226,6 +233,33 @@ public class AbstractElementAnnotationMetadataFactory<K, A> implements ElementAn
             @Override
             public String toString() {
                 return methodElement.toString();
+            }
+        };
+    }
+
+    @NonNull
+    private AbstractElementAnnotationMetadata buildForConstructor(@Nullable AnnotationMetadata defaultAnnotationMetadata,
+                                                                  @NonNull ConstructorElement constructorElement) {
+        return new AbstractElementAnnotationMetadata(defaultAnnotationMetadata) {
+
+            @Override
+            protected AnnotationMetadata createOnMissing(K nativeOwnerType, K nativeType) {
+                return metadataBuilder.build(nativeOwnerType, nativeType);
+            }
+
+            @Override
+            protected K getNativeOwnerType() {
+                return (K) constructorElement.getOwningType().getNativeType();
+            }
+
+            @Override
+            protected K getNativeType() {
+                return (K) constructorElement.getNativeType();
+            }
+
+            @Override
+            public String toString() {
+                return constructorElement.toString();
             }
         };
     }

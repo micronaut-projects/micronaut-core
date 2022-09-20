@@ -184,7 +184,7 @@ public class FactoryBeanBuilder extends SimpleBeanBuilder {
 
             BeanDefinitionVisitor aopProxyWriter = aopHelper.createAroundAopProxyWriter(producedBeanDefinitionWriter, producedAnnotationMetadata, metadataBuilder, visitorContext, true);
 
-            MethodElement constructorElement = findConstructorElement(producedType).orElse(null);
+            MethodElement constructorElement = producedType.getPrimaryConstructor().orElse(null);
             if (constructorElement != null) {
                 aopProxyWriter.visitBeanDefinitionConstructor(constructorElement, constructorElement.isReflectionRequired(), visitorContext);
             } else {

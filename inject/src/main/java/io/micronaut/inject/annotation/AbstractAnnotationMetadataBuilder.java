@@ -230,7 +230,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @return The {@link AnnotationMetadata}
      */
     public AnnotationMetadata build(String owningType, T element) {
-        final AnnotationMetadata existing = lookupExisting(owningType, element);
+        final AnnotationMetadata existing = lookupExisting(owningType, getElementAsString(element));
         if (existing != null) {
             return existing;
         }
@@ -270,8 +270,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @return The {@link AnnotationMetadata}
      */
     public AnnotationMetadata buildForMethod(T owningType, T element) {
-        String owningTypeName = getElementAsString(owningType);
-        final AnnotationMetadata existing = lookupExisting(owningTypeName, element);
+        final AnnotationMetadata existing = lookupExisting(getElementAsString(owningType), getElementAsString(element));
         if (existing != null) {
             return existing;
         } else {
@@ -332,7 +331,9 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @return The {@link AnnotationMetadata}
      */
     public AnnotationMetadata buildForParents(String owningTypeName, List<T> parents, T element) {
-        final AnnotationMetadata existing = lookupExisting(owningTypeName, element);
+        System.out.println("buildForParents " + owningTypeName + " " + getElementAsString(element));
+
+        final AnnotationMetadata existing = lookupExisting(owningTypeName, getElementAsString(element));
         DefaultAnnotationMetadata annotationMetadata;
         if (existing instanceof DefaultAnnotationMetadata) {
             // ugly, but will have to do
@@ -367,8 +368,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @return The {@link AnnotationMetadata}
      */
     public AnnotationMetadata buildForParent(T parent, T element, boolean inheritTypeAnnotations) {
-        String declaringType = getElementAsString(element);
-        final AnnotationMetadata existing = lookupExisting(declaringType, element);
+        final AnnotationMetadata existing = null;
         DefaultAnnotationMetadata annotationMetadata;
         if (existing instanceof DefaultAnnotationMetadata) {
             // ugly, but will have to do
@@ -1048,8 +1048,14 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         }
     }
 
-    private AnnotationMetadata lookupExisting(String declaringType, T element) {
-        return MUTATED_ANNOTATION_METADATA.get(new MetadataKey(declaringType, getElementAsString(element)));
+    private AnnotationMetadata lookupExisting(String declaringType, String elementAsString) {
+        AnnotationMetadata annotationMetadata = MUTATED_ANNOTATION_METADATA.get(new MetadataKey(declaringType, elementAsString));
+        System.out.println("GET " + declaringType + " " + elementAsString);
+        if (annotationMetadata != null) {
+            System.out.println("vv " + annotationMetadata.getAnnotationNames());
+        }
+
+        return annotationMetadata;
     }
 
     private void processAnnotationAlias(

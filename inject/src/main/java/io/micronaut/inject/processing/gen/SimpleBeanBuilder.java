@@ -48,7 +48,7 @@ public class SimpleBeanBuilder extends AbstractBeanBuilder {
         beanDefinitionWriters.add(beanDefinitionWriter);
         beanDefinitionWriter.visitTypeArguments(classElement.getAllTypeArguments());
         visitAnnotationMetadata(beanDefinitionWriter, classElement.getAnnotationMetadata());
-        MethodElement constructorElement = findConstructorElement(classElement).orElse(null);
+        MethodElement constructorElement = classElement.getPrimaryConstructor().orElse(null);
         if (constructorElement != null) {
             beanDefinitionWriter.visitBeanDefinitionConstructor(constructorElement, constructorElement.isPrivate(), visitorContext);
         } else {
@@ -71,7 +71,7 @@ public class SimpleBeanBuilder extends AbstractBeanBuilder {
                 false
             );
             beanDefinitionWriters.add(aopProxyVisitor);
-            MethodElement constructorElement = findConstructorElement(classElement).orElse(null);
+            MethodElement constructorElement = classElement.getPrimaryConstructor().orElse(null);
             if (constructorElement != null) {
                 aopProxyVisitor.visitBeanDefinitionConstructor(
                     constructorElement,
