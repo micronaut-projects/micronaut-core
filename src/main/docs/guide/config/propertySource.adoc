@@ -21,6 +21,9 @@ Micronaut by default contains `PropertySourceLoader` implementations that load p
 
 TIP: `.properties`, `.json`, `.yml` are supported out of the box. For Groovy users `.groovy` is supported as well.
 
+Note that if you want full control of where your application loads configuration from you can disable the default `PropertySourceLoader` implementations listed above by calling the `enableDefaultPropertySources(false)` method of the api:context.ApplicationContextBuilder[] interface when starting your application.
+
+In this case only explicit api:context.env.PropertySource[] instances that you add via the `propertySources(..)` method of the api:context.ApplicationContextBuilder[] interface will be used.
 
 === Supplying Configuration via Command Line
 
@@ -54,7 +57,7 @@ public class Application {
 
 === Secrets and Sensitive Configuration
 
-It is important to note that it is not recommended to store sensitive configuration such as passwords and tokens within configuration files that can potentially be checked into source control systems. 
+It is important to note that it is not recommended to store sensitive configuration such as passwords and tokens within configuration files that can potentially be checked into source control systems.
 
 It is good practise to instead externalize sensitive configuration completely from the application code using preferably a external secret manager system (there are many options here, many provided by Cloud providers) or environment variables that are set during the deployment of the application. You can also use property placeholders (see the following section), to customize names of the environment variables to use and supply default values:
 

@@ -22,7 +22,11 @@ import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.SupplierUtil;
-import io.micronaut.http.*;
+import io.micronaut.http.HttpAttributes;
+import io.micronaut.http.HttpMethod;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpStatus;
+import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.annotation.FilterMatcher;
 import io.micronaut.http.filter.FilterPatternStyle;
@@ -34,7 +38,18 @@ import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
 import java.net.URI;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
@@ -66,7 +81,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         httpFilters.sort(OrderUtil.COMPARATOR);
         return httpFilters;
     });
-    
+
     /**
      * Construct a new router for the given route builders.
      *
@@ -203,6 +218,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         if (routeCount <= 1) {
             return uriRoutes;
         }
+        // if there are multiple routes, try to resolve the ambiguity
 
         if (CollectionUtils.isNotEmpty(acceptedProducedTypes)) {
             // take the highest priority accepted type
@@ -213,7 +229,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
                     mostSpecific.add(routeMatch);
                 }
             }
-            if (!mostSpecific.isEmpty() || !acceptedProducedTypes.contains(MediaType.ALL_TYPE)) {
+            if (!mostSpecific.isEmpty()) {
                 uriRoutes = mostSpecific;
             }
         }
