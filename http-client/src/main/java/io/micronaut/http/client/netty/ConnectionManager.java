@@ -78,6 +78,7 @@ import io.netty.handler.codec.http2.DefaultHttp2Connection;
 import io.netty.handler.codec.http2.DelegatingDecompressorFrameListener;
 import io.netty.handler.codec.http2.Http2ClientUpgradeCodec;
 import io.netty.handler.codec.http2.Http2Connection;
+import io.netty.handler.codec.http2.Http2FrameCodec;
 import io.netty.handler.codec.http2.Http2FrameCodecBuilder;
 import io.netty.handler.codec.http2.Http2FrameListener;
 import io.netty.handler.codec.http2.Http2FrameLogger;
@@ -1470,50 +1471,98 @@ class ConnectionManager {
 
     private class Http2PriorKnowledgeInitializer extends ChannelInitializer<Channel> {
         private final Pool pool;
+        private final Http2FrameCodec frameCodec;
 
         Http2PriorKnowledgeInitializer(Pool pool) {
+            this(pool, Http2FrameCodecBuilder.forClient().build());
+        }
+
+        Http2PriorKnowledgeInitializer(Pool pool, Http2FrameCodec frameCodec) {
+            this.pool = pool;
+            this.frameCodec = frameCodec;
+        }
+
+        @Override
+        protected void initChannel(Channel ch) throws Exception {
+            ch.pipeline().addLast(frameCodec);
+            ch.pipeline().addLast(new Http2MultiplexHandler(new ChannelInitializer<Http2StreamChannel>() {
+                @Override
+                protected void initChannel(Http2StreamChannel ch) throws Exception {
+                    // todo: fail connection?
+                    log.warn("Server opened HTTP2 stream {}, closing immediately", ch.stream().id());
+                    ch.close();
+                }
+            }, new ChannelInitializer<Http2StreamChannel>() {
+                @Override
+                protected void initChannel(Http2StreamChannel ch) throws Exception {
+                    // discard any response data for the upgrade request
+                    ch.close();
+                }
+            }));
+            ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_SETTINGS, new InitialConnectionErrorHandler(pool) {
+                @Override
+                public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+                    if (msg instanceof Http2SettingsFrame) {
+                        ctx.pipeline().remove(this);
+                        pool.new Http2ConnectionHolder(ch).init();
+                        return;
+                    } else {
+                        log.warn("Premature frame: {}", msg.getClass());
+                    }
+
+                    super.channelRead(ctx, msg);
+                }
+            });
+            // stream frames should be handled by the multiplexer
+            ch.pipeline().addLast(new ChannelInboundHandlerAdapter() {
+                @Override
+                public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
+                    ctx.read();
+                }
+
+                @Override
+                public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+                    // todo: log
+                    ReferenceCountUtil.release(msg);
+                    ctx.read();
+                }
+            });
+        }
+    }
+
+    private class Http2UpgradeInitializer extends ChannelInitializer<Channel> {
+        private final Pool pool;
+
+        Http2UpgradeInitializer(Pool pool) {
             this.pool = pool;
         }
 
         @Override
         protected void initChannel(Channel ch) throws Exception {
-            ch.pipeline()
-                .addLast(Http2FrameCodecBuilder.forClient()
-                    .build())
-                .addLast(new Http2MultiplexHandler(new ChannelInitializer<Http2StreamChannel>() {
-                    @Override
-                    protected void initChannel(Http2StreamChannel ch1) throws Exception {
-                        // todo: fail connection?
-                        log.warn("Server opened HTTP2 stream {}, closing immediately", ch1.stream().id());
-                        ch1.close();
-                    }
-                }, new ChannelInboundHandlerAdapter() {
-                    @Override
-                    public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
-                        ctx.read();
-                    }
+            Http2FrameCodec frameCodec = Http2FrameCodecBuilder.forClient().build();
 
-                    @Override
-                    public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-                        // todo: log
-                        ReferenceCountUtil.release(msg);
-                        ctx.read();
-                    }
-                }))
-                .addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_SETTINGS, new InitialConnectionErrorHandler(pool) {
-                    @Override
-                    public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-                        if (msg instanceof Http2SettingsFrame) {
-                            ctx.pipeline().remove(this);
-                            pool.new Http2ConnectionHolder(ch).init();
-                            return;
-                        } else {
-                            log.warn("Premature frame: {}", msg.getClass());
-                        }
+            HttpClientCodec sourceCodec = new HttpClientCodec();
+            Http2ClientUpgradeCodec upgradeCodec = new Http2ClientUpgradeCodec(ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION, frameCodec,
+                new Http2PriorKnowledgeInitializer(pool, frameCodec));
+            HttpClientUpgradeHandler upgradeHandler = new HttpClientUpgradeHandler(sourceCodec, upgradeCodec, 65536);
 
-                        super.channelRead(ctx, msg);
-                    }
-                });
+            ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC, sourceCodec);
+            ch.pipeline().addLast(upgradeHandler);
+
+            ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_UPGRADE_REQUEST, new ChannelInboundHandlerAdapter() {
+                @Override
+                public void channelActive(ChannelHandlerContext ctx) throws Exception {
+                    DefaultFullHttpRequest upgradeRequest =
+                        new DefaultFullHttpRequest(io.netty.handler.codec.http.HttpVersion.HTTP_1_1, HttpMethod.GET, "/", Unpooled.EMPTY_BUFFER);
+
+                    // Set HOST header as the remote peer may require it.
+                    upgradeRequest.headers().set(HttpHeaderNames.HOST, pool.requestKey.getHost() + ':' + pool.requestKey.getPort());
+                    ctx.writeAndFlush(upgradeRequest);
+                    ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_HTTP2_UPGRADE_REQUEST);
+
+                    super.channelActive(ctx);
+                }
+            });
         }
     }
 
@@ -1632,7 +1681,6 @@ class ConnectionManager {
             }
             // no connection open that has room
             pendingRequests.add(sink);
-            // todo: http1
             openNewConnection();
         }
 
@@ -1650,12 +1698,23 @@ class ConnectionManager {
                     requestKey.getPort()
                 );
             } else {
-                initializer = new Http1Initializer(
-                    this,
-                    false,
-                    requestKey.getHost(),
-                    requestKey.getPort()
-                );
+                switch (configuration.getPlaintextMode()) {
+                    case HTTP_1:
+                        initializer = new Http1Initializer(
+                            this,
+                            false,
+                            requestKey.getHost(),
+                            requestKey.getPort()
+                        );
+                        break;
+                    case H2C:
+                        initializer = new Http2UpgradeInitializer(
+                            this
+                        );
+                        break;
+                    default:
+                        throw new AssertionError("Unknown plaintext mode");
+                }
             }
             addInstrumentedListener(doConnect(requestKey, initializer), future -> {
                 if (!future.isSuccess()) {

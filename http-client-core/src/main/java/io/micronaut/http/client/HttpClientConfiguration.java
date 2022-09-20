@@ -147,6 +147,8 @@ public abstract class HttpClientConfiguration {
 
     private HttpVersion httpVersion = HttpVersion.HTTP_1_1;
 
+    private PlaintextMode plaintextMode = PlaintextMode.HTTP_1;
+
     private LogLevel logLevel;
 
     /**
@@ -637,6 +639,15 @@ public abstract class HttpClientConfiguration {
         }
     }
 
+    // TODO: docs
+    public PlaintextMode getPlaintextMode() {
+        return plaintextMode;
+    }
+
+    public void setPlaintextMode(PlaintextMode plaintextMode) {
+        this.plaintextMode = plaintextMode;
+    }
+
     /**
      * Configuration for the HTTP client connnection pool.
      */
@@ -738,5 +749,10 @@ public abstract class HttpClientConfiguration {
         public void setAcquireTimeout(@Nullable Duration acquireTimeout) {
             this.acquireTimeout = acquireTimeout;
         }
+    }
+
+    public enum PlaintextMode {
+        HTTP_1,
+        H2C,
     }
 }

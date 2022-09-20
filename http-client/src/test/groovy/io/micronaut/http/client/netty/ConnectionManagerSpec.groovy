@@ -2,6 +2,7 @@ package io.micronaut.http.client.netty
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.HttpVersion
 import io.micronaut.http.client.HttpClient
@@ -12,8 +13,12 @@ import io.netty.buffer.ByteBufAllocator
 import io.netty.buffer.Unpooled
 import io.netty.channel.Channel
 import io.netty.channel.ChannelFuture
+import io.netty.channel.ChannelHandler
 import io.netty.channel.ChannelHandlerContext
+import io.netty.channel.ChannelId
+import io.netty.channel.ChannelInboundHandlerAdapter
 import io.netty.channel.ChannelInitializer
+import io.netty.channel.ServerChannel
 import io.netty.channel.embedded.EmbeddedChannel
 import io.netty.handler.codec.http.DefaultFullHttpResponse
 import io.netty.handler.codec.http.DefaultHttpContent
@@ -22,24 +27,34 @@ import io.netty.handler.codec.http.DefaultLastHttpContent
 import io.netty.handler.codec.http.HttpMethod
 import io.netty.handler.codec.http.HttpResponseStatus
 import io.netty.handler.codec.http.HttpServerCodec
+import io.netty.handler.codec.http.HttpServerUpgradeHandler
 import io.netty.handler.codec.http.LastHttpContent
 import io.netty.handler.codec.http2.DefaultHttp2DataFrame
 import io.netty.handler.codec.http2.DefaultHttp2Headers
 import io.netty.handler.codec.http2.DefaultHttp2HeadersFrame
+import io.netty.handler.codec.http2.Http2FrameCodec
 import io.netty.handler.codec.http2.Http2FrameCodecBuilder
 import io.netty.handler.codec.http2.Http2FrameStream
+import io.netty.handler.codec.http2.Http2FrameStreamEvent
 import io.netty.handler.codec.http2.Http2Headers
 import io.netty.handler.codec.http2.Http2HeadersFrame
+import io.netty.handler.codec.http2.Http2ResetFrame
+import io.netty.handler.codec.http2.Http2ServerUpgradeCodec
 import io.netty.handler.codec.http2.Http2SettingsAckFrame
 import io.netty.handler.codec.http2.Http2SettingsFrame
+import io.netty.handler.codec.http2.Http2Stream
+import io.netty.handler.logging.LogLevel
+import io.netty.handler.logging.LoggingHandler
 import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler
 import io.netty.handler.ssl.SslContextBuilder
 import io.netty.handler.ssl.util.SelfSignedCertificate
+import io.netty.util.AsciiString
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import spock.lang.Specification
 
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.Future
 
 class ConnectionManagerSpec extends Specification {
     private static void patch(DefaultHttpClient httpClient, EmbeddedChannel... channels) {
@@ -58,7 +73,6 @@ class ConnectionManagerSpec extends Specification {
     }
 
     def 'simple http2 get'() {
-        given:
         def ctx = ApplicationContext.run([
                 'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
         ])
@@ -68,23 +82,9 @@ class ConnectionManagerSpec extends Specification {
         conn.setupHttp2Tls()
         patch(client, conn.clientChannel)
 
-        when:
-        def future = Mono.from(client.exchange('https://example.com/foo')).toFuture()
-        future.exceptionally(t -> t.printStackTrace())
+        def future = conn.testExchangeRequest(client)
         conn.exchangeSettings()
-        then:
-        Http2HeadersFrame request = conn.serverChannel.readInbound()
-        request.headers().get(Http2Headers.PseudoHeaderName.PATH.value()) == '/foo'
-        request.headers().get(Http2Headers.PseudoHeaderName.SCHEME.value()) == 'https'
-        request.headers().get(Http2Headers.PseudoHeaderName.AUTHORITY.value()) == 'example.com'
-        request.headers().get(Http2Headers.PseudoHeaderName.METHOD.value()) == 'GET'
-
-        when:
-        conn.respondOk(request.stream())
-        conn.advance()
-        then:
-        def response = future.get()
-        response.status() == HttpStatus.OK
+        conn.testExchangeResponse(future)
 
         cleanup:
         client.close()
@@ -165,6 +165,39 @@ class ConnectionManagerSpec extends Specification {
         patch(client, conn.clientChannel)
 
         conn.testExchange(client)
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
+    def 'simple h2c get'() {
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.plaintext-mode': 'h2c',
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn = new EmbeddedTestConnectionHttp2()
+        conn.setupH2c()
+        patch(client, conn.clientChannel)
+
+        def future = conn.testExchangeRequest(client)
+        conn.clientChannel.pipeline().fireChannelActive()
+        conn.advance()
+
+        Http2HeadersFrame upgradeRequest = conn.serverChannel.readInbound()
+        assert upgradeRequest.headers().get(Http2Headers.PseudoHeaderName.METHOD.value()) == 'GET'
+        assert upgradeRequest.headers().get(Http2Headers.PseudoHeaderName.PATH.value()) == '/'
+        assert upgradeRequest.headers().get(Http2Headers.PseudoHeaderName.AUTHORITY.value()) == 'example.com:80'
+        assert upgradeRequest.headers().get('content-length') == '0'
+        // client closes the stream immediately
+        assert upgradeRequest.stream().state() == Http2Stream.State.CLOSED
+
+        assert conn.serverChannel.readInbound() instanceof Http2SettingsFrame
+        assert conn.serverChannel.readInbound() instanceof Http2ResetFrame
+        assert conn.serverChannel.readInbound() instanceof Http2SettingsAckFrame
+
+        conn.testExchangeResponse(future)
 
         cleanup:
         client.close()
@@ -276,7 +309,7 @@ class ConnectionManagerSpec extends Specification {
         final EmbeddedChannel clientChannel
 
         EmbeddedTestConnectionBase() {
-            serverChannel = new EmbeddedChannel(new DummyChannelId('server'))
+            serverChannel = new EmbeddedServerChannel(new DummyChannelId('server'))
             serverChannel.freezeTime()
             serverChannel.config().setAutoRead(true)
 
@@ -287,6 +320,12 @@ class ConnectionManagerSpec extends Specification {
 
         void advance() {
             EmbeddedTestUtil.advance(serverChannel, clientChannel)
+        }
+    }
+
+    static class EmbeddedServerChannel extends EmbeddedChannel implements ServerChannel {
+        EmbeddedServerChannel(ChannelId channelId) {
+            super(channelId)
         }
     }
 
@@ -373,7 +412,12 @@ class ConnectionManagerSpec extends Specification {
     }
 
     static class EmbeddedTestConnectionHttp2 extends EmbeddedTestConnectionBase {
+        private String scheme
+        Http2FrameStream h2cResponseStream
+
         void setupHttp2Tls() {
+            scheme = 'https'
+
             def certificate = new SelfSignedCertificate()
             def builder = SslContextBuilder.forServer(certificate.key(), certificate.cert())
             CertificateProvidedSslBuilder.setupSslBuilder(builder, new SslConfiguration(), HttpVersion.HTTP_2_0);
@@ -385,20 +429,51 @@ class ConnectionManagerSpec extends Specification {
                         @Override
                         protected void configurePipeline(ChannelHandlerContext chtx, String protocol) throws Exception {
                             chtx.pipeline()
-                                    .addLast(Http2FrameCodecBuilder.forServer()
-                                            .autoAckSettingsFrame(false)
-                                            .build())
+                                    .addLast(Http2FrameCodecBuilder.forServer().build())
                         }
                     })
         }
 
+        void setupH2c() {
+            scheme = 'http'
+
+            ChannelHandler responseStreamHandler = new ChannelInboundHandlerAdapter() {
+                @Override
+                void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+                    if (evt instanceof Http2FrameStreamEvent && evt.stream().id() == 1) {
+                        h2cResponseStream = evt.stream()
+                    }
+
+                    super.userEventTriggered(ctx, evt)
+                }
+            }
+            Http2FrameCodec frameCodec = Http2FrameCodecBuilder.forServer()
+                    .build()
+            HttpServerUpgradeHandler.UpgradeCodecFactory upgradeCodecFactory = protocol -> {
+                if (AsciiString.contentEquals("h2c", protocol)) {
+                    return new Http2ServerUpgradeCodec(frameCodec, responseStreamHandler)
+                } else {
+                    return null
+                }
+            }
+
+            HttpServerCodec sourceCodec = new HttpServerCodec()
+            serverChannel.pipeline()
+                    .addLast(new LoggingHandler(LogLevel.INFO))
+                    .addLast(sourceCodec)
+                    .addLast(new HttpServerUpgradeHandler(sourceCodec, upgradeCodecFactory, 1024))
+        }
+
         void exchangeSettings() {
             advance()
-            if (!(serverChannel.readInbound() instanceof Http2SettingsFrame)) {
-                throw new AssertionError()
+
+            def settings = serverChannel.readInbound()
+            if (!(settings instanceof Http2SettingsFrame)) {
+                throw new AssertionError(settings)
             }
-            if (!(serverChannel.readInbound() instanceof Http2SettingsAckFrame)) {
-                throw new AssertionError()
+            def ack = serverChannel.readInbound()
+            if (!(ack instanceof Http2SettingsAckFrame)) {
+                throw new AssertionError(ack)
             }
         }
 
@@ -406,6 +481,26 @@ class ConnectionManagerSpec extends Specification {
             def responseHeaders = new DefaultHttp2Headers()
             responseHeaders.add(Http2Headers.PseudoHeaderName.STATUS.value(), "200")
             serverChannel.writeOutbound(new DefaultHttp2HeadersFrame(responseHeaders, true).stream(stream))
+        }
+
+        Future<HttpResponse<?>> testExchangeRequest(HttpClient client) {
+            def future = Mono.from(client.exchange(scheme + '://example.com/foo')).toFuture()
+            future.exceptionally(t -> t.printStackTrace())
+            return future
+        }
+
+        void testExchangeResponse(Future<HttpResponse<?>> future) {
+            Http2HeadersFrame request = serverChannel.readInbound()
+            assert request.headers().get(Http2Headers.PseudoHeaderName.PATH.value()) == '/foo'
+            assert request.headers().get(Http2Headers.PseudoHeaderName.SCHEME.value()) == scheme
+            assert request.headers().get(Http2Headers.PseudoHeaderName.AUTHORITY.value()) == 'example.com'
+            assert request.headers().get(Http2Headers.PseudoHeaderName.METHOD.value()) == 'GET'
+
+            respondOk(request.stream())
+            advance()
+
+            def response = future.get()
+            assert response.status() == HttpStatus.OK
         }
     }
 }
