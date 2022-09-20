@@ -76,6 +76,11 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
     }
 
     @Override
+    public boolean isAbstract() {
+        return false;
+    }
+
+    @Override
     @NonNull
     public Set<Class<?>> getExposedTypes() {
         return ArrayUtils.isNotEmpty(exposedTypes) ?
