@@ -48,7 +48,8 @@ dependencies {
         exclude module: 'micronaut-inject'
         exclude module: 'micronaut-runtime'
     }
-
+    testImplementation libs.managed.javax.annotation.api
+    testImplementation libs.managed.snakeyaml
     testRuntimeOnly libs.javax.el.impl
     testRuntimeOnly libs.javax.el
 }

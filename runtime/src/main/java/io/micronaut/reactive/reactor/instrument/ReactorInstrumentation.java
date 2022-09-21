@@ -24,13 +24,13 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.scheduling.instrument.Instrumentation;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.micronaut.scheduling.instrument.ReactiveInvocationInstrumenterFactory;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Hooks;
 import reactor.core.publisher.Operators;
 import reactor.core.scheduler.Schedulers;
 
-import javax.annotation.PostConstruct;
-import javax.annotation.PreDestroy;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -50,7 +50,6 @@ class ReactorInstrumentation {
      *
      * @param instrumenterFactory The instrumenter factory
      */
-    @SuppressWarnings("unchecked")
     @PostConstruct
     void init(ReactorInstrumenterFactory instrumenterFactory) {
         if (instrumenterFactory.hasInstrumenters()) {
