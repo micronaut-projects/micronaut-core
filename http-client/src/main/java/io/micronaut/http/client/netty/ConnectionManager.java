@@ -1019,6 +1019,21 @@ class ConnectionManager {
         }
     }
 
+    private Http2FrameCodec makeFrameCodec() {
+        Http2FrameCodecBuilder builder = Http2FrameCodecBuilder.forClient();
+        configuration.getLogLevel().ifPresent(logLevel -> {
+            try {
+                final io.netty.handler.logging.LogLevel nettyLevel = io.netty.handler.logging.LogLevel.valueOf(
+                    logLevel.name()
+                );
+                builder.frameLogger(new Http2FrameLogger(nettyLevel, DefaultHttpClient.class));
+            } catch (IllegalArgumentException e) {
+                throw customizeException(new HttpClientException("Unsupported log level: " + logLevel));
+            }
+        });
+        return builder.build();
+    }
+
     private void removeReadTimeoutHandler(ChannelPipeline pipeline) {
         if (readTimeoutMillis != null && pipeline.context(ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT) != null) {
             pipeline.remove(ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT);
@@ -1402,7 +1417,7 @@ class ConnectionManager {
                         @Override
                         protected void configurePipeline(ChannelHandlerContext ctx, String protocol) {
                             if (ApplicationProtocolNames.HTTP_2.equals(protocol)) {
-                                ctx.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION, Http2FrameCodecBuilder.forClient().build());
+                                ctx.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION, makeFrameCodec());
                                 initHttp2(pool, ctx.channel(), channelCustomizer);
                                 ctx.pipeline().remove(initialErrorHandler);
                             } else if (ApplicationProtocolNames.HTTP_1_1.equals(protocol)) {
@@ -1502,7 +1517,7 @@ class ConnectionManager {
         protected void initChannel(Channel ch) throws Exception {
             NettyClientCustomizer connectionCustomizer = clientCustomizer.specializeForChannel(ch, NettyClientCustomizer.ChannelRole.CONNECTION);
 
-            Http2FrameCodec frameCodec = Http2FrameCodecBuilder.forClient().build();
+            Http2FrameCodec frameCodec = makeFrameCodec();
 
             HttpClientCodec sourceCodec = new HttpClientCodec();
             Http2ClientUpgradeCodec upgradeCodec = new Http2ClientUpgradeCodec(frameCodec,
