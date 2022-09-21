@@ -187,6 +187,18 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
     }
 
     @Override
+    protected String getDeclaringType(@NonNull AnnotatedNode element) {
+        if (element instanceof ClassNode) {
+            return ((ClassNode) element).getName();
+        }
+        final ClassNode declaringClass = element.getDeclaringClass();
+        if (declaringClass != null) {
+            return declaringClass.getName();
+        }
+        return null;
+    }
+
+    @Override
     protected String getElementAsString(AnnotatedNode element) {
         if (element instanceof ClassNode) {
             return ((ClassNode) element).getName();
@@ -203,6 +215,9 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
         }
         if (element instanceof Parameter) {
             return ((Parameter) element).getName();
+        }
+        if (element instanceof PropertyNode) {
+            return ((PropertyNode) element).getName();
         }
         throw new IllegalStateException("Cannot extract type name from: " + element.getClass().getName());
     }
@@ -315,7 +330,7 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
     @Override
     protected List<AnnotatedNode> buildHierarchy(AnnotatedNode element, boolean inheritTypeAnnotations, boolean declaredOnly) {
         if (declaredOnly) {
-            return Collections.singletonList(element);
+            return new ArrayList<>(Collections.singletonList(element));
         } else if (element instanceof ClassNode) {
             List<AnnotatedNode> hierarchy = new ArrayList<>();
             ClassNode cn = (ClassNode) element;
@@ -355,7 +370,7 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
             if (element == null) {
                 return new ArrayList<>();
             } else {
-                return Collections.singletonList(element);
+                return new ArrayList<>(Collections.singletonList(element));
             }
         }
     }

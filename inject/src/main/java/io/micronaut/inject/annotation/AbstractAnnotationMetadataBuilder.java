@@ -215,6 +215,30 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     /**
      * Build the meta data for the given element. If the element is a method the class metadata will be included.
      *
+     * @param owningType The owning type
+     * @param element    The element
+     * @return The {@link AnnotationMetadata}
+     */
+    public AnnotationMetadata buildForParameter(T owningType, T element) {
+        final AnnotationMetadata existing = lookupExisting(getElementAsString(owningType), getDeclaringType(element) + " " + getElementAsString(owningType));
+        if (existing != null) {
+            return existing;
+        }
+        DefaultAnnotationMetadata annotationMetadata = new MutableAnnotationMetadata();
+        try {
+            AnnotationMetadata metadata = buildInternal(null, element, annotationMetadata, true, false, true);
+            if (metadata.isEmpty()) {
+                return AnnotationMetadata.EMPTY_METADATA;
+            }
+            return metadata;
+        } catch (RuntimeException e) {
+            return metadataForError(e);
+        }
+    }
+
+    /**
+     * Build the meta data for the given element. If the element is a method the class metadata will be included.
+     *
      * @param element    The element
      * @return The {@link AnnotationMetadata}
      */
@@ -255,6 +279,15 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     protected abstract boolean isMethodOrClassElement(T element);
 
     /**
+     * Obtains the declaring type for an element.
+     *
+     * @param element The element
+     * @return The declaring type
+     */
+    @Nullable
+    protected abstract String getDeclaringType(@NonNull T element);
+
+    /**
      * Obtains the owning type name.
      *
      * @param element The element
@@ -280,109 +313,50 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     }
 
     /**
-     * Get the annotation metadata for the given element and the given parent.
-     * This method is used for cases when you need to combine annotation metadata for
-     * two elements, for example a JavaBean property where the field and the method metadata
-     * need to be combined.
+     * Build the meta data for the given parents and method element excluding any class metadata.
      *
-     * @param parent  The parent element
-     * @param element The element
+     * @param parents        The parent elements
+     * @param element        The element
      * @return The {@link AnnotationMetadata}
      */
-    public AnnotationMetadata buildForParent(T parent, T element) {
-        return buildForParents(parent == null ? Collections.emptyList() : Collections.singletonList(parent), element);
-    }
-
-    /**
-     * Get the annotation metadata for the given element and the given parents.
-     * This method is used for cases when you need to combine annotation metadata for
-     * two elements, for example a JavaBean property where the field and the method metadata
-     * need to be combined.
-     *
-     * @param parents The parent elements
-     * @param element The element
-     * @return The {@link AnnotationMetadata}
-     */
-    public AnnotationMetadata buildForParents(List<T> parents, T element) {
-        String declaringType = getElementAsString(element);
-        return buildForParents(declaringType, parents, element);
+    public AnnotationMetadata buildCombinedNoCache(List<T> parents, T element) {
+        DefaultAnnotationMetadata annotationMetadata = new MutableAnnotationMetadata();
+        return buildInternalMulti(parents, element, annotationMetadata, false, false, true);
     }
 
     /**
      * Build the meta data for the given parent and method element excluding any class metadata.
      *
-     * @param declaringType The declaring type
      * @param parent        The parent element
      * @param element       The element
      * @return The {@link AnnotationMetadata}
      */
-    public AnnotationMetadata buildForParent(String declaringType, T parent, T element) {
-        return buildForParents(declaringType,
-                               parent == null ? Collections.emptyList() : Collections.singletonList(parent),
-                               element);
+    public AnnotationMetadata buildCombinedNoCache(T parent, T element) {
+        return buildCombinedNoCache(parent, element, false);
     }
 
     /**
-     * Build the meta data for the given parents and method element excluding any class metadata.
-     *
-     * @param owningTypeName The owning type name
-     * @param parents        The parent elements
-     * @param element        The element
-     * @return The {@link AnnotationMetadata}
-     */
-    public AnnotationMetadata buildForParents(String owningTypeName, List<T> parents, T element) {
-        System.out.println("buildForParents " + owningTypeName + " " + getElementAsString(element));
-
-        final AnnotationMetadata existing = lookupExisting(owningTypeName, getElementAsString(element));
-        DefaultAnnotationMetadata annotationMetadata;
-        if (existing instanceof DefaultAnnotationMetadata) {
-            // ugly, but will have to do
-            annotationMetadata = ((DefaultAnnotationMetadata) existing).clone();
-            if (parents.isEmpty()) {
-                // Don't need to do anything with existing
-                return annotationMetadata;
-            }
-        } else if (existing instanceof AnnotationMetadataHierarchy) {
-            final AnnotationMetadata declaredMetadata = ((AnnotationMetadataHierarchy) existing).getDeclaredMetadata();
-            if (declaredMetadata instanceof DefaultAnnotationMetadata) {
-                annotationMetadata = ((DefaultAnnotationMetadata) declaredMetadata).clone();
-            } else {
-                annotationMetadata = new MutableAnnotationMetadata();
-            }
-            if (parents.isEmpty()) {
-                // Don't need to do anything with existing
-                return annotationMetadata;
-            }
-        } else {
-            annotationMetadata = new MutableAnnotationMetadata();
-        }
-        return buildInternalMulti(parents, element, annotationMetadata, false, false, true);
-    }
-
-    /**
-     * Build the meta data for the given method element excluding any class metadata.
+     * Build the metadata for the given method element excluding any class metadata.
      *
      * @param parent                 The parent element
      * @param element                The element
      * @param inheritTypeAnnotations Whether to inherit annotations from type as stereotypes
      * @return The {@link AnnotationMetadata}
      */
-    public AnnotationMetadata buildForParent(T parent, T element, boolean inheritTypeAnnotations) {
-        final AnnotationMetadata existing = null;
-        DefaultAnnotationMetadata annotationMetadata;
-        if (existing instanceof DefaultAnnotationMetadata) {
-            // ugly, but will have to do
-            annotationMetadata = ((DefaultAnnotationMetadata) existing).clone();
-        } else if (existing instanceof AnnotationMetadataHierarchy) {
-            final AnnotationMetadata declaredMetadata = existing.getDeclaredMetadata();
-            if (declaredMetadata instanceof DefaultAnnotationMetadata) {
-                annotationMetadata = ((DefaultAnnotationMetadata) declaredMetadata).clone();
-            } else {
-                annotationMetadata = new MutableAnnotationMetadata();
-            }
-        } else {
-            annotationMetadata = new MutableAnnotationMetadata();
-        }
+    public AnnotationMetadata buildCombinedNoCache(T parent, T element, boolean inheritTypeAnnotations) {
+        final DefaultAnnotationMetadata annotationMetadata = new MutableAnnotationMetadata();
+        return buildInternal(parent, element, annotationMetadata, inheritTypeAnnotations, false, true);
+    }
+
+    /**
+     * Build the metadata for the given method element excluding any class metadata.
+     *
+     * @param parent                 The parent element
+     * @param element                The element
+     * @param inheritTypeAnnotations Whether to inherit annotations from type as stereotypes
+     * @return The {@link AnnotationMetadata}
+     */
+    public AnnotationMetadata buildCombinedNoCache(DefaultAnnotationMetadata annotationMetadata, T parent, T element, boolean inheritTypeAnnotations) {
         return buildInternal(parent, element, annotationMetadata, inheritTypeAnnotations, false, true);
     }
 
@@ -1048,14 +1022,13 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         }
     }
 
-    private AnnotationMetadata lookupExisting(String declaringType, String elementAsString) {
-        AnnotationMetadata annotationMetadata = MUTATED_ANNOTATION_METADATA.get(new MetadataKey(declaringType, elementAsString));
-        System.out.println("GET " + declaringType + " " + elementAsString);
-        if (annotationMetadata != null) {
-            System.out.println("vv " + annotationMetadata.getAnnotationNames());
-        }
+    @Nullable
+    public AnnotationMetadata lookupExisting(T declaringType, T element) {
+        return lookupExisting(getElementAsString(declaringType), getElementAsString(element));
+    }
 
-        return annotationMetadata;
+    private AnnotationMetadata lookupExisting(String declaringType, String elementAsString) {
+        return MUTATED_ANNOTATION_METADATA.get(new MetadataKey(declaringType, elementAsString));
     }
 
     private void processAnnotationAlias(
@@ -2188,7 +2161,6 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     @Internal
     public void addMutatedMetadata(T owningType, T element, AnnotationMetadata metadata) {
         if (element != null && metadata != null) {
-            System.out.println("PUT " + getElementAsString(owningType) + " " + getElementAsString(element));
             MUTATED_ANNOTATION_METADATA.put(new MetadataKey(getElementAsString(owningType), getElementAsString(element)), metadata);
         }
     }
@@ -2458,11 +2430,11 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @param <T> the element type
      */
     private static class MetadataKey<T> {
-        final String declaringName;
+        final String owningTypeName;
         final String element;
 
-        MetadataKey(String declaringName, String element) {
-            this.declaringName = declaringName;
+        MetadataKey(String owningTypeName, String element) {
+            this.owningTypeName = owningTypeName;
             this.element = element;
         }
 
@@ -2475,13 +2447,13 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 return false;
             }
             MetadataKey that = (MetadataKey) o;
-            return declaringName.equals(that.declaringName) &&
+            return owningTypeName.equals(that.owningTypeName) &&
                     element.equals(that.element);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(declaringName, element);
+            return Objects.hash(owningTypeName, element);
         }
     }
 

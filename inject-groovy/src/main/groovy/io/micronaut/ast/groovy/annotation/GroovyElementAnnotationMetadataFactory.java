@@ -5,6 +5,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.ast.AbstractElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementAnnotationMetadata;
+import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
 import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.AnnotationNode;
 
@@ -12,6 +13,11 @@ public class GroovyElementAnnotationMetadataFactory extends AbstractElementAnnot
 
     public GroovyElementAnnotationMetadataFactory(boolean isReadOnly, GroovyAnnotationMetadataBuilder metadataBuilder) {
         super(isReadOnly, metadataBuilder);
+    }
+
+    @Override
+    public ElementAnnotationMetadataFactory readOnly() {
+        return new GroovyElementAnnotationMetadataFactory(true, (GroovyAnnotationMetadataBuilder) metadataBuilder);
     }
 
     @Override

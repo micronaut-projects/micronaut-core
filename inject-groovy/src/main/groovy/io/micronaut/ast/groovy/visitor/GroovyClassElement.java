@@ -15,7 +15,6 @@
  */
 package io.micronaut.ast.groovy.visitor;
 
-import io.micronaut.ast.groovy.annotation.GroovyElementAnnotationMetadataFactory;
 import io.micronaut.ast.groovy.utils.AstClassUtils;
 import io.micronaut.ast.groovy.utils.AstGenericUtils;
 import io.micronaut.ast.groovy.utils.PublicMethodVisitor;
@@ -541,7 +540,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
             for (Map.Entry<String, ClassNode> entry : forType.entrySet()) {
                 ClassNode classNode = entry.getValue();
 
-                ClassElement rawElement = new GroovyClassElement(visitorContext, classNode, resolveElementAnnotationMetadataFactory());
+                ClassElement rawElement = new GroovyClassElement(visitorContext, classNode, resolveElementAnnotationMetadataFactory(classNode));
                 if (thisSpec != null) {
                     rawElement = getGenericElement(sourceUnit, classNode, rawElement, thisSpec);
                 }
@@ -563,7 +562,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
         genericInfo.forEach((name, generics) -> {
             Map<String, ClassElement> resolved = new LinkedHashMap<>(generics.size());
             generics.forEach((variable, type) -> {
-                resolved.put(variable, new GroovyClassElement(visitorContext, type, resolveElementAnnotationMetadataFactory()));
+                resolved.put(variable, new GroovyClassElement(visitorContext, type, resolveElementAnnotationMetadataFactory(classNode)));
             });
             results.put(name, resolved);
         });
@@ -596,7 +595,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                             typeArgumentMap.put(redirectType.getName(), new GroovyClassElement(
                                 visitorContext,
                                 cn,
-                                resolveElementAnnotationMetadataFactory(),
+                                resolveElementAnnotationMetadataFactory(cn),
                                 Collections.singletonMap(cn.getName(), newInfo),
                                 cn.isArray() ? computeDimensions(cn) : 0,
                                 true
@@ -614,7 +613,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                         typeArgumentMap.put(redirectType.getName(), new GroovyClassElement(
                             visitorContext,
                             type,
-                            resolveElementAnnotationMetadataFactory(),
+                            resolveElementAnnotationMetadataFactory(type),
                             Collections.emptyMap(),
                             type.isArray() ? computeDimensions(type) : 0
                         ));
@@ -633,7 +632,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                         typeArgumentMap.put(gt.getName(), new GroovyClassElement(
                             visitorContext,
                             cn,
-                            resolveElementAnnotationMetadataFactory(),
+                            resolveElementAnnotationMetadataFactory(cn),
                             Collections.singletonMap(cn.getName(), newInfo),
                             cn.isArray() ? computeDimensions(cn) : 0
                         ));
@@ -649,7 +648,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
             Map<String, ClassElement> map = new LinkedHashMap<>(spec.size());
             for (Map.Entry<String, ClassNode> entry : spec.entrySet()) {
                 ClassNode cn = entry.getValue();
-                map.put(entry.getKey(), new GroovyClassElement(visitorContext, cn, resolveElementAnnotationMetadataFactory()));
+                map.put(entry.getKey(), new GroovyClassElement(visitorContext, cn, resolveElementAnnotationMetadataFactory(cn)));
             }
             return Collections.unmodifiableMap(map);
         }
@@ -836,7 +835,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     }
 
     protected final ClassElement toClassElement(ClassNode classNode) {
-        return visitorContext.getElementFactory().newClassElement(classNode, GroovyElementAnnotationMetadataFactory.EMPTY);
+        return visitorContext.getElementFactory().newClassElement(classNode, emptyAnnotationsForNativeType(classNode));
     }
 
     @NonNull
@@ -982,7 +981,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                             getterAndSetter.getter = node;
                             if (getterAndSetter.setter != null) {
                                 ClassNode typeMirror = getterAndSetter.setter.getParameters()[0].getType();
-                                ClassElement setterParameterType = visitorContext.getElementFactory().newClassElement(typeMirror, GroovyElementAnnotationMetadataFactory.EMPTY);
+                                ClassElement setterParameterType = visitorContext.getElementFactory().newClassElement(typeMirror, emptyAnnotationsForNativeType(classNode));
                                 if (!setterParameterType.getName().equals(getterReturnType.getName())) {
                                     getterAndSetter.setter = null; // not a compatible setter
                                 }
@@ -993,7 +992,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                                 return;
                             }
                             ClassNode typeMirror = node.getParameters()[0].getType();
-                            ClassElement setterParameterType = visitorContext.getElementFactory().newClassElement(typeMirror, GroovyElementAnnotationMetadataFactory.EMPTY);
+                            ClassElement setterParameterType = visitorContext.getElementFactory().newClassElement(typeMirror, emptyAnnotationsForNativeType(classNode));
 
                             GetterAndSetter getterAndSetter = props.computeIfAbsent(propertyName, GetterAndSetter::new);
                             configureDeclaringType(declaringTypeElement, getterAndSetter);

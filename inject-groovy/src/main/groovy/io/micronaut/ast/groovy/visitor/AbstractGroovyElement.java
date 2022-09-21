@@ -69,7 +69,7 @@ public abstract class AbstractGroovyElement implements AnnotationMetadataDelegat
     protected final CompilationUnit compilationUnit;
     protected final GroovyVisitorContext visitorContext;
     protected final ElementAnnotationMetadataFactory elementAnnotationMetadataFactory;
-    private final ElementAnnotationMetadata elementAnnotationMetadata;
+    private ElementAnnotationMetadata elementAnnotationMetadata;
     private final AnnotatedNode annotatedNode;
 
     /**
@@ -86,21 +86,19 @@ public abstract class AbstractGroovyElement implements AnnotationMetadataDelegat
         this.compilationUnit = visitorContext.getCompilationUnit();
         this.annotatedNode = annotatedNode;
         this.elementAnnotationMetadataFactory = annotationMetadataFactory;
-        this.elementAnnotationMetadata = annotationMetadataFactory.build(this);
         this.sourceUnit = visitorContext.getSourceUnit();
+    }
+
+    private ElementAnnotationMetadata getElementAnnotationMetadata() {
+        if (elementAnnotationMetadata == null) {
+            elementAnnotationMetadata = elementAnnotationMetadataFactory.build(this);
+        }
+        return elementAnnotationMetadata;
     }
 
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
-        return elementAnnotationMetadata.get();
-    }
-
-    SourceUnit getSourceUnit() {
-        return sourceUnit;
-    }
-
-    CompilationUnit getCompilationUnit() {
-        return compilationUnit;
+        return getElementAnnotationMetadata().get();
     }
 
     @Override
@@ -116,37 +114,37 @@ public abstract class AbstractGroovyElement implements AnnotationMetadataDelegat
     @CompileStatic
     @Override
     public <T extends Annotation> Element annotate(@NonNull String annotationType, @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
-        elementAnnotationMetadata.annotate(annotationType, consumer);
+        getElementAnnotationMetadata().annotate(annotationType, consumer);
         return this;
     }
 
     @Override
     public <T extends Annotation> Element annotate(AnnotationValue<T> annotationValue) {
-        elementAnnotationMetadata.annotate(annotationValue);
+        getElementAnnotationMetadata().annotate(annotationValue);
         return this;
     }
 
     @Override
     public Element removeAnnotation(@NonNull String annotationType) {
-        elementAnnotationMetadata.removeAnnotation(annotationType);
+        getElementAnnotationMetadata().removeAnnotation(annotationType);
         return this;
     }
 
     @Override
     public <T extends Annotation> Element removeAnnotationIf(@NonNull Predicate<AnnotationValue<T>> predicate) {
-        elementAnnotationMetadata.removeAnnotationIf(predicate);
+        getElementAnnotationMetadata().removeAnnotationIf(predicate);
         return this;
     }
 
     @Override
     public Element removeStereotype(@NonNull String annotationType) {
-        elementAnnotationMetadata.removeStereotype(annotationType);
+        getElementAnnotationMetadata().removeStereotype(annotationType);
         return this;
     }
 
     @Override
     public Element replaceAnnotations(AnnotationMetadata annotationMetadata) {
-        this.elementAnnotationMetadata.replaceAnnotations(annotationMetadata);
+        this.getElementAnnotationMetadata().replaceAnnotations(annotationMetadata);
         return this;
     }
 
@@ -345,6 +343,10 @@ public abstract class AbstractGroovyElement implements AnnotationMetadataDelegat
         if (visitorContext.getConfiguration().includeTypeLevelAnnotationsInGenericArguments()) {
             return elementAnnotationMetadataFactory;
         }
+        return emptyAnnotationsForNativeType(nativeType);
+    }
+
+    protected ElementAnnotationMetadataFactory emptyAnnotationsForNativeType(Object nativeType) {
         return elementAnnotationMetadataFactory.overrideForNativeType(nativeType, element -> elementAnnotationMetadataFactory.build(element, AnnotationMetadata.EMPTY_METADATA));
     }
 

@@ -94,7 +94,7 @@ class AnnotatedFieldWithSetter {
             it.kind == ElementKind.FIELD && it.simpleName.contentEquals(expectedFieldName)
         }
 
-        argument != null ? builder.buildForParent(field, argument) : null
+        argument != null ? builder.buildCombinedNoCache(field, argument) : null
     }
 
 }

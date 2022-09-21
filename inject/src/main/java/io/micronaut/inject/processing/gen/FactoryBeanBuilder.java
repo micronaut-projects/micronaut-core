@@ -85,7 +85,6 @@ public class FactoryBeanBuilder extends SimpleBeanBuilder {
 
                     if (element1 instanceof MethodElement) {
                         MethodElement methodElement = (MethodElement) element1;
-
                         if (isAopProxy && visitAopMethod(visitor, methodElement)) {
                             return;
                         }
@@ -118,14 +117,17 @@ public class FactoryBeanBuilder extends SimpleBeanBuilder {
     private AnnotationMetadata createProducedTypeAnnotationMetadata(ClassElement producedType, MemberElement producingElement) {
         // Original logic is to combine producing element annotation metadata (method or field) with the produced type's annotation metadata
         AbstractAnnotationMetadataBuilder annotationMetadataBuilder = visitorContext.getAnnotationMetadataBuilder();
-        AnnotationMetadata producedAnnotationMetadata = annotationMetadataBuilder.buildForParent(
+        MutableAnnotationMetadata producedAnnotationMetadata = ((MutableAnnotationMetadata) getElementAnnotationMetadata(producingElement)).clone();
+        producedAnnotationMetadata = (MutableAnnotationMetadata) annotationMetadataBuilder.buildCombinedNoCache(
+            producedAnnotationMetadata,
+            null,
             producedType.getNativeType(),
-            producingElement.getNativeType()
+            false
         );
         AnnotationMetadata producedTypeAnnotationMetadata = producedType.getAnnotationMetadata();
         AnnotationMetadata elementAnnotationMetadata = getElementAnnotationMetadata(producingElement);
 
-        cleanupScopeAndQualifierAnnotations((MutableAnnotationMetadata) producedAnnotationMetadata, producedTypeAnnotationMetadata, elementAnnotationMetadata);
+        cleanupScopeAndQualifierAnnotations(producedAnnotationMetadata, producedTypeAnnotationMetadata, elementAnnotationMetadata);
         return producedAnnotationMetadata;
     }
 
@@ -162,15 +164,15 @@ public class FactoryBeanBuilder extends SimpleBeanBuilder {
                 throw new ProcessingException(producingElement, "Cannot apply AOP advice to final class. Class must be made non-final to support proxying: " + producedType.getName());
             }
 
-            MethodElement constructor = producedType.getPrimaryConstructor().orElse(null);
-            if (!producedType.isInterface() && constructor != null && constructor.getParameters().length > 0) {
+            MethodElement constructorElement = producedType.getPrimaryConstructor().orElse(null);
+            if (!producedType.isInterface() && constructorElement != null && constructorElement.getParameters().length > 0) {
                 final String proxyTargetMode = producedAnnotationMetadata.stringValue(AnnotationUtil.ANN_AROUND, "proxyTargetMode").orElse("ERROR");
                 switch (proxyTargetMode) {
                     case "ALLOW":
-                        allowProxyConstruction(constructor);
+                        allowProxyConstruction(constructorElement);
                         break;
                     case "WARN":
-                        allowProxyConstruction(constructor);
+                        allowProxyConstruction(constructorElement);
                         visitorContext.warn("The produced type of a @Factory method has constructor arguments and is proxied. " +
                             "This can lead to unexpected behaviour. See the javadoc for Around.ProxyTargetConstructorMode for more information: " + producingElement.getName(), producingElement);
                         break;
@@ -179,12 +181,9 @@ public class FactoryBeanBuilder extends SimpleBeanBuilder {
                         throw new ProcessingException(producingElement, "The produced type from a factory which has AOP proxy advice specified must define an accessible no arguments constructor. " +
                             "Proxying types with constructor arguments can lead to unexpected behaviour. See the javadoc for for Around.ProxyTargetConstructorMode for more information and possible solutions: " + producingElement.getName());
                 }
-
             }
 
             BeanDefinitionVisitor aopProxyWriter = aopHelper.createAroundAopProxyWriter(producedBeanDefinitionWriter, producedAnnotationMetadata, metadataBuilder, visitorContext, true);
-
-            MethodElement constructorElement = producedType.getPrimaryConstructor().orElse(null);
             if (constructorElement != null) {
                 aopProxyWriter.visitBeanDefinitionConstructor(constructorElement, constructorElement.isReflectionRequired(), visitorContext);
             } else {

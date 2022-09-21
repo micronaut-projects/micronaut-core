@@ -18,6 +18,7 @@ import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.ast.ElementFactory;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
@@ -274,61 +275,58 @@ public abstract class AbstractBeanBuilder {
     }
 
     public static void methodAnnotationsGuard(VisitorContext visitorContext, MethodElement methodElement, Consumer<MethodElement> consumer) {
-//        ElementFactory elementFactory = visitorContext.getElementFactory();
-//        // Because of the shared method's annotation cache we need to make a copy of the method.
-//        // The method is going to be stored in the visitor till the write process
-//        // We need to make sure we don't reuse the same instance for other adapters, and we don't override
-//        // added annotations.
-//        MethodElement targetMethod = elementFactory.newMethodElement(
-//            methodElement.getOwningType(),
-//            methodElement.getNativeType(),
-//            visitorContext.getElementAnnotationMetadataFactory().readOnly()
-//        );
-//        consumer.accept(targetMethod);
-//        // Previous modifications will modify the shared annotation cache of this method
-//        // We need to put original values into the cache
-//        methodElement.replaceAnnotations(methodElement.getAnnotationMetadata());
-        consumer.accept(methodElement);
+        ElementFactory elementFactory = visitorContext.getElementFactory();
+        // Because of the shared method's annotation cache we need to make a copy of the method.
+        // The method is going to be stored in the visitor till the write process
+        // We need to make sure we don't reuse the same instance for other adapters, and we don't override
+        // added annotations.
+        MethodElement targetMethod = elementFactory.newMethodElement(
+            methodElement.getOwningType(),
+            methodElement.getNativeType(),
+            visitorContext.getElementAnnotationMetadataFactory().readOnly()
+        );
+        consumer.accept(targetMethod);
+        // Previous modifications will modify the shared annotation cache of this method
+        // We need to put original values into the cache
+        methodElement.replaceAnnotations(methodElement.getAnnotationMetadata());
     }
 
     public static void fieldAnnotationsGuard(VisitorContext visitorContext, FieldElement fieldElement, Consumer<FieldElement> consumer) {
-        consumer.accept(fieldElement);
-//        ElementFactory elementFactory = visitorContext.getElementFactory();
-//        // Because of the shared method's annotation cache we need to make a copy of the method.
-//        // The method is going to be stored in the visitor till the write process
-//        // We need to make sure we don't reuse the same instance for other adapters, and we don't override
-//        // added annotations.
-//        FieldElement targetField = elementFactory.newFieldElement(
-//            fieldElement.getOwningType(),
-//            fieldElement.getNativeType(),
-//            visitorContext.getElementAnnotationMetadataFactory().readOnly()
-//        );
-//        consumer.accept(targetField);
-//        // Previous modifications will modify the shared annotation cache of this method
-//        // We need to put original values into the cache
-//        fieldElement.replaceAnnotations(fieldElement.getAnnotationMetadata());
+        ElementFactory elementFactory = visitorContext.getElementFactory();
+        // Because of the shared method's annotation cache we need to make a copy of the method.
+        // The method is going to be stored in the visitor till the write process
+        // We need to make sure we don't reuse the same instance for other adapters, and we don't override
+        // added annotations.
+        FieldElement targetField = elementFactory.newFieldElement(
+            fieldElement.getOwningType(),
+            fieldElement.getNativeType(),
+            visitorContext.getElementAnnotationMetadataFactory().readOnly()
+        );
+        consumer.accept(targetField);
+        // Previous modifications will modify the shared annotation cache of this method
+        // We need to put original values into the cache
+        fieldElement.replaceAnnotations(fieldElement.getAnnotationMetadata());
     }
 
     public static void classAnnotationsGuard(VisitorContext visitorContext, ClassElement classElement, Consumer<ClassElement> consumer) {
-        consumer.accept(classElement);
-//        if (classElement.isPrimitive()) {
-//            consumer.accept(classElement);
-//            return;
-//        }
-//        ElementFactory elementFactory = visitorContext.getElementFactory();
-//        // Because of the shared method's annotation cache we need to make a copy of the class.
-//        // The class is going to be stored in the visitor till the write process
-//        // We need to make sure we don't reuse the same instance for other adapters, and we don't override
-//        // added annotations.
-//        ClassElement newClassElement = elementFactory.newClassElement(
-//            classElement.getNativeType(),
-//            visitorContext.getElementAnnotationMetadataFactory().readOnly(),
-//            classElement.getTypeArguments()
-//        );
-//        consumer.accept(newClassElement);
-//        // Previous modifications will modify the shared annotation cache of this class
-//        // We need to put original values into the cache
-//        classElement.replaceAnnotations(classElement.getAnnotationMetadata());
+        if (classElement.isPrimitive()) {
+            consumer.accept(classElement);
+            return;
+        }
+        ElementFactory elementFactory = visitorContext.getElementFactory();
+        // Because of the shared method's annotation cache we need to make a copy of the class.
+        // The class is going to be stored in the visitor till the write process
+        // We need to make sure we don't reuse the same instance for other adapters, and we don't override
+        // added annotations.
+        ClassElement newClassElement = elementFactory.newClassElement(
+            classElement.getNativeType(),
+            visitorContext.getElementAnnotationMetadataFactory().readOnly(),
+            classElement.getTypeArguments()
+        );
+        consumer.accept(newClassElement);
+        // Previous modifications will modify the shared annotation cache of this class
+        // We need to put original values into the cache
+        classElement.replaceAnnotations(classElement.getAnnotationMetadata());
     }
 
 }

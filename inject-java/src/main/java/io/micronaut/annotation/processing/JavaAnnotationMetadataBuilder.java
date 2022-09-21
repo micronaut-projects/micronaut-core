@@ -227,6 +227,16 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
         return element instanceof TypeElement || element instanceof ExecutableElement;
     }
 
+    @NonNull
+    @Override
+    protected String getDeclaringType(@NonNull Element element) {
+        TypeElement typeElement = modelUtils.classElementFor(element);
+        if (typeElement != null) {
+            return typeElement.getQualifiedName().toString();
+        }
+        return element.getSimpleName().toString();
+    }
+
     @Override
     protected String getElementAsString(Element element) {
         if (element instanceof ExecutableElement) {

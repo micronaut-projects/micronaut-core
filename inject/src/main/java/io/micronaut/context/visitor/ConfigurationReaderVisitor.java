@@ -156,7 +156,7 @@ public class ConfigurationReaderVisitor implements TypeElementVisitor<Configurat
             method.getAnnotationMetadata().stringValue(Bindable.class, "defaultValue").orElse(null)
         ).getPath();
 
-        method.annotate(Property.class, (builder) -> builder.member("name", path)).getAnnotationMetadata();
+        method.annotate(Property.class, (builder) -> builder.member("name", path));
 
         method.annotate(ANN_CONFIGURATION_ADVICE, (annBuilder) -> {
             if (!method.getReturnType().isPrimitive() && method.getReturnType().hasStereotype(AnnotationUtil.SCOPE)) {

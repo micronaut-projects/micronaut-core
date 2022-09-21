@@ -43,7 +43,7 @@ final class GroovyWildcardElement extends GroovyClassElement implements Wildcard
         super(
             upperBounds.get(0).visitorContext,
             upperBounds.get(0).classNode,
-            annotationMetadataFactory.readOnly(upperBounds.get(0).getAnnotationMetadata()),
+            annotationMetadataFactory,
             upperBounds.get(0).getGenericTypeInfo(),
             0
         );
