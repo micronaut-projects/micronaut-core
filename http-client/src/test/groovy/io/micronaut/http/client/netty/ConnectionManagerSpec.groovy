@@ -1,12 +1,15 @@
 package io.micronaut.http.client.netty
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.event.BeanCreatedEvent
+import io.micronaut.context.event.BeanCreatedEventListener
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.HttpVersion
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.StreamingHttpClient
+import io.micronaut.http.netty.channel.ChannelPipelineCustomizer
 import io.micronaut.http.server.netty.ssl.CertificateProvidedSslBuilder
 import io.micronaut.http.ssl.SslConfiguration
 import io.netty.buffer.ByteBufAllocator
@@ -49,6 +52,7 @@ import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler
 import io.netty.handler.ssl.SslContextBuilder
 import io.netty.handler.ssl.util.SelfSignedCertificate
 import io.netty.util.AsciiString
+import jakarta.inject.Singleton
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import spock.lang.Specification
@@ -92,7 +96,6 @@ class ConnectionManagerSpec extends Specification {
     }
 
     def 'http2 streaming get'() {
-        given:
         def ctx = ApplicationContext.run([
                 'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
         ])
@@ -102,37 +105,9 @@ class ConnectionManagerSpec extends Specification {
         conn.setupHttp2Tls()
         patch(client, conn.clientChannel)
 
-        when:
-        def responseData = new ArrayDeque<String>()
-        def responseComplete = false
-        Flux.from(client.dataStream(HttpRequest.GET('https://example.com/foo')))
-            .doOnError(t -> t.printStackTrace())
-            .doOnComplete(() -> responseComplete = true)
-            .subscribe(b -> responseData.add(b.toString(StandardCharsets.UTF_8)))
+        def r1 = conn.testStreamingRequest(client)
         conn.exchangeSettings()
-        then:
-        Http2HeadersFrame request = conn.serverChannel.readInbound()
-        request.headers().get(Http2Headers.PseudoHeaderName.PATH.value()) == '/foo'
-        request.headers().get(Http2Headers.PseudoHeaderName.SCHEME.value()) == 'https'
-        request.headers().get(Http2Headers.PseudoHeaderName.AUTHORITY.value()) == 'example.com'
-        request.headers().get(Http2Headers.PseudoHeaderName.METHOD.value()) == 'GET'
-
-        when:
-        def responseHeaders = new DefaultHttp2Headers()
-        responseHeaders.add(Http2Headers.PseudoHeaderName.STATUS.value(), "200")
-        conn.serverChannel.writeOutbound(new DefaultHttp2HeadersFrame(responseHeaders, false).stream(request.stream()))
-        conn.serverChannel.writeOutbound(new DefaultHttp2DataFrame(Unpooled.wrappedBuffer('foo'.bytes)).stream(request.stream()))
-        conn.advance()
-        then:
-        responseData.poll() == 'foo'
-        !responseComplete
-
-        when:
-        conn.serverChannel.writeOutbound(new DefaultHttp2DataFrame(Unpooled.wrappedBuffer('bar'.bytes), true).stream(request.stream()))
-        conn.advance()
-        then:
-        responseData.poll() == 'bar'
-        responseComplete
+        conn.testStreamingResponse(r1)
 
         cleanup:
         client.close()
@@ -298,6 +273,102 @@ class ConnectionManagerSpec extends Specification {
         conn.testStreaming(client)
         conn.testExchange(client)
         conn.testStreaming(client)
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
+    def 'http1 plain text customization'() {
+        given:
+        def ctx = ApplicationContext.run()
+        def client = ctx.getBean(DefaultHttpClient)
+        def tracker = ctx.getBean(CustomizerTracker)
+
+        def conn = new EmbeddedTestConnectionHttp1()
+        conn.setupHttp1()
+        patch(client, conn.clientChannel)
+
+        when:
+        conn.testExchange(client)
+        conn.testStreaming(client)
+
+        then:
+        def outerChannel = tracker.initialPipelineBuilt.poll()
+        outerChannel.channel == conn.clientChannel
+        outerChannel.handlerNames.contains(ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC)
+        outerChannel.handlerNames.contains(ChannelPipelineCustomizer.HANDLER_HTTP_DECODER)
+        !outerChannel.handlerNames.contains(ChannelPipelineCustomizer.HANDLER_HTTP_AGGREGATOR)
+        !outerChannel.handlerNames.contains(ChannelPipelineCustomizer.HANDLER_HTTP_STREAM)
+        tracker.initialPipelineBuilt.isEmpty()
+
+        def innerChannel = tracker.streamPipelineBuilt.poll()
+        innerChannel.channel == conn.clientChannel
+        innerChannel.handlerNames == outerChannel.handlerNames
+        tracker.streamPipelineBuilt.isEmpty()
+
+        def req1Channel = tracker.requestPipelineBuilt.poll()
+        req1Channel.channel == conn.clientChannel
+        req1Channel.handlerNames.contains(ChannelPipelineCustomizer.HANDLER_HTTP_AGGREGATOR)
+        req1Channel.handlerNames.contains(ChannelPipelineCustomizer.HANDLER_MICRONAUT_FULL_HTTP_RESPONSE)
+
+        def req2Channel = tracker.requestPipelineBuilt.poll()
+        req2Channel.channel == conn.clientChannel
+        req2Channel.handlerNames.contains(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE_FULL)
+        req2Channel.handlerNames.contains(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE_STREAM)
+
+        tracker.requestPipelineBuilt.isEmpty()
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
+    def 'http2 alpn customization'() {
+        given:
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+        def tracker = ctx.getBean(CustomizerTracker)
+
+        def conn = new EmbeddedTestConnectionHttp2()
+        conn.setupHttp2Tls()
+        patch(client, conn.clientChannel)
+
+        when:
+        def r1 = conn.testExchangeRequest(client)
+        conn.exchangeSettings()
+        conn.testExchangeResponse(r1)
+
+        def r2 = conn.testStreamingRequest(client)
+        conn.testStreamingResponse(r2)
+
+        then:
+        def outerChannel = tracker.initialPipelineBuilt.poll()
+        outerChannel.channel == conn.clientChannel
+        outerChannel.handlerNames.contains(ChannelPipelineCustomizer.HANDLER_SSL)
+        !outerChannel.handlerNames.contains(ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION)
+        tracker.initialPipelineBuilt.isEmpty()
+
+        def innerChannel = tracker.streamPipelineBuilt.poll()
+        innerChannel.channel == conn.clientChannel
+        innerChannel.handlerNames.contains(ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION)
+        tracker.streamPipelineBuilt.isEmpty()
+
+        def req1Channel = tracker.requestPipelineBuilt.poll()
+        req1Channel.role == NettyClientCustomizer.ChannelRole.HTTP2_STREAM
+        req1Channel.channel !== conn.clientChannel
+        req1Channel.handlerNames.contains(ChannelPipelineCustomizer.HANDLER_HTTP_AGGREGATOR)
+        req1Channel.handlerNames.contains(ChannelPipelineCustomizer.HANDLER_MICRONAUT_FULL_HTTP_RESPONSE)
+
+        def req2Channel = tracker.requestPipelineBuilt.poll()
+        req2Channel.role == NettyClientCustomizer.ChannelRole.HTTP2_STREAM
+        req2Channel.channel !== conn.clientChannel
+        req2Channel.handlerNames.contains(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE_FULL)
+        req2Channel.handlerNames.contains(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE_STREAM)
+
+        tracker.requestPipelineBuilt.isEmpty()
 
         cleanup:
         client.close()
@@ -501,6 +572,93 @@ class ConnectionManagerSpec extends Specification {
 
             def response = future.get()
             assert response.status() == HttpStatus.OK
+        }
+
+        Queue<String> testStreamingRequest(StreamingHttpClient client) {
+            def responseData = new ArrayDeque<String>()
+            Flux.from(client.dataStream(HttpRequest.GET(scheme + '://example.com/foo')))
+                    .doOnError(t -> t.printStackTrace())
+                    .doOnComplete(() -> responseData.add("END"))
+                    .subscribe(b -> responseData.add(b.toString(StandardCharsets.UTF_8)))
+            return responseData
+        }
+
+        void testStreamingResponse(Queue<String> responseData) {
+            advance()
+            Http2HeadersFrame request = serverChannel.readInbound()
+            assert request.headers().get(Http2Headers.PseudoHeaderName.PATH.value()) == '/foo'
+            assert request.headers().get(Http2Headers.PseudoHeaderName.SCHEME.value()) == scheme
+            assert request.headers().get(Http2Headers.PseudoHeaderName.AUTHORITY.value()) == 'example.com'
+            assert request.headers().get(Http2Headers.PseudoHeaderName.METHOD.value()) == 'GET'
+
+            def responseHeaders = new DefaultHttp2Headers()
+            responseHeaders.add(Http2Headers.PseudoHeaderName.STATUS.value(), "200")
+            serverChannel.writeOutbound(new DefaultHttp2HeadersFrame(responseHeaders, false).stream(request.stream()))
+            serverChannel.writeOutbound(new DefaultHttp2DataFrame(Unpooled.wrappedBuffer('foo'.bytes)).stream(request.stream()))
+            advance()
+
+            assert responseData.poll() == 'foo'
+            assert responseData.isEmpty()
+
+            serverChannel.writeOutbound(new DefaultHttp2DataFrame(Unpooled.wrappedBuffer('bar'.bytes), true).stream(request.stream()))
+            advance()
+
+            assert responseData.poll() == 'bar'
+            assert responseData.poll() == 'END'
+        }
+    }
+
+    @Singleton
+    static class CustomizerTracker implements NettyClientCustomizer, BeanCreatedEventListener<Registry> {
+        final Queue<Snapshot> initialPipelineBuilt = new ArrayDeque<>()
+        final Queue<Snapshot> streamPipelineBuilt = new ArrayDeque<>()
+        final Queue<Snapshot> requestPipelineBuilt = new ArrayDeque<>()
+
+        @Override
+        NettyClientCustomizer specializeForChannel(Channel channel, ChannelRole role) {
+            return new NettyClientCustomizer() {
+                @Override
+                NettyClientCustomizer specializeForChannel(Channel channel_, ChannelRole role_) {
+                    return CustomizerTracker.this.specializeForChannel(channel_, role_)
+                }
+
+                Snapshot snap() {
+                    return new Snapshot(channel, role, channel.pipeline().names())
+                }
+
+                @Override
+                void onInitialPipelineBuilt() {
+                    initialPipelineBuilt.add(snap())
+                }
+
+                @Override
+                void onStreamPipelineBuilt() {
+                    streamPipelineBuilt.add(snap())
+                }
+
+                @Override
+                void onRequestPipelineBuilt() {
+                    requestPipelineBuilt.add(snap())
+                }
+            }
+        }
+
+        @Override
+        Registry onCreated(BeanCreatedEvent<Registry> event) {
+            event.getBean().register(this)
+            return event.getBean()
+        }
+
+        static class Snapshot {
+            final Channel channel
+            final ChannelRole role
+            final List<String> handlerNames
+
+            Snapshot(Channel channel, ChannelRole role, List<String> handlerNames) {
+                this.channel = channel
+                this.role = role
+                this.handlerNames = handlerNames
+            }
         }
     }
 }

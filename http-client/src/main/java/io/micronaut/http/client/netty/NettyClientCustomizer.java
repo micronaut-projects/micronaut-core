@@ -79,6 +79,10 @@ public interface NettyClientCustomizer {
          * {@link io.netty.channel.socket.SocketChannel}, representing an HTTP connection.
          */
         CONNECTION,
+        /**
+         * The channel is a HTTP2 stream channel.
+         */
+        HTTP2_STREAM,
     }
 
     /**

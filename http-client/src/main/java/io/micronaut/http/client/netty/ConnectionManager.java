@@ -1402,13 +1402,13 @@ class ConnectionManager {
                         @Override
                         protected void configurePipeline(ChannelHandlerContext ctx, String protocol) {
                             if (ApplicationProtocolNames.HTTP_2.equals(protocol)) {
-                                ctx.pipeline()
-                                    .addLast(new Http2PriorKnowledgeInitializer(pool))
-                                    .remove(initialErrorHandler);
+                                ctx.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION, Http2FrameCodecBuilder.forClient().build());
+                                initHttp2(pool, ctx.channel(), channelCustomizer);
+                                ctx.pipeline().remove(initialErrorHandler);
                             } else if (ApplicationProtocolNames.HTTP_1_1.equals(protocol)) {
-                                ctx.pipeline()
-                                    .addLast(new Http1Initializer(pool, true, host, port))
-                                    .remove(initialErrorHandler);
+                                initHttp1(ctx.channel());
+                                pool.new Http1ConnectionHolder(ch, channelCustomizer).init(false);
+                                ctx.pipeline().remove(initialErrorHandler);
                             } else {
                                 ctx.close();
                                 throw customizeException(new HttpClientException("Unknown Protocol: " + protocol));
@@ -1416,6 +1416,8 @@ class ConnectionManager {
                         }
                     })
                 .addLast(initialErrorHandler);
+
+            channelCustomizer.onInitialPipelineBuilt();
         }
     }
 
@@ -1438,96 +1440,55 @@ class ConnectionManager {
         }
     }
 
-    private class Http1Initializer extends ChannelInitializer<Channel> {
-        final Pool pool;
-        final boolean secure;
-        final String host;
-        final int port;
-
-        Http1Initializer(Pool pool,
-                         boolean secure,
-                                       String host,
-                                       int port) {
-            this.pool = pool;
-            this.secure = secure;
-            this.host = host;
-            this.port = port;
-        }
-
-        /**
-         * @param ch The channel
-         */
-        @Override
-        protected void initChannel(Channel ch) {
-            configureProxy(ch.pipeline(), secure, host, port); // todo
-
-            ch.pipeline()
-                .addLast(ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC, new HttpClientCodec())
-                .addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECODER, new HttpContentDecompressor());
-
-            pool.new Http1ConnectionHolder(ch).init();
-        }
+    private void initHttp1(Channel ch) {
+        ch.pipeline()
+            .addLast(ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC, new HttpClientCodec())
+            .addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECODER, new HttpContentDecompressor());
     }
 
-    private class Http2PriorKnowledgeInitializer extends ChannelInitializer<Channel> {
-        private final Pool pool;
-        private final Http2FrameCodec frameCodec;
-
-        Http2PriorKnowledgeInitializer(Pool pool) {
-            this(pool, Http2FrameCodecBuilder.forClient().build());
-        }
-
-        Http2PriorKnowledgeInitializer(Pool pool, Http2FrameCodec frameCodec) {
-            this.pool = pool;
-            this.frameCodec = frameCodec;
-        }
-
-        @Override
-        protected void initChannel(Channel ch) throws Exception {
-            ch.pipeline().addLast(frameCodec);
-            ch.pipeline().addLast(new Http2MultiplexHandler(new ChannelInitializer<Http2StreamChannel>() {
-                @Override
-                protected void initChannel(Http2StreamChannel ch) throws Exception {
-                    // todo: fail connection?
-                    log.warn("Server opened HTTP2 stream {}, closing immediately", ch.stream().id());
-                    ch.close();
-                }
-            }, new ChannelInitializer<Http2StreamChannel>() {
-                @Override
-                protected void initChannel(Http2StreamChannel ch) throws Exception {
-                    // discard any response data for the upgrade request
-                    ch.close();
-                }
-            }));
-            ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_SETTINGS, new InitialConnectionErrorHandler(pool) {
-                @Override
-                public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-                    if (msg instanceof Http2SettingsFrame) {
-                        ctx.pipeline().remove(this);
-                        pool.new Http2ConnectionHolder(ch).init();
-                        return;
-                    } else {
-                        log.warn("Premature frame: {}", msg.getClass());
-                    }
-
-                    super.channelRead(ctx, msg);
-                }
-            });
-            // stream frames should be handled by the multiplexer
-            ch.pipeline().addLast(new ChannelInboundHandlerAdapter() {
-                @Override
-                public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
-                    ctx.read();
+    private void initHttp2(Pool pool, Channel ch, NettyClientCustomizer connectionCustomizer) {
+        ch.pipeline().addLast(new Http2MultiplexHandler(new ChannelInitializer<Http2StreamChannel>() {
+            @Override
+            protected void initChannel(Http2StreamChannel ch) throws Exception {
+                // todo: fail connection?
+                log.warn("Server opened HTTP2 stream {}, closing immediately", ch.stream().id());
+                ch.close();
+            }
+        }, new ChannelInitializer<Http2StreamChannel>() {
+            @Override
+            protected void initChannel(Http2StreamChannel ch) throws Exception {
+                // discard any response data for the upgrade request
+                ch.close();
+            }
+        }));
+        ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_SETTINGS, new InitialConnectionErrorHandler(pool) {
+            @Override
+            public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+                if (msg instanceof Http2SettingsFrame) {
+                    ctx.pipeline().remove(this);
+                    pool.new Http2ConnectionHolder(ch, connectionCustomizer).init();
+                    return;
+                } else {
+                    log.warn("Premature frame: {}", msg.getClass());
                 }
 
-                @Override
-                public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-                    // todo: log
-                    ReferenceCountUtil.release(msg);
-                    ctx.read();
-                }
-            });
-        }
+                super.channelRead(ctx, msg);
+            }
+        });
+        // stream frames should be handled by the multiplexer
+        ch.pipeline().addLast(new ChannelInboundHandlerAdapter() {
+            @Override
+            public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
+                ctx.read();
+            }
+
+            @Override
+            public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+                // todo: log
+                ReferenceCountUtil.release(msg);
+                ctx.read();
+            }
+        });
     }
 
     private class Http2UpgradeInitializer extends ChannelInitializer<Channel> {
@@ -1539,11 +1500,19 @@ class ConnectionManager {
 
         @Override
         protected void initChannel(Channel ch) throws Exception {
+            NettyClientCustomizer connectionCustomizer = clientCustomizer.specializeForChannel(ch, NettyClientCustomizer.ChannelRole.CONNECTION);
+
             Http2FrameCodec frameCodec = Http2FrameCodecBuilder.forClient().build();
 
             HttpClientCodec sourceCodec = new HttpClientCodec();
             Http2ClientUpgradeCodec upgradeCodec = new Http2ClientUpgradeCodec(ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION, frameCodec,
-                new Http2PriorKnowledgeInitializer(pool, frameCodec));
+                new ChannelInitializer<Channel>() {
+                    @Override
+                    protected void initChannel(Channel ch) throws Exception {
+                        ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION, frameCodec);
+                        initHttp2(pool, ch, connectionCustomizer);
+                    }
+                });
             HttpClientUpgradeHandler upgradeHandler = new HttpClientUpgradeHandler(sourceCodec, upgradeCodec, 65536);
 
             ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC, sourceCodec);
@@ -1563,6 +1532,8 @@ class ConnectionManager {
                     super.channelActive(ctx);
                 }
             });
+
+            connectionCustomizer.onInitialPipelineBuilt();
         }
     }
 
@@ -1700,12 +1671,15 @@ class ConnectionManager {
             } else {
                 switch (configuration.getPlaintextMode()) {
                     case HTTP_1:
-                        initializer = new Http1Initializer(
-                            this,
-                            false,
-                            requestKey.getHost(),
-                            requestKey.getPort()
-                        );
+                        initializer = new ChannelInitializer<Channel>() {
+                            @Override
+                            protected void initChannel(Channel ch) throws Exception {
+                                NettyClientCustomizer channelCustomizer = clientCustomizer.specializeForChannel(ch, NettyClientCustomizer.ChannelRole.CONNECTION);
+                                configureProxy(ch.pipeline(), false, requestKey.getHost(), requestKey.getPort());
+                                initHttp1(ch);
+                                new Http1ConnectionHolder(ch, channelCustomizer).init(true);
+                            }
+                        };
                         break;
                     case H2C:
                         initializer = new Http2UpgradeInitializer(
@@ -1731,14 +1705,16 @@ class ConnectionManager {
 
         final class Http1ConnectionHolder {
             private final Channel channel;
+            private final NettyClientCustomizer connectionCustomizer;
             private final AtomicBoolean hasLiveRequest = new AtomicBoolean(false);
             private volatile boolean canReturn = true;
 
-            Http1ConnectionHolder(Channel channel) {
+            Http1ConnectionHolder(Channel channel, NettyClientCustomizer connectionCustomizer) {
                 this.channel = channel;
+                this.connectionCustomizer = connectionCustomizer;
             }
 
-            void init() {
+            void init(boolean fireInitialPipelineBuilt) {
                 channel.pipeline().addLast(new ChannelInboundHandlerAdapter() {
                     @Override
                     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
@@ -1748,7 +1724,10 @@ class ConnectionManager {
                     }
                 });
 
-                // todo: notify customizer
+                if (fireInitialPipelineBuilt) {
+                    connectionCustomizer.onInitialPipelineBuilt();
+                }
+                connectionCustomizer.onStreamPipelineBuilt();
 
                 Sinks.One<PoolHandle> pendingRequest = pendingRequests.poll();
                 if (pendingRequest != null) {
@@ -1809,7 +1788,7 @@ class ConnectionManager {
 
                     @Override
                     void notifyRequestPipelineBuilt() {
-                        // TODO
+                        connectionCustomizer.onRequestPipelineBuilt();
                     }
                 });
                 if (emitResult.isFailure()) {
@@ -1828,9 +1807,11 @@ class ConnectionManager {
         final class Http2ConnectionHolder {
             private final Channel channel;
             private final AtomicInteger liveRequests = new AtomicInteger(0);
+            private final NettyClientCustomizer customizer;
 
-            Http2ConnectionHolder(Channel channel) {
+            Http2ConnectionHolder(Channel channel, NettyClientCustomizer customizer) {
                 this.channel = channel;
+                this.customizer = customizer;
             }
 
             void init() {
@@ -1842,7 +1823,7 @@ class ConnectionManager {
                     }
                 });
 
-                // todo: notify customizer
+                customizer.onStreamPipelineBuilt();
 
                 for (int i = 0; i < MAX_CONCURRENT_REQUESTS_PER_HTTP2_CONNECTION; i++) {
                     Sinks.One<PoolHandle> pendingRequest = pendingRequests.poll();
@@ -1879,6 +1860,7 @@ class ConnectionManager {
                         Http2StreamChannel streamChannel = future.get();
                         streamChannel.pipeline()
                             .addLast(new Http2StreamFrameToHttpObjectCodec(false));
+                        NettyClientCustomizer streamCustomizer = customizer.specializeForChannel(streamChannel, NettyClientCustomizer.ChannelRole.HTTP2_STREAM);
                         Sinks.EmitResult emitResult = sink.tryEmitValue(new PoolHandle(streamChannel) {
                             @Override
                             void taint() {
@@ -1898,7 +1880,7 @@ class ConnectionManager {
 
                             @Override
                             void notifyRequestPipelineBuilt() {
-                                // TODO
+                                streamCustomizer.onRequestPipelineBuilt();
                             }
                         });
                         if (emitResult.isFailure()) {

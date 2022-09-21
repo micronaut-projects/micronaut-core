@@ -2090,9 +2090,7 @@ public class DefaultHttpClient implements
             }
         }
 
-        protected void removeHandler(ChannelHandlerContext ctx) {
-            ctx.pipeline().remove(this);
-        }
+        protected abstract void removeHandler(ChannelHandlerContext ctx);
 
         protected abstract Function<URI, Publisher<? extends O>> makeRedirectHandler(io.micronaut.http.HttpRequest<?> parentRequest, MutableHttpRequest<Object> redirectRequest);
 
@@ -2152,6 +2150,11 @@ public class DefaultHttpClient implements
                 }
                 channelHandlerContext.pipeline().remove(this);
             }
+        }
+
+        @Override
+        protected void removeHandler(ChannelHandlerContext ctx) {
+            // done in channelReadInstrumented
         }
 
         @Override
