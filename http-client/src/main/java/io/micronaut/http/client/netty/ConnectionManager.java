@@ -1505,7 +1505,7 @@ class ConnectionManager {
             Http2FrameCodec frameCodec = Http2FrameCodecBuilder.forClient().build();
 
             HttpClientCodec sourceCodec = new HttpClientCodec();
-            Http2ClientUpgradeCodec upgradeCodec = new Http2ClientUpgradeCodec(ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION, frameCodec,
+            Http2ClientUpgradeCodec upgradeCodec = new Http2ClientUpgradeCodec(frameCodec,
                 new ChannelInitializer<Channel>() {
                     @Override
                     protected void initChannel(Channel ch) throws Exception {

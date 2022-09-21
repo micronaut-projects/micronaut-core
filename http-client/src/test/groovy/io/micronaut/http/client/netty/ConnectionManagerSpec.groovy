@@ -157,21 +157,7 @@ class ConnectionManagerSpec extends Specification {
         patch(client, conn.clientChannel)
 
         def future = conn.testExchangeRequest(client)
-        conn.clientChannel.pipeline().fireChannelActive()
-        conn.advance()
-
-        Http2HeadersFrame upgradeRequest = conn.serverChannel.readInbound()
-        assert upgradeRequest.headers().get(Http2Headers.PseudoHeaderName.METHOD.value()) == 'GET'
-        assert upgradeRequest.headers().get(Http2Headers.PseudoHeaderName.PATH.value()) == '/'
-        assert upgradeRequest.headers().get(Http2Headers.PseudoHeaderName.AUTHORITY.value()) == 'example.com:80'
-        assert upgradeRequest.headers().get('content-length') == '0'
-        // client closes the stream immediately
-        assert upgradeRequest.stream().state() == Http2Stream.State.CLOSED
-
-        assert conn.serverChannel.readInbound() instanceof Http2SettingsFrame
-        assert conn.serverChannel.readInbound() instanceof Http2ResetFrame
-        assert conn.serverChannel.readInbound() instanceof Http2SettingsAckFrame
-
+        conn.exchangeH2c()
         conn.testExchangeResponse(future)
 
         cleanup:
@@ -324,21 +310,30 @@ class ConnectionManagerSpec extends Specification {
         ctx.close()
     }
 
-    def 'http2 alpn customization'() {
+    def 'http2 customization'(boolean secure) {
         given:
         def ctx = ApplicationContext.run([
                 'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+                'micronaut.http.client.plaintext-mode': 'h2c',
         ])
         def client = ctx.getBean(DefaultHttpClient)
         def tracker = ctx.getBean(CustomizerTracker)
 
         def conn = new EmbeddedTestConnectionHttp2()
-        conn.setupHttp2Tls()
+        if (secure) {
+            conn.setupHttp2Tls()
+        } else {
+            conn.setupH2c()
+        }
         patch(client, conn.clientChannel)
 
         when:
         def r1 = conn.testExchangeRequest(client)
-        conn.exchangeSettings()
+        if (secure) {
+            conn.exchangeSettings()
+        } else {
+            conn.exchangeH2c()
+        }
         conn.testExchangeResponse(r1)
 
         def r2 = conn.testStreamingRequest(client)
@@ -347,7 +342,7 @@ class ConnectionManagerSpec extends Specification {
         then:
         def outerChannel = tracker.initialPipelineBuilt.poll()
         outerChannel.channel == conn.clientChannel
-        outerChannel.handlerNames.contains(ChannelPipelineCustomizer.HANDLER_SSL)
+        outerChannel.handlerNames.contains(ChannelPipelineCustomizer.HANDLER_SSL) == secure
         !outerChannel.handlerNames.contains(ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION)
         tracker.initialPipelineBuilt.isEmpty()
 
@@ -373,6 +368,9 @@ class ConnectionManagerSpec extends Specification {
         cleanup:
         client.close()
         ctx.close()
+
+        where:
+        secure << [true, false]
     }
 
     static class EmbeddedTestConnectionBase {
@@ -538,14 +536,25 @@ class ConnectionManagerSpec extends Specification {
         void exchangeSettings() {
             advance()
 
-            def settings = serverChannel.readInbound()
-            if (!(settings instanceof Http2SettingsFrame)) {
-                throw new AssertionError(settings)
-            }
-            def ack = serverChannel.readInbound()
-            if (!(ack instanceof Http2SettingsAckFrame)) {
-                throw new AssertionError(ack)
-            }
+            assert serverChannel.readInbound() instanceof Http2SettingsFrame
+            assert serverChannel.readInbound() instanceof Http2SettingsAckFrame
+        }
+
+        void exchangeH2c() {
+            clientChannel.pipeline().fireChannelActive()
+            advance()
+
+            Http2HeadersFrame upgradeRequest = serverChannel.readInbound()
+            assert upgradeRequest.headers().get(Http2Headers.PseudoHeaderName.METHOD.value()) == 'GET'
+            assert upgradeRequest.headers().get(Http2Headers.PseudoHeaderName.PATH.value()) == '/'
+            assert upgradeRequest.headers().get(Http2Headers.PseudoHeaderName.AUTHORITY.value()) == 'example.com:80'
+            assert upgradeRequest.headers().get('content-length') == '0'
+            // client closes the stream immediately
+            assert upgradeRequest.stream().state() == Http2Stream.State.CLOSED
+
+            assert serverChannel.readInbound() instanceof Http2SettingsFrame
+            assert serverChannel.readInbound() instanceof Http2ResetFrame
+            assert serverChannel.readInbound() instanceof Http2SettingsAckFrame
         }
 
         void respondOk(Http2FrameStream stream) {
