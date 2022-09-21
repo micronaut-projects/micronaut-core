@@ -27,6 +27,7 @@ import io.netty.handler.codec.http.DefaultFullHttpResponse
 import io.netty.handler.codec.http.DefaultHttpContent
 import io.netty.handler.codec.http.DefaultHttpResponse
 import io.netty.handler.codec.http.DefaultLastHttpContent
+import io.netty.handler.codec.http.HttpContentCompressor
 import io.netty.handler.codec.http.HttpMethod
 import io.netty.handler.codec.http.HttpResponseStatus
 import io.netty.handler.codec.http.HttpServerCodec
@@ -123,6 +124,35 @@ class ConnectionManagerSpec extends Specification {
         patch(client, conn.clientChannel)
 
         conn.testExchange(client)
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
+    def 'http1 get with compression'() {
+        def ctx = ApplicationContext.run()
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn = new EmbeddedTestConnectionHttp1()
+        conn.setupHttp1()
+        conn.serverChannel.pipeline().addLast(new HttpContentCompressor())
+        patch(client, conn.clientChannel)
+
+        def future = Mono.from(client.exchange(
+                HttpRequest.GET('http://example.com/foo').header('accept-encoding', 'gzip'), String)).toFuture()
+        future.exceptionally(t -> t.printStackTrace())
+        conn.advance()
+
+        assert conn.serverChannel.readInbound() instanceof io.netty.handler.codec.http.HttpRequest
+
+        def response = new DefaultFullHttpResponse(io.netty.handler.codec.http.HttpVersion.HTTP_1_1, HttpResponseStatus.OK, Unpooled.wrappedBuffer("foo".bytes))
+        response.headers().add('content-length', 3)
+        conn.serverChannel.writeOutbound(response)
+
+        conn.advance()
+        assert future.get().status() == HttpStatus.OK
+        assert future.get().body() == 'foo'
 
         cleanup:
         client.close()
