@@ -1,5 +1,14 @@
 This section documents breaking changes between Micronaut versions
 
+== 4.0.0
+
+=== Core Changes
+
+==== Caffeine No Longer Shaded
+
+https://github.com/ben-manes/caffeine[Caffeine] is no longer shaded into the `io.micronaut.caffeine` package. If you depend on this library you should directly depend on the latest version of Caffeine.
+
+
 == 3.3.0
 
 - The <<environmentEndpoint, environmental endpoint>> is now disabled by default. To enable it, you must update your endpoint config:
