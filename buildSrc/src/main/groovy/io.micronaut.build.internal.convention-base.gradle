@@ -47,10 +47,11 @@ tasks.withType(Jar).configureEach {
 }
 
 configurations.all {
-    resolutionStrategy.dependencySubstitution {
-        substitute(module("org.codehaus.groovy:groovy")).using(module("org.apache.groovy:groovy:${libs.versions.managed.groovy.get()}"))
-        substitute(module("org.codehaus.groovy:groovy-test")).using(module("org.apache.groovy:groovy-test:${libs.versions.managed.groovy.get()}"))
-        substitute(module("org.codehaus.groovy:groovy-bom")).using(module("org.apache.groovy:groovy-bom:${libs.versions.managed.groovy.get()}"))
+    resolutionStrategy.eachDependency { DependencyResolveDetails details ->
+        if (details.requested.group == 'org.codehaus.groovy') {
+            details.useTarget("org.apache.groovy:${details.requested.name}:${details.requested.version}")
+            details.because "Plugin 'io.micronaut.build.internal.common' isn't Groovy 4 yet and it's pulling in old versions"
+        }
     }
 }
 
