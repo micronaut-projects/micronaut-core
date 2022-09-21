@@ -1859,7 +1859,8 @@ class ConnectionManager {
                     if (future.isSuccess()) {
                         Http2StreamChannel streamChannel = future.get();
                         streamChannel.pipeline()
-                            .addLast(new Http2StreamFrameToHttpObjectCodec(false));
+                            .addLast(new Http2StreamFrameToHttpObjectCodec(false))
+                            .addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECODER, new HttpContentDecompressor());
                         NettyClientCustomizer streamCustomizer = customizer.specializeForChannel(streamChannel, NettyClientCustomizer.ChannelRole.HTTP2_STREAM);
                         Sinks.EmitResult emitResult = sink.tryEmitValue(new PoolHandle(streamChannel) {
                             @Override

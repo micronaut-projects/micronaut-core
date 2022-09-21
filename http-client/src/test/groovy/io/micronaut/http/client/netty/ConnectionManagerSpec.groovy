@@ -60,6 +60,7 @@ import spock.lang.Specification
 
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.Future
+import java.util.zip.GZIPOutputStream
 
 class ConnectionManagerSpec extends Specification {
     private static void patch(DefaultHttpClient httpClient, EmbeddedChannel... channels) {
@@ -153,6 +154,41 @@ class ConnectionManagerSpec extends Specification {
         conn.advance()
         assert future.get().status() == HttpStatus.OK
         assert future.get().body() == 'foo'
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
+    def 'http2 get with compression'() {
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn = new EmbeddedTestConnectionHttp2()
+        conn.setupHttp2Tls()
+        patch(client, conn.clientChannel)
+
+        def future = Mono.from(client.exchange('https://example.com/foo', String)).toFuture()
+        future.exceptionally(t -> t.printStackTrace())
+        conn.exchangeSettings()
+
+        Http2HeadersFrame request = conn.serverChannel.readInbound()
+        def responseHeaders = new DefaultHttp2Headers()
+        responseHeaders.add(Http2Headers.PseudoHeaderName.STATUS.value(), "200")
+        responseHeaders.add('content-encoding', "gzip")
+        conn.serverChannel.writeOutbound(new DefaultHttp2HeadersFrame(responseHeaders, false).stream(request.stream()))
+        def compressedOut = new ByteArrayOutputStream()
+        try (OutputStream os = new GZIPOutputStream(compressedOut)) {
+            os.write('foo'.bytes)
+        }
+        conn.serverChannel.writeOutbound(new DefaultHttp2DataFrame(Unpooled.wrappedBuffer(compressedOut.toByteArray()), true).stream(request.stream()))
+
+        conn.advance()
+        def response = future.get()
+        assert response.status() == HttpStatus.OK
+        assert response.body() == 'foo'
 
         cleanup:
         client.close()
