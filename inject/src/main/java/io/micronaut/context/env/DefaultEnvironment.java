@@ -640,16 +640,18 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     private EnvironmentsAndPackage getEnvironmentsAndPackage(List<String> specifiedNames) {
         EnvironmentsAndPackage environmentsAndPackage = this.environmentsAndPackage;
-        final boolean extendedDeduction = !specifiedNames.contains(Environment.FUNCTION);
+        boolean isNotFunction = !specifiedNames.contains(Environment.FUNCTION);
+        final boolean deduceEnvironment = shouldDeduceEnvironments();
+        final boolean deduceCloudEnvironmentUsingProbes = isNotFunction && configuration.isDeduceCloudEnvironment();
         if (environmentsAndPackage == null) {
             synchronized (EnvironmentsAndPackage.class) { // double check
                 environmentsAndPackage = this.environmentsAndPackage;
                 if (environmentsAndPackage == null) {
                     environmentsAndPackage = deduceEnvironmentsAndPackage(
-                            shouldDeduceEnvironments(),
-                            extendedDeduction,
-                            extendedDeduction,
-                            !extendedDeduction
+                            deduceEnvironment,
+                            deduceCloudEnvironmentUsingProbes,
+                            isNotFunction,
+                            !deduceCloudEnvironmentUsingProbes
                     );
                     this.environmentsAndPackage = environmentsAndPackage;
                 }

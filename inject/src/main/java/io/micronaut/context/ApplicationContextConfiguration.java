@@ -40,10 +40,31 @@ public interface ApplicationContextConfiguration extends BeanContextConfiguratio
     @NonNull List<String> getEnvironments();
 
     /**
+     * If set to {@code true} (the default is {@code true}) Micronaut will attempt to automatically deduce the environment
+     * it is running in using environment variables and/or stack trace inspection.
+     *
+     * <p>This method differs from {@link #isDeduceCloudEnvironment()} which controls whether network and/or disk probes
+     *  are performed to try and automatically establish the Cloud environment.</p>
+     *
+     * <p>This behaviour controls the automatic activation of, for example, the {@link io.micronaut.context.env.Environment#TEST} when running tests.</p>
+     *
      * @return True if the environments should be deduced
      */
     default Optional<Boolean> getDeduceEnvironments() {
         return Optional.empty();
+    }
+
+    /**
+     * If set to {@code true} Micronaut will attempt to deduce the environment using safe methods like environment variables and the stack trace.
+     *
+     * <p>Enabling this should be done with caution since network probes are required to figure out whether the application is
+     * running in certain clouds like GCP.</p>
+     *
+     * @return True if the environments should be deduced
+     * @since 4.0.0
+     */
+    default boolean isDeduceCloudEnvironment() {
+        return false;
     }
 
     /**

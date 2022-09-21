@@ -8,6 +8,9 @@ This section documents breaking changes between Micronaut versions
 
 https://github.com/ben-manes/caffeine[Caffeine] is no longer shaded into the `io.micronaut.caffeine` package. If you depend on this library you should directly depend on the latest version of Caffeine.
 
+==== Environment Deduction Disabled by Default
+
+In previous versions of the Micronaut framework probes were used to attempt to deduce the running environment and establish whether the application was running in the Cloud. These probes involved network calls which resulted in issues with startup performance and security concerns. These probes have been disabled by default and can be re-enabled as necessary by calling `ApplicationContextBuilder.deduceEnvironment(true)` if your application still requires this functionality.
 
 == 3.3.0
 
