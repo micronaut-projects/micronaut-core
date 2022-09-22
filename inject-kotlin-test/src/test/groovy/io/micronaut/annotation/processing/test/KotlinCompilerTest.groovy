@@ -7,12 +7,6 @@ import spock.lang.IgnoreIf
 import spock.lang.Requires
 import spock.util.environment.Jvm
 
-// fails due to https://issues.apache.org/jira/browse/GROOVY-10145
-@Requires({
-    SemanticVersion.isAtLeastMajorMinor(GroovySystem.version, 4, 0) ||
-            !Jvm.current.isJava16Compatible()
-})
-@IgnoreIf({ Jvm.current.isJava16Compatible() }) // Still fails even with https://issues.apache.org/jira/browse/GROOVY-10145 fixed ...
 class KotlinCompilerTest extends AbstractKotlinCompilerSpec {
     void "simple class"() {
         given:
