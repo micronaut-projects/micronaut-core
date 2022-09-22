@@ -28,4 +28,6 @@ public interface MicronautCoreExtension {
 
     void usesMicronautTestKotest();
 
+    void usesMicronautTestKotest5();
+
 }

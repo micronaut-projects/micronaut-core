@@ -60,6 +60,11 @@ public abstract class DefaultMicronautCoreExtension implements MicronautCoreExte
         addTestImplementationDependency("kotest");
     }
 
+    @Override
+    public void usesMicronautTestKotest5() {
+        addTestImplementationDependency("kotest5");
+    }
+
     private void addTestImplementationDependency(String lib) {
         dependencyHandler.addProvider("testImplementation", libs.findLibrary(
                 "managed.micronaut.test." + lib
