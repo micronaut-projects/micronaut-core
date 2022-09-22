@@ -45,9 +45,7 @@ public class EntityIntrospectedAnnotationMapper implements NamedAnnotationMapper
 
     @Override
     public List<AnnotationValue<?>> map(AnnotationValue<Annotation> annotation, VisitorContext visitorContext) { // <1>
-        final AnnotationValueBuilder<Introspected> builder = AnnotationValue.builder(Introspected.class)
-                // don't bother with transients properties
-                .member("excludedAnnotations", "javax.persistence.Transient"); // <2>
+        final AnnotationValueBuilder<Introspected> builder = AnnotationValue.builder(Introspected.class); // <2>
         return Arrays.asList(
                 builder.build(),
                 AnnotationValue.builder(ReflectiveAccess.class).build()
