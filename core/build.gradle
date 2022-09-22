@@ -1,3 +1,6 @@
+import me.champeau.gradle.japicmp.JapicmpTask
+import io.micronaut.build.internal.japicmp.RemovedPackages
+
 plugins {
     id "io.micronaut.build.internal.convention-core-library"
 }
@@ -20,10 +23,6 @@ dependencies {
 
     shadowCompile libs.bundles.asm
     shadowCompile libs.asm.tree
-    shadowCompile(libs.caffeine) {
-        exclude group: "com.google.errorprone", module: "error_prone_annotations"
-        exclude group: "org.checkerframework", module: "checker-qual"
-    }
 }
 
 spotless {
@@ -46,3 +45,10 @@ def versionInfo = tasks.register("micronautVersionInfo", WriteProperties) {
 tasks.named("processResources") {
     from(versionInfo)
 }
+
+tasks.withType(JapicmpTask).configureEach {
+   richReport {
+       addViolationTransformer(RemovedPackages, [prefixes: ['io.micronaut.caffeine'], exact: []])
+   }
+}
+
