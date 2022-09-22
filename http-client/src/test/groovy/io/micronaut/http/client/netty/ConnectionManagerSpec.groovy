@@ -9,6 +9,7 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.HttpVersion
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.StreamingHttpClient
+import io.micronaut.http.client.exceptions.ReadTimeoutException
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer
 import io.micronaut.http.server.netty.ssl.CertificateProvidedSslBuilder
 import io.micronaut.http.ssl.SslConfiguration
@@ -59,7 +60,9 @@ import reactor.core.publisher.Mono
 import spock.lang.Specification
 
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.ExecutionException
 import java.util.concurrent.Future
+import java.util.concurrent.TimeUnit
 import java.util.zip.GZIPOutputStream
 
 class ConnectionManagerSpec extends Specification {
@@ -437,6 +440,84 @@ class ConnectionManagerSpec extends Specification {
 
         where:
         secure << [true, false]
+    }
+
+    def 'http1 exchange read timeout'() {
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.read-timeout': '5s',
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn = new EmbeddedTestConnectionHttp1()
+        conn.setupHttp1()
+        patch(client, conn.clientChannel)
+
+        // do one request
+        conn.testExchange(client)
+        conn.clientChannel.unfreezeTime()
+        // connection is in reserve, should not time out
+        TimeUnit.SECONDS.sleep(10)
+        conn.advance()
+
+        // second request
+        def future = Mono.from(client.exchange('http://example.com/foo', String)).toFuture()
+        conn.advance()
+
+        // todo: move to advanceTime once IdleStateHandler supports it
+        TimeUnit.SECONDS.sleep(5)
+        conn.advance()
+
+        assert future.isDone()
+        when:
+        future.get()
+        then:
+        def e = thrown ExecutionException
+        e.cause instanceof ReadTimeoutException
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
+    def 'http2 exchange read timeout'() {
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+                'micronaut.http.client.read-timeout': '5s',
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn = new EmbeddedTestConnectionHttp2()
+        conn.setupHttp2Tls()
+        patch(client, conn.clientChannel)
+
+        // one request opens the connection
+        def r1 = conn.testExchangeRequest(client)
+        conn.exchangeSettings()
+        conn.testExchangeResponse(r1)
+        conn.clientChannel.unfreezeTime()
+
+        // connection is in reserve, should not time out
+        TimeUnit.SECONDS.sleep(10)
+        conn.advance()
+
+        // second request
+        def future = Mono.from(client.exchange('https://example.com/foo', String)).toFuture()
+        conn.advance()
+
+        // todo: move to advanceTime once IdleStateHandler supports it
+        TimeUnit.SECONDS.sleep(5)
+        conn.advance()
+
+        assert future.isDone()
+        when:
+        future.get()
+        then:
+        def e = thrown ExecutionException
+        e.cause instanceof ReadTimeoutException
+
+        cleanup:
+        client.close()
+        ctx.close()
     }
 
     static class EmbeddedTestConnectionBase {
