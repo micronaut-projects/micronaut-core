@@ -25,16 +25,13 @@ micronautBuild {
 }
 
 dependencies {
-    testImplementation "cglib:cglib-nodep:3.3.0"
-    testImplementation "org.objenesis:objenesis:3.1"
-    testImplementation libs.managed.netty.codec.http
     testImplementation(project(":inject-groovy")) {
         exclude module: 'groovy'
     }
 
     testImplementation libs.geb.spock
     testImplementation libs.spock.for.geb
-    testImplementation "org.codehaus.groovy:groovy-test:3.0.12"
+    testImplementation libs.geb.groovy.test
 
     testImplementation project(':http')
     testImplementation project(':http-server-netty')
