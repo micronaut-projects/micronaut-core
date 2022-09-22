@@ -117,7 +117,8 @@ object KotlinCompileHelper {
                 message: String,
                 location: CompilerMessageSourceLocation?
             ) {
-                if (severity == CompilerMessageSeverity.ERROR) {
+                // With Java 17 and Groovy 4.x this breaks inject-kotlin-test:KotlinCompilerTest as it throws an AssertionError for the Note: message
+                if (severity == CompilerMessageSeverity.ERROR && !message.startsWith("Note:")) {
                     throw AssertionError("Error reported in processing: $message")
                 }
             }
