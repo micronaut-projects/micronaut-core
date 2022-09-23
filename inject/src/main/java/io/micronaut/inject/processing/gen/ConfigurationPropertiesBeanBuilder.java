@@ -3,8 +3,10 @@ package io.micronaut.inject.processing.gen;
 import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationInject;
 import io.micronaut.context.annotation.ConfigurationReader;
+import io.micronaut.context.annotation.Property;
 import io.micronaut.core.annotation.AccessorsStyle;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
@@ -78,7 +80,7 @@ public class ConfigurationPropertiesBeanBuilder extends SimpleBeanBuilder {
                 }
                 throw new ProcessingException(fieldElement, "ConfigurationBuilder applied to a non accessible (private or package-private/protected in a different package) field must have a corresponding non-private getter method.");
             }
-        } else {
+        } else if (!propertyElement.isExcluded()) {
             if (propertyElement.getWriteAccessKind() == PropertyElement.AccessKind.METHOD && propertyElement.getWriteMethod().isPresent()) {
                 visitor.setValidated(visitor.isValidated() || propertyElement.hasAnnotation(ANN_REQUIRES_VALIDATION));
                 MethodElement methodElement = propertyElement.getWriteMethod().get();
@@ -87,6 +89,7 @@ public class ConfigurationPropertiesBeanBuilder extends SimpleBeanBuilder {
                     propertyElement,
                     parameter
                 ).merge();
+                annotationMetadata = calculatePath(propertyElement, methodElement, annotationMetadata);
                 methodElement.replaceAnnotations(annotationMetadata);
                 parameter.replaceAnnotations(annotationMetadata);
                 visitor.visitSetterValue(methodElement.getDeclaringType(), methodElement, annotationMetadata, methodElement.isReflectionRequired(classElement), true);
@@ -98,7 +101,11 @@ public class ConfigurationPropertiesBeanBuilder extends SimpleBeanBuilder {
                 AnnotationMetadata annotationMetadata = propertyElement.getAnnotationMetadata();
                 if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
                     annotationMetadata = ((AnnotationMetadataHierarchy) annotationMetadata).merge();
+                } else {
+                    // Just a copy
+                    annotationMetadata = new AnnotationMetadataHierarchy(annotationMetadata).merge();
                 }
+                annotationMetadata = calculatePath(propertyElement, fieldElement, annotationMetadata);
                 visitor.visitFieldValue(fieldElement.getDeclaringType(), fieldElement, annotationMetadata,true, fieldElement.isReflectionRequired(classElement));
                 return true;
             }
@@ -107,41 +114,23 @@ public class ConfigurationPropertiesBeanBuilder extends SimpleBeanBuilder {
     }
 
     @Override
-    protected boolean visitMethod(BeanDefinitionVisitor visitor, MethodElement methodElement) {
-        if (methodElement.hasStereotype(ConfigurationBuilder.class)) {
-            ClassElement builderType = methodElement.getReturnType();
-            visitor.visitConfigBuilderMethod(
-                builderType,
-                methodElement.getName(),
-                methodElement.getAnnotationMetadata(),
-                null,
-                builderType.isInterface()
-            );
-            visitConfigurationBuilder(visitor, methodElement, builderType);
-            return true;
-        }
-        return super.visitMethod(visitor, methodElement);
-    }
-
-    @Override
     protected boolean visitField(BeanDefinitionVisitor visitor, FieldElement fieldElement) {
-        if (fieldElement.hasStereotype(ConfigurationBuilder.class)) {
-            if (fieldElement.isAccessible(classElement)) {
-                ClassElement builderType = fieldElement.getType();
-                visitor.visitConfigBuilderField(
-                    builderType,
-                    fieldElement.getName(),
-                    fieldElement.getAnnotationMetadata(),
-                    metadataBuilder,
-                    builderType.isInterface()
-                );
-                visitConfigurationBuilder(visitor, fieldElement, builderType);
-                return true;
-            } else {
-                throw new ProcessingException(fieldElement, "ConfigurationBuilder applied to a non accessible (private or package-private/protected in a different package) field must have a corresponding non-private getter method.");
-            }
+        if (fieldElement.hasStereotype(ConfigurationBuilder.class) && !fieldElement.isAccessible(classElement)) {
+            throw new ProcessingException(fieldElement, "ConfigurationBuilder applied to a non accessible (private or package-private/protected in a different package) field must have a corresponding non-private getter method.");
         }
         return super.visitField(visitor, fieldElement);
+    }
+
+    private AnnotationMetadata calculatePath(PropertyElement propertyElement, MemberElement writeMember, AnnotationMetadata annotationMetadata) {
+        String path = metadataBuilder.visitProperty(
+            writeMember.getOwningType(),
+            writeMember.getDeclaringType(),
+            propertyElement.getGenericType(),
+            propertyElement.getName(),
+            propertyElement.getDocumentation().orElse(null),
+            null
+        ).getPath();
+        return visitorContext.getAnnotationMetadataBuilder().annotate(annotationMetadata, AnnotationValue.builder(Property.class).member("name", path).build());
     }
 
     @Override

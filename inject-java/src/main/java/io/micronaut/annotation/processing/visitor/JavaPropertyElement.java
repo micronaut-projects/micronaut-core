@@ -57,6 +57,7 @@ final class JavaPropertyElement extends AbstractJavaElement implements PropertyE
     private final MethodElement setter;
     @Nullable
     private final FieldElement field;
+    private final boolean excluded;
     private final List<MemberElement> elements;
     private final AnnotationMetadata annotationMetadata;
 
@@ -69,6 +70,7 @@ final class JavaPropertyElement extends AbstractJavaElement implements PropertyE
                         String name,
                         AccessKind readAccessKind,
                         AccessKind writeAccessKind,
+                        boolean excluded,
                         JavaVisitorContext visitorContext) {
         super(selectNativeType(getter, setter, field), annotationMetadataFactory, visitorContext);
         this.type = type;
@@ -79,6 +81,7 @@ final class JavaPropertyElement extends AbstractJavaElement implements PropertyE
         this.readAccessKind = readAccessKind;
         this.writeAccessKind = writeAccessKind;
         this.owningElement = owningElement;
+        this.excluded = excluded;
         elements = new ArrayList<>(3);
         if (getter != null) {
             elements.add(getter);
@@ -89,8 +92,10 @@ final class JavaPropertyElement extends AbstractJavaElement implements PropertyE
         if (field != null) {
             elements.add(field);
         }
+        // The instance AnnotationMetadata of each element can change after a modification
+        // Set annotation metadata as actual elements so the changes are reflected
         if (elements.size() == 1) {
-            annotationMetadata = elements.iterator().next().getAnnotationMetadata();
+            annotationMetadata = elements.iterator().next();
         } else {
             annotationMetadata = new AnnotationMetadataHierarchy(
                 true,
@@ -123,6 +128,11 @@ final class JavaPropertyElement extends AbstractJavaElement implements PropertyE
             return (Element) field.getNativeType();
         }
         throw new IllegalStateException();
+    }
+
+    @Override
+    public boolean isExcluded() {
+        return excluded;
     }
 
     @Override

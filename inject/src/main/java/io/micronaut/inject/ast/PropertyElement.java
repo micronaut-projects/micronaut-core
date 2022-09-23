@@ -35,6 +35,16 @@ public interface PropertyElement extends TypedElement, MemberElement {
     ClassElement getType();
 
     /**
+     * Return true the property is excluded.
+     *
+     * @return True if the property is excluded
+     * @since 3.8.0
+     */
+    default boolean isExcluded() {
+        return false;
+    }
+
+    /**
      * Return true only if the property has a getter but no setter.
      *
      * @return True if the property is read only.
@@ -46,7 +56,8 @@ public interface PropertyElement extends TypedElement, MemberElement {
     /**
      * Return true only if the property doesn't support modifying the value.
      *
-     * @return True if the property is read only.
+     * @return True if the property is write only.
+     * @since 3.8.0
      */
     default boolean isWriteOnly() {
         return !getReadMethod().isPresent();
@@ -54,9 +65,10 @@ public interface PropertyElement extends TypedElement, MemberElement {
 
     /**
      * The field representing the property.
-     * NOTE: The field should be returned even if methods exist.
+     * NOTE: The field can be returned even if getter/setter are present.
      *
      * @return The field
+     * @since 3.8.0
      */
     default Optional<FieldElement> getField() {
         return Optional.empty();
@@ -64,6 +76,7 @@ public interface PropertyElement extends TypedElement, MemberElement {
 
     /**
      * @return The method to write the property
+     * @since 3.8.0
      */
     default Optional<MethodElement> getWriteMethod() {
         return Optional.empty();
@@ -78,6 +91,7 @@ public interface PropertyElement extends TypedElement, MemberElement {
 
     /**
      * @return The member to read the property
+     * @since 3.8.0
      */
     default Optional<? extends MemberElement> getReadMember() {
         if (getReadAccessKind() == AccessKind.METHOD) {
@@ -88,6 +102,7 @@ public interface PropertyElement extends TypedElement, MemberElement {
 
     /**
      * @return The member to write the property
+     * @since 3.8.0
      */
     default Optional<? extends MemberElement> getWriteMember() {
         if (getWriteAccessKind() == AccessKind.METHOD) {
@@ -98,6 +113,7 @@ public interface PropertyElement extends TypedElement, MemberElement {
 
     /**
      * @return The read access kind of the property
+     * @since 3.8.0
      */
     default AccessKind getReadAccessKind() {
         return AccessKind.METHOD;
@@ -105,6 +121,7 @@ public interface PropertyElement extends TypedElement, MemberElement {
 
     /**
      * @return The write access kind of the property
+     * @since 3.8.0
      */
     default AccessKind getWriteAccessKind() {
         return AccessKind.METHOD;
@@ -112,6 +129,7 @@ public interface PropertyElement extends TypedElement, MemberElement {
 
     /**
      * The access type for bean properties.
+     * @since 3.8.0
      */
     enum AccessKind {
         /**

@@ -18,6 +18,8 @@ package io.micronaut.annotation.processing.visitor;
 import io.micronaut.annotation.processing.ModelUtils;
 import io.micronaut.annotation.processing.SuperclassAwareTypeVisitor;
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.context.annotation.Property;
+import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.AccessorsStyle;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
@@ -295,7 +297,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             BeanProperties.Visibility visibility = annotationMetadata.enumValue(BeanProperties.class, BeanProperties.VISIBILITY, BeanProperties.Visibility.class)
                 .orElse(BeanProperties.Visibility.DEFAULT);
             EnumSet<BeanProperties.AccessKind> accessKinds = annotationMetadata.isPresent(BeanProperties.class, BeanProperties.ACCESS_KIND) ?
-                annotationMetadata .enumValuesSet(BeanProperties.class, BeanProperties.ACCESS_KIND, BeanProperties.AccessKind.class) : EnumSet.of(BeanProperties.AccessKind.METHOD);
+                annotationMetadata.enumValuesSet(BeanProperties.class, BeanProperties.ACCESS_KIND, BeanProperties.AccessKind.class) : EnumSet.of(BeanProperties.AccessKind.METHOD);
 
             Set<String> includes = new HashSet<>(Arrays.asList(annotationMetadata.stringValues(BeanProperties.class, BeanProperties.INCLUDES)));
             Set<String> excludes = new HashSet<>(Arrays.asList(annotationMetadata.stringValues(BeanProperties.class, BeanProperties.EXCLUDES)));
@@ -372,9 +374,6 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                         if (NameUtils.isReaderName(methodName, readPrefixes) && methodElement.getParameters().length == 0) {
                             String propertyName = isKotlinClass(((Element) methodElement.getNativeType()).getEnclosingElement()) && methodName.startsWith(PREFIX_IS) ?
                                 methodName : NameUtils.getPropertyNameForGetter(methodName, readPrefixes);
-                            if (shouldExclude(includes, excludes, propertyName)) {
-                                continue;
-                            }
                             BeanPropertyData beanPropertyData = props.computeIfAbsent(propertyName, BeanPropertyData::new);
                             beanPropertyData.getter = methodElement;
                             beanPropertyData.readAccessKind = BeanProperties.AccessKind.METHOD;
@@ -392,9 +391,6 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                             }
                         } else if (NameUtils.isWriterName(methodName, writePrefixes) && methodElement.getParameters().length == 1) {
                             String propertyName = NameUtils.getPropertyNameForSetter(methodName, writePrefixes);
-                            if (shouldExclude(includes, excludes, propertyName)) {
-                                continue;
-                            }
                             ClassElement setterType = methodElement.getParameters()[0].getType();
                             BeanPropertyData beanPropertyData = props.computeIfAbsent(propertyName, BeanPropertyData::new);
                             if (beanPropertyData.setter != null) {
@@ -419,7 +415,11 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                 }
                 if (accessKinds.contains(BeanProperties.AccessKind.FIELD)) {
                     for (FieldElement fieldElement : getPropertyFields()) {
-                        if (fieldElement.isStatic() || fieldElement.hasDeclaredAnnotation(AnnotationUtil.INJECT)) {
+                        if (fieldElement.isStatic()
+                            || fieldElement.hasDeclaredAnnotation(AnnotationUtil.INJECT)
+                            || fieldElement.hasStereotype(Value.class)
+                            || fieldElement.hasStereotype(Property.class)
+                        ) {
                             continue;
                         }
                         if (visibility == BeanProperties.Visibility.DEFAULT) {
@@ -430,9 +430,6 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                             continue;
                         }
                         String propertyName = fieldElement.getSimpleName();
-                        if (shouldExclude(includes, excludes, propertyName)) {
-                            continue;
-                        }
                         BeanPropertyData beanPropertyData = props.computeIfAbsent(propertyName, BeanPropertyData::new);
                         ClassElement fieldType = fieldElement.getGenericType();
                         if (fieldType.isOptional()) {
@@ -470,7 +467,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                 this.beanProperties = new ArrayList<>(props.size());
                 Map<String, FieldElement> fields = getEnclosedElements(ElementQuery.ALL_FIELDS)
                     .stream()
-                    .filter(f ->!f.isStatic() && !f.hasDeclaredAnnotation(AnnotationUtil.INJECT))
+                    .filter(f -> !f.isStatic() && !f.hasDeclaredAnnotation(AnnotationUtil.INJECT))
                     .collect(Collectors.toMap(io.micronaut.inject.ast.Element::getName, f -> f));
                 for (Map.Entry<String, BeanPropertyData> entry : props.entrySet()) {
                     String propertyName = entry.getKey();
@@ -480,6 +477,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                         value.field = fields.get(propertyName);
                     }
                     if (value.getter != null || value.field != null || value.setter != null) {
+                        boolean isExcluded = shouldExclude(includes, excludes, propertyName);
                         JavaPropertyElement propertyElement = new JavaPropertyElement(
                             JavaClassElement.this,
                             value.type,
@@ -490,6 +488,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                             value.propertyName,
                             value.readAccessKind == null ? PropertyElement.AccessKind.METHOD : PropertyElement.AccessKind.valueOf(value.readAccessKind.name()),
                             value.writeAccessKind == null ? PropertyElement.AccessKind.METHOD : PropertyElement.AccessKind.valueOf(value.writeAccessKind.name()),
+                            isExcluded,
                             visitorContext);
                         beanProperties.add(propertyElement);
                     }
@@ -518,6 +517,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         return result;
 
     }
+
     private List<FieldElement> getPropertyFields() {
         List<FieldElement> fields = getEnclosedElements(ElementQuery.ALL_FIELDS);
         List<FieldElement> result = new ArrayList<>(fields.size());

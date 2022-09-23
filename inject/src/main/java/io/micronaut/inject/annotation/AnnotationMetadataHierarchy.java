@@ -1049,19 +1049,25 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
         MutableAnnotationMetadata newAnnotationMetadata = new MutableAnnotationMetadata();
         for (int i = hierarchy.length - 1; i >= 0; i--) {
             AnnotationMetadata metadata = hierarchy[i];
+            metadata = unwrap(metadata);
             if (metadata.isEmpty()) {
                 continue;
             }
-            if (metadata instanceof AnnotationMetadataProvider) {
-                metadata = ((AnnotationMetadataProvider) metadata).getAnnotationMetadata();
-            }
-
             if (metadata instanceof AnnotationMetadataHierarchy) {
                 newAnnotationMetadata.addAnnotationMetadata(((AnnotationMetadataHierarchy) metadata).merge());
-            } else {
+            } else if (metadata instanceof DefaultAnnotationMetadata) {
                 newAnnotationMetadata.addAnnotationMetadata((DefaultAnnotationMetadata) metadata);
+            } else {
+                throw new IllegalStateException("Unknown instance of AnnotationMetadata: " + metadata.getClass());
             }
         }
         return newAnnotationMetadata;
+    }
+
+    private static AnnotationMetadata unwrap(AnnotationMetadata metadata) {
+        if (metadata instanceof AnnotationMetadataProvider) {
+            return unwrap(((AnnotationMetadataProvider) metadata).getAnnotationMetadata());
+        }
+        return metadata;
     }
 }
