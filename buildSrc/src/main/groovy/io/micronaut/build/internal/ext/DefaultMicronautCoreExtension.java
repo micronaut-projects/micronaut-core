@@ -56,11 +56,6 @@ public abstract class DefaultMicronautCoreExtension implements MicronautCoreExte
     }
 
     @Override
-    public void usesMicronautTestKotest() {
-        addTestImplementationDependency("kotest");
-    }
-
-    @Override
     public void usesMicronautTestKotest5() {
         addTestImplementationDependency("kotest5");
     }

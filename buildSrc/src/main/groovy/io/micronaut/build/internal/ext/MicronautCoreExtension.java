@@ -18,6 +18,7 @@ package io.micronaut.build.internal.ext;
 import org.gradle.api.provider.Property;
 
 public interface MicronautCoreExtension {
+
     Property<Boolean> getDocumented();
 
     void usesMicronautTest();
@@ -26,8 +27,5 @@ public interface MicronautCoreExtension {
 
     void usesMicronautTestJunit();
 
-    void usesMicronautTestKotest();
-
     void usesMicronautTestKotest5();
-
 }
