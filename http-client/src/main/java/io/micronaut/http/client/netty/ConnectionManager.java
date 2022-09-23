@@ -611,23 +611,6 @@ class ConnectionManager {
                     ch.config().setAutoRead(false);
                 }
 
-                configuration.getLogLevel().ifPresent(logLevel -> {
-                    try {
-                        final io.netty.handler.logging.LogLevel nettyLevel = io.netty.handler.logging.LogLevel.valueOf(
-                                logLevel.name()
-                        );
-                        p.addLast(new LoggingHandler(DefaultHttpClient.class, nettyLevel));
-                    } catch (IllegalArgumentException e) {
-                        throw customizeException(new HttpClientException("Unsupported log level: " + logLevel));
-                    }
-                });
-
-                if (sslContext != null) {
-                    SslHandler sslHandler = sslContext.newHandler(ch.alloc(), host, port);
-                    sslHandler.setHandshakeTimeoutMillis(configuration.getSslConfiguration().getHandshakeTimeout().toMillis());
-                    p.addLast(ChannelPipelineCustomizer.HANDLER_SSL, sslHandler);
-                }
-
                 // Pool connections require alternative timeout handling
                 if (true/*poolMap == null*/) {
                     // read timeout settings are not applied to streamed requests.
@@ -794,8 +777,10 @@ class ConnectionManager {
             configureProxy(ch.pipeline(), true, host, port);
 
             InitialConnectionErrorHandler initialErrorHandler = new InitialConnectionErrorHandler(pool);
+            SslHandler sslHandler = sslContext.newHandler(ch.alloc(), host, port);
+            sslHandler.setHandshakeTimeoutMillis(configuration.getSslConfiguration().getHandshakeTimeout().toMillis());
             ch.pipeline()
-                .addLast(ChannelPipelineCustomizer.HANDLER_SSL, sslContext.newHandler(ch.alloc(), host, port))
+                .addLast(ChannelPipelineCustomizer.HANDLER_SSL, sslHandler)
                 .addLast(
                     ChannelPipelineCustomizer.HANDLER_HTTP2_PROTOCOL_NEGOTIATOR,
                     new ApplicationProtocolNegotiationHandler(ApplicationProtocolNames.HTTP_1_1) {
