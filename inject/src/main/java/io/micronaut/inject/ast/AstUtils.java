@@ -21,14 +21,13 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 
 public class AstUtils {
 
     public static List<PropertyElement> resolveBeanProperties(ClassElement classElement,
                                                               Supplier<List<MethodElement>> methodsSupplier,
                                                               Supplier<List<FieldElement>> fieldSupplier,
-                                                              boolean excludeMethodsInRole,
+                                                              boolean excludeElementsInRole,
                                                               Function<MethodElement, Optional<String>> customMethodNameResolver,
                                                               Function<BeanPropertyData, PropertyElement> propertyCreator) {
         AnnotationMetadata annotationMetadata = classElement.getAnnotationMetadata();
@@ -52,9 +51,9 @@ public class AstUtils {
             for (MethodElement methodElement : methodsSupplier.get()) {
                 // Records include everything
                 if (methodElement.isStatic()
-                    || !excludeMethodsInRole && (methodElement.hasDeclaredAnnotation(AnnotationUtil.INJECT)
-                                        || methodElement.hasDeclaredAnnotation(AnnotationUtil.PRE_DESTROY)
-                                        || methodElement.hasDeclaredAnnotation(AnnotationUtil.POST_CONSTRUCT))
+                    || !excludeElementsInRole && (methodElement.hasDeclaredAnnotation(AnnotationUtil.INJECT)
+                    || methodElement.hasDeclaredAnnotation(AnnotationUtil.PRE_DESTROY)
+                    || methodElement.hasDeclaredAnnotation(AnnotationUtil.POST_CONSTRUCT))
                 ) {
                     continue;
                 }
@@ -71,116 +70,42 @@ public class AstUtils {
                 }
                 if (classElement.isRecord()) {
                     String propertyName = methodElement.getSimpleName();
-                    BeanPropertyData beanPropertyData = props.computeIfAbsent(propertyName, BeanPropertyData::new);
-                    beanPropertyData.getter = methodElement;
-                    beanPropertyData.readAccessKind = BeanProperties.AccessKind.METHOD;
-                    ClassElement getterType = beanPropertyData.getter.getGenericReturnType();
-                    if (getterType.isOptional()) {
-                        getterType = getterType.getFirstTypeArgument().orElse(getterType);
-                    }
-                    beanPropertyData.type = getterType;
+                    processRecord(props, methodElement, propertyName);
                 } else if (NameUtils.isReaderName(methodName, readPrefixes) && methodElement.getParameters().length == 0) {
                     String propertyName = customMethodNameResolver.apply(methodElement).orElseGet(() -> NameUtils.getPropertyNameForGetter(methodName, readPrefixes));
-                    BeanPropertyData beanPropertyData = props.computeIfAbsent(propertyName, BeanPropertyData::new);
-                    beanPropertyData.getter = methodElement;
-                    beanPropertyData.readAccessKind = BeanProperties.AccessKind.METHOD;
-                    ClassElement getterType = beanPropertyData.getter.getGenericReturnType();
-                    if (getterType.isOptional()) {
-                        getterType = getterType.getFirstTypeArgument().orElse(getterType);
-                    }
-                    if (beanPropertyData.type != null) {
-                        if (!getterType.isAssignable(beanPropertyData.type)) {
-                            beanPropertyData.getter = null; // not a compatible getter
-                            beanPropertyData.readAccessKind = null;
-                        }
-                    } else {
-                        beanPropertyData.type = getterType;
-                    }
+                    processGetter(props, methodElement, propertyName);
                 } else if (NameUtils.isWriterName(methodName, writePrefixes) && methodElement.getParameters().length == 1) {
                     String propertyName = NameUtils.getPropertyNameForSetter(methodName, writePrefixes);
-                    ClassElement setterType = methodElement.getParameters()[0].getType();
-                    BeanPropertyData beanPropertyData = props.computeIfAbsent(propertyName, BeanPropertyData::new);
-                    if (beanPropertyData.setter != null) {
-                        if (setterType.isAssignable(beanPropertyData.type)) {
-                            // Override the setter because the type is higher
-                            beanPropertyData.setter = methodElement;
-                        }
-                        continue;
-                    }
-                    beanPropertyData.setter = methodElement;
-                    beanPropertyData.writeAccessKind = BeanProperties.AccessKind.METHOD;
-                    if (beanPropertyData.type != null) {
-                        if (!setterType.isAssignable(beanPropertyData.type)) {
-                            beanPropertyData.setter = null; // not a compatible setter
-                            beanPropertyData.writeAccessKind = null;
-                        }
-                    } else {
-                        beanPropertyData.type = setterType;
-                    }
+                    processSetter(props, methodElement, propertyName);
                 }
             }
         }
-        if (!classElement.isRecord() && accessKinds.contains(BeanProperties.AccessKind.FIELD)) {
-            for (FieldElement fieldElement : getSubtypeFirstFields(classElement)) {
-                if (fieldElement.isStatic()
-                    || fieldElement.hasDeclaredAnnotation(AnnotationUtil.INJECT)
-                    || fieldElement.hasStereotype(Value.class)
-                    || fieldElement.hasStereotype(Property.class)
-                ) {
-                    continue;
-                }
-                if (visibility == BeanProperties.Visibility.DEFAULT) {
-                    if (fieldElement.isPrivate() || !fieldElement.isAccessible() && !fieldElement.getDeclaringType().hasDeclaredStereotype(BeanProperties.class)) {
-                        continue;
-                    }
-                } else if (visibility == BeanProperties.Visibility.PUBLIC && !fieldElement.isPublic()) {
-                    continue;
-                }
-                String propertyName = fieldElement.getSimpleName();
-                BeanPropertyData beanPropertyData = props.computeIfAbsent(propertyName, BeanPropertyData::new);
-                ClassElement fieldType = fieldElement.getGenericType();
-                if (fieldType.isOptional()) {
-                    fieldType = fieldType.getFirstTypeArgument().orElse(fieldType);
-                }
-                if (beanPropertyData.getter == null) {
-                    if (beanPropertyData.type != null) {
-                        if (fieldType.isAssignable(beanPropertyData.type)) {
-                            beanPropertyData.field = fieldElement;
-                            beanPropertyData.readAccessKind = BeanProperties.AccessKind.FIELD;
-                        }
-                    } else {
-                        beanPropertyData.type = fieldType;
-                        beanPropertyData.field = fieldElement;
-                        beanPropertyData.readAccessKind = BeanProperties.AccessKind.FIELD;
-                    }
-                }
-                if (!fieldElement.isFinal() && beanPropertyData.setter == null) {
-                    if (beanPropertyData.type != null) {
-                        if (fieldType.isAssignable(beanPropertyData.type)) {
-                            beanPropertyData.field = fieldElement;
-                            beanPropertyData.writeAccessKind = BeanProperties.AccessKind.FIELD;
-                        }
-                    } else {
-                        beanPropertyData.type = fieldType;
-                        beanPropertyData.field = fieldElement;
-                        beanPropertyData.writeAccessKind = BeanProperties.AccessKind.FIELD;
-                    }
-                }
+        for (FieldElement fieldElement : fieldSupplier.get()) {
+            if (fieldElement.isStatic()
+                || !excludeElementsInRole && (fieldElement.hasDeclaredAnnotation(AnnotationUtil.INJECT)
+                || fieldElement.hasStereotype(Value.class)
+                || fieldElement.hasStereotype(Property.class))
+            ) {
+                continue;
             }
+            String propertyName = fieldElement.getSimpleName();
+            boolean isAccessor = canFieldBeUsedForAccess(classElement, fieldElement, accessKinds, visibility);
+            if (!isAccessor && !props.containsKey(propertyName)) {
+                continue;
+            }
+            BeanPropertyData beanPropertyData = props.computeIfAbsent(propertyName, BeanPropertyData::new);
+            ClassElement fieldType = fieldElement.getGenericType();
+            if (fieldType.isOptional()) {
+                fieldType = fieldType.getFirstTypeArgument().orElse(fieldType);
+            }
+            resolveReadAccessForField(fieldElement, isAccessor, beanPropertyData, fieldType);
+            resolveWriteAccessForField(fieldElement, isAccessor, beanPropertyData, fieldType);
         }
         if (!props.isEmpty()) {
             List<PropertyElement> beanProperties = new ArrayList<>(props.size());
-            Map<String, FieldElement> fields = fieldSupplier.get()
-                .stream()
-                .filter(f -> !f.isStatic() && !f.hasDeclaredAnnotation(AnnotationUtil.INJECT))
-                .collect(Collectors.toMap(io.micronaut.inject.ast.Element::getName, f -> f));
             for (Map.Entry<String, BeanPropertyData> entry : props.entrySet()) {
                 String propertyName = entry.getKey();
                 BeanPropertyData value = entry.getValue();
-                if (value.field == null && (value.getter != null || value.setter != null)) {
-                    // Find private setter for getter or setter to include the metadata
-                    value.field = fields.get(propertyName);
-                }
                 if (value.getter != null || value.field != null || value.setter != null) {
                     value.isExcluded = shouldExclude(includes, excludes, propertyName);
                     beanProperties.add(propertyCreator.apply(value));
@@ -189,6 +114,124 @@ public class AstUtils {
             return Collections.unmodifiableList(beanProperties);
         }
         return Collections.emptyList();
+    }
+
+    private static void processRecord(Map<String, BeanPropertyData> props, MethodElement methodElement, String propertyName) {
+        BeanPropertyData beanPropertyData = props.computeIfAbsent(propertyName, BeanPropertyData::new);
+        beanPropertyData.getter = methodElement;
+        beanPropertyData.readAccessKind = BeanProperties.AccessKind.METHOD;
+        ClassElement getterType = beanPropertyData.getter.getGenericReturnType();
+        if (getterType.isOptional()) {
+            getterType = getterType.getFirstTypeArgument().orElse(getterType);
+        }
+        beanPropertyData.type = getterType;
+    }
+
+    private static void processGetter(Map<String, BeanPropertyData> props, MethodElement methodElement, String propertyName) {
+        BeanPropertyData beanPropertyData = props.computeIfAbsent(propertyName, BeanPropertyData::new);
+        beanPropertyData.getter = methodElement;
+        beanPropertyData.readAccessKind = BeanProperties.AccessKind.METHOD;
+        ClassElement getterType = beanPropertyData.getter.getGenericReturnType();
+        if (getterType.isOptional()) {
+            getterType = getterType.getFirstTypeArgument().orElse(getterType);
+        }
+        if (beanPropertyData.type != null) {
+            if (!getterType.isAssignable(beanPropertyData.type)) {
+                beanPropertyData.getter = null; // not a compatible getter
+                beanPropertyData.readAccessKind = null;
+            }
+        } else {
+            beanPropertyData.type = getterType;
+        }
+    }
+
+    private static void processSetter(Map<String, BeanPropertyData> props, MethodElement methodElement, String propertyName) {
+        ClassElement setterType = methodElement.getParameters()[0].getType();
+        BeanPropertyData beanPropertyData = props.computeIfAbsent(propertyName, BeanPropertyData::new);
+        if (beanPropertyData.setter != null) {
+            if (setterType.isAssignable(beanPropertyData.type)) {
+                // Override the setter because the type is higher
+                beanPropertyData.setter = methodElement;
+            }
+            return;
+        }
+        beanPropertyData.setter = methodElement;
+        beanPropertyData.writeAccessKind = BeanProperties.AccessKind.METHOD;
+        if (beanPropertyData.type != null) {
+            if (!setterType.isAssignable(beanPropertyData.type)) {
+                beanPropertyData.setter = null; // not a compatible setter
+                beanPropertyData.writeAccessKind = null;
+            }
+        } else {
+            beanPropertyData.type = setterType;
+        }
+    }
+
+    private static void resolveWriteAccessForField(FieldElement fieldElement, boolean isAccessor, BeanPropertyData beanPropertyData, ClassElement fieldType) {
+        if (fieldElement.isFinal()) {
+            return;
+        }
+        if (beanPropertyData.setter == null) {
+            if (beanPropertyData.type != null) {
+                if (fieldType.isAssignable(beanPropertyData.type)) {
+                    beanPropertyData.field = fieldElement;
+                    if (isAccessor) {
+                        beanPropertyData.writeAccessKind = BeanProperties.AccessKind.FIELD;
+                    }
+                }
+                // Else: not compatible field
+            } else {
+                beanPropertyData.field = fieldElement;
+                beanPropertyData.type = fieldType;
+                if (isAccessor) {
+                    beanPropertyData.writeAccessKind = BeanProperties.AccessKind.FIELD;
+                }
+            }
+        } else {
+            beanPropertyData.field = fieldElement;
+        }
+    }
+
+    private static void resolveReadAccessForField(FieldElement fieldElement, boolean isAccessor, BeanPropertyData beanPropertyData, ClassElement fieldType) {
+        if (beanPropertyData.getter == null) {
+            if (beanPropertyData.type != null) {
+                if (fieldType.isAssignable(beanPropertyData.type)) {
+                    beanPropertyData.field = fieldElement;
+                    if (isAccessor) {
+                        beanPropertyData.readAccessKind = BeanProperties.AccessKind.FIELD;
+                    }
+                }
+                // Else: not compatible field
+            } else {
+                beanPropertyData.field = fieldElement;
+                beanPropertyData.type = fieldType;
+                if (isAccessor) {
+                    beanPropertyData.readAccessKind = BeanProperties.AccessKind.FIELD;
+                }
+            }
+        } else {
+            beanPropertyData.field = fieldElement;
+        }
+    }
+
+    private static boolean canFieldBeUsedForAccess(ClassElement classElement,
+                                                   FieldElement fieldElement,
+                                                   EnumSet<BeanProperties.AccessKind> accessKinds,
+                                                   BeanProperties.Visibility visibility) {
+        if (classElement.isRecord()) {
+            return false;
+        }
+        if (accessKinds.contains(BeanProperties.AccessKind.FIELD)) {
+            switch (visibility) {
+                case DEFAULT:
+                    return !fieldElement.isPrivate() && (fieldElement.isAccessible() || fieldElement.getDeclaringType().hasDeclaredStereotype(BeanProperties.class));
+                case PUBLIC:
+                    return fieldElement.isPublic();
+                default:
+                    return false;
+            }
+        }
+        return false;
     }
 
     public static List<MethodElement> getSubtypeFirstMethods(ClassElement classElement) {
