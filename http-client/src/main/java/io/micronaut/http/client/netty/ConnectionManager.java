@@ -62,9 +62,7 @@ import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketClientCompressionHandler;
-import io.netty.handler.codec.http2.DefaultHttp2Connection;
 import io.netty.handler.codec.http2.Http2ClientUpgradeCodec;
-import io.netty.handler.codec.http2.Http2Connection;
 import io.netty.handler.codec.http2.Http2FrameCodec;
 import io.netty.handler.codec.http2.Http2FrameCodecBuilder;
 import io.netty.handler.codec.http2.Http2FrameLogger;
@@ -117,7 +115,6 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Consumer;
 
 /**
  * Connection manager for {@link DefaultHttpClient}. This class manages the lifecycle of netty
@@ -479,47 +476,44 @@ class ConnectionManager {
     Mono<?> connectForWebsocket(DefaultHttpClient.RequestKey requestKey, ChannelHandler handler) {
         Sinks.Empty<Object> initial = Sinks.empty();
 
-        Bootstrap bootstrap = this.bootstrap.clone();
-        SslContext sslContext = buildSslContext(requestKey);
-
-        bootstrap.remoteAddress(requestKey.getHost(), requestKey.getPort());
-        initBootstrapForProxy(bootstrap, sslContext != null, requestKey.getHost(), requestKey.getPort());
-        bootstrap.handler(new HttpClientInitializer(
-            sslContext,
-            requestKey.getHost(),
-            requestKey.getPort(),
-            false,
-            false,
-            false,
-            null
-        ) {
+        ChannelFuture connectFuture = doConnect(requestKey, new ChannelInitializer<Channel>() {
             @Override
-            protected void addFinalHandler(ChannelPipeline pipeline) {
-                pipeline.remove(ChannelPipelineCustomizer.HANDLER_HTTP_DECODER);
-                ReadTimeoutHandler readTimeoutHandler = pipeline.get(ReadTimeoutHandler.class);
-                if (readTimeoutHandler != null) {
-                    pipeline.remove(readTimeoutHandler);
+            protected void initChannel(Channel ch) throws Exception {
+                addLogHandler(ch);
+
+                if (requestKey.isSecure()) {
+                    SslHandler sslHandler = sslContext.newHandler(ch.alloc(), requestKey.getHost(), requestKey.getPort());
+                    sslHandler.setHandshakeTimeoutMillis(configuration.getSslConfiguration().getHandshakeTimeout().toMillis());
+                    ch.pipeline().addLast(sslHandler);
                 }
+
+                ch.pipeline()
+                    .addLast(ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC, new HttpClientCodec())
+                    .addLast(ChannelPipelineCustomizer.HANDLER_HTTP_AGGREGATOR, new HttpObjectAggregator(configuration.getMaxContentLength()));
 
                 Optional<Duration> readIdleTime = configuration.getReadIdleTimeout();
                 if (readIdleTime.isPresent()) {
                     Duration duration = readIdleTime.get();
                     if (!duration.isNegative()) {
-                        pipeline.addLast(ChannelPipelineCustomizer.HANDLER_IDLE_STATE, new IdleStateHandler(duration.toMillis(), duration.toMillis(), duration.toMillis(), TimeUnit.MILLISECONDS));
+                        ch.pipeline()
+                            .addLast(ChannelPipelineCustomizer.HANDLER_IDLE_STATE, new IdleStateHandler(duration.toMillis(), duration.toMillis(), duration.toMillis(), TimeUnit.MILLISECONDS));
                     }
                 }
 
                 try {
-                    pipeline.addLast(WebSocketClientCompressionHandler.INSTANCE);
-                    pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_WEBSOCKET_CLIENT, handler);
-                    initial.tryEmitEmpty();
+                    ch.pipeline().addLast(WebSocketClientCompressionHandler.INSTANCE);
+                    ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_WEBSOCKET_CLIENT, handler);
+                    if (initial.tryEmitEmpty().isSuccess()) {
+                        return;
+                    }
                 } catch (Throwable e) {
                     initial.tryEmitError(new WebSocketSessionException("Error opening WebSocket client session: " + e.getMessage(), e));
                 }
+                // failed
+                ch.close();
             }
         });
-
-        addInstrumentedListener(bootstrap.connect(), future -> {
+        addInstrumentedListener(connectFuture, future -> {
             if (!future.isSuccess()) {
                 initial.tryEmitError(future.cause());
             }
@@ -597,117 +591,6 @@ class ConnectionManager {
             }
         });
         return builder.build();
-    }
-
-    /**
-     * Initializes the HTTP client channel.
-     */
-    private class HttpClientInitializer extends ChannelInitializer<Channel> {
-
-        final SslContext sslContext;
-        final String host;
-        final int port;
-        final boolean stream;
-        final boolean proxy;
-        final boolean acceptsEvents;
-        final Consumer<ChannelHandlerContext> contextConsumer;
-        private NettyClientCustomizer channelCustomizer;
-
-        /**
-         * @param sslContext      The ssl context
-         * @param host            The host
-         * @param port            The port
-         * @param stream          Whether is stream
-         * @param proxy           Is this a streaming proxy
-         * @param acceptsEvents   Whether an event stream is accepted
-         * @param contextConsumer The context consumer
-         */
-        protected HttpClientInitializer(SslContext sslContext,
-                                        String host,
-                                        int port,
-                                        boolean stream,
-                                        boolean proxy,
-                                        boolean acceptsEvents,
-                                        Consumer<ChannelHandlerContext> contextConsumer) {
-            this.sslContext = sslContext;
-            this.stream = stream;
-            this.host = host;
-            this.port = port;
-            this.proxy = proxy;
-            this.acceptsEvents = acceptsEvents;
-            this.contextConsumer = contextConsumer;
-        }
-
-        /**
-         * @param ch The channel
-         */
-        @Override
-        protected void initChannel(Channel ch) {
-            channelCustomizer = clientCustomizer.specializeForChannel(ch, NettyClientCustomizer.ChannelRole.CONNECTION);
-            ch.attr(CHANNEL_CUSTOMIZER_KEY).set(channelCustomizer);
-
-            ChannelPipeline p = ch.pipeline();
-
-            configureProxy(p, sslContext != null, host, port);
-
-            if (httpVersion == HttpVersion.HTTP_2_0) {
-                final Http2Connection connection = new DefaultHttp2Connection(false);
-                if (sslContext != null) {
-                } else {
-                }
-                channelCustomizer.onInitialPipelineBuilt();
-            } else {
-                if (stream) {
-                    // for streaming responses we disable auto read
-                    // so that the consumer is in charge of back pressure
-                    ch.config().setAutoRead(false);
-                }
-
-                channelCustomizer.onInitialPipelineBuilt();
-                onStreamPipelineBuilt();
-            }
-        }
-
-        /**
-         * Called when the stream pipeline is fully set up (all handshakes completed) and we can
-         * start processing requests.
-         */
-        void onStreamPipelineBuilt() {
-            channelCustomizer.onStreamPipelineBuilt();
-        }
-
-        void addEventStreamHandlerIfNecessary(ChannelPipeline p) {
-            // if the content type is a SSE event stream we add a decoder
-            // to delimit the content by lines (unless we are proxying the stream)
-            if (acceptsEventStream() && !proxy) {
-
-
-            }
-        }
-
-        /**
-         * Allows overriding the final handler added to the pipeline.
-         *
-         * @param pipeline The pipeline
-         */
-        protected void addFinalHandler(ChannelPipeline pipeline) {
-            pipeline.addLast(
-                    ChannelPipelineCustomizer.HANDLER_HTTP_STREAM,
-                    new HttpStreamsClientHandler() {
-                @Override
-                public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
-                    if (evt instanceof IdleStateEvent) {
-                        // close the connection if it is idle for too long
-                        ctx.close();
-                    }
-                    super.userEventTriggered(ctx, evt);
-                }
-                    });
-        }
-
-        private boolean acceptsEventStream() {
-            return this.acceptsEvents;
-        }
     }
 
     private class AdaptiveAlpnChannelInitializer extends ChannelInitializer<Channel> {
@@ -788,6 +671,14 @@ class ConnectionManager {
     }
 
     private void initHttp1(Channel ch) {
+        addLogHandler(ch);
+
+        ch.pipeline()
+            .addLast(ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC, new HttpClientCodec())
+            .addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECODER, new HttpContentDecompressor());
+    }
+
+    private void addLogHandler(Channel ch) {
         configuration.getLogLevel().ifPresent(logLevel -> {
             try {
                 final io.netty.handler.logging.LogLevel nettyLevel =
@@ -797,10 +688,6 @@ class ConnectionManager {
                 throw customizeException(new HttpClientException("Unsupported log level: " + logLevel));
             }
         });
-
-        ch.pipeline()
-            .addLast(ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC, new HttpClientCodec())
-            .addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECODER, new HttpContentDecompressor());
     }
 
     private void initHttp2(Pool pool, Channel ch, NettyClientCustomizer connectionCustomizer) {

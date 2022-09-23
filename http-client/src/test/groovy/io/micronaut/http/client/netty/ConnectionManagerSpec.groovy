@@ -13,6 +13,9 @@ import io.micronaut.http.client.exceptions.ReadTimeoutException
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer
 import io.micronaut.http.server.netty.ssl.CertificateProvidedSslBuilder
 import io.micronaut.http.ssl.SslConfiguration
+import io.micronaut.websocket.WebSocketSession
+import io.micronaut.websocket.annotation.ClientWebSocket
+import io.micronaut.websocket.annotation.OnMessage
 import io.netty.buffer.ByteBufAllocator
 import io.netty.buffer.Unpooled
 import io.netty.channel.Channel
@@ -30,10 +33,13 @@ import io.netty.handler.codec.http.DefaultHttpResponse
 import io.netty.handler.codec.http.DefaultLastHttpContent
 import io.netty.handler.codec.http.HttpContentCompressor
 import io.netty.handler.codec.http.HttpMethod
+import io.netty.handler.codec.http.HttpObjectAggregator
 import io.netty.handler.codec.http.HttpResponseStatus
 import io.netty.handler.codec.http.HttpServerCodec
 import io.netty.handler.codec.http.HttpServerUpgradeHandler
 import io.netty.handler.codec.http.LastHttpContent
+import io.netty.handler.codec.http.websocketx.TextWebSocketFrame
+import io.netty.handler.codec.http.websocketx.WebSocketServerHandshakerFactory
 import io.netty.handler.codec.http2.DefaultHttp2DataFrame
 import io.netty.handler.codec.http2.DefaultHttp2Headers
 import io.netty.handler.codec.http2.DefaultHttp2HeadersFrame
@@ -58,6 +64,7 @@ import jakarta.inject.Singleton
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import spock.lang.Specification
+import spock.lang.Unroll
 
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.CompletableFuture
@@ -596,6 +603,58 @@ class ConnectionManagerSpec extends Specification {
         cleanup:
         client.close()
         ctx.close()
+    }
+
+    @Unroll
+    def 'websocket ssl=#secure'(boolean secure) {
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+                'micronaut.http.client.connect-ttl': '100s',
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn = new EmbeddedTestConnectionHttp1()
+        if (secure) {
+            conn.setupHttp1Tls()
+        } else {
+            conn.setupHttp1()
+        }
+        conn.serverChannel.pipeline().addLast(new HttpObjectAggregator(1024))
+        patch(client, conn.clientChannel)
+
+        def uri = conn.scheme + "://example.com/foo"
+        Mono.from(client.connect(Ws, uri)).subscribe()
+        conn.advance()
+        conn.clientChannel.pipeline().fireChannelActive()
+        conn.advance()
+        io.netty.handler.codec.http.HttpRequest req = conn.serverChannel.readInbound()
+        def handshaker = new WebSocketServerHandshakerFactory(uri, null, false).newHandshaker(req)
+        handshaker.handshake(conn.serverChannel, req)
+        conn.advance()
+
+        conn.serverChannel.writeOutbound(new TextWebSocketFrame('foo'))
+        conn.advance()
+        TextWebSocketFrame response = conn.serverChannel.readInbound()
+        assert response.text() == 'received: foo'
+
+        cleanup:
+        client.close()
+        ctx.close()
+
+        where:
+        secure << [true, false]
+    }
+
+    @ClientWebSocket
+    static class Ws implements AutoCloseable {
+        @Override
+        void close() throws Exception {
+        }
+
+        @OnMessage
+        def onMessage(String msg, WebSocketSession session) {
+            return session.send('received: ' + msg)
+        }
     }
 
     static class EmbeddedTestConnectionBase {

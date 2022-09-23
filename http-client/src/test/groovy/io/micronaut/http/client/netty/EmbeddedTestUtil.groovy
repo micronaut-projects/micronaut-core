@@ -67,7 +67,7 @@ class EmbeddedTestUtil {
                 @Override
                 void write(ChannelHandlerContext ctx_, Object msg, ChannelPromise promise) throws Exception {
                     if (!(msg instanceof ByteBuf)) {
-                        throw new IllegalArgumentException("Can only forward bytes!")
+                        throw new IllegalArgumentException("Can only forward bytes, got " + msg)
                     }
                     if (!msg.isReadable()) {
                         // no data
