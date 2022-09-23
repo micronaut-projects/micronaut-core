@@ -374,6 +374,7 @@ class ConnectionManager {
         return pool.acquire()
             .map(ph -> {
                 // TODO: this sucks
+                boolean sse = !isProxy && acceptEvents;
                 ph.channel.pipeline().addLast(new ChannelInboundHandlerAdapter() {
                     boolean ignoreOneLast = false;
 
@@ -390,6 +391,10 @@ class ConnectionManager {
                             if (ignoreOneLast) {
                                 ignoreOneLast = false;
                             } else {
+                                if (sse) {
+                                    ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_MICRONAUT_SSE_EVENT_STREAM);
+                                    ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_MICRONAUT_SSE_CONTENT);
+                                }
                                 ctx.pipeline()
                                     .remove(this)
                                     .remove(ChannelPipelineCustomizer.HANDLER_HTTP_STREAM);
@@ -398,6 +403,53 @@ class ConnectionManager {
                         }
                     }
                 });
+                if (sse) {
+                    ph.channel.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_SSE_EVENT_STREAM, new LineBasedFrameDecoder(configuration.getMaxContentLength(), true, true) {
+
+                        @Override
+                        public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+                            if (msg instanceof HttpContent) {
+                                if (msg instanceof LastHttpContent) {
+                                    super.channelRead(ctx, msg);
+                                } else {
+                                    Attribute<Http2Stream> streamKey = ctx.channel().attr(STREAM_KEY);
+                                    if (msg instanceof Http2Content) {
+                                        streamKey.set(((Http2Content) msg).stream());
+                                    }
+                                    try {
+                                        super.channelRead(ctx, ((HttpContent) msg).content());
+                                    } finally {
+                                        streamKey.set(null);
+                                    }
+                                }
+                            } else {
+                                super.channelRead(ctx, msg);
+                            }
+                        }
+                    });
+                    ph.channel.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_SSE_CONTENT, new SimpleChannelInboundHandlerInstrumented<ByteBuf>(instrumenter, false) {
+
+                        @Override
+                        public boolean acceptInboundMessage(Object msg) {
+                            return msg instanceof ByteBuf;
+                        }
+
+                        @Override
+                        protected void channelReadInstrumented(ChannelHandlerContext ctx, ByteBuf msg) {
+                            try {
+                                Attribute<Http2Stream> streamKey = ctx.channel().attr(STREAM_KEY);
+                                Http2Stream http2Stream = streamKey.get();
+                                if (http2Stream != null) {
+                                    ctx.fireChannelRead(new DefaultHttp2Content(msg.copy(), http2Stream));
+                                } else {
+                                    ctx.fireChannelRead(new DefaultHttpContent(msg.copy()));
+                                }
+                            } finally {
+                                msg.release();
+                            }
+                        }
+                    });
+                }
                 ph.channel.pipeline().addLast(
                         ChannelPipelineCustomizer.HANDLER_HTTP_STREAM,
                         new HttpStreamsClientHandler() {
@@ -611,27 +663,6 @@ class ConnectionManager {
                     ch.config().setAutoRead(false);
                 }
 
-                // Pool connections require alternative timeout handling
-                if (true/*poolMap == null*/) {
-                    // read timeout settings are not applied to streamed requests.
-                    // instead idle timeout settings are applied.
-                    if (stream) {
-                        Optional<Duration> readIdleTime = configuration.getReadIdleTimeout();
-                        if (readIdleTime.isPresent()) {
-                            Duration duration = readIdleTime.get();
-                            if (!duration.isNegative()) {
-                                p.addLast(ChannelPipelineCustomizer.HANDLER_IDLE_STATE, new IdleStateHandler(
-                                        duration.toMillis(),
-                                        duration.toMillis(),
-                                        duration.toMillis(),
-                                        TimeUnit.MILLISECONDS
-                                ));
-                            }
-                        }
-                    }
-                }
-
-                addHttp1Handlers(p);
                 channelCustomizer.onInitialPipelineBuilt();
                 onStreamPipelineBuilt();
             }
@@ -645,80 +676,11 @@ class ConnectionManager {
             channelCustomizer.onStreamPipelineBuilt();
         }
 
-        void addHttp1Handlers(ChannelPipeline p) {
-            p.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC, new HttpClientCodec());
-
-            p.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECOMPRESSOR, new HttpContentDecompressor());
-
-            if (!stream) {
-                p.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_AGGREGATOR, new HttpObjectAggregator(configuration.getMaxContentLength()) {
-                    @Override
-                    protected void finishAggregation(FullHttpMessage aggregated) throws Exception {
-                        if (!HttpUtil.isContentLengthSet(aggregated)) {
-                            if (aggregated.content().readableBytes() > 0) {
-                                super.finishAggregation(aggregated);
-                            }
-                        }
-                    }
-                });
-            }
-            addEventStreamHandlerIfNecessary(p);
-            addFinalHandler(p);
-            for (ChannelPipelineListener pipelineListener : pipelineListeners) {
-                pipelineListener.onConnect(p);
-            }
-        }
-
         void addEventStreamHandlerIfNecessary(ChannelPipeline p) {
             // if the content type is a SSE event stream we add a decoder
             // to delimit the content by lines (unless we are proxying the stream)
             if (acceptsEventStream() && !proxy) {
-                p.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_SSE_EVENT_STREAM, new LineBasedFrameDecoder(configuration.getMaxContentLength(), true, true) {
 
-                    @Override
-                    public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-                        if (msg instanceof HttpContent) {
-                            if (msg instanceof LastHttpContent) {
-                                super.channelRead(ctx, msg);
-                            } else {
-                                Attribute<Http2Stream> streamKey = ctx.channel().attr(STREAM_KEY);
-                                if (msg instanceof Http2Content) {
-                                    streamKey.set(((Http2Content) msg).stream());
-                                }
-                                try {
-                                    super.channelRead(ctx, ((HttpContent) msg).content());
-                                } finally {
-                                    streamKey.set(null);
-                                }
-                            }
-                        } else {
-                            super.channelRead(ctx, msg);
-                        }
-                    }
-                });
-
-                p.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_SSE_CONTENT, new SimpleChannelInboundHandlerInstrumented<ByteBuf>(instrumenter, false) {
-
-                    @Override
-                    public boolean acceptInboundMessage(Object msg) {
-                        return msg instanceof ByteBuf;
-                    }
-
-                    @Override
-                    protected void channelReadInstrumented(ChannelHandlerContext ctx, ByteBuf msg) {
-                        try {
-                            Attribute<Http2Stream> streamKey = ctx.channel().attr(STREAM_KEY);
-                            Http2Stream http2Stream = streamKey.get();
-                            if (http2Stream != null) {
-                                ctx.fireChannelRead(new DefaultHttp2Content(msg.copy(), http2Stream));
-                            } else {
-                                ctx.fireChannelRead(new DefaultHttpContent(msg.copy()));
-                            }
-                        } finally {
-                            msg.release();
-                        }
-                    }
-                });
 
             }
         }
@@ -1035,10 +997,17 @@ class ConnectionManager {
                         initializer = new ChannelInitializer<Channel>() {
                             @Override
                             protected void initChannel(Channel ch) throws Exception {
-                                NettyClientCustomizer channelCustomizer = clientCustomizer.specializeForChannel(ch, NettyClientCustomizer.ChannelRole.CONNECTION);
                                 configureProxy(ch.pipeline(), false, requestKey.getHost(), requestKey.getPort());
                                 initHttp1(ch);
-                                new Http1ConnectionHolder(ch, channelCustomizer).init(true);
+                                ch.pipeline().addLast("activity-listener", new ChannelInboundHandlerAdapter() {
+                                    @Override
+                                    public void channelActive(ChannelHandlerContext ctx) throws Exception {
+                                        super.channelActive(ctx);
+                                        ctx.pipeline().remove(this);
+                                        NettyClientCustomizer channelCustomizer = clientCustomizer.specializeForChannel(ch, NettyClientCustomizer.ChannelRole.CONNECTION);
+                                        new Http1ConnectionHolder(ch, channelCustomizer).init(true);
+                                    }
+                                });
                             }
                         };
                         break;
