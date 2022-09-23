@@ -829,8 +829,9 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
             beanDefinitionWriter.visitFieldValue(
                     injectedField.getDeclaringType(),
                     injectedField,
-                    ibf.isReflectionRequired(),
-                    ibf.isDeclaredNullable()
+                    injectedField.getAnnotationMetadata(),
+                    ibf.isDeclaredNullable(),
+                    ibf.isReflectionRequired()
             );
         } else {
             beanDefinitionWriter.visitFieldInjectionPoint(

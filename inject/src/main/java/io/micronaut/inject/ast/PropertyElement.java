@@ -17,8 +17,6 @@ package io.micronaut.inject.ast;
 
 import io.micronaut.core.annotation.NonNull;
 
-import java.util.Collections;
-import java.util.List;
 import java.util.Optional;
 
 /**
@@ -28,6 +26,7 @@ import java.util.Optional;
  * @since 1.0
  */
 public interface PropertyElement extends TypedElement, MemberElement {
+
     /**
      * @return The type of the property
      */
@@ -45,23 +44,84 @@ public interface PropertyElement extends TypedElement, MemberElement {
     }
 
     /**
-     * @return The name of the method used to write the property
+     * Return true only if the property doesn't support modifying the value.
+     *
+     * @return True if the property is read only.
+     */
+    default boolean isWriteOnly() {
+        return !getReadMethod().isPresent();
+    }
+
+    /**
+     * The field representing the property.
+     * NOTE: The field should be returned even if methods exist.
+     *
+     * @return The field
+     */
+    default Optional<FieldElement> getField() {
+        return Optional.empty();
+    }
+
+    /**
+     * @return The method to write the property
      */
     default Optional<MethodElement> getWriteMethod() {
         return Optional.empty();
     }
 
     /**
-     * @return The name of the method used to read the property
+     * @return The method to read the property
      */
     default Optional<MethodElement> getReadMethod() {
         return Optional.empty();
     }
 
     /**
-     * @return The native parents that this property is representing (getter, setter, field)
+     * @return The member to read the property
      */
-    default List<?> getNativeParents() {
-        return Collections.emptyList();
+    default Optional<? extends MemberElement> getReadMember() {
+        if (getReadAccessKind() == AccessKind.METHOD) {
+            return getReadMethod();
+        }
+        return getField();
     }
+
+    /**
+     * @return The member to write the property
+     */
+    default Optional<? extends MemberElement> getWriteMember() {
+        if (getWriteAccessKind() == AccessKind.METHOD) {
+            return getWriteMethod();
+        }
+        return getField();
+    }
+
+    /**
+     * @return The read access kind of the property
+     */
+    default AccessKind getReadAccessKind() {
+        return AccessKind.METHOD;
+    }
+
+    /**
+     * @return The write access kind of the property
+     */
+    default AccessKind getWriteAccessKind() {
+        return AccessKind.METHOD;
+    }
+
+    /**
+     * The access type for bean properties.
+     */
+    enum AccessKind {
+        /**
+         * Allows the use of public or package-protected fields to represent bean properties.
+         */
+        FIELD,
+        /**
+         * The default behaviour which is to favour public getters for bean properties.
+         */
+        METHOD
+    }
+
 }

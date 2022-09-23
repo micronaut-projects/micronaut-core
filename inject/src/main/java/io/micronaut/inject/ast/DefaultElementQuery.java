@@ -48,9 +48,10 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
     private final boolean includeEnumConstants;
     private final boolean includeOverriddenMethods;
     private final boolean includeHiddenElements;
+    private final boolean excludePropertyElements;
 
     DefaultElementQuery(Class<T> elementType) {
-        this(elementType, null, false, false, false, false, false, false, false, false, false, null, null, null, null, null);
+        this(elementType, null, false, false, false, false, false, false, false, false, false, false, null, null, null, null, null);
     }
 
     @SuppressWarnings("checkstyle:ParameterNumber")
@@ -66,6 +67,7 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
         boolean includeEnumConstants,
         boolean includeOverriddenMethods,
         boolean includeHiddenElements,
+        boolean excludePropertyElements,
         List<Predicate<AnnotationMetadata>> annotationPredicates,
         List<Predicate<Set<ElementModifier>>> modifiersPredicates,
         List<Predicate<T>> elementPredicates,
@@ -85,6 +87,7 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
         this.includeEnumConstants = includeEnumConstants;
         this.includeOverriddenMethods = includeOverriddenMethods;
         this.includeHiddenElements = includeHiddenElements;
+        this.excludePropertyElements = excludePropertyElements;
         this.typePredicates = typePredicates;
     }
 
@@ -152,6 +155,11 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
     }
 
     @Override
+    public boolean isExcludePropertyElements() {
+        return excludePropertyElements;
+    }
+
+    @Override
     public List<Predicate<String>> getNamePredicates() {
         if (namePredicates == null) {
             return Collections.emptyList();
@@ -205,6 +213,7 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
             includeEnumConstants,
             includeOverriddenMethods,
             includeHiddenElements,
+            excludePropertyElements,
             annotationPredicates, modifiersPredicates, elementPredicates, namePredicates,
             typePredicates);
     }
@@ -228,6 +237,7 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
             includeEnumConstants,
             includeOverriddenMethods,
             includeHiddenElements,
+            excludePropertyElements,
             annotationPredicates, modifiersPredicates, elementPredicates, namePredicates,
             typePredicates);
     }
@@ -245,6 +255,7 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
             includeEnumConstants,
             includeOverriddenMethods,
             includeHiddenElements,
+            excludePropertyElements,
             annotationPredicates, modifiersPredicates, elementPredicates, namePredicates,
             typePredicates);
     }
@@ -262,6 +273,7 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
             includeEnumConstants,
             includeOverriddenMethods,
             includeHiddenElements,
+            excludePropertyElements,
             annotationPredicates, modifiersPredicates, elementPredicates, namePredicates,
             typePredicates);
     }
@@ -280,6 +292,7 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
             includeEnumConstants,
             includeOverriddenMethods,
             includeHiddenElements,
+            excludePropertyElements,
             annotationPredicates, modifiersPredicates, elementPredicates, namePredicates,
             typePredicates);
     }
@@ -298,6 +311,7 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
             includeEnumConstants,
             includeOverriddenMethods,
             includeHiddenElements,
+            excludePropertyElements,
             annotationPredicates, modifiersPredicates, elementPredicates, namePredicates,
             typePredicates);
     }
@@ -314,6 +328,7 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
             includeEnumConstants,
             includeOverriddenMethods,
             includeHiddenElements,
+            excludePropertyElements,
             annotationPredicates, modifiersPredicates, elementPredicates, namePredicates,
             typePredicates);
     }
@@ -330,6 +345,7 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
             includeEnumConstants,
             includeOverriddenMethods,
             includeHiddenElements,
+            excludePropertyElements,
             annotationPredicates, modifiersPredicates, elementPredicates, namePredicates,
             typePredicates);
     }
@@ -346,6 +362,7 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
             true,
             includeOverriddenMethods,
             includeHiddenElements,
+            excludePropertyElements,
             annotationPredicates, modifiersPredicates, elementPredicates, namePredicates,
             typePredicates);
     }
@@ -362,6 +379,7 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
             includeEnumConstants,
             true,
             includeHiddenElements,
+            excludePropertyElements,
             annotationPredicates, modifiersPredicates, elementPredicates, namePredicates,
             typePredicates);
     }
@@ -377,6 +395,24 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
             onlyStatic,
             includeEnumConstants,
             includeOverriddenMethods,
+            true,
+            excludePropertyElements,
+            annotationPredicates, modifiersPredicates, elementPredicates, namePredicates,
+            typePredicates);
+    }
+
+    @Override
+    public ElementQuery<T> excludePropertyElements() {
+        return new DefaultElementQuery<>(
+            elementType, onlyAccessibleType,
+            onlyDeclared,
+            onlyAbstract, onlyConcrete,
+            onlyInjected,
+            onlyInstance,
+            onlyStatic,
+            includeEnumConstants,
+            includeOverriddenMethods,
+            includeHiddenElements,
             true,
             annotationPredicates, modifiersPredicates, elementPredicates, namePredicates,
             typePredicates);
@@ -405,6 +441,7 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
             includeEnumConstants,
             includeOverriddenMethods,
             includeHiddenElements,
+            excludePropertyElements,
             annotationPredicates,
             modifiersPredicates,
             elementPredicates,
@@ -435,6 +472,7 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
             includeEnumConstants,
             includeOverriddenMethods,
             includeHiddenElements,
+            excludePropertyElements,
             annotationPredicates,
             modifiersPredicates,
             elementPredicates,
@@ -463,6 +501,7 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
             includeEnumConstants,
             includeOverriddenMethods,
             includeHiddenElements,
+            excludePropertyElements,
             annotationPredicates, modifiersPredicates, elementPredicates, namePredicates,
             typePredicates);
     }
@@ -487,6 +526,7 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
             includeEnumConstants,
             includeOverriddenMethods,
             includeHiddenElements,
+            excludePropertyElements,
             annotationPredicates, modifierPredicates, elementPredicates, namePredicates,
             typePredicates);
     }
@@ -511,6 +551,7 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
             includeEnumConstants,
             includeOverriddenMethods,
             includeHiddenElements,
+            excludePropertyElements,
             annotationPredicates, modifiersPredicates, elementPredicates, namePredicates,
             typePredicates);
     }

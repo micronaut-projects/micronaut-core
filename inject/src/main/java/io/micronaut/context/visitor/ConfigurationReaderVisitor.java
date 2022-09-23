@@ -21,12 +21,9 @@ import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Value;
-import io.micronaut.context.visitor.annotations.ConfigurationGetter;
-import io.micronaut.context.visitor.annotations.ConfigurationSetter;
 import io.micronaut.core.annotation.AccessorsStyle;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
-import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.NonNull;
@@ -35,9 +32,8 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
-import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
-import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.configuration.ConfigurationMetadata;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.visitor.TypeElementVisitor;
@@ -108,6 +104,27 @@ public class ConfigurationReaderVisitor implements TypeElementVisitor<Configurat
         // TODO: investigate why aliases aren't propagated
         includes.addAll(Arrays.asList(annotationMetadata.stringValues(ConfigurationProperties.class, "includes")));
         excludes.addAll(Arrays.asList(annotationMetadata.stringValues(ConfigurationProperties.class, "excludes")));
+
+// field.isPrivate() || !field.isAccessible(classElement) && !field.getDeclaringType().hasDeclaredStereotype(ConfigurationReader.class)
+        for (PropertyElement beanProperty : classElement.getBeanProperties()) {
+            if (beanProperty.hasStereotype(ConfigurationBuilder.class)) {
+                continue;
+            } else {
+                beanProperty.getWriteMember().ifPresent(memberElement -> {
+                    String path = metadataBuilder.visitProperty(
+                        memberElement.getOwningType(),
+                        memberElement.getDeclaringType(),
+                        beanProperty.getGenericType(),
+                        beanProperty.getName(),
+                        beanProperty.getDocumentation().orElse(null),
+                        null
+                    ).getPath();
+
+                    beanProperty.annotate(Property.class, (builder) -> builder.member("name", path));
+                });
+            }
+        }
+
     }
 
     private void reset() {
@@ -118,7 +135,6 @@ public class ConfigurationReaderVisitor implements TypeElementVisitor<Configurat
         classElement = null;
     }
 
-    @Override
     public void visitMethod(MethodElement method, VisitorContext context) {
         if (classElement == null) {
             return;
@@ -126,7 +142,7 @@ public class ConfigurationReaderVisitor implements TypeElementVisitor<Configurat
         if (method.isAbstract()) {
             visitAbstractMethod(method, context);
         } else {
-            visitPossibleGetterSetterMethod(method, context);
+//            visitPossibleGetterSetterMethod(method, context);
         }
     }
 
@@ -167,121 +183,6 @@ public class ConfigurationReaderVisitor implements TypeElementVisitor<Configurat
             }
 
         }).getAnnotationMetadata();
-    }
-
-    public void visitPossibleGetterSetterMethod(MethodElement method, VisitorContext context) {
-        if (shouldExclude(method)) {
-            if (method.getAnnotationMetadata().hasStereotype(ConfigurationBuilder.class)) {
-                method.removeAnnotation(ConfigurationBuilder.class);
-            }
-            return;
-        }
-        String methodName = method.getSimpleName();
-        if (method.getAnnotationMetadata().hasStereotype(ConfigurationBuilder.class)) {
-            visitConfigurationBuilder(method, context, methodName);
-            return;
-        }
-        if (isSetter(methodName) && method.getParameters().length == 1) {
-            String propertyName = getPropertyNameForSetter(methodName);
-            if (shouldExclude(propertyName)) {
-                return;
-            }
-            ParameterElement parameterElement = method.getParameters()[0];
-
-            String path = metadataBuilder.visitProperty(
-                method.getOwningType(),
-                method.getDeclaringType(),
-                parameterElement.getGenericType(),
-                propertyName,
-                method.getDocumentation().orElse(null),
-                null
-            ).getPath();
-
-            method.annotate(Property.class, (builder) -> builder.member("name", path));
-            method.annotate(ConfigurationSetter.class);
-        } else if (isGetter(methodName)) {
-            method.annotate(ConfigurationGetter.class);
-        }
-    }
-
-    private void visitConfigurationBuilder(MethodElement method, VisitorContext context, String methodName) {
-        if (isSetter(methodName)) {
-            if (method.getParameters().length != 1) {
-                context.fail("Expected a setter with one parameter", method);
-                return;
-            }
-            // Setter is annotated with @ConfigurationBuilder but we need getter
-            String propertyName = getPropertyNameForSetter(methodName);
-            if (tryToMoveConfigurationBuilderAnnotationsToGetter(method, propertyName)) {
-                return;
-            }
-        } else if (isGetter(methodName)) {
-            if ("void".equals(method.getReturnType().getName())) {
-                context.fail("Expected a getter with a return value", method);
-            }
-            // No modification needed
-            return;
-        }
-        // Failed to configure
-        method.removeAnnotation(ConfigurationBuilder.class);
-    }
-
-    private boolean tryToMoveConfigurationBuilderAnnotationsToGetter(MemberElement element, String propertyName) {
-        AnnotationValue<ConfigurationBuilder> configurationBuilder = element.getAnnotation(ConfigurationBuilder.class);
-        Optional<MethodElement> getterMethod = findGetterMethodFor(propertyName);
-        if (getterMethod.isPresent()) {
-            // Move annotation to the getter
-            MethodElement configurationBuilderGetter = getterMethod.get();
-            configurationBuilderGetter.annotate(configurationBuilder);
-            AnnotationValue<AccessorsStyle> accessorsStyle = element.getAnnotation(AccessorsStyle.class);
-            if (accessorsStyle != null) {
-                configurationBuilderGetter.annotate(accessorsStyle);
-                element.removeAnnotation(AccessorsStyle.class);
-            }
-            element.removeAnnotation(ConfigurationBuilder.class);
-            return true;
-        }
-        return false;
-    }
-
-    @Override
-    public void visitField(FieldElement field, VisitorContext context) {
-        if (classElement == null) {
-            return;
-        }
-        if (field.isStatic()) {
-            field.removeAnnotation(ConfigurationBuilder.class);
-            return;
-        }
-        if (field.hasStereotype(ConfigurationBuilder.class)) {
-            // Let's try to move the configuration to the getter
-            tryToMoveConfigurationBuilderAnnotationsToGetter(field, field.getSimpleName());
-            return;
-        }
-        if (shouldExclude(field)) {
-            return;
-        }
-        String propertyName = field.getSimpleName();
-        Optional<MethodElement> setterMethod = findSetterMethodFor(propertyName);
-        if (setterMethod.isPresent() && !shouldExclude(setterMethod.get())) {
-            return;
-        }
-        if (!setterMethod.isPresent()) { // Access property by field
-            String path = metadataBuilder.visitProperty(
-                field.getOwningType(),
-                field.getDeclaringType(),
-                field.getGenericType(),
-                field.getName(),
-                field.getDocumentation().orElse(null),
-                null
-            ).getPath();
-            field.annotate(Property.class, (builder) -> builder.member("name", path));
-            field.annotate(ConfigurationSetter.class);
-        }
-        Optional<MethodElement> getterMethod = findGetterMethodFor(propertyName);
-        if (!getterMethod.isPresent()) {
-            field.annotate(ConfigurationGetter.class);
-        }
     }
 
     private boolean shouldExclude(String propertyName) {

@@ -187,7 +187,7 @@ public class GroovyElementFactory implements ElementFactory<AnnotatedNode, Class
                 }
             };
         } else {
-            return new GroovyClassElement(visitorContext, classNode, annotationMetadataFactory, true) {
+            return new GroovyClassElement(visitorContext, classNode, annotationMetadataFactory) {
                 @NonNull
                 @Override
                 public BeanElementBuilder addAssociatedBean(@NonNull ClassElement type) {
@@ -298,23 +298,13 @@ public class GroovyElementFactory implements ElementFactory<AnnotatedNode, Class
         if (!(declaringClass instanceof GroovyClassElement)) {
             throw new IllegalArgumentException("Declaring class must be a GroovyClassElement");
         }
-        return new GroovyFieldElement(
-            visitorContext,
-            field,
-            field,
-            annotationMetadataFactory
-        );
+        return new GroovyFieldElement(visitorContext, field, annotationMetadataFactory);
     }
 
     @NonNull
     @Override
     public FieldElement newFieldElement(@NonNull FieldNode field, @NonNull AnnotationMetadata annotationMetadata) {
-        return new GroovyFieldElement(
-            visitorContext,
-            field,
-            field,
-            defaultAnnotationMetadata(field, annotationMetadata)
-        );
+        return new GroovyFieldElement(visitorContext, field, defaultAnnotationMetadata(field, annotationMetadata));
     }
 
     /**

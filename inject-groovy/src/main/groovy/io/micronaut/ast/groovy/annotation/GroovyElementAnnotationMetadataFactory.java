@@ -1,11 +1,13 @@
 package io.micronaut.ast.groovy.annotation;
 
+import io.micronaut.ast.groovy.visitor.AbstractGroovyElement;
 import io.micronaut.ast.groovy.visitor.GroovyVarPropertyElement;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.ast.AbstractElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementAnnotationMetadata;
 import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
+import io.micronaut.inject.ast.MethodElement;
 import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.AnnotationNode;
 
@@ -18,6 +20,11 @@ public class GroovyElementAnnotationMetadataFactory extends AbstractElementAnnot
     @Override
     public ElementAnnotationMetadataFactory readOnly() {
         return new GroovyElementAnnotationMetadataFactory(true, (GroovyAnnotationMetadataBuilder) metadataBuilder);
+    }
+
+    @Override
+    protected boolean isSupported(MethodElement methodElement) {
+        return methodElement instanceof AbstractGroovyElement;
     }
 
     @Override

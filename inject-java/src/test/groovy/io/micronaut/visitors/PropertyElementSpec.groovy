@@ -44,7 +44,6 @@ record Book( @javax.validation.constraints.NotBlank String title, int pages) {}
         beanProperties.every { it.readOnly }
     }
 
-
     // Java 9+ doesn't allow resolving elements was the compiler
     // is finished being used so this test cannot be made to work beyond Java 8 the way it is currently written
     @IgnoreIf({ Jvm.current.isJava9Compatible() })

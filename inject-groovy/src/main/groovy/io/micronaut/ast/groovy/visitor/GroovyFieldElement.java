@@ -16,7 +16,6 @@
 package io.micronaut.ast.groovy.visitor;
 
 import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
-import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.FieldNode;
 import org.codehaus.groovy.ast.Variable;
 
@@ -33,15 +32,13 @@ public class GroovyFieldElement extends AbstractGroovyVariableElement {
 
     /**
      * @param visitorContext            The visitor context
-     * @param fieldNode                  The {@link FieldNode}
-     * @param annotatedNode             The annotated ndoe
+     * @param fieldNode                 The {@link FieldNode}
      * @param annotationMetadataFactory The annotation metadata
      */
     GroovyFieldElement(GroovyVisitorContext visitorContext,
                        FieldNode fieldNode,
-                       AnnotatedNode annotatedNode,
                        ElementAnnotationMetadataFactory annotationMetadataFactory) {
-        super(visitorContext, fieldNode, annotatedNode, annotationMetadataFactory);
+        super(visitorContext, fieldNode, fieldNode, annotationMetadataFactory);
         this.fieldNode = fieldNode;
     }
 

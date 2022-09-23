@@ -75,23 +75,23 @@ import io.micronaut.runtime.event.annotation.*;
 public class Test {
     boolean invoked = false;
     boolean shutdown = false;
-    
+
     public boolean getInvoked() {
         return invoked;
-    } 
+    }
     public boolean isShutdown() {
         return shutdown;
     }
-    
+
     @EventListener
     void receive(StartupEvent event) {
         invoked = true;
     }
-    
+
     @EventListener
     void receive(ShutdownEvent event) {
         shutdown = true;
-    } 
+    }
 }
 
 ''')
@@ -124,7 +124,7 @@ class MethodAdapterTest {
 
     @Adapter(ApplicationEventListener.class)
     void onStartup(StartupEvent event) {
-        
+
     }
 }
 
@@ -151,7 +151,7 @@ class MethodAdapterTest implements Contract {
 
     @Override
     void onStartup(StartupEvent event) {
-        
+
     }
 }
 
@@ -182,7 +182,7 @@ class MethodAdapterTest2 {
 
     @Adapter(Foo.class)
     void myMethod(String blah) {
-        
+
     }
 }
 
@@ -211,7 +211,7 @@ class MethodAdapterTest3 {
 
     @Adapter(Foo.class)
     void myMethod(Integer blah) {
-        
+
     }
 }
 
@@ -219,7 +219,7 @@ interface Foo<T extends CharSequence> extends java.util.function.Consumer<T> {}
 ''')
         then:"An error occurs"
         def e = thrown(RuntimeException)
-        e.message.contains('Cannot adapt method [test.MethodAdapterTest3.myMethod(..)] to target method [java.util.function.Consumer.accept(..)]. Argument type [java.lang.Integer] is not a subtype of type [java.lang.CharSequence] at position 0.')
+        e.message.contains('Cannot adapt method [test.MethodAdapterTest3.myMethod(..)] to target method [java.util.function.Consumer.accept(..)]. Type [java.lang.Integer] is not a subtype of type [java.lang.CharSequence] for argument at position 0')
     }
 
     void  "test method adapter wrong argument count"() {
@@ -237,7 +237,7 @@ class MethodAdapterTest4 {
 
     @Adapter(ApplicationEventListener.class)
     void onStartup(StartupEvent event, boolean stuff) {
-        
+
     }
 }
 

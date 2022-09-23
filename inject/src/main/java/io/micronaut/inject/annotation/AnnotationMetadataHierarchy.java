@@ -16,16 +16,32 @@
 package io.micronaut.inject.annotation;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.value.OptionalValues;
+
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Array;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.OptionalDouble;
+import java.util.OptionalInt;
+import java.util.OptionalLong;
+import java.util.Set;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
@@ -47,6 +63,7 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     public static final AnnotationMetadata[] EMPTY_HIERARCHY = {AnnotationMetadata.EMPTY_METADATA, AnnotationMetadata.EMPTY_METADATA};
 
     private final AnnotationMetadata[] hierarchy;
+    private final boolean delegateDeclaredToAllElements;
 
     /**
      * Default constructor.
@@ -54,6 +71,18 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
      * @param hierarchy The annotation hierarchy
      */
     public AnnotationMetadataHierarchy(AnnotationMetadata... hierarchy) {
+        this(false, hierarchy);
+    }
+
+    /**
+     * Default constructor.
+     *
+     * @param hierarchy                     The annotation hierarchy
+     * @param delegateDeclaredToAllElements The delegate declared to all elements
+     */
+    @Internal
+    public AnnotationMetadataHierarchy(boolean delegateDeclaredToAllElements, AnnotationMetadata... hierarchy) {
+        this.delegateDeclaredToAllElements = delegateDeclaredToAllElements;
         if (ArrayUtils.isNotEmpty(hierarchy)) {
             // place the first in the hierarchy first
             final int len = hierarchy.length;
@@ -73,6 +102,7 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
 
     /**
      * Copy constructor.
+     *
      * @param existing Existing
      * @param newChild new child
      */
@@ -80,6 +110,7 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
         hierarchy = new AnnotationMetadata[existing.length];
         System.arraycopy(existing, 0, hierarchy, 0, existing.length);
         hierarchy[0] = newChild;
+        delegateDeclaredToAllElements = false;
     }
 
     @Override
@@ -121,6 +152,7 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
 
     /**
      * Create a new hierarchy instance from this metadata using this metadata's parents.
+     *
      * @param child The child annotation metadata
      * @return A new sibling
      */
@@ -162,10 +194,10 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
             return (T[]) AnnotationUtil.ZERO_ANNOTATIONS;
         }
         return Stream.of(hierarchy)
-                .flatMap(am -> am.getAnnotationValuesByType(annotationClass).stream())
-                .distinct()
-                .map(entries -> AnnotationMetadataSupport.buildAnnotation(annotationClass, entries))
-                        .toArray(value -> (T[]) Array.newInstance(annotationClass, value));
+            .flatMap(am -> am.getAnnotationValuesByType(annotationClass).stream())
+            .distinct()
+            .map(entries -> AnnotationMetadataSupport.buildAnnotation(annotationClass, entries))
+            .toArray(value -> (T[]) Array.newInstance(annotationClass, value));
     }
 
     @SuppressWarnings("unchecked")
@@ -174,10 +206,10 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
             return (T[]) AnnotationUtil.ZERO_ANNOTATIONS;
         }
         return Stream.of(hierarchy)
-                .flatMap(am -> am.getAnnotationValuesByType(annotationClass).stream())
-                .distinct()
-                .map(entries -> AnnotationMetadataSupport.buildAnnotation(annotationClass, entries))
-                .toArray(value -> (T[]) Array.newInstance(annotationClass, value));
+            .flatMap(am -> am.getAnnotationValuesByType(annotationClass).stream())
+            .distinct()
+            .map(entries -> AnnotationMetadataSupport.buildAnnotation(annotationClass, entries))
+            .toArray(value -> (T[]) Array.newInstance(annotationClass, value));
     }
 
     @Nullable
@@ -201,36 +233,52 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     @Nullable
     @Override
     public <T extends Annotation> T synthesizeDeclared(@NonNull Class<T> annotationClass) {
+        if (delegateDeclaredToAllElements) {
+            return merge().synthesizeDeclared(annotationClass);
+        }
         return hierarchy[0].synthesize(annotationClass);
     }
 
     @NonNull
     @Override
     public <T extends Annotation> Optional<AnnotationValue<T>> findAnnotation(@NonNull String annotation) {
-        AnnotationValue<T> ann = null;
+        AnnotationValue<T> existing = null;
         for (AnnotationMetadata annotationMetadata : hierarchy) {
-            final AnnotationValue<T> av = annotationMetadata.getAnnotation(annotation);
-            if (av != null) {
-                if (ann == null) {
-                    ann = av;
-                } else {
-                    final Map<CharSequence, Object> values = av.getValues();
-                    final Map<CharSequence, Object> existing = ann.getValues();
-                    Map<CharSequence, Object> newValues = new LinkedHashMap<>(values.size() + existing.size());
-                    newValues.putAll(existing);
-                    for (Map.Entry<CharSequence, Object> entry : values.entrySet()) {
-                        newValues.putIfAbsent(entry.getKey(), entry.getValue());
-                    }
-                    ann = new AnnotationValue<>(annotation, newValues, AnnotationMetadataSupport.getDefaultValues(annotation));
-                }
-            }
+            existing = mergeValue(annotation, existing, annotationMetadata.getAnnotation(annotation));
         }
-        return Optional.ofNullable(ann);
+        return Optional.ofNullable(existing);
+    }
+
+    @Nullable
+    private <T extends Annotation> AnnotationValue<T> mergeValue(@NonNull String annotation,
+                                                                 @Nullable AnnotationValue<T> existingValue,
+                                                                 @Nullable AnnotationValue<T> newValud) {
+        if (newValud == null) {
+            return existingValue;
+        }
+        if (existingValue == null) {
+            return newValud;
+        }
+        final Map<CharSequence, Object> values = newValud.getValues();
+        final Map<CharSequence, Object> existing = existingValue.getValues();
+        Map<CharSequence, Object> newValues = new LinkedHashMap<>(values.size() + existing.size());
+        newValues.putAll(existing);
+        for (Map.Entry<CharSequence, Object> entry : values.entrySet()) {
+            newValues.putIfAbsent(entry.getKey(), entry.getValue());
+        }
+        return new AnnotationValue<>(annotation, newValues, AnnotationMetadataSupport.getDefaultValues(annotation));
     }
 
     @NonNull
     @Override
     public <T extends Annotation> Optional<AnnotationValue<T>> findDeclaredAnnotation(@NonNull String annotation) {
+        if (delegateDeclaredToAllElements) {
+            AnnotationValue<T> existing = null;
+            for (AnnotationMetadata annotationMetadata : hierarchy) {
+                existing = mergeValue(annotation, existing, annotationMetadata.getDeclaredAnnotation(annotation));
+            }
+            return Optional.ofNullable(existing);
+        }
         return hierarchy[0].findDeclaredAnnotation(annotation);
     }
 
@@ -387,6 +435,13 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     @NonNull
     @Override
     public Set<String> getDeclaredAnnotationNames() {
+        if (delegateDeclaredToAllElements) {
+            Set<String> set = new HashSet<>();
+            for (AnnotationMetadata am : hierarchy) {
+                set.addAll(am.getDeclaredAnnotationNames());
+            }
+            return set;
+        }
         return hierarchy[0].getDeclaredAnnotationNames();
     }
 
@@ -443,10 +498,16 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
         if (annotationType == null) {
             return Collections.emptyList();
         }
+        return mergeAnnotationValues(annotationType, AnnotationMetadata::getAnnotationValuesByName);
+    }
+
+    @NonNull
+    private <T extends Annotation, V> List<AnnotationValue<T>> mergeAnnotationValues(V annotationType,
+                                                                                     BiFunction<AnnotationMetadata, V, List<AnnotationValue<T>>> fn) {
         List<AnnotationValue<T>> list = new ArrayList<>(10);
         Set<AnnotationValue<T>> uniqueValues = new HashSet<>(10);
         for (AnnotationMetadata am : hierarchy) {
-            for (AnnotationValue<T> tAnnotationValue : am.<T>getAnnotationValuesByName(annotationType)) {
+            for (AnnotationValue<T> tAnnotationValue : fn.apply(am, annotationType)) {
                 if (uniqueValues.add(tAnnotationValue)) {
                     list.add(tAnnotationValue);
                 }
@@ -458,16 +519,30 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     @NonNull
     @Override
     public <T extends Annotation> List<AnnotationValue<T>> getDeclaredAnnotationValuesByType(@NonNull Class<T> annotationType) {
+        if (delegateDeclaredToAllElements) {
+            return mergeAnnotationValues(annotationType, AnnotationMetadata::getDeclaredAnnotationValuesByType);
+        }
         return hierarchy[0].getDeclaredAnnotationValuesByType(annotationType);
     }
 
     @Override
     public <T extends Annotation> List<AnnotationValue<T>> getDeclaredAnnotationValuesByName(String annotationType) {
+        if (delegateDeclaredToAllElements) {
+            return mergeAnnotationValues(annotationType, AnnotationMetadata::getDeclaredAnnotationValuesByName);
+        }
         return hierarchy[0].getDeclaredAnnotationValuesByName(annotationType);
     }
 
     @Override
     public boolean hasDeclaredAnnotation(@Nullable String annotation) {
+        if (delegateDeclaredToAllElements) {
+            for (AnnotationMetadata annotationMetadata : hierarchy) {
+                if (annotationMetadata.hasDeclaredAnnotation(annotation)) {
+                    return true;
+                }
+            }
+            return false;
+        }
         return hierarchy[0].hasDeclaredAnnotation(annotation);
     }
 
@@ -493,6 +568,14 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
 
     @Override
     public boolean hasDeclaredStereotype(@Nullable String annotation) {
+        if (delegateDeclaredToAllElements) {
+            for (AnnotationMetadata annotationMetadata : hierarchy) {
+                if (annotationMetadata.hasDeclaredStereotype(annotation)) {
+                    return true;
+                }
+            }
+            return false;
+        }
         return hierarchy[0].hasDeclaredStereotype(annotation);
     }
 
@@ -954,5 +1037,31 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
             }
         }
         return Optional.empty();
+    }
+
+    /**
+     * Merges the hierarchy into one {@link MutableAnnotationMetadata}.
+     *
+     * @return merged metadata
+     * @since 3.8.0
+     */
+    public MutableAnnotationMetadata merge() {
+        MutableAnnotationMetadata newAnnotationMetadata = new MutableAnnotationMetadata();
+        for (int i = hierarchy.length - 1; i >= 0; i--) {
+            AnnotationMetadata metadata = hierarchy[i];
+            if (metadata.isEmpty()) {
+                continue;
+            }
+            if (metadata instanceof AnnotationMetadataProvider) {
+                metadata = ((AnnotationMetadataProvider) metadata).getAnnotationMetadata();
+            }
+
+            if (metadata instanceof AnnotationMetadataHierarchy) {
+                newAnnotationMetadata.addAnnotationMetadata(((AnnotationMetadataHierarchy) metadata).merge());
+            } else {
+                newAnnotationMetadata.addAnnotationMetadata((DefaultAnnotationMetadata) metadata);
+            }
+        }
+        return newAnnotationMetadata;
     }
 }

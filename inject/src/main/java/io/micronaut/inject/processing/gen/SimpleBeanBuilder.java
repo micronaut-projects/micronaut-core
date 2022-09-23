@@ -13,6 +13,7 @@ import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.BeanDefinitionVisitor;
 import io.micronaut.inject.writer.BeanDefinitionWriter;
@@ -89,8 +90,22 @@ public class SimpleBeanBuilder extends AbstractBeanBuilder {
         return aopProxyVisitor;
     }
 
+    protected boolean processAsProperties() {
+        return false;
+    }
+
     protected void build(BeanDefinitionVisitor visitor) {
-        List<FieldElement> fields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS.includeHiddenElements());
+        ElementQuery<FieldElement> fieldsQuery = ElementQuery.ALL_FIELDS.includeHiddenElements();
+        ElementQuery<MethodElement> membersQuery = ElementQuery.ALL_METHODS;
+        boolean processAsProperties = processAsProperties();
+        if (processAsProperties) {
+            fieldsQuery = fieldsQuery.excludePropertyElements();
+            membersQuery = membersQuery.excludePropertyElements();
+            for (PropertyElement propertyElement : classElement.getBeanProperties()) {
+                visitPropertyInternal(visitor, propertyElement);
+            }
+        }
+        List<FieldElement> fields = classElement.getEnclosedElements(fieldsQuery);
         List<FieldElement> declaredFields = new ArrayList<>(fields.size());
         // Process subtype fields first
         for (FieldElement fieldElement : fields) {
@@ -100,7 +115,7 @@ public class SimpleBeanBuilder extends AbstractBeanBuilder {
                 visitFieldInternal(visitor, fieldElement);
             }
         }
-        List<MethodElement> methods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS);
+        List<MethodElement> methods = classElement.getEnclosedElements(membersQuery);
         List<MethodElement> declaredMethods = new ArrayList<>(methods.size());
         // Process subtype methods first
         for (MethodElement methodElement : methods) {
@@ -136,6 +151,29 @@ public class SimpleBeanBuilder extends AbstractBeanBuilder {
         }
     }
 
+    private void visitPropertyInternal(BeanDefinitionVisitor visitor, PropertyElement propertyElement) {
+        propertyElement.getWriteMethod().ifPresent(methodElement -> {
+            if (methodElement.hasAnnotation(ANN_REQUIRES_VALIDATION)) {
+                methodElement.annotate(ANN_VALIDATED);
+            }
+        });
+        propertyElement.getReadMethod().ifPresent(methodElement -> {
+            if (methodElement.hasAnnotation(ANN_REQUIRES_VALIDATION)) {
+                methodElement.annotate(ANN_VALIDATED);
+            }
+        });
+        boolean claimed = visitProperty(visitor, propertyElement);
+        if (claimed) {
+            propertyElement.getReadMethod().ifPresent(element -> addOriginatingElementIfNecessary(visitor, element));
+            propertyElement.getWriteMethod().ifPresent(element -> addOriginatingElementIfNecessary(visitor, element));
+            propertyElement.getField().ifPresent(element -> addOriginatingElementIfNecessary(visitor, element));
+        }
+    }
+
+    protected boolean visitProperty(BeanDefinitionVisitor visitor, PropertyElement propertyElement) {
+        return false;
+    }
+
     protected boolean visitMethod(BeanDefinitionVisitor visitor, MethodElement methodElement) {
         // All the cases above are using executable methods
         boolean claimed = false;
@@ -146,8 +184,7 @@ public class SimpleBeanBuilder extends AbstractBeanBuilder {
                 methodElement.getDeclaringType(),
                 methodElement,
                 methodElement.isReflectionRequired(classElement),
-                visitorContext
-            );
+                visitorContext);
             claimed = true;
         }
         if (methodElement.hasDeclaredAnnotation(AnnotationUtil.PRE_DESTROY)) {
@@ -249,7 +286,7 @@ public class SimpleBeanBuilder extends AbstractBeanBuilder {
         }
         AnnotationMetadata fieldAnnotationMetadata = fieldElement.getAnnotationMetadata();
         if (fieldAnnotationMetadata.hasStereotype(Value.class) || fieldAnnotationMetadata.hasStereotype(Property.class)) {
-            visitor.visitFieldValue(fieldElement.getDeclaringType(), fieldElement, fieldElement.isReflectionRequired(classElement), isOptionalFieldValue());
+            visitor.visitFieldValue(fieldElement.getDeclaringType(), fieldElement, fieldElement.getAnnotationMetadata(), isOptionalFieldValue(), fieldElement.isReflectionRequired(classElement));
             return true;
         }
         if (fieldAnnotationMetadata.hasStereotype(AnnotationUtil.INJECT)
@@ -280,8 +317,8 @@ public class SimpleBeanBuilder extends AbstractBeanBuilder {
             if (!methodElement.isAccessible()) {
                 throw new ProcessingException(methodElement, "Method annotated as executable but is declared private. To invoke the method using reflection annotate it with @ReflectiveAccess");
             }
-        } else if (!isDeclaredInThisClass(methodElement)) {
-            // @Executable annotated on the parent class
+        } else if (!isDeclaredInThisClass(methodElement) && !methodElement.getDeclaringType().hasStereotype(Executable.class)) {
+            // @Executable not annotated on the declared class or method
             // Only include public methods
             if (!methodElement.isPublic()) {
                 return false;
@@ -290,7 +327,8 @@ public class SimpleBeanBuilder extends AbstractBeanBuilder {
         // else
         // @Executable annotated on the class
         // only include own accessible methods or the ones annotated with @ReflectiveAccess
-        if (methodElement.isAccessible()) {
+        if (methodElement.isAccessible()
+            || !methodElement.isPrivate() && methodElement.getClass().getSimpleName().contains("Groovy")) {
             visitor.visitExecutableMethod(classElement, methodElement, visitorContext);
         }
         return true;

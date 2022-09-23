@@ -1197,12 +1197,14 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     public void visitSetterValue(
             TypedElement declaringType,
             MethodElement methodElement,
+            AnnotationMetadata annotationMetadata,
             boolean requiresReflection,
             boolean isOptional) {
         deferredInjectionPoints.add(() ->
                 proxyBeanDefinitionWriter.visitSetterValue(
                         declaringType,
                         methodElement,
+                        annotationMetadata,
                         requiresReflection,
                         isOptional
                 )
@@ -1296,16 +1298,14 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
     @Override
     public void visitFieldValue(
-            TypedElement declaringType,
-            FieldElement fieldType,
-            boolean requiresReflection,
-            boolean isOptional) {
+        TypedElement declaringType,
+        FieldElement fieldType,
+        AnnotationMetadata annotationMetadata, boolean isOptional, boolean requiresReflection) {
         deferredInjectionPoints.add(() ->
                 proxyBeanDefinitionWriter.visitFieldValue(
                         declaringType,
                         fieldType,
-                        requiresReflection,
-                        isOptional
+                    annotationMetadata, isOptional, requiresReflection
                 )
         );
     }

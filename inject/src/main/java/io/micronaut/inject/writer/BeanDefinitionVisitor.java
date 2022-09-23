@@ -212,11 +212,13 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
      *
      * @param declaringType      The declaring type
      * @param methodElement      The method element
+     * @param annotationMetadata The annotationMetadata
      * @param requiresReflection Whether the setter requires reflection
      * @param isOptional         Whether the setter is optional
      */
     void visitSetterValue(TypedElement declaringType,
                           MethodElement methodElement,
+                          AnnotationMetadata annotationMetadata,
                           boolean requiresReflection,
                           boolean isOptional);
 
@@ -301,13 +303,13 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
      *
      * @param declaringType      The declaring type. Either a Class or a string representing the name of the type
      * @param fieldElement       The field element
-     * @param requiresReflection Whether accessing the field requires reflection
+     * @param annotationMetadata
      * @param isOptional         Is the value optional
+     * @param requiresReflection Whether accessing the field requires reflection
      */
     void visitFieldValue(TypedElement declaringType,
                          FieldElement fieldElement,
-                         boolean requiresReflection,
-                         boolean isOptional);
+                         AnnotationMetadata annotationMetadata, boolean isOptional, boolean requiresReflection);
 
     /**
      * @return The package name of the bean

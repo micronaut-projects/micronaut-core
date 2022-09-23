@@ -455,6 +455,15 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                 continue;
             }
 
+            AnnotationMetadata annotationMetadata;
+            if (metadata) {
+                annotationMetadata = beanProperty.getAnnotationMetadata();
+                if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
+                    annotationMetadata = ((AnnotationMetadataHierarchy) annotationMetadata).merge();
+                }
+            } else {
+                annotationMetadata = null;
+            }
             writer.visitProperty(
                     type,
                     genericType,
@@ -462,7 +471,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                     beanProperty.getReadMethod().orElse(null),
                     beanProperty.getWriteMethod().orElse(null),
                     beanProperty.isReadOnly(),
-                    metadata ? beanProperty.getAnnotationMetadata() : null,
+                    annotationMetadata,
                     genericType.getTypeArguments()
             );
 

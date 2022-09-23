@@ -28,7 +28,9 @@ import java.lang.annotation.Annotation;
 import java.lang.annotation.Repeatable;
 import java.lang.reflect.Array;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -891,6 +893,21 @@ public interface AnnotationMetadata extends AnnotationSource {
      * The enum values for the given annotation.
      *
      * @param annotation The annotation
+     * @param member     The annotation member
+     * @param enumType The enum type
+     * @param <E> The enum type
+     * @return An enum set of enum values
+     * @since 3.8.0
+     */
+    default <E extends Enum<E>> EnumSet<E> enumValuesSet(@NonNull String annotation, @NonNull String member, Class<E> enumType) {
+        E[] values = enumValues(annotation, member, enumType);
+        return values.length == 0 ? EnumSet.noneOf(enumType) : EnumSet.copyOf(Arrays.asList(values));
+    }
+
+    /**
+     * The enum values for the given annotation.
+     *
+     * @param annotation The annotation
      * @param enumType The enum type
      * @param <E> The enum type
      * @return An array of enum values
@@ -915,6 +932,20 @@ public interface AnnotationMetadata extends AnnotationSource {
         ArgumentUtils.requireNonNull("member", member);
 
         return enumValues(annotation.getName(), member, enumType);
+    }
+
+    /**
+     * The enum values for the given annotation.
+     *
+     * @param annotation The annotation
+     * @param member     The annotation member
+     * @param enumType The enum type
+     * @param <E> The enum type
+     * @return An enum set of enum values
+     * @since 3.8.0
+     */
+    default <E extends Enum<E>> EnumSet<E> enumValuesSet(@NonNull Class<? extends Annotation> annotation, @NonNull String member, Class<E> enumType) {
+       return enumValuesSet(annotation.getName(), member, enumType);
     }
 
     /**

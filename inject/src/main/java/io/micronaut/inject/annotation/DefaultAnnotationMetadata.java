@@ -2136,6 +2136,81 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         return mutateMember(annotationMetadata, annotationName, Collections.singletonMap(member, value));
     }
 
+    @Internal
+    final void addAnnotationMetadata(DefaultAnnotationMetadata annotationMetadata) {
+        if (annotationMetadata.declaredAnnotations != null && !annotationMetadata.declaredAnnotations.isEmpty()) {
+            if (declaredAnnotations == null) {
+                declaredAnnotations = new LinkedHashMap<>();
+            }
+            for (Map.Entry<String, Map<CharSequence, Object>> entry : annotationMetadata.declaredAnnotations.entrySet()) {
+                putValues(entry.getKey(), entry.getValue(), declaredAnnotations);
+            }
+        }
+        if (annotationMetadata.declaredStereotypes != null && !annotationMetadata.declaredStereotypes.isEmpty()) {
+            if (declaredStereotypes == null) {
+                declaredStereotypes = new LinkedHashMap<>();
+            }
+            for (Map.Entry<String, Map<CharSequence, Object>> entry : annotationMetadata.declaredStereotypes.entrySet()) {
+                putValues(entry.getKey(), entry.getValue(), declaredStereotypes);
+            }
+        }
+        if (annotationMetadata.allStereotypes != null && !annotationMetadata.allStereotypes.isEmpty()) {
+            if (allStereotypes == null) {
+                allStereotypes = new LinkedHashMap<>();
+            }
+            for (Map.Entry<String, Map<CharSequence, Object>> entry : annotationMetadata.allStereotypes.entrySet()) {
+                putValues(entry.getKey(), entry.getValue(), allStereotypes);
+            }
+        }
+        if (annotationMetadata.allAnnotations != null && !annotationMetadata.allAnnotations.isEmpty()) {
+            if (allAnnotations == null) {
+                allAnnotations = new LinkedHashMap<>();
+            }
+            for (Map.Entry<String, Map<CharSequence, Object>> entry : annotationMetadata.allAnnotations.entrySet()) {
+                putValues(entry.getKey(), entry.getValue(), allAnnotations);
+            }
+        }
+        Map<String, List<String>> source = annotationMetadata.annotationsByStereotype;
+        if (source != null && !source.isEmpty()) {
+            if (annotationsByStereotype == null) {
+                annotationsByStereotype = new LinkedHashMap<>();
+            }
+            for (Map.Entry<String, List<String>> entry : source.entrySet()) {
+                String ann = entry.getKey();
+                List<String> prevValues = annotationsByStereotype.get(ann);
+                if (prevValues == null) {
+                    annotationsByStereotype.put(ann, new ArrayList<>(entry.getValue()));
+                } else {
+                    Set<String> prevValuesSet = new LinkedHashSet<>(prevValues);
+                    prevValuesSet.addAll(entry.getValue());
+                    annotationsByStereotype.put(ann, new ArrayList<>(prevValuesSet));
+                }
+            }
+        }
+        if (annotationMetadata.repeated != null) {
+            if (repeated == null) {
+                repeated = new LinkedHashMap<>(annotationMetadata.repeated);
+            } else {
+                repeated.putAll(annotationMetadata.repeated);
+            }
+        }
+        if (annotationMetadata.sourceRetentionAnnotations != null) {
+            if (sourceRetentionAnnotations == null) {
+                sourceRetentionAnnotations = new HashSet<>(annotationMetadata.sourceRetentionAnnotations);
+            } else {
+                sourceRetentionAnnotations.addAll(annotationMetadata.sourceRetentionAnnotations);
+            }
+        }
+        if (annotationMetadata.annotationDefaultValues != null) {
+            if (annotationDefaultValues == null) {
+                annotationDefaultValues = new LinkedHashMap<>(annotationMetadata.annotationDefaultValues);
+            } else {
+                // No need to merge values
+                annotationDefaultValues.putAll(annotationMetadata.annotationDefaultValues);
+            }
+        }
+    }
+
     /**
      * Contributes defaults to the given target.
      *

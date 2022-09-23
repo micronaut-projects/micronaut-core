@@ -17,32 +17,34 @@ package io.micronaut.inject.ast;
 
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Nullable;
 
 /**
  * A {@link ClassElement} of primitive types.
  */
 public final class PrimitiveElement implements ArrayableClassElement {
 
-    public static final PrimitiveElement VOID = new PrimitiveElement("void");
-    public static final PrimitiveElement BOOLEAN = new PrimitiveElement("boolean");
-    public static final PrimitiveElement INT = new PrimitiveElement("int");
-    public static final PrimitiveElement CHAR = new PrimitiveElement("char");
-    public static final PrimitiveElement LONG = new PrimitiveElement("long");
-    public static final PrimitiveElement FLOAT = new PrimitiveElement("float");
-    public static final PrimitiveElement DOUBLE = new PrimitiveElement("double");
-    public static final PrimitiveElement SHORT = new PrimitiveElement("short");
-    public static final PrimitiveElement BYTE = new PrimitiveElement("byte");
+    public static final PrimitiveElement VOID = new PrimitiveElement("void", null);
+    public static final PrimitiveElement BOOLEAN = new PrimitiveElement("boolean", Boolean.class);
+    public static final PrimitiveElement INT = new PrimitiveElement("int", Integer.class);
+    public static final PrimitiveElement CHAR = new PrimitiveElement("char", Character.class);
+    public static final PrimitiveElement LONG = new PrimitiveElement("long", Long.class);
+    public static final PrimitiveElement FLOAT = new PrimitiveElement("float", Float.class);
+    public static final PrimitiveElement DOUBLE = new PrimitiveElement("double", Double.class);
+    public static final PrimitiveElement SHORT = new PrimitiveElement("short", Short.class);
+    public static final PrimitiveElement BYTE = new PrimitiveElement("byte", Byte.class);
     private static final PrimitiveElement[] PRIMITIVES = new PrimitiveElement[] {INT, CHAR, BOOLEAN, LONG, FLOAT, DOUBLE, SHORT, BYTE, VOID};
 
     private final String typeName;
     private final int arrayDimensions;
+    private final String boxedTypeName;
 
     /**
      * Default constructor.
      * @param name The type name
      */
-    private PrimitiveElement(String name) {
-        this(name, 0);
+    private PrimitiveElement(String name, @Nullable Class<?> boxedType) {
+        this(name, boxedType == null ? "<>" : boxedType.getName(), 0);
     }
 
     /**
@@ -50,19 +52,28 @@ public final class PrimitiveElement implements ArrayableClassElement {
      * @param name            The type name
      * @param arrayDimensions The number of array dimensions
      */
-    private PrimitiveElement(String name, int arrayDimensions) {
+    private PrimitiveElement(String name, String boxedTypeName, int arrayDimensions) {
         this.typeName = name;
         this.arrayDimensions = arrayDimensions;
+        this.boxedTypeName = boxedTypeName;
     }
 
     @Override
     public boolean isAssignable(String type) {
-        return typeName.equals(type);
+        return typeName.equals(type) || boxedTypeName.equals(type) || Object.class.getName().equals(type);
     }
 
     @Override
     public boolean isAssignable(ClassElement type) {
-        return this.typeName.equals(type.getName());
+        if (this == type) {
+            return true;
+        }
+        if (isArray()) {
+            if (!type.isPrimitive() || !type.isArray() || type.getArrayDimensions() != getArrayDimensions()) {
+                return false;
+            }
+        }
+        return isAssignable(type.getName());
     }
 
     @Override
@@ -104,7 +115,7 @@ public final class PrimitiveElement implements ArrayableClassElement {
 
     @Override
     public ClassElement withArrayDimensions(int arrayDimensions) {
-        return new PrimitiveElement(typeName, arrayDimensions);
+        return new PrimitiveElement(typeName, boxedTypeName, arrayDimensions);
     }
 
     @Override
@@ -119,5 +130,14 @@ public final class PrimitiveElement implements ArrayableClassElement {
             }
         }
         throw new IllegalArgumentException(String.format("No primitive found for name: %s", name));
+    }
+
+    @Override
+    public String toString() {
+        final StringBuilder sb = new StringBuilder("PrimitiveElement{");
+        sb.append("typeName='").append(typeName).append('\'');
+        sb.append(", arrayDimensions=").append(arrayDimensions);
+        sb.append('}');
+        return sb.toString();
     }
 }

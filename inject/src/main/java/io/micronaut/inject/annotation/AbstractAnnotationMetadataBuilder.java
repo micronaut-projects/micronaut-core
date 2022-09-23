@@ -1027,6 +1027,11 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         return lookupExisting(getElementAsString(declaringType), getElementAsString(element));
     }
 
+    @Nullable
+    public AnnotationMetadata lookupExisting(T declaringType, String elementAsString) {
+        return lookupExisting(getElementAsString(declaringType), elementAsString);
+    }
+
     private AnnotationMetadata lookupExisting(String declaringType, String elementAsString) {
         return MUTATED_ANNOTATION_METADATA.get(new MetadataKey(declaringType, elementAsString));
     }
@@ -2161,8 +2166,13 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     @Internal
     public void addMutatedMetadata(T owningType, T element, AnnotationMetadata metadata) {
         if (element != null && metadata != null) {
-            MUTATED_ANNOTATION_METADATA.put(new MetadataKey(getElementAsString(owningType), getElementAsString(element)), metadata);
+            addMutatedMetadata(owningType, getElementAsString(element), metadata);
         }
+    }
+
+    @Internal
+    public void addMutatedMetadata(T owningType, String elementAsString, AnnotationMetadata metadata) {
+        MUTATED_ANNOTATION_METADATA.put(new MetadataKey(getElementAsString(owningType), elementAsString), metadata);
     }
 
     /**

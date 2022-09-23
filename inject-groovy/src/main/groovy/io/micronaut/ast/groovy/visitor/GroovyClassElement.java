@@ -38,10 +38,7 @@ import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.PackageElement;
-import io.micronaut.inject.ast.ParameterElement;
-import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.PropertyElement;
-import org.apache.groovy.ast.tools.ClassNodeUtils;
 import org.apache.groovy.util.concurrent.LazyInitializable;
 import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.ClassHelper;
@@ -61,6 +58,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -75,6 +73,7 @@ import java.util.stream.Stream;
 import static groovyjarjarasm.asm.Opcodes.ACC_PRIVATE;
 import static groovyjarjarasm.asm.Opcodes.ACC_PROTECTED;
 import static groovyjarjarasm.asm.Opcodes.ACC_PUBLIC;
+import static org.objectweb.asm.Opcodes.ACC_SYNTHETIC;
 
 /**
  * A class element returning data from a {@link ClassNode}.
@@ -112,7 +111,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     private final boolean isTypeVar;
     private List<? extends ClassElement> overrideBoundGenericTypes;
     private Map<String, Map<String, ClassNode>> genericInfo;
-    private boolean isSource;
+    private List<PropertyElement> properties;
 
     /**
      * @param visitorContext            The visitor context
@@ -122,21 +121,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     public GroovyClassElement(GroovyVisitorContext visitorContext,
                               ClassNode classNode,
                               ElementAnnotationMetadataFactory annotationMetadataFactory) {
-        this(visitorContext, classNode, annotationMetadataFactory, false);
-    }
-
-    /**
-     * @param visitorContext            The visitor context
-     * @param classNode                 The {@link ClassNode}
-     * @param annotationMetadataFactory The annotation metadata
-     * @param isSource                  The isSource
-     */
-    public GroovyClassElement(GroovyVisitorContext visitorContext,
-                              ClassNode classNode,
-                              ElementAnnotationMetadataFactory annotationMetadataFactory,
-                              boolean isSource) {
         this(visitorContext, classNode, annotationMetadataFactory, null, 0);
-        this.isSource = isSource;
     }
 
     /**
@@ -195,6 +180,26 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
         boolean onlyConcrete = result.isOnlyConcrete();
         boolean onlyInstance = result.isOnlyInstance();
         boolean onlyStatic = result.isOnlyStatic();
+        boolean excludePropertyElements = result.isExcludePropertyElements();
+        Set<AnnotatedNode> excludeMethodElements;
+        Set<AnnotatedNode> excludeFieldElements;
+        if (excludePropertyElements) {
+            excludeMethodElements = new HashSet<>();
+            excludeFieldElements = new HashSet<>();
+            for (PropertyElement excludePropertyElement : getBeanProperties()) {
+                excludePropertyElement.getReadMethod()
+                    .filter(m -> m instanceof AbstractGroovyElement)
+                    .ifPresent(methodElement -> excludeMethodElements.add((AnnotatedNode) methodElement.getNativeType()));
+                excludePropertyElement.getWriteMethod()
+                    .filter(m -> m instanceof AbstractGroovyElement)
+                    .ifPresent(methodElement -> excludeMethodElements.add((AnnotatedNode) methodElement.getNativeType()));
+                excludePropertyElement.getField().ifPresent(fieldElement -> excludeFieldElements.add((AnnotatedNode) fieldElement.getNativeType()));
+            }
+        } else {
+            excludeMethodElements = Collections.emptySet();
+            excludeFieldElements = Collections.emptySet();
+        }
+
         List<Predicate<String>> namePredicates = result.getNamePredicates();
         List<Predicate<ClassElement>> typePredicates = result.getTypePredicates();
         List<Predicate<AnnotationMetadata>> annotationPredicates = result.getAnnotationPredicates();
@@ -205,12 +210,11 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
         if (elementType == MethodElement.class) {
 
             List<MethodNode> methods;
-            Map<String, MethodNode> declaredMethodsMap = classNode.getDeclaredMethodsMap();
-            ClassNodeUtils.addDeclaredMethodsFromInterfaces(classNode, declaredMethodsMap);
+
             if (onlyDeclared) {
                 methods = new ArrayList<>(classNode.getMethods());
             } else {
-                methods = new ArrayList<>(classNode.getAllDeclaredMethods());
+                methods = new ArrayList<>(getDeclaredMethods());
             }
 
             Iterator<MethodNode> i = methods.iterator();
@@ -261,6 +265,9 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                     if (!namePredicates.stream().allMatch(p -> p.test(methodNode.getName()))) {
                         i.remove();
                     }
+                }
+                if (excludeMethodElements.contains(methodNode)) {
+                    i.remove();
                 }
             }
 
@@ -330,8 +337,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                 }
                 fields = findRelevantFields(onlyAccessible, result.getOnlyAccessibleFromType().orElse(this), fields, namePredicates, modifierPredicates);
             }
-            //noinspection unchecked
-            Stream<FieldNode> fieldStream = fields.stream();
+            Stream<FieldNode> fieldStream = fields.stream().filter(f -> !excludeFieldElements.contains(f));
             if (onlyInstance) {
                 fieldStream = fieldStream.filter((fn) -> !fn.isStatic());
             } else if (onlyStatic) {
@@ -390,6 +396,33 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
             }
         }
         return elements;
+    }
+
+    private Collection<MethodNode> getDeclaredMethods() {
+        Map<String, MethodNode> declaredMethodsMap = new LinkedHashMap<>();
+        collectDeclaredMethodsMap(classNode, declaredMethodsMap);
+        return declaredMethodsMap.values();
+    }
+
+    private void collectDeclaredMethodsMap(ClassNode classNode, Map<String, MethodNode> methods) {
+        // Partial copy from ClassNode#declaredMethodsMap to have linked map
+        ClassNode parent = classNode.getSuperClass();
+        if (parent != null) {
+            collectDeclaredMethodsMap(parent, methods);
+        }
+        for (ClassNode iface : classNode.getInterfaces()) {
+            Map<String, MethodNode> declaredMethods = new LinkedHashMap<>();
+            collectDeclaredMethodsMap(iface, declaredMethods);
+            for (Map.Entry<String, MethodNode> entry : declaredMethods.entrySet()) {
+                if (entry.getValue().getDeclaringClass().isInterface() && (entry.getValue().getModifiers() & ACC_SYNTHETIC) == 0) {
+                    methods.putIfAbsent(entry.getKey(), entry.getValue());
+                }
+            }
+        }
+        // add in the methods implemented in this class
+        for (MethodNode method : classNode.getMethods()) {
+            methods.put(method.getTypeDescriptor(), method);
+        }
     }
 
     private List<FieldNode> findRelevantFields(
@@ -681,11 +714,14 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
 
     @Override
     public List<PropertyElement> getBeanProperties() {
-        List<PropertyElement> allProperties = new ArrayList<>();
-        List<GroovyPropertyElement> propertyElements = getPropertyNodes();
-        allProperties.addAll(propertyElements);
-        allProperties.addAll(getPropertiesFromGettersAndSetters(propertyElements));
-        return Collections.unmodifiableList(allProperties);
+        if (properties == null) {
+            List<PropertyElement> allProperties = new ArrayList<>();
+            List<GroovyPropertyElement> propertyElements = getPropertyNodes();
+            allProperties.addAll(propertyElements);
+            allProperties.addAll(getPropertiesFromGettersAndSetters(propertyElements));
+            properties = Collections.unmodifiableList(allProperties);
+        }
+        return properties;
     }
 
     @Override
@@ -857,64 +893,12 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
         List<GroovyPropertyElement> propertyElements = new ArrayList<>();
         for (PropertyNode propertyNode : propertyNodes) {
             if (propertyNode.isPublic() && !propertyNode.isStatic()) {
-                final String propertyName = propertyNode.getName();
-                boolean readOnly = propertyNode.getField().isFinal();
                 GroovyPropertyElement groovyPropertyElement = new GroovyPropertyElement(
                     visitorContext,
                     this,
-                    Collections.emptyList(),
-                    propertyNode.getField(),
-                    elementAnnotationMetadataFactory,
-                    propertyName,
-                    readOnly,
-                    propertyNode
-                ) {
-
-                    final String[] readPrefixes = GroovyClassElement.this.getValue(AccessorsStyle.class, "readPrefixes", String[].class)
-                        .orElse(new String[]{AccessorsStyle.DEFAULT_READ_PREFIX});
-                    final String[] writePrefixes = GroovyClassElement.this.getValue(AccessorsStyle.class, "writePrefixes", String[].class)
-                        .orElse(new String[]{AccessorsStyle.DEFAULT_WRITE_PREFIX});
-
-                    @NonNull
-                    @Override
-                    public ClassElement getType() {
-                        return visitorContext.getElementFactory().newClassElement(propertyNode.getType(), elementAnnotationMetadataFactory);
-                    }
-
-                    @Override
-                    public Optional<MethodElement> getWriteMethod() {
-                        if (!readOnly) {
-                            return Optional.of(MethodElement.of(
-                                GroovyClassElement.this,
-                                getAnnotationMetadata(),
-                                PrimitiveElement.VOID,
-                                PrimitiveElement.VOID,
-                                NameUtils.setterNameFor(propertyName, writePrefixes),
-                                ParameterElement.of(getType(), propertyName)
-
-                            ));
-                        }
-                        return Optional.empty();
-                    }
-
-                    @Override
-                    public Optional<MethodElement> getReadMethod() {
-                        return Optional.of(MethodElement.of(
-                            GroovyClassElement.this,
-                            getAnnotationMetadata(),
-                            getType(),
-                            getGenericType(),
-                            getGetterName(propertyName, getType())
-                        ));
-                    }
-
-                    private String getGetterName(String propertyName, ClassElement type) {
-                        return NameUtils.getterNameFor(
-                            propertyName,
-                            type.equals(PrimitiveElement.BOOLEAN) || type.getName().equals(Boolean.class.getName())
-                        );
-                    }
-                };
+                    propertyNode,
+                    elementAnnotationMetadataFactory
+                );
                 propertyElements.add(groovyPropertyElement);
             }
         }
@@ -956,7 +940,6 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                     @Override
                     public void accept(ClassNode classNode, MethodNode node) {
                         String methodName = node.getName();
-                        final ClassNode declaringTypeElement = node.getDeclaringClass();
                         if (NameUtils.isReaderName(methodName, readPrefixes) && node.getParameters().length == 0) {
                             String propertyName = NameUtils.getPropertyNameForGetter(methodName, readPrefixes);
                             if (groovyProps.contains(propertyName)) {
@@ -976,7 +959,6 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                             }
 
                             GetterAndSetter getterAndSetter = props.computeIfAbsent(propertyName, GetterAndSetter::new);
-                            configureDeclaringType(declaringTypeElement, getterAndSetter);
                             getterAndSetter.type = getterReturnType;
                             getterAndSetter.getter = node;
                             if (getterAndSetter.setter != null) {
@@ -995,7 +977,6 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                             ClassElement setterParameterType = visitorContext.getElementFactory().newClassElement(typeMirror, emptyAnnotationsForNativeType(classNode));
 
                             GetterAndSetter getterAndSetter = props.computeIfAbsent(propertyName, GetterAndSetter::new);
-                            configureDeclaringType(declaringTypeElement, getterAndSetter);
                             ClassElement propertyType = getterAndSetter.type;
                             if (propertyType != null) {
                                 if (propertyType.getName().equals(setterParameterType.getName())) {
@@ -1007,30 +988,16 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                         }
                     }
 
-                    private void configureDeclaringType(ClassNode declaringTypeElement, GetterAndSetter beanPropertyData) {
-                        if (beanPropertyData.declaringType == null) {
-                            if (GroovyClassElement.this.classNode.equals(declaringTypeElement)) {
-                                beanPropertyData.declaringType = GroovyClassElement.this;
-                            } else {
-                                beanPropertyData.declaringType = new GroovyClassElement(
-                                    visitorContext,
-                                    declaringTypeElement,
-                                    elementAnnotationMetadataFactory
-                                );
-                            }
-                        }
-                    }
                 });
             classNode = classNode.getSuperClass();
         }
         List<GroovyPropertyElement> propertyElements = new ArrayList<>(props.size());
         if (!props.isEmpty()) {
-            GroovyClassElement thisElement = this;
             for (Map.Entry<String, GetterAndSetter> entry : props.entrySet()) {
                 String propertyName = entry.getKey();
                 GetterAndSetter value = entry.getValue();
                 if (value.getter != null) {
-                    FieldNode field = value.declaringType.classNode.getField(propertyName);
+                    FieldNode field = GroovyClassElement.this.classNode.getField(propertyName);
                     if (field instanceof LazyInitializable) {
                         //this nonsense is to work around https://issues.apache.org/jira/browse/GROOVY-10398
                         ((LazyInitializable) field).lazyInit();
@@ -1042,46 +1009,19 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                             // no op
                         }
                     }
-                    final List<AnnotatedNode> parents = new ArrayList<>();
-                    if (field != null) {
-                        parents.add(field);
-                    }
-                    if (value.setter != null) {
-                        parents.add(value.setter);
-                    }
+
                     GroovyPropertyElement propertyElement = new GroovyPropertyElement(
                         visitorContext,
-                        value.declaringType,
-                        parents,
-                        value.getter,
-                        elementAnnotationMetadataFactory,
+                        this,
+                        value.type,
                         propertyName,
                         value.setter == null,
-                        value.getter) {
-                        @Override
-                        public Optional<MethodElement> getWriteMethod() {
-                            if (value.setter != null) {
-                                return Optional.of(new GroovyMethodElement(
-                                    thisElement,
-                                    visitorContext,
-                                    value.setter,
-                                    elementAnnotationMetadataFactory
-                                ));
-                            }
-                            return Optional.empty();
-                        }
+                        value.getter,
+                        field,
+                        value.getter,
+                        value.setter,
+                        elementAnnotationMetadataFactory);
 
-                        @NonNull
-                        @Override
-                        public ClassElement getType() {
-                            return value.type;
-                        }
-
-                        @Override
-                        public Optional<MethodElement> getReadMethod() {
-                            return Optional.of(new GroovyMethodElement(thisElement, visitorContext, value.getter, elementAnnotationMetadataFactory));
-                        }
-                    };
                     propertyElements.add(propertyElement);
                 }
             }
@@ -1098,7 +1038,6 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
      */
     private class GetterAndSetter {
         ClassElement type;
-        GroovyClassElement declaringType;
         MethodNode getter;
         MethodNode setter;
         final String propertyName;

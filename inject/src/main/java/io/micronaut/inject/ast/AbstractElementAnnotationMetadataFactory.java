@@ -1,24 +1,22 @@
 package io.micronaut.inject.ast;
 
-import io.micronaut.core.annotation.AccessorsStyle;
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
+import org.jetbrains.annotations.NotNull;
 
 import java.lang.annotation.Annotation;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
-public class AbstractElementAnnotationMetadataFactory<K, A> implements ElementAnnotationMetadataFactory {
+public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements ElementAnnotationMetadataFactory {
 
     protected final boolean isReadOnly;
     protected final AbstractAnnotationMetadataBuilder<K, A> metadataBuilder;
@@ -70,6 +68,8 @@ public class AbstractElementAnnotationMetadataFactory<K, A> implements ElementAn
         return buildForUnknown(defaultAnnotationMetadata, element);
     }
 
+    protected abstract boolean isSupported(MethodElement methodElement);
+
     @NonNull
     protected ElementAnnotationMetadata buildForUnknown(@Nullable AnnotationMetadata annotationMetadata, @NonNull Element element) {
         throw new IllegalStateException("Unknown element: " + element.getClass() + " with native type: " + element.getNativeType());
@@ -77,19 +77,33 @@ public class AbstractElementAnnotationMetadataFactory<K, A> implements ElementAn
 
     @NonNull
     private AbstractElementAnnotationMetadata buildForProperty(@Nullable AnnotationMetadata defaultAnnotationMetadata, @NonNull PropertyElement propertyElement) {
-        return new AbstractElementAnnotationMetadata(true, defaultAnnotationMetadata) {
+        return new AbstractElementAnnotationMetadata(defaultAnnotationMetadata) {
 
             @Override
             protected AnnotationMetadata createOnMissing(K nativeOwnerType, K nativeType) {
-                List<K> parents = (List<K>) propertyElement.getNativeParents();
+                AnnotationMetadata existing = metadataBuilder.lookupExisting(nativeOwnerType, getElementAsString());
+                if (existing != null) {
+                    return existing;
+                }
+                List<K> parents = new ArrayList<>(3);
+                propertyElement.getField().ifPresent(e -> parents.add((K) e.getNativeType()));
+                propertyElement.getWriteMethod().filter(m -> isSupported(m)).ifPresent(e -> parents.add((K) e.getNativeType()));
+                propertyElement.getReadMethod().filter(m -> isSupported(m)).ifPresent(e -> parents.add((K) e.getNativeType()));
+                K element = parents.remove(parents.size() - 1);
                 if (!parents.isEmpty()) {
-//                    AnnotationMetadata existing = metadataBuilder.lookupExisting(nativeOwnerType, nativeType);
-//                    if (existing != null) {
-//                        return existing;
-//                    }
-                    return metadataBuilder.buildCombinedNoCache(parents, (K) propertyElement.getNativeType());
+                    return metadataBuilder.buildCombinedNoCache(parents, element);
                 }
                 return metadataBuilder.buildForMethod(nativeOwnerType, nativeType);
+            }
+
+            @Override
+            protected void addMutatedData() {
+                metadataBuilder.addMutatedMetadata(getNativeOwnerType(), getElementAsString(), annotationMetadata);
+            }
+
+            @NotNull
+            private String getElementAsString() {
+                return "property$ " + propertyElement.getName();
             }
 
             @Override
@@ -166,18 +180,9 @@ public class AbstractElementAnnotationMetadataFactory<K, A> implements ElementAn
     private AbstractElementAnnotationMetadata buildForParameter(@Nullable AnnotationMetadata defaultAnnotationMetadata, @NonNull ParameterElement parameterElement) {
         return new AbstractElementAnnotationMetadata(defaultAnnotationMetadata) {
 
-            private final Optional<FieldElement> fieldElement = findPropertyFieldElement(parameterElement.getMethodElement());
-
             @Override
             protected AnnotationMetadata createOnMissing(K nativeOwnerType, K nativeType) {
-                if (!fieldElement.isPresent()) {
-                    return metadataBuilder.buildForParameter(nativeOwnerType, nativeType);
-                }
-                AnnotationMetadata annotationMetadata = metadataBuilder.lookupExisting(nativeOwnerType, nativeType);
-                if (annotationMetadata != null) {
-                    return annotationMetadata;
-                }
-                return metadataBuilder.buildCombinedNoCache((K) fieldElement.get().getNativeType(), nativeType);
+                return metadataBuilder.buildForParameter(nativeOwnerType, nativeType);
             }
 
             @Override
@@ -196,24 +201,6 @@ public class AbstractElementAnnotationMetadataFactory<K, A> implements ElementAn
             }
 
         };
-    }
-
-    private static Optional<FieldElement> findPropertyFieldElement(MethodElement methodElement) {
-        if (methodElement.hasDeclaredAnnotation(AnnotationUtil.INJECT)) {
-            return Optional.empty();
-        }
-        String[] writerPrefixes = methodElement.getAnnotationMetadata()
-            .getValue(AccessorsStyle.class, "writePrefixes", String[].class)
-            .orElse(new String[]{AccessorsStyle.DEFAULT_WRITE_PREFIX});
-
-        final String methodName = methodElement.getName();
-        if (!NameUtils.isWriterName(methodName, writerPrefixes) || methodElement.getParameters().length != 1) {
-            return Optional.empty();    // not a writer
-        }
-        final String fieldName = NameUtils.getPropertyNameForSetter(methodName, writerPrefixes);
-        // Return the field corresponding to this writer.
-        return methodElement.getDeclaringType()
-            .getEnclosedElement(ElementQuery.ALL_FIELDS.named(fieldName));
     }
 
     @NonNull
@@ -330,7 +317,7 @@ public class AbstractElementAnnotationMetadataFactory<K, A> implements ElementAn
     protected abstract class AbstractElementAnnotationMetadata implements ElementAnnotationMetadata {
 
         private final boolean readOnly;
-        private AnnotationMetadata annotationMetadata;
+        protected AnnotationMetadata annotationMetadata;
 
         protected AbstractElementAnnotationMetadata(@Nullable AnnotationMetadata annotationMetadata) {
             this(AbstractElementAnnotationMetadataFactory.this.isReadOnly, annotationMetadata);
@@ -349,8 +336,12 @@ public class AbstractElementAnnotationMetadataFactory<K, A> implements ElementAn
 
         private void updateAnnotationCaches() {
             if (!readOnly) {
-                metadataBuilder.addMutatedMetadata(getNativeOwnerType(), getNativeType(), annotationMetadata);
+                addMutatedData();
             }
+        }
+
+        protected void addMutatedData() {
+            metadataBuilder.addMutatedMetadata(getNativeOwnerType(), getNativeType(), annotationMetadata);
         }
 
         @Override

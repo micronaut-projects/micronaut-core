@@ -3,17 +3,18 @@ package io.micronaut.inject.processing.gen;
 import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationInject;
 import io.micronaut.context.annotation.ConfigurationReader;
-import io.micronaut.context.visitor.annotations.ConfigurationGetter;
-import io.micronaut.context.visitor.annotations.ConfigurationSetter;
 import io.micronaut.core.annotation.AccessorsStyle;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.configuration.PropertyMetadata;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.BeanDefinitionVisitor;
@@ -41,12 +42,77 @@ public class ConfigurationPropertiesBeanBuilder extends SimpleBeanBuilder {
     }
 
     @Override
+    protected boolean processAsProperties() {
+        return true;
+    }
+
+    @Override
+    protected boolean visitProperty(BeanDefinitionVisitor visitor, PropertyElement propertyElement) {
+        if (propertyElement.hasStereotype(ConfigurationBuilder.class)) {
+            if (propertyElement.getReadMethod().isPresent()) {
+                MethodElement methodElement = propertyElement.getReadMethod().get();
+                ClassElement builderType = methodElement.getReturnType();
+                visitor.visitConfigBuilderMethod(
+                    builderType,
+                    methodElement.getName(),
+                    propertyElement.getAnnotationMetadata(),
+                    null,
+                    builderType.isInterface()
+                );
+                visitConfigurationBuilder(visitor, propertyElement, builderType);
+                return true;
+            }
+            if (propertyElement.getField().isPresent()) {
+                FieldElement fieldElement = propertyElement.getField().get();
+                if (fieldElement.isAccessible(classElement)) {
+                    ClassElement builderType = fieldElement.getType();
+                    visitor.visitConfigBuilderField(
+                        builderType,
+                        fieldElement.getName(),
+                        fieldElement.getAnnotationMetadata(),
+                        metadataBuilder,
+                        builderType.isInterface()
+                    );
+                    visitConfigurationBuilder(visitor, propertyElement, builderType);
+                    return true;
+                }
+                throw new ProcessingException(fieldElement, "ConfigurationBuilder applied to a non accessible (private or package-private/protected in a different package) field must have a corresponding non-private getter method.");
+            }
+        } else {
+            if (propertyElement.getWriteAccessKind() == PropertyElement.AccessKind.METHOD && propertyElement.getWriteMethod().isPresent()) {
+                visitor.setValidated(visitor.isValidated() || propertyElement.hasAnnotation(ANN_REQUIRES_VALIDATION));
+                MethodElement methodElement = propertyElement.getWriteMethod().get();
+                ParameterElement parameter = methodElement.getParameters()[0];
+                AnnotationMetadata annotationMetadata = new AnnotationMetadataHierarchy(
+                    propertyElement,
+                    parameter
+                ).merge();
+                methodElement.replaceAnnotations(annotationMetadata);
+                parameter.replaceAnnotations(annotationMetadata);
+                visitor.visitSetterValue(methodElement.getDeclaringType(), methodElement, annotationMetadata, methodElement.isReflectionRequired(classElement), true);
+                return true;
+            }
+            if (propertyElement.getWriteAccessKind() == PropertyElement.AccessKind.FIELD && propertyElement.getField().isPresent()) {
+                visitor.setValidated(visitor.isValidated() || propertyElement.hasAnnotation(ANN_REQUIRES_VALIDATION));
+                FieldElement fieldElement = propertyElement.getField().get();
+                AnnotationMetadata annotationMetadata = propertyElement.getAnnotationMetadata();
+                if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
+                    annotationMetadata = ((AnnotationMetadataHierarchy) annotationMetadata).merge();
+                }
+                visitor.visitFieldValue(fieldElement.getDeclaringType(), fieldElement, annotationMetadata,true, fieldElement.isReflectionRequired(classElement));
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
     protected boolean visitMethod(BeanDefinitionVisitor visitor, MethodElement methodElement) {
         if (methodElement.hasStereotype(ConfigurationBuilder.class)) {
-            ClassElement builderType = methodElement.getReturnType().getGenericType();
+            ClassElement builderType = methodElement.getReturnType();
             visitor.visitConfigBuilderMethod(
                 builderType,
-                methodElement.getSimpleName(),
+                methodElement.getName(),
                 methodElement.getAnnotationMetadata(),
                 null,
                 builderType.isInterface()
@@ -54,58 +120,33 @@ public class ConfigurationPropertiesBeanBuilder extends SimpleBeanBuilder {
             visitConfigurationBuilder(visitor, methodElement, builderType);
             return true;
         }
-        if (methodElement.hasAnnotation(ConfigurationSetter.class)) {
-            if (methodElement.getParameters().length == 0) {
-                throw new RuntimeException(classElement + " " + methodElement);
-            }
-            visitor.setValidated(visitor.isValidated() || methodElement.hasAnnotation(ANN_REQUIRES_VALIDATION));
-            visitor.visitSetterValue(methodElement.getDeclaringType(), methodElement, methodElement.isReflectionRequired(classElement), true);
-            return true;
-        }
-        if (methodElement.hasAnnotation(ConfigurationGetter.class)) {
-            visitor.setValidated(visitor.isValidated() || methodElement.hasAnnotation(ANN_REQUIRES_VALIDATION));
-            return true;
-        }
         return super.visitMethod(visitor, methodElement);
-    }
-
-    @Override
-    protected boolean isInjectPointMethod(MethodElement methodElement) {
-        return super.isInjectPointMethod(methodElement) || methodElement.hasDeclaredStereotype(ConfigurationInject.class);
     }
 
     @Override
     protected boolean visitField(BeanDefinitionVisitor visitor, FieldElement fieldElement) {
         if (fieldElement.hasStereotype(ConfigurationBuilder.class)) {
             if (fieldElement.isAccessible(classElement)) {
+                ClassElement builderType = fieldElement.getType();
                 visitor.visitConfigBuilderField(
-                    fieldElement.getType(),
+                    builderType,
                     fieldElement.getName(),
                     fieldElement.getAnnotationMetadata(),
                     metadataBuilder,
-                    fieldElement.getType().isInterface()
+                    builderType.isInterface()
                 );
+                visitConfigurationBuilder(visitor, fieldElement, builderType);
+                return true;
             } else {
                 throw new ProcessingException(fieldElement, "ConfigurationBuilder applied to a non accessible (private or package-private/protected in a different package) field must have a corresponding non-private getter method.");
             }
-            visitConfigurationBuilder(visitor, fieldElement, fieldElement.getType());
-            return true;
-        }
-        if (fieldElement.hasAnnotation(ConfigurationSetter.class)) {
-            visitor.setValidated(visitor.isValidated() || fieldElement.hasAnnotation(ANN_REQUIRES_VALIDATION));
-            visitor.visitFieldValue(
-                classElement,
-                fieldElement,
-                fieldElement.isReflectionRequired(classElement),
-                true
-            );
-            return true;
-        }
-        if (fieldElement.hasAnnotation(ConfigurationGetter.class)) {
-            visitor.setValidated(visitor.isValidated() || fieldElement.hasAnnotation(ANN_REQUIRES_VALIDATION));
-            return true;
         }
         return super.visitField(visitor, fieldElement);
+    }
+
+    @Override
+    protected boolean isInjectPointMethod(MethodElement methodElement) {
+        return super.isInjectPointMethod(methodElement) || methodElement.hasDeclaredStereotype(ConfigurationInject.class);
     }
 
     private void visitConfigurationBuilder(BeanDefinitionVisitor visitor, MemberElement builderElement, ClassElement builderType) {
