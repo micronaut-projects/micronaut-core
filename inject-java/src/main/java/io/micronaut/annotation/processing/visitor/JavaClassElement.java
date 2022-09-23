@@ -17,13 +17,8 @@ package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.annotation.processing.ModelUtils;
 import io.micronaut.annotation.processing.SuperclassAwareTypeVisitor;
-import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.context.annotation.Property;
-import io.micronaut.context.annotation.Value;
-import io.micronaut.core.annotation.AccessorsStyle;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
-import io.micronaut.core.annotation.BeanProperties;
 import io.micronaut.core.annotation.Creator;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
@@ -31,6 +26,7 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ArrayableClassElement;
+import io.micronaut.inject.ast.AstUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
@@ -59,10 +55,8 @@ import javax.lang.model.util.ElementFilter;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -292,253 +286,127 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
 
     @Override
     public List<PropertyElement> getBeanProperties() {
-        if (this.beanProperties == null) {
-            AnnotationMetadata annotationMetadata = getAnnotationMetadata();
-            BeanProperties.Visibility visibility = annotationMetadata.enumValue(BeanProperties.class, BeanProperties.VISIBILITY, BeanProperties.Visibility.class)
-                .orElse(BeanProperties.Visibility.DEFAULT);
-            EnumSet<BeanProperties.AccessKind> accessKinds = annotationMetadata.isPresent(BeanProperties.class, BeanProperties.ACCESS_KIND) ?
-                annotationMetadata.enumValuesSet(BeanProperties.class, BeanProperties.ACCESS_KIND, BeanProperties.AccessKind.class) : EnumSet.of(BeanProperties.AccessKind.METHOD);
-
-            Set<String> includes = new HashSet<>(Arrays.asList(annotationMetadata.stringValues(BeanProperties.class, BeanProperties.INCLUDES)));
-            Set<String> excludes = new HashSet<>(Arrays.asList(annotationMetadata.stringValues(BeanProperties.class, BeanProperties.EXCLUDES)));
-            // TODO: investigate why aliases aren't propagated
-            includes.addAll(Arrays.asList(annotationMetadata.stringValues(ConfigurationProperties.class, BeanProperties.INCLUDES)));
-            excludes.addAll(Arrays.asList(annotationMetadata.stringValues(ConfigurationProperties.class, BeanProperties.EXCLUDES)));
-
-            Map<String, BeanPropertyData> props = new LinkedHashMap<>();
+        if (beanProperties == null) {
             if (isRecord()) {
-                classElement.asType().accept(new SuperclassAwareTypeVisitor<Object, Object>(visitorContext) {
-
-                    @Override
-                    protected boolean isAcceptable(Element element) {
-                        return JavaModelUtils.isRecord(element);
-                    }
-
-                    @Override
-                    public Object visitDeclared(DeclaredType type, Object o) {
-                        Element element = type.asElement();
-                        if (isAcceptable(element)) {
-                            List<? extends Element> enclosedElements = element.getEnclosedElements();
-                            for (Element enclosedElement : enclosedElements) {
-                                if (JavaModelUtils.isRecordComponent(enclosedElement) || enclosedElement instanceof ExecutableElement) {
-                                    if (enclosedElement.getKind() != ElementKind.CONSTRUCTOR) {
-                                        accept(type, enclosedElement, o);
-                                    }
-                                }
-                            }
-                        }
-                        return o;
-                    }
-
-                    @Override
-                    protected void accept(DeclaredType type, Element element, Object o) {
-                        String name = element.getSimpleName().toString();
-                        if (element instanceof ExecutableElement) {
-                            BeanPropertyData beanPropertyData = props.get(name);
-                            if (beanPropertyData != null) {
-                                beanPropertyData.getter = new JavaMethodElement(JavaClassElement.this, (ExecutableElement) element, elementAnnotationMetadataFactory, visitorContext);
-                                beanPropertyData.type = beanPropertyData.getter.getReturnType().getGenericType();
-                            }
-                        } else {
-                            props.computeIfAbsent(name, BeanPropertyData::new);
-                        }
-                    }
-
-                }, null);
+                beanProperties = AstUtils.resolveBeanProperties(this,
+                    this::getRecordMethods,
+                    this::getRecordFields,
+                    true,
+                    methodElement -> Optional.empty(),
+                    this::mapToPropertyElement);
             } else {
-                if (accessKinds.contains(BeanProperties.AccessKind.METHOD)) {
-                    final String[] readPrefixes = getValue(AccessorsStyle.class, "readPrefixes", String[].class)
-                        .orElse(new String[]{AccessorsStyle.DEFAULT_READ_PREFIX});
-                    final String[] writePrefixes = getValue(AccessorsStyle.class, "writePrefixes", String[].class)
-                        .orElse(new String[]{AccessorsStyle.DEFAULT_WRITE_PREFIX});
-
-                    for (MethodElement methodElement : getPropertyMethods()) {
-                        if (methodElement.isStatic()
-                            || methodElement.hasDeclaredAnnotation(AnnotationUtil.INJECT)
-                            || methodElement.hasDeclaredAnnotation(AnnotationUtil.PRE_DESTROY)
-                            || methodElement.hasDeclaredAnnotation(AnnotationUtil.POST_CONSTRUCT)) {
-                            continue;
+                beanProperties = AstUtils.resolveBeanProperties(this,
+                    () -> AstUtils.getSubtypeFirstMethods(this),
+                    () -> AstUtils.getSubtypeFirstFields(this),
+                    false,
+                    methodElement -> {
+                        String methodName = methodElement.getSimpleName();
+                        if (isKotlinClass(((Element) methodElement.getNativeType()).getEnclosingElement()) && methodName.startsWith(PREFIX_IS)) {
+                            return Optional.of(methodName);
                         }
-                        String methodName = methodElement.getName();
-                        if (methodName.contains("$")) {
-                            continue;
-                        }
-                        if (visibility == BeanProperties.Visibility.DEFAULT) {
-                            if (methodElement.isPrivate() || !methodElement.isAccessible() && !methodElement.getDeclaringType().hasDeclaredStereotype(BeanProperties.class)) {
-                                continue;
-                            }
-                        } else if (visibility == BeanProperties.Visibility.PUBLIC && !methodElement.isPublic()) {
-                            continue;
-                        }
-
-                        if (NameUtils.isReaderName(methodName, readPrefixes) && methodElement.getParameters().length == 0) {
-                            String propertyName = isKotlinClass(((Element) methodElement.getNativeType()).getEnclosingElement()) && methodName.startsWith(PREFIX_IS) ?
-                                methodName : NameUtils.getPropertyNameForGetter(methodName, readPrefixes);
-                            BeanPropertyData beanPropertyData = props.computeIfAbsent(propertyName, BeanPropertyData::new);
-                            beanPropertyData.getter = methodElement;
-                            beanPropertyData.readAccessKind = BeanProperties.AccessKind.METHOD;
-                            ClassElement getterType = beanPropertyData.getter.getGenericReturnType();
-                            if (getterType.isOptional()) {
-                                getterType = getterType.getFirstTypeArgument().orElse(getterType);
-                            }
-                            if (beanPropertyData.type != null) {
-                                if (!getterType.isAssignable(beanPropertyData.type)) {
-                                    beanPropertyData.getter = null; // not a compatible getter
-                                    beanPropertyData.readAccessKind = null;
-                                }
-                            } else {
-                                beanPropertyData.type = getterType;
-                            }
-                        } else if (NameUtils.isWriterName(methodName, writePrefixes) && methodElement.getParameters().length == 1) {
-                            String propertyName = NameUtils.getPropertyNameForSetter(methodName, writePrefixes);
-                            ClassElement setterType = methodElement.getParameters()[0].getType();
-                            BeanPropertyData beanPropertyData = props.computeIfAbsent(propertyName, BeanPropertyData::new);
-                            if (beanPropertyData.setter != null) {
-                                if (setterType.isAssignable(beanPropertyData.type)) {
-                                    // Override the setter because the type is higher
-                                    beanPropertyData.setter = methodElement;
-                                }
-                                continue;
-                            }
-                            beanPropertyData.setter = methodElement;
-                            beanPropertyData.writeAccessKind = BeanProperties.AccessKind.METHOD;
-                            if (beanPropertyData.type != null) {
-                                if (!setterType.isAssignable(beanPropertyData.type)) {
-                                    beanPropertyData.setter = null; // not a compatible setter
-                                    beanPropertyData.writeAccessKind = null;
-                                }
-                            } else {
-                                beanPropertyData.type = setterType;
-                            }
-                        }
-                    }
-                }
-                if (accessKinds.contains(BeanProperties.AccessKind.FIELD)) {
-                    for (FieldElement fieldElement : getPropertyFields()) {
-                        if (fieldElement.isStatic()
-                            || fieldElement.hasDeclaredAnnotation(AnnotationUtil.INJECT)
-                            || fieldElement.hasStereotype(Value.class)
-                            || fieldElement.hasStereotype(Property.class)
-                        ) {
-                            continue;
-                        }
-                        if (visibility == BeanProperties.Visibility.DEFAULT) {
-                            if (fieldElement.isPrivate() || !fieldElement.isAccessible() && !fieldElement.getDeclaringType().hasDeclaredStereotype(BeanProperties.class)) {
-                                continue;
-                            }
-                        } else if (visibility == BeanProperties.Visibility.PUBLIC && !fieldElement.isPublic()) {
-                            continue;
-                        }
-                        String propertyName = fieldElement.getSimpleName();
-                        BeanPropertyData beanPropertyData = props.computeIfAbsent(propertyName, BeanPropertyData::new);
-                        ClassElement fieldType = fieldElement.getGenericType();
-                        if (fieldType.isOptional()) {
-                            fieldType = fieldType.getFirstTypeArgument().orElse(fieldType);
-                        }
-                        if (beanPropertyData.getter == null) {
-                            if (beanPropertyData.type != null) {
-                                if (fieldType.isAssignable(beanPropertyData.type)) {
-                                    beanPropertyData.field = fieldElement;
-                                    beanPropertyData.readAccessKind = BeanProperties.AccessKind.FIELD;
-                                }
-                            } else {
-                                beanPropertyData.type = fieldType;
-                                beanPropertyData.field = fieldElement;
-                                beanPropertyData.readAccessKind = BeanProperties.AccessKind.FIELD;
-                            }
-                        }
-                        if (!fieldElement.isFinal() && beanPropertyData.setter == null) {
-                            if (beanPropertyData.type != null) {
-                                if (fieldType.isAssignable(beanPropertyData.type)) {
-                                    beanPropertyData.field = fieldElement;
-                                    beanPropertyData.writeAccessKind = BeanProperties.AccessKind.FIELD;
-                                }
-                            } else {
-                                beanPropertyData.type = fieldType;
-                                beanPropertyData.field = fieldElement;
-                                beanPropertyData.writeAccessKind = BeanProperties.AccessKind.FIELD;
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (!props.isEmpty()) {
-                this.beanProperties = new ArrayList<>(props.size());
-                Map<String, FieldElement> fields = getEnclosedElements(ElementQuery.ALL_FIELDS)
-                    .stream()
-                    .filter(f -> !f.isStatic() && !f.hasDeclaredAnnotation(AnnotationUtil.INJECT))
-                    .collect(Collectors.toMap(io.micronaut.inject.ast.Element::getName, f -> f));
-                for (Map.Entry<String, BeanPropertyData> entry : props.entrySet()) {
-                    String propertyName = entry.getKey();
-                    BeanPropertyData value = entry.getValue();
-                    if (value.field == null && (value.getter != null || value.setter != null)) {
-                        // Find private setter for getter or setter to include the metadata
-                        value.field = fields.get(propertyName);
-                    }
-                    if (value.getter != null || value.field != null || value.setter != null) {
-                        boolean isExcluded = shouldExclude(includes, excludes, propertyName);
-                        JavaPropertyElement propertyElement = new JavaPropertyElement(
-                            JavaClassElement.this,
-                            value.type,
-                            value.getter,
-                            value.setter,
-                            value.field,
-                            elementAnnotationMetadataFactory,
-                            value.propertyName,
-                            value.readAccessKind == null ? PropertyElement.AccessKind.METHOD : PropertyElement.AccessKind.valueOf(value.readAccessKind.name()),
-                            value.writeAccessKind == null ? PropertyElement.AccessKind.METHOD : PropertyElement.AccessKind.valueOf(value.writeAccessKind.name()),
-                            isExcluded,
-                            visitorContext);
-                        beanProperties.add(propertyElement);
-                    }
-                }
-                this.beanProperties = Collections.unmodifiableList(beanProperties);
-            } else {
-                this.beanProperties = Collections.emptyList();
+                        return Optional.empty();
+                    }, this::mapToPropertyElement);
             }
         }
         return Collections.unmodifiableList(beanProperties);
     }
 
-    private List<MethodElement> getPropertyMethods() {
-        List<MethodElement> methods = getEnclosedElements(ElementQuery.ALL_METHODS.onlyInstance());
-        List<MethodElement> result = new ArrayList<>(methods.size());
-        List<MethodElement> other = new ArrayList<>(methods.size());
-        // Process subtype methods first
-        for (MethodElement methodElement : methods) {
-            if (methodElement.getDeclaringType().equals(this)) {
-                other.add(methodElement);
-            } else {
-                result.add(methodElement);
-            }
-        }
-        result.addAll(other);
-        return result;
-
+    private JavaPropertyElement mapToPropertyElement(AstUtils.BeanPropertyData value) {
+        return new JavaPropertyElement(
+            JavaClassElement.this,
+            value.type,
+            value.getter,
+            value.setter,
+            value.field,
+            elementAnnotationMetadataFactory,
+            value.propertyName,
+            value.readAccessKind == null ? PropertyElement.AccessKind.METHOD : PropertyElement.AccessKind.valueOf(value.readAccessKind.name()),
+            value.writeAccessKind == null ? PropertyElement.AccessKind.METHOD : PropertyElement.AccessKind.valueOf(value.writeAccessKind.name()),
+            value.isExcluded,
+            visitorContext);
     }
 
-    private List<FieldElement> getPropertyFields() {
-        List<FieldElement> fields = getEnclosedElements(ElementQuery.ALL_FIELDS);
-        List<FieldElement> result = new ArrayList<>(fields.size());
-        List<FieldElement> other = new ArrayList<>(fields.size());
-        // Process subtype fields first
-        for (FieldElement fieldElement : fields) {
-            if (fieldElement.getDeclaringType().equals(this)) {
-                other.add(fieldElement);
-            } else {
-                result.add(fieldElement);
+    private List<MethodElement> getRecordMethods() {
+        List<MethodElement> methodElements = new ArrayList<>();
+        classElement.asType().accept(new SuperclassAwareTypeVisitor<Object, Object>(visitorContext) {
+
+            private final Set<String> recordComponents = new HashSet<>();
+
+            @Override
+            protected boolean isAcceptable(Element element) {
+                return JavaModelUtils.isRecord(element);
             }
-        }
-        result.addAll(other);
-        return result;
+
+            @Override
+            public Object visitDeclared(DeclaredType type, Object o) {
+                Element element = type.asElement();
+                if (isAcceptable(element)) {
+                    List<? extends Element> enclosedElements = element.getEnclosedElements();
+                    for (Element enclosedElement : enclosedElements) {
+                        if (JavaModelUtils.isRecordComponent(enclosedElement) || enclosedElement instanceof ExecutableElement) {
+                            if (enclosedElement.getKind() != ElementKind.CONSTRUCTOR) {
+                                accept(type, enclosedElement, o);
+                            }
+                        }
+                    }
+                }
+                return o;
+            }
+
+            @Override
+            protected void accept(DeclaredType type, Element element, Object o) {
+                String name = element.getSimpleName().toString();
+                if (element instanceof ExecutableElement) {
+                    if (recordComponents.contains(name)) {
+                        methodElements.add(
+                            new JavaMethodElement(JavaClassElement.this, (ExecutableElement) element, elementAnnotationMetadataFactory, visitorContext)
+                        );
+                    }
+                } else if (element instanceof VariableElement) {
+                    recordComponents.add(name);
+                }
+            }
+
+        }, null);
+        return methodElements;
     }
 
-    private boolean shouldExclude(Set<String> includes, Set<String> excludes, String propertyName) {
-        if (!includes.isEmpty() && !includes.contains(propertyName)) {
-            return true;
-        }
-        return !excludes.isEmpty() && excludes.contains(propertyName);
+    private List<FieldElement> getRecordFields() {
+        List<FieldElement> fieldElements = new ArrayList<>();
+        classElement.asType().accept(new SuperclassAwareTypeVisitor<Object, Object>(visitorContext) {
+
+            @Override
+            protected boolean isAcceptable(Element element) {
+                return JavaModelUtils.isRecord(element);
+            }
+
+            @Override
+            public Object visitDeclared(DeclaredType type, Object o) {
+                Element element = type.asElement();
+                if (isAcceptable(element)) {
+                    List<? extends Element> enclosedElements = element.getEnclosedElements();
+                    for (Element enclosedElement : enclosedElements) {
+                        if (JavaModelUtils.isRecordComponent(enclosedElement) || enclosedElement instanceof ExecutableElement) {
+                            if (enclosedElement.getKind() != ElementKind.CONSTRUCTOR) {
+                                accept(type, enclosedElement, o);
+                            }
+                        }
+                    }
+                }
+                return o;
+            }
+
+            @Override
+            protected void accept(DeclaredType type, Element element, Object o) {
+                if (element instanceof VariableElement) {
+                    fieldElements.add(
+                        new JavaFieldElement(JavaClassElement.this, (VariableElement) element, elementAnnotationMetadataFactory, visitorContext)
+                    );
+                }
+            }
+
+        }, null);
+        return fieldElements;
     }
 
     private boolean isKotlinClass(Element element) {
@@ -1222,20 +1090,4 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         return genericTypeInfo;
     }
 
-    /**
-     * Internal holder class for getters and setters.
-     */
-    private static class BeanPropertyData {
-        ClassElement type;
-        MethodElement getter;
-        MethodElement setter;
-        FieldElement field;
-        BeanProperties.AccessKind readAccessKind;
-        BeanProperties.AccessKind writeAccessKind;
-        final String propertyName;
-
-        public BeanPropertyData(String propertyName) {
-            this.propertyName = propertyName;
-        }
-    }
 }
