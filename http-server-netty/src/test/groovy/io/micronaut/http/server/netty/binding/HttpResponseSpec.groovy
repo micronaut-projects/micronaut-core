@@ -162,7 +162,7 @@ class HttpResponseSpec extends AbstractMicronautSpec {
 
     void "test server header"() {
         given:
-        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['micronaut.server.serverHeader': 'Foo!', (SPEC_NAME_PROPERTY):getClass().simpleName])
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['micronaut.server.server-header': 'Foo!', (SPEC_NAME_PROPERTY):getClass().simpleName])
         def ctx = server.getApplicationContext()
         HttpClient client = ctx.createBean(HttpClient, server.getURL())
 
@@ -216,7 +216,7 @@ class HttpResponseSpec extends AbstractMicronautSpec {
 
     void "test date header turned off"() {
         given:
-        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['micronaut.server.dateHeader': false, (SPEC_NAME_PROPERTY):getClass().simpleName])
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['micronaut.server.date-header': false, (SPEC_NAME_PROPERTY):getClass().simpleName])
         ApplicationContext ctx = server.getApplicationContext()
         HttpClient client = ctx.createBean(HttpClient, server.getURL())
 
@@ -234,7 +234,7 @@ class HttpResponseSpec extends AbstractMicronautSpec {
 
     void "test keep alive connection header is not set by default for > 499 response"() {
         when:
-        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['micronaut.server.dateHeader': false, (SPEC_NAME_PROPERTY):getClass().simpleName])
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['micronaut.server.date-header': false, (SPEC_NAME_PROPERTY):getClass().simpleName])
         ApplicationContext ctx = server.getApplicationContext()
         HttpClient client = ctx.createBean(HttpClient, server.getURL())
 
@@ -303,6 +303,6 @@ class HttpResponseSpec extends AbstractMicronautSpec {
 
     @Override
     Map<String, Object> getConfiguration() {
-        super.getConfiguration() << ['micronaut.server.dateHeader': false]
+        super.getConfiguration() << ['micronaut.server.date-header': false]
     }
 }
