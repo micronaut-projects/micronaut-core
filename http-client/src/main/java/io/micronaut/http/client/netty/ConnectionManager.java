@@ -1438,7 +1438,7 @@ class ConnectionManager {
                 addTimeoutHandlers(
                     requestKey.isSecure() ?
                         ChannelPipelineCustomizer.HANDLER_SSL :
-                        ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC
+                        ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION
                 );
 
                 connectionCustomizer.onStreamPipelineBuilt();
