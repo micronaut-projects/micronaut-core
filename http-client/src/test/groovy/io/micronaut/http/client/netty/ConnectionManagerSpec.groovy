@@ -573,6 +573,31 @@ class ConnectionManagerSpec extends Specification {
         ctx.close()
     }
 
+    def 'http1 pool timeout'() {
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.connection-pool-idle-timeout': '5s',
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn1 = new EmbeddedTestConnectionHttp1()
+        conn1.setupHttp1()
+        def conn2 = new EmbeddedTestConnectionHttp1()
+        conn2.setupHttp1()
+        patch(client, conn1.clientChannel, conn2.clientChannel)
+
+        conn1.testExchange(client)
+        conn1.clientChannel.unfreezeTime()
+        // todo: move to advanceTime once IdleStateHandler supports it
+        TimeUnit.SECONDS.sleep(5)
+        conn1.advance()
+        // conn1 should expire now, conn2 will be the next connection
+        conn2.testExchange(client)
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
     static class EmbeddedTestConnectionBase {
         final EmbeddedChannel serverChannel
         final EmbeddedChannel clientChannel

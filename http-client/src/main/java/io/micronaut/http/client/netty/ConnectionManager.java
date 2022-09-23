@@ -540,14 +540,6 @@ class ConnectionManager {
             public void channelReleased(Channel ch) {
                 Duration idleTimeout = configuration.getConnectionPoolIdleTimeout().orElse(Duration.ofNanos(0));
                 ChannelPipeline pipeline = ch.pipeline();
-                if (ch.isOpen()) {
-                    ch.config().setAutoRead(true);
-                    pipeline.addLast(IdlingConnectionHandler.INSTANCE);
-                    if (idleTimeout.toNanos() > 0) {
-                        pipeline.addLast(ChannelPipelineCustomizer.HANDLER_IDLE_STATE, new IdleStateHandler(idleTimeout.toNanos(), idleTimeout.toNanos(), 0, TimeUnit.NANOSECONDS));
-                        pipeline.addLast(IdleTimeoutHandler.INSTANCE);
-                    }
-                }
 
                 removeReadTimeoutHandler(pipeline);
             }
@@ -555,15 +547,6 @@ class ConnectionManager {
             @Override
             public void channelAcquired(Channel ch) throws Exception {
                 ChannelPipeline pipeline = ch.pipeline();
-                if (pipeline.context(IdlingConnectionHandler.INSTANCE) != null) {
-                    pipeline.remove(IdlingConnectionHandler.INSTANCE);
-                }
-                if (pipeline.context(ChannelPipelineCustomizer.HANDLER_IDLE_STATE) != null) {
-                    pipeline.remove(ChannelPipelineCustomizer.HANDLER_IDLE_STATE);
-                }
-                if (pipeline.context(IdleTimeoutHandler.INSTANCE) != null) {
-                    pipeline.remove(IdleTimeoutHandler.INSTANCE);
-                }
             }
         };
     }
@@ -1160,20 +1143,6 @@ class ConnectionManager {
         }
     }
 
-    private static class ConditionalReadTimeoutHandler extends ReadTimeoutHandler {
-        private final Consumer<ChannelHandlerContext> fireTimeout;
-
-        ConditionalReadTimeoutHandler(long timeout, TimeUnit unit, Consumer<ChannelHandlerContext> fireTimeout) {
-            super(timeout, unit);
-            this.fireTimeout = fireTimeout;
-        }
-
-        @Override
-        protected void readTimedOut(ChannelHandlerContext ctx) throws Exception {
-            fireTimeout.accept(ctx);
-        }
-    }
-
     private final class Pool {
         private static final int MAX_CONCURRENT_REQUESTS_PER_HTTP2_CONNECTION = 4; // TODO: config
         private static final int MAX_PENDING_CONNECTIONS = 1;
@@ -1280,10 +1249,28 @@ class ConnectionManager {
                 this.connectionCustomizer = connectionCustomizer;
             }
 
-            void addTimeoutHandlers(String before, Consumer<ChannelHandlerContext> fireTimeout) {
+            final void addTimeoutHandlers(String before) {
+                // read timeout handles timeouts *during* a request
                 configuration.getReadTimeout()
-                    .map(dur -> new ConditionalReadTimeoutHandler(dur.toNanos(), TimeUnit.NANOSECONDS, fireTimeout))
-                    .ifPresent(ch -> channel.pipeline().addBefore(before, ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT, ch));
+                    .ifPresent(dur -> channel.pipeline().addBefore(before, ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT, new ReadTimeoutHandler(dur.toNanos(), TimeUnit.NANOSECONDS) {
+                        @Override
+                        protected void readTimedOut(ChannelHandlerContext ctx) throws Exception {
+                            if (hasLiveRequests()) {
+                                fireReadTimeout(ctx);
+                                ctx.close();
+                            }
+                        }
+                    }));
+                // pool idle timeout happens *outside* a request
+                configuration.getConnectionPoolIdleTimeout()
+                    .ifPresent(dur -> channel.pipeline().addBefore(before, ChannelPipelineCustomizer.HANDLER_IDLE_STATE, new ReadTimeoutHandler(dur.toNanos(), TimeUnit.NANOSECONDS) {
+                        @Override
+                        protected void readTimedOut(ChannelHandlerContext ctx) throws Exception {
+                            if (!hasLiveRequests()) {
+                                ctx.close();
+                            }
+                        }
+                    }));
                 configuration.getConnectTtl().ifPresent(ttl ->
                     ttlFuture = channel.eventLoop().schedule(this::windDownConnection, ttl.toNanos(), TimeUnit.NANOSECONDS));
                 channel.pipeline().addBefore(before, "connection-cleaner", new ChannelInboundHandlerAdapter() {
@@ -1316,8 +1303,14 @@ class ConnectionManager {
 
             abstract boolean tryEarmarkForRequest();
 
+            abstract boolean hasLiveRequests();
+
+            abstract void fireReadTimeout(ChannelHandlerContext ctx);
+
             void onInactive() {
-                ttlFuture.cancel(false);
+                if (ttlFuture != null) {
+                    ttlFuture.cancel(false);
+                }
                 windDownConnection = true;
             }
         }
@@ -1333,13 +1326,7 @@ class ConnectionManager {
                 addTimeoutHandlers(
                     requestKey.isSecure() ?
                         ChannelPipelineCustomizer.HANDLER_SSL :
-                        ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC,
-                    ctx -> {
-                        if (hasLiveRequest.get()) {
-                            ctx.fireExceptionCaught(ReadTimeoutException.INSTANCE);
-                            ctx.close();
-                        }
-                    }
+                        ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC
                 );
 
                 if (fireInitialPipelineBuilt) {
@@ -1359,6 +1346,16 @@ class ConnectionManager {
             @Override
             boolean tryEarmarkForRequest() {
                 return !windDownConnection && hasLiveRequest.compareAndSet(false, true);
+            }
+
+            @Override
+            boolean hasLiveRequests() {
+                return hasLiveRequest.get();
+            }
+
+            @Override
+            void fireReadTimeout(ChannelHandlerContext ctx) {
+                ctx.fireExceptionCaught(ReadTimeoutException.INSTANCE);
             }
 
             @Override
@@ -1441,15 +1438,7 @@ class ConnectionManager {
                 addTimeoutHandlers(
                     requestKey.isSecure() ?
                         ChannelPipelineCustomizer.HANDLER_SSL :
-                        ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC,
-                    ctx -> {
-                        if (liveRequests.get() != 0) {
-                            for (Channel sc : liveStreamChannels) {
-                                sc.pipeline().fireExceptionCaught(ReadTimeoutException.INSTANCE);
-                            }
-                            ctx.close();
-                        }
-                    }
+                        ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC
                 );
 
                 connectionCustomizer.onStreamPipelineBuilt();
@@ -1469,6 +1458,18 @@ class ConnectionManager {
             @Override
             boolean tryEarmarkForRequest() {
                 return !windDownConnection && incrementWithLimit(liveRequests, MAX_CONCURRENT_REQUESTS_PER_HTTP2_CONNECTION);
+            }
+
+            @Override
+            boolean hasLiveRequests() {
+                return liveRequests.get() > 0;
+            }
+
+            @Override
+            void fireReadTimeout(ChannelHandlerContext ctx) {
+                for (Channel sc : liveStreamChannels) {
+                    sc.pipeline().fireExceptionCaught(ReadTimeoutException.INSTANCE);
+                }
             }
 
             @Override
