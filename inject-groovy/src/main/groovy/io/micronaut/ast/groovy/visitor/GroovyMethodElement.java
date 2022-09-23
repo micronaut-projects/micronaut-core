@@ -72,11 +72,11 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
         final ClassNode[] exceptions = methodNode.getExceptions();
         if (ArrayUtils.isNotEmpty(exceptions)) {
             return Arrays.stream(exceptions)
-                    .map(cn -> getGenericElement(cn, visitorContext.getElementFactory().newClassElement(
-                            cn,
-                            elementAnnotationMetadataFactory,
-                            Collections.emptyMap()
-                    ))).toArray(ClassElement[]::new);
+                .map(cn -> getGenericElement(cn, visitorContext.getElementFactory().newClassElement(
+                    cn,
+                    elementAnnotationMetadataFactory,
+                    Collections.emptyMap()
+                ))).toArray(ClassElement[]::new);
         }
         return ClassElement.ZERO_CLASS_ELEMENTS;
     }
@@ -190,12 +190,12 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
         Parameter[] parameters = methodNode.getParameters();
         if (this.parameters == null) {
             this.parameters = Arrays.stream(parameters).map(parameter ->
-                    new GroovyParameterElement(
-                            this,
-                            visitorContext,
-                            parameter,
-                            elementAnnotationMetadataFactory
-                    )
+                new GroovyParameterElement(
+                    this,
+                    visitorContext,
+                    parameter,
+                    elementAnnotationMetadataFactory
+                )
             ).toArray(ParameterElement[]::new);
         }
 
@@ -234,9 +234,9 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
     public List<? extends GenericPlaceholderElement> getDeclaredTypeVariables() {
         GenericsType[] genericsTypes = methodNode.getGenericsTypes();
         return genericsTypes == null ?
-                Collections.emptyList() :
-                Arrays.stream(genericsTypes)
-                        .map(gt -> (GenericPlaceholderElement) visitorContext.getElementFactory().newClassElement(gt.getType(), elementAnnotationMetadataFactory))
-                        .collect(Collectors.toList());
+            Collections.emptyList() :
+            Arrays.stream(genericsTypes)
+                .map(gt -> (GenericPlaceholderElement) visitorContext.getElementFactory().newClassElement(gt.getType(), elementAnnotationMetadataFactory))
+                .collect(Collectors.toList());
     }
 }

@@ -17,17 +17,15 @@ package io.micronaut.ast.groovy.visitor;
 
 import io.micronaut.ast.groovy.utils.AstClassUtils;
 import io.micronaut.ast.groovy.utils.AstGenericUtils;
-import io.micronaut.ast.groovy.utils.PublicMethodVisitor;
-import io.micronaut.core.annotation.AccessorsStyle;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ArrayableClassElement;
+import io.micronaut.inject.ast.AstUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.Element;
@@ -39,7 +37,6 @@ import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.PackageElement;
 import io.micronaut.inject.ast.PropertyElement;
-import org.apache.groovy.util.concurrent.LazyInitializable;
 import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
@@ -52,7 +49,6 @@ import org.codehaus.groovy.ast.PackageNode;
 import org.codehaus.groovy.ast.PropertyNode;
 import org.codehaus.groovy.ast.stmt.BlockStatement;
 
-import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -716,7 +712,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     public List<PropertyElement> getBeanProperties() {
         if (properties == null) {
             List<PropertyElement> allProperties = new ArrayList<>();
-            List<GroovyPropertyElement> propertyElements = getPropertyNodes();
+            List<GroovyNativePropertyElement> propertyElements = getPropertyNodes();
             allProperties.addAll(propertyElements);
             allProperties.addAll(getPropertiesFromGettersAndSetters(propertyElements));
             properties = Collections.unmodifiableList(allProperties);
@@ -883,17 +879,17 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
         return copy;
     }
 
-    private List<GroovyPropertyElement> getPropertyNodes() {
+    private List<GroovyNativePropertyElement> getPropertyNodes() {
         List<PropertyNode> propertyNodes = new ArrayList<>();
         ClassNode classNode = this.classNode;
         while (classNode != null && !classNode.equals(ClassHelper.OBJECT_TYPE) && !classNode.equals(ClassHelper.Enum_Type)) {
             propertyNodes.addAll(classNode.getProperties());
             classNode = classNode.getSuperClass();
         }
-        List<GroovyPropertyElement> propertyElements = new ArrayList<>();
+        List<GroovyNativePropertyElement> propertyElements = new ArrayList<>();
         for (PropertyNode propertyNode : propertyNodes) {
             if (propertyNode.isPublic() && !propertyNode.isStatic()) {
-                GroovyPropertyElement groovyPropertyElement = new GroovyPropertyElement(
+                GroovyNativePropertyElement groovyPropertyElement = new GroovyNativePropertyElement(
                     visitorContext,
                     this,
                     propertyNode,
@@ -905,128 +901,28 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
         return propertyElements;
     }
 
-    private List<GroovyPropertyElement> getPropertiesFromGettersAndSetters(List<GroovyPropertyElement> propertyNodes) {
-        Set<String> groovyProps = propertyNodes.stream().map(PropertyElement::getName).collect(Collectors.toSet());
-        Map<String, GetterAndSetter> props = new LinkedHashMap<>();
-        ClassNode classNode = this.classNode;
-        while (classNode != null && !classNode.equals(ClassHelper.OBJECT_TYPE) && !classNode.equals(ClassHelper.Enum_Type)) {
-
-            classNode.visitContents(
-                new PublicMethodVisitor(null) {
-
-                    final String[] readPrefixes = getValue(AccessorsStyle.class, "readPrefixes", String[].class)
-                        .orElse(new String[]{AccessorsStyle.DEFAULT_READ_PREFIX});
-                    final String[] writePrefixes = getValue(AccessorsStyle.class, "writePrefixes", String[].class)
-                        .orElse(new String[]{AccessorsStyle.DEFAULT_WRITE_PREFIX});
-
-                    @Override
-                    protected boolean isAcceptable(MethodNode node) {
-                        boolean validModifiers = node.isPublic() && !node.isStatic() && !node.isSynthetic() && !node.isAbstract();
-                        if (validModifiers) {
-                            String methodName = node.getName();
-                            if (methodName.contains("$") || methodName.equals("getMetaClass")) {
-                                return false;
-                            }
-
-                            if (NameUtils.isReaderName(methodName, readPrefixes) && node.getParameters().length == 0) {
-                                return true;
-                            } else {
-                                return NameUtils.isWriterName(methodName, writePrefixes) && node.getParameters().length == 1;
-                            }
-                        }
-                        return validModifiers;
-                    }
-
-                    @Override
-                    public void accept(ClassNode classNode, MethodNode node) {
-                        String methodName = node.getName();
-                        if (NameUtils.isReaderName(methodName, readPrefixes) && node.getParameters().length == 0) {
-                            String propertyName = NameUtils.getPropertyNameForGetter(methodName, readPrefixes);
-                            if (groovyProps.contains(propertyName)) {
-                                return;
-                            }
-                            ClassNode returnTypeNode = node.getReturnType();
-                            ClassElement getterReturnType = null;
-                            if (returnTypeNode.isGenericsPlaceHolder()) {
-                                final String placeHolderName = returnTypeNode.getUnresolvedName();
-                                final ClassElement classElement = getTypeArguments().get(placeHolderName);
-                                if (classElement != null) {
-                                    getterReturnType = classElement;
-                                }
-                            }
-                            if (getterReturnType == null) {
-                                getterReturnType = visitorContext.getElementFactory().newClassElement(returnTypeNode, elementAnnotationMetadataFactory);
-                            }
-
-                            GetterAndSetter getterAndSetter = props.computeIfAbsent(propertyName, GetterAndSetter::new);
-                            getterAndSetter.type = getterReturnType;
-                            getterAndSetter.getter = node;
-                            if (getterAndSetter.setter != null) {
-                                ClassNode typeMirror = getterAndSetter.setter.getParameters()[0].getType();
-                                ClassElement setterParameterType = visitorContext.getElementFactory().newClassElement(typeMirror, emptyAnnotationsForNativeType(classNode));
-                                if (!setterParameterType.getName().equals(getterReturnType.getName())) {
-                                    getterAndSetter.setter = null; // not a compatible setter
-                                }
-                            }
-                        } else if (NameUtils.isWriterName(methodName, writePrefixes) && node.getParameters().length == 1) {
-                            String propertyName = NameUtils.getPropertyNameForSetter(methodName, writePrefixes);
-                            if (groovyProps.contains(propertyName)) {
-                                return;
-                            }
-                            ClassNode typeMirror = node.getParameters()[0].getType();
-                            ClassElement setterParameterType = visitorContext.getElementFactory().newClassElement(typeMirror, emptyAnnotationsForNativeType(classNode));
-
-                            GetterAndSetter getterAndSetter = props.computeIfAbsent(propertyName, GetterAndSetter::new);
-                            ClassElement propertyType = getterAndSetter.type;
-                            if (propertyType != null) {
-                                if (propertyType.getName().equals(setterParameterType.getName())) {
-                                    getterAndSetter.setter = node;
-                                }
-                            } else {
-                                getterAndSetter.setter = node;
-                            }
-                        }
-                    }
-
-                });
-            classNode = classNode.getSuperClass();
-        }
-        List<GroovyPropertyElement> propertyElements = new ArrayList<>(props.size());
-        if (!props.isEmpty()) {
-            for (Map.Entry<String, GetterAndSetter> entry : props.entrySet()) {
-                String propertyName = entry.getKey();
-                GetterAndSetter value = entry.getValue();
-                if (value.getter != null) {
-                    FieldNode field = GroovyClassElement.this.classNode.getField(propertyName);
-                    if (field instanceof LazyInitializable) {
-                        //this nonsense is to work around https://issues.apache.org/jira/browse/GROOVY-10398
-                        ((LazyInitializable) field).lazyInit();
-                        try {
-                            Field delegate = field.getClass().getDeclaredField("delegate");
-                            delegate.setAccessible(true);
-                            field = (FieldNode) delegate.get(field);
-                        } catch (NoSuchFieldException | IllegalAccessException e) {
-                            // no op
-                        }
-                    }
-
-                    GroovyPropertyElement propertyElement = new GroovyPropertyElement(
-                        visitorContext,
-                        this,
-                        value.type,
-                        propertyName,
-                        value.setter == null,
-                        value.getter,
-                        field,
-                        value.getter,
-                        value.setter,
-                        elementAnnotationMetadataFactory);
-
-                    propertyElements.add(propertyElement);
-                }
-            }
-        }
-        return propertyElements;
+    private List<PropertyElement> getPropertiesFromGettersAndSetters(List<GroovyNativePropertyElement> propertyNodes) {
+        Set<String> nativeProps = propertyNodes.stream().map(GroovyNativePropertyElement::getName).collect(Collectors.toSet());
+        return AstUtils.resolveBeanProperties(this,
+                () -> AstUtils.getSubtypeFirstMethods(this),
+                () -> AstUtils.getSubtypeFirstFields(this),
+                true,
+                methodElement -> Optional.empty(),
+                value -> new GroovyGetSetPropertyElement(
+                    visitorContext,
+                    this,
+                    value.type,
+                    value.getter,
+                    value.setter,
+                    value.field,
+                    elementAnnotationMetadataFactory,
+                    value.propertyName,
+                    value.readAccessKind == null ? PropertyElement.AccessKind.METHOD : PropertyElement.AccessKind.valueOf(value.readAccessKind.name()),
+                    value.writeAccessKind == null ? PropertyElement.AccessKind.METHOD : PropertyElement.AccessKind.valueOf(value.writeAccessKind.name()),
+                    value.isExcluded))
+            .stream()
+            .filter(p -> !nativeProps.contains(p.getName()))
+            .collect(Collectors.toList());
     }
 
     private MethodElement asConstructor(ConstructorNode cn) {

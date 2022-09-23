@@ -48,7 +48,7 @@ class JavaConstructorElement extends JavaMethodElement implements ConstructorEle
 
     @Override
     public MethodElement withNewParameters(ParameterElement... newParameters) {
-        return new JavaConstructorElement(declaringClass, executableElement, elementAnnotationMetadataFactory, visitorContext) {
+        return new JavaConstructorElement(owningType, executableElement, elementAnnotationMetadataFactory, visitorContext) {
             @Override
             public ParameterElement[] getParameters() {
                 return ArrayUtils.concat(super.getParameters(), newParameters);

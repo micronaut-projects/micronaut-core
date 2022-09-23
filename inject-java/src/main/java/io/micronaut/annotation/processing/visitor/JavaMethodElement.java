@@ -51,7 +51,7 @@ import java.util.stream.Collectors;
 @Internal
 public class JavaMethodElement extends AbstractJavaElement implements MethodElement {
 
-    protected final JavaClassElement declaringClass;
+    protected final JavaClassElement owningType;
     protected final ExecutableElement executableElement;
     protected final JavaVisitorContext visitorContext;
     private ClassElement resolvedDeclaringClass;
@@ -61,19 +61,19 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
     private ClassElement returnType;
 
     /**
-     * @param declaringClass            The declaring class
+     * @param owningType                The declaring class
      * @param executableElement         The {@link ExecutableElement}
      * @param annotationMetadataFactory The annotation metadata factory
      * @param visitorContext            The visitor context
      */
-    public JavaMethodElement(JavaClassElement declaringClass,
+    public JavaMethodElement(JavaClassElement owningType,
                              ExecutableElement executableElement,
                              ElementAnnotationMetadataFactory annotationMetadataFactory,
                              JavaVisitorContext visitorContext) {
         super(executableElement, annotationMetadataFactory, visitorContext);
         this.executableElement = executableElement;
         this.visitorContext = visitorContext;
-        this.declaringClass = declaringClass;
+        this.owningType = owningType;
     }
 
     @Override
@@ -83,7 +83,7 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
             if (receiverType.getKind() != TypeKind.NONE) {
                 final ClassElement classElement = mirrorToClassElement(receiverType,
                     visitorContext,
-                    declaringClass.getGenericTypeInfo());
+                    owningType.getGenericTypeInfo());
                 return Optional.of(classElement);
             }
         }
@@ -99,7 +99,7 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
                 .map(tm -> mirrorToClassElement(
                     tm,
                     visitorContext,
-                    declaringClass.getGenericTypeInfo()
+                    owningType.getGenericTypeInfo()
                 )).toArray(ClassElement[]::new);
         }
 
@@ -117,7 +117,7 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
             return visitorContext.getElements().overrides(
                 executableElement,
                 ((JavaMethodElement) methodElement).executableElement,
-                declaringClass.classElement
+                owningType.classElement
             );
         }
         return false;
@@ -127,7 +127,7 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
     @Override
     public ClassElement getGenericReturnType() {
         if (this.genericReturnType == null) {
-            this.genericReturnType = returnType(declaringClass.getGenericTypeInfo());
+            this.genericReturnType = returnType(owningType.getGenericTypeInfo());
         }
         return this.genericReturnType;
     }
@@ -174,7 +174,7 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
 
     @Override
     public MethodElement withNewParameters(ParameterElement... newParameters) {
-        return new JavaMethodElement(declaringClass, executableElement, elementAnnotationMetadataFactory, visitorContext) {
+        return new JavaMethodElement(owningType, executableElement, elementAnnotationMetadataFactory, visitorContext) {
             @Override
             public ParameterElement[] getParameters() {
                 return ArrayUtils.concat(super.getParameters(), newParameters);
@@ -195,12 +195,12 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
     /**
      * Creates a new parameter element for the given args.
      *
-     * @param variableElement           The variable element
+     * @param variableElement The variable element
      * @return The parameter element
      */
     @NonNull
-    protected JavaParameterElement newParameterElement(@NonNull  MethodElement methodElement, @NonNull VariableElement variableElement) {
-        return new JavaParameterElement(declaringClass, methodElement, variableElement, elementAnnotationMetadataFactory, visitorContext);
+    protected JavaParameterElement newParameterElement(@NonNull MethodElement methodElement, @NonNull VariableElement variableElement) {
+        return new JavaParameterElement(owningType, methodElement, variableElement, elementAnnotationMetadataFactory, visitorContext);
     }
 
     @Override
@@ -210,13 +210,13 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
             Element enclosingElement = executableElement.getEnclosingElement();
             if (enclosingElement instanceof TypeElement) {
                 TypeElement te = (TypeElement) enclosingElement;
-                if (declaringClass.getName().equals(te.getQualifiedName().toString())) {
-                    resolvedDeclaringClass = declaringClass;
+                if (owningType.getName().equals(te.getQualifiedName().toString())) {
+                    resolvedDeclaringClass = owningType;
                 } else {
-                    resolvedDeclaringClass = mirrorToClassElement(te.asType(), visitorContext, declaringClass.getGenericTypeInfo());
+                    resolvedDeclaringClass = mirrorToClassElement(te.asType(), visitorContext, owningType.getGenericTypeInfo());
                 }
             } else {
-                return declaringClass;
+                return owningType;
             }
         }
         return resolvedDeclaringClass;
@@ -224,7 +224,7 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
 
     @Override
     public ClassElement getOwningType() {
-        return declaringClass;
+        return owningType;
     }
 
     /**

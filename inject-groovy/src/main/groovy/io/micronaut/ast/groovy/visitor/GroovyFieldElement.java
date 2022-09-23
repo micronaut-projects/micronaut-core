@@ -16,8 +16,11 @@
 package io.micronaut.ast.groovy.visitor;
 
 import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
+import org.apache.groovy.util.concurrent.LazyInitializable;
 import org.codehaus.groovy.ast.FieldNode;
 import org.codehaus.groovy.ast.Variable;
+
+import java.lang.reflect.Field;
 
 /**
  * A field element returning data from a {@link Variable}. The
@@ -28,6 +31,7 @@ import org.codehaus.groovy.ast.Variable;
  */
 public class GroovyFieldElement extends AbstractGroovyVariableElement {
 
+    private final GroovyClassElement owningType;
     private final FieldNode fieldNode;
 
     /**
@@ -36,14 +40,37 @@ public class GroovyFieldElement extends AbstractGroovyVariableElement {
      * @param annotationMetadataFactory The annotation metadata
      */
     GroovyFieldElement(GroovyVisitorContext visitorContext,
+                       GroovyClassElement owningType,
                        FieldNode fieldNode,
                        ElementAnnotationMetadataFactory annotationMetadataFactory) {
         super(visitorContext, fieldNode, fieldNode, annotationMetadataFactory);
-        this.fieldNode = fieldNode;
+        this.owningType = owningType;
+        this.fieldNode = unwrapLazyField(fieldNode);
+    }
+
+    @Deprecated
+    private static FieldNode unwrapLazyField(FieldNode fieldNode) {
+        if (fieldNode instanceof LazyInitializable) {
+            //this nonsense is to work around https://issues.apache.org/jira/browse/GROOVY-10398
+            ((LazyInitializable) fieldNode).lazyInit();
+            try {
+                Field delegate = fieldNode.getClass().getDeclaredField("delegate");
+                delegate.setAccessible(true);
+                fieldNode = (FieldNode) delegate.get(fieldNode);
+            } catch (NoSuchFieldException | IllegalAccessException e) {
+                // no op
+            }
+        }
+        return fieldNode;
     }
 
     @Override
     public FieldNode getNativeType() {
         return fieldNode;
+    }
+
+    @Override
+    public GroovyClassElement getOwningType() {
+        return owningType;
     }
 }

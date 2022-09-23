@@ -183,6 +183,9 @@ public interface MethodElement extends MemberElement {
             @NonNull String name,
             ParameterElement...parameterElements) {
         return new MethodElement() {
+
+            private @NonNull AnnotationMetadata thisAnnotationMetadata = annotationMetadata;
+
             @NonNull
             @Override
             public ClassElement getReturnType() {
@@ -204,7 +207,7 @@ public interface MethodElement extends MemberElement {
             public MethodElement withNewParameters(ParameterElement... newParameters) {
                 return MethodElement.of(
                         declaredType,
-                        annotationMetadata,
+                    thisAnnotationMetadata,
                         returnType,
                         genericReturnType,
                         name,
@@ -215,7 +218,7 @@ public interface MethodElement extends MemberElement {
             @NonNull
             @Override
             public AnnotationMetadata getAnnotationMetadata() {
-                return annotationMetadata;
+                return thisAnnotationMetadata;
             }
 
             @Override
@@ -242,6 +245,12 @@ public interface MethodElement extends MemberElement {
             @Override
             public boolean isPublic() {
                 return true;
+            }
+
+            @Override
+            public MethodElement replaceAnnotations(AnnotationMetadata annotationMetadata) {
+                this.thisAnnotationMetadata = annotationMetadata;
+                return this;
             }
 
             @NonNull

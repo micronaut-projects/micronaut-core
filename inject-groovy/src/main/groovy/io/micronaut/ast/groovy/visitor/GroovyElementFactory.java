@@ -292,19 +292,19 @@ public class GroovyElementFactory implements ElementFactory<AnnotatedNode, Class
 
     @NonNull
     @Override
-    public GroovyFieldElement newFieldElement(ClassElement declaringClass,
+    public GroovyFieldElement newFieldElement(ClassElement owningType,
                                               FieldNode field,
                                               ElementAnnotationMetadataFactory annotationMetadataFactory) {
-        if (!(declaringClass instanceof GroovyClassElement)) {
+        if (!(owningType instanceof GroovyClassElement)) {
             throw new IllegalArgumentException("Declaring class must be a GroovyClassElement");
         }
-        return new GroovyFieldElement(visitorContext, field, annotationMetadataFactory);
+        return new GroovyFieldElement(visitorContext, (GroovyClassElement) owningType, field, annotationMetadataFactory);
     }
 
     @NonNull
     @Override
     public FieldElement newFieldElement(@NonNull FieldNode field, @NonNull AnnotationMetadata annotationMetadata) {
-        return new GroovyFieldElement(visitorContext, field, defaultAnnotationMetadata(field, annotationMetadata));
+        throw new IllegalArgumentException("Not supported");
     }
 
     /**

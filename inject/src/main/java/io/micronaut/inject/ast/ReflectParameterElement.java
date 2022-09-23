@@ -105,4 +105,10 @@ final class ReflectParameterElement implements ParameterElement {
         }
         return this;
     }
+
+    @Override
+    public ParameterElement replaceAnnotations(AnnotationMetadata annotationMetadata) {
+        this.annotationMetadata = annotationMetadata;
+        return this;
+    }
 }
