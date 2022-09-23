@@ -48,12 +48,8 @@ import io.netty.channel.ChannelPromise;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.pool.AbstractChannelPoolHandler;
-import io.netty.channel.pool.AbstractChannelPoolMap;
 import io.netty.channel.pool.ChannelHealthChecker;
 import io.netty.channel.pool.ChannelPool;
-import io.netty.channel.pool.ChannelPoolMap;
-import io.netty.channel.pool.FixedChannelPool;
-import io.netty.channel.pool.SimpleChannelPool;
 import io.netty.handler.codec.LineBasedFrameDecoder;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.DefaultHttpContent;
@@ -101,9 +97,7 @@ import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 import io.netty.util.concurrent.Promise;
-import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 import reactor.core.scheduler.Scheduler;
@@ -147,7 +141,6 @@ class ConnectionManager {
         AttributeKey.valueOf("micronaut.http.streamChannelInitialized");
     private static final AttributeKey<Http2Stream> STREAM_KEY = AttributeKey.valueOf("micronaut.http2.stream");
 
-    final ChannelPoolMap<DefaultHttpClient.RequestKey, ChannelPool> poolMap;
     final InvocationInstrumenter instrumenter;
     final HttpVersion httpVersion;
 
@@ -168,7 +161,6 @@ class ConnectionManager {
     private final String informationalServiceId;
 
     ConnectionManager(ConnectionManager from) {
-        this.poolMap = from.poolMap;
         this.instrumenter = from.instrumenter;
         this.httpVersion = from.httpVersion;
         this.log = from.log;
@@ -235,51 +227,6 @@ class ConnectionManager {
         final ChannelHealthChecker channelHealthChecker = channel -> channel.eventLoop().newSucceededFuture(channel.isActive() && !ConnectTTLHandler.isChannelExpired(channel));
 
         HttpClientConfiguration.ConnectionPoolConfiguration connectionPoolConfiguration = configuration.getConnectionPoolConfiguration();
-        // HTTP/2 defaults to keep alive connections so should we should always use a pool
-        if (connectionPoolConfiguration.isEnabled() || httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0) {
-            int maxConnections = connectionPoolConfiguration.getMaxConnections();
-            if (maxConnections > -1) {
-                poolMap = new AbstractChannelPoolMap<DefaultHttpClient.RequestKey, ChannelPool>() {
-                    @Override
-                    protected ChannelPool newPool(DefaultHttpClient.RequestKey key) {
-                        Bootstrap newBootstrap = bootstrap.clone(group);
-                        initBootstrapForProxy(newBootstrap, key.isSecure(), key.getHost(), key.getPort());
-                        newBootstrap.remoteAddress(key.getRemoteAddress());
-
-                        AbstractChannelPoolHandler channelPoolHandler = newPoolHandler(key);
-                        final long acquireTimeoutMillis = connectionPoolConfiguration.getAcquireTimeout().map(Duration::toMillis).orElse(-1L);
-                        return new FixedChannelPool(
-                            newBootstrap,
-                            channelPoolHandler,
-                            channelHealthChecker,
-                            acquireTimeoutMillis > -1 ? FixedChannelPool.AcquireTimeoutAction.FAIL : null,
-                            acquireTimeoutMillis,
-                            maxConnections,
-                            connectionPoolConfiguration.getMaxPendingAcquires()
-
-                        );
-                    }
-                };
-            } else {
-                poolMap = new AbstractChannelPoolMap<DefaultHttpClient.RequestKey, ChannelPool>() {
-                    @Override
-                    protected ChannelPool newPool(DefaultHttpClient.RequestKey key) {
-                        Bootstrap newBootstrap = bootstrap.clone(group);
-                        initBootstrapForProxy(newBootstrap, key.isSecure(), key.getHost(), key.getPort());
-                        newBootstrap.remoteAddress(key.getRemoteAddress());
-
-                        AbstractChannelPoolHandler channelPoolHandler = newPoolHandler(key);
-                        return new SimpleChannelPool(
-                            newBootstrap,
-                            channelPoolHandler,
-                            channelHealthChecker
-                        );
-                    }
-                };
-            }
-        } else {
-            this.poolMap = null;
-        }
 
         Optional<Duration> connectTimeout = configuration.getConnectTimeout();
         connectTimeout.ifPresent(duration -> bootstrap.option(
@@ -340,28 +287,8 @@ class ConnectionManager {
      * @see DefaultHttpClient#stop()
      */
     public void shutdown() {
-        // todo: shutdown pools
-        if (poolMap instanceof Iterable) {
-            Iterable<Map.Entry<DefaultHttpClient.RequestKey, ChannelPool>> i = (Iterable) poolMap;
-            for (Map.Entry<DefaultHttpClient.RequestKey, ChannelPool> entry : i) {
-                ChannelPool cp = entry.getValue();
-                try {
-                    if (cp instanceof SimpleChannelPool) {
-                        addInstrumentedListener(((SimpleChannelPool) cp).closeAsync(), future -> {
-                            if (!future.isSuccess()) {
-                                final Throwable cause = future.cause();
-                                if (cause != null) {
-                                    log.error("Error shutting down HTTP client connection pool: " + cause.getMessage(), cause);
-                                }
-                            }
-                        });
-                    } else {
-                        cp.close();
-                    }
-                } catch (Exception cause) {
-                    log.error("Error shutting down HTTP client connection pool: " + cause.getMessage(), cause);
-                }
-            }
+        for (Pool pool : pools.values()) {
+            pool.shutdown();
         }
         if (shutdownGroup) {
             Duration shutdownTimeout = configuration.getShutdownTimeout()
@@ -400,33 +327,6 @@ class ConnectionManager {
         return Schedulers.fromExecutor(group);
     }
 
-    /**
-     * Creates an initial connection to the given remote host.
-     *
-     * @param requestKey      The request key to connect to
-     * @param isStream        Is the connection a stream connection
-     * @param isProxy         Is this a streaming proxy
-     * @param acceptsEvents   Whether the connection will accept events
-     * @param contextConsumer The logic to run once the channel is configured correctly
-     * @return A ChannelFuture
-     * @throws HttpClientException If the URI is invalid
-     */
-    private ChannelFuture doConnect(
-        DefaultHttpClient.RequestKey requestKey,
-        boolean isStream,
-        boolean isProxy,
-        boolean acceptsEvents,
-        Consumer<ChannelHandlerContext> contextConsumer) throws HttpClientException {
-        return doConnect(requestKey, new HttpClientInitializer(
-            buildSslContext(requestKey),
-            requestKey.getHost(),
-            requestKey.getPort(),
-            isStream,
-            isProxy,
-            acceptsEvents,
-            contextConsumer));
-    }
-
     // for testing
     protected ChannelFuture doConnect(DefaultHttpClient.RequestKey requestKey, ChannelInitializer<?> channelInitializer) {
         String host = requestKey.getHost();
@@ -463,10 +363,6 @@ class ConnectionManager {
         return sslCtx;
     }
 
-    private PoolHandle mockPoolHandle(Channel channel) {
-        return new OldPoolHandle(null, channel);
-    }
-
     /**
      * Get a connection for exchange-like (non-streaming) http client methods.
      *
@@ -476,83 +372,21 @@ class ConnectionManager {
      * @return A mono that will complete once the channel is ready for transmission
      */
     Mono<PoolHandle> connectForExchange(DefaultHttpClient.RequestKey requestKey, boolean multipart, boolean acceptEvents) {
-        if (true) {
-            Pool pool = pools.computeIfAbsent(requestKey, Pool::new);
-            // todo: aggregator
-            return pool.acquire().map(ph -> {
-                ph.channel.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP_AGGREGATOR, new HttpObjectAggregator(configuration.getMaxContentLength()) {
-                    @Override
-                    protected void finishAggregation(FullHttpMessage aggregated) throws Exception {
-                        if (!HttpUtil.isContentLengthSet(aggregated)) {
-                            if (aggregated.content().readableBytes() > 0) {
-                                super.finishAggregation(aggregated);
-                            }
+        Pool pool = pools.computeIfAbsent(requestKey, Pool::new);
+        return pool.acquire().map(ph -> {
+            // TODO: this sucks
+            ph.channel.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP_AGGREGATOR, new HttpObjectAggregator(configuration.getMaxContentLength()) {
+                @Override
+                protected void finishAggregation(FullHttpMessage aggregated) throws Exception {
+                    if (!HttpUtil.isContentLengthSet(aggregated)) {
+                        if (aggregated.content().readableBytes() > 0) {
+                            super.finishAggregation(aggregated);
                         }
                     }
-                });
-                return ph;
-            });
-        }
-        return Mono.<PoolHandle>create(emitter -> {
-            if (poolMap != null && !multipart) {
-                try {
-                    ChannelPool channelPool = poolMap.get(requestKey);
-                    addInstrumentedListener(channelPool.acquire(), future -> {
-                        if (future.isSuccess()) {
-                            Channel channel = future.get();
-                            PoolHandle poolHandle = new OldPoolHandle(channelPool, channel);
-                            Future<?> initFuture = channel.attr(STREAM_CHANNEL_INITIALIZED).get();
-                            if (initFuture == null) {
-                                emitter.success(poolHandle);
-                            } else {
-                                // we should wait until the handshake completes
-                                addInstrumentedListener(initFuture, f -> {
-                                    emitter.success(poolHandle);
-                                });
-                            }
-                        } else {
-                            Throwable cause = future.cause();
-                            emitter.error(customizeException(new HttpClientException("Connect Error: " + cause.getMessage(), cause)));
-                        }
-                    });
-                } catch (HttpClientException e) {
-                    emitter.error(e);
                 }
-            } else {
-                ChannelFuture connectionFuture = doConnect(requestKey, false, false, acceptEvents, null);
-                addInstrumentedListener(connectionFuture, future -> {
-                    if (!future.isSuccess()) {
-                        Throwable cause = future.cause();
-                        emitter.error(customizeException(new HttpClientException("Connect Error: " + cause.getMessage(), cause)));
-                    } else {
-                        emitter.success(mockPoolHandle(connectionFuture.channel()));
-                    }
-                });
-            }
-        })
-            .delayUntil(this::delayUntilHttp2Ready)
-            .map(poolHandle -> {
-                addReadTimeoutHandler(poolHandle.channel.pipeline());
-                return poolHandle;
             });
-    }
-
-    private Publisher<?> delayUntilHttp2Ready(PoolHandle poolHandle) {
-        Http2SettingsHandler settingsHandler = (Http2SettingsHandler) poolHandle.channel.pipeline().get(ChannelPipelineCustomizer.HANDLER_HTTP2_SETTINGS);
-        if (settingsHandler == null) {
-            return Flux.empty();
-        }
-        Sinks.Empty<?> empty = Sinks.empty();
-        addInstrumentedListener(settingsHandler.promise, future -> {
-            if (future.isSuccess()) {
-                empty.tryEmitEmpty();
-            } else {
-                poolHandle.taint();
-                poolHandle.release();
-                empty.tryEmitError(future.cause());
-            }
+            return ph;
         });
-        return empty.asMono();
     }
 
     /**
@@ -564,58 +398,49 @@ class ConnectionManager {
      * @return A mono that will complete once the channel is ready for transmission
      */
     Mono<PoolHandle> connectForStream(DefaultHttpClient.RequestKey requestKey, boolean isProxy, boolean acceptEvents) {
-        if (true) {
-            Pool pool = pools.computeIfAbsent(requestKey, Pool::new);
-            return pool.acquire()
-                .map(ph -> {
-                    // TODO: this sucks
-                    ph.channel.pipeline().addLast(new ChannelInboundHandlerAdapter() {
-                        boolean ignoreOneLast = false;
+        Pool pool = pools.computeIfAbsent(requestKey, Pool::new);
+        return pool.acquire()
+            .map(ph -> {
+                // TODO: this sucks
+                ph.channel.pipeline().addLast(new ChannelInboundHandlerAdapter() {
+                    boolean ignoreOneLast = false;
 
-                        @Override
-                        public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-                            if (msg instanceof HttpResponse &&
-                                ((HttpResponse) msg).status().equals(HttpResponseStatus.CONTINUE)) {
-                                ignoreOneLast = true;
-                            }
+                    @Override
+                    public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+                        if (msg instanceof HttpResponse &&
+                            ((HttpResponse) msg).status().equals(HttpResponseStatus.CONTINUE)) {
+                            ignoreOneLast = true;
+                        }
 
-                            super.channelRead(ctx, msg);
+                        super.channelRead(ctx, msg);
 
-                            if (msg instanceof LastHttpContent) {
-                                if (ignoreOneLast) {
-                                    ignoreOneLast = false;
-                                } else {
-                                    ctx.pipeline()
-                                        .remove(this)
-                                        .remove(ChannelPipelineCustomizer.HANDLER_HTTP_STREAM);
-                                    ph.release();
-                                }
+                        if (msg instanceof LastHttpContent) {
+                            if (ignoreOneLast) {
+                                ignoreOneLast = false;
+                            } else {
+                                ctx.pipeline()
+                                    .remove(this)
+                                    .remove(ChannelPipelineCustomizer.HANDLER_HTTP_STREAM);
+                                ph.release();
                             }
                         }
-                    });
-                    ph.channel.pipeline().addLast(
-                            ChannelPipelineCustomizer.HANDLER_HTTP_STREAM,
-                            new HttpStreamsClientHandler() {
-                                @Override
-                                public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
-                                    if (evt instanceof IdleStateEvent) {
-                                        // close the connection if it is idle for too long
-                                        ph.taint();
-                                        ph.release();
-                                    }
-                                    super.userEventTriggered(ctx, evt);
-                                }
-                            }
-                    );
-                    return ph;
+                    }
                 });
-        }
-        return Mono.<PoolHandle>create(emitter -> {
-        })
-            .delayUntil(this::delayUntilHttp2Ready)
-            .map(poolHandle -> {
-                addReadTimeoutHandler(poolHandle.channel.pipeline());
-                return poolHandle;
+                ph.channel.pipeline().addLast(
+                        ChannelPipelineCustomizer.HANDLER_HTTP_STREAM,
+                        new HttpStreamsClientHandler() {
+                            @Override
+                            public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+                                if (evt instanceof IdleStateEvent) {
+                                    // close the connection if it is idle for too long
+                                    ph.taint();
+                                    ph.release();
+                                }
+                                super.userEventTriggered(ctx, evt);
+                            }
+                        }
+                );
+                return ph;
             });
     }
 
@@ -989,7 +814,7 @@ class ConnectionManager {
                 }
 
                 // Pool connections require alternative timeout handling
-                if (poolMap == null) {
+                if (true/*poolMap == null*/) {
                     // read timeout settings are not applied to streamed requests.
                     // instead idle timeout settings are applied.
                     if (stream) {
@@ -1483,6 +1308,15 @@ class ConnectionManager {
         void onNewConnectionFailure() {
             pendingConnectionCount.decrementAndGet();
             // todo: retry connection
+        }
+
+        public void shutdown() {
+            for (Http1ConnectionHolder http1Connection : http1Connections) {
+                http1Connection.channel.close();
+            }
+            for (Http2ConnectionHolder http2Connection : http2Connections) {
+                http2Connection.channel.close();
+            }
         }
 
         final class Http1ConnectionHolder {
