@@ -44,11 +44,8 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelPipeline;
-import io.netty.channel.ChannelPromise;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.channel.pool.AbstractChannelPoolHandler;
-import io.netty.channel.pool.ChannelPool;
 import io.netty.handler.codec.LineBasedFrameDecoder;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.DefaultHttpContent;
@@ -72,7 +69,6 @@ import io.netty.handler.codec.http2.Http2FrameCodec;
 import io.netty.handler.codec.http2.Http2FrameCodecBuilder;
 import io.netty.handler.codec.http2.Http2FrameLogger;
 import io.netty.handler.codec.http2.Http2MultiplexHandler;
-import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.codec.http2.Http2SettingsFrame;
 import io.netty.handler.codec.http2.Http2Stream;
 import io.netty.handler.codec.http2.Http2StreamChannel;
@@ -95,7 +91,6 @@ import io.netty.util.AttributeKey;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
-import io.netty.util.concurrent.Promise;
 import io.netty.util.concurrent.ScheduledFuture;
 import org.slf4j.Logger;
 import reactor.core.publisher.Mono;
@@ -132,13 +127,6 @@ import java.util.function.Consumer;
 class ConnectionManager {
     private static final AttributeKey<NettyClientCustomizer> CHANNEL_CUSTOMIZER_KEY =
         AttributeKey.valueOf("micronaut.http.customizer");
-    /**
-     * Future on a pooled channel that will be completed when the channel has fully connected (e.g.
-     * TLS handshake has completed). If unset, then no handshake is needed or it has already
-     * completed.
-     */
-    private static final AttributeKey<Future<?>> STREAM_CHANNEL_INITIALIZED =
-        AttributeKey.valueOf("micronaut.http.streamChannelInitialized");
     private static final AttributeKey<Http2Stream> STREAM_KEY = AttributeKey.valueOf("micronaut.http2.stream");
 
     final InvocationInstrumenter instrumenter;
@@ -488,69 +476,6 @@ class ConnectionManager {
         return initial.asMono();
     }
 
-    private AbstractChannelPoolHandler newPoolHandler(DefaultHttpClient.RequestKey key) {
-        return new AbstractChannelPoolHandler() {
-            @Override
-            public void channelCreated(Channel ch) {
-                Promise<?> streamPipelineBuilt = ch.newPromise();
-                ch.attr(STREAM_CHANNEL_INITIALIZED).set(streamPipelineBuilt);
-
-                // make sure the future completes eventually
-                ChannelHandler failureHandler = new ChannelInboundHandlerAdapter() {
-                    @Override
-                    public void handlerRemoved(ChannelHandlerContext ctx) {
-                        streamPipelineBuilt.trySuccess(null);
-                    }
-
-                    @Override
-                    public void channelInactive(ChannelHandlerContext ctx) {
-                        streamPipelineBuilt.trySuccess(null);
-                        ctx.fireChannelInactive();
-                    }
-                };
-                ch.pipeline().addLast(failureHandler);
-
-                ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_INIT, new HttpClientInitializer(
-                    key.isSecure() ? sslContext : null,
-                    key.getHost(),
-                    key.getPort(),
-                    false,
-                    false,
-                    false,
-                    null
-                ) {
-                    @Override
-                    protected void addFinalHandler(ChannelPipeline pipeline) {
-                        // no-op, don't add the stream handler which is not supported
-                        // in the connection pooled scenario
-                    }
-
-                    @Override
-                    void onStreamPipelineBuilt() {
-                        super.onStreamPipelineBuilt();
-                        streamPipelineBuilt.trySuccess(null);
-                        ch.pipeline().remove(failureHandler);
-                        ch.attr(STREAM_CHANNEL_INITIALIZED).set(null);
-                    }
-                });
-
-            }
-
-            @Override
-            public void channelReleased(Channel ch) {
-                Duration idleTimeout = configuration.getConnectionPoolIdleTimeout().orElse(Duration.ofNanos(0));
-                ChannelPipeline pipeline = ch.pipeline();
-
-                removeReadTimeoutHandler(pipeline);
-            }
-
-            @Override
-            public void channelAcquired(Channel ch) throws Exception {
-                ChannelPipeline pipeline = ch.pipeline();
-            }
-        };
-    }
-
     private void configureProxy(ChannelPipeline pipeline, boolean secure, String host, int port) {
         Proxy proxy = configuration.resolveProxy(secure, host, port);
         if (Proxy.NO_PROXY.equals(proxy)) {
@@ -622,54 +547,6 @@ class ConnectionManager {
         return builder.build();
     }
 
-    private void removeReadTimeoutHandler(ChannelPipeline pipeline) {
-        if (pipeline.context(ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT) != null) {
-            pipeline.remove(ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT);
-        }
-    }
-
-    /**
-     * Reads the first {@link Http2Settings} object and notifies a {@link io.netty.channel.ChannelPromise}.
-     */
-    private class Http2SettingsHandler extends
-            SimpleChannelInboundHandlerInstrumented<Http2Settings> {
-        final ChannelPromise promise;
-
-        /**
-         * Create new instance.
-         *
-         * @param promise Promise object used to notify when first settings are received
-         */
-        Http2SettingsHandler(ChannelPromise promise) {
-            super(instrumenter);
-            this.promise = promise;
-        }
-
-        @Override
-        protected void channelReadInstrumented(ChannelHandlerContext ctx, Http2Settings msg) {
-            promise.setSuccess();
-
-            // Only care about the first settings message
-            ctx.pipeline().remove(this);
-        }
-
-        @Override
-        public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-            super.channelInactive(ctx);
-            if (!promise.isDone()) {
-                promise.tryFailure(new HttpClientException("Channel became inactive before settings frame was received"));
-            }
-        }
-
-        @Override
-        public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
-            super.handlerRemoved(ctx);
-            if (!promise.isDone()) {
-                promise.tryFailure(new HttpClientException("Handler was removed before settings frame was received"));
-            }
-        }
-    }
-
     /**
      * Initializes the HTTP client channel.
      */
@@ -681,7 +558,6 @@ class ConnectionManager {
         final boolean stream;
         final boolean proxy;
         final boolean acceptsEvents;
-        Http2SettingsHandler settingsHandler;
         final Consumer<ChannelHandlerContext> contextConsumer;
         private NettyClientCustomizer channelCustomizer;
 
@@ -965,6 +841,16 @@ class ConnectionManager {
     }
 
     private void initHttp1(Channel ch) {
+        configuration.getLogLevel().ifPresent(logLevel -> {
+            try {
+                final io.netty.handler.logging.LogLevel nettyLevel =
+                    io.netty.handler.logging.LogLevel.valueOf(logLevel.name());
+                ch.pipeline().addLast(new LoggingHandler(DefaultHttpClient.class, nettyLevel));
+            } catch (IllegalArgumentException e) {
+                throw customizeException(new HttpClientException("Unsupported log level: " + logLevel));
+            }
+        });
+
         ch.pipeline()
             .addLast(ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC, new HttpClientCodec())
             .addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECODER, new HttpContentDecompressor());
@@ -1093,42 +979,6 @@ class ConnectionManager {
         void notifyRequestPipelineBuilt() {
             channel.attr(CHANNEL_CUSTOMIZER_KEY).get().onRequestPipelineBuilt();
         }
-    }
-
-    private final class OldPoolHandle extends PoolHandle {
-        private final ChannelPool channelPool;
-        private boolean canReturn;
-
-        private OldPoolHandle(ChannelPool channelPool, Channel channel) {
-            super(channel);
-            this.channelPool = channelPool;
-            this.canReturn = channelPool != null;
-        }
-
-        void taint() {
-            canReturn = false;
-        }
-
-        void release() {
-            if (channelPool != null) {
-                removeReadTimeoutHandler(channel.pipeline());
-                if (!canReturn) {
-                    channel.closeFuture().addListener((future ->
-                        channelPool.release(channel)
-                    ));
-                } else {
-                    channelPool.release(channel);
-                }
-            } else {
-                // just close it to prevent any future reads without a handler registered
-                channel.close();
-            }
-        }
-
-        boolean canReturn() {
-            return canReturn;
-        }
-
     }
 
     private static boolean incrementWithLimit(AtomicInteger variable, int limit) {
