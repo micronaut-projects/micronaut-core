@@ -150,7 +150,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             packages.add(aPackage);
         }
 
-        environments.removeAll(specifiedNames);
+        specifiedNames.forEach(environments::remove);
         environments.addAll(specifiedNames);
         this.classLoader = configuration.getClassLoader();
         this.annotationScanner = createAnnotationScanner(classLoader);
@@ -357,7 +357,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             }
 
             return deduceEnvironments;
-        } else {
+        } else if (configuration.isEnableDefaultPropertySources()) {
             String deduceProperty = CachedEnvironment.getProperty(Environment.DEDUCE_ENVIRONMENT_PROPERTY);
             String deduceEnv = CachedEnvironment.getenv(Environment.DEDUCE_ENVIRONMENT_ENV);
 
@@ -380,6 +380,8 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                 }
                 return deduceDefault;
             }
+        } else {
+            return false;
         }
     }
 
@@ -405,18 +407,23 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      */
     protected void readPropertySources(String name) {
         refreshablePropertySources.clear();
-        List<PropertySource> propertySources = readPropertySourceList(name);
-        addDefaultPropertySources(propertySources);
-        String propertySourcesSystemProperty = CachedEnvironment.getProperty(Environment.PROPERTY_SOURCES_KEY);
-        if (propertySourcesSystemProperty != null) {
-            propertySources.addAll(readPropertySourceListFromFiles(propertySourcesSystemProperty));
+        List<PropertySource> propertySources;
+        if (configuration.isEnableDefaultPropertySources()) {
+            propertySources = readPropertySourceList(name);
+            addDefaultPropertySources(propertySources);
+            String propertySourcesSystemProperty = CachedEnvironment.getProperty(Environment.PROPERTY_SOURCES_KEY);
+            if (propertySourcesSystemProperty != null) {
+                propertySources.addAll(readPropertySourceListFromFiles(propertySourcesSystemProperty));
+            }
+            String propertySourcesEnv = readPropertySourceListKeyFromEnvironment();
+            if (propertySourcesEnv != null) {
+                propertySources.addAll(readPropertySourceListFromFiles(propertySourcesEnv));
+            }
+            refreshablePropertySources.addAll(propertySources);
+            readConstantPropertySources(name, propertySources);
+        } else {
+            propertySources = new ArrayList<>(this.propertySources.size());
         }
-        String propertySourcesEnv = readPropertySourceListKeyFromEnvironment();
-        if (propertySourcesEnv != null) {
-            propertySources.addAll(readPropertySourceListFromFiles(propertySourcesEnv));
-        }
-        refreshablePropertySources.addAll(propertySources);
-        readConstantPropertySources(name, propertySources);
 
         propertySources.addAll(this.propertySources.values());
         OrderUtil.sort(propertySources);

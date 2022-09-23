@@ -47,7 +47,7 @@ import java.util.List;
  * @since 3.1
  */
 @Internal
-public class DispatchWriter extends AbstractClassFileWriter implements Opcodes {
+public final class DispatchWriter extends AbstractClassFileWriter implements Opcodes {
 
     private static final Method DISPATCH_METHOD = new Method("dispatch", getMethodDescriptor(Object.class, Arrays.asList(int.class, Object.class, Object[].class)));
 
@@ -268,29 +268,10 @@ public class DispatchWriter extends AbstractClassFileWriter implements Opcodes {
             @Override
             public void generateCase(int key, Label end) {
                 MethodDispatchTarget method = (MethodDispatchTarget) dispatchTargets.get(key);
-                Type declaringTypeObject = JavaModelUtils.getTypeReference(method.declaringType);
-                List<ParameterElement> argumentTypes = Arrays.asList(method.methodElement.getSuspendParameters());
-
-                getTargetMethodByIndex.push(declaringTypeObject);
-                getTargetMethodByIndex.push(method.methodElement.getName());
-                if (!argumentTypes.isEmpty()) {
-                    int len = argumentTypes.size();
-                    Iterator<ParameterElement> iter = argumentTypes.iterator();
-                    pushNewArray(getTargetMethodByIndex, Class.class, len);
-                    for (int i = 0; i < len; i++) {
-                        ParameterElement type = iter.next();
-                        pushStoreInArray(
-                                getTargetMethodByIndex,
-                                i,
-                                len,
-                                () -> getTargetMethodByIndex.push(JavaModelUtils.getTypeReference(type))
-                        );
-
-                    }
-                } else {
-                    getTargetMethodByIndex.getStatic(TYPE_REFLECTION_UTILS, "EMPTY_CLASS_ARRAY", Type.getType(Class[].class));
-                }
-                getTargetMethodByIndex.invokeStatic(TYPE_REFLECTION_UTILS, METHOD_GET_REQUIRED_METHOD);
+                TypedElement declaringType = method.declaringType;
+                Type declaringTypeObject = JavaModelUtils.getTypeReference(declaringType);
+                MethodElement methodElement = method.methodElement;
+                pushTypeUtilsGetRequiredMethod(getTargetMethodByIndex, declaringTypeObject, methodElement);
                 getTargetMethodByIndex.returnValue();
             }
 
@@ -304,6 +285,31 @@ public class DispatchWriter extends AbstractClassFileWriter implements Opcodes {
         }, true);
         getTargetMethodByIndex.visitMaxs(DEFAULT_MAX_STACK, 1);
         getTargetMethodByIndex.visitEnd();
+    }
+
+    public static void pushTypeUtilsGetRequiredMethod(GeneratorAdapter builder, Type declaringTypeObject, MethodElement methodElement) {
+        List<ParameterElement> argumentTypes = Arrays.asList(methodElement.getSuspendParameters());
+
+        builder.push(declaringTypeObject);
+        builder.push(methodElement.getName());
+        if (!argumentTypes.isEmpty()) {
+            int len = argumentTypes.size();
+            Iterator<ParameterElement> iter = argumentTypes.iterator();
+            pushNewArray(builder, Class.class, len);
+            for (int i = 0; i < len; i++) {
+                ParameterElement type = iter.next();
+                pushStoreInArray(
+                    builder,
+                        i,
+                        len,
+                        () -> builder.push(JavaModelUtils.getTypeReference(type))
+                );
+
+            }
+        } else {
+            builder.getStatic(TYPE_REFLECTION_UTILS, "EMPTY_CLASS_ARRAY", Type.getType(Class[].class));
+        }
+        builder.invokeStatic(TYPE_REFLECTION_UTILS, METHOD_GET_REQUIRED_METHOD);
     }
 
     @Override
@@ -503,9 +509,14 @@ public class DispatchWriter extends AbstractClassFileWriter implements Opcodes {
             boolean hasArgs = !argumentTypes.isEmpty();
 
             // load this
-            writer.loadArg(1);
+            if (!methodElement.isStatic()) {
+                writer.loadArg(1);
+            }
 
             if (reflectionRequired) {
+                if (methodElement.isStatic()) {
+                    writer.push((String) null);
+                }
                 writer.loadThis();
                 writer.push(methodIndex);
                 writer.invokeVirtual(ExecutableMethodsDefinitionWriter.SUPER_TYPE, GET_ACCESSIBLE_TARGET_METHOD);
@@ -516,7 +527,9 @@ public class DispatchWriter extends AbstractClassFileWriter implements Opcodes {
                 }
                 writer.invokeStatic(TYPE_REFLECTION_UTILS, METHOD_INVOKE_METHOD);
             } else {
-                pushCastToType(writer, declaringTypeObject);
+                if (!methodElement.isStatic()) {
+                    pushCastToType(writer, declaringTypeObject);
+                }
                 if (hasArgs) {
                     int argCount = argumentTypes.size();
                     Iterator<ParameterElement> argIterator = argumentTypes.iterator();
@@ -529,13 +542,17 @@ public class DispatchWriter extends AbstractClassFileWriter implements Opcodes {
                     }
                 }
                 String methodDescriptor = getMethodDescriptor(returnType, argumentTypes);
-                writer.visitMethodInsn(isInterface ? INVOKEINTERFACE : INVOKEVIRTUAL,
-                    declaringTypeObject.getInternalName(), methodName,
-                    methodDescriptor, isInterface);
+                if (methodElement.isStatic()) {
+                    writer.invokeStatic(declaringTypeObject, new Method(methodName, methodDescriptor));
+                } else {
+                    writer.visitMethodInsn(isInterface ? INVOKEINTERFACE : INVOKEVIRTUAL,
+                        declaringTypeObject.getInternalName(), methodName,
+                        methodDescriptor, isInterface);
+                }
             }
 
             if (returnTypeObject.equals(Type.VOID_TYPE)) {
-                writer.visitInsn(ACONST_NULL);
+                writer.push((String) null);
             } else if (!reflectionRequired) {
                 pushBoxPrimitiveIfNecessary(returnType, writer);
             }

@@ -17,6 +17,7 @@ package io.micronaut.messaging;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.naming.Described;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.qualifiers.Qualifiers;
@@ -76,6 +77,7 @@ public class MessagingApplication implements EmbeddedApplication<MessagingApplic
     }
 
     @Override
+    @NonNull
     public MessagingApplication start() {
         ApplicationContext applicationContext = getApplicationContext();
         if (applicationContext != null && !applicationContext.isRunning()) {
@@ -90,6 +92,7 @@ public class MessagingApplication implements EmbeddedApplication<MessagingApplic
     }
 
     @Override
+    @NonNull
     public MessagingApplication stop() {
         ApplicationContext applicationContext = getApplicationContext();
         if (applicationContext != null && applicationContext.isRunning()) {

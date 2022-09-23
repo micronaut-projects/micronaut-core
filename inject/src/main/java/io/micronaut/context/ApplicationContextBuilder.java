@@ -61,6 +61,16 @@ public interface ApplicationContextBuilder {
     }
 
     /**
+     * Specify whether the default set of property sources should be enabled (default is {@code true}).
+     * @param areEnabled Whether the default property sources are enabled
+     * @return This builder
+     * @since 3.7.0
+     */
+    default @NonNull ApplicationContextBuilder enableDefaultPropertySources(boolean areEnabled) {
+        return this;
+    }
+
+    /**
      * Specifies to eager init the given annotated types.
      *
      * @param annotations The annotation stereotypes
