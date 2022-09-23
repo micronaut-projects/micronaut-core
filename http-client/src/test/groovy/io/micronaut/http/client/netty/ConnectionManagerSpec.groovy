@@ -60,6 +60,7 @@ import reactor.core.publisher.Mono
 import spock.lang.Specification
 
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
@@ -520,6 +521,58 @@ class ConnectionManagerSpec extends Specification {
         ctx.close()
     }
 
+    def 'http1 ttl'() {
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.connect-ttl': '100s',
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn1 = new EmbeddedTestConnectionHttp1()
+        conn1.setupHttp1()
+        def conn2 = new EmbeddedTestConnectionHttp1()
+        conn2.setupHttp1()
+        patch(client, conn1.clientChannel, conn2.clientChannel)
+
+        def r1 = conn1.testExchangeRequest(client)
+        conn1.clientChannel.advanceTimeBy(101, TimeUnit.SECONDS)
+        conn1.testExchangeResponse(r1)
+
+        // conn1 should expire now, conn2 will be the next connection
+        conn2.testExchange(client)
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
+    def 'http2 ttl'() {
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+                'micronaut.http.client.connect-ttl': '100s',
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn1 = new EmbeddedTestConnectionHttp2()
+        conn1.setupHttp2Tls()
+        def conn2 = new EmbeddedTestConnectionHttp2()
+        conn2.setupHttp2Tls()
+        patch(client, conn1.clientChannel, conn2.clientChannel)
+
+        def r1 = conn1.testExchangeRequest(client)
+        conn1.exchangeSettings()
+        conn1.clientChannel.advanceTimeBy(101, TimeUnit.SECONDS)
+        conn1.testExchangeResponse(r1)
+
+        // conn1 should expire now, conn2 will be the next connection
+        def r2 = conn2.testExchangeRequest(client)
+        conn2.exchangeSettings()
+        conn2.testExchangeResponse(r2)
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
     static class EmbeddedTestConnectionBase {
         final EmbeddedChannel serverChannel
         final EmbeddedChannel clientChannel
@@ -573,10 +626,17 @@ class ConnectionManagerSpec extends Specification {
         }
 
         void testExchange(HttpClient client) {
+            testExchangeResponse(testExchangeRequest(client))
+        }
+
+        CompletableFuture<HttpResponse<?>> testExchangeRequest(HttpClient client) {
             def future = Mono.from(client.exchange(scheme + '://example.com/foo')).toFuture()
             future.exceptionally(t -> t.printStackTrace())
             advance()
+            return future
+        }
 
+        void testExchangeResponse(CompletableFuture<HttpResponse<?>> future) {
             io.netty.handler.codec.http.HttpRequest request = serverChannel.readInbound()
             assert request.uri() == '/foo'
             assert request.method() == HttpMethod.GET
