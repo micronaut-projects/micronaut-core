@@ -8,6 +8,9 @@ This section documents breaking changes between Micronaut versions
 
 https://github.com/ben-manes/caffeine[Caffeine] is no longer shaded into the `io.micronaut.caffeine` package. If you depend on this library you should directly depend on the latest version of Caffeine.
 
+==== Kotlin base version updated to 1.7.10
+
+Kotlin has been updated to 1.7.10, which may cause issues when compiling or linking to Kotlin libraries.
 
 == 3.3.0
 
