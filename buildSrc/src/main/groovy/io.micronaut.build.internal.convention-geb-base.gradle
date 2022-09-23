@@ -18,6 +18,15 @@ def micronautBuild = (ExtensionAware) project.extensions.getByName("micronautBui
 def micronautCore = micronautBuild.extensions.create(MicronautCoreExtension, "core", DefaultMicronautCoreExtension, extensions.findByType(VersionCatalogsExtension))
 micronautCore.documented.convention(true)
 
+if (System.getProperty('geb.env')) {
+    apply plugin:"com.energizedwork.webdriver-binaries"
+
+    webdriverBinaries {
+        chromedriver "${chromedriverVersion}"
+        geckodriver "${geckodriverVersion}"
+    }
+}
+
 tasks.withType(Test).configureEach {
     useJUnitPlatform()
     jvmArgs '-Xmx2048m'
@@ -25,6 +34,12 @@ tasks.withType(Test).configureEach {
     if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_15)) {
         jvmArgs "--enable-preview"
     }
+}
+
+tasks.named("test") {
+    systemProperty "geb.env", System.getProperty('geb.env')
+    systemProperty "webdriver.chrome.driver", System.getProperty('webdriver.chrome.driver')
+    systemProperty "webdriver.gecko.driver", System.getProperty('webdriver.gecko.driver')
 }
 
 tasks.withType(JavaCompile).configureEach {
@@ -69,4 +84,17 @@ dependencies {
 
     testImplementation libs.caffeine
     testImplementation libs.bundles.asm
+
+    // Geb currently requires Groovy 3, and Spock for Groovy 3
+    testImplementation libs.geb.spock
+    testImplementation libs.spock.for.geb
+    testImplementation libs.geb.groovy.test
+    testImplementation libs.selenium.driver.htmlunit
+    testImplementation libs.selenium.remote.driver
+    testImplementation libs.selenium.api
+    testImplementation libs.selenium.support
+
+    testRuntimeOnly libs.htmlunit
+    testRuntimeOnly libs.selenium.driver.chrome
+    testRuntimeOnly libs.selenium.driver.firefox
 }

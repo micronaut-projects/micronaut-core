@@ -2,21 +2,6 @@ plugins {
     id "io.micronaut.build.internal.convention-geb-base"
 }
 
-tasks.named("test") {
-    systemProperty "geb.env", System.getProperty('geb.env')
-    systemProperty "webdriver.chrome.driver", System.getProperty('webdriver.chrome.driver')
-    systemProperty "webdriver.gecko.driver", System.getProperty('webdriver.gecko.driver')
-}
-
-if (System.getProperty('geb.env')) {
-    apply plugin:"com.energizedwork.webdriver-binaries"
-
-    webdriverBinaries {
-        chromedriver "${chromedriverVersion}"
-        geckodriver "${geckodriverVersion}"
-    }
-}
-
 micronautBuild {
     core {
         usesMicronautTestJunit()
@@ -29,19 +14,8 @@ dependencies {
         exclude module: 'groovy'
     }
 
-    testImplementation libs.geb.spock
-    testImplementation libs.spock.for.geb
-    testImplementation libs.geb.groovy.test
-
     testImplementation project(':http')
     testImplementation project(':http-server-netty')
-    testImplementation libs.selenium.driver.htmlunit
-    testImplementation libs.selenium.remote.driver
-    testImplementation libs.selenium.api
-    testImplementation libs.selenium.support
 
     testRuntimeOnly "ch.qos.logback:logback-classic:1.2.3"
-    testRuntimeOnly libs.htmlunit
-    testRuntimeOnly libs.selenium.driver.chrome
-    testRuntimeOnly libs.selenium.driver.firefox
 }
