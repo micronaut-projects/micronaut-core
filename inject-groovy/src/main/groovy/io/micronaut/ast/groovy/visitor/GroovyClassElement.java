@@ -851,11 +851,22 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
             if (propertyNode.isPublic() && !propertyNode.isStatic()) {
                 final String propertyName = propertyNode.getName();
                 boolean readOnly = propertyNode.getField().isFinal();
+
+                ClassNode propDeclaringClass = propertyNode.getDeclaringClass();
+                GroovyClassElement declaringEl = this;
+                if (!propDeclaringClass.getName().equals(getName())) {
+                    declaringEl = new GroovyClassElement(
+                        visitorContext,
+                        propDeclaringClass,
+                        AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, propDeclaringClass)
+                    );
+                }
+
                 final AnnotationMetadata annotationMetadata =
                         AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, propertyNode.getField());
                 GroovyPropertyElement groovyPropertyElement = new GroovyPropertyElement(
                         visitorContext,
-                        this,
+                        declaringEl,
                         propertyNode.getField(),
                         annotationMetadata,
                         propertyName,

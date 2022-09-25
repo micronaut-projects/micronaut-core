@@ -23,15 +23,18 @@ import io.micronaut.inject.ast.ElementModifier
 import io.micronaut.inject.ast.ElementQuery
 import io.micronaut.inject.ast.EnumElement
 import io.micronaut.inject.ast.FieldElement
+import io.micronaut.inject.ast.MemberElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.PackageElement
 import io.micronaut.inject.ast.PropertyElement
+import io.micronaut.inject.ast.TypedElement
 import spock.lang.Issue
 import spock.lang.Unroll
 import spock.util.environment.RestoreSystemProperties
 
 import java.sql.SQLException
 import java.util.function.Supplier
+import java.util.stream.Collectors
 
 @RestoreSystemProperties
 class ClassElementSpec extends AbstractBeanDefinitionSpec {
@@ -42,6 +45,77 @@ class ClassElementSpec extends AbstractBeanDefinitionSpec {
 
     def cleanup() {
         AllElementsVisitor.clearVisited()
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-openapi/issues/670")
+    void "test correct properties decaliring class with inheritance"() {
+        given:
+        def controller = buildBeanDefinition('test.TestController', '''
+package test
+
+import groovy.transform.CompileStatic
+import io.micronaut.core.annotation.Introspected
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
+
+import javax.validation.constraints.NotNull
+
+@Controller
+class TestController {
+
+    @Get
+    PessoaFisicaDto test() {
+        return null
+    }
+}
+
+@Introspected
+@CompileStatic
+abstract class EntidadeDto {
+
+    @NotNull
+    UUID id
+    Long tenantId
+    Integer version
+    @NotNull
+    Date criadoEm
+    @NotNull
+    Date atualizadoEm
+}
+
+@Introspected
+@CompileStatic
+class PessoaFisicaDto extends EntidadeDto {
+
+    String nome
+    String nomeMae
+    String nomePai
+    String CPF
+}
+
+''')
+        expect:
+        controller
+        AllElementsVisitor.VISITED_METHOD_ELEMENTS
+        when:
+        def method = AllElementsVisitor.VISITED_METHOD_ELEMENTS[0]
+        def type = method.genericReturnType;
+        List<PropertyElement> beanProperties = type.getBeanProperties().stream().filter(p -> !"groovy.lang.MetaClass".equals(p.getType().getName())).collect(Collectors.toList());
+
+        List<TypedElement> childClassFields = new ArrayList<>();
+        for (TypedElement publicField : beanProperties) {
+            if (publicField instanceof MemberElement) {
+
+                MemberElement memberEl = (MemberElement) publicField;
+                if (memberEl.getDeclaringType().getType().getName() == type.getName()) {
+                    childClassFields.add(publicField)
+                }
+            }
+        }
+
+        then:
+        childClassFields
+        childClassFields.size() == 4
     }
 
     void "test interface bean properties"() {

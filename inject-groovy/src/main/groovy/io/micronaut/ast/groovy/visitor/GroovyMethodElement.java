@@ -130,7 +130,7 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
     @NonNull
     @Override
     public ClassElement getGenericReturnType() {
-        ClassNode returnType = methodNode.getReturnType();
+        ClassNode returnType = methodNode.getReturnType().redirect();
         ClassElement rawElement = getReturnType();
         return getGenericElement(returnType, rawElement);
     }
@@ -176,7 +176,7 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
     @Override
     @NonNull
     public ClassElement getReturnType() {
-        return visitorContext.getElementFactory().newClassElement(methodNode.getReturnType(), AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, methodNode.getReturnType()));
+        return visitorContext.getElementFactory().newClassElement(methodNode.getReturnType().redirect(), AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, methodNode.getReturnType()));
     }
 
     @Override
