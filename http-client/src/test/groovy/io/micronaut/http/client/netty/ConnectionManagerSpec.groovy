@@ -677,6 +677,26 @@ class ConnectionManagerSpec extends Specification {
         }
     }
 
+    def 'cancel pool acquisition'() {
+        def ctx = ApplicationContext.run()
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn = new EmbeddedTestConnectionHttp1()
+        conn.setupHttp1()
+        patch(client, conn.clientChannel)
+
+        def subscription = Mono.from(client.exchange(conn.scheme + '://example.com/foo')).subscribe()
+        conn.advance()
+        subscription.dispose()
+        conn.fireClientActive()
+
+        conn.testExchangeResponse(conn.testExchangeRequest(client))
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
     static class EmbeddedTestConnectionBase {
         final EmbeddedChannel serverChannel
         final EmbeddedChannel clientChannel

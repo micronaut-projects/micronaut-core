@@ -832,9 +832,8 @@ class ConnectionManager {
         }
 
         Mono<PoolHandle> acquire() {
-            Sinks.One<PoolHandle> sink = Sinks.one();
+            Sinks.One<PoolHandle> sink = new CancellableMonoSink<>();
             acquire(sink);
-            // todo: if the subscriber cancels before the connection is acquired, what happens?
             Optional<Duration> acquireTimeout = configuration.getConnectionPoolConfiguration().getAcquireTimeout();
             if (acquireTimeout.isPresent()) {
                 return sink.asMono().timeout(acquireTimeout.get(), getEventLoopScheduler());
