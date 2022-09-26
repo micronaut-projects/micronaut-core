@@ -204,7 +204,7 @@ public abstract class AbstractBeanBuilder {
             annotation.stringValue(RequiresCondition.MEMBER_BEAN_PROPERTY)
                 .ifPresent(beanProperty -> {
                     annotation.stringValue(RequiresCondition.MEMBER_BEAN)
-                        .map(className -> visitorContext.getClassElement(className.replace('$', '.'), visitorContext.getElementAnnotationMetadataFactory().readOnly()).get())
+                        .map(className -> visitorContext.getClassElement(className, visitorContext.getElementAnnotationMetadataFactory().readOnly()).get())
                         .ifPresent(classElement -> {
                             String requiredValue = annotation.stringValue().orElse(null);
                             String notEqualsValue = annotation.stringValue(RequiresCondition.MEMBER_NOT_EQUALS).orElse(null);
