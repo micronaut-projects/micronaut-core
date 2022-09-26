@@ -987,6 +987,19 @@ class ConnectionManager {
                 windDownConnection = true;
             }
 
+            final void satisfySomePendingRequests() {
+                while (true) {
+                    Sinks.One<PoolHandle> pending = pollPendingRequest();
+                    if (pending == null) {
+                        break;
+                    }
+                    if (!satisfy(pending)) {
+                        addPendingRequest(pending);
+                        break;
+                    }
+                }
+            }
+
             boolean satisfy(Sinks.One<PoolHandle> sink) {
                 if (!tryEarmarkForRequest()) {
                     return false;
@@ -1084,7 +1097,7 @@ class ConnectionManager {
                         }
                         if (!windDownConnection) {
                             hasLiveRequest.set(false);
-                            // todo: claim a new request
+                            satisfySomePendingRequests();
                         } else {
                             channel.close();
                         }
@@ -1102,7 +1115,7 @@ class ConnectionManager {
                 });
                 if (emitResult.isFailure()) {
                     hasLiveRequest.set(false);
-                    // todo: claim a new request
+                    satisfySomePendingRequests();
                 }
             }
 
@@ -1190,7 +1203,7 @@ class ConnectionManager {
                         PoolHandle ph = new PoolHandle(true, streamChannel) {
                             @Override
                             void taint() {
-                                // todo
+                                // do nothing, we don't reuse stream channels
                             }
 
                             @Override
@@ -1198,7 +1211,7 @@ class ConnectionManager {
                                 liveStreamChannels.remove(streamChannel);
                                 streamChannel.close();
                                 liveRequests.decrementAndGet();
-                                // todo: claim a new request
+                                satisfySomePendingRequests();
                             }
 
                             @Override
