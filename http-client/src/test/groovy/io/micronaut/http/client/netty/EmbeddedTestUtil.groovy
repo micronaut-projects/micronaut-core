@@ -1,6 +1,7 @@
 package io.micronaut.http.client.netty
 
 import io.netty.buffer.ByteBuf
+import io.netty.buffer.CompositeByteBuf
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.ChannelOutboundHandlerAdapter
 import io.netty.channel.ChannelPromise
@@ -28,38 +29,24 @@ class EmbeddedTestUtil {
     }
 
     private static class ConnectionDirection {
-        private static final Object FLUSH = new Object()
-
         final EmbeddedChannel source
         final EmbeddedChannel dest
-        final Queue<Object> queue = new ArrayDeque<>()
+        CompositeByteBuf sourceQueue
+        final List<ChannelPromise> sourceQueueFutures = new ArrayList<>();
+        final Queue<ByteBuf> destQueue = new ArrayDeque<>()
         boolean readPending
-        boolean newData = false
 
         ConnectionDirection(EmbeddedChannel source, EmbeddedChannel dest) {
             this.source = source
             this.dest = dest
         }
 
-        private void forwardLater(Object msg) {
-            if (readPending || dest.config().isAutoRead()) {
-                dest.eventLoop().execute(() -> forwardNow(msg))
-                readPending = false
-            } else {
-                queue.add(msg)
+        private void forwardNow(ByteBuf msg) {
+            if (!dest.isOpen()) {
+                return
             }
-        }
-
-        private void forwardNow(Object msg) {
-            if (msg == FLUSH) {
-                if (dest.isOpen() && newData) {
-                    dest.pipeline().fireChannelReadComplete()
-                    newData = false
-                }
-            } else {
-                newData = true
-                dest.writeOneInbound(msg)
-            }
+            dest.writeOneInbound(msg)
+            dest.pipeline().fireChannelReadComplete()
         }
 
         void register() {
@@ -75,22 +62,44 @@ class EmbeddedTestUtil {
                         promise.setSuccess()
                         return
                     }
-                    forwardLater(msg)
-                    promise.setSuccess()
+
+                    if (sourceQueue == null) {
+                        sourceQueue = ((ByteBuf) msg).alloc().compositeBuffer()
+                    }
+                    sourceQueue.addComponent(true, (ByteBuf) msg)
+                    if (!promise.isVoid()) {
+                        sourceQueueFutures.add(promise)
+                    }
                 }
 
                 @Override
                 void flush(ChannelHandlerContext ctx_) throws Exception {
-                    forwardLater(FLUSH)
+                    if (sourceQueue != null) {
+                        ByteBuf packet = sourceQueue
+                        sourceQueue = null
+
+                        for (ChannelPromise promise : sourceQueueFutures) {
+                            promise.trySuccess()
+                        }
+                        sourceQueueFutures.clear()
+
+                        if (readPending || dest.config().isAutoRead()) {
+                            dest.eventLoop().execute(() -> forwardNow(packet))
+                            readPending = false
+                        } else {
+                            destQueue.add(packet)
+                        }
+                    }
                 }
             })
             dest.pipeline().addFirst(new ChannelOutboundHandlerAdapter() {
                 @Override
                 void read(ChannelHandlerContext ctx) throws Exception {
-                    if (queue.isEmpty()) {
+                    if (destQueue.isEmpty()) {
                         readPending = true
                     } else {
-                        ctx.fireChannelRead(queue.poll())
+                        ByteBuf msg = destQueue.poll()
+                        ctx.channel().eventLoop().execute(() -> forwardNow(msg))
                     }
                 }
             })

@@ -490,7 +490,7 @@ class ConnectionManager {
      * @return A mono that will complete when the handshakes complete
      */
     Mono<?> connectForWebsocket(DefaultHttpClient.RequestKey requestKey, ChannelHandler handler) {
-        Sinks.Empty<Object> initial = Sinks.empty();
+        Sinks.Empty<Object> initial = new CancellableMonoSink<>();
 
         ChannelFuture connectFuture = doConnect(requestKey, new ChannelInitializer<Channel>() {
             @Override
@@ -791,6 +791,8 @@ class ConnectionManager {
                     upgradeRequest.headers().set(HttpHeaderNames.HOST, pool.requestKey.getHost() + ':' + pool.requestKey.getPort());
                     ctx.writeAndFlush(upgradeRequest);
                     ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_HTTP2_UPGRADE_REQUEST);
+                    // read the upgrade response
+                    ctx.read();
 
                     super.channelActive(ctx);
                 }
@@ -930,9 +932,7 @@ class ConnectionManager {
                         };
                         break;
                     case H2C:
-                        initializer = new Http2UpgradeInitializer(
-                            this
-                        );
+                        initializer = new Http2UpgradeInitializer(this);
                         break;
                     default:
                         throw new AssertionError("Unknown plaintext mode");

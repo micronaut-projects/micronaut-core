@@ -14,6 +14,8 @@ import reactor.core.publisher.Sinks;
  */
 @Internal
 final class CancellableMonoSink<T> implements Publisher<T>, Sinks.One<T>, Subscription {
+    private static final Object EMPTY = new Object();
+
     private T value;
     private Throwable failure;
     private boolean complete = false;
@@ -32,7 +34,9 @@ final class CancellableMonoSink<T> implements Publisher<T>, Sinks.One<T>, Subscr
     private void tryForward() {
         if (subscriberWaiting && complete) {
             if (failure == null) {
-                subscriber.onNext(value);
+                if (value != EMPTY) {
+                    subscriber.onNext(value);
+                }
                 subscriber.onComplete();
             } else {
                 subscriber.onError(failure);
@@ -58,10 +62,11 @@ final class CancellableMonoSink<T> implements Publisher<T>, Sinks.One<T>, Subscr
         throw new UnsupportedOperationException();
     }
 
+    @SuppressWarnings("unchecked")
     @NonNull
     @Override
     public Sinks.EmitResult tryEmitEmpty() {
-        throw new UnsupportedOperationException();
+        return tryEmitValue((T) EMPTY);
     }
 
     @NonNull

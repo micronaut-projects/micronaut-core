@@ -64,8 +64,10 @@ import io.netty.handler.ssl.SslContextBuilder
 import io.netty.handler.ssl.util.SelfSignedCertificate
 import io.netty.util.AsciiString
 import jakarta.inject.Singleton
+import org.spockframework.runtime.model.parallel.ExecutionMode
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
+import spock.lang.Execution
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -76,6 +78,7 @@ import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
 import java.util.zip.GZIPOutputStream
 
+@Execution(ExecutionMode.CONCURRENT)
 class ConnectionManagerSpec extends Specification {
     private static void patch(DefaultHttpClient httpClient, EmbeddedChannel... channels) {
         httpClient.connectionManager = new ConnectionManager(httpClient.connectionManager) {
@@ -746,6 +749,7 @@ class ConnectionManagerSpec extends Specification {
 
             clientChannel = new EmbeddedChannel(new DummyChannelId('client'))
             clientChannel.freezeTime()
+            clientChannel.config().setAutoRead(false)
             EmbeddedTestUtil.connect(serverChannel, clientChannel)
         }
 
@@ -907,15 +911,14 @@ class ConnectionManagerSpec extends Specification {
         }
 
         void exchangeSettings() {
-            advance()
+            fireClientActive()
 
             assert serverChannel.readInbound() instanceof Http2SettingsFrame
             assert serverChannel.readInbound() instanceof Http2SettingsAckFrame
         }
 
         void exchangeH2c() {
-            clientChannel.pipeline().fireChannelActive()
-            advance()
+            fireClientActive()
 
             Http2HeadersFrame upgradeRequest = serverChannel.readInbound()
             assert upgradeRequest.headers().get(Http2Headers.PseudoHeaderName.METHOD.value()) == 'GET'
