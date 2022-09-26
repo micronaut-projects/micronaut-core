@@ -728,6 +728,12 @@ public abstract class HttpClientConfiguration {
         @SuppressWarnings("WeakerAccess")
         public static final int DEFAULT_MAXCONNECTIONS = -1;
 
+        private int maxPendingConnections = 4;
+
+        private int maxConcurrentRequestsPerHttp2Connection = Integer.MAX_VALUE;
+        private int maxConcurrentHttp1Connections = Integer.MAX_VALUE;
+        private int maxConcurrentHttp2Connections = 1;
+
         private int maxConnections = DEFAULT_MAXCONNECTIONS;
 
         private int maxPendingAcquires = Integer.MAX_VALUE;
@@ -807,6 +813,50 @@ public abstract class HttpClientConfiguration {
          */
         public void setAcquireTimeout(@Nullable Duration acquireTimeout) {
             this.acquireTimeout = acquireTimeout;
+        }
+
+        /**
+         * The maximum number of <i>pending</i> (new) connections before they are assigned to a
+         * pool.
+         *
+         * @return The maximum number of pending connections
+         */
+        public int getMaxPendingConnections() {
+            return maxPendingConnections;
+        }
+
+        /**
+         * The maximum number of <i>pending</i> (new) connections before they are assigned to a
+         * pool.
+         *
+         * @param maxPendingConnections The maximum number of pending connections
+         */
+        public void setMaxPendingConnections(int maxPendingConnections) {
+            this.maxPendingConnections = maxPendingConnections;
+        }
+
+        public int getMaxConcurrentRequestsPerHttp2Connection() {
+            return maxConcurrentRequestsPerHttp2Connection;
+        }
+
+        public void setMaxConcurrentRequestsPerHttp2Connection(int maxConcurrentRequestsPerHttp2Connection) {
+            this.maxConcurrentRequestsPerHttp2Connection = maxConcurrentRequestsPerHttp2Connection;
+        }
+
+        public int getMaxConcurrentHttp1Connections() {
+            return maxConcurrentHttp1Connections;
+        }
+
+        public void setMaxConcurrentHttp1Connections(int maxConcurrentHttp1Connections) {
+            this.maxConcurrentHttp1Connections = maxConcurrentHttp1Connections;
+        }
+
+        public int getMaxConcurrentHttp2Connections() {
+            return maxConcurrentHttp2Connections;
+        }
+
+        public void setMaxConcurrentHttp2Connections(int maxConcurrentHttp2Connections) {
+            this.maxConcurrentHttp2Connections = maxConcurrentHttp2Connections;
         }
     }
 

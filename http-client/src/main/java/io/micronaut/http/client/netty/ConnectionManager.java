@@ -653,6 +653,7 @@ class ConnectionManager {
 
     private class InitialConnectionErrorHandler extends ChannelInboundHandlerAdapter {
         private final Pool pool;
+        private Throwable cause;
 
         InitialConnectionErrorHandler(Pool pool) {
             this.pool = pool;
@@ -661,12 +662,13 @@ class ConnectionManager {
         @Override
         public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
             log.error("Failed to open connection", cause);
+            this.cause = cause;
         }
 
         @Override
         public void channelInactive(ChannelHandlerContext ctx) throws Exception {
             super.channelInactive(ctx);
-            pool.onNewConnectionFailure();
+            pool.onNewConnectionFailure(cause);
         }
     }
 
@@ -817,30 +819,15 @@ class ConnectionManager {
         }
     }
 
-    private static boolean incrementWithLimit(AtomicInteger variable, int limit) {
-        while (true) {
-            int old = variable.get();
-            if (old >= limit) {
-                return false;
-            }
-            if (variable.compareAndSet(old, old + 1)) {
-                return true;
-            }
-        }
-    }
-
-    private final class Pool {
-        private static final int MAX_CONCURRENT_REQUESTS_PER_HTTP2_CONNECTION = 4; // TODO: config
-        private static final int MAX_PENDING_CONNECTIONS = 1;
-
+    private final class Pool extends PoolResizer {
         private final DefaultHttpClient.RequestKey requestKey;
 
         private final Queue<Sinks.One<PoolHandle>> pendingRequests = new ConcurrentLinkedQueue<>();
         private final List<Http1ConnectionHolder> http1Connections = new CopyOnWriteArrayList<>();
         private final List<Http2ConnectionHolder> http2Connections = new CopyOnWriteArrayList<>();
-        private final AtomicInteger pendingConnectionCount = new AtomicInteger(0);
 
         Pool(DefaultHttpClient.RequestKey requestKey) {
+            super(log, configuration.getConnectionPoolConfiguration());
             this.requestKey = requestKey;
         }
 
@@ -848,7 +835,12 @@ class ConnectionManager {
             Sinks.One<PoolHandle> sink = Sinks.one();
             acquire(sink);
             // todo: if the subscriber cancels before the connection is acquired, what happens?
-            return sink.asMono();
+            Optional<Duration> acquireTimeout = configuration.getConnectionPoolConfiguration().getAcquireTimeout();
+            if (acquireTimeout.isPresent()) {
+                return sink.asMono().timeout(acquireTimeout.get(), getEventLoopScheduler());
+            } else {
+                return sink.asMono();
+            }
         }
 
         private void acquire(Sinks.One<PoolHandle> sink) {
@@ -863,14 +855,36 @@ class ConnectionManager {
                 }
             }
             // no connection open that has room
-            pendingRequests.add(sink);
-            openNewConnection();
+            addPendingRequest(sink);
         }
 
-        private void openNewConnection() {
-            if (!incrementWithLimit(pendingConnectionCount, MAX_PENDING_CONNECTIONS)) {
-                return;
+        @Override
+        void onNewConnectionFailure(@Nullable Throwable error) throws Exception {
+            log.error("Failed to connect to remote", error);
+            super.onNewConnectionFailure(error);
+            // to avoid an infinite loop, fail one pending request.
+            Sinks.One<PoolHandle> pending = pollPendingRequest();
+            if (pending != null) {
+                pending.tryEmitError(new HttpClientException("Failed to establish connection", error));
             }
+        }
+
+        private void addPendingRequest(Sinks.One<PoolHandle> sink) {
+            pendingRequests.add(sink);
+            onPendingRequestChange(1);
+        }
+
+        @Nullable
+        private Sinks.One<PoolHandle> pollPendingRequest() {
+            Sinks.One<PoolHandle> req = pendingRequests.poll();
+            if (req != null) {
+                onPendingRequestChange(-1);
+            }
+            return req;
+        }
+
+        @Override
+        void openNewConnection() {
             // open a new connection
             ChannelInitializer<?> initializer;
             if (requestKey.isSecure()) {
@@ -911,15 +925,9 @@ class ConnectionManager {
             }
             addInstrumentedListener(doConnect(requestKey, initializer), future -> {
                 if (!future.isSuccess()) {
-                    log.error("Failed to connect to remote", future.cause());
-                    onNewConnectionFailure();
+                    onNewConnectionFailure(future.cause());
                 }
             });
-        }
-
-        void onNewConnectionFailure() {
-            pendingConnectionCount.decrementAndGet();
-            // todo: retry connection
         }
 
         public void shutdown() {
@@ -1027,13 +1035,13 @@ class ConnectionManager {
                 }
                 connectionCustomizer.onStreamPipelineBuilt();
 
-                Sinks.One<PoolHandle> pendingRequest = pendingRequests.poll();
+                Sinks.One<PoolHandle> pendingRequest = pollPendingRequest();
                 if (pendingRequest != null) {
                     hasLiveRequest.set(true);
                     satisfy0(pendingRequest);
                 }
                 http1Connections.add(this);
-                pendingConnectionCount.decrementAndGet();
+                onNewConnectionEstablished1();
             }
 
             @Override
@@ -1100,7 +1108,7 @@ class ConnectionManager {
 
             private void returnPendingRequest(Sinks.One<PoolHandle> sink) {
                 // failed, but the pending request may still work on another connection.
-                pendingRequests.add(sink);
+                addPendingRequest(sink);
                 hasLiveRequest.set(false);
             }
 
@@ -1116,6 +1124,7 @@ class ConnectionManager {
             void onInactive() {
                 super.onInactive();
                 http1Connections.remove(this);
+                onConnectionInactive1();
             }
         }
 
@@ -1136,8 +1145,8 @@ class ConnectionManager {
 
                 connectionCustomizer.onStreamPipelineBuilt();
 
-                for (int i = 0; i < MAX_CONCURRENT_REQUESTS_PER_HTTP2_CONNECTION; i++) {
-                    Sinks.One<PoolHandle> pendingRequest = pendingRequests.poll();
+                for (int i = 0; i < configuration.getConnectionPoolConfiguration().getMaxConcurrentRequestsPerHttp2Connection(); i++) {
+                    Sinks.One<PoolHandle> pendingRequest = pollPendingRequest();
                     if (pendingRequest == null) {
                         break;
                     }
@@ -1145,12 +1154,12 @@ class ConnectionManager {
                     satisfy0(pendingRequest);
                 }
                 http2Connections.add(this);
-                pendingConnectionCount.decrementAndGet();
+                onNewConnectionEstablished2();
             }
 
             @Override
             boolean tryEarmarkForRequest() {
-                return !windDownConnection && incrementWithLimit(liveRequests, MAX_CONCURRENT_REQUESTS_PER_HTTP2_CONNECTION);
+                return !windDownConnection && incrementWithLimit(liveRequests, configuration.getConnectionPoolConfiguration().getMaxConcurrentRequestsPerHttp2Connection());
             }
 
             @Override
@@ -1216,7 +1225,7 @@ class ConnectionManager {
 
             private void returnPendingRequest(Sinks.One<PoolHandle> sink) {
                 // failed, but the pending request may still work on another connection.
-                pendingRequests.add(sink);
+                addPendingRequest(sink);
                 liveRequests.decrementAndGet();
             }
 
@@ -1232,6 +1241,7 @@ class ConnectionManager {
             void onInactive() {
                 super.onInactive();
                 http2Connections.remove(Http2ConnectionHolder.this);
+                onConnectionInactive2();
             }
         }
     }
