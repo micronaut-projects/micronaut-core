@@ -222,20 +222,20 @@ public class JavaElementFactory implements ElementFactory<Element, TypeElement, 
 
     @NonNull
     @Override
-    public JavaMethodElement newMethodElement(ClassElement declaringClass,
+    public JavaMethodElement newMethodElement(ClassElement owningType,
                                               @NonNull ExecutableElement method,
                                               @NonNull AnnotationMetadata annotationMetadata) {
-        return newMethodElement(declaringClass, method, defaultAnnotationMetadata(method, annotationMetadata));
+        return newMethodElement(owningType, method, defaultAnnotationMetadata(method, annotationMetadata));
     }
 
     @NonNull
     @Override
-    public JavaMethodElement newMethodElement(ClassElement declaringClass,
+    public JavaMethodElement newMethodElement(ClassElement owningType,
                                               @NonNull ExecutableElement method,
                                               @NonNull ElementAnnotationMetadataFactory annotationMetadataFactory) {
-        validateOwningClass(declaringClass);
+        validateOwningClass(owningType);
         return new JavaMethodElement(
-            (JavaClassElement) declaringClass,
+            (JavaClassElement) owningType,
             method,
             annotationMetadataFactory,
             visitorContext

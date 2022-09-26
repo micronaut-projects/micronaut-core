@@ -36,40 +36,35 @@ public class AstUtils {
         String[] writePrefixes = configuration.getWritePrefixes();
 
         Map<String, BeanPropertyData> props = new LinkedHashMap<>();
-        if (accessKinds.contains(BeanProperties.AccessKind.METHOD)) {
-            for (MethodElement methodElement : methodsSupplier.get()) {
-                // Records include everything
-                if (methodElement.isStatic()
-                    || !excludeElementsInRole && (methodElement.hasDeclaredAnnotation(AnnotationUtil.INJECT)
-                    || methodElement.hasDeclaredAnnotation(AnnotationUtil.PRE_DESTROY)
-                    || methodElement.hasDeclaredAnnotation(AnnotationUtil.POST_CONSTRUCT))
-                ) {
+        for (MethodElement methodElement : methodsSupplier.get()) {
+            // Records include everything
+            if (methodElement.isStatic()
+                || !excludeElementsInRole && (methodElement.hasDeclaredAnnotation(AnnotationUtil.INJECT)
+                || methodElement.hasDeclaredAnnotation(AnnotationUtil.PRE_DESTROY)
+                || methodElement.hasDeclaredAnnotation(AnnotationUtil.POST_CONSTRUCT))
+            ) {
+                continue;
+            }
+            String methodName = methodElement.getName();
+            if (methodName.contains("$") || methodName.equals("getMetaClass")) {
+                continue;
+            }
+            boolean isAccessor = canMethodBeUsedForAccess(methodElement, accessKinds, visibility);
+            if (classElement.isRecord()) {
+                if (!isAccessor) {
                     continue;
                 }
-                String methodName = methodElement.getName();
-                if (methodName.contains("$") || methodName.equals("getMetaClass")) {
-                    continue;
-                }
-                if (visibility == BeanProperties.Visibility.DEFAULT) {
-                    if (methodElement.isPrivate() || !methodElement.isAccessible() && !methodElement.getDeclaringType().hasDeclaredStereotype(BeanProperties.class)) {
-                        continue;
-                    }
-                } else if (visibility == BeanProperties.Visibility.PUBLIC && !methodElement.isPublic()) {
-                    continue;
-                }
-                if (classElement.isRecord()) {
-                    String propertyName = methodElement.getSimpleName();
-                    processRecord(props, methodElement, propertyName);
-                } else if (NameUtils.isReaderName(methodName, readPrefixes) && methodElement.getParameters().length == 0) {
-                    String propertyName = customMethodNameResolver.apply(methodElement).orElseGet(() -> NameUtils.getPropertyNameForGetter(methodName, readPrefixes));
-                    processGetter(props, methodElement, propertyName);
-                } else if (NameUtils.isWriterName(methodName, writePrefixes)
-                    && (methodElement.getParameters().length == 1
-                    || configuration.isAllowSetterWithZeroArgs() && methodElement.getParameters().length == 0
-                    || configuration.isAllowSetterWithMultipleArgs() && methodElement.getParameters().length > 1)) {
-                    String propertyName = NameUtils.getPropertyNameForSetter(methodName, writePrefixes);
-                    processSetter(props, methodElement, propertyName);
-                }
+                String propertyName = methodElement.getSimpleName();
+                processRecord(props, methodElement, propertyName);
+            } else if (NameUtils.isReaderName(methodName, readPrefixes) && methodElement.getParameters().length == 0) {
+                String propertyName = customMethodNameResolver.apply(methodElement).orElseGet(() -> NameUtils.getPropertyNameForGetter(methodName, readPrefixes));
+                processGetter(props, methodElement, propertyName, isAccessor);
+            } else if (NameUtils.isWriterName(methodName, writePrefixes)
+                && (methodElement.getParameters().length == 1
+                || configuration.isAllowSetterWithZeroArgs() && methodElement.getParameters().length == 0
+                || configuration.isAllowSetterWithMultipleArgs() && methodElement.getParameters().length > 1)) {
+                String propertyName = NameUtils.getPropertyNameForSetter(methodName, writePrefixes);
+                processSetter(props, methodElement, propertyName, isAccessor);
             }
         }
         for (FieldElement fieldElement : fieldSupplier.get()) {
@@ -81,7 +76,7 @@ public class AstUtils {
                 continue;
             }
             String propertyName = fieldElement.getSimpleName();
-            boolean isAccessor = propertyFields.contains(propertyName) || canFieldBeUsedForAccess(classElement, fieldElement, accessKinds, visibility);
+            boolean isAccessor = propertyFields.contains(propertyName) || canFieldBeUsedForAccess(fieldElement, accessKinds, visibility);
             if (!isAccessor && !props.containsKey(propertyName)) {
                 continue;
             }
@@ -98,7 +93,7 @@ public class AstUtils {
             for (Map.Entry<String, BeanPropertyData> entry : props.entrySet()) {
                 String propertyName = entry.getKey();
                 BeanPropertyData value = entry.getValue();
-                if (value.getter != null || value.field != null || value.setter != null) {
+                if (value.readAccessKind != null || value.writeAccessKind != null) {
                     value.isExcluded = shouldExclude(includes, excludes, propertyName);
                     beanProperties.add(propertyCreator.apply(value));
                 }
@@ -119,10 +114,12 @@ public class AstUtils {
         beanPropertyData.type = getterType;
     }
 
-    private static void processGetter(Map<String, BeanPropertyData> props, MethodElement methodElement, String propertyName) {
+    private static void processGetter(Map<String, BeanPropertyData> props, MethodElement methodElement, String propertyName, boolean isAccessor) {
         BeanPropertyData beanPropertyData = props.computeIfAbsent(propertyName, BeanPropertyData::new);
         beanPropertyData.getter = methodElement;
-        beanPropertyData.readAccessKind = BeanProperties.AccessKind.METHOD;
+        if (isAccessor) {
+            beanPropertyData.readAccessKind = BeanProperties.AccessKind.METHOD;
+        }
         ClassElement getterType = beanPropertyData.getter.getGenericReturnType();
         if (getterType.isOptional()) {
             getterType = getterType.getFirstTypeArgument().orElse(getterType);
@@ -137,7 +134,7 @@ public class AstUtils {
         }
     }
 
-    private static void processSetter(Map<String, BeanPropertyData> props, MethodElement methodElement, String propertyName) {
+    private static void processSetter(Map<String, BeanPropertyData> props, MethodElement methodElement, String propertyName, boolean isAccessor) {
         BeanPropertyData beanPropertyData = props.computeIfAbsent(propertyName, BeanPropertyData::new);
         ClassElement setterType =  methodElement.getParameters().length == 0 ? null : methodElement.getParameters()[0].getType();
         if (setterType != null && beanPropertyData.setter != null) {
@@ -148,7 +145,9 @@ public class AstUtils {
             return;
         }
         beanPropertyData.setter = methodElement;
-        beanPropertyData.writeAccessKind = BeanProperties.AccessKind.METHOD;
+        if (isAccessor) {
+            beanPropertyData.writeAccessKind = BeanProperties.AccessKind.METHOD;
+        }
         if (beanPropertyData.type != null) {
             if (setterType != null && !setterType.isAssignable(beanPropertyData.type)) {
                 beanPropertyData.setter = null; // not a compatible setter
@@ -206,25 +205,35 @@ public class AstUtils {
         }
     }
 
-    private static boolean canFieldBeUsedForAccess(ClassElement classElement,
-                                                   FieldElement fieldElement,
+    private static boolean canFieldBeUsedForAccess(FieldElement fieldElement,
                                                    EnumSet<BeanProperties.AccessKind> accessKinds,
                                                    BeanProperties.Visibility visibility) {
-        if (classElement.isRecord()) {
+        if (fieldElement.getOwningType().isRecord()) {
             return false;
         }
         if (accessKinds.contains(BeanProperties.AccessKind.FIELD)) {
-            switch (visibility) {
-                case DEFAULT:
-                    return !fieldElement.isPrivate() && (fieldElement.isAccessible() || fieldElement.getDeclaringType().hasDeclaredStereotype(BeanProperties.class));
-                case PUBLIC:
-                    return fieldElement.isPublic();
-                default:
-                    return false;
-            }
+            return isAccessible(fieldElement, visibility);
         }
         return false;
     }
+
+    private static boolean canMethodBeUsedForAccess(MethodElement methodElement,
+                                                    EnumSet<BeanProperties.AccessKind> accessKinds,
+                                                    BeanProperties.Visibility visibility) {
+        return accessKinds.contains(BeanProperties.AccessKind.METHOD) && isAccessible(methodElement, visibility);
+    }
+
+    private static boolean isAccessible(MemberElement memberElement, BeanProperties.Visibility visibility) {
+        switch (visibility) {
+            case DEFAULT:
+                return !memberElement.isPrivate() && (memberElement.isAccessible() || memberElement.getDeclaringType().hasDeclaredStereotype(BeanProperties.class));
+            case PUBLIC:
+                return memberElement.isPublic();
+            default:
+                return false;
+        }
+    }
+
 
     public static List<MethodElement> getSubtypeFirstMethods(ClassElement classElement) {
         List<MethodElement> methods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS.onlyInstance());

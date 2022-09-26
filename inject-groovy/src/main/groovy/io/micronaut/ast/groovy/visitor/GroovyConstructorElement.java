@@ -27,15 +27,15 @@ import org.codehaus.groovy.ast.ConstructorNode;
  */
 public class GroovyConstructorElement extends GroovyMethodElement implements ConstructorElement {
     /**
-     * @param declaringClass     The declaring class
-     * @param visitorContext     The visitor context
-     * @param methodNode         The {@link ConstructorNode}
+     * @param owningType                The owning class
+     * @param visitorContext            The visitor context
+     * @param methodNode                The {@link ConstructorNode}
      * @param annotationMetadataFactory The annotation metadata
      */
-    GroovyConstructorElement(GroovyClassElement declaringClass,
+    GroovyConstructorElement(GroovyClassElement owningType,
                              GroovyVisitorContext visitorContext,
                              ConstructorNode methodNode,
                              ElementAnnotationMetadataFactory annotationMetadataFactory) {
-        super(declaringClass, visitorContext, methodNode, annotationMetadataFactory);
+        super(owningType, visitorContext, methodNode, annotationMetadataFactory);
     }
 }

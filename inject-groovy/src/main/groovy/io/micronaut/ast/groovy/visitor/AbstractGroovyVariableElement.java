@@ -140,6 +140,11 @@ public abstract class AbstractGroovyVariableElement extends AbstractGroovyElemen
         return Modifier.isProtected(variable.getModifiers());
     }
 
+    @Override
+    public boolean isPackagePrivate() {
+        return !Modifier.isPublic(variable.getModifiers()) && !Modifier.isProtected(variable.getModifiers()) && !Modifier.isPrivate(variable.getModifiers());
+    }
+
     @NonNull
     @Override
     public ClassElement getType() {

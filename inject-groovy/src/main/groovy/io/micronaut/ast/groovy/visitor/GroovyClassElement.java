@@ -65,6 +65,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -403,30 +404,66 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     }
 
     private Collection<MethodNode> getDeclaredMethods() {
-        Map<String, MethodNode> declaredMethodsMap = new LinkedHashMap<>();
-        collectDeclaredMethodsMap(classNode, declaredMethodsMap);
-        return declaredMethodsMap.values();
+        // This method will return private/package private methods that
+        // cannot be overridden by defining a method with the same signature
+        List<MethodNode> methods = new ArrayList<>();
+        List<List<MethodNode>> hierarchy = new ArrayList<>();
+        collectHierarchyMethods(classNode, hierarchy);
+        for (List<MethodNode> classMethods : hierarchy) {
+            List<MethodNode> addedFromClassMethods = new ArrayList<>(classMethods.size());
+            classMethodsLoop:
+            for (MethodNode newMethod : classMethods) {
+                String typeDescriptor = newMethod.getTypeDescriptor();
+                for (ListIterator<MethodNode> iterator = methods.listIterator(); iterator.hasNext(); ) {
+                    MethodNode existingMethod = iterator.next();
+                    String existingTypeDescriptor = existingMethod.getTypeDescriptor();
+                    if (existingTypeDescriptor.equals(typeDescriptor)) {
+                        if (isOverridden(classNode, existingMethod, newMethod)) {
+                            if (newMethod.isAbstract()) {
+                                continue classMethodsLoop;
+                            }
+                            iterator.remove();
+                        }
+                        addedFromClassMethods.add(newMethod);
+                        continue classMethodsLoop;
+                    }
+                }
+                addedFromClassMethods.add(newMethod);
+            }
+            methods.addAll(addedFromClassMethods);
+        }
+        return methods;
     }
 
-    private void collectDeclaredMethodsMap(ClassNode classNode, Map<String, MethodNode> methods) {
-        // Partial copy from ClassNode#declaredMethodsMap to have linked map
+    private boolean isOverridden(ClassNode owner, MethodNode existingMethod, MethodNode newMethod) {
+        // Cannot override existing private/package private methods even if the signature is the same
+        if (existingMethod.isPrivate()) {
+            return false;
+        }
+        if (existingMethod.isPackageScope()) {
+            return owner.getPackageName().equals(existingMethod.getDeclaringClass().getPackageName());
+        }
+        return true;
+    }
+
+    private void collectHierarchyMethods(ClassNode classNode, List<List<MethodNode>> hierarchy) {
+        if (classNode.getName().equals("java.lang.Object") || classNode.getName().equals("java.lang.Enum")) {
+            return;
+        }
         ClassNode parent = classNode.getSuperClass();
         if (parent != null) {
-            collectDeclaredMethodsMap(parent, methods);
+            collectHierarchyMethods(parent, hierarchy);
         }
         for (ClassNode iface : classNode.getInterfaces()) {
-            Map<String, MethodNode> declaredMethods = new LinkedHashMap<>();
-            collectDeclaredMethodsMap(iface, declaredMethods);
-            for (Map.Entry<String, MethodNode> entry : declaredMethods.entrySet()) {
-                if (entry.getValue().getDeclaringClass().isInterface() && (entry.getValue().getModifiers() & ACC_SYNTHETIC) == 0) {
-                    methods.putIfAbsent(entry.getKey(), entry.getValue());
-                }
+            if (iface.getName().equals("groovy.lang.GroovyObject")) {
+                continue;
             }
+            List<List<MethodNode>> interfaceMethods = new ArrayList<>();
+            collectHierarchyMethods(iface, interfaceMethods);
+            interfaceMethods.forEach(methodNodes -> methodNodes.removeIf(methodNode -> !methodNode.getDeclaringClass().isInterface() || (methodNode.getModifiers() & ACC_SYNTHETIC) != 0));
+            hierarchy.addAll(interfaceMethods);
         }
-        // add in the methods implemented in this class
-        for (MethodNode method : classNode.getMethods()) {
-            methods.put(method.getTypeDescriptor(), method);
-        }
+        hierarchy.add(classNode.getMethods().stream().filter(m -> !JUNK_METHOD_FILTER.test(m)).collect(Collectors.toList()));
     }
 
     private List<FieldNode> findRelevantFields(
@@ -535,6 +572,19 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
         if (primaryConstructor.isPresent()) {
             return primaryConstructor;
         }
+        return possibleDefaultEmptyConstructor();
+    }
+
+    @Override
+    public Optional<MethodElement> getDefaultConstructor() {
+        Optional<MethodElement> defaultConstructor = ArrayableClassElement.super.getDefaultConstructor();
+        if (defaultConstructor.isPresent()) {
+            return defaultConstructor;
+        }
+        return possibleDefaultEmptyConstructor();
+    }
+
+    private Optional<MethodElement> possibleDefaultEmptyConstructor() {
         List<ConstructorNode> constructors = classNode.getDeclaredConstructors();
         if (CollectionUtils.isEmpty(constructors) && !classNode.isAbstract() && !classNode.isEnum()) {
             // empty default constructor
@@ -752,8 +802,11 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                             getterName
                         );
                         value.readAccessKind = BeanProperties.AccessKind.METHOD;
+                    } else {
+                        // Skip not accessible getters
+                        value.getter = null;
                     }
-                    if (value.setter == null || value.writeAccessKind == BeanProperties.AccessKind.FIELD) {
+                    if (!value.field.isFinal() && (value.setter == null || value.writeAccessKind == BeanProperties.AccessKind.FIELD)) {
                         value.setter = MethodElement.of(
                             this,
                             annotationMetadataProvider,
@@ -763,6 +816,9 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                             ParameterElement.of(value.type, value.propertyName)
                         );
                         value.writeAccessKind = BeanProperties.AccessKind.METHOD;
+                    } else {
+                        // Skip not accessible setters
+                        value.setter = null;
                     }
                 }
                 GroovyPropertyElement propertyElement = new GroovyPropertyElement(

@@ -55,7 +55,7 @@ public class ConfigurationPropertiesBeanBuilder extends SimpleBeanBuilder {
                     null,
                     builderType.isInterface()
                 );
-                visitConfigurationBuilder(visitor, propertyElement, getElementAnnotationMetadata(methodElement), builderType);
+                visitConfigurationBuilder(visitor, propertyElement, builderType);
                 return true;
             }
             if (propertyElement.getField().isPresent()) {
@@ -69,7 +69,7 @@ public class ConfigurationPropertiesBeanBuilder extends SimpleBeanBuilder {
                         metadataBuilder,
                         builderType.isInterface()
                     );
-                    visitConfigurationBuilder(visitor, propertyElement, fieldElement.getAnnotationMetadata(), builderType);
+                    visitConfigurationBuilder(visitor, propertyElement, builderType);
                     return true;
                 }
                 throw new ProcessingException(fieldElement, "ConfigurationBuilder applied to a non accessible (private or package-private/protected in a different package) field must have a corresponding non-private getter method.");
@@ -134,7 +134,6 @@ public class ConfigurationPropertiesBeanBuilder extends SimpleBeanBuilder {
 
     private void visitConfigurationBuilder(BeanDefinitionVisitor visitor,
                                            MemberElement builderElement,
-                                           AnnotationMetadata annotationMetadata,
                                            ClassElement builderType) {
         try {
             String configurationPrefix = builderElement.stringValue(ConfigurationBuilder.class).map(v -> v + ".").orElse("");

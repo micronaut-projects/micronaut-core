@@ -219,8 +219,7 @@ interface AnotherInterface {
         def allMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS)
 
         then:"All methods, including non-accessible are returned but not overridden"
-        // slightly different result to java since groovy hides private methods
-        allMethods.size() == 9
+        allMethods.size() == 10
 
         when:"only abstract methods are requested"
         def abstractMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS.onlyAbstract())
@@ -294,7 +293,7 @@ interface AnotherInterface {
         def allMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS)
 
         then:"All methods, including non-accessible are returned but not overridden"
-        allMethods.size() == 6 // slightly different result to java since groovy hides private methods
+        allMethods.size() == 7
         allMethods.find { it.name == 'publicMethod'}.declaringType.simpleName == 'Test'
         allMethods.find { it.name == 'otherSuper'}.declaringType.simpleName == 'SuperType'
 

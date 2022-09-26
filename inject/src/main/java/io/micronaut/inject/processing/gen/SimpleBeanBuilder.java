@@ -152,16 +152,9 @@ public class SimpleBeanBuilder extends AbstractBeanBuilder {
     }
 
     private void visitPropertyInternal(BeanDefinitionVisitor visitor, PropertyElement propertyElement) {
-        propertyElement.getWriteMethod().ifPresent(methodElement -> {
-            if (methodElement.hasAnnotation(ANN_REQUIRES_VALIDATION)) {
-                methodElement.annotate(ANN_VALIDATED);
-            }
-        });
-        propertyElement.getReadMethod().ifPresent(methodElement -> {
-            if (methodElement.hasAnnotation(ANN_REQUIRES_VALIDATION)) {
-                methodElement.annotate(ANN_VALIDATED);
-            }
-        });
+        if (propertyElement.hasAnnotation(ANN_REQUIRES_VALIDATION)) {
+            propertyElement.annotate(ANN_VALIDATED);
+        }
         boolean claimed = visitProperty(visitor, propertyElement);
         if (claimed) {
             propertyElement.getReadMethod().ifPresent(element -> addOriginatingElementIfNecessary(visitor, element));
@@ -202,6 +195,8 @@ public class SimpleBeanBuilder extends AbstractBeanBuilder {
             return true;
         }
         if (!methodElement.isStatic() && isInjectPointMethod(methodElement)) {
+//            System.out.println("%%%" + classElement + " " + methodElement + " " + methodElement.getDeclaringType() + " " + methodElement.isPackagePrivate());
+
             staticMethodCheck(methodElement);
             // TODO: Require @ReflectiveAccess for private methods in Micronaut 4
             visitor.visitMethodInjectionPoint(

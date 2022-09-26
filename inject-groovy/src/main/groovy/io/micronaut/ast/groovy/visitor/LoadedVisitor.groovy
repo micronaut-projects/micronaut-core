@@ -108,6 +108,17 @@ class LoadedVisitor implements Ordered {
 
     /**
      * @param annotationMetadata The annotation data
+     * @return True if the class should be visited
+     */
+    boolean matchesClass(AnnotationMetadata annotationMetadata) {
+        if (classAnnotation == ClassHelper.OBJECT) {
+            return true
+        }
+        return annotationMetadata.hasStereotype(classAnnotation)
+    }
+
+    /**
+     * @param annotationMetadata The annotation data
      * @return True if the element should be visited
      */
     boolean matches(AnnotationMetadata annotationMetadata) {

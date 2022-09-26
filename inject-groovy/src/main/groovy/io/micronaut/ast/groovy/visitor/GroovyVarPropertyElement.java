@@ -16,7 +16,6 @@
 package io.micronaut.ast.groovy.visitor;
 
 import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
-import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.FieldNode;
 import org.codehaus.groovy.ast.PropertyNode;
 
@@ -30,19 +29,13 @@ public class GroovyVarPropertyElement extends AbstractGroovyVariableElement {
     /**
      * @param visitorContext            The visitor context
      * @param propertyNode                  The {@link FieldNode}
-     * @param annotatedNode             The annotated ndoe
      * @param annotationMetadataFactory The annotation metadata
      */
     GroovyVarPropertyElement(GroovyVisitorContext visitorContext,
                              PropertyNode propertyNode,
-                             AnnotatedNode annotatedNode,
                              ElementAnnotationMetadataFactory annotationMetadataFactory) {
-        super(visitorContext, propertyNode, annotatedNode, annotationMetadataFactory);
+        super(visitorContext, propertyNode.getField(), propertyNode.getField(), annotationMetadataFactory);
         this.propertyNode = propertyNode;
     }
 
-    @Override
-    public PropertyNode getNativeType() {
-        return propertyNode;
-    }
 }

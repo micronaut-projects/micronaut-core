@@ -329,8 +329,8 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         return new JavaPropertyElement(
             JavaClassElement.this,
             value.type,
-            value.getter,
-            value.setter,
+            value.readAccessKind == null ? null : value.getter,
+            value.writeAccessKind == null ? null : value.setter,
             value.field,
             elementAnnotationMetadataFactory,
             value.propertyName,
