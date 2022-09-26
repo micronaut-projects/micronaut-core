@@ -37,7 +37,12 @@ import java.io.Writer;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.net.URI;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * An implementation of {@link io.micronaut.inject.writer.ClassWriterOutputVisitor} for annotation processing.
@@ -195,12 +200,6 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
             }
         }
         return os;
-    }
-
-    @Override
-    @Deprecated
-    public Optional<GeneratedFile> visitMetaInfFile(String path) {
-        return visitMetaInfFile(path, io.micronaut.inject.ast.Element.EMPTY_ELEMENT_ARRAY);
     }
 
     @Override
