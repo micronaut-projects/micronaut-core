@@ -7,9 +7,11 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.HttpVersion
+import io.micronaut.http.MediaType
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.StreamingHttpClient
 import io.micronaut.http.client.exceptions.ReadTimeoutException
+import io.micronaut.http.client.multipart.MultipartBody
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer
 import io.micronaut.http.server.netty.ssl.CertificateProvidedSslBuilder
 import io.micronaut.http.ssl.SslConfiguration
@@ -31,6 +33,7 @@ import io.netty.handler.codec.http.DefaultFullHttpResponse
 import io.netty.handler.codec.http.DefaultHttpContent
 import io.netty.handler.codec.http.DefaultHttpResponse
 import io.netty.handler.codec.http.DefaultLastHttpContent
+import io.netty.handler.codec.http.FullHttpRequest
 import io.netty.handler.codec.http.HttpContentCompressor
 import io.netty.handler.codec.http.HttpMethod
 import io.netty.handler.codec.http.HttpObjectAggregator
@@ -691,6 +694,41 @@ class ConnectionManagerSpec extends Specification {
         conn.fireClientActive()
 
         conn.testExchangeResponse(conn.testExchangeRequest(client))
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
+    def 'multipart request'() {
+        def ctx = ApplicationContext.run()
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn = new EmbeddedTestConnectionHttp1()
+        conn.setupHttp1()
+        patch(client, conn.clientChannel)
+        conn.serverChannel.pipeline().addLast(new HttpObjectAggregator(1024))
+
+        def future = Mono.from(client.exchange(HttpRequest.POST(conn.scheme + '://example.com/foo', MultipartBody.builder()
+            .addPart('foo', 'fn', MediaType.TEXT_PLAIN_TYPE, 'bar'.bytes)
+            .build())
+                .contentType(MediaType.MULTIPART_FORM_DATA), String)).toFuture()
+        future.exceptionally(t -> t.printStackTrace())
+        conn.advance()
+        conn.fireClientActive()
+
+        FullHttpRequest request = conn.serverChannel.readInbound()
+        assert request.uri() == '/foo'
+        assert request.method() == HttpMethod.POST
+        assert request.headers().get('host') == 'example.com'
+        assert request.headers().get("connection") == "keep-alive"
+        assert request.content().isReadable(100) // cba to check the exact content
+
+        def response = new DefaultFullHttpResponse(io.netty.handler.codec.http.HttpVersion.HTTP_1_1, HttpResponseStatus.OK, Unpooled.wrappedBuffer('foo'.bytes))
+        response.headers().add("Content-Length", 3)
+        conn.serverChannel.writeOutbound(response)
+        conn.advance()
+        assert future.get().body() == 'foo'
 
         cleanup:
         client.close()

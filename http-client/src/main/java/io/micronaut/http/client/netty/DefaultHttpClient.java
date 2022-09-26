@@ -173,6 +173,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ThreadFactory;
@@ -2273,6 +2274,14 @@ public class DefaultHttpClient implements
         @Override
         public void handlerRemoved(ChannelHandlerContext ctx) {
             ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_HTTP_AGGREGATOR);
+            try {
+                ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_HTTP_CHUNK);
+            } catch (NoSuchElementException ignored) {
+            }
+            try {
+                ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_HTTP_STREAM);
+            } catch (NoSuchElementException ignored) {
+            }
             poolHandle.release();
         }
 

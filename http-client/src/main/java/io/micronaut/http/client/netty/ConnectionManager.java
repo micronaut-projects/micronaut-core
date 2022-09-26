@@ -354,6 +354,22 @@ class ConnectionManager {
                     }
                 }
             });
+            if (multipart) {
+                ph.channel.pipeline().addLast(
+                    ChannelPipelineCustomizer.HANDLER_HTTP_STREAM,
+                    new HttpStreamsClientHandler() {
+                        @Override
+                        public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+                            if (evt instanceof IdleStateEvent) {
+                                // close the connection if it is idle for too long
+                                ph.taint();
+                                ph.release();
+                            }
+                            super.userEventTriggered(ctx, evt);
+                        }
+                    }
+                );
+            }
             return ph;
         });
     }
