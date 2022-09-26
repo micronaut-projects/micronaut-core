@@ -26,7 +26,7 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ArrayableClassElement;
-import io.micronaut.inject.ast.AstUtils;
+import io.micronaut.inject.ast.AstBeanPropertiesUtils;
 import io.micronaut.inject.ast.BeanPropertiesConfiguration;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
@@ -297,7 +297,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     @Override
     public List<PropertyElement> getBeanProperties(BeanPropertiesConfiguration configuration) {
         if (isRecord()) {
-            return AstUtils.resolveBeanProperties(configuration,
+            return AstBeanPropertiesUtils.resolveBeanProperties(configuration,
                 this,
                 this::getRecordMethods,
                 this::getRecordFields,
@@ -306,10 +306,10 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                 methodElement -> Optional.empty(),
                 this::mapToPropertyElement);
         }
-        return AstUtils.resolveBeanProperties(configuration,
+        return AstBeanPropertiesUtils.resolveBeanProperties(configuration,
             this,
-            () -> AstUtils.getSubtypeFirstMethods(this),
-            () -> AstUtils.getSubtypeFirstFields(this),
+            () -> AstBeanPropertiesUtils.getSubtypeFirstMethods(this),
+            () -> AstBeanPropertiesUtils.getSubtypeFirstFields(this),
             false,
             Collections.emptySet(),
             methodElement -> {
@@ -321,7 +321,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             }, this::mapToPropertyElement);
     }
 
-    private JavaPropertyElement mapToPropertyElement(AstUtils.BeanPropertyData value) {
+    private JavaPropertyElement mapToPropertyElement(AstBeanPropertiesUtils.BeanPropertyData value) {
         if (value.type == null) {
             // withSomething() builder setter
             value.type = PrimitiveElement.VOID;

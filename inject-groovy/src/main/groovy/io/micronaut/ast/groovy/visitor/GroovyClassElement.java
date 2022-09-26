@@ -28,7 +28,7 @@ import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ArrayableClassElement;
-import io.micronaut.inject.ast.AstUtils;
+import io.micronaut.inject.ast.AstBeanPropertiesUtils;
 import io.micronaut.inject.ast.BeanPropertiesConfiguration;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
@@ -769,73 +769,77 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     @Override
     public List<PropertyElement> getBeanProperties(BeanPropertiesConfiguration configuration) {
         Set<String> nativeProps = getPropertyNodes().stream().map(PropertyNode::getName).collect(Collectors.toCollection(LinkedHashSet::new));
-        return AstUtils.resolveBeanProperties(configuration,
+        return AstBeanPropertiesUtils.resolveBeanProperties(configuration,
             this,
-            () -> AstUtils.getSubtypeFirstMethods(this),
-            () -> AstUtils.getSubtypeFirstFields(this),
+            () -> AstBeanPropertiesUtils.getSubtypeFirstMethods(this),
+            () -> AstBeanPropertiesUtils.getSubtypeFirstFields(this),
             true,
             nativeProps,
             methodElement -> Optional.empty(),
             value -> {
-                if (value.type == null) {
-                    // withSomething() builder setter
-                    value.type = PrimitiveElement.VOID;
-                }
-                AtomicReference<AnnotationMetadataProvider> ref = new AtomicReference<>();
-                if (nativeProps.remove(value.propertyName)) {
-                    AnnotationMetadataProvider annotationMetadataProvider = new AnnotationMetadataProvider() {
-                        @Override
-                        public AnnotationMetadata getAnnotationMetadata() {
-                            return ref.get().getAnnotationMetadata();
-                        }
-                    };
-                    if (value.getter == null || value.readAccessKind == BeanProperties.AccessKind.FIELD) {
-                        String getterName = NameUtils.getterNameFor(
-                            value.propertyName,
-                            value.type.equals(PrimitiveElement.BOOLEAN) || value.type.getName().equals(Boolean.class.getName())
-                        );
-                        value.getter = MethodElement.of(
-                            this,
-                            annotationMetadataProvider,
-                            value.type,
-                            value.type,
-                            getterName
-                        );
-                        value.readAccessKind = BeanProperties.AccessKind.METHOD;
-                    } else {
-                        // Skip not accessible getters
-                        value.getter = null;
-                    }
-                    if (!value.field.isFinal() && (value.setter == null || value.writeAccessKind == BeanProperties.AccessKind.FIELD)) {
-                        value.setter = MethodElement.of(
-                            this,
-                            annotationMetadataProvider,
-                            PrimitiveElement.VOID,
-                            PrimitiveElement.VOID,
-                            NameUtils.setterNameFor(value.propertyName),
-                            ParameterElement.of(value.type, value.propertyName)
-                        );
-                        value.writeAccessKind = BeanProperties.AccessKind.METHOD;
-                    } else {
-                        // Skip not accessible setters
-                        value.setter = null;
-                    }
-                }
-                GroovyPropertyElement propertyElement = new GroovyPropertyElement(
-                    visitorContext,
-                    this,
-                    value.type,
-                    value.getter,
-                    value.setter,
-                    value.field,
-                    elementAnnotationMetadataFactory,
-                    value.propertyName,
-                    value.readAccessKind == null ? PropertyElement.AccessKind.METHOD : PropertyElement.AccessKind.valueOf(value.readAccessKind.name()),
-                    value.writeAccessKind == null ? PropertyElement.AccessKind.METHOD : PropertyElement.AccessKind.valueOf(value.writeAccessKind.name()),
-                    value.isExcluded);
-                ref.set(propertyElement);
-                return propertyElement;
+                return mapPropertyElement(nativeProps, value);
             });
+    }
+
+    private GroovyPropertyElement mapPropertyElement(Set<String> nativeProps, AstBeanPropertiesUtils.BeanPropertyData value) {
+        if (value.type == null) {
+            // withSomething() builder setter
+            value.type = PrimitiveElement.VOID;
+        }
+        AtomicReference<AnnotationMetadataProvider> ref = new AtomicReference<>();
+        if (nativeProps.remove(value.propertyName)) {
+            AnnotationMetadataProvider annotationMetadataProvider = new AnnotationMetadataProvider() {
+                @Override
+                public AnnotationMetadata getAnnotationMetadata() {
+                    return ref.get().getAnnotationMetadata();
+                }
+            };
+            if (value.getter == null || value.readAccessKind == BeanProperties.AccessKind.FIELD) {
+                String getterName = NameUtils.getterNameFor(
+                    value.propertyName,
+                    value.type.equals(PrimitiveElement.BOOLEAN) || value.type.getName().equals(Boolean.class.getName())
+                );
+                value.getter = MethodElement.of(
+                    this,
+                    annotationMetadataProvider,
+                    value.field.getGenericType(),
+                    value.field.getGenericType(),
+                    getterName
+                );
+                value.readAccessKind = BeanProperties.AccessKind.METHOD;
+            } else {
+                // Skip not accessible getters
+                value.getter = null;
+            }
+            if (!value.field.isFinal() && (value.setter == null || value.writeAccessKind == BeanProperties.AccessKind.FIELD)) {
+                value.setter = MethodElement.of(
+                    this,
+                    annotationMetadataProvider,
+                    PrimitiveElement.VOID,
+                    PrimitiveElement.VOID,
+                    NameUtils.setterNameFor(value.propertyName),
+                    ParameterElement.of(value.field.getGenericType(), value.propertyName)
+                );
+                value.writeAccessKind = BeanProperties.AccessKind.METHOD;
+            } else {
+                // Skip not accessible setters
+                value.setter = null;
+            }
+        }
+        GroovyPropertyElement propertyElement = new GroovyPropertyElement(
+            visitorContext,
+            this,
+            value.type,
+            value.getter,
+            value.setter,
+            value.field,
+            elementAnnotationMetadataFactory,
+            value.propertyName,
+            value.readAccessKind == null ? PropertyElement.AccessKind.METHOD : PropertyElement.AccessKind.valueOf(value.readAccessKind.name()),
+            value.writeAccessKind == null ? PropertyElement.AccessKind.METHOD : PropertyElement.AccessKind.valueOf(value.writeAccessKind.name()),
+            value.isExcluded);
+        ref.set(propertyElement);
+        return propertyElement;
     }
 
     @Override

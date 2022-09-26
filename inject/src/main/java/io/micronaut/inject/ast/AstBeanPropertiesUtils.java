@@ -17,10 +17,10 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-public class AstUtils {
+public class AstBeanPropertiesUtils {
 
     public static List<PropertyElement> resolveBeanProperties(BeanPropertiesConfiguration configuration,
-                                                            ClassElement classElement,
+                                                              ClassElement classElement,
                                                               Supplier<List<MethodElement>> methodsSupplier,
                                                               Supplier<List<FieldElement>> fieldSupplier,
                                                               boolean excludeElementsInRole,
@@ -81,10 +81,7 @@ public class AstUtils {
                 continue;
             }
             BeanPropertyData beanPropertyData = props.computeIfAbsent(propertyName, BeanPropertyData::new);
-            ClassElement fieldType = fieldElement.getGenericType();
-            if (fieldType.isOptional()) {
-                fieldType = fieldType.getFirstTypeArgument().orElse(fieldType);
-            }
+            ClassElement fieldType = processType(fieldElement.getGenericType());
             resolveReadAccessForField(fieldElement, isAccessor, beanPropertyData, fieldType);
             resolveWriteAccessForField(fieldElement, isAccessor, beanPropertyData, fieldType);
         }
@@ -107,11 +104,7 @@ public class AstUtils {
         BeanPropertyData beanPropertyData = props.computeIfAbsent(propertyName, BeanPropertyData::new);
         beanPropertyData.getter = methodElement;
         beanPropertyData.readAccessKind = BeanProperties.AccessKind.METHOD;
-        ClassElement getterType = beanPropertyData.getter.getGenericReturnType();
-        if (getterType.isOptional()) {
-            getterType = getterType.getFirstTypeArgument().orElse(getterType);
-        }
-        beanPropertyData.type = getterType;
+        beanPropertyData.type = processType(beanPropertyData.getter.getGenericReturnType());
     }
 
     private static void processGetter(Map<String, BeanPropertyData> props, MethodElement methodElement, String propertyName, boolean isAccessor) {
@@ -120,10 +113,8 @@ public class AstUtils {
         if (isAccessor) {
             beanPropertyData.readAccessKind = BeanProperties.AccessKind.METHOD;
         }
-        ClassElement getterType = beanPropertyData.getter.getGenericReturnType();
-        if (getterType.isOptional()) {
-            getterType = getterType.getFirstTypeArgument().orElse(getterType);
-        }
+        ClassElement genericReturnType = beanPropertyData.getter.getGenericReturnType();
+        ClassElement getterType = processType(genericReturnType);
         if (beanPropertyData.type != null) {
             if (!getterType.isAssignable(beanPropertyData.type)) {
                 beanPropertyData.getter = null; // not a compatible getter
@@ -136,7 +127,7 @@ public class AstUtils {
 
     private static void processSetter(Map<String, BeanPropertyData> props, MethodElement methodElement, String propertyName, boolean isAccessor) {
         BeanPropertyData beanPropertyData = props.computeIfAbsent(propertyName, BeanPropertyData::new);
-        ClassElement setterType =  methodElement.getParameters().length == 0 ? null : methodElement.getParameters()[0].getType();
+        ClassElement setterType = methodElement.getParameters().length == 0 ? null : processType(methodElement.getParameters()[0].getGenericType());
         if (setterType != null && beanPropertyData.setter != null) {
             if (setterType.isAssignable(beanPropertyData.type)) {
                 // Override the setter because the type is higher
@@ -156,6 +147,13 @@ public class AstUtils {
         } else {
             beanPropertyData.type = setterType;
         }
+    }
+
+    private static ClassElement processType(ClassElement type) {
+        if (type.isOptional()) {
+            return type.getFirstTypeArgument().orElse(type);
+        }
+        return type;
     }
 
     private static void resolveWriteAccessForField(FieldElement fieldElement, boolean isAccessor, BeanPropertyData beanPropertyData, ClassElement fieldType) {
