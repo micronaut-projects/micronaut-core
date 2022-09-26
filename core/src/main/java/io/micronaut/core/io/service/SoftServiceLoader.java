@@ -266,19 +266,6 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
      * @param name The name
      * @param loadedClass The loaded class
      * @return The service definition
-     * @deprecated No longer used
-     */
-    @SuppressWarnings({"unchecked", "ProtectedMemberInFinalClass", "OptionalUsedAsFieldOrParameterType", "java:S3740",
-            "java:S1133", "rawtypes"})
-    @Deprecated
-    protected ServiceDefinition<S> newService(String name, Optional<Class> loadedClass) {
-        return new DefaultServiceDefinition<>(name, loadedClass.orElse(null));
-    }
-
-    /**
-     * @param name The name
-     * @param loadedClass The loaded class
-     * @return The service definition
      */
     private ServiceDefinition<S> createService(String name, Class<S> loadedClass) {
         return new DefaultServiceDefinition<>(name, loadedClass);
