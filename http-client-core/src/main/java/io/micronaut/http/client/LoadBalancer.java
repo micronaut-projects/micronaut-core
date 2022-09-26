@@ -23,7 +23,6 @@ import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
 import org.reactivestreams.Publisher;
 
 import java.net.URI;
-import java.net.URL;
 import java.util.Optional;
 
 /**
@@ -53,18 +52,6 @@ public interface LoadBalancer {
      */
     default Publisher<ServiceInstance> select() {
         return select(null);
-    }
-
-    /**
-     * A {@link LoadBalancer} that does no load balancing and always hits the given URL.
-     *
-     * @param url The URL
-     * @return The {@link LoadBalancer}
-     * @deprecated Use {@link #fixed(URI)} instead
-     */
-    @Deprecated
-    static LoadBalancer fixed(URL url) {
-        return new FixedLoadBalancer(url);
     }
 
     /**
