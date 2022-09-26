@@ -135,7 +135,9 @@ class ConnectionManagerSpec extends Specification {
         conn.setupHttp1()
         patch(client, conn.clientChannel)
 
-        conn.testExchange(client)
+        def request = conn.testExchangeRequest(client)
+        conn.fireClientActive()
+        conn.testExchangeResponse(request)
 
         cleanup:
         client.close()
@@ -155,6 +157,7 @@ class ConnectionManagerSpec extends Specification {
                 HttpRequest.GET('http://example.com/foo').header('accept-encoding', 'gzip'), String)).toFuture()
         future.exceptionally(t -> t.printStackTrace())
         conn.advance()
+        conn.fireClientActive()
 
         assert conn.serverChannel.readInbound() instanceof io.netty.handler.codec.http.HttpRequest
 
@@ -216,7 +219,7 @@ class ConnectionManagerSpec extends Specification {
         conn.setupHttp1Tls()
         patch(client, conn.clientChannel)
 
-        conn.testExchange(client)
+        conn.testExchangeResponse(conn.testExchangeRequest(client))
 
         cleanup:
         client.close()
@@ -250,7 +253,9 @@ class ConnectionManagerSpec extends Specification {
         conn.setupHttp1()
         patch(client, conn.clientChannel)
 
-        conn.testStreaming(client)
+        Queue<String> responseData = conn.testStreamingRequest(client)
+        conn.fireClientActive()
+        conn.testStreamingResponse(responseData)
 
         cleanup:
         client.close()
@@ -332,10 +337,14 @@ class ConnectionManagerSpec extends Specification {
         conn.setupHttp1()
         patch(client, conn.clientChannel)
 
-        conn.testExchange(client)
-        conn.testStreaming(client)
-        conn.testExchange(client)
-        conn.testStreaming(client)
+        def r1 = conn.testExchangeRequest(client)
+        conn.fireClientActive()
+        conn.testExchangeResponse(r1)
+        Queue<String> responseData1 = conn.testStreamingRequest(client)
+        conn.testStreamingResponse(responseData1)
+        conn.testExchangeResponse(conn.testExchangeRequest(client))
+        Queue<String> responseData = conn.testStreamingRequest(client)
+        conn.testStreamingResponse(responseData)
 
         cleanup:
         client.close()
@@ -353,8 +362,11 @@ class ConnectionManagerSpec extends Specification {
         patch(client, conn.clientChannel)
 
         when:
-        conn.testExchange(client)
-        conn.testStreaming(client)
+        def r1 = conn.testExchangeRequest(client)
+        conn.fireClientActive()
+        conn.testExchangeResponse(r1)
+        Queue<String> responseData = conn.testStreamingRequest(client)
+        conn.testStreamingResponse(responseData)
 
         then:
         def outerChannel = tracker.initialPipelineBuilt.poll()
@@ -461,7 +473,9 @@ class ConnectionManagerSpec extends Specification {
         patch(client, conn.clientChannel)
 
         // do one request
-        conn.testExchange(client)
+        def r1 = conn.testExchangeRequest(client)
+        conn.fireClientActive()
+        conn.testExchangeResponse(r1)
         conn.clientChannel.unfreezeTime()
         // connection is in reserve, should not time out
         TimeUnit.SECONDS.sleep(10)
@@ -541,11 +555,14 @@ class ConnectionManagerSpec extends Specification {
         patch(client, conn1.clientChannel, conn2.clientChannel)
 
         def r1 = conn1.testExchangeRequest(client)
+        conn1.fireClientActive()
         conn1.clientChannel.advanceTimeBy(101, TimeUnit.SECONDS)
         conn1.testExchangeResponse(r1)
 
         // conn1 should expire now, conn2 will be the next connection
-        conn2.testExchange(client)
+        def r2 = conn2.testExchangeRequest(client)
+        conn2.fireClientActive()
+        conn2.testExchangeResponse(r2)
 
         cleanup:
         client.close()
@@ -592,13 +609,17 @@ class ConnectionManagerSpec extends Specification {
         conn2.setupHttp1()
         patch(client, conn1.clientChannel, conn2.clientChannel)
 
-        conn1.testExchange(client)
+        def r1 = conn1.testExchangeRequest(client)
+        conn1.fireClientActive()
+        conn1.testExchangeResponse(r1)
         conn1.clientChannel.unfreezeTime()
         // todo: move to advanceTime once IdleStateHandler supports it
         TimeUnit.SECONDS.sleep(5)
         conn1.advance()
         // conn1 should expire now, conn2 will be the next connection
-        conn2.testExchange(client)
+        def r2 = conn2.testExchangeRequest(client)
+        conn2.fireClientActive()
+        conn2.testExchangeResponse(r2)
 
         cleanup:
         client.close()
@@ -625,8 +646,7 @@ class ConnectionManagerSpec extends Specification {
         def uri = conn.scheme + "://example.com/foo"
         Mono.from(client.connect(Ws, uri)).subscribe()
         conn.advance()
-        conn.clientChannel.pipeline().fireChannelActive()
-        conn.advance()
+        conn.fireClientActive()
         io.netty.handler.codec.http.HttpRequest req = conn.serverChannel.readInbound()
         def handshaker = new WebSocketServerHandshakerFactory(uri, null, false).newHandshaker(req)
         handshaker.handshake(conn.serverChannel, req)
@@ -674,6 +694,11 @@ class ConnectionManagerSpec extends Specification {
         void advance() {
             EmbeddedTestUtil.advance(serverChannel, clientChannel)
         }
+
+        void fireClientActive() {
+            clientChannel.pipeline().fireChannelActive()
+            advance()
+        }
     }
 
     static class EmbeddedServerChannel extends EmbeddedChannel implements ServerChannel {
@@ -709,10 +734,6 @@ class ConnectionManagerSpec extends Specification {
             serverChannel.writeOutbound(response)
         }
 
-        void testExchange(HttpClient client) {
-            testExchangeResponse(testExchangeRequest(client))
-        }
-
         CompletableFuture<HttpResponse<?>> testExchangeRequest(HttpClient client) {
             def future = Mono.from(client.exchange(scheme + '://example.com/foo')).toFuture()
             future.exceptionally(t -> t.printStackTrace())
@@ -736,13 +757,16 @@ class ConnectionManagerSpec extends Specification {
             assert future.get().status() == HttpStatus.OK
         }
 
-        void testStreaming(StreamingHttpClient client) {
+        private Queue<String> testStreamingRequest(StreamingHttpClient client) {
             def responseData = new ArrayDeque<String>()
-            def responseComplete = false
             Flux.from(client.dataStream(HttpRequest.GET(scheme + '://example.com/foo')))
                     .doOnError(t -> t.printStackTrace())
-                    .doOnComplete(() -> responseComplete = true)
+                    .doOnComplete(() -> responseData.add("END"))
                     .subscribe(b -> responseData.add(b.toString(StandardCharsets.UTF_8)))
+            responseData
+        }
+
+        private void testStreamingResponse(Queue<String> responseData) {
             advance()
 
             io.netty.handler.codec.http.HttpRequest request = serverChannel.readInbound()
@@ -761,13 +785,13 @@ class ConnectionManagerSpec extends Specification {
             advance()
 
             assert responseData.poll() == 'foo'
-            assert !responseComplete
+            assert responseData.isEmpty()
 
             serverChannel.writeOutbound(new DefaultLastHttpContent(Unpooled.wrappedBuffer('bar'.bytes)))
             advance()
 
             assert responseData.poll() == 'bar'
-            assert responseComplete
+            assert responseData.poll() == 'END'
         }
     }
 

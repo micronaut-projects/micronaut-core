@@ -47,6 +47,7 @@ import io.micronaut.http.client.BlockingHttpClient;
 import io.micronaut.http.client.DefaultHttpClientConfiguration;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.HttpClientConfiguration;
+import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.ProxyHttpClient;
 import io.micronaut.http.client.ProxyRequestOptions;
@@ -269,7 +270,7 @@ public class DefaultHttpClient implements
             List<InvocationInstrumenterFactory> invocationInstrumenterFactories,
             HttpClientFilter... filters) {
         this(loadBalancer,
-            configuration.getHttpVersion(),
+            null,
             configuration,
             contextPath,
             new DefaultHttpClientFilterResolver(annotationMetadataResolver, Arrays.asList(filters)),
@@ -307,7 +308,7 @@ public class DefaultHttpClient implements
      * @param informationalServiceId          Optional service ID that will be passed to exceptions created by this client
      */
     public DefaultHttpClient(@Nullable LoadBalancer loadBalancer,
-                             @Nullable io.micronaut.http.HttpVersion explicitHttpVersion,
+                             @Nullable HttpVersionSelection explicitHttpVersion,
                              @NonNull HttpClientConfiguration configuration,
                              @Nullable String contextPath,
                              @NonNull HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver,
@@ -1461,11 +1462,11 @@ public class DefaultHttpClient implements
         HttpRequest nettyRequest = requestWriter.getNettyRequest();
 
         prepareHttpHeaders(
-                requestURI,
-                finalRequest,
-                nettyRequest,
-                permitsBody,
-                poolHandle.canReturn()
+            poolHandle,
+            requestURI,
+            finalRequest,
+            nettyRequest,
+            permitsBody
         );
 
         if (log.isDebugEnabled()) {
@@ -1542,7 +1543,7 @@ public class DefaultHttpClient implements
                 }
             }
         );
-        prepareHttpHeaders(requestURI, finalRequest, requestWriter.getNettyRequest(), permitsBody, poolHandle.canReturn());
+        prepareHttpHeaders(poolHandle, requestURI, finalRequest, requestWriter.getNettyRequest(), permitsBody);
 
         HttpRequest nettyRequest = requestWriter.getNettyRequest();
         Promise<HttpResponse<?>> responsePromise = poolHandle.channel.eventLoop().newPromise();
@@ -1590,20 +1591,19 @@ public class DefaultHttpClient implements
     }
 
     private <I> void prepareHttpHeaders(
+        ConnectionManager.PoolHandle poolHandle,
         URI requestURI,
         io.micronaut.http.HttpRequest<I> request,
-        io.netty.handler.codec.http.HttpRequest nettyRequest,
-        boolean permitsBody,
-        boolean keepAlive) {
+        HttpRequest nettyRequest,
+        boolean permitsBody) {
         HttpHeaders headers = nettyRequest.headers();
 
         if (!headers.contains(HttpHeaderNames.HOST)) {
             headers.set(HttpHeaderNames.HOST, getHostHeader(requestURI));
         }
 
-        // HTTP/2 assumes keep-alive connections
-        if (connectionManager.httpVersion != io.micronaut.http.HttpVersion.HTTP_2_0) {
-            if (keepAlive) {
+        if (!poolHandle.http2) {
+            if (poolHandle.canReturn()) {
                 headers.set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
             } else {
                 headers.set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
@@ -1929,7 +1929,7 @@ public class DefaultHttpClient implements
          * @param emitter     The emitter
          */
         protected void write(ConnectionManager.PoolHandle poolHandle, boolean isSecure, FluxSink<?> emitter) {
-            if (connectionManager.httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0) {
+            if (poolHandle.http2) {
                 // todo: move to CM
                 if (isSecure) {
                     nettyRequest.headers().add(AbstractNettyHttpRequest.HTTP2_SCHEME, HttpScheme.HTTPS);

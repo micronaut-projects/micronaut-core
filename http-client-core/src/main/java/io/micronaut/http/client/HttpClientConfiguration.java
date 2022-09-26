@@ -36,8 +36,11 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.ThreadFactory;
@@ -145,9 +148,16 @@ public abstract class HttpClientConfiguration {
 
     private String eventLoopGroup = "default";
 
-    private HttpVersion httpVersion = HttpVersion.HTTP_1_1;
+    @Deprecated
+    @Nullable
+    private HttpVersion httpVersion = null;
 
-    private PlaintextMode plaintextMode = PlaintextMode.HTTP_1;
+    private HttpVersionSelection.PlaintextMode plaintextMode = HttpVersionSelection.PlaintextMode.HTTP_1;
+
+    private List<String> alpnModes = Arrays.asList(
+        HttpVersionSelection.ALPN_HTTP_2,
+        HttpVersionSelection.ALPN_HTTP_1
+    );
 
     private LogLevel logLevel;
 
@@ -203,7 +213,11 @@ public abstract class HttpClientConfiguration {
     /**
      * The HTTP version to use. Defaults to {@link HttpVersion#HTTP_1_1}.
      * @return The http version
+     * @deprecated There are now separate settings for HTTP and HTTPS connections. To configure
+     * HTTP connections (e.g. for h2c), use {@link #plaintextMode}. To configure ALPN, set
+     * {@link #alpnModes}.
      */
+    @Deprecated
     public HttpVersion getHttpVersion() {
         return httpVersion;
     }
@@ -211,7 +225,11 @@ public abstract class HttpClientConfiguration {
     /**
      * Sets the HTTP version to use. Defaults to {@link HttpVersion#HTTP_1_1}.
      * @param httpVersion The http version
+     * @deprecated There are now separate settings for HTTP and HTTPS connections. To configure
+     * HTTP connections (e.g. for h2c), use {@link #plaintextMode}. To configure ALPN, set
+     * {@link #alpnModes}.
      */
+    @Deprecated
     public void setHttpVersion(HttpVersion httpVersion) {
         if (httpVersion != null) {
             this.httpVersion = httpVersion;
@@ -639,13 +657,54 @@ public abstract class HttpClientConfiguration {
         }
     }
 
-    // TODO: docs
-    public PlaintextMode getPlaintextMode() {
+    /**
+     * The connection mode to use for <i>plaintext</i> (http as opposed to https) connections.
+     * <br>
+     * <b>Note: If {@link #httpVersion} is set, this setting is ignored!</b>
+     *
+     * @return The plaintext connection mode.
+     * @since 4.0.0
+     */
+    public HttpVersionSelection.PlaintextMode getPlaintextMode() {
         return plaintextMode;
     }
 
-    public void setPlaintextMode(PlaintextMode plaintextMode) {
-        this.plaintextMode = plaintextMode;
+    /**
+     * The connection mode to use for <i>plaintext</i> (http as opposed to https) connections.
+     * <br>
+     * <b>Note: If {@link #httpVersion} is set, this setting is ignored!</b>
+     *
+     * @param plaintextMode The plaintext connection mode.
+     * @since 4.0.0
+     */
+    public void setPlaintextMode(HttpVersionSelection.PlaintextMode plaintextMode) {
+        this.plaintextMode = Objects.requireNonNull(plaintextMode, "plaintextMode");
+    }
+
+    /**
+     * The protocols to support for TLS ALPN. If HTTP 2 is included, this will also restrict the
+     * TLS cipher suites to those supported by the HTTP 2 standard.
+     * <br>
+     * <b>Note: If {@link #httpVersion} is set, this setting is ignored!</b>
+     *
+     * @return The supported ALPN protocols.
+     * @since 4.0.0
+     */
+    public List<String> getAlpnModes() {
+        return alpnModes;
+    }
+
+    /**
+     * The protocols to support for TLS ALPN. If HTTP 2 is included, this will also restrict the
+     * TLS cipher suites to those supported by the HTTP 2 standard.
+     * <br>
+     * <b>Note: If {@link #httpVersion} is set, this setting is ignored!</b>
+     *
+     * @param alpnModes The supported ALPN protocols.
+     * @since 4.0.0
+     */
+    public void setAlpnModes(List<String> alpnModes) {
+        this.alpnModes = Objects.requireNonNull(alpnModes, "alpnModes");
     }
 
     /**
@@ -751,8 +810,4 @@ public abstract class HttpClientConfiguration {
         }
     }
 
-    public enum PlaintextMode {
-        HTTP_1,
-        H2C,
-    }
 }

@@ -47,9 +47,24 @@ public interface HttpClientRegistry<T extends HttpClient> {
      * @param clientId    The client ID
      * @param path        The path (Optional)
      * @return The client
+     * @deprecated Use {@link #getClient(HttpVersionSelection, String, String)} instead
+     */
+    @Deprecated
+    @NonNull
+    default T getClient(HttpVersion httpVersion, @NonNull String clientId, @Nullable String path) {
+        return getClient(HttpVersionSelection.forLegacyVersion(httpVersion), clientId, path);
+    }
+
+    /**
+     * Return the client for the client ID and path.
+     *
+     * @param httpVersion The HTTP version
+     * @param clientId    The client ID
+     * @param path        The path (Optional)
+     * @return The client
      */
     @NonNull
-    T getClient(HttpVersion httpVersion, @NonNull String clientId, @Nullable String path);
+    T getClient(HttpVersionSelection httpVersion, @NonNull String clientId, @Nullable String path);
 
     /**
      * Resolves a {@link HttpClient} for the given injection point.

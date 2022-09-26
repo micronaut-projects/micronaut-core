@@ -19,8 +19,8 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.http.HttpVersion;
 import io.micronaut.http.client.HttpClientConfiguration;
+import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.netty.ssl.NettyClientSslBuilder;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
@@ -127,7 +127,7 @@ class ConnectionManager {
     private static final AttributeKey<Http2Stream> STREAM_KEY = AttributeKey.valueOf("micronaut.http2.stream");
 
     final InvocationInstrumenter instrumenter;
-    final HttpVersion httpVersion;
+    final HttpVersionSelection httpVersion;
 
     private final Logger log;
     private final Map<DefaultHttpClient.RequestKey, Pool> pools = new ConcurrentHashMap<>();
@@ -161,7 +161,7 @@ class ConnectionManager {
         @Nullable EventLoopGroup eventLoopGroup,
         @Nullable ThreadFactory threadFactory,
         HttpClientConfiguration configuration,
-        HttpVersion httpVersion,
+        @Nullable  HttpVersionSelection httpVersion,
         InvocationInstrumenter instrumenter,
         ChannelFactory<? extends Channel> socketChannelFactory,
         NettyClientSslBuilder nettyClientSslBuilder,
@@ -170,7 +170,7 @@ class ConnectionManager {
         String informationalServiceId) {
 
         if (httpVersion == null) {
-            httpVersion = configuration.getHttpVersion();
+            httpVersion = HttpVersionSelection.forClientConfiguration(configuration);
         }
 
         this.log = log;
@@ -182,7 +182,7 @@ class ConnectionManager {
         this.pipelineListeners = pipelineListeners;
         this.informationalServiceId = informationalServiceId;
 
-        this.sslContext = nettyClientSslBuilder.build(configuration.getSslConfiguration(), HttpVersion.HTTP_2_0).orElse(null); // TODO: alpn config
+        this.sslContext = nettyClientSslBuilder.build(configuration.getSslConfiguration(), httpVersion);
 
         if (eventLoopGroup != null) {
             group = eventLoopGroup;
@@ -783,6 +783,7 @@ class ConnectionManager {
     }
 
     static abstract class PoolHandle {
+        final boolean http2;
         final Channel channel;
 
         /**
@@ -790,7 +791,8 @@ class ConnectionManager {
          */
         abstract void taint();
 
-        private PoolHandle(Channel channel) {
+        private PoolHandle(boolean http2, Channel channel) {
+            this.http2 = http2;
             this.channel = channel;
         }
 
@@ -879,7 +881,7 @@ class ConnectionManager {
                     requestKey.getPort()
                 );
             } else {
-                switch (configuration.getPlaintextMode()) {
+                switch (httpVersion.getPlaintextMode()) {
                     case HTTP_1:
                         initializer = new ChannelInitializer<Channel>() {
                             @Override
@@ -1055,7 +1057,7 @@ class ConnectionManager {
                     returnPendingRequest(sink);
                     return;
                 }
-                Sinks.EmitResult emitResult = sink.tryEmitValue(new PoolHandle(channel) {
+                Sinks.EmitResult emitResult = sink.tryEmitValue(new PoolHandle(false, channel) {
                     final ChannelHandlerContext lastContext = channel.pipeline().lastContext();
 
                     @Override
@@ -1176,7 +1178,7 @@ class ConnectionManager {
                             .addLast(new Http2StreamFrameToHttpObjectCodec(false))
                             .addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECOMPRESSOR, new HttpContentDecompressor());
                         NettyClientCustomizer streamCustomizer = connectionCustomizer.specializeForChannel(streamChannel, NettyClientCustomizer.ChannelRole.HTTP2_STREAM);
-                        PoolHandle ph = new PoolHandle(streamChannel) {
+                        PoolHandle ph = new PoolHandle(true, streamChannel) {
                             @Override
                             void taint() {
                                 // todo

@@ -32,6 +32,7 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.runtime.server.event.ServerStartupEvent;
 import io.micronaut.scheduling.TaskScheduler;
 import reactor.core.publisher.Flux;
+
 import java.net.URI;
 import java.time.Duration;
 import java.util.Collection;
@@ -98,7 +99,7 @@ public class ServiceHttpClientFactory {
                     Collection<URI> loadBalancedURIs = instanceList.getLoadBalancedURIs();
                     final HttpClient httpClient = clientFactory.get()
                             .getClient(
-                                    configuration.getHttpVersion(),
+                                    HttpVersionSelection.forClientConfiguration(configuration),
                                     configuration.getServiceId(),
                                     configuration.getPath().orElse(null));
                     final Duration initialDelay = configuration.getHealthCheckInterval();

@@ -19,6 +19,7 @@ import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.http.HttpVersion;
+import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.ssl.AbstractClientSslConfiguration;
 import io.micronaut.http.ssl.ClientAuthentication;
 import io.micronaut.http.ssl.SslBuilder;
@@ -26,7 +27,6 @@ import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.http.ssl.SslConfigurationException;
 import io.netty.handler.codec.http2.Http2SecurityUtil;
 import io.netty.handler.ssl.ApplicationProtocolConfig;
-import io.netty.handler.ssl.ApplicationProtocolNames;
 import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
@@ -74,17 +74,20 @@ public class NettyClientSslBuilder extends SslBuilder<SslContext> {
         if (!ssl.isEnabled()) {
             return Optional.empty();
         }
-        final boolean isHttp2 = httpVersion == HttpVersion.HTTP_2_0;
+        return Optional.of(build(ssl, HttpVersionSelection.forLegacyVersion(httpVersion)));
+    }
+
+    public SslContext build(SslConfiguration ssl, HttpVersionSelection versionSelection) {
         SslContextBuilder sslBuilder = SslContextBuilder
-                .forClient()
-                .keyManager(getKeyManagerFactory(ssl))
-                .trustManager(getTrustManagerFactory(ssl));
+            .forClient()
+            .keyManager(getKeyManagerFactory(ssl))
+            .trustManager(getTrustManagerFactory(ssl));
         if (ssl.getProtocols().isPresent()) {
             sslBuilder.protocols(ssl.getProtocols().get());
         }
         if (ssl.getCiphers().isPresent()) {
             sslBuilder = sslBuilder.ciphers(Arrays.asList(ssl.getCiphers().get()));
-        } else if (isHttp2) {
+        } else if (versionSelection.isHttp2CipherSuites()) {
             sslBuilder.ciphers(Http2SecurityUtil.CIPHERS, SupportedCipherSuiteFilter.INSTANCE);
         }
         if (ssl.getClientAuthentication().isPresent()) {
@@ -95,20 +98,19 @@ public class NettyClientSslBuilder extends SslBuilder<SslContext> {
                 sslBuilder = sslBuilder.clientAuth(ClientAuth.OPTIONAL);
             }
         }
-        if (isHttp2) {
+        if (versionSelection.isAlpn()) {
             SslProvider provider = SslProvider.isAlpnSupported(SslProvider.OPENSSL) ? SslProvider.OPENSSL : SslProvider.JDK;
             sslBuilder.sslProvider(provider);
             sslBuilder.applicationProtocolConfig(new ApplicationProtocolConfig(
-                    ApplicationProtocolConfig.Protocol.ALPN,
-                    ApplicationProtocolConfig.SelectorFailureBehavior.NO_ADVERTISE,
-                    ApplicationProtocolConfig.SelectedListenerFailureBehavior.ACCEPT,
-                    ApplicationProtocolNames.HTTP_1_1,
-                    ApplicationProtocolNames.HTTP_2
+                ApplicationProtocolConfig.Protocol.ALPN,
+                ApplicationProtocolConfig.SelectorFailureBehavior.NO_ADVERTISE,
+                ApplicationProtocolConfig.SelectedListenerFailureBehavior.ACCEPT,
+                versionSelection.getAlpnSupportedProtocols()
             ));
         }
 
         try {
-            return Optional.of(sslBuilder.build());
+            return sslBuilder.build();
         } catch (SSLException ex) {
             throw new SslConfigurationException("An error occurred while setting up SSL", ex);
         }
