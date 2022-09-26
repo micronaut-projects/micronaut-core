@@ -19,7 +19,6 @@ import groovy.transform.CompileStatic
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.Internal
 import io.micronaut.core.order.Ordered
-import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.visitor.TypeElementVisitor
 import org.codehaus.groovy.ast.ClassHelper
 import org.codehaus.groovy.ast.ClassNode
@@ -42,7 +41,6 @@ class LoadedVisitor implements Ordered {
     private final TypeElementVisitor visitor
     private final String classAnnotation
     private final String elementAnnotation
-    private ClassElement currentClassElement
     private final CompilationUnit compilationUnit
 
     private static final String OBJECT_CLASS = Object.class.getName()

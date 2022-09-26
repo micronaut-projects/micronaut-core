@@ -85,7 +85,7 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
         for (LoadedVisitor loadedVisitor : sortedVisitors) {
             for (ClassNode classNode in classes) {
                 if (!(classNode instanceof InnerClassNode && !Modifier.isStatic(classNode.getModifiers())) && classNode.getAnnotations(generatedNode).empty) {
-                    ClassElement targetClassElement = visitorContext.getElementFactory().newClassElement(classNode, visitorContext.getElementAnnotationMetadataFactory())
+                    ClassElement targetClassElement = visitorContext.getElementFactory().newSourceClassElement(classNode, visitorContext.getElementAnnotationMetadataFactory())
                     if (!loadedVisitor.matchesClass(targetClassElement)) {
                         continue
                     }
@@ -151,7 +151,7 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
         @Override
         void visitClass(ClassNode node) {
             if (targetClassElement.getNativeType() != node) {
-                targetClassElement = visitorContext.getElementFactory().newClassElement(node, visitorContext.getElementAnnotationMetadataFactory())
+                targetClassElement = visitorContext.getElementFactory().newSourceClassElement(node, visitorContext.getElementAnnotationMetadataFactory())
             }
 
             typeElementVisitors.each {
