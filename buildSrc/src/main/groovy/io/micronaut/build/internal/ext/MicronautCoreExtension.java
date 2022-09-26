@@ -27,5 +27,5 @@ public interface MicronautCoreExtension {
 
     void usesMicronautTestJunit();
 
-    void usesMicronautTestKotest5();
+    void usesMicronautTestKotest();
 }
