@@ -902,7 +902,9 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
 
     @Override
     public boolean isStatic() {
-        return classNode.isStaticClass();
+        // I assume Groovy can decide not to make the class static internally
+        // and isStaticClass will be false even if the class has static modifier
+        return classNode.isStaticClass() || Modifier.isStatic(classNode.getModifiers());
     }
 
     @Override
