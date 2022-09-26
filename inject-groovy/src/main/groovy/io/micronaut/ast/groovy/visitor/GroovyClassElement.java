@@ -18,14 +18,18 @@ package io.micronaut.ast.groovy.visitor;
 import io.micronaut.ast.groovy.utils.AstClassUtils;
 import io.micronaut.ast.groovy.utils.AstGenericUtils;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationMetadataProvider;
+import io.micronaut.core.annotation.BeanProperties;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ArrayableClassElement;
 import io.micronaut.inject.ast.AstUtils;
+import io.micronaut.inject.ast.BeanPropertiesConfiguration;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.Element;
@@ -36,6 +40,8 @@ import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.PackageElement;
+import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.PropertyElement;
 import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.ClassHelper;
@@ -57,11 +63,13 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -709,13 +717,75 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     }
 
     @Override
+    public List<PropertyElement> getBeanProperties(BeanPropertiesConfiguration configuration) {
+        Set<String> nativeProps = getPropertyNodes().stream().map(PropertyNode::getName).collect(Collectors.toCollection(LinkedHashSet::new));
+        return AstUtils.resolveBeanProperties(configuration,
+            this,
+            () -> AstUtils.getSubtypeFirstMethods(this),
+            () -> AstUtils.getSubtypeFirstFields(this),
+            true,
+            nativeProps,
+            methodElement -> Optional.empty(),
+            value -> {
+                if (value.type == null) {
+                    // withSomething() builder setter
+                    value.type = PrimitiveElement.VOID;
+                }
+                AtomicReference<AnnotationMetadataProvider> ref = new AtomicReference<>();
+                if (nativeProps.remove(value.propertyName)) {
+                    AnnotationMetadataProvider annotationMetadataProvider = new AnnotationMetadataProvider() {
+                        @Override
+                        public AnnotationMetadata getAnnotationMetadata() {
+                            return ref.get().getAnnotationMetadata();
+                        }
+                    };
+                    if (value.getter == null || value.readAccessKind == BeanProperties.AccessKind.FIELD) {
+                        String getterName = NameUtils.getterNameFor(
+                            value.propertyName,
+                            value.type.equals(PrimitiveElement.BOOLEAN) || value.type.getName().equals(Boolean.class.getName())
+                        );
+                        value.getter = MethodElement.of(
+                            this,
+                            annotationMetadataProvider,
+                            value.type,
+                            value.type,
+                            getterName
+                        );
+                        value.readAccessKind = BeanProperties.AccessKind.METHOD;
+                    }
+                    if (value.setter == null || value.writeAccessKind == BeanProperties.AccessKind.FIELD) {
+                        value.setter = MethodElement.of(
+                            this,
+                            annotationMetadataProvider,
+                            PrimitiveElement.VOID,
+                            PrimitiveElement.VOID,
+                            NameUtils.setterNameFor(value.propertyName),
+                            ParameterElement.of(value.type, value.propertyName)
+                        );
+                        value.writeAccessKind = BeanProperties.AccessKind.METHOD;
+                    }
+                }
+                GroovyPropertyElement propertyElement = new GroovyPropertyElement(
+                    visitorContext,
+                    this,
+                    value.type,
+                    value.getter,
+                    value.setter,
+                    value.field,
+                    elementAnnotationMetadataFactory,
+                    value.propertyName,
+                    value.readAccessKind == null ? PropertyElement.AccessKind.METHOD : PropertyElement.AccessKind.valueOf(value.readAccessKind.name()),
+                    value.writeAccessKind == null ? PropertyElement.AccessKind.METHOD : PropertyElement.AccessKind.valueOf(value.writeAccessKind.name()),
+                    value.isExcluded);
+                ref.set(propertyElement);
+                return propertyElement;
+            });
+    }
+
+    @Override
     public List<PropertyElement> getBeanProperties() {
         if (properties == null) {
-            List<PropertyElement> allProperties = new ArrayList<>();
-            List<GroovyNativePropertyElement> propertyElements = getPropertyNodes();
-            allProperties.addAll(propertyElements);
-            allProperties.addAll(getPropertiesFromGettersAndSetters(propertyElements));
-            properties = Collections.unmodifiableList(allProperties);
+            properties = getBeanProperties(BeanPropertiesConfiguration.of(this));
         }
         return properties;
     }
@@ -879,50 +949,20 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
         return copy;
     }
 
-    private List<GroovyNativePropertyElement> getPropertyNodes() {
+    private List<PropertyNode> getPropertyNodes() {
         List<PropertyNode> propertyNodes = new ArrayList<>();
         ClassNode classNode = this.classNode;
         while (classNode != null && !classNode.equals(ClassHelper.OBJECT_TYPE) && !classNode.equals(ClassHelper.Enum_Type)) {
             propertyNodes.addAll(classNode.getProperties());
             classNode = classNode.getSuperClass();
         }
-        List<GroovyNativePropertyElement> propertyElements = new ArrayList<>();
+        List<PropertyNode> propertyElements = new ArrayList<>();
         for (PropertyNode propertyNode : propertyNodes) {
             if (propertyNode.isPublic() && !propertyNode.isStatic()) {
-                GroovyNativePropertyElement groovyPropertyElement = new GroovyNativePropertyElement(
-                    visitorContext,
-                    this,
-                    propertyNode,
-                    elementAnnotationMetadataFactory
-                );
-                propertyElements.add(groovyPropertyElement);
+                propertyElements.add(propertyNode);
             }
         }
         return propertyElements;
-    }
-
-    private List<PropertyElement> getPropertiesFromGettersAndSetters(List<GroovyNativePropertyElement> propertyNodes) {
-        Set<String> nativeProps = propertyNodes.stream().map(GroovyNativePropertyElement::getName).collect(Collectors.toSet());
-        return AstUtils.resolveBeanProperties(this,
-                () -> AstUtils.getSubtypeFirstMethods(this),
-                () -> AstUtils.getSubtypeFirstFields(this),
-                true,
-                methodElement -> Optional.empty(),
-                value -> new GroovyGetSetPropertyElement(
-                    visitorContext,
-                    this,
-                    value.type,
-                    value.getter,
-                    value.setter,
-                    value.field,
-                    elementAnnotationMetadataFactory,
-                    value.propertyName,
-                    value.readAccessKind == null ? PropertyElement.AccessKind.METHOD : PropertyElement.AccessKind.valueOf(value.readAccessKind.name()),
-                    value.writeAccessKind == null ? PropertyElement.AccessKind.METHOD : PropertyElement.AccessKind.valueOf(value.writeAccessKind.name()),
-                    value.isExcluded))
-            .stream()
-            .filter(p -> !nativeProps.contains(p.getName()))
-            .collect(Collectors.toList());
     }
 
     private MethodElement asConstructor(ConstructorNode cn) {

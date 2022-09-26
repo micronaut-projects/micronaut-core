@@ -27,6 +27,7 @@ import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ArrayableClassElement;
 import io.micronaut.inject.ast.AstUtils;
+import io.micronaut.inject.ast.BeanPropertiesConfiguration;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
@@ -36,6 +37,7 @@ import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.PackageElement;
+import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.WildcardElement;
 import io.micronaut.inject.processing.JavaModelUtils;
@@ -287,31 +289,43 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     @Override
     public List<PropertyElement> getBeanProperties() {
         if (beanProperties == null) {
-            if (isRecord()) {
-                beanProperties = AstUtils.resolveBeanProperties(this,
-                    this::getRecordMethods,
-                    this::getRecordFields,
-                    true,
-                    methodElement -> Optional.empty(),
-                    this::mapToPropertyElement);
-            } else {
-                beanProperties = AstUtils.resolveBeanProperties(this,
-                    () -> AstUtils.getSubtypeFirstMethods(this),
-                    () -> AstUtils.getSubtypeFirstFields(this),
-                    false,
-                    methodElement -> {
-                        String methodName = methodElement.getSimpleName();
-                        if (isKotlinClass(((Element) methodElement.getNativeType()).getEnclosingElement()) && methodName.startsWith(PREFIX_IS)) {
-                            return Optional.of(methodName);
-                        }
-                        return Optional.empty();
-                    }, this::mapToPropertyElement);
-            }
+            beanProperties = getBeanProperties(BeanPropertiesConfiguration.of(this));
         }
         return Collections.unmodifiableList(beanProperties);
     }
 
+    @Override
+    public List<PropertyElement> getBeanProperties(BeanPropertiesConfiguration configuration) {
+        if (isRecord()) {
+            return AstUtils.resolveBeanProperties(configuration,
+                this,
+                this::getRecordMethods,
+                this::getRecordFields,
+                true,
+                Collections.emptySet(),
+                methodElement -> Optional.empty(),
+                this::mapToPropertyElement);
+        }
+        return AstUtils.resolveBeanProperties(configuration,
+            this,
+            () -> AstUtils.getSubtypeFirstMethods(this),
+            () -> AstUtils.getSubtypeFirstFields(this),
+            false,
+            Collections.emptySet(),
+            methodElement -> {
+                String methodName = methodElement.getSimpleName();
+                if (isKotlinClass(((Element) methodElement.getNativeType()).getEnclosingElement()) && methodName.startsWith(PREFIX_IS)) {
+                    return Optional.of(methodName);
+                }
+                return Optional.empty();
+            }, this::mapToPropertyElement);
+    }
+
     private JavaPropertyElement mapToPropertyElement(AstUtils.BeanPropertyData value) {
+        if (value.type == null) {
+            // withSomething() builder setter
+            value.type = PrimitiveElement.VOID;
+        }
         return new JavaPropertyElement(
             JavaClassElement.this,
             value.type,

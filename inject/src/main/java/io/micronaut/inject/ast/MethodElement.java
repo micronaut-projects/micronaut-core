@@ -15,8 +15,10 @@
  */
 package io.micronaut.inject.ast;
 
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationMetadataProvider;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
 
@@ -218,6 +220,105 @@ public interface MethodElement extends MemberElement {
             @NonNull
             @Override
             public AnnotationMetadata getAnnotationMetadata() {
+                return thisAnnotationMetadata;
+            }
+
+            @Override
+            public ClassElement getDeclaringType() {
+                return declaredType;
+            }
+
+            @NonNull
+            @Override
+            public String getName() {
+                return name;
+            }
+
+            @Override
+            public boolean isPackagePrivate() {
+                return false;
+            }
+
+            @Override
+            public boolean isProtected() {
+                return false;
+            }
+
+            @Override
+            public boolean isPublic() {
+                return true;
+            }
+
+            @Override
+            public MethodElement replaceAnnotations(AnnotationMetadata annotationMetadata) {
+                this.thisAnnotationMetadata = annotationMetadata;
+                return this;
+            }
+
+            @NonNull
+            @Override
+            public Object getNativeType() {
+                throw new UnsupportedOperationException("No native method type present");
+            }
+        };
+    }
+
+    /**
+     * Creates a {@link MethodElement} for the given parameters.
+     * @param declaredType The declaring type
+     * @param annotationMetadataProvider The annotation metadata provider
+     * @param returnType The return type
+     * @param genericReturnType The generic return type
+     * @param name The name
+     * @param parameterElements The parameter elements
+     * @return The method element
+     */
+    static @NonNull MethodElement of(
+            @NonNull ClassElement declaredType,
+            @NonNull AnnotationMetadataProvider annotationMetadataProvider,
+            @NonNull ClassElement returnType,
+            @NonNull ClassElement genericReturnType,
+            @NonNull String name,
+            ParameterElement...parameterElements) {
+        return new MethodElement() {
+
+            private @Nullable AnnotationMetadata thisAnnotationMetadata;
+
+            @NonNull
+            @Override
+            public ClassElement getReturnType() {
+                return returnType;
+            }
+
+            @NonNull
+            @Override
+            public ClassElement getGenericReturnType() {
+                return genericReturnType;
+            }
+
+            @Override
+            public ParameterElement[] getParameters() {
+                return parameterElements;
+            }
+
+            @Override
+            public MethodElement withNewParameters(ParameterElement... newParameters) {
+                return MethodElement.of(
+                        declaredType,
+                    thisAnnotationMetadata,
+                        returnType,
+                        genericReturnType,
+                        name,
+                        ArrayUtils.concat(parameterElements, newParameters)
+                );
+            }
+
+            @NonNull
+            @Override
+            public AnnotationMetadata getAnnotationMetadata() {
+                if (thisAnnotationMetadata == null) {
+                    thisAnnotationMetadata = annotationMetadataProvider.getAnnotationMetadata();
+                }
                 return thisAnnotationMetadata;
             }
 

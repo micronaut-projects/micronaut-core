@@ -383,6 +383,17 @@ public interface ClassElement extends TypedElement {
     }
 
     /**
+     * Returns the bean properties (getters and setters) for this class element based on custom configuration.
+     *
+     * @param configuration The configuration
+     * @return The bean properties for this class element
+     * @since 3.8.0
+     */
+    default List<PropertyElement> getBeanProperties(BeanPropertiesConfiguration configuration) {
+        return Collections.emptyList();
+    }
+
+    /**
      * Return all the fields of this class element.
      *
      * @return The fields

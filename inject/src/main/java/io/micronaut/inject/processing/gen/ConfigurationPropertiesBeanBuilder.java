@@ -4,14 +4,11 @@ import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationInject;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.Property;
-import io.micronaut.core.annotation.AccessorsStyle;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.core.naming.NameUtils;
-import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
+import io.micronaut.inject.ast.BeanPropertiesConfiguration;
 import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
@@ -22,10 +19,7 @@ import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.BeanDefinitionVisitor;
 
 import java.time.Duration;
-import java.util.Arrays;
-import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 public class ConfigurationPropertiesBeanBuilder extends SimpleBeanBuilder {
@@ -61,7 +55,7 @@ public class ConfigurationPropertiesBeanBuilder extends SimpleBeanBuilder {
                     null,
                     builderType.isInterface()
                 );
-                visitConfigurationBuilder(visitor, propertyElement, builderType);
+                visitConfigurationBuilder(visitor, propertyElement, getElementAnnotationMetadata(methodElement), builderType);
                 return true;
             }
             if (propertyElement.getField().isPresent()) {
@@ -75,7 +69,7 @@ public class ConfigurationPropertiesBeanBuilder extends SimpleBeanBuilder {
                         metadataBuilder,
                         builderType.isInterface()
                     );
-                    visitConfigurationBuilder(visitor, propertyElement, builderType);
+                    visitConfigurationBuilder(visitor, propertyElement, fieldElement.getAnnotationMetadata(), builderType);
                     return true;
                 }
                 throw new ProcessingException(fieldElement, "ConfigurationBuilder applied to a non accessible (private or package-private/protected in a different package) field must have a corresponding non-private getter method.");
@@ -106,7 +100,7 @@ public class ConfigurationPropertiesBeanBuilder extends SimpleBeanBuilder {
                     annotationMetadata = new AnnotationMetadataHierarchy(annotationMetadata).merge();
                 }
                 annotationMetadata = calculatePath(propertyElement, fieldElement, annotationMetadata);
-                visitor.visitFieldValue(fieldElement.getDeclaringType(), fieldElement, annotationMetadata,true, fieldElement.isReflectionRequired(classElement));
+                visitor.visitFieldValue(fieldElement.getDeclaringType(), fieldElement, annotationMetadata, true, fieldElement.isReflectionRequired(classElement));
                 return true;
             }
         }
@@ -138,32 +132,30 @@ public class ConfigurationPropertiesBeanBuilder extends SimpleBeanBuilder {
         return super.isInjectPointMethod(methodElement) || methodElement.hasDeclaredStereotype(ConfigurationInject.class);
     }
 
-    private void visitConfigurationBuilder(BeanDefinitionVisitor visitor, MemberElement builderElement, ClassElement builderType) {
+    private void visitConfigurationBuilder(BeanDefinitionVisitor visitor,
+                                           MemberElement builderElement,
+                                           AnnotationMetadata annotationMetadata,
+                                           ClassElement builderType) {
         try {
-            Boolean allowZeroArgs = builderElement.booleanValue(ConfigurationBuilder.class, "allowZeroArgs").orElse(false);
-            List<String> prefixes = Arrays.asList(builderElement.getValue(AccessorsStyle.class, "writePrefixes", String[].class).orElse(new String[]{AccessorsStyle.DEFAULT_WRITE_PREFIX}));
             String configurationPrefix = builderElement.stringValue(ConfigurationBuilder.class).map(v -> v + ".").orElse("");
-            Set<String> includes = CollectionUtils.setOf(builderElement.stringValues(ConfigurationBuilder.class, "includes"));
-            Set<String> excludes = CollectionUtils.setOf(builderElement.stringValues(ConfigurationBuilder.class, "excludes"));
-
-            builderType.getEnclosedElements(ElementQuery.ALL_METHODS)
+            builderType.getBeanProperties(BeanPropertiesConfiguration.of(builderElement))
                 .stream()
-                .filter(methodElement -> {
+                .filter(propertyElement -> {
+                    if (propertyElement.isExcluded()) {
+                        return false;
+                    }
+                    Optional<MethodElement> writeMethod = propertyElement.getWriteMethod();
+                    if (!writeMethod.isPresent()) {
+                        return false;
+                    }
+                    MethodElement methodElement = writeMethod.get();
                     if (methodElement.hasStereotype(Deprecated.class) || !methodElement.isPublic()) {
                         return false;
                     }
-                    int paramCount = methodElement.getParameters().length;
-                    if (!((paramCount > 0 && paramCount < 3) || allowZeroArgs && paramCount == 0)) {
-                        return false;
-                    }
-                    return isPrefixedWith(methodElement, prefixes);
-                }).forEach(methodElement -> {
-                    String methodName = methodElement.getSimpleName();
-                    String prefix = getMethodPrefix(prefixes, methodName);
-                    String propertyName = NameUtils.decapitalize(methodName.substring(prefix.length()));
-                    if (shouldExclude(includes, excludes, propertyName)) {
-                        return;
-                    }
+                    return methodElement.getParameters().length <= 2;
+                }).forEach(propertyElement -> {
+                    MethodElement methodElement = propertyElement.getWriteMethod().get();
+                    String propertyName = propertyElement.getName();
                     ParameterElement[] params = methodElement.getParameters();
                     int paramCount = params.length;
                     if (paramCount < 2) {
@@ -180,9 +172,9 @@ public class ConfigurationPropertiesBeanBuilder extends SimpleBeanBuilder {
                         );
 
                         visitor.visitConfigBuilderMethod(
-                            prefix,
+                            propertyName,
                             methodElement.getReturnType(),
-                            methodName,
+                            methodElement.getSimpleName(),
                             parameterElementType,
                             parameterElementType != null ? parameterElementType.getTypeArguments() : null,
                             metadata.getPath()
@@ -205,9 +197,9 @@ public class ConfigurationPropertiesBeanBuilder extends SimpleBeanBuilder {
                             );
 
                             visitor.visitConfigBuilderDurationMethod(
-                                prefix,
+                                propertyName,
                                 methodElement.getReturnType(),
-                                methodName,
+                                methodElement.getSimpleName(),
                                 metadata.getPath()
                             );
                         }
@@ -216,39 +208,6 @@ public class ConfigurationPropertiesBeanBuilder extends SimpleBeanBuilder {
         } finally {
             visitor.visitConfigBuilderEnd();
         }
-    }
-
-    private boolean shouldExclude(Set<String> includes, Set<String> excludes, String propertyName) {
-        if (!includes.isEmpty() && !includes.contains(propertyName)) {
-            return true;
-        }
-        return !excludes.isEmpty() && excludes.contains(propertyName);
-    }
-
-    private boolean isPrefixedWith(MemberElement enclosedElement, List<String> prefixes) {
-        String name = enclosedElement.getSimpleName();
-        for (String prefix : prefixes) {
-            if (name.startsWith(prefix)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private String getMethodPrefix(List<String> prefixes, String methodName) {
-        for (String prefix : prefixes) {
-            if (methodName.startsWith(prefix)) {
-                return prefix;
-            }
-        }
-        return methodName;
-    }
-
-    private Optional<MethodElement> findGetterMethodFor(FieldElement field) {
-        return classElement.getEnclosedElements(ElementQuery.ALL_METHODS.onlyAccessible()
-                .named(NameUtils.getterNameFor(field.getSimpleName())))
-            .stream()
-            .findFirst();
     }
 
 }

@@ -1712,12 +1712,12 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     @Override
     public void visitConfigBuilderDurationMethod(
-            String prefix,
+            String propertyName,
             ClassElement returnType,
             String methodName,
             String path) {
         visitConfigBuilderMethodInternal(
-                prefix,
+            propertyName,
                 returnType,
                 methodName,
                 ClassElement.of(Duration.class),
@@ -1729,7 +1729,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     @Override
     public void visitConfigBuilderMethod(
-            String prefix,
+            String propertyName,
             ClassElement returnType,
             String methodName,
             ClassElement paramType,
@@ -1737,7 +1737,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             String path) {
 
         visitConfigBuilderMethodInternal(
-                prefix,
+            propertyName,
                 returnType,
                 methodName,
                 paramType,
@@ -1995,7 +1995,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     private void visitConfigBuilderMethodInternal(
-            String prefix,
+            String propertyName,
             ClassElement returnType,
             String methodName,
             ClassElement paramType,
@@ -2008,8 +2008,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             String builderName = currentConfigBuilderState.getName();
             boolean isResolveBuilderViaMethodCall = currentConfigBuilderState.isMethod();
             GeneratorAdapter injectMethodVisitor = this.injectMethodVisitor;
-
-            String propertyName = NameUtils.hyphenate(NameUtils.decapitalize(methodName.substring(prefix.length())), true);
 
             boolean zeroArgs = paramType == null;
 

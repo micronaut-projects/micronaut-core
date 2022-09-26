@@ -363,36 +363,34 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
     /**
      * Visit a configuration builder method.
      *
-     * @param prefix     The prefix used for the method
-     * @param returnType The return type
-     * @param methodName The method name
-     * @param paramType  The method type
-     * @param generics   The generic types of the method
-     * @param path       The property path
+     * @param propertyName The property name
+     * @param returnType   The return type
+     * @param methodName   The method name
+     * @param paramType    The method type
+     * @param generics     The generic types of the method
+     * @param path         The property path
      * @see io.micronaut.context.annotation.ConfigurationBuilder
      */
-    void visitConfigBuilderMethod(
-            String prefix,
-            ClassElement returnType,
-            String methodName,
-            @Nullable ClassElement paramType,
-            Map<String, ClassElement> generics,
-            String path);
+    void visitConfigBuilderMethod(String propertyName,
+                                  ClassElement returnType,
+                                  String methodName,
+                                  @Nullable ClassElement paramType,
+                                  Map<String, ClassElement> generics,
+                                  String path);
 
     /**
      * Visit a configuration builder method that accepts a long and a TimeUnit.
      *
-     * @param prefix     The prefix used for the method
-     * @param returnType The return type
-     * @param methodName The method name
-     * @param path       The property path
+     * @param propertyName The property name
+     * @param returnType   The return type
+     * @param methodName   The method name
+     * @param path         The property path
      * @see io.micronaut.context.annotation.ConfigurationBuilder
      */
-    void visitConfigBuilderDurationMethod(
-            String prefix,
-            ClassElement returnType,
-            String methodName,
-            String path);
+    void visitConfigBuilderDurationMethod(String propertyName,
+                                          ClassElement returnType,
+                                          String methodName,
+                                          String path);
 
     /**
      * Finalize a configuration builder field.

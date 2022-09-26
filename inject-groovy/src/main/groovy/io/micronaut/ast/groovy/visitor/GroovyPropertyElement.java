@@ -45,7 +45,7 @@ import java.util.function.Predicate;
  * @since 1.0
  */
 @Internal
-final class GroovyGetSetPropertyElement extends AbstractGroovyElement implements PropertyElement {
+final class GroovyPropertyElement extends AbstractGroovyElement implements PropertyElement {
     private final ClassElement type;
     private final String name;
     private final AccessKind readAccessKind;
@@ -61,17 +61,17 @@ final class GroovyGetSetPropertyElement extends AbstractGroovyElement implements
     private final List<MemberElement> elements;
     private final AnnotationMetadata annotationMetadata;
 
-    GroovyGetSetPropertyElement(GroovyVisitorContext visitorContext,
-                                ClassElement owningElement,
-                                ClassElement type,
-                                MethodElement getter,
-                                MethodElement setter,
-                                FieldElement field,
-                                ElementAnnotationMetadataFactory annotationMetadataFactory,
-                                String name,
-                                AccessKind readAccessKind,
-                                AccessKind writeAccessKind,
-                                boolean excluded) {
+    GroovyPropertyElement(GroovyVisitorContext visitorContext,
+                          ClassElement owningElement,
+                          ClassElement type,
+                          MethodElement getter,
+                          MethodElement setter,
+                          FieldElement field,
+                          ElementAnnotationMetadataFactory annotationMetadataFactory,
+                          String name,
+                          AccessKind readAccessKind,
+                          AccessKind writeAccessKind,
+                          boolean excluded) {
         super(visitorContext, selectNativeType(getter, setter, field), annotationMetadataFactory);
         this.type = type;
         this.getter = getter;
@@ -83,13 +83,13 @@ final class GroovyGetSetPropertyElement extends AbstractGroovyElement implements
         this.owningElement = owningElement;
         this.excluded = excluded;
         elements = new ArrayList<>(3);
-        if (getter != null) {
+        if (getter instanceof AbstractGroovyElement) {
             elements.add(getter);
         }
-        if (setter != null) {
+        if (setter instanceof AbstractGroovyElement) {
             elements.add(setter);
         }
-        if (field != null) {
+        if (field instanceof AbstractGroovyElement) {
             elements.add(field);
         }
         // The instance AnnotationMetadata of each element can change after a modification
@@ -118,13 +118,13 @@ final class GroovyGetSetPropertyElement extends AbstractGroovyElement implements
     private static AnnotatedNode selectNativeType(MethodElement getter,
                                                   MethodElement setter,
                                                   FieldElement field) {
-        if (getter != null) {
+        if (getter instanceof AbstractGroovyElement) {
             return (AnnotatedNode) getter.getNativeType();
         }
-        if (setter != null) {
+        if (setter instanceof AbstractGroovyElement) {
             return (AnnotatedNode) setter.getNativeType();
         }
-        if (field != null) {
+        if (field instanceof AbstractGroovyElement) {
             return (AnnotatedNode) field.getNativeType();
         }
         throw new IllegalStateException();

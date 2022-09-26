@@ -1,19 +1,14 @@
 package io.micronaut.inject.ast;
 
-import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Value;
-import io.micronaut.core.annotation.AccessorsStyle;
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.BeanProperties;
 import io.micronaut.core.naming.NameUtils;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,27 +19,21 @@ import java.util.function.Supplier;
 
 public class AstUtils {
 
-    public static List<PropertyElement> resolveBeanProperties(ClassElement classElement,
+    public static List<PropertyElement> resolveBeanProperties(BeanPropertiesConfiguration configuration,
+                                                            ClassElement classElement,
                                                               Supplier<List<MethodElement>> methodsSupplier,
                                                               Supplier<List<FieldElement>> fieldSupplier,
                                                               boolean excludeElementsInRole,
+                                                              Set<String> propertyFields,
                                                               Function<MethodElement, Optional<String>> customMethodNameResolver,
                                                               Function<BeanPropertyData, PropertyElement> propertyCreator) {
-        AnnotationMetadata annotationMetadata = classElement.getAnnotationMetadata();
-        BeanProperties.Visibility visibility = annotationMetadata.enumValue(BeanProperties.class, BeanProperties.VISIBILITY, BeanProperties.Visibility.class)
-            .orElse(BeanProperties.Visibility.DEFAULT);
-        EnumSet<BeanProperties.AccessKind> accessKinds = annotationMetadata.isPresent(BeanProperties.class, BeanProperties.ACCESS_KIND) ?
-            annotationMetadata.enumValuesSet(BeanProperties.class, BeanProperties.ACCESS_KIND, BeanProperties.AccessKind.class) : EnumSet.of(BeanProperties.AccessKind.METHOD);
+        BeanProperties.Visibility visibility = configuration.getVisibility();
+        EnumSet<BeanProperties.AccessKind> accessKinds = configuration.getAccessKinds();
 
-        Set<String> includes = new HashSet<>(Arrays.asList(annotationMetadata.stringValues(BeanProperties.class, BeanProperties.INCLUDES)));
-        Set<String> excludes = new HashSet<>(Arrays.asList(annotationMetadata.stringValues(BeanProperties.class, BeanProperties.EXCLUDES)));
-        // TODO: investigate why aliases aren't propagated
-        includes.addAll(Arrays.asList(annotationMetadata.stringValues(ConfigurationProperties.class, BeanProperties.INCLUDES)));
-        excludes.addAll(Arrays.asList(annotationMetadata.stringValues(ConfigurationProperties.class, BeanProperties.EXCLUDES)));
-        String[] readPrefixes = classElement.getValue(AccessorsStyle.class, "readPrefixes", String[].class)
-            .orElse(new String[]{AccessorsStyle.DEFAULT_READ_PREFIX});
-        String[] writePrefixes = classElement.getValue(AccessorsStyle.class, "writePrefixes", String[].class)
-            .orElse(new String[]{AccessorsStyle.DEFAULT_WRITE_PREFIX});
+        Set<String> includes = configuration.getIncludes();
+        Set<String> excludes = configuration.getExcludes();
+        String[] readPrefixes = configuration.getReadPrefixes();
+        String[] writePrefixes = configuration.getWritePrefixes();
 
         Map<String, BeanPropertyData> props = new LinkedHashMap<>();
         if (accessKinds.contains(BeanProperties.AccessKind.METHOD)) {
@@ -74,7 +63,10 @@ public class AstUtils {
                 } else if (NameUtils.isReaderName(methodName, readPrefixes) && methodElement.getParameters().length == 0) {
                     String propertyName = customMethodNameResolver.apply(methodElement).orElseGet(() -> NameUtils.getPropertyNameForGetter(methodName, readPrefixes));
                     processGetter(props, methodElement, propertyName);
-                } else if (NameUtils.isWriterName(methodName, writePrefixes) && methodElement.getParameters().length == 1) {
+                } else if (NameUtils.isWriterName(methodName, writePrefixes)
+                    && (methodElement.getParameters().length == 1
+                    || configuration.isAllowSetterWithZeroArgs() && methodElement.getParameters().length == 0
+                    || configuration.isAllowSetterWithMultipleArgs() && methodElement.getParameters().length > 1)) {
                     String propertyName = NameUtils.getPropertyNameForSetter(methodName, writePrefixes);
                     processSetter(props, methodElement, propertyName);
                 }
@@ -89,7 +81,7 @@ public class AstUtils {
                 continue;
             }
             String propertyName = fieldElement.getSimpleName();
-            boolean isAccessor = canFieldBeUsedForAccess(classElement, fieldElement, accessKinds, visibility);
+            boolean isAccessor = propertyFields.contains(propertyName) || canFieldBeUsedForAccess(classElement, fieldElement, accessKinds, visibility);
             if (!isAccessor && !props.containsKey(propertyName)) {
                 continue;
             }
@@ -111,7 +103,7 @@ public class AstUtils {
                     beanProperties.add(propertyCreator.apply(value));
                 }
             }
-            return Collections.unmodifiableList(beanProperties);
+            return beanProperties;
         }
         return Collections.emptyList();
     }
@@ -146,9 +138,9 @@ public class AstUtils {
     }
 
     private static void processSetter(Map<String, BeanPropertyData> props, MethodElement methodElement, String propertyName) {
-        ClassElement setterType = methodElement.getParameters()[0].getType();
         BeanPropertyData beanPropertyData = props.computeIfAbsent(propertyName, BeanPropertyData::new);
-        if (beanPropertyData.setter != null) {
+        ClassElement setterType =  methodElement.getParameters().length == 0 ? null : methodElement.getParameters()[0].getType();
+        if (setterType != null && beanPropertyData.setter != null) {
             if (setterType.isAssignable(beanPropertyData.type)) {
                 // Override the setter because the type is higher
                 beanPropertyData.setter = methodElement;
@@ -158,7 +150,7 @@ public class AstUtils {
         beanPropertyData.setter = methodElement;
         beanPropertyData.writeAccessKind = BeanProperties.AccessKind.METHOD;
         if (beanPropertyData.type != null) {
-            if (!setterType.isAssignable(beanPropertyData.type)) {
+            if (setterType != null && !setterType.isAssignable(beanPropertyData.type)) {
                 beanPropertyData.setter = null; // not a compatible setter
                 beanPropertyData.writeAccessKind = null;
             }
