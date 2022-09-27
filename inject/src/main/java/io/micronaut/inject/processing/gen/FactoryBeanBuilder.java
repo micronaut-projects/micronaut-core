@@ -8,7 +8,6 @@ import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
@@ -17,6 +16,7 @@ import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.configuration.ConfigurationUtils;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.BeanDefinitionVisitor;
@@ -54,6 +54,15 @@ public class FactoryBeanBuilder extends SimpleBeanBuilder {
             return true;
         }
         return super.visitField(visitor, fieldElement);
+    }
+
+    @Override
+    protected boolean visitPropertyReadElement(BeanDefinitionVisitor visitor, PropertyElement propertyElement, MethodElement readElement) {
+        if (propertyElement.hasDeclaredStereotype(Bean.class.getName())) {
+            visitBeanFactoryElement(visitor, readElement.getGenericReturnType(), readElement);
+            return true;
+        }
+        return super.visitPropertyReadElement(visitor, propertyElement, readElement);
     }
 
     void visitBeanFactoryElement(BeanDefinitionVisitor visitor, ClassElement producedType, MemberElement producingElement) {
@@ -116,14 +125,10 @@ public class FactoryBeanBuilder extends SimpleBeanBuilder {
 
     private AnnotationMetadata createProducedTypeAnnotationMetadata(ClassElement producedType, MemberElement producingElement) {
         // Original logic is to combine producing element annotation metadata (method or field) with the produced type's annotation metadata
-        AbstractAnnotationMetadataBuilder annotationMetadataBuilder = visitorContext.getAnnotationMetadataBuilder();
-        MutableAnnotationMetadata producedAnnotationMetadata = ((MutableAnnotationMetadata) getElementAnnotationMetadata(producingElement)).clone();
-        producedAnnotationMetadata = (MutableAnnotationMetadata) annotationMetadataBuilder.buildCombinedNoCache(
-            producedAnnotationMetadata,
-            null,
-            producedType.getNativeType(),
-            false
-        );
+        MutableAnnotationMetadata producedAnnotationMetadata = new AnnotationMetadataHierarchy(
+            producedType.getAnnotationMetadata(),
+            getElementAnnotationMetadata(producingElement)
+        ).merge();
         AnnotationMetadata producedTypeAnnotationMetadata = producedType.getAnnotationMetadata();
         AnnotationMetadata elementAnnotationMetadata = getElementAnnotationMetadata(producingElement);
 

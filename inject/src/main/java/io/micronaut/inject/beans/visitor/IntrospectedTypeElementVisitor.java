@@ -272,7 +272,6 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
 
     @Override
     public void finish(VisitorContext visitorContext) {
-
         try {
             for (AbstractIntrospection abstractIntrospection : abstractIntrospections) {
                 final Collection<? extends PropertyElement> properties = abstractIntrospection.properties.values();

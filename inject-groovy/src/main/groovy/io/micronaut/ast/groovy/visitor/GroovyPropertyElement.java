@@ -197,7 +197,7 @@ final class GroovyPropertyElement extends AbstractGroovyElement implements Prope
 
     @Override
     public String toString() {
-        return name;
+        return getDeclaringType().getName() + "." + name;
     }
 
     @Override

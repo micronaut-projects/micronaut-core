@@ -128,8 +128,8 @@ public class ConfigurationPropertiesBeanBuilder extends SimpleBeanBuilder {
     }
 
     @Override
-    protected boolean isInjectPointMethod(MethodElement methodElement) {
-        return super.isInjectPointMethod(methodElement) || methodElement.hasDeclaredStereotype(ConfigurationInject.class);
+    protected boolean isInjectPointMethod(MemberElement memberElement) {
+        return super.isInjectPointMethod(memberElement) || memberElement.hasDeclaredStereotype(ConfigurationInject.class);
     }
 
     private void visitConfigurationBuilder(BeanDefinitionVisitor visitor,

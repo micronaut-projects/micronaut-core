@@ -8,6 +8,8 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
+import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
@@ -19,7 +21,10 @@ import io.micronaut.inject.writer.BeanDefinitionVisitor;
 import io.micronaut.inject.writer.BeanDefinitionWriter;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class SimpleBeanBuilder extends AbstractBeanBuilder {
@@ -95,6 +100,13 @@ public class SimpleBeanBuilder extends AbstractBeanBuilder {
     }
 
     protected void build(BeanDefinitionVisitor visitor) {
+        Set<FieldElement> processedFields = new HashSet<>();
+        if (!processAsProperties()) {
+            for (PropertyElement propertyElement : classElement.getNativeBeanProperties()) {
+                propertyElement.getField().ifPresent(processedFields::add);
+                visitPropertyInternal(visitor, propertyElement);
+            }
+        }
         ElementQuery<FieldElement> fieldsQuery = ElementQuery.ALL_FIELDS.includeHiddenElements();
         ElementQuery<MethodElement> membersQuery = ElementQuery.ALL_METHODS;
         boolean processAsProperties = processAsProperties();
@@ -105,7 +117,8 @@ public class SimpleBeanBuilder extends AbstractBeanBuilder {
                 visitPropertyInternal(visitor, propertyElement);
             }
         }
-        List<FieldElement> fields = classElement.getEnclosedElements(fieldsQuery);
+        List<FieldElement> fields = new ArrayList<>(classElement.getEnclosedElements(fieldsQuery));
+        fields.removeIf(processedFields::contains);
         List<FieldElement> declaredFields = new ArrayList<>(fields.size());
         // Process subtype fields first
         for (FieldElement fieldElement : fields) {
@@ -152,9 +165,6 @@ public class SimpleBeanBuilder extends AbstractBeanBuilder {
     }
 
     private void visitPropertyInternal(BeanDefinitionVisitor visitor, PropertyElement propertyElement) {
-        if (propertyElement.hasAnnotation(ANN_REQUIRES_VALIDATION)) {
-            propertyElement.annotate(ANN_VALIDATED);
-        }
         boolean claimed = visitProperty(visitor, propertyElement);
         if (claimed) {
             propertyElement.getReadMethod().ifPresent(element -> addOriginatingElementIfNecessary(visitor, element));
@@ -164,10 +174,64 @@ public class SimpleBeanBuilder extends AbstractBeanBuilder {
     }
 
     protected boolean visitProperty(BeanDefinitionVisitor visitor, PropertyElement propertyElement) {
-        return false;
+        if (propertyElement.hasAnnotation(ANN_REQUIRES_VALIDATION)) {
+            propertyElement.annotate(ANN_VALIDATED);
+        }
+        boolean claimed = false;
+        Optional<MethodElement> writeMethod = propertyElement.getWriteMethod();
+        if (writeMethod.isPresent()) {
+            MethodElement writeElement = writeMethod.get();
+            prepareAnnotations(writeElement);
+            adjustMethodToIncludeClassMetadata(visitor, writeElement);
+            claimed = visitPropertyWriteElement(visitor, propertyElement, writeElement) || claimed;
+        }
+        Optional<MethodElement> readMethod = propertyElement.getReadMethod();
+        if (readMethod.isPresent()) {
+            MethodElement readElement = readMethod.get();
+            prepareAnnotations(readElement);
+            adjustMethodToIncludeClassMetadata(visitor, readElement);
+            claimed = visitPropertyReadElement(visitor, propertyElement, readElement) || claimed;
+        }
+        // Process property's field if no methods were processed
+        if (!claimed && propertyElement.getField().isPresent()) {
+            FieldElement writeElement = propertyElement.getField().get();
+            prepareAnnotations(writeElement);
+            claimed = visitField(visitor, writeElement);
+        }
+        return claimed;
+    }
+
+    private static void prepareAnnotations(MemberElement memberElement) {
+        MutableAnnotationMetadata annotationMetadata = new AnnotationMetadataHierarchy(
+            memberElement.getAnnotationMetadata()
+        ).merge();
+        memberElement.replaceAnnotations(annotationMetadata);
+    }
+
+    protected boolean visitPropertyReadElement(BeanDefinitionVisitor visitor,
+                                               PropertyElement propertyElement,
+                                               MethodElement readElement) {
+        return visitAopAndExecutableMethod(visitor, readElement);
+    }
+
+    protected boolean visitPropertyWriteElement(BeanDefinitionVisitor visitor,
+                                                PropertyElement propertyElement,
+                                                MethodElement writeElement) {
+        if (visitInjectAndLifecycleMethod(visitor, writeElement)) {
+            return true;
+        }
+        return visitAopAndExecutableMethod(visitor, writeElement);
     }
 
     protected boolean visitMethod(BeanDefinitionVisitor visitor, MethodElement methodElement) {
+        adjustMethodToIncludeClassMetadata(visitor, methodElement);
+        if (visitInjectAndLifecycleMethod(visitor, methodElement)) {
+            return true;
+        }
+        return visitAopAndExecutableMethod(visitor, methodElement);
+    }
+
+    private boolean visitInjectAndLifecycleMethod(BeanDefinitionVisitor visitor, MethodElement methodElement) {
         // All the cases above are using executable methods
         boolean claimed = false;
         if (methodElement.hasDeclaredAnnotation(AnnotationUtil.POST_CONSTRUCT)) {
@@ -195,8 +259,6 @@ public class SimpleBeanBuilder extends AbstractBeanBuilder {
             return true;
         }
         if (!methodElement.isStatic() && isInjectPointMethod(methodElement)) {
-//            System.out.println("%%%" + classElement + " " + methodElement + " " + methodElement.getDeclaringType() + " " + methodElement.isPackagePrivate());
-
             staticMethodCheck(methodElement);
             // TODO: Require @ReflectiveAccess for private methods in Micronaut 4
             visitor.visitMethodInjectionPoint(
@@ -207,6 +269,10 @@ public class SimpleBeanBuilder extends AbstractBeanBuilder {
             );
             return true;
         }
+        return false;
+    }
+
+    private boolean visitAopAndExecutableMethod(BeanDefinitionVisitor visitor, MethodElement methodElement) {
         if (methodElement.isStatic() && isExplicitlyAnnotatedAsExecutable(methodElement)) {
             // Only allow static executable methods when it's explicitly annotated with Executable.class
             return false;
@@ -252,8 +318,8 @@ public class SimpleBeanBuilder extends AbstractBeanBuilder {
         return false;
     }
 
-    protected boolean isInjectPointMethod(MethodElement methodElement) {
-        return methodElement.hasDeclaredStereotype(AnnotationUtil.INJECT);
+    protected boolean isInjectPointMethod(MemberElement memberElement) {
+        return memberElement.hasDeclaredStereotype(AnnotationUtil.INJECT);
     }
 
     private void staticMethodCheck(MethodElement methodElement) {
@@ -273,6 +339,23 @@ public class SimpleBeanBuilder extends AbstractBeanBuilder {
 
     private static boolean isExplicitlyAnnotatedAsExecutable(MethodElement methodElement) {
         return !getElementAnnotationMetadata(methodElement).hasDeclaredAnnotation(Executable.class);
+    }
+
+    protected boolean visitProperty(BeanDefinitionVisitor visitor, FieldElement fieldElement) {
+        if (fieldElement.isStatic() || fieldElement.isFinal()) {
+            return false;
+        }
+        AnnotationMetadata fieldAnnotationMetadata = fieldElement.getAnnotationMetadata();
+        if (fieldAnnotationMetadata.hasStereotype(Value.class) || fieldAnnotationMetadata.hasStereotype(Property.class)) {
+            visitor.visitFieldValue(fieldElement.getDeclaringType(), fieldElement, fieldElement.getAnnotationMetadata(), isOptionalFieldValue(), fieldElement.isReflectionRequired(classElement));
+            return true;
+        }
+        if (fieldAnnotationMetadata.hasStereotype(AnnotationUtil.INJECT)
+            || (fieldAnnotationMetadata.hasDeclaredStereotype(AnnotationUtil.QUALIFIER) && !fieldAnnotationMetadata.hasDeclaredAnnotation(Bean.class))) {
+            visitor.visitFieldInjectionPoint(fieldElement.getDeclaringType(), fieldElement, fieldElement.isReflectionRequired(classElement));
+            return true;
+        }
+        return false;
     }
 
     protected boolean visitField(BeanDefinitionVisitor visitor, FieldElement fieldElement) {
@@ -297,7 +380,7 @@ public class SimpleBeanBuilder extends AbstractBeanBuilder {
     }
 
     protected void addOriginatingElementIfNecessary(BeanDefinitionVisitor writer, MemberElement memberElement) {
-        if (!isDeclaredInThisClass(memberElement)) {
+        if (!memberElement.isSynthetic() && !isDeclaredInThisClass(memberElement)) {
             writer.addOriginatingElement(memberElement.getDeclaringType());
         }
     }

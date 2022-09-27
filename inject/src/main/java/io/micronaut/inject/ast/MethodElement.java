@@ -17,15 +17,22 @@ package io.micronaut.inject.ast;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
+import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
 
+import java.lang.annotation.Annotation;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 /**
@@ -188,6 +195,11 @@ public interface MethodElement extends MemberElement {
 
             private @NonNull AnnotationMetadata thisAnnotationMetadata = annotationMetadata;
 
+            @Override
+            public boolean isSynthetic() {
+                return true;
+            }
+
             @NonNull
             @Override
             public ClassElement getReturnType() {
@@ -259,6 +271,11 @@ public interface MethodElement extends MemberElement {
             @Override
             public Object getNativeType() {
                 throw new UnsupportedOperationException("No native method type present");
+            }
+
+            @Override
+            public String toString() {
+                return getDeclaringType().getName() + "." + name + "(..)";
             }
         };
     }
@@ -276,13 +293,19 @@ public interface MethodElement extends MemberElement {
     static @NonNull MethodElement of(
             @NonNull ClassElement declaredType,
             @NonNull AnnotationMetadataProvider annotationMetadataProvider,
+            @NonNull AbstractAnnotationMetadataBuilder<?, ?> metadataBuilder,
             @NonNull ClassElement returnType,
             @NonNull ClassElement genericReturnType,
             @NonNull String name,
             ParameterElement...parameterElements) {
         return new MethodElement() {
 
-            private @Nullable AnnotationMetadata thisAnnotationMetadata;
+            private @Nullable AnnotationMetadata annotationMetadata;
+
+            @Override
+            public boolean isSynthetic() {
+                return true;
+            }
 
             @NonNull
             @Override
@@ -305,7 +328,7 @@ public interface MethodElement extends MemberElement {
             public MethodElement withNewParameters(ParameterElement... newParameters) {
                 return MethodElement.of(
                         declaredType,
-                    thisAnnotationMetadata,
+                    annotationMetadata,
                         returnType,
                         genericReturnType,
                         name,
@@ -316,10 +339,10 @@ public interface MethodElement extends MemberElement {
             @NonNull
             @Override
             public AnnotationMetadata getAnnotationMetadata() {
-                if (thisAnnotationMetadata == null) {
-                    thisAnnotationMetadata = annotationMetadataProvider.getAnnotationMetadata();
+                if (annotationMetadata == null) {
+                    annotationMetadata = annotationMetadataProvider.getAnnotationMetadata();
                 }
-                return thisAnnotationMetadata;
+                return annotationMetadata;
             }
 
             @Override
@@ -349,8 +372,51 @@ public interface MethodElement extends MemberElement {
             }
 
             @Override
+            public <T extends Annotation> Element annotate(@NonNull String annotationType, @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
+                ArgumentUtils.requireNonNull("annotationType", annotationType);
+                AnnotationValueBuilder<T> builder = AnnotationValue.builder(annotationType);
+                //noinspection ConstantConditions
+                if (consumer != null) {
+
+                    consumer.accept(builder);
+                    AnnotationValue<T> av = builder.build();
+                    this.annotationMetadata = metadataBuilder.annotate(getAnnotationMetadata(), av);
+                }
+                return this;
+            }
+
+            @Override
+            public <T extends Annotation> Element annotate(AnnotationValue<T> annotationValue) {
+                ArgumentUtils.requireNonNull("annotationValue", annotationValue);
+                annotationMetadata = metadataBuilder.annotate(getAnnotationMetadata(), annotationValue);
+                return this;
+            }
+
+            @Override
+            public Element removeAnnotation(@NonNull String annotationType) {
+                ArgumentUtils.requireNonNull("annotationType", annotationType);
+                annotationMetadata = metadataBuilder.removeAnnotation(getAnnotationMetadata(), annotationType);
+                return this;
+            }
+
+            @Override
+            public <T extends Annotation> Element removeAnnotationIf(@NonNull Predicate<AnnotationValue<T>> predicate) {
+                ArgumentUtils.requireNonNull("predicate", predicate);
+                annotationMetadata = metadataBuilder.removeAnnotationIf(getAnnotationMetadata(), predicate);
+                return this;
+
+            }
+
+            @Override
+            public Element removeStereotype(@NonNull String annotationType) {
+                ArgumentUtils.requireNonNull("annotationType", annotationType);
+                annotationMetadata = metadataBuilder.removeStereotype(getAnnotationMetadata(), annotationType);
+                return this;
+            }
+
+            @Override
             public MethodElement replaceAnnotations(AnnotationMetadata annotationMetadata) {
-                this.thisAnnotationMetadata = annotationMetadata;
+                this.annotationMetadata = annotationMetadata;
                 return this;
             }
 
@@ -358,6 +424,11 @@ public interface MethodElement extends MemberElement {
             @Override
             public Object getNativeType() {
                 throw new UnsupportedOperationException("No native method type present");
+            }
+
+            @Override
+            public String toString() {
+                return getDeclaringType().getName() + "." + name + "(..)";
             }
         };
     }

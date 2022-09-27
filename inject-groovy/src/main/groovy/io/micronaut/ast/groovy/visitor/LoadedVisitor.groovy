@@ -119,7 +119,7 @@ class LoadedVisitor implements Ordered {
      * @param annotationMetadata The annotation data
      * @return True if the element should be visited
      */
-    boolean matches(AnnotationMetadata annotationMetadata) {
+    boolean matchesElement(AnnotationMetadata annotationMetadata) {
         if (elementAnnotation == ClassHelper.OBJECT) {
             return true
         }

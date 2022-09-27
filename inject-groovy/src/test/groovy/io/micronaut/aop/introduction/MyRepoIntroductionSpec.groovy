@@ -57,7 +57,7 @@ class MyRepoIntroductionSpec extends Specification {
             def findByIdMethods = beanDef.getExecutableMethods().findAll(m -> m.getName() == "findById")
         then:
             MyRepoIntroducer.EXECUTED_METHODS.size() == 0
-            findByIdMethods.size() == 2
+            findByIdMethods.size() == 1
             findByIdMethods[0].hasAnnotation(Marker)
         when:
             Object id = 111
@@ -80,7 +80,7 @@ class MyRepoIntroductionSpec extends Specification {
             def findByIdMethods = beanDef.getExecutableMethods().findAll(m -> m.getName() == "findById")
         then:
             MyRepoIntroducer.EXECUTED_METHODS.size() == 0
-            findByIdMethods.size() == 2
+            findByIdMethods.size() == 1
             findByIdMethods[0].hasAnnotation(Marker)
         when:
             Object id = 111
@@ -103,7 +103,7 @@ class MyRepoIntroductionSpec extends Specification {
             def findByIdMethods = beanDef.getExecutableMethods().findAll(m -> m.getName() == "findById")
         then:
             MyRepoIntroducer.EXECUTED_METHODS.size() == 0
-            findByIdMethods.size() == 2
+            findByIdMethods.size() == 1
             findByIdMethods[0].hasAnnotation(Marker)
         when:
             def id = 111

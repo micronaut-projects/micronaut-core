@@ -275,6 +275,10 @@ public abstract class AbstractBeanBuilder {
     }
 
     public static void methodAnnotationsGuard(VisitorContext visitorContext, MethodElement methodElement, Consumer<MethodElement> consumer) {
+        if (methodElement.isSynthetic()) {
+            consumer.accept(methodElement);
+            return;
+        }
         ElementFactory elementFactory = visitorContext.getElementFactory();
         // Because of the shared method's annotation cache we need to make a copy of the method.
         // The method is going to be stored in the visitor till the write process

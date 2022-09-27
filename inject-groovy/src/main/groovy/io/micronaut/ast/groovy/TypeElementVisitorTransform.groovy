@@ -18,26 +18,23 @@ package io.micronaut.ast.groovy
 import groovy.transform.CompilationUnitAware
 import groovy.transform.CompileStatic
 import groovy.transform.PackageScope
-import io.micronaut.aop.Introduction
-import io.micronaut.ast.groovy.utils.PublicMethodVisitor
+import io.micronaut.ast.groovy.utils.AstClassUtils
+import io.micronaut.ast.groovy.visitor.GroovyClassElement
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.ast.groovy.visitor.LoadedVisitor
 import io.micronaut.core.annotation.Generated
-import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.order.OrderUtil
 import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.ast.PropertyElement
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.AnnotatedNode
-import org.codehaus.groovy.ast.ClassCodeVisitorSupport
-import org.codehaus.groovy.ast.ClassHelper
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.ConstructorNode
 import org.codehaus.groovy.ast.FieldNode
 import org.codehaus.groovy.ast.InnerClassNode
 import org.codehaus.groovy.ast.MethodNode
 import org.codehaus.groovy.ast.ModuleNode
-import org.codehaus.groovy.ast.PropertyNode
 import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.CompilePhase
 import org.codehaus.groovy.control.SourceUnit
@@ -89,24 +86,13 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
                     if (!loadedVisitor.matchesClass(targetClassElement)) {
                         continue
                     }
-
-                    def isIntroduction = targetClassElement.hasStereotype(Introduction.class)
-                    def visitor = new ElementVisitor(source, compilationUnit, classNode, [loadedVisitor], visitorContext, !isIntroduction, targetClassElement)
-                    if (isIntroduction || (targetClassElement.hasStereotype(Introspected.class) && classNode.isAbstract())) {
-                        visitor.visitClass(classNode)
-                        new PublicMethodVisitor(source) {
-                            @Override
-                            void accept(ClassNode cn, MethodNode methodNode) {
-                                visitor.doVisitMethod(methodNode)
-                            }
-                        }.accept(classNode)
-                    } else {
-                        visitor.visitClass(classNode)
-                    }
+                    def visitor = new ElementVisitor(source, compilationUnit, classNode, [loadedVisitor], visitorContext, targetClassElement)
+                    visitor.visitClass(classNode)
                 }
             }
         }
 
+        loadedVisitors.set(visitors)
         beanDefinitionBuilders.get().addAll(visitorContext.getBeanElementBuilders())
     }
 
@@ -116,12 +102,11 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
     }
 
     @CompileStatic
-    private static class ElementVisitor extends ClassCodeVisitorSupport {
+    private static class ElementVisitor {
 
         final SourceUnit sourceUnit
         final CompilationUnit compilationUnit
         final GroovyVisitorContext visitorContext
-        final boolean visitMethods
         private final ClassNode concreteClass
         private final Collection<LoadedVisitor> typeElementVisitors
 
@@ -133,81 +118,65 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
                 ClassNode targetClassNode,
                 Collection<LoadedVisitor> typeElementVisitors,
                 GroovyVisitorContext visitorContext,
-                boolean visitMethods = true,
                 ClassElement targetClassElement) {
-            this.targetClassElement = targetClassElement;
+            this.targetClassElement = targetClassElement
             this.compilationUnit = compilationUnit
             this.typeElementVisitors = typeElementVisitors
             this.concreteClass = targetClassNode
             this.sourceUnit = sourceUnit
             this.visitorContext = visitorContext
-            this.visitMethods = visitMethods
         }
 
         protected boolean isPackagePrivate(AnnotatedNode annotatedNode, int modifiers) {
             return ((!Modifier.isProtected(modifiers) && !Modifier.isPublic(modifiers) && !Modifier.isPrivate(modifiers)) || !annotatedNode.getAnnotations(makeCached(PackageScope)).isEmpty())
         }
 
-        @Override
         void visitClass(ClassNode node) {
             if (targetClassElement.getNativeType() != node) {
                 targetClassElement = visitorContext.getElementFactory().newSourceClassElement(node, visitorContext.getElementAnnotationMetadataFactory())
             }
-
-            typeElementVisitors.each {
+            for (LoadedVisitor it : typeElementVisitors) {
                 if (it.matchesClass(targetClassElement)) {
                     it.getVisitor().visitClass(targetClassElement, visitorContext)
                 }
             }
+            GroovyClassElement classElement = targetClassElement as GroovyClassElement;
 
-            ClassNode superClass = node.getSuperClass()
-            List<ClassNode> superClasses = []
-            while (superClass != null) {
-                superClasses.add(superClass)
-                superClass = superClass.getSuperClass()
+            def properties = classElement.getNativeBeanProperties()
+            for (PropertyElement pn : (properties)) {
+                visitNativeProperty(pn)
             }
-            superClasses = superClasses.reverse()
-            for (classNode in superClasses) {
-                if (classNode.name != ClassHelper.OBJECT_TYPE.name && classNode.name != GroovyObjectSupport.name && classNode.name != Script.name) {
-                    classNode.visitContents(this)
+            for (FieldNode fn : node.getFields()) {
+                visitField(fn)
+            }
+            for (ConstructorNode cn : node.getDeclaredConstructors()) {
+                visitConstructor(cn)
+            }
+            for (MethodNode mn : AstClassUtils.getAllMethods(node)) {
+                visitMethod(mn)
+            }
+        }
+
+        void visitConstructor(ConstructorNode node) {
+            def e = visitorContext.getElementFactory()
+                    .newConstructorElement(targetClassElement, node, visitorContext.getElementAnnotationMetadataFactory())
+            for (LoadedVisitor it : typeElementVisitors) {
+                if (it.matchesElement(e)) {
+                    it.getVisitor().visitConstructor(e, visitorContext)
                 }
             }
-            super.visitClass(node)
         }
 
-        @Override
-        protected void visitConstructorOrMethod(MethodNode methodNode, boolean isConstructor) {
-            if (visitMethods) {
-                doVisitMethod(methodNode)
+        void visitMethod(MethodNode node) {
+            def e = visitorContext.getElementFactory()
+                    .newSourceMethodElement(targetClassElement, node, visitorContext.getElementAnnotationMetadataFactory())
+            for (LoadedVisitor it : typeElementVisitors) {
+                if (it.matchesElement(e)) {
+                    it.getVisitor().visitMethod(e, visitorContext)
+                }
             }
         }
 
-        void doVisitMethod(MethodNode methodNode) {
-            switch (methodNode.getClass()) {
-                case ConstructorNode:
-                    def e = visitorContext.getElementFactory()
-                            .newConstructorElement(targetClassElement, (ConstructorNode) methodNode, visitorContext.getElementAnnotationMetadataFactory())
-
-                    typeElementVisitors.findAll {
-                        if (it.matches(e.getAnnotationMetadata())) {
-                            it.getVisitor().visitConstructor(e, visitorContext)
-                        }
-                    }
-                    break
-                case MethodNode:
-                    def e = visitorContext.getElementFactory()
-                            .newSourceMethodElement(targetClassElement, (MethodNode) methodNode, visitorContext.getElementAnnotationMetadataFactory())
-
-                    typeElementVisitors.findAll {
-                        if (it.matches(e.getAnnotationMetadata())) {
-                            it.getVisitor().visitMethod(e, visitorContext)
-                        }
-                    }
-                    break
-            }
-        }
-
-        @Override
         void visitField(FieldNode fieldNode) {
             if (fieldNode.name == 'metaClass') return
             int modifiers = fieldNode.modifiers
@@ -220,35 +189,29 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
             if (fieldNode.enum) {
                 def e = visitorContext.getElementFactory()
                         .newEnumConstantElement(targetClassElement, fieldNode, visitorContext.getElementAnnotationMetadataFactory())
-                typeElementVisitors.findAll {
-                    if (it.matches(e.getAnnotationMetadata())) {
+                for (LoadedVisitor it : typeElementVisitors) {
+                    if (it.matchesElement(e)) {
                         it.getVisitor().visitEnumConstant(e, visitorContext)
                     }
                 }
             } else {
                 def e = visitorContext.getElementFactory()
                         .newFieldElement(targetClassElement, fieldNode, visitorContext.getElementAnnotationMetadataFactory())
-                typeElementVisitors.findAll {
-                    if (it.matches(e.getAnnotationMetadata())) {
+                for (LoadedVisitor it : typeElementVisitors) {
+                    if (it.matchesElement(e)) {
                         it.getVisitor().visitField(e, visitorContext)
                     }
                 }
             }
         }
 
-        @Override
-        void visitProperty(PropertyNode propertyNode) {
-            FieldNode fieldNode = propertyNode.field
-            if (fieldNode.name == 'metaClass') return
-            def modifiers = propertyNode.getModifiers()
-            if (Modifier.isFinal(modifiers) || Modifier.isStatic(modifiers)) {
-                return
-            }
-            def e = visitorContext.getElementFactory()
-                    .newFieldElement(propertyNode, visitorContext.getElementAnnotationMetadataFactory())
-            typeElementVisitors.findAll {
-                if (it.matches(e.getAnnotationMetadata())) {
-                    it.getVisitor().visitField(e, visitorContext)
+        void visitNativeProperty(PropertyElement propertyNode) {
+            for (LoadedVisitor it : typeElementVisitors) {
+                if (it.matchesElement(propertyNode)) {
+//                    propertyNode.field.ifPresent(f -> it.getVisitor().visitField(f, visitorContext))
+                    // visit synthetic getter/setter methods
+                    propertyNode.writeMethod.ifPresent(m -> it.getVisitor().visitMethod(m, visitorContext))
+                    propertyNode.readMethod.ifPresent(m -> it.getVisitor().visitMethod(m, visitorContext))
                 }
             }
         }

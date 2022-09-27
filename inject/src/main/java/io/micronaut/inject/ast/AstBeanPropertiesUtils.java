@@ -92,7 +92,10 @@ public class AstBeanPropertiesUtils {
                 BeanPropertyData value = entry.getValue();
                 if (value.readAccessKind != null || value.writeAccessKind != null) {
                     value.isExcluded = shouldExclude(includes, excludes, propertyName);
-                    beanProperties.add(propertyCreator.apply(value));
+                    PropertyElement propertyElement = propertyCreator.apply(value);
+                    if (propertyElement != null) {
+                        beanProperties.add(propertyElement);
+                    }
                 }
             }
             return beanProperties;

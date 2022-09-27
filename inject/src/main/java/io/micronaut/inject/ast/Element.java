@@ -54,6 +54,14 @@ public interface Element extends MutableAnnotatedElement<Element>, AnnotatedElem
     }
 
     /**
+     * @return True if the element is synthetic.
+     * @since 3.8.0
+     */
+    default boolean isSynthetic() {
+        return false;
+    }
+
+    /**
      * @return True if the element is protected.
      */
     boolean isProtected();

@@ -134,8 +134,7 @@ public class ConfigurationReaderVisitor implements TypeElementVisitor<Configurat
             if (method.hasStereotype(EachProperty.class)) {
                 annBuilder.member("iterable", true);
             }
-
-        }).getAnnotationMetadata();
+        });
     }
 
     private String getPropertyNameForGetter(String methodName) {

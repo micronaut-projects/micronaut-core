@@ -206,6 +206,6 @@ class Test {}
         e.message.contains(modifier)
 
         where:
-        modifier << ['private', 'protected']
+        modifier << ['private']
     }
 }
