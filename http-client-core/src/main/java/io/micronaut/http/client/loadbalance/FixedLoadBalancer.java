@@ -21,6 +21,8 @@ import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.http.client.LoadBalancer;
 import org.reactivestreams.Publisher;
 
+import java.io.UncheckedIOException;
+import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -39,6 +41,17 @@ public class FixedLoadBalancer implements LoadBalancer  {
     /**
      * Constructs a new FixedLoadBalancer.
      *
+     * @param url The URL to fix to
+     * @deprecated Use {@link #FixedLoadBalancer(URI)} instead
+     */
+    @Deprecated
+    public FixedLoadBalancer(URL url) {
+        this(toUriUnchecked(url));
+    }
+
+    /**
+     * Constructs a new FixedLoadBalancer.
+     *
      * @param uri The URI to fix to
      */
     public FixedLoadBalancer(URI uri) {
@@ -49,6 +62,19 @@ public class FixedLoadBalancer implements LoadBalancer  {
     @Override
     public Publisher<ServiceInstance> select(@Nullable Object discriminator) {
         return publisher;
+    }
+
+    /**
+     * @return The URL of the {@link LoadBalancer}
+     * @deprecated Use {@link #getUri()} instead
+     */
+    @Deprecated
+    public URL getUrl() {
+        try {
+            return uri.toURL();
+        } catch (MalformedURLException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     /**
