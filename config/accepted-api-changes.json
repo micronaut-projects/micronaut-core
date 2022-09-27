@@ -34,7 +34,7 @@
       "type": "io.micronaut.inject.visitor.TypeElementVisitor",
       "member": "Method io.micronaut.inject.visitor.TypeElementVisitor.visitEnumConstant(io.micronaut.inject.ast.EnumConstantElement,io.micronaut.inject.visitor.VisitorContext)",
       "reason": "Added EnumConstantElement. Added EnumElement.elements() method to collect enum constant elements"
-  },  
+  },
   {
     "type": "io.micronaut.scheduling.TaskScheduler",
     "member": "Method io.micronaut.scheduling.TaskScheduler.schedule(java.lang.String,java.lang.String,java.lang.Runnable)",
