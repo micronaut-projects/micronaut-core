@@ -16,6 +16,7 @@
 package io.micronaut.inject.writer;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Generated;
 import io.micronaut.core.annotation.Internal;
@@ -26,6 +27,7 @@ import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.annotation.AnnotationMetadataWriter;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
@@ -608,7 +610,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         // 2nd argument: The argument name
         generatorAdapter.push(argumentName);
 
-        boolean hasAnnotations = !annotationMetadata.isEmpty() && annotationMetadata instanceof DefaultAnnotationMetadata;
+        boolean hasAnnotations = !annotationMetadata.isEmpty();
         boolean hasTypeArguments = typeArguments != null && !typeArguments.isEmpty();
         boolean isGenericPlaceholder = typedElement instanceof GenericPlaceholderElement;
         boolean isTypeVariable = isGenericPlaceholder || ((typedElement instanceof ClassElement) && ((ClassElement) typedElement).isTypeVariable());
@@ -633,6 +635,11 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
 
         // 3rd argument: The annotation metadata
         if (hasAnnotations) {
+            // TODO: Support referencing method / field annotation for argument
+            annotationMetadata = AnnotationMetadataProvider.unwrap(annotationMetadata);
+            if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
+                annotationMetadata = ((AnnotationMetadataHierarchy) annotationMetadata).merge();
+            }
             AnnotationMetadataWriter.instantiateNewMetadata(
                     owningType,
                     declaringClassWriter,

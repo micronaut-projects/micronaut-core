@@ -84,21 +84,25 @@ public interface MethodElement extends MemberElement {
     /**
      * @return The method parameters
      */
-    @NonNull ParameterElement[] getParameters();
+    @NonNull
+    ParameterElement[] getParameters();
 
     /**
      * Takes this method element and transforms into a new method element with the given parameters appended to the existing parameters.
+     *
      * @param newParameters The new parameters
      * @return A new method element
      * @since 2.3.0
      */
-    @NonNull MethodElement withNewParameters(@NonNull ParameterElement...newParameters);
+    @NonNull
+    MethodElement withNewParameters(@NonNull ParameterElement... newParameters);
 
     /**
      * This method adds an associated bean using this method element as the originating element.
      *
      * <p>Note that this method can only be called on classes being directly compiled by Micronaut. If the ClassElement is
      * loaded from pre-compiled code an {@link UnsupportedOperationException} will be thrown.</p>
+     *
      * @param type The type of the bean
      * @return A bean builder
      */
@@ -109,6 +113,7 @@ public interface MethodElement extends MemberElement {
 
     /**
      * If {@link #isSuspend()} returns true this method exposes the continuation parameter in addition to the other parameters of the method.
+     *
      * @return The suspend parameters
      * @since 2.3.0
      */
@@ -127,6 +132,7 @@ public interface MethodElement extends MemberElement {
 
     /**
      * Is the method a Kotlin suspend function.
+     *
      * @return True if it is.
      * @since 2.3.0
      */
@@ -136,6 +142,7 @@ public interface MethodElement extends MemberElement {
 
     /**
      * Is the method a default method on an interfaces.
+     *
      * @return True if it is.
      * @since 2.3.0
      */
@@ -155,6 +162,7 @@ public interface MethodElement extends MemberElement {
 
     /**
      * Get the method description.
+     *
      * @param simple If simple type names are to be used
      * @return The method description
      */
@@ -166,6 +174,7 @@ public interface MethodElement extends MemberElement {
 
     /**
      * Checks if this method element overrides another.
+     *
      * @param overridden Possible overridden method
      * @return true if this overrides passed method element
      * @since 3.1
@@ -176,21 +185,22 @@ public interface MethodElement extends MemberElement {
 
     /**
      * Creates a {@link MethodElement} for the given parameters.
-     * @param declaredType The declaring type
+     *
+     * @param declaredType       The declaring type
      * @param annotationMetadata The annotation metadata
-     * @param returnType The return type
-     * @param genericReturnType The generic return type
-     * @param name The name
-     * @param parameterElements The parameter elements
+     * @param returnType         The return type
+     * @param genericReturnType  The generic return type
+     * @param name               The name
+     * @param parameterElements  The parameter elements
      * @return The method element
      */
     static @NonNull MethodElement of(
-            @NonNull ClassElement declaredType,
-            @NonNull AnnotationMetadata annotationMetadata,
-            @NonNull ClassElement returnType,
-            @NonNull ClassElement genericReturnType,
-            @NonNull String name,
-            ParameterElement...parameterElements) {
+        @NonNull ClassElement declaredType,
+        @NonNull AnnotationMetadata annotationMetadata,
+        @NonNull ClassElement returnType,
+        @NonNull ClassElement genericReturnType,
+        @NonNull String name,
+        ParameterElement... parameterElements) {
         return new MethodElement() {
 
             private @NonNull AnnotationMetadata thisAnnotationMetadata = annotationMetadata;
@@ -220,12 +230,12 @@ public interface MethodElement extends MemberElement {
             @Override
             public MethodElement withNewParameters(ParameterElement... newParameters) {
                 return MethodElement.of(
-                        declaredType,
+                    declaredType,
                     thisAnnotationMetadata,
-                        returnType,
-                        genericReturnType,
-                        name,
-                        ArrayUtils.concat(parameterElements, newParameters)
+                    returnType,
+                    genericReturnType,
+                    name,
+                    ArrayUtils.concat(parameterElements, newParameters)
                 );
             }
 
@@ -282,22 +292,23 @@ public interface MethodElement extends MemberElement {
 
     /**
      * Creates a {@link MethodElement} for the given parameters.
-     * @param declaredType The declaring type
+     *
+     * @param declaredType               The declaring type
      * @param annotationMetadataProvider The annotation metadata provider
-     * @param returnType The return type
-     * @param genericReturnType The generic return type
-     * @param name The name
-     * @param parameterElements The parameter elements
+     * @param returnType                 The return type
+     * @param genericReturnType          The generic return type
+     * @param name                       The name
+     * @param parameterElements          The parameter elements
      * @return The method element
      */
     static @NonNull MethodElement of(
-            @NonNull ClassElement declaredType,
-            @NonNull AnnotationMetadataProvider annotationMetadataProvider,
-            @NonNull AbstractAnnotationMetadataBuilder<?, ?> metadataBuilder,
-            @NonNull ClassElement returnType,
-            @NonNull ClassElement genericReturnType,
-            @NonNull String name,
-            ParameterElement...parameterElements) {
+        @NonNull ClassElement declaredType,
+        @NonNull AnnotationMetadataProvider annotationMetadataProvider,
+        @NonNull AbstractAnnotationMetadataBuilder<?, ?> metadataBuilder,
+        @NonNull ClassElement returnType,
+        @NonNull ClassElement genericReturnType,
+        @NonNull String name,
+        ParameterElement... parameterElements) {
         return new MethodElement() {
 
             private @Nullable AnnotationMetadata annotationMetadata;
@@ -327,12 +338,13 @@ public interface MethodElement extends MemberElement {
             @Override
             public MethodElement withNewParameters(ParameterElement... newParameters) {
                 return MethodElement.of(
-                        declaredType,
-                    annotationMetadata,
-                        returnType,
-                        genericReturnType,
-                        name,
-                        ArrayUtils.concat(parameterElements, newParameters)
+                    declaredType,
+                    annotationMetadataProvider,
+                    metadataBuilder,
+                    returnType,
+                    genericReturnType,
+                    name,
+                    ArrayUtils.concat(parameterElements, newParameters)
                 );
             }
 

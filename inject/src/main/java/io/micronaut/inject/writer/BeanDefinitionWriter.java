@@ -4156,6 +4156,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             );
         }
         // 4: annotationMetadata
+        if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
+            annotationMetadata = ((AnnotationMetadataHierarchy) annotationMetadata).merge();
+        }
         pushAnnotationMetadata(staticInit, annotationMetadata);
         // 5: requiresReflection
         staticInit.push(requiresReflection);
@@ -4210,6 +4213,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     private void pushAnnotationMetadata(GeneratorAdapter staticInit, AnnotationMetadata annotationMetadata) {
+        annotationMetadata = AnnotationMetadataProvider.unwrap(annotationMetadata);
         if (annotationMetadata == AnnotationMetadata.EMPTY_METADATA || annotationMetadata.isEmpty()) {
             staticInit.push((String) null);
         } else if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
@@ -4229,7 +4233,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                     defaultsStorage,
                     loadTypeMethods);
         } else {
-            staticInit.push((String) null);
+            throw new IllegalStateException("Unknown annotation metadata: " + annotationMetadata.getClass().getName());
         }
     }
 

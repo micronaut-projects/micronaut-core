@@ -65,6 +65,14 @@ public class FactoryBeanBuilder extends SimpleBeanBuilder {
         return super.visitPropertyReadElement(visitor, propertyElement, readElement);
     }
 
+    @Override
+    protected boolean visitPropertyWriteElement(BeanDefinitionVisitor visitor, PropertyElement propertyElement, MethodElement writeElement) {
+        if (propertyElement.hasDeclaredStereotype(Bean.class.getName())) {
+            return true;
+        }
+        return super.visitPropertyWriteElement(visitor, propertyElement, writeElement);
+    }
+
     void visitBeanFactoryElement(BeanDefinitionVisitor visitor, ClassElement producedType, MemberElement producingElement) {
         if (producedType.isPrimitive()) {
             BeanDefinitionWriter producedBeanDefinitionWriter = new BeanDefinitionWriter(producingElement,

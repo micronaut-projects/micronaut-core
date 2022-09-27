@@ -219,6 +219,16 @@ public class SimpleBeanBuilder extends AbstractBeanBuilder {
                                                 MethodElement writeElement) {
         if (visitInjectAndLifecycleMethod(visitor, writeElement)) {
             return true;
+        } else if (!writeElement.isStatic() && writeElement.hasStereotype(AnnotationUtil.QUALIFIER)) {
+            staticMethodCheck(writeElement);
+            // TODO: Require @ReflectiveAccess for private methods in Micronaut 4
+            visitor.visitMethodInjectionPoint(
+                writeElement.getDeclaringType(),
+                writeElement,
+                writeElement.isReflectionRequired(classElement),
+                visitorContext
+            );
+            return true;
         }
         return visitAopAndExecutableMethod(visitor, writeElement);
     }
