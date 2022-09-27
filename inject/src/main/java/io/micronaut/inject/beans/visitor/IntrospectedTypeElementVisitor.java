@@ -19,6 +19,7 @@ import io.micronaut.context.annotation.Executable;
 import io.micronaut.core.annotation.AccessorsStyle;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
@@ -456,7 +457,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
 
             AnnotationMetadata annotationMetadata;
             if (metadata) {
-                annotationMetadata = beanProperty.getAnnotationMetadata();
+                annotationMetadata = AnnotationMetadataProvider.unwrap(beanProperty.getAnnotationMetadata());
                 if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
                     annotationMetadata = ((AnnotationMetadataHierarchy) annotationMetadata).merge();
                 }

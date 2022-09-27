@@ -782,7 +782,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                     PrimitiveElement.VOID,
                     PrimitiveElement.VOID,
                     NameUtils.setterNameFor(value.propertyName),
-                    ParameterElement.of(value.field.getGenericType(), value.propertyName, value.field, visitorContext.getAnnotationMetadataBuilder())
+                    ParameterElement.of(value.field.getGenericType(), value.propertyName, annotationMetadataProvider, visitorContext.getAnnotationMetadataBuilder())
                 );
                 value.writeAccessKind = BeanProperties.AccessKind.METHOD;
             } else if (nativePropertiesOnly) {

@@ -208,7 +208,7 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
         void visitNativeProperty(PropertyElement propertyNode) {
             for (LoadedVisitor it : typeElementVisitors) {
                 if (it.matchesElement(propertyNode)) {
-//                    propertyNode.field.ifPresent(f -> it.getVisitor().visitField(f, visitorContext))
+                    propertyNode.field.ifPresent(f -> it.getVisitor().visitField(f, visitorContext))
                     // visit synthetic getter/setter methods
                     propertyNode.writeMethod.ifPresent(m -> it.getVisitor().visitMethod(m, visitorContext))
                     propertyNode.readMethod.ifPresent(m -> it.getVisitor().visitMethod(m, visitorContext))

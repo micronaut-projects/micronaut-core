@@ -1049,7 +1049,7 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
         MutableAnnotationMetadata newAnnotationMetadata = new MutableAnnotationMetadata();
         for (int i = hierarchy.length - 1; i >= 0; i--) {
             AnnotationMetadata metadata = hierarchy[i];
-            metadata = unwrap(metadata);
+            metadata = AnnotationMetadataProvider.unwrap(metadata);
             if (metadata.isEmpty()) {
                 continue;
             }
@@ -1064,10 +1064,4 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
         return newAnnotationMetadata;
     }
 
-    private static AnnotationMetadata unwrap(AnnotationMetadata metadata) {
-        if (metadata instanceof AnnotationMetadataProvider) {
-            return unwrap(((AnnotationMetadataProvider) metadata).getAnnotationMetadata());
-        }
-        return metadata;
-    }
 }

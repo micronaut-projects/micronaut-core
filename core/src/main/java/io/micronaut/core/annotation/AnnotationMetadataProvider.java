@@ -95,4 +95,17 @@ public interface AnnotationMetadataProvider extends AnnotationSource {
     default <T extends Annotation> Optional<AnnotationValue<T>> findDeclaredAnnotation(Class<T> annotationClass) {
         return getAnnotationMetadata().findDeclaredAnnotation(annotationClass);
     }
+
+    /**
+     * Unwraps possible {@link AnnotationMetadataProvider}.
+     * @param metadata The metadata
+     * @return unwraped
+     * @since 3.8.0
+     */
+    static AnnotationMetadata unwrap(AnnotationMetadata metadata) {
+        if (metadata instanceof AnnotationMetadataProvider) {
+            return unwrap(((AnnotationMetadataProvider) metadata).getAnnotationMetadata());
+        }
+        return metadata;
+    }
 }

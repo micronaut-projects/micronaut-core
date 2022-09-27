@@ -165,6 +165,9 @@ public class SimpleBeanBuilder extends AbstractBeanBuilder {
     }
 
     private void visitPropertyInternal(BeanDefinitionVisitor visitor, PropertyElement propertyElement) {
+        if (propertyElement.hasAnnotation(ANN_REQUIRES_VALIDATION)) {
+            propertyElement.annotate(ANN_VALIDATED);
+        }
         boolean claimed = visitProperty(visitor, propertyElement);
         if (claimed) {
             propertyElement.getReadMethod().ifPresent(element -> addOriginatingElementIfNecessary(visitor, element));
@@ -174,9 +177,6 @@ public class SimpleBeanBuilder extends AbstractBeanBuilder {
     }
 
     protected boolean visitProperty(BeanDefinitionVisitor visitor, PropertyElement propertyElement) {
-        if (propertyElement.hasAnnotation(ANN_REQUIRES_VALIDATION)) {
-            propertyElement.annotate(ANN_VALIDATED);
-        }
         boolean claimed = false;
         Optional<MethodElement> writeMethod = propertyElement.getWriteMethod();
         if (writeMethod.isPresent()) {
