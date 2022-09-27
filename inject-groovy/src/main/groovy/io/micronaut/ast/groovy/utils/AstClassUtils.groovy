@@ -22,7 +22,6 @@ import org.codehaus.groovy.ast.MethodNode
 import org.objectweb.asm.Opcodes
 
 import static org.codehaus.groovy.ast.ClassHelper.make
-import static org.codehaus.groovy.ast.ClassHelper.makeCached
 /**
  * Utility methods for working with classes
  *
@@ -83,17 +82,6 @@ class AstClassUtils {
     static boolean implementsInterface(ClassNode classNode, String interfaceName) {
         ClassNode interfaceNode = make(interfaceName)
         return implementsInterface(classNode, interfaceNode)
-    }
-
-    /**
-     * Whether the given class node implements the given interface node
-     *
-     * @param classNode The class node
-     * @param itfc The interface
-     * @return True if it does
-     */
-    static boolean implementsInterface(ClassNode classNode, Class itfc) {
-        return classNode.getAllInterfaces().contains(makeCached(itfc))
     }
 
     /**
