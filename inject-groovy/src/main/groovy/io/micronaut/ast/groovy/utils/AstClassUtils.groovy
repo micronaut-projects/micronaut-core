@@ -104,7 +104,17 @@ class AstClassUtils {
      * @return True if it does
      */
     static boolean implementsInterface(ClassNode classNode, ClassNode interfaceNode) {
-        return classNode.getAllInterfaces().contains(interfaceNode)
+        if (classNode.getAllInterfaces().contains(interfaceNode)) {
+            return true
+        }
+        ClassNode superClass = classNode.getSuperClass()
+        while (superClass != null) {
+            if (superClass.getAllInterfaces().contains(interfaceNode)) {
+                return true
+            }
+            superClass = superClass.getSuperClass()
+        }
+        return false
     }
 
     static Collection<MethodNode> getAllMethods(ClassNode classNode) {
