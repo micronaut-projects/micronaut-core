@@ -2278,10 +2278,7 @@ public class DefaultHttpClient implements
                 ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_HTTP_CHUNK);
             } catch (NoSuchElementException ignored) {
             }
-            try {
-                ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_HTTP_STREAM);
-            } catch (NoSuchElementException ignored) {
-            }
+            ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_HTTP_STREAM);
             poolHandle.release();
         }
 

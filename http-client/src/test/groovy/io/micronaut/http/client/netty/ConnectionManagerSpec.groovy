@@ -738,6 +738,40 @@ class ConnectionManagerSpec extends Specification {
         ctx.close()
     }
 
+    def 'publisher request'() {
+        def ctx = ApplicationContext.run()
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn = new EmbeddedTestConnectionHttp1()
+        conn.serverChannel.pipeline().addLast(new LoggingHandler(LogLevel.INFO)) // TODO
+        conn.setupHttp1()
+        patch(client, conn.clientChannel)
+        conn.serverChannel.pipeline().addLast(new HttpObjectAggregator(1024))
+
+        def future = Mono.from(client.exchange(HttpRequest.POST(conn.scheme + '://example.com/foo', Flux.fromIterable([1,2,3,4,5]))
+                .contentType(MediaType.APPLICATION_JSON_TYPE), String)).toFuture()
+        future.exceptionally(t -> t.printStackTrace())
+        conn.advance()
+        conn.fireClientActive()
+
+        FullHttpRequest request = conn.serverChannel.readInbound()
+        assert request.uri() == '/foo'
+        assert request.method() == HttpMethod.POST
+        assert request.headers().get('host') == 'example.com'
+        assert request.headers().get("connection") == "keep-alive"
+        assert request.content().toString(StandardCharsets.UTF_8) == '[1,2,3,4,5]'
+
+        def response = new DefaultFullHttpResponse(io.netty.handler.codec.http.HttpVersion.HTTP_1_1, HttpResponseStatus.OK, Unpooled.wrappedBuffer('foo'.bytes))
+        response.headers().add("Content-Length", 3)
+        conn.serverChannel.writeOutbound(response)
+        conn.advance()
+        assert future.get().body() == 'foo'
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
     static class EmbeddedTestConnectionBase {
         final EmbeddedChannel serverChannel
         final EmbeddedChannel clientChannel
