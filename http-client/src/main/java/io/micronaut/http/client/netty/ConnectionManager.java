@@ -875,13 +875,22 @@ class ConnectionManager {
 
         @Override
         void onNewConnectionFailure(@Nullable Throwable error) throws Exception {
-            log.error("Failed to connect to remote", error);
             super.onNewConnectionFailure(error);
             // to avoid an infinite loop, fail one pending request.
             Sinks.One<PoolHandle> pending = pollPendingRequest();
             if (pending != null) {
-                pending.tryEmitError(new HttpClientException("Failed to establish connection", error));
+                HttpClientException wrapped;
+                if (error == null) {
+                    wrapped = new HttpClientException("Unknown connect error");
+                } else {
+                    wrapped = new HttpClientException("Connect Error: " + error.getMessage(), error);
+                }
+                if (pending.tryEmitError(customizeException(wrapped)) == Sinks.EmitResult.OK) {
+                    // no need to log
+                    return;
+                }
             }
+            log.error("Failed to connect to remote", error);
         }
 
         private void addPendingRequest(Sinks.One<PoolHandle> sink) {
