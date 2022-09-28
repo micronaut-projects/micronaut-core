@@ -26,8 +26,6 @@ import io.micronaut.http.client.netty.ssl.NettyClientSslBuilder;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.channel.ChannelPipelineListener;
 import io.micronaut.http.netty.channel.NettyThreadFactory;
-import io.micronaut.http.netty.stream.DefaultHttp2Content;
-import io.micronaut.http.netty.stream.Http2Content;
 import io.micronaut.http.netty.stream.HttpStreamsClientHandler;
 import io.micronaut.scheduling.instrument.Instrumentation;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
@@ -53,7 +51,6 @@ import io.netty.handler.codec.http.DefaultHttpContent;
 import io.netty.handler.codec.http.FullHttpMessage;
 import io.netty.handler.codec.http.HttpClientCodec;
 import io.netty.handler.codec.http.HttpClientUpgradeHandler;
-import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpContentDecompressor;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpMethod;
@@ -69,7 +66,6 @@ import io.netty.handler.codec.http2.Http2FrameCodecBuilder;
 import io.netty.handler.codec.http2.Http2FrameLogger;
 import io.netty.handler.codec.http2.Http2MultiplexHandler;
 import io.netty.handler.codec.http2.Http2SettingsFrame;
-import io.netty.handler.codec.http2.Http2Stream;
 import io.netty.handler.codec.http2.Http2StreamChannel;
 import io.netty.handler.codec.http2.Http2StreamChannelBootstrap;
 import io.netty.handler.codec.http2.Http2StreamFrameToHttpObjectCodec;
@@ -86,7 +82,6 @@ import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.handler.timeout.ReadTimeoutException;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.resolver.NoopAddressResolverGroup;
-import io.netty.util.Attribute;
 import io.netty.util.AttributeKey;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.Future;
@@ -123,7 +118,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 class ConnectionManager {
     private static final AttributeKey<NettyClientCustomizer> CHANNEL_CUSTOMIZER_KEY =
         AttributeKey.valueOf("micronaut.http.customizer");
-    private static final AttributeKey<Http2Stream> STREAM_KEY = AttributeKey.valueOf("micronaut.http2.stream");
 
     final InvocationInstrumenter instrumenter;
     final HttpVersionSelection httpVersion;
@@ -414,29 +408,7 @@ class ConnectionManager {
                     }
                 });
                 if (sse) {
-                    ph.channel.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_SSE_EVENT_STREAM, new LineBasedFrameDecoder(configuration.getMaxContentLength(), true, true) {
-
-                        @Override
-                        public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-                            if (msg instanceof HttpContent) {
-                                if (msg instanceof LastHttpContent) {
-                                    super.channelRead(ctx, msg);
-                                } else {
-                                    Attribute<Http2Stream> streamKey = ctx.channel().attr(STREAM_KEY);
-                                    if (msg instanceof Http2Content) {
-                                        streamKey.set(((Http2Content) msg).stream());
-                                    }
-                                    try {
-                                        super.channelRead(ctx, ((HttpContent) msg).content());
-                                    } finally {
-                                        streamKey.set(null);
-                                    }
-                                }
-                            } else {
-                                super.channelRead(ctx, msg);
-                            }
-                        }
-                    });
+                    ph.channel.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_SSE_EVENT_STREAM, new LineBasedFrameDecoder(configuration.getMaxContentLength(), true, true));
                     ph.channel.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_SSE_CONTENT, new SimpleChannelInboundHandlerInstrumented<ByteBuf>(instrumenter, false) {
 
                         @Override
@@ -447,13 +419,7 @@ class ConnectionManager {
                         @Override
                         protected void channelReadInstrumented(ChannelHandlerContext ctx, ByteBuf msg) {
                             try {
-                                Attribute<Http2Stream> streamKey = ctx.channel().attr(STREAM_KEY);
-                                Http2Stream http2Stream = streamKey.get();
-                                if (http2Stream != null) {
-                                    ctx.fireChannelRead(new DefaultHttp2Content(msg.copy(), http2Stream));
-                                } else {
-                                    ctx.fireChannelRead(new DefaultHttpContent(msg.copy()));
-                                }
+                                ctx.fireChannelRead(new DefaultHttpContent(msg.copy()));
                             } finally {
                                 msg.release();
                             }
