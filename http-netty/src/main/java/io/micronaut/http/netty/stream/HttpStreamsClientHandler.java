@@ -182,12 +182,6 @@ public class HttpStreamsClientHandler extends HttpStreamsHandler<HttpResponse, H
     }
 
     @Override
-    protected int getStreamId(Object msg) {
-        // TODO
-        return -1;
-    }
-
-    @Override
     public void write(final ChannelHandlerContext ctx, Object msg, final ChannelPromise promise) throws Exception {
         // todo
         if (ctx.channel().attr(AttributeKey.valueOf(ChannelPipelineCustomizer.HANDLER_HTTP_CHUNK)).get() == Boolean.TRUE) {
