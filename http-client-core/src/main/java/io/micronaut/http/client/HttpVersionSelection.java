@@ -48,7 +48,7 @@ public final class HttpVersionSelection {
     );
 
     private static final HttpVersionSelection LEGACY_2 = new HttpVersionSelection(
-        PlaintextMode.HTTP_1,
+        PlaintextMode.H2C,
         true,
         new String[]{ALPN_HTTP_1, ALPN_HTTP_2},
         true
