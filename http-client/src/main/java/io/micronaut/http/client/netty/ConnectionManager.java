@@ -646,7 +646,6 @@ class ConnectionManager {
                             if (ApplicationProtocolNames.HTTP_2.equals(protocol)) {
                                 ctx.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION, makeFrameCodec());
                                 initHttp2(pool, ctx.channel(), channelCustomizer);
-                                ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_INITIAL_ERROR);
                             } else if (ApplicationProtocolNames.HTTP_1_1.equals(protocol)) {
                                 initHttp1(ctx.channel());
                                 pool.new Http1ConnectionHolder(ch, channelCustomizer).init(false);
@@ -735,7 +734,6 @@ class ConnectionManager {
                 super.channelRead(ctx, msg);
             }
         });
-        ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_INITIAL_ERROR, pool.initialErrorHandler);
         // stream frames should be handled by the multiplexer
         ch.pipeline().addLast(new ChannelInboundHandlerAdapter() {
             @Override
@@ -795,6 +793,7 @@ class ConnectionManager {
                     super.channelActive(ctx);
                 }
             });
+            ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_INITIAL_ERROR, pool.initialErrorHandler);
 
             connectionCustomizer.onInitialPipelineBuilt();
         }
