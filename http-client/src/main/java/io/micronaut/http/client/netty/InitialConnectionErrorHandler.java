@@ -2,6 +2,7 @@ package io.micronaut.http.client.netty;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
@@ -18,8 +19,12 @@ abstract class InitialConnectionErrorHandler extends ChannelInboundHandlerAdapte
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-        ctx.channel().attr(FAILURE_KEY).set(cause);
+        setFailureCause(ctx.channel(), cause);
         ctx.close();
+    }
+
+    static void setFailureCause(Channel channel, Throwable cause) {
+        channel.attr(FAILURE_KEY).set(cause);
     }
 
     @Override

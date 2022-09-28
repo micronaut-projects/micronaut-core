@@ -80,6 +80,7 @@ import io.netty.handler.ssl.ApplicationProtocolNames;
 import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslHandler;
+import io.netty.handler.ssl.SslHandshakeCompletionEvent;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.handler.timeout.ReadTimeoutException;
@@ -654,6 +655,17 @@ class ConnectionManager {
                                 ctx.close();
                                 throw customizeException(new HttpClientException("Unknown Protocol: " + protocol));
                             }
+                        }
+
+                        @Override
+                        public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+                            if (evt instanceof SslHandshakeCompletionEvent) {
+                                SslHandshakeCompletionEvent event = (SslHandshakeCompletionEvent) evt;
+                                if (!event.isSuccess()) {
+                                    InitialConnectionErrorHandler.setFailureCause(ctx.channel(), event.cause());
+                                }
+                            }
+                            super.userEventTriggered(ctx, evt);
                         }
 
                         @Override
