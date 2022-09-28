@@ -247,8 +247,19 @@ abstract class PoolResizer {
     }
 
     private enum WorkState {
+        /**
+         * There are no pending changes, and nobody is currently executing {@link #doSomeWork()}.
+         */
         IDLE,
+        /**
+         * Someone is currently executing {@link #doSomeWork()}, but there were further changes
+         * after {@link #doSomeWork()} was called, so it needs to be called again.
+         */
         ACTIVE_WITH_PENDING_WORK,
+        /**
+         * Someone is currently executing {@link #doSomeWork()}, and there were no other changes
+         * since then.
+         */
         ACTIVE_WITHOUT_PENDING_WORK,
     }
 
