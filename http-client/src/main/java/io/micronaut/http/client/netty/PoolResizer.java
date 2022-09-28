@@ -103,14 +103,14 @@ abstract class PoolResizer {
             }
             boolean dispatched = false;
             for (ResizerConnection c : http2Connections) {
-                if (c.dispatch(toDispatch)) {
+                if (dispatchSafe(c, toDispatch)) {
                     dispatched = true;
                     break;
                 }
             }
             if (!dispatched) {
                 for (ResizerConnection c : http1Connections) {
-                    if (c.dispatch(toDispatch)) {
+                    if (dispatchSafe(c, toDispatch)) {
                         dispatched = true;
                         break;
                     }
@@ -157,6 +157,22 @@ abstract class PoolResizer {
                 }
             }
             dirty();
+        }
+    }
+
+    private boolean dispatchSafe(ResizerConnection connection, Sinks.One<ConnectionManager.PoolHandle> toDispatch) {
+        try {
+            return connection.dispatch(toDispatch);
+        } catch (Exception e) {
+            try {
+                if (toDispatch.tryEmitError(e) != Sinks.EmitResult.OK) {
+                    // this is probably fine, log it anyway
+                    log.debug("Failure during connection dispatch operation, but dispatch request was already complete.", e);
+                }
+            } catch (Exception f) {
+                log.error("Internal error", f);
+            }
+            return true;
         }
     }
 
@@ -244,6 +260,6 @@ abstract class PoolResizer {
          * @return {@code true} if the acquisition may succeed (if it fails later, the pending
          * request must be readded), or {@code false} if it fails immediately
          */
-        abstract boolean dispatch(Sinks.One<ConnectionManager.PoolHandle> sink);
+        abstract boolean dispatch(Sinks.One<ConnectionManager.PoolHandle> sink) throws Exception;
     }
 }
