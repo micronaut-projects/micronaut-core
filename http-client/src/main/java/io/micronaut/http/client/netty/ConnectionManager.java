@@ -46,6 +46,7 @@ import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.handler.codec.DecoderException;
 import io.netty.handler.codec.LineBasedFrameDecoder;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.DefaultHttpContent;
@@ -96,6 +97,7 @@ import reactor.core.publisher.Sinks;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 
+import javax.net.ssl.SSLException;
 import java.net.InetSocketAddress;
 import java.net.Proxy;
 import java.net.SocketAddress;
@@ -631,7 +633,6 @@ class ConnectionManager {
 
             configureProxy(ch.pipeline(), true, host, port);
 
-            InitialConnectionErrorHandler initialErrorHandler = new InitialConnectionErrorHandler(pool);
             SslHandler sslHandler = sslContext.newHandler(ch.alloc(), host, port);
             sslHandler.setHandshakeTimeoutMillis(configuration.getSslConfiguration().getHandshakeTimeout().toMillis());
             ch.pipeline()
@@ -644,41 +645,30 @@ class ConnectionManager {
                             if (ApplicationProtocolNames.HTTP_2.equals(protocol)) {
                                 ctx.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION, makeFrameCodec());
                                 initHttp2(pool, ctx.channel(), channelCustomizer);
-                                ctx.pipeline().remove(initialErrorHandler);
+                                ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_INITIAL_ERROR);
                             } else if (ApplicationProtocolNames.HTTP_1_1.equals(protocol)) {
                                 initHttp1(ctx.channel());
                                 pool.new Http1ConnectionHolder(ch, channelCustomizer).init(false);
-                                ctx.pipeline().remove(initialErrorHandler);
+                                ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_INITIAL_ERROR);
                             } else {
                                 ctx.close();
                                 throw customizeException(new HttpClientException("Unknown Protocol: " + protocol));
                             }
                         }
+
+                        @Override
+                        public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+                            // let the HANDLER_INITIAL_ERROR handle the failure
+                            if (cause instanceof DecoderException && cause.getCause() instanceof SSLException) {
+                                // unwrap DecoderException
+                                cause = cause.getCause();
+                            }
+                            ctx.fireExceptionCaught(cause);
+                        }
                     })
-                .addLast(initialErrorHandler);
+                .addLast(ChannelPipelineCustomizer.HANDLER_INITIAL_ERROR, pool.initialErrorHandler);
 
             channelCustomizer.onInitialPipelineBuilt();
-        }
-    }
-
-    private class InitialConnectionErrorHandler extends ChannelInboundHandlerAdapter {
-        private final Pool pool;
-        private Throwable cause;
-
-        InitialConnectionErrorHandler(Pool pool) {
-            this.pool = pool;
-        }
-
-        @Override
-        public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-            log.error("Failed to open connection", cause);
-            this.cause = cause;
-        }
-
-        @Override
-        public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-            super.channelInactive(ctx);
-            pool.onNewConnectionFailure(cause);
         }
     }
 
@@ -718,11 +708,12 @@ class ConnectionManager {
             }
         });
         ch.pipeline().addLast(multiplexHandler);
-        ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_SETTINGS, new InitialConnectionErrorHandler(pool) {
+        ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_SETTINGS, new ChannelInboundHandlerAdapter() {
             @Override
             public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
                 if (msg instanceof Http2SettingsFrame) {
-                    ctx.pipeline().remove(this);
+                    ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_HTTP2_SETTINGS);
+                    ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_INITIAL_ERROR);
                     pool.new Http2ConnectionHolder(ch, connectionCustomizer).init();
                     return;
                 } else {
@@ -732,6 +723,7 @@ class ConnectionManager {
                 super.channelRead(ctx, msg);
             }
         });
+        ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_INITIAL_ERROR, pool.initialErrorHandler);
         // stream frames should be handled by the multiplexer
         ch.pipeline().addLast(new ChannelInboundHandlerAdapter() {
             @Override
@@ -834,6 +826,13 @@ class ConnectionManager {
     private final class Pool extends PoolResizer {
         private final DefaultHttpClient.RequestKey requestKey;
 
+        final InitialConnectionErrorHandler initialErrorHandler = new InitialConnectionErrorHandler() {
+            @Override
+            protected void onNewConnectionFailure(@Nullable Throwable cause) throws Exception {
+                Pool.this.onNewConnectionFailure(cause);
+            }
+        };
+
         Pool(DefaultHttpClient.RequestKey requestKey) {
             super(log, configuration.getConnectionPoolConfiguration());
             this.requestKey = requestKey;
@@ -858,6 +857,7 @@ class ConnectionManager {
             if (pending != null) {
                 HttpClientException wrapped;
                 if (error == null) {
+                    // no failure observed, but channel closed
                     wrapped = new HttpClientException("Unknown connect error");
                 } else {
                     wrapped = new HttpClientException("Connect Error: " + error.getMessage(), error);
