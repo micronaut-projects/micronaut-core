@@ -45,6 +45,8 @@ class SslRefreshSpec extends Specification {
             'micronaut.http.client.ssl.key-store.password': 'secret',
             'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
             'micronaut.http.client.pool.enabled': false,
+            // need to force http1 because our ciphers are not supported by http2
+            'micronaut.http.client.http-version': '1.1',
     ]
     @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext
                                                             .builder()
