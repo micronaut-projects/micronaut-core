@@ -10,15 +10,20 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.handler.codec.LineBasedFrameDecoder;
 import io.netty.handler.codec.http.DefaultHttpContent;
 import io.netty.handler.codec.http.HttpContent;
+import io.netty.handler.codec.http.HttpResponse;
+import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.LastHttpContent;
 
 /**
  * Variant of {@link LineBasedFrameDecoder} that accepts
- * {@link io.netty.handler.codec.http.HttpContent} data. Note: this loses {@link LastHttpContent}.
+ * {@link io.netty.handler.codec.http.HttpContent} data. Note: this handler removes itself when the
+ * response has been consumed.
  */
 @Internal
 final class HttpLineBasedFrameDecoder extends LineBasedFrameDecoder {
     static final String NAME = ChannelPipelineCustomizer.HANDLER_MICRONAUT_SSE_EVENT_STREAM;
+
+    private boolean ignoreOneLast = false;
 
     public HttpLineBasedFrameDecoder(int maxLength, boolean stripDelimiter, boolean failFast) {
         super(maxLength, stripDelimiter, failFast);
@@ -26,10 +31,26 @@ final class HttpLineBasedFrameDecoder extends LineBasedFrameDecoder {
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+        if (msg instanceof HttpResponse &&
+            ((HttpResponse) msg).status().equals(HttpResponseStatus.CONTINUE)) {
+            ignoreOneLast = true;
+        }
+
         if (msg instanceof HttpContent) {
             super.channelRead(ctx, ((HttpContent) msg).content());
         } else {
             ctx.fireChannelRead(msg);
+        }
+
+        if (msg instanceof LastHttpContent) {
+            if (ignoreOneLast) {
+                ignoreOneLast = false;
+            } else {
+                // first, remove the handler so that LineBasedFrameDecoder flushes any further
+                // data. Then forward the LastHttpContent.
+                ctx.pipeline().remove(NAME);
+                ctx.fireChannelRead(LastHttpContent.EMPTY_LAST_CONTENT);
+            }
         }
     }
 

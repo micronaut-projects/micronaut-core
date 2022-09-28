@@ -392,9 +392,6 @@ class ConnectionManager {
                             if (ignoreOneLast) {
                                 ignoreOneLast = false;
                             } else {
-                                if (sse) {
-                                    ctx.pipeline().remove(HttpLineBasedFrameDecoder.NAME);
-                                }
                                 ctx.pipeline()
                                     .remove(this)
                                     .remove(ChannelPipelineCustomizer.HANDLER_HTTP_STREAM);
