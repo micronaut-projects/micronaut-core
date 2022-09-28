@@ -102,15 +102,11 @@ import java.net.SocketAddress;
 import java.time.Duration;
 import java.util.Collection;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
-import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -838,10 +834,6 @@ class ConnectionManager {
     private final class Pool extends PoolResizer {
         private final DefaultHttpClient.RequestKey requestKey;
 
-        private final Queue<Sinks.One<PoolHandle>> pendingRequests = new ConcurrentLinkedQueue<>();
-        private final List<Http1ConnectionHolder> http1Connections = new CopyOnWriteArrayList<>();
-        private final List<Http2ConnectionHolder> http2Connections = new CopyOnWriteArrayList<>();
-
         Pool(DefaultHttpClient.RequestKey requestKey) {
             super(log, configuration.getConnectionPoolConfiguration());
             this.requestKey = requestKey;
@@ -849,28 +841,13 @@ class ConnectionManager {
 
         Mono<PoolHandle> acquire() {
             Sinks.One<PoolHandle> sink = new CancellableMonoSink<>();
-            acquire(sink);
+            addPendingRequest(sink);
             Optional<Duration> acquireTimeout = configuration.getConnectionPoolConfiguration().getAcquireTimeout();
             if (acquireTimeout.isPresent()) {
                 return sink.asMono().timeout(acquireTimeout.get(), getEventLoopScheduler());
             } else {
                 return sink.asMono();
             }
-        }
-
-        private void acquire(Sinks.One<PoolHandle> sink) {
-            for (Http2ConnectionHolder http2Connection : http2Connections) {
-                if (http2Connection.satisfy(sink)) {
-                    return;
-                }
-            }
-            for (Http1ConnectionHolder http1Connection : http1Connections) {
-                if (http1Connection.satisfy(sink)) {
-                    return;
-                }
-            }
-            // no connection open that has room
-            addPendingRequest(sink);
         }
 
         @Override
@@ -891,20 +868,6 @@ class ConnectionManager {
                 }
             }
             log.error("Failed to connect to remote", error);
-        }
-
-        private void addPendingRequest(Sinks.One<PoolHandle> sink) {
-            pendingRequests.add(sink);
-            onPendingRequestChange(1);
-        }
-
-        @Nullable
-        private Sinks.One<PoolHandle> pollPendingRequest() {
-            Sinks.One<PoolHandle> req = pendingRequests.poll();
-            if (req != null) {
-                onPendingRequestChange(-1);
-            }
-            return req;
         }
 
         @Override
@@ -953,15 +916,10 @@ class ConnectionManager {
         }
 
         public void shutdown() {
-            for (Http1ConnectionHolder http1Connection : http1Connections) {
-                http1Connection.channel.close();
-            }
-            for (Http2ConnectionHolder http2Connection : http2Connections) {
-                http2Connection.channel.close();
-            }
+            forEachConnection(c -> ((ConnectionHolder) c).channel.close());
         }
 
-        abstract class ConnectionHolder {
+        abstract class ConnectionHolder extends ResizerConnection {
             final Channel channel;
             final NettyClientCustomizer connectionCustomizer;
             ScheduledFuture<?> ttlFuture;
@@ -1009,20 +967,8 @@ class ConnectionManager {
                 windDownConnection = true;
             }
 
-            final void satisfySomePendingRequests() {
-                while (true) {
-                    Sinks.One<PoolHandle> pending = pollPendingRequest();
-                    if (pending == null) {
-                        break;
-                    }
-                    if (!satisfy(pending)) {
-                        addPendingRequest(pending);
-                        break;
-                    }
-                }
-            }
-
-            boolean satisfy(Sinks.One<PoolHandle> sink) {
+            @Override
+            public boolean dispatch(Sinks.One<PoolHandle> sink) {
                 if (!tryEarmarkForRequest()) {
                     return false;
                 }
@@ -1070,13 +1016,7 @@ class ConnectionManager {
                 }
                 connectionCustomizer.onStreamPipelineBuilt();
 
-                Sinks.One<PoolHandle> pendingRequest = pollPendingRequest();
-                if (pendingRequest != null) {
-                    hasLiveRequest.set(true);
-                    satisfy0(pendingRequest);
-                }
-                http1Connections.add(this);
-                onNewConnectionEstablished1();
+                onNewConnectionEstablished1(this);
             }
 
             @Override
@@ -1119,7 +1059,7 @@ class ConnectionManager {
                         }
                         if (!windDownConnection) {
                             hasLiveRequest.set(false);
-                            satisfySomePendingRequests();
+                            markConnectionAvailable();
                         } else {
                             channel.close();
                         }
@@ -1137,7 +1077,7 @@ class ConnectionManager {
                 });
                 if (emitResult.isFailure()) {
                     hasLiveRequest.set(false);
-                    satisfySomePendingRequests();
+                    markConnectionAvailable();
                 }
             }
 
@@ -1158,8 +1098,7 @@ class ConnectionManager {
             @Override
             void onInactive() {
                 super.onInactive();
-                http1Connections.remove(this);
-                onConnectionInactive1();
+                onConnectionInactive1(this);
             }
         }
 
@@ -1180,16 +1119,7 @@ class ConnectionManager {
 
                 connectionCustomizer.onStreamPipelineBuilt();
 
-                for (int i = 0; i < configuration.getConnectionPoolConfiguration().getMaxConcurrentRequestsPerHttp2Connection(); i++) {
-                    Sinks.One<PoolHandle> pendingRequest = pollPendingRequest();
-                    if (pendingRequest == null) {
-                        break;
-                    }
-                    liveRequests.incrementAndGet();
-                    satisfy0(pendingRequest);
-                }
-                http2Connections.add(this);
-                onNewConnectionEstablished2();
+                onNewConnectionEstablished2(this);
             }
 
             @Override
@@ -1233,7 +1163,7 @@ class ConnectionManager {
                                 liveStreamChannels.remove(streamChannel);
                                 streamChannel.close();
                                 liveRequests.decrementAndGet();
-                                satisfySomePendingRequests();
+                                markConnectionAvailable();
                             }
 
                             @Override
@@ -1275,8 +1205,7 @@ class ConnectionManager {
             @Override
             void onInactive() {
                 super.onInactive();
-                http2Connections.remove(Http2ConnectionHolder.this);
-                onConnectionInactive2();
+                onConnectionInactive2(this);
             }
         }
     }

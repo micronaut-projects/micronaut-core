@@ -19,13 +19,26 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.client.HttpClientConfiguration;
 import org.slf4j.Logger;
+import reactor.core.publisher.Sinks;
 
+import java.util.Deque;
+import java.util.List;
+import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 /**
  * This class handles the sizing of a connection pool to conform to the configuration in
  * {@link io.micronaut.http.client.HttpClientConfiguration.ConnectionPoolConfiguration}.
+ *
+ * @implNote This class consists of various mutator methods (e.g. {@link #addPendingRequest}) that
+ * may be called concurrently and in a reentrant fashion (e.g. inside {@link #openNewConnection()}).
+ * These mutator methods update their respective fields and then mark this class as
+ * {@link #dirty()}. The state management logic ensures that {@link #doSomeWork()} is called in a
+ * serialized fashion (no concurrency or reentrancy) at least once after each {@link #dirty()}
+ * call.
  */
 @Internal
 abstract class PoolResizer {
@@ -34,10 +47,11 @@ abstract class PoolResizer {
 
     private final AtomicReference<WorkState> state = new AtomicReference<>(WorkState.IDLE);
 
-    private final AtomicInteger pendingRequests = new AtomicInteger(0);
     private final AtomicInteger pendingConnectionCount = new AtomicInteger(0);
-    private final AtomicInteger http1ConnectionCount = new AtomicInteger(0);
-    private final AtomicInteger http2ConnectionCount = new AtomicInteger(0);
+
+    private final Deque<Sinks.One<ConnectionManager.PoolHandle>> pendingRequests = new ConcurrentLinkedDeque<>();
+    private final List<ResizerConnection> http1Connections = new CopyOnWriteArrayList<>();
+    private final List<ResizerConnection> http2Connections = new CopyOnWriteArrayList<>();
 
     PoolResizer(Logger log, HttpClientConfiguration.ConnectionPoolConfiguration connectionPoolConfiguration) {
         this.log = log;
@@ -58,7 +72,14 @@ abstract class PoolResizer {
         }
         // we were in idle state, this thread will handle the changes.
         while (true) {
-            doSomeWork();
+            try {
+                doSomeWork();
+            } catch (Throwable t) {
+                // this is probably an irrecoverable failure, we need to bail immediately, but
+                // avoid locking up the state. Another thread might be able to continue work.
+                state.set(WorkState.IDLE);
+                throw t;
+            }
 
             WorkState endState = state.updateAndGet(ws -> {
                 if (ws == WorkState.ACTIVE_WITH_PENDING_WORK) {
@@ -75,11 +96,37 @@ abstract class PoolResizer {
     }
 
     private void doSomeWork() {
+        while (true) {
+            Sinks.One<ConnectionManager.PoolHandle> toDispatch = pendingRequests.pollFirst();
+            if (toDispatch == null) {
+                break;
+            }
+            boolean dispatched = false;
+            for (ResizerConnection c : http2Connections) {
+                if (c.dispatch(toDispatch)) {
+                    dispatched = true;
+                    break;
+                }
+            }
+            if (!dispatched) {
+                for (ResizerConnection c : http1Connections) {
+                    if (c.dispatch(toDispatch)) {
+                        dispatched = true;
+                        break;
+                    }
+                }
+            }
+            if (!dispatched) {
+                pendingRequests.addFirst(toDispatch);
+                break;
+            }
+        }
+
         // snapshot our fields
-        int pendingRequests = this.pendingRequests.get();
+        int pendingRequests = this.pendingRequests.size();
         int pendingConnectionCount = this.pendingConnectionCount.get();
-        int http1ConnectionCount = this.http1ConnectionCount.get();
-        int http2ConnectionCount = this.http2ConnectionCount.get();
+        int http1ConnectionCount = this.http1Connections.size();
+        int http2ConnectionCount = this.http2Connections.size();
 
         if (pendingRequests == 0) {
             // if there are no pending requests, there is nothing to do.
@@ -127,13 +174,6 @@ abstract class PoolResizer {
         }
     }
 
-    final void onPendingRequestChange(int delta) {
-        if (pendingRequests.addAndGet(delta) < 0) {
-            throw new IllegalStateException("Negative pending requests");
-        }
-        dirty();
-    }
-
     // can be overridden, so `throws Exception` ensures we handle any errors
     void onNewConnectionFailure(@Nullable Throwable error) throws Exception {
         // todo: circuit breaker?
@@ -141,31 +181,69 @@ abstract class PoolResizer {
         dirty();
     }
 
-    final void onNewConnectionEstablished1() {
-        http1ConnectionCount.incrementAndGet();
+    final void onNewConnectionEstablished1(ResizerConnection connection) {
+        http1Connections.add(connection);
         pendingConnectionCount.decrementAndGet();
         dirty();
     }
 
-    final void onNewConnectionEstablished2() {
-        http2ConnectionCount.incrementAndGet();
+    final void onNewConnectionEstablished2(ResizerConnection connection) {
+        http2Connections.add(connection);
         pendingConnectionCount.decrementAndGet();
         dirty();
     }
 
-    final void onConnectionInactive1() {
-        http1ConnectionCount.decrementAndGet();
+    final void onConnectionInactive1(ResizerConnection connection) {
+        http1Connections.remove(connection);
         dirty();
     }
 
-    final void onConnectionInactive2() {
-        http2ConnectionCount.decrementAndGet();
+    final void onConnectionInactive2(ResizerConnection connection) {
+        http2Connections.remove(connection);
         dirty();
+    }
+
+    final void addPendingRequest(Sinks.One<ConnectionManager.PoolHandle> sink) {
+        pendingRequests.addLast(sink);
+        dirty();
+    }
+
+    @Nullable
+    final Sinks.One<ConnectionManager.PoolHandle> pollPendingRequest() {
+        Sinks.One<ConnectionManager.PoolHandle> req = pendingRequests.pollFirst();
+        if (req != null) {
+            dirty();
+        }
+        return req;
+    }
+
+    final void markConnectionAvailable() {
+        dirty();
+    }
+
+    final void forEachConnection(Consumer<ResizerConnection> c) {
+        for (ResizerConnection http1Connection : http1Connections) {
+            c.accept(http1Connection);
+        }
+        for (ResizerConnection http2Connection : http2Connections) {
+            c.accept(http2Connection);
+        }
     }
 
     private enum WorkState {
         IDLE,
         ACTIVE_WITH_PENDING_WORK,
         ACTIVE_WITHOUT_PENDING_WORK,
+    }
+
+    abstract static class ResizerConnection {
+        /**
+         * Attempt to dispatch a stream on this connection.
+         *
+         * @param sink The pending request that wants to acquire this connection
+         * @return {@code true} if the acquisition may succeed (if it fails later, the pending
+         * request must be readded), or {@code false} if it fails immediately
+         */
+        abstract boolean dispatch(Sinks.One<ConnectionManager.PoolHandle> sink);
     }
 }
