@@ -909,16 +909,41 @@ class ConnectionManager {
                 configuration.getConnectTtl().ifPresent(ttl ->
                     ttlFuture = channel.eventLoop().schedule(this::windDownConnection, ttl.toNanos(), TimeUnit.NANOSECONDS));
                 channel.pipeline().addBefore(before, "connection-cleaner", new ChannelInboundHandlerAdapter() {
+                    boolean inactiveCalled = false;
+
                     @Override
                     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
                         super.channelInactive(ctx);
-                        onInactive();
+                        if (!inactiveCalled) {
+                            inactiveCalled = true;
+                            onInactive();
+                        }
+                    }
+
+                    @Override
+                    public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
+                        if (!inactiveCalled) {
+                            inactiveCalled = true;
+                            onInactive();
+                        }
                     }
                 });
             }
 
             void windDownConnection() {
                 windDownConnection = true;
+            }
+
+            final void emitPoolHandle(Sinks.One<PoolHandle> sink, PoolHandle ph) {
+                Sinks.EmitResult emitResult = sink.tryEmitValue(ph);
+                if (emitResult.isFailure()) {
+                    ph.release();
+                } else {
+                    if (!configuration.getConnectionPoolConfiguration().isEnabled()) {
+                        // if pooling is off, release the connection after this.
+                        windDownConnection();
+                    }
+                }
             }
 
             @Override
@@ -994,7 +1019,7 @@ class ConnectionManager {
                     returnPendingRequest(sink);
                     return;
                 }
-                Sinks.EmitResult emitResult = sink.tryEmitValue(new PoolHandle(false, channel) {
+                PoolHandle ph = new PoolHandle(false, channel) {
                     final ChannelHandlerContext lastContext = channel.pipeline().lastContext();
 
                     @Override
@@ -1028,11 +1053,8 @@ class ConnectionManager {
                     void notifyRequestPipelineBuilt() {
                         connectionCustomizer.onRequestPipelineBuilt();
                     }
-                });
-                if (emitResult.isFailure()) {
-                    hasLiveRequest.set(false);
-                    markConnectionAvailable();
-                }
+                };
+                emitPoolHandle(sink, ph);
             }
 
             private void returnPendingRequest(Sinks.One<PoolHandle> sink) {
@@ -1095,7 +1117,7 @@ class ConnectionManager {
 
             @Override
             void satisfy0(Sinks.One<PoolHandle> sink) {
-                if (!channel.isActive()) {
+                if (!channel.isActive() || windDownConnection) {
                     returnPendingRequest(sink);
                     return;
                 }
@@ -1116,8 +1138,12 @@ class ConnectionManager {
                             void release() {
                                 liveStreamChannels.remove(streamChannel);
                                 streamChannel.close();
-                                liveRequests.decrementAndGet();
-                                markConnectionAvailable();
+                                int newCount = liveRequests.decrementAndGet();
+                                if (windDownConnection && newCount <= 0) {
+                                    Http2ConnectionHolder.this.channel.close();
+                                } else {
+                                    markConnectionAvailable();
+                                }
                             }
 
                             @Override
@@ -1131,10 +1157,7 @@ class ConnectionManager {
                             }
                         };
                         liveStreamChannels.add(streamChannel);
-                        Sinks.EmitResult emitResult = sink.tryEmitValue(ph);
-                        if (emitResult.isFailure()) {
-                            ph.release();
-                        }
+                        emitPoolHandle(sink, ph);
                     } else {
                         log.debug("Failed to open http2 stream", future.cause());
                         returnPendingRequest(sink);

@@ -43,7 +43,8 @@ class SslRefreshSpec extends Specification {
             'micronaut.http.client.ssl.client-authentication': 'NEED',
             'micronaut.http.client.ssl.key-store.path': 'classpath:certs/client1.p12',
             'micronaut.http.client.ssl.key-store.password': 'secret',
-            'micronaut.http.client.ssl.insecure-trust-all-certificates': true
+            'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+            'micronaut.http.client.pool.enabled': false,
     ]
     @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext
                                                             .builder()

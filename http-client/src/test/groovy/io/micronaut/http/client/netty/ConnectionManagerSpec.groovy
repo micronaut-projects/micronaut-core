@@ -27,6 +27,7 @@ import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.ChannelId
 import io.netty.channel.ChannelInboundHandlerAdapter
 import io.netty.channel.ChannelInitializer
+import io.netty.channel.ChannelPromise
 import io.netty.channel.ServerChannel
 import io.netty.channel.embedded.EmbeddedChannel
 import io.netty.handler.codec.http.DefaultFullHttpResponse
@@ -63,6 +64,7 @@ import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler
 import io.netty.handler.ssl.SslContextBuilder
 import io.netty.handler.ssl.util.SelfSignedCertificate
 import io.netty.util.AsciiString
+import io.netty.util.concurrent.GenericFutureListener
 import jakarta.inject.Singleton
 import org.spockframework.runtime.model.parallel.ExecutionMode
 import reactor.core.publisher.Flux
@@ -80,17 +82,23 @@ import java.util.zip.GZIPOutputStream
 
 @Execution(ExecutionMode.CONCURRENT)
 class ConnectionManagerSpec extends Specification {
-    private static void patch(DefaultHttpClient httpClient, EmbeddedChannel... channels) {
+    private static void patch(DefaultHttpClient httpClient, EmbeddedTestConnectionBase... connections) {
         httpClient.connectionManager = new ConnectionManager(httpClient.connectionManager) {
             int i = 0
 
             @Override
             protected ChannelFuture doConnect(DefaultHttpClient.RequestKey requestKey, ChannelInitializer<? extends Channel> channelInitializer) {
-                def channel = channels[i++]
-                channel.pipeline().addLast(channelInitializer)
-                def promise = channel.newPromise()
-                promise.setSuccess()
-                return promise
+                try {
+                    def connection = connections[i++]
+                    connection.clientChannel = new EmbeddedChannel(new DummyChannelId('client' + i), connection.clientInitializer, channelInitializer)
+                    def promise = connection.clientChannel.newPromise()
+                    promise.setSuccess()
+                    return promise
+                } catch (Throwable t) {
+                    // print it immediately to make sure it's not swallowed
+                    t.printStackTrace()
+                    throw t
+                }
             }
         }
     }
@@ -103,7 +111,7 @@ class ConnectionManagerSpec extends Specification {
 
         def conn = new EmbeddedTestConnectionHttp2()
         conn.setupHttp2Tls()
-        patch(client, conn.clientChannel)
+        patch(client, conn)
 
         def future = conn.testExchangeRequest(client)
         conn.exchangeSettings()
@@ -122,7 +130,7 @@ class ConnectionManagerSpec extends Specification {
 
         def conn = new EmbeddedTestConnectionHttp2()
         conn.setupHttp2Tls()
-        patch(client, conn.clientChannel)
+        patch(client, conn)
 
         def r1 = conn.testStreamingRequest(client)
         conn.exchangeSettings()
@@ -139,11 +147,9 @@ class ConnectionManagerSpec extends Specification {
 
         def conn = new EmbeddedTestConnectionHttp1()
         conn.setupHttp1()
-        patch(client, conn.clientChannel)
+        patch(client, conn)
 
-        def request = conn.testExchangeRequest(client)
-        conn.fireClientActive()
-        conn.testExchangeResponse(request)
+        conn.testExchangeResponse(conn.testExchangeRequest(client))
 
         cleanup:
         client.close()
@@ -157,13 +163,12 @@ class ConnectionManagerSpec extends Specification {
         def conn = new EmbeddedTestConnectionHttp1()
         conn.setupHttp1()
         conn.serverChannel.pipeline().addLast(new HttpContentCompressor())
-        patch(client, conn.clientChannel)
+        patch(client, conn)
 
         def future = Mono.from(client.exchange(
                 HttpRequest.GET('http://example.com/foo').header('accept-encoding', 'gzip'), String)).toFuture()
         future.exceptionally(t -> t.printStackTrace())
         conn.advance()
-        conn.fireClientActive()
 
         assert conn.serverChannel.readInbound() instanceof io.netty.handler.codec.http.HttpRequest
 
@@ -188,7 +193,7 @@ class ConnectionManagerSpec extends Specification {
 
         def conn = new EmbeddedTestConnectionHttp2()
         conn.setupHttp2Tls()
-        patch(client, conn.clientChannel)
+        patch(client, conn)
 
         def future = Mono.from(client.exchange('https://example.com/foo', String)).toFuture()
         future.exceptionally(t -> t.printStackTrace())
@@ -223,7 +228,7 @@ class ConnectionManagerSpec extends Specification {
 
         def conn = new EmbeddedTestConnectionHttp1()
         conn.setupHttp1Tls()
-        patch(client, conn.clientChannel)
+        patch(client, conn)
 
         conn.testExchangeResponse(conn.testExchangeRequest(client))
 
@@ -240,7 +245,7 @@ class ConnectionManagerSpec extends Specification {
 
         def conn = new EmbeddedTestConnectionHttp2()
         conn.setupH2c()
-        patch(client, conn.clientChannel)
+        patch(client, conn)
 
         def future = conn.testExchangeRequest(client)
         conn.exchangeH2c()
@@ -257,11 +262,9 @@ class ConnectionManagerSpec extends Specification {
 
         def conn = new EmbeddedTestConnectionHttp1()
         conn.setupHttp1()
-        patch(client, conn.clientChannel)
+        patch(client, conn)
 
-        Queue<String> responseData = conn.testStreamingRequest(client)
-        conn.fireClientActive()
-        conn.testStreamingResponse(responseData)
+        conn.testStreamingResponse(conn.testStreamingRequest(client))
 
         cleanup:
         client.close()
@@ -279,7 +282,7 @@ class ConnectionManagerSpec extends Specification {
         conn1.setupHttp2Tls()
         def conn2 = new EmbeddedTestConnectionHttp2()
         conn2.setupHttp2Tls()
-        patch(client, conn1.clientChannel, conn2.clientChannel)
+        patch(client, conn1, conn2)
 
         when:
         // start two requests. this will open two connections
@@ -341,11 +344,10 @@ class ConnectionManagerSpec extends Specification {
 
         def conn = new EmbeddedTestConnectionHttp1()
         conn.setupHttp1()
-        patch(client, conn.clientChannel)
+        patch(client, conn)
 
-        def r1 = conn.testExchangeRequest(client)
-        conn.fireClientActive()
-        conn.testExchangeResponse(r1)
+        conn.testExchangeResponse(conn.testExchangeRequest(client))
+
         Queue<String> responseData1 = conn.testStreamingRequest(client)
         conn.testStreamingResponse(responseData1)
         conn.testExchangeResponse(conn.testExchangeRequest(client))
@@ -365,12 +367,11 @@ class ConnectionManagerSpec extends Specification {
 
         def conn = new EmbeddedTestConnectionHttp1()
         conn.setupHttp1()
-        patch(client, conn.clientChannel)
+        patch(client, conn)
 
         when:
-        def r1 = conn.testExchangeRequest(client)
-        conn.fireClientActive()
-        conn.testExchangeResponse(r1)
+        conn.testExchangeResponse(conn.testExchangeRequest(client))
+
         Queue<String> responseData = conn.testStreamingRequest(client)
         conn.testStreamingResponse(responseData)
 
@@ -420,7 +421,7 @@ class ConnectionManagerSpec extends Specification {
         } else {
             conn.setupH2c()
         }
-        patch(client, conn.clientChannel)
+        patch(client, conn)
 
         when:
         def r1 = conn.testExchangeRequest(client)
@@ -476,12 +477,10 @@ class ConnectionManagerSpec extends Specification {
 
         def conn = new EmbeddedTestConnectionHttp1()
         conn.setupHttp1()
-        patch(client, conn.clientChannel)
+        patch(client, conn)
 
         // do one request
-        def r1 = conn.testExchangeRequest(client)
-        conn.fireClientActive()
-        conn.testExchangeResponse(r1)
+        conn.testExchangeResponse(conn.testExchangeRequest(client))
         conn.clientChannel.unfreezeTime()
         // connection is in reserve, should not time out
         TimeUnit.SECONDS.sleep(10)
@@ -516,7 +515,7 @@ class ConnectionManagerSpec extends Specification {
 
         def conn = new EmbeddedTestConnectionHttp2()
         conn.setupHttp2Tls()
-        patch(client, conn.clientChannel)
+        patch(client, conn)
 
         // one request opens the connection
         def r1 = conn.testExchangeRequest(client)
@@ -558,17 +557,14 @@ class ConnectionManagerSpec extends Specification {
         conn1.setupHttp1()
         def conn2 = new EmbeddedTestConnectionHttp1()
         conn2.setupHttp1()
-        patch(client, conn1.clientChannel, conn2.clientChannel)
+        patch(client, conn1, conn2)
 
         def r1 = conn1.testExchangeRequest(client)
-        conn1.fireClientActive()
         conn1.clientChannel.advanceTimeBy(101, TimeUnit.SECONDS)
         conn1.testExchangeResponse(r1)
 
         // conn1 should expire now, conn2 will be the next connection
-        def r2 = conn2.testExchangeRequest(client)
-        conn2.fireClientActive()
-        conn2.testExchangeResponse(r2)
+        conn2.testExchangeResponse(conn2.testExchangeRequest(client))
 
         cleanup:
         client.close()
@@ -586,7 +582,7 @@ class ConnectionManagerSpec extends Specification {
         conn1.setupHttp2Tls()
         def conn2 = new EmbeddedTestConnectionHttp2()
         conn2.setupHttp2Tls()
-        patch(client, conn1.clientChannel, conn2.clientChannel)
+        patch(client, conn1, conn2)
 
         def r1 = conn1.testExchangeRequest(client)
         conn1.exchangeSettings()
@@ -613,19 +609,15 @@ class ConnectionManagerSpec extends Specification {
         conn1.setupHttp1()
         def conn2 = new EmbeddedTestConnectionHttp1()
         conn2.setupHttp1()
-        patch(client, conn1.clientChannel, conn2.clientChannel)
+        patch(client, conn1, conn2)
 
-        def r1 = conn1.testExchangeRequest(client)
-        conn1.fireClientActive()
-        conn1.testExchangeResponse(r1)
+        conn1.testExchangeResponse(conn1.testExchangeRequest(client))
         conn1.clientChannel.unfreezeTime()
         // todo: move to advanceTime once IdleStateHandler supports it
         TimeUnit.SECONDS.sleep(5)
         conn1.advance()
         // conn1 should expire now, conn2 will be the next connection
-        def r2 = conn2.testExchangeRequest(client)
-        conn2.fireClientActive()
-        conn2.testExchangeResponse(r2)
+        conn2.testExchangeResponse(conn2.testExchangeRequest(client))
 
         cleanup:
         client.close()
@@ -647,12 +639,11 @@ class ConnectionManagerSpec extends Specification {
             conn.setupHttp1()
         }
         conn.serverChannel.pipeline().addLast(new HttpObjectAggregator(1024))
-        patch(client, conn.clientChannel)
+        patch(client, conn)
 
         def uri = conn.scheme + "://example.com/foo"
         Mono.from(client.connect(Ws, uri)).subscribe()
         conn.advance()
-        conn.fireClientActive()
         io.netty.handler.codec.http.HttpRequest req = conn.serverChannel.readInbound()
         def handshaker = new WebSocketServerHandshakerFactory(uri, null, false).newHandshaker(req)
         handshaker.handshake(conn.serverChannel, req)
@@ -689,12 +680,37 @@ class ConnectionManagerSpec extends Specification {
 
         def conn = new EmbeddedTestConnectionHttp1()
         conn.setupHttp1()
-        patch(client, conn.clientChannel)
+
+        ChannelPromise delayPromise
+        def normalInit = conn.clientInitializer
+        // hack: delay the channelActive call until we complete delayPromise
+        conn.clientInitializer = new ChannelInitializer<EmbeddedChannel>() {
+            @Override
+            protected void initChannel(EmbeddedChannel ch) throws Exception {
+                ch.pipeline().addLast(new ChannelInboundHandlerAdapter() {
+                    @Override
+                    void channelActive(ChannelHandlerContext chtx) throws Exception {
+                        delayPromise = chtx.newPromise()
+                        delayPromise.addListener(new GenericFutureListener<io.netty.util.concurrent.Future<? super Void>>() {
+                            @Override
+                            void operationComplete(io.netty.util.concurrent.Future<? super Void> future) throws Exception {
+                                chtx.fireChannelActive()
+                            }
+                        })
+                    }
+                })
+                ch.pipeline().addLast(normalInit)
+            }
+        }
+
+        patch(client, conn)
 
         def subscription = Mono.from(client.exchange(conn.scheme + '://example.com/foo')).subscribe()
         conn.advance()
         subscription.dispose()
-        conn.fireClientActive()
+        // this completes the handshake
+        delayPromise.setSuccess()
+        conn.advance()
 
         conn.testExchangeResponse(conn.testExchangeRequest(client))
 
@@ -709,16 +725,15 @@ class ConnectionManagerSpec extends Specification {
 
         def conn = new EmbeddedTestConnectionHttp1()
         conn.setupHttp1()
-        patch(client, conn.clientChannel)
+        patch(client, conn)
         conn.serverChannel.pipeline().addLast(new HttpObjectAggregator(1024))
 
         def future = Mono.from(client.exchange(HttpRequest.POST(conn.scheme + '://example.com/foo', MultipartBody.builder()
-            .addPart('foo', 'fn', MediaType.TEXT_PLAIN_TYPE, 'bar'.bytes)
-            .build())
+                .addPart('foo', 'fn', MediaType.TEXT_PLAIN_TYPE, 'bar'.bytes)
+                .build())
                 .contentType(MediaType.MULTIPART_FORM_DATA), String)).toFuture()
         future.exceptionally(t -> t.printStackTrace())
         conn.advance()
-        conn.fireClientActive()
 
         FullHttpRequest request = conn.serverChannel.readInbound()
         assert request.uri() == '/foo'
@@ -743,16 +758,14 @@ class ConnectionManagerSpec extends Specification {
         def client = ctx.getBean(DefaultHttpClient)
 
         def conn = new EmbeddedTestConnectionHttp1()
-        conn.serverChannel.pipeline().addLast(new LoggingHandler(LogLevel.INFO)) // TODO
         conn.setupHttp1()
-        patch(client, conn.clientChannel)
+        patch(client, conn)
         conn.serverChannel.pipeline().addLast(new HttpObjectAggregator(1024))
 
         def future = Mono.from(client.exchange(HttpRequest.POST(conn.scheme + '://example.com/foo', Flux.fromIterable([1,2,3,4,5]))
                 .contentType(MediaType.APPLICATION_JSON_TYPE), String)).toFuture()
         future.exceptionally(t -> t.printStackTrace())
         conn.advance()
-        conn.fireClientActive()
 
         FullHttpRequest request = conn.serverChannel.readInbound()
         assert request.uri() == '/foo'
@@ -772,28 +785,75 @@ class ConnectionManagerSpec extends Specification {
         ctx.close()
     }
 
+    def 'connection pool disabled http1'() {
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.pool.enabled': false,
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn1 = new EmbeddedTestConnectionHttp1()
+        conn1.setupHttp1()
+        def conn2 = new EmbeddedTestConnectionHttp1()
+        conn2.setupHttp1()
+        patch(client, conn1, conn2)
+
+        def r1 = conn1.testExchangeRequest(client)
+        conn1.testExchangeResponse(r1, "close")
+
+        def r2 = conn2.testExchangeRequest(client)
+        conn2.testExchangeResponse(r2, "close")
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
+    def 'connection pool disabled http2'() {
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.pool.enabled': false,
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn1 = new EmbeddedTestConnectionHttp2()
+        conn1.setupHttp2Tls()
+        def conn2 = new EmbeddedTestConnectionHttp2()
+        conn2.setupHttp2Tls()
+        patch(client, conn1, conn2)
+
+        def r1 = conn1.testExchangeRequest(client)
+        conn1.exchangeSettings()
+        conn1.testExchangeResponse(r1)
+
+        def r2 = conn2.testExchangeRequest(client)
+        conn2.exchangeSettings()
+        conn2.testExchangeResponse(r2)
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
     static class EmbeddedTestConnectionBase {
         final EmbeddedChannel serverChannel
-        final EmbeddedChannel clientChannel
+        EmbeddedChannel clientChannel
+        ChannelInitializer<EmbeddedChannel> clientInitializer = new ChannelInitializer<EmbeddedChannel>() {
+            @Override
+            protected void initChannel(EmbeddedChannel ch) throws Exception {
+                ch.freezeTime()
+                ch.config().setAutoRead(false)
+                EmbeddedTestUtil.connect(serverChannel, ch)
+            }
+        }
 
         EmbeddedTestConnectionBase() {
             serverChannel = new EmbeddedServerChannel(new DummyChannelId('server'))
             serverChannel.freezeTime()
             serverChannel.config().setAutoRead(true)
-
-            clientChannel = new EmbeddedChannel(new DummyChannelId('client'))
-            clientChannel.freezeTime()
-            clientChannel.config().setAutoRead(false)
-            EmbeddedTestUtil.connect(serverChannel, clientChannel)
         }
 
-        void advance() {
+        final void advance() {
             EmbeddedTestUtil.advance(serverChannel, clientChannel)
-        }
-
-        void fireClientActive() {
-            clientChannel.pipeline().fireChannelActive()
-            advance()
         }
     }
 
@@ -837,12 +897,12 @@ class ConnectionManagerSpec extends Specification {
             return future
         }
 
-        void testExchangeResponse(CompletableFuture<HttpResponse<?>> future) {
+        void testExchangeResponse(CompletableFuture<HttpResponse<?>> future, String connectionHeader = "keep-alive") {
             io.netty.handler.codec.http.HttpRequest request = serverChannel.readInbound()
             assert request.uri() == '/foo'
             assert request.method() == HttpMethod.GET
             assert request.headers().get('host') == 'example.com'
-            assert request.headers().get("connection") == "keep-alive"
+            assert request.headers().get("connection") == connectionHeader
 
             def tail = serverChannel.readInbound()
             assert tail == null || tail instanceof LastHttpContent
@@ -945,14 +1005,14 @@ class ConnectionManagerSpec extends Specification {
         }
 
         void exchangeSettings() {
-            fireClientActive()
+            advance()
 
             assert serverChannel.readInbound() instanceof Http2SettingsFrame
             assert serverChannel.readInbound() instanceof Http2SettingsAckFrame
         }
 
         void exchangeH2c() {
-            fireClientActive()
+            advance()
 
             Http2HeadersFrame upgradeRequest = serverChannel.readInbound()
             assert upgradeRequest.headers().get(Http2Headers.PseudoHeaderName.METHOD.value()) == 'GET'

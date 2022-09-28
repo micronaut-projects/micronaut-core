@@ -720,7 +720,7 @@ public abstract class HttpClientConfiguration {
          * The default enable value.
          */
         @SuppressWarnings("WeakerAccess")
-        public static final boolean DEFAULT_ENABLED = false;
+        public static final boolean DEFAULT_ENABLED = true;
 
         /**
          * The default max connections value.
