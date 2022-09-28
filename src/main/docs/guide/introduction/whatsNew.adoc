@@ -2,9 +2,35 @@
 
 == 3.7.0
 
-New modules:
+Several improvements:
+
+- If you want complete control of where your application loads configuration from, for example, due to security restrictions, you can disable the default https://docs.micronaut.io/snapshot/guide/#propertySource[`PropertySourceLoader`] implementations by calling `ApplicationContextBuilder::enableDefaultPropertySources(false)` when starting your application.
+
+- Better `java.time` conversion for YAML configuration
+
+- Client SSL inner configuration is https://docs.micronaut.io/latest/guide/#bootstrap[Bootstrap] context compatible.
+
+- https://docs.micronaut.io/snapshot/api/io/micronaut/http/uri/UriBuilder.html[`UriBuilder`] methods `queryParam` and `replaceQueryParam` ignore null values.
+
+- It is possible to stop the Netty server without stopping the Application context.
+
+- You can declare beans at runtime using interfaces.
+
+- You can mark static methods as `@Executable`.
+
+- A big HTTP client refactor.
+
+**Spring integration improvements**
+
+- https://micronaut-projects.github.io/micronaut-spring/latest/guide/[Micronaut Spring] contains improvements for developers who want to use Micronaut modules with a Spring application or consume Spring libraries from a Micronaut application.
+
+**New modules**:
 
 - https://micronaut-projects.github.io/micronaut-object-storage/latest/guide/[Object Storage].
+
+- https://micronaut-projects.github.io/micronaut-crac/latest/guide/[Micronaut CRaC].
+
+Please read the https://micronaut.io/2022/09/21/micronaut-framework-3-7-0-released/[Micronaut Framework 3.7.0 announcement blog post]. You will find a detailed overview of what’s new in Micronaut 3.7.0.
 
 == 3.6.0
 

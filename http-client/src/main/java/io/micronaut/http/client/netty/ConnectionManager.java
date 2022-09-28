@@ -116,7 +116,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 @Internal
 class ConnectionManager {
-    private static final AttributeKey<NettyClientCustomizer> CHANNEL_CUSTOMIZER_KEY =
+    private final AttributeKey<NettyClientCustomizer> CHANNEL_CUSTOMIZER_KEY =
         AttributeKey.valueOf("micronaut.http.customizer");
 
     final InvocationInstrumenter instrumenter;
@@ -765,7 +765,7 @@ class ConnectionManager {
         }
     }
 
-    static abstract class PoolHandle {
+    abstract class PoolHandle {
         final boolean http2;
         final Channel channel;
 

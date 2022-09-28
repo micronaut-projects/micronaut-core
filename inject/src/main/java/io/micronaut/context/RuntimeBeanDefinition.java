@@ -25,6 +25,7 @@ import io.micronaut.inject.BeanContextConditional;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
 import io.micronaut.inject.BeanFactory;
+import io.micronaut.inject.qualifiers.Qualifiers;
 
 import java.lang.annotation.Annotation;
 import java.util.Objects;
@@ -180,6 +181,21 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, Be
          * @return This builder
          */
         Builder<B> qualifier(@Nullable Qualifier<B> qualifier);
+
+        /**
+         * The qualifier to use.
+         * @param name The named qualifier to use.
+         * @return This builder
+         * @since 3.7.0
+         */
+        default Builder<B> named(@Nullable String name) {
+            if (name == null) {
+                qualifier(null);
+            } else {
+                qualifier(Qualifiers.byName(name));
+            }
+            return this;
+        }
 
         /**
          * The scope to use.

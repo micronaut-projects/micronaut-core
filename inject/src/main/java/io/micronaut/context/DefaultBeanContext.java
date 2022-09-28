@@ -368,7 +368,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
      */
     @Override
     public synchronized BeanContext stop() {
-        if (terminating.compareAndSet(false, true)) {
+        if (terminating.compareAndSet(false, true) && isRunning()) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Stopping BeanContext");
             }
