@@ -31,7 +31,6 @@ import io.micronaut.scheduling.instrument.Instrumentation;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.micronaut.websocket.exceptions.WebSocketSessionException;
 import io.netty.bootstrap.Bootstrap;
-import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFactory;
@@ -45,9 +44,7 @@ import io.netty.channel.ChannelPipeline;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.handler.codec.DecoderException;
-import io.netty.handler.codec.LineBasedFrameDecoder;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
-import io.netty.handler.codec.http.DefaultHttpContent;
 import io.netty.handler.codec.http.FullHttpMessage;
 import io.netty.handler.codec.http.HttpClientCodec;
 import io.netty.handler.codec.http.HttpClientUpgradeHandler;
@@ -396,8 +393,7 @@ class ConnectionManager {
                                 ignoreOneLast = false;
                             } else {
                                 if (sse) {
-                                    ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_MICRONAUT_SSE_EVENT_STREAM);
-                                    ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_MICRONAUT_SSE_CONTENT);
+                                    ctx.pipeline().remove(HttpLineBasedFrameDecoder.NAME);
                                 }
                                 ctx.pipeline()
                                     .remove(this)
@@ -408,23 +404,7 @@ class ConnectionManager {
                     }
                 });
                 if (sse) {
-                    ph.channel.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_SSE_EVENT_STREAM, new LineBasedFrameDecoder(configuration.getMaxContentLength(), true, true));
-                    ph.channel.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_SSE_CONTENT, new SimpleChannelInboundHandlerInstrumented<ByteBuf>(instrumenter, false) {
-
-                        @Override
-                        public boolean acceptInboundMessage(Object msg) {
-                            return msg instanceof ByteBuf;
-                        }
-
-                        @Override
-                        protected void channelReadInstrumented(ChannelHandlerContext ctx, ByteBuf msg) {
-                            try {
-                                ctx.fireChannelRead(new DefaultHttpContent(msg.copy()));
-                            } finally {
-                                msg.release();
-                            }
-                        }
-                    });
+                    ph.channel.pipeline().addLast(HttpLineBasedFrameDecoder.NAME, new HttpLineBasedFrameDecoder(configuration.getMaxContentLength(), true, true));
                 }
                 ph.channel.pipeline().addLast(
                         ChannelPipelineCustomizer.HANDLER_HTTP_STREAM,
