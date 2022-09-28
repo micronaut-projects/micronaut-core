@@ -90,7 +90,7 @@ abstract class PoolResizer {
         connectionsToOpen = Math.min(connectionsToOpen, connectionPoolConfiguration.getMaxPendingConnections() - pendingConnectionCount);
         // limit the connection count to the protocol-specific settings, but only if that protocol was seen for this pool.
         if (http1ConnectionCount > 0) {
-            connectionsToOpen = Math.min(connectionsToOpen, connectionPoolConfiguration.getMaxConcurrentHttp2Connections() - http1ConnectionCount);
+            connectionsToOpen = Math.min(connectionsToOpen, connectionPoolConfiguration.getMaxConcurrentHttp1Connections() - http1ConnectionCount);
         }
         if (http2ConnectionCount > 0) {
             connectionsToOpen = Math.min(connectionsToOpen, connectionPoolConfiguration.getMaxConcurrentHttp2Connections() - http2ConnectionCount);
