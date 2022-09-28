@@ -138,12 +138,38 @@ class UriBuilderSpec extends Specification {
         builder.toString() == expected
 
         where:
-        uri                  | params                  | expected
-        '/foo?existing=true' | ['foo': 'bar']          | '/foo?existing=true&foo=bar'
-        '/foo'               | ['foo': 'bar']          | '/foo?foo=bar'
-        '/foo'               | ['foo': 'hello world']  | '/foo?foo=hello+world'
-        '/foo'               | ['foo': ['bar', 'baz']] | '/foo?foo=bar&foo=baz'
-        '/foo'               | ['foo': ['bar', 'baz']] | '/foo?foo=bar&foo=baz'
+        uri                  | params                              | expected
+        '/foo?existing=true' | ['foo': 'bar']                      | '/foo?existing=true&foo=bar'
+        '/foo'               | ['foo': 'bar']                      | '/foo?foo=bar'
+        '/foo'               | ['foo': 'hello world']              | '/foo?foo=hello+world'
+        '/foo'               | ['foo': ['bar', 'baz']]             | '/foo?foo=bar&foo=baz'
+        '/foo'               | ['foo': null, 'bar': 'baz']         | '/foo?bar=baz'
+        '/foo'               | ['foo': [null, null], 'bar': 'baz'] | '/foo?bar=baz'
+    }
+
+    @Unroll
+    void "test replaceQueryParam method for uri #uri"() {
+        given:
+        def builder = UriBuilder.of(uri)
+        for (p in params) {
+            if (p.value instanceof List) {
+                builder.replaceQueryParam(p.key, *p.value)
+            } else {
+                builder.replaceQueryParam(p.key, p.value)
+            }
+        }
+
+        expect:
+        builder.toString() == expected
+
+        where:
+        uri             | params                              | expected
+        '/foo?foo=old'  | ['foo': 'bar']                      | '/foo?foo=bar'
+        '/foo?old=keep' | ['foo': 'bar']                      | '/foo?old=keep&foo=bar'
+        '/foo?foo=old'  | ['foo': 'hello world']              | '/foo?foo=hello+world'
+        '/foo?foo=old'  | ['foo': ['bar', 'baz']]             | '/foo?foo=bar&foo=baz'
+        '/foo?foo=old'  | ['foo': null, 'bar': 'baz']         | '/foo?foo=old&bar=baz'
+        '/foo?foo=old'  | ['foo': [null, null], 'bar': 'baz'] | '/foo?foo=old&bar=baz'
     }
 
     @Issue("https://github.com/micronaut-projects/micronaut-core/issues/2823")

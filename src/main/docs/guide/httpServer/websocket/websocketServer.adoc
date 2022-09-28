@@ -8,7 +8,7 @@ snippet::io.micronaut.docs.http.server.netty.websocket.ChatServerWebSocket[tags=
 <4> You can use a api:websocket.WebSocketBroadcaster[] to broadcast messages to every WebSocket session. You can filter which sessions to send to with a `Predicate`. Also, you could use the api:websocket.WebSocketSession[] instance to send a message to it with `WebSocketSession::send`.
 <5> The ann:websocket.annotation.OnClose[] annotation declares the method to invoke when the WebSocket is closed.
 
-TIP: A working example of WebSockets in action can be found in the https://github.com/micronaut-projects/micronaut-examples/tree/master/websocket-chat[Micronaut Examples] GitHub repository.
+TIP: A working example of WebSockets in action can be found at https://guides.micronaut.io/latest/micronaut-websocket.html[Micronaut Guides].
 
 For binding, method arguments to each WebSocket method can be:
 

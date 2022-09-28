@@ -22,7 +22,7 @@ mongodb:
   uri: mongodb://username:password@localhost:27017/databaseName
 ----
 
-TIP: The `mongodb.uri` follows the https://docs.mongodb.com/manual/reference/connection-string/[MongoDB Connection String] format.
+TIP: The `mongodb.uri` follows the https://www.mongodb.com/docs/manual/reference/connection-string/[MongoDB Connection String] format.
 
 A non-blocking Reactive Streams https://mongodb.github.io/mongo-java-driver-reactivestreams/1.8/javadoc/com/mongodb/reactivestreams/client/MongoClient.html[MongoClient] is then available for dependency injection.
 
