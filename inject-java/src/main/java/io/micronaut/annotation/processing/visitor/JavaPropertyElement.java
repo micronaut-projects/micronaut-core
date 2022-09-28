@@ -69,32 +69,6 @@ class JavaPropertyElement extends AbstractJavaElement implements PropertyElement
         this.visitorContext = visitorContext;
     }
 
-//    /**
-//     * Default constructor.
-//     *
-//     * @param declaringElement   The declaring element
-//     * @param rootElement        The element
-//     * @param annotationMetadata The annotation metadata
-//     * @param name               The name
-//     * @param type               The type
-//     * @param readOnly           Whether it is read only
-//     * @param visitorContext     The java visitor context
-//     * @deprecated Use {@link #JavaPropertyElement(ClassElement, Element, AnnotationMetadata, String, ClassElement, boolean, JavaVisitorContext)} instead
-//     */
-//    @SuppressWarnings("DeprecatedIsStillUsed") // used by openapi processor
-//    // ask about this
-//    @Deprecated
-//    JavaPropertyElement(
-//            ClassElement declaringElement,
-//            ExecutableElement rootElement,
-//            AnnotationMetadata annotationMetadata,
-//            String name,
-//            ClassElement type,
-//            boolean readOnly,
-//            JavaVisitorContext visitorContext) {
-//        this(declaringElement, (Element) rootElement, annotationMetadata, name, type, readOnly, visitorContext);
-//    }
-
     @Override
     public ClassElement getGenericType() {
         Map<String, Map<String, TypeMirror>> declaredGenericInfo;
