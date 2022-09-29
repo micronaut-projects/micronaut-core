@@ -8,14 +8,11 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.runtime.server.EmbeddedServer
 import io.netty.channel.Channel
-import io.netty.channel.pool.AbstractChannelPoolMap
 import spock.lang.AutoCleanup
 import spock.lang.Retry
 import spock.lang.Shared
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
-
-import java.lang.reflect.Field
 
 @Retry
 class IdleTimeoutSpec extends Specification {
@@ -35,8 +32,8 @@ class IdleTimeoutSpec extends Specification {
 
         when: "make first request"
         httpClient.toBlocking().retrieve(HttpRequest.GET('/idleTimeout/'), String)
-        Deque<Channel> deque = getQueuedChannels(httpClient)
-        Channel ch1 = deque.first
+        List<Channel> deque = getQueuedChannels(httpClient)
+        Channel ch1 = deque.get(0)
 
         then: "ensure that connection is open as connection-pool-idle-timeout is not reached"
         deque.size() == 1
@@ -54,7 +51,7 @@ class IdleTimeoutSpec extends Specification {
         }
 
         when:
-        Channel ch2 = deque.first
+        Channel ch2 = deque.get(0)
 
         then: "ensure channel 2 is open and channel 2 != channel 1"
         deque.size() == 1
@@ -79,13 +76,13 @@ class IdleTimeoutSpec extends Specification {
 
         when: "make first request"
         httpClient.toBlocking().retrieve(HttpRequest.GET('/idleTimeout/'), String)
-        Deque<Channel> deque = getQueuedChannels(httpClient)
-        Channel ch1 = deque.first
+        List<Channel> deque = getQueuedChannels(httpClient)
+        Channel ch1 = deque.get(0)
 
         then: "ensure that connection is open as connection-pool-idle-timeout is not reached"
         deque.size() == 1
         new PollingConditions().eventually {
-            deque.first.isOpen()
+            deque.get(0).isOpen()
         }
 
         when: "make another request"
@@ -97,13 +94,13 @@ class IdleTimeoutSpec extends Specification {
         }
 
         when:
-        Channel ch2 = deque.first
+        Channel ch2 = deque.get(0)
 
         then: "ensure channel is still open"
         ch1 == ch2
         deque.size() == 1
         new PollingConditions().eventually {
-            deque.first.isOpen()
+            deque.get(0).isOpen()
         }
 
         cleanup:
@@ -111,12 +108,8 @@ class IdleTimeoutSpec extends Specification {
         clientContext.close()
     }
 
-    Deque getQueuedChannels(HttpClient client) {
-        AbstractChannelPoolMap poolMap = client.connectionManager.poolMap
-        Field mapField = AbstractChannelPoolMap.getDeclaredField("map")
-        mapField.setAccessible(true)
-        Map innerMap = mapField.get(poolMap)
-        return innerMap.values().first().deque
+    List<Channel> getQueuedChannels(HttpClient client) {
+        return client.connectionManager.channels
     }
 
     @Requires(property = 'spec.name', value = 'IdleTimeoutSpec')

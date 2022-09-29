@@ -95,8 +95,10 @@ import java.net.InetSocketAddress;
 import java.net.Proxy;
 import java.net.SocketAddress;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
@@ -232,6 +234,36 @@ class ConnectionManager {
             }
         }
         return group;
+    }
+
+    /**
+     * For testing
+     */
+    List<Channel> getChannels() {
+        List<Channel> channels = new ArrayList<>();
+        for (Pool pool : pools.values()) {
+            pool.forEachConnection(c -> channels.add(((Pool.ConnectionHolder) c).channel));
+        }
+        return channels;
+    }
+
+    /**
+     * For testing
+     */
+    int liveRequestCount() {
+        AtomicInteger count = new AtomicInteger();
+        for (Pool pool : pools.values()) {
+            pool.forEachConnection(c -> {
+                if (c instanceof Pool.Http1ConnectionHolder) {
+                    if (((Pool.Http1ConnectionHolder) c).hasLiveRequests()) {
+                        count.incrementAndGet();
+                    }
+                } else {
+                    count.addAndGet(((Pool.Http2ConnectionHolder) c).liveRequests.get());
+                }
+            });
+        }
+        return count.get();
     }
 
     /**
