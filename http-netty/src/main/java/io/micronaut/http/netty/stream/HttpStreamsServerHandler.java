@@ -220,6 +220,15 @@ public class HttpStreamsServerHandler extends HttpStreamsHandler<HttpRequest, Ht
             webSocketResponse = null;
             webSocketResponseChannelPromise = null;
         }
+        if (inFlight == 0) {
+            // normally, after writing the response, the routing handler triggers a read() for the
+            // next request. However, if at this point the request is not fully read yet (e.g.
+            // still missing a LastHttpContent), then that read() call will simply read the
+            // remaining content, and the HandlerPublisher also won't trigger more read()s since
+            // it's complete. To prevent the connection from being stuck in that case, we trigger a
+            // read here.
+            ctx.read();
+        }
     }
 
     private void handleWebSocketResponse(ChannelHandlerContext ctx, HttpResponse message, ChannelPromise promise) {
