@@ -707,6 +707,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
         // Native properties should be composed of field + synthetic getter/setter
         if (nativeProperties == null) {
             BeanPropertiesConfiguration configuration = new BeanPropertiesConfiguration();
+            configuration.setAllowStaticProperties(true);
             Set<String> nativeProps = getPropertyNodes().stream().map(PropertyNode::getName).collect(Collectors.toCollection(LinkedHashSet::new));
             nativeProperties = AstBeanPropertiesUtils.resolveBeanProperties(configuration,
                 this,
@@ -767,7 +768,8 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                     visitorContext.getAnnotationMetadataBuilder(),
                     value.field.getGenericType(),
                     value.field.getGenericType(),
-                    getterName
+                    getterName,
+                    value.field.isStatic()
                 );
                 value.readAccessKind = BeanProperties.AccessKind.METHOD;
             } else if (nativePropertiesOnly) {
@@ -782,6 +784,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                     PrimitiveElement.VOID,
                     PrimitiveElement.VOID,
                     NameUtils.setterNameFor(value.propertyName),
+                    value.field.isStatic(),
                     ParameterElement.of(value.field.getGenericType(), value.propertyName, annotationMetadataProvider, visitorContext.getAnnotationMetadataBuilder())
                 );
                 value.writeAccessKind = BeanProperties.AccessKind.METHOD;
@@ -986,7 +989,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
         }
         List<PropertyNode> propertyElements = new ArrayList<>();
         for (PropertyNode propertyNode : propertyNodes) {
-            if (propertyNode.isPublic() && !propertyNode.isStatic()) {
+            if (propertyNode.isPublic()) {
                 propertyElements.add(propertyNode);
             }
         }

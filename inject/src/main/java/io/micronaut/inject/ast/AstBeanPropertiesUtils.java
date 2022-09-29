@@ -38,7 +38,7 @@ public class AstBeanPropertiesUtils {
         Map<String, BeanPropertyData> props = new LinkedHashMap<>();
         for (MethodElement methodElement : methodsSupplier.get()) {
             // Records include everything
-            if (methodElement.isStatic()
+            if (methodElement.isStatic() && !configuration.isAllowStaticProperties()
                 || !excludeElementsInRole && (methodElement.hasDeclaredAnnotation(AnnotationUtil.INJECT)
                 || methodElement.hasDeclaredAnnotation(AnnotationUtil.PRE_DESTROY)
                 || methodElement.hasDeclaredAnnotation(AnnotationUtil.POST_CONSTRUCT))
@@ -68,7 +68,7 @@ public class AstBeanPropertiesUtils {
             }
         }
         for (FieldElement fieldElement : fieldSupplier.get()) {
-            if (fieldElement.isStatic()
+            if (fieldElement.isStatic() && !configuration.isAllowStaticProperties()
                 || !excludeElementsInRole && (fieldElement.hasDeclaredAnnotation(AnnotationUtil.INJECT)
                 || fieldElement.hasStereotype(Value.class)
                 || fieldElement.hasStereotype(Property.class))

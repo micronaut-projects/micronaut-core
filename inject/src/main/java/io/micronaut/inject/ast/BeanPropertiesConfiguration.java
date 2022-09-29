@@ -22,6 +22,7 @@ public final class BeanPropertiesConfiguration {
     private String[] writePrefixes = new String[]{AccessorsStyle.DEFAULT_WRITE_PREFIX};
     private boolean allowSetterWithZeroArgs;
     private boolean allowSetterWithMultipleArgs;
+    private boolean allowStaticProperties;
 
     public static BeanPropertiesConfiguration of(AnnotationMetadata annotationMetadata) {
         BeanPropertiesConfiguration conf = new BeanPropertiesConfiguration();
@@ -123,5 +124,13 @@ public final class BeanPropertiesConfiguration {
 
     public void setAllowSetterWithMultipleArgs(boolean allowSetterWithMultipleArgs) {
         this.allowSetterWithMultipleArgs = allowSetterWithMultipleArgs;
+    }
+
+    public boolean isAllowStaticProperties() {
+        return allowStaticProperties;
+    }
+
+    public void setAllowStaticProperties(boolean allowStaticProperties) {
+        this.allowStaticProperties = allowStaticProperties;
     }
 }

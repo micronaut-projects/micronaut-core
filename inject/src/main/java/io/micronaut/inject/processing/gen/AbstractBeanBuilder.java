@@ -104,6 +104,9 @@ public abstract class AbstractBeanBuilder {
         }
         // NOTE: In Micronaut 3 abstract classes are allowed to be beans, but are not pickup to be beans just by having methods or fields with @Inject
         if (isDeclaredBean(classElement) || (!isAbstract && (containsInjectMethod(classElement) || containsInjectField(classElement)))) {
+            if (classElement.hasStereotype("groovy.lang.Singleton")) {
+                throw new ProcessingException(classElement, "Class annotated with groovy.lang.Singleton instead of jakarta.inject.Singleton. Import jakarta.inject.Singleton to use Micronaut Dependency Injection.");
+            }
             return new SimpleBeanBuilder(classElement, visitorContext, false);
         }
         return null;

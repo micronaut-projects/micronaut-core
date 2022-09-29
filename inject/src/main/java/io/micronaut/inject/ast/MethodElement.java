@@ -298,8 +298,10 @@ public interface MethodElement extends MemberElement {
      * @param returnType                 The return type
      * @param genericReturnType          The generic return type
      * @param name                       The name
+     * @param isStatic                   The static
      * @param parameterElements          The parameter elements
      * @return The method element
+     * @since 4.0.0
      */
     static @NonNull MethodElement of(
         @NonNull ClassElement declaredType,
@@ -308,6 +310,7 @@ public interface MethodElement extends MemberElement {
         @NonNull ClassElement returnType,
         @NonNull ClassElement genericReturnType,
         @NonNull String name,
+        boolean isStatic,
         ParameterElement... parameterElements) {
         return new MethodElement() {
 
@@ -344,6 +347,7 @@ public interface MethodElement extends MemberElement {
                     returnType,
                     genericReturnType,
                     name,
+                    isStatic,
                     ArrayUtils.concat(parameterElements, newParameters)
                 );
             }
@@ -381,6 +385,11 @@ public interface MethodElement extends MemberElement {
             @Override
             public boolean isPublic() {
                 return true;
+            }
+
+            @Override
+            public boolean isStatic() {
+                return isStatic;
             }
 
             @Override
