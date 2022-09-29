@@ -8,6 +8,14 @@ This section documents breaking changes between Micronaut versions
 
 https://github.com/ben-manes/caffeine[Caffeine] is no longer shaded into the `io.micronaut.caffeine` package. If you depend on this library you should directly depend on the latest version of Caffeine.
 
+==== SnakeYAML no longer a direct dependency
+
+SnakeYAML is no longer a direct dependency, if you need YAML configuration you should add SnakeYAML to your classpath explicitly
+
+==== `javax.annotation` no longer a directory dependency
+
+The `javax.annotation` library is no longer a directory dependency. Any references to types in the `javax.anotation` package should be changed to `jakarta.annotation`
+
 ==== Kotlin base version updated to 1.7.10
 
 Kotlin has been updated to 1.7.10, which may cause issues when compiling or linking to Kotlin libraries.
