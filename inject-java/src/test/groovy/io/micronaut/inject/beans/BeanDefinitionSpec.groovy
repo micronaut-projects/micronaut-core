@@ -1,14 +1,10 @@
 package io.micronaut.inject.beans
 
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.Order
-import io.micronaut.core.order.Ordered
-import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Issue
-
-import jakarta.inject.Named
-import jakarta.inject.Qualifier
 
 class BeanDefinitionSpec extends AbstractTypeElementSpec {
 
@@ -19,9 +15,46 @@ package genctor;
 
 import jakarta.inject.*;
 
-@Singleton
-class Test {
-    Test(Runnable foo) {}
+import javax.annotation.Nullable;
+import javax.persistence.Entity;
+import javax.validation.constraints.NotBlank;
+
+@Entity
+class Account {
+
+    private Long id;
+
+    @Nullable
+    @NotBlank
+    private String username;
+
+    @Nullable
+    @NotBlank
+    private String password;
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public String getPassword() {
+        return password;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
+    }
 }
 
 ''')
@@ -111,10 +144,10 @@ class Test {
 }
 
 interface X {
-    
+
 }
 class Y implements X {
-    
+
 }
 
 ''')
@@ -164,10 +197,10 @@ class Test {
 }
 
 interface X {
-    
+
 }
 class Y implements X {
-    
+
 }
 
 ''')
