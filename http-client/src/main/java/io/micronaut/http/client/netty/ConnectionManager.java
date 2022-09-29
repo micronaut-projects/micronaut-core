@@ -437,7 +437,8 @@ class ConnectionManager {
             protected void initChannel(Channel ch) throws Exception {
                 addLogHandler(ch);
 
-                if (requestKey.isSecure()) {
+                SslContext sslContext = buildSslContext(requestKey);
+                if (sslContext != null) {
                     SslHandler sslHandler = sslContext.newHandler(ch.alloc(), requestKey.getHost(), requestKey.getPort());
                     sslHandler.setHandshakeTimeoutMillis(configuration.getSslConfiguration().getHandshakeTimeout().toMillis());
                     ch.pipeline().addLast(sslHandler);

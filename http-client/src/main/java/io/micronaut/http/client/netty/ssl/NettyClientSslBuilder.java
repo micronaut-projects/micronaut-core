@@ -17,6 +17,7 @@ package io.micronaut.http.client.netty.ssl;
 
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.client.HttpVersionSelection;
@@ -71,13 +72,14 @@ public class NettyClientSslBuilder extends SslBuilder<SslContext> {
 
     @Override
     public Optional<SslContext> build(SslConfiguration ssl, HttpVersion httpVersion) {
-        if (!ssl.isEnabled()) {
-            return Optional.empty();
-        }
-        return Optional.of(build(ssl, HttpVersionSelection.forLegacyVersion(httpVersion)));
+        return Optional.ofNullable(build(ssl, HttpVersionSelection.forLegacyVersion(httpVersion)));
     }
 
+    @Nullable
     public SslContext build(SslConfiguration ssl, HttpVersionSelection versionSelection) {
+        if (!ssl.isEnabled()) {
+            return null;
+        }
         SslContextBuilder sslBuilder = SslContextBuilder
             .forClient()
             .keyManager(getKeyManagerFactory(ssl))
