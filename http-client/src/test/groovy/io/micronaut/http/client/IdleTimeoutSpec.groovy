@@ -32,11 +32,10 @@ class IdleTimeoutSpec extends Specification {
 
         when: "make first request"
         httpClient.toBlocking().retrieve(HttpRequest.GET('/idleTimeout/'), String)
-        List<Channel> deque = getQueuedChannels(httpClient)
-        Channel ch1 = deque.get(0)
+        Channel ch1 = getQueuedChannels(httpClient).get(0)
 
         then: "ensure that connection is open as connection-pool-idle-timeout is not reached"
-        deque.size() == 1
+        getQueuedChannels(httpClient).size() == 1
         ch1.isOpen()
         new PollingConditions(timeout: 2).eventually {
             !ch1.isOpen()
@@ -47,14 +46,14 @@ class IdleTimeoutSpec extends Specification {
 
         then:
         new PollingConditions().eventually {
-            assert deque.size() > 0
+            assert getQueuedChannels(httpClient).size() > 0
         }
 
         when:
-        Channel ch2 = deque.get(0)
+        Channel ch2 = getQueuedChannels(httpClient).get(0)
 
         then: "ensure channel 2 is open and channel 2 != channel 1"
-        deque.size() == 1
+        getQueuedChannels(httpClient).size() == 1
         ch1 != ch2
         ch2.isOpen()
         new PollingConditions(timeout: 2).eventually {

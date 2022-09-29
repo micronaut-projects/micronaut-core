@@ -220,8 +220,6 @@ public class HttpStreamsServerHandler extends HttpStreamsHandler<HttpRequest, Ht
             webSocketResponse = null;
             webSocketResponseChannelPromise = null;
         }
-        // read next request
-        ctx.read();
     }
 
     private void handleWebSocketResponse(ChannelHandlerContext ctx, HttpResponse message, ChannelPromise promise) {
