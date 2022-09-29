@@ -492,6 +492,7 @@ class ConnectionManager {
                 try {
                     ch.pipeline().addLast(WebSocketClientCompressionHandler.INSTANCE);
                     ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_WEBSOCKET_CLIENT, handler);
+                    clientCustomizer.specializeForChannel(ch, NettyClientCustomizer.ChannelRole.CONNECTION).onInitialPipelineBuilt();
                     if (initial.tryEmitEmpty().isSuccess()) {
                         return;
                     }
