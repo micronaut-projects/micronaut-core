@@ -764,6 +764,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                 );
                 value.getter = MethodElement.of(
                     this,
+                    value.field.getDeclaringType(),
                     annotationMetadataProvider,
                     visitorContext.getAnnotationMetadataBuilder(),
                     value.field.getGenericType(),
@@ -779,6 +780,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
             if (!value.field.isFinal() && value.writeAccessKind != BeanProperties.AccessKind.METHOD) {
                 value.setter = MethodElement.of(
                     this,
+                    value.field.getDeclaringType(),
                     annotationMetadataProvider,
                     visitorContext.getAnnotationMetadataBuilder(),
                     PrimitiveElement.VOID,

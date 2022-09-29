@@ -293,7 +293,7 @@ public interface MethodElement extends MemberElement {
     /**
      * Creates a {@link MethodElement} for the given parameters.
      *
-     * @param declaredType               The declaring type
+     * @param owningType               The declaring type
      * @param annotationMetadataProvider The annotation metadata provider
      * @param returnType                 The return type
      * @param genericReturnType          The generic return type
@@ -304,7 +304,8 @@ public interface MethodElement extends MemberElement {
      * @since 4.0.0
      */
     static @NonNull MethodElement of(
-        @NonNull ClassElement declaredType,
+        @NonNull ClassElement owningType,
+        @NonNull ClassElement declaringType,
         @NonNull AnnotationMetadataProvider annotationMetadataProvider,
         @NonNull AbstractAnnotationMetadataBuilder<?, ?> metadataBuilder,
         @NonNull ClassElement returnType,
@@ -341,7 +342,8 @@ public interface MethodElement extends MemberElement {
             @Override
             public MethodElement withNewParameters(ParameterElement... newParameters) {
                 return MethodElement.of(
-                    declaredType,
+                    owningType,
+                    declaringType,
                     annotationMetadataProvider,
                     metadataBuilder,
                     returnType,
@@ -362,8 +364,13 @@ public interface MethodElement extends MemberElement {
             }
 
             @Override
+            public ClassElement getOwningType() {
+                return owningType;
+            }
+
+            @Override
             public ClassElement getDeclaringType() {
-                return declaredType;
+                return declaringType;
             }
 
             @NonNull
