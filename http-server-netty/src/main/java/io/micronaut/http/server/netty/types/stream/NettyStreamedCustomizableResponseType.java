@@ -19,7 +19,6 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
-import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.types.NettyCustomizableResponseType;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
@@ -56,10 +55,6 @@ public interface NettyStreamedCustomizableResponseType extends NettyCustomizable
 
             // Write the request data
             final DefaultHttpResponse finalResponse = new DefaultHttpResponse(nettyResponse.getNettyHttpVersion(), nettyResponse.getNettyHttpStatus(), nettyResponse.getNettyHeaders());
-            final io.micronaut.http.HttpVersion httpVersion = request.getHttpVersion();
-            if (request instanceof NettyHttpRequest) {
-                ((NettyHttpRequest<?>) request).prepareHttp2ResponseIfNecessary(finalResponse);
-            }
             InputStream inputStream = getInputStream();
             //  can be null if the stream was closed
             context.write(finalResponse, context.voidPromise());

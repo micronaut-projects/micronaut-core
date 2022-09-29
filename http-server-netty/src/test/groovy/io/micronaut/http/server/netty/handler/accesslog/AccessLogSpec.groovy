@@ -274,6 +274,7 @@ class AccessLogSpec extends Specification {
                 'micronaut.ssl.buildSelfSigned': true,
                 'micronaut.server.netty.access-logger.enabled': true,
                 'micronaut.server.netty.access-logger.logger-name': 'http-access-log',
+                'micronaut.netty.event-loops.default.num-threads': 1
         ])
         def server = ctx.getBean(EmbeddedServer)
         server.start()
@@ -358,15 +359,15 @@ class AccessLogSpec extends Specification {
             responses.size() == 3
         }
         responses[0].content().toString(StandardCharsets.UTF_8) == 'simple'
-        responses[1].content().toString(StandardCharsets.UTF_8) == 'open'
-        responses[2].content().toString(StandardCharsets.UTF_8) == 'finish'
+        responses[1].content().toString(StandardCharsets.UTF_8) == 'finish'
+        responses[2].content().toString(StandardCharsets.UTF_8) == 'open'
 
         new PollingConditions(timeout: 5).eventually {
             listAppender.list.size() == 3
         }
         listAppender.list[0].message.contains('/interleave/simple')
-        listAppender.list[1].message.contains('/interleave/open')
-        listAppender.list[2].message.contains('/interleave/finish')
+        listAppender.list[1].message.contains('/interleave/finish')
+        listAppender.list[2].message.contains('/interleave/open')
 
         cleanup:
         responses*.content().forEach(ByteBuf::release)
@@ -455,16 +456,16 @@ class AccessLogSpec extends Specification {
         }
         responses[0].content().toString(StandardCharsets.UTF_8) == 'simple'
         responses[1].content().toString(StandardCharsets.UTF_8) == 'simple'
-        responses[2].content().toString(StandardCharsets.UTF_8) == 'open'
-        responses[3].content().toString(StandardCharsets.UTF_8) == 'finish'
+        responses[2].content().toString(StandardCharsets.UTF_8) == 'finish'
+        responses[3].content().toString(StandardCharsets.UTF_8) == 'open'
 
         new PollingConditions(timeout: 5).eventually {
             listAppender.list.size() == 4
         }
         listAppender.list[0].message.contains('/interleave/simple')
         listAppender.list[1].message.contains('/interleave/simple')
-        listAppender.list[2].message.contains('/interleave/open')
-        listAppender.list[3].message.contains('/interleave/finish')
+        listAppender.list[2].message.contains('/interleave/finish')
+        listAppender.list[3].message.contains('/interleave/open')
 
         cleanup:
         responses*.content().forEach(ByteBuf::release)
@@ -554,8 +555,8 @@ class AccessLogSpec extends Specification {
         }
         responses[0].content().toString(StandardCharsets.UTF_8) == 'simple'
         responses[1].content().toString(StandardCharsets.UTF_8) == 'simple'
-        responses[2].content().toString(StandardCharsets.UTF_8) == 'open'
-        responses[3].content().toString(StandardCharsets.UTF_8) == 'finish'
+        responses[2].content().toString(StandardCharsets.UTF_8) == 'finish'
+        responses[3].content().toString(StandardCharsets.UTF_8) == 'open'
 
         new PollingConditions(timeout: 5).eventually {
             listAppender.list.size() == 1

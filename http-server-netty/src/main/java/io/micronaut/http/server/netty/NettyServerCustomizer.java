@@ -113,5 +113,13 @@ public interface NettyServerCustomizer {
          * {@link io.netty.channel.socket.SocketChannel}, representing an HTTP connection.
          */
         CONNECTION,
+        /**
+         * The channel is a channel representing an individual HTTP2 stream.
+         */
+        REQUEST_STREAM,
+        /**
+         * The channel is a channel representing an individual HTTP2 stream, created for a push promise.
+         */
+        PUSH_PROMISE_STREAM,
     }
 }

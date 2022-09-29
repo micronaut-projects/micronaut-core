@@ -17,6 +17,7 @@ package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
@@ -38,6 +39,7 @@ import io.micronaut.http.netty.AbstractNettyHttpRequest;
 import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.NettyHttpParameters;
 import io.micronaut.http.netty.NettyHttpRequestBuilder;
+import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.cookies.NettyCookie;
 import io.micronaut.http.netty.cookies.NettyCookies;
 import io.micronaut.http.netty.stream.DefaultStreamedHttpRequest;
@@ -51,23 +53,31 @@ import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInitializer;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.DefaultHttpRequest;
 import io.netty.handler.codec.http.DefaultLastHttpContent;
 import io.netty.handler.codec.http.EmptyHttpHeaders;
 import io.netty.handler.codec.http.HttpHeaderNames;
-import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import io.netty.handler.codec.http.cookie.ClientCookieEncoder;
 import io.netty.handler.codec.http.multipart.AbstractHttpData;
 import io.netty.handler.codec.http.multipart.HttpData;
 import io.netty.handler.codec.http.multipart.MixedAttribute;
+import io.netty.handler.codec.http2.DefaultHttp2PushPromiseFrame;
 import io.netty.handler.codec.http2.Http2ConnectionHandler;
+import io.netty.handler.codec.http2.Http2FrameCodec;
+import io.netty.handler.codec.http2.Http2StreamChannel;
+import io.netty.handler.codec.http2.Http2StreamChannelBootstrap;
 import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.ReferenceCounted;
+import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.GenericFutureListener;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -95,6 +105,7 @@ import java.util.function.Supplier;
  */
 @Internal
 public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements HttpRequest<T>, PushCapableHttpRequest<T> {
+    private static final Logger LOG = LoggerFactory.getLogger(NettyHttpRequest.class);
 
     /**
      * Headers to exclude from the push promise sent to the client. We use
@@ -184,24 +195,6 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
             this.bodyUnwrapped = built;
             return Optional.ofNullable(built);
         });
-    }
-
-    /**
-     * Prepares a response based on this HTTP/2 request if HTTP/2 is enabled.
-     *
-     * @param finalResponse The response to prepare, never {@code null}
-     */
-    @Internal
-    public final void prepareHttp2ResponseIfNecessary(@NonNull HttpResponse finalResponse) {
-        final io.micronaut.http.HttpVersion httpVersion = getHttpVersion();
-        final boolean isHttp2 = httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0;
-        if (isHttp2) {
-            final io.netty.handler.codec.http.HttpHeaders nativeHeaders = nettyRequest.headers();
-            final String streamId = nativeHeaders.get(STREAM_ID);
-            if (streamId != null) {
-                finalResponse.headers().set(STREAM_ID, streamId);
-            }
-        }
     }
 
     @Override
@@ -458,15 +451,28 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         return bodyRequired || HttpMethod.requiresRequestBody(getMethod());
     }
 
+    @Nullable
+    private ChannelHandlerContext findConnectionHandler() {
+        ChannelHandlerContext current = channelHandlerContext.pipeline().context(Http2ConnectionHandler.class);
+        if (current != null) {
+            return current;
+        }
+        Channel parentChannel = channelHandlerContext.channel().parent();
+        if (parentChannel != null) {
+            return parentChannel.pipeline().context(Http2FrameCodec.class);
+        }
+        return null;
+    }
+
     @Override
     public boolean isServerPushSupported() {
-        Http2ConnectionHandler http2ConnectionHandler = channelHandlerContext.pipeline().get(Http2ConnectionHandler.class);
-        return http2ConnectionHandler != null && http2ConnectionHandler.connection().remote().allowPushTo();
+        ChannelHandlerContext http2ConnectionHandlerContext = findConnectionHandler();
+        return http2ConnectionHandlerContext != null && ((Http2ConnectionHandler) http2ConnectionHandlerContext.handler()).connection().remote().allowPushTo();
     }
 
     @Override
     public PushCapableHttpRequest<T> serverPush(@NonNull HttpRequest<?> request) {
-        ChannelHandlerContext connectionHandlerContext = channelHandlerContext.pipeline().context(Http2ConnectionHandler.class);
+        ChannelHandlerContext connectionHandlerContext = findConnectionHandler();
         if (connectionHandlerContext != null) {
             Http2ConnectionHandler connectionHandler = (Http2ConnectionHandler) connectionHandlerContext.handler();
 
@@ -477,7 +483,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
             URI configuredUri = request.getUri();
             String scheme = configuredUri.getScheme();
             if (scheme == null) {
-                scheme = channelHandlerContext.pipeline().get(SslHandler.class) == null ? SCHEME_HTTP : SCHEME_HTTPS;
+                scheme = channelHandlerContext.channel().parent().pipeline().get(SslHandler.class) == null ? SCHEME_HTTP : SCHEME_HTTPS;
             }
             String authority = configuredUri.getAuthority();
             if (authority == null) {
@@ -520,22 +526,42 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
                     inboundRequest.headers()
             );
 
-            int ourStream = this.nettyRequest.headers().getInt(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text());
-            int newStream = connectionHandler.connection().local().incrementAndGetNextStreamId();
+            int ourStream = ((Http2StreamChannel) channelHandlerContext.channel()).stream().id();
+            HttpPipelineBuilder.StreamPipeline originalStreamPipeline = channelHandlerContext.channel().attr(HttpPipelineBuilder.STREAM_PIPELINE_ATTRIBUTE).get();
 
-            connectionHandler.encoder().frameWriter().writePushPromise(
-                    connectionHandlerContext,
-                    ourStream,
-                    newStream,
-                    HttpConversionUtil.toHttp2Headers(outboundRequest, false),
-                    0,
-                    connectionHandlerContext.voidPromise()
-            );
+            new Http2StreamChannelBootstrap(channelHandlerContext.channel().parent())
+                    .handler(new ChannelInitializer<Http2StreamChannel>() {
+                        @Override
+                        protected void initChannel(@NonNull Http2StreamChannel ch) throws Exception {
+                            int newStream = ch.stream().id();
 
-            inboundRequest.headers().setInt(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text(), newStream);
-            inboundRequest.headers().setInt(HttpConversionUtil.ExtensionHeaderNames.STREAM_PROMISE_ID.text(), ourStream);
-            // delay until our handling is complete
-            connectionHandlerContext.executor().execute(() -> connectionHandlerContext.fireChannelRead(inboundRequest));
+                            channelHandlerContext.write(new DefaultHttp2PushPromiseFrame(HttpConversionUtil.toHttp2Headers(outboundRequest, false))
+                                    .stream(((Http2StreamChannel) channelHandlerContext.channel()).stream())
+                                    .pushStream(ch.stream()));
+
+                            originalStreamPipeline.initializeChildPipelineForPushPromise(ch);
+
+                            inboundRequest.headers().setInt(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text(), newStream);
+                            inboundRequest.headers().setInt(HttpConversionUtil.ExtensionHeaderNames.STREAM_PROMISE_ID.text(), ourStream);
+
+                            // delay until our handling is complete
+                            connectionHandlerContext.executor().execute(() -> {
+                                try {
+                                    ch.pipeline().context(ChannelPipelineCustomizer.HANDLER_HTTP_DECODER).fireChannelRead(inboundRequest);
+                                } catch (Exception e) {
+                                    LOG.warn("Failed to complete push promise", e);
+                                }
+                            });
+                        }
+                    })
+                    .open()
+                    .addListener((GenericFutureListener<Future<Http2StreamChannel>>) future -> {
+                        try {
+                            future.sync();
+                        } catch (Exception e) {
+                            LOG.warn("Failed to complete push promise", e);
+                        }
+                    });
             return this;
         } else {
             throw new UnsupportedOperationException("Server push not supported by this client: Not a HTTP2 client");
