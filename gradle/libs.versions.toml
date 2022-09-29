@@ -37,8 +37,8 @@ managed-dekorate = "1.0.3"
 managed-elasticsearch = "7.16.3"
 managed-ignite = "2.13.0"
 managed-junit5 = "5.9.0"
-managed-kotlin = "1.6.21"
-managed-kotlin-coroutines = "1.5.1"
+managed-kotlin = "1.7.10"
+managed-kotlin-coroutines = "1.6.4"
 managed-google-function-framework = "1.0.4"
 managed-google-function-invoker = "1.0.0"
 managed-gorm = "7.3.2"
@@ -315,6 +315,7 @@ managed-micronaut-test-bom = { module = "io.micronaut.test:micronaut-test-bom", 
 managed-micronaut-test-core = { module = "io.micronaut.test:micronaut-test-core", version.ref = "managed-micronaut-test" }
 managed-micronaut-test-junit5 = { module = "io.micronaut.test:micronaut-test-junit5", version.ref = "managed-micronaut-test" }
 managed-micronaut-test-kotest = { module = "io.micronaut.test:micronaut-test-kotest", version.ref = "managed-micronaut-test" }
+managed-micronaut-test-kotest5 = { module = "io.micronaut.test:micronaut-test-kotest5", version.ref = "managed-micronaut-test" }
 managed-micronaut-test-spock = { module = "io.micronaut.test:micronaut-test-spock", version.ref = "managed-micronaut-test" }
 managed-micronaut-toml = { module = "io.micronaut.toml:micronaut-toml", version.ref = "managed-micronaut-toml" }
 managed-micronaut-tracing-legacy = { module = "io.micronaut:micronaut-tracing", version.ref = "managed-micronaut-tracing-legacy" }
