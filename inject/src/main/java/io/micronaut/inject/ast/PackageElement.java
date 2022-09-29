@@ -16,6 +16,7 @@
 package io.micronaut.inject.ast;
 
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.util.StringUtils;
 
 import java.util.Objects;
 
@@ -38,7 +39,6 @@ public interface PackageElement extends Element {
      */
     static @NonNull PackageElement of(@NonNull String name) {
         Objects.requireNonNull(name, "Name cannot be null");
-
         return new SimplePackageElement(name);
     }
 
@@ -49,6 +49,6 @@ public interface PackageElement extends Element {
      * @since 3.7.0
      */
     default boolean isUnnamed() {
-        return false;
+        return StringUtils.isEmpty(getName());
     }
 }
