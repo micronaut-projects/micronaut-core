@@ -40,6 +40,11 @@ public @interface ConfigurationReader {
     String PREFIX = "prefix";
 
     /**
+     * The base prefix name.
+     */
+    String BASE_PREFIX = "basePrefix";
+
+    /**
      * The prefix to use when resolving properties. The prefix should be defined in kebab case. Example: my-app.foo.
      *
      * @return The configuration entry to read
@@ -51,6 +56,13 @@ public @interface ConfigurationReader {
      * @return The prefix to use
      */
     String prefix() default "";
+
+    /**
+     * The base prefix to prepend to the original prefix.
+     * @return The base prefix
+     * @since 4.0.0
+     */
+    String basePrefix() default "";
 
     /**
      * @return The names of the properties to include

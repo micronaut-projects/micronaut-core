@@ -79,7 +79,18 @@ public final class ConfigurationUtils {
     }
 
     private static String getPath(AnnotationMetadata annotationMetadata) {
-        String prefix = annotationMetadata.stringValue(ConfigurationReader.class, ConfigurationReader.PREFIX).orElse(null);
+        Optional<String> basePrefixOptional = annotationMetadata.stringValue(ConfigurationReader.class, ConfigurationReader.BASE_PREFIX);
+        Optional<String> prefixOptional = annotationMetadata.stringValue(ConfigurationReader.class, ConfigurationReader.PREFIX);
+        String prefix = null;
+        if (basePrefixOptional.isPresent()) {
+            if (!prefixOptional.isPresent()) {
+                prefix = basePrefixOptional.get();
+            } else {
+                prefix = prefixOptional.map(p -> basePrefixOptional.get() + "." + p).orElse(null);
+            }
+        } else {
+            prefix = prefixOptional.orElse(null);
+        }
         if (annotationMetadata.hasDeclaredAnnotation(EachProperty.class)) {
             Objects.requireNonNull(prefix);
             if (annotationMetadata.booleanValue(EachProperty.class, "list").orElse(false)) {

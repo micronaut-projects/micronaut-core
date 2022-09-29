@@ -15,48 +15,64 @@
  */
 package io.micronaut.inject.configproperties
 
-import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.annotation.Property
 import io.micronaut.inject.BeanDefinition
 
-class InheritedConfigurationReaderPrefixSpec extends AbstractBeanDefinitionSpec {
+class InheritedConfigurationReaderPrefixSpec extends AbstractTypeElementSpec {
 
     void "property path is broken because alias is pointing to another alias"() {
         given:
-        BeanDefinition beanDefinition = buildBeanDefinition('io.micronaut.inject.configproperties.MyBean', """
+            BeanDefinition beanDefinition = buildBeanDefinition('io.micronaut.inject.configproperties.MyBean', """
 package io.micronaut.inject.configproperties;
 
 @TestEndpoint1("simple")
 class MyBean  {
-    String myValue
+    String myValue;
+
+    public String getMyValue() {
+        return myValue;
+    }
+
+    public void setMyValue(String myValue) {
+        this.myValue = myValue;
+    }
 }
 
 """)
 
         expect:
-        beanDefinition.getInjectedMethods()[0].name == 'setMyValue'
-        def metadata = beanDefinition.getInjectedMethods()[0].getAnnotationMetadata()
-        metadata.hasAnnotation(Property)
-        metadata.getValue(Property, "name", String).get() == 'endpoints.my-value'
+            beanDefinition.getInjectedMethods()[0].name == 'setMyValue'
+            def metadata = beanDefinition.getInjectedMethods()[0].getAnnotationMetadata()
+            metadata.hasAnnotation(Property)
+            metadata.getValue(Property, "name", String).get() == 'endpoints.my-value'
     }
 
     void "property path is overriding the existing one without base prefix"() {
         given:
-        BeanDefinition beanDefinition = buildBeanDefinition('io.micronaut.inject.configproperties.MyBean', """
+            BeanDefinition beanDefinition = buildBeanDefinition('io.micronaut.inject.configproperties.MyBean', """
 package io.micronaut.inject.configproperties;
 
 @TestEndpoint2("simple")
 class MyBean  {
-    String myValue
+    String myValue;
+
+    public String getMyValue() {
+        return myValue;
+    }
+
+    public void setMyValue(String myValue) {
+        this.myValue = myValue;
+    }
 }
 
 """)
 
         expect:
-        beanDefinition.getInjectedMethods()[0].name == 'setMyValue'
-        def metadata = beanDefinition.getInjectedMethods()[0].getAnnotationMetadata()
-        metadata.hasAnnotation(Property)
-        metadata.getValue(Property, "name", String).get() == 'simple.my-value'
+            beanDefinition.getInjectedMethods()[0].name == 'setMyValue'
+            def metadata = beanDefinition.getInjectedMethods()[0].getAnnotationMetadata()
+            metadata.hasAnnotation(Property)
+            metadata.getValue(Property, "name", String).get() == 'simple.my-value'
     }
 
     void "property path is broken because alias is pointing to another alias 2"() {
@@ -66,7 +82,15 @@ package io.micronaut.inject.configproperties;
 
 @TestEndpoint3("simple")
 class MyBean  {
-    String myValue
+    String myValue;
+
+    public String getMyValue() {
+        return myValue;
+    }
+
+    public void setMyValue(String myValue) {
+        this.myValue = myValue;
+    }
 }
 
 """)
@@ -85,7 +109,15 @@ package io.micronaut.inject.configproperties;
 
 @TestEndpoint4("simple")
 class MyBean  {
-    String myValue
+    String myValue;
+
+    public String getMyValue() {
+        return myValue;
+    }
+
+    public void setMyValue(String myValue) {
+        this.myValue = myValue;
+    }
 }
 
 """)
