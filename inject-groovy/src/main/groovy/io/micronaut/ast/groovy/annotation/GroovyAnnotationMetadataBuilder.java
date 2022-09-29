@@ -19,12 +19,12 @@ import groovy.lang.GroovyObject;
 import groovy.lang.GroovyObjectSupport;
 import groovy.lang.Script;
 import io.micronaut.ast.groovy.utils.AstGenericUtils;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.ast.groovy.utils.AstMessageUtils;
 import io.micronaut.ast.groovy.utils.ExtendedParameter;
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.reflect.ClassUtils;
@@ -74,7 +74,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 /**
  * Groovy implementation of {@link AbstractAnnotationMetadataBuilder}.
@@ -109,7 +108,11 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
         } else {
             this.elementValidator = null;
         }
+    }
 
+    @Override
+    public CacheEntry lookupOrBuildForParameter(AnnotatedNode owningType, AnnotatedNode methodElement, AnnotatedNode parameterElement) {
+        return super.lookupOrBuildForParameter(owningType, methodElement, new ExtendedParameter((MethodNode) methodElement, (Parameter) parameterElement));
     }
 
     @Override
@@ -179,47 +182,6 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
     @Override
     protected void addWarning(@NonNull AnnotatedNode originatingElement, @NonNull String warning) {
         AstMessageUtils.warning(sourceUnit, originatingElement, warning);
-    }
-
-    @Override
-    protected boolean isMethodOrClassElement(AnnotatedNode element) {
-        return element instanceof ClassNode || element instanceof MethodNode;
-    }
-
-    @Override
-    protected String getDeclaringType(@NonNull AnnotatedNode element) {
-        if (element instanceof ClassNode) {
-            return ((ClassNode) element).getName();
-        }
-        final ClassNode declaringClass = element.getDeclaringClass();
-        if (declaringClass != null) {
-            return declaringClass.getName();
-        }
-        return null;
-    }
-
-    @Override
-    protected String getElementAsString(AnnotatedNode element) {
-        if (element instanceof ClassNode) {
-            return ((ClassNode) element).getName();
-        }
-        if (element instanceof PackageNode) {
-            return ((PackageNode) element).getName();
-        }
-        if (element instanceof MethodNode) {
-            MethodNode methodNode = (MethodNode) element;
-            return methodNode.getName() + "(" + Arrays.stream(methodNode.getParameters()).map(p -> p.getType().getName()).collect(Collectors.joining(",")) + ")";
-        }
-        if (element instanceof FieldNode) {
-            return ((FieldNode) element).getName();
-        }
-        if (element instanceof Parameter) {
-            return ((Parameter) element).getName();
-        }
-        if (element instanceof PropertyNode) {
-            return ((PropertyNode) element).getName();
-        }
-        throw new IllegalStateException("Cannot extract type name from: " + element.getClass().getName());
     }
 
     @Override

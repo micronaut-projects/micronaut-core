@@ -8,11 +8,8 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
-import org.jetbrains.annotations.NotNull;
 
 import java.lang.annotation.Annotation;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
@@ -80,40 +77,30 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
         return new AbstractElementAnnotationMetadata(defaultAnnotationMetadata) {
 
             @Override
-            protected AnnotationMetadata createOnMissing(K nativeOwnerType, K nativeType) {
-                AnnotationMetadata existing = metadataBuilder.lookupExisting(nativeOwnerType, getElementAsString());
-                if (existing != null) {
-                    return existing;
-                }
-                List<K> parents = new ArrayList<>(3);
-                propertyElement.getField().ifPresent(e -> parents.add((K) e.getNativeType()));
-                propertyElement.getWriteMethod().filter(m -> isSupported(m)).ifPresent(e -> parents.add((K) e.getNativeType()));
-                propertyElement.getReadMethod().filter(m -> isSupported(m)).ifPresent(e -> parents.add((K) e.getNativeType()));
-                K element = parents.remove(parents.size() - 1);
-                if (!parents.isEmpty()) {
-                    return metadataBuilder.buildCombinedNoCache(parents, element);
-                }
-                return metadataBuilder.buildForMethod(nativeOwnerType, nativeType);
+            protected AbstractAnnotationMetadataBuilder.CacheEntry lookup() {
+                throw new IllegalStateException("Properties should combine annotations for it's elements!");
+//                // Use a simple property as a key
+//                AbstractAnnotationMetadataBuilder metadataBuilderObject = metadataBuilder;
+//                AnnotationMetadata existing = metadataBuilderObject.lookupExisting(nativeOwnerType, propertyElement.getName());
+//                if (existing != null) {
+//                    return existing;
+//                }
+//                List<K> parents = new ArrayList<>(3);
+//                propertyElement.getField().ifPresent(e -> parents.add((K) e.getNativeType()));
+//                propertyElement.getWriteMethod().filter(m -> isSupported(m)).ifPresent(e -> parents.add((K) e.getNativeType()));
+//                propertyElement.getReadMethod().filter(m -> isSupported(m)).ifPresent(e -> parents.add((K) e.getNativeType()));
+//                K element = parents.remove(parents.size() - 1);
+//                if (!parents.isEmpty()) {
+//                    return metadataBuilder.buildCombinedNoCache(parents, element);
+//                }
+//                return metadataBuilder.buildForMethod(nativeOwnerType, nativeType);
             }
 
             @Override
             protected void addMutatedData() {
-                metadataBuilder.addMutatedMetadata(getNativeOwnerType(), getElementAsString(), annotationMetadata);
-            }
-
-            @NotNull
-            private String getElementAsString() {
-                return "property$ " + propertyElement.getName();
-            }
-
-            @Override
-            protected K getNativeOwnerType() {
-                return (K) propertyElement.getOwningType().getNativeType();
-            }
-
-            @Override
-            protected K getNativeType() {
-                return (K) propertyElement.getNativeType();
+                throw new IllegalStateException("Properties should combine annotations for it's elements!");
+//                AbstractAnnotationMetadataBuilder metadataBuilderObject = metadataBuilder;
+//                metadataBuilderObject.addMutatedMetadata(getNativeOwnerType(), propertyElement.getName(), annotationMetadata);
             }
 
             @Override
@@ -129,18 +116,11 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
         return new AbstractElementAnnotationMetadata(defaultAnnotationMetadata) {
 
             @Override
-            protected AnnotationMetadata createOnMissing(K nativeOwnerType, K nativeType) {
-                return metadataBuilder.build(nativeOwnerType, nativeType);
-            }
-
-            @Override
-            protected K getNativeOwnerType() {
-                return (K) enumConstantElement.getOwningType().getNativeType();
-            }
-
-            @Override
-            protected K getNativeType() {
-                return (K) enumConstantElement.getNativeType();
+            protected AbstractAnnotationMetadataBuilder.CacheEntry lookup() {
+                return metadataBuilder.lookupOrBuildForField(
+                    (K) enumConstantElement.getOwningType().getNativeType(),
+                    (K) enumConstantElement.getNativeType()
+                );
             }
 
             @Override
@@ -155,18 +135,8 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
         return new AbstractElementAnnotationMetadata(defaultAnnotationMetadata) {
 
             @Override
-            protected AnnotationMetadata createOnMissing(K nativeOwnerType, K nativeType) {
-                return metadataBuilder.buildForType((K) packageElement.getNativeType());
-            }
-
-            @Override
-            protected K getNativeOwnerType() {
-                return (K) packageElement.getNativeType();
-            }
-
-            @Override
-            protected K getNativeType() {
-                return (K) packageElement.getNativeType();
+            protected AbstractAnnotationMetadataBuilder.CacheEntry lookup() {
+                return metadataBuilder.lookupOrBuildForType((K) packageElement.getNativeType());
             }
 
             @Override
@@ -181,18 +151,12 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
         return new AbstractElementAnnotationMetadata(defaultAnnotationMetadata) {
 
             @Override
-            protected AnnotationMetadata createOnMissing(K nativeOwnerType, K nativeType) {
-                return metadataBuilder.buildForParameter(nativeOwnerType, nativeType);
-            }
-
-            @Override
-            protected K getNativeOwnerType() {
-                return (K) parameterElement.getMethodElement().getOwningType().getNativeType();
-            }
-
-            @Override
-            protected K getNativeType() {
-                return (K) parameterElement.getNativeType();
+            protected AbstractAnnotationMetadataBuilder.CacheEntry lookup() {
+                return metadataBuilder.lookupOrBuildForParameter(
+                    (K) parameterElement.getMethodElement().getOwningType().getNativeType(),
+                    (K) parameterElement.getMethodElement().getNativeType(),
+                    (K) parameterElement.getNativeType()
+                );
             }
 
             @Override
@@ -208,18 +172,11 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
         return new AbstractElementAnnotationMetadata(defaultAnnotationMetadata) {
 
             @Override
-            protected AnnotationMetadata createOnMissing(K nativeOwnerType, K nativeType) {
-                return metadataBuilder.build(nativeOwnerType, nativeType);
-            }
-
-            @Override
-            protected K getNativeOwnerType() {
-                return (K) fieldElement.getOwningType().getNativeType();
-            }
-
-            @Override
-            protected K getNativeType() {
-                return (K) fieldElement.getNativeType();
+            protected AbstractAnnotationMetadataBuilder.CacheEntry lookup() {
+                return metadataBuilder.lookupOrBuildForField(
+                    (K) fieldElement.getOwningType().getNativeType(),
+                    (K) fieldElement.getNativeType()
+                );
             }
 
             @Override
@@ -235,23 +192,20 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
         return new AbstractElementAnnotationMetadata(defaultAnnotationMetadata) {
 
             @Override
-            protected AnnotationMetadata createOnMissing(K nativeOwnerType, K nativeType) {
-                AnnotationMetadata methodAnnotations = metadataBuilder.buildForMethod(nativeOwnerType, nativeType);
+            protected AbstractAnnotationMetadataBuilder.CacheEntry lookup() {
+                K ownerType = (K) methodElement.getOwningType().getNativeType();
+                AbstractAnnotationMetadataBuilder.CacheEntry methodCacheEntry = metadataBuilder.lookupOrBuildForMethod(
+                    ownerType, (K) methodElement.getNativeType());
+                AnnotationMetadata methodAnnotations = methodCacheEntry.get();
                 if (methodAnnotations instanceof AnnotationMetadataHierarchy) {
-                    return methodAnnotations;
+                    return methodCacheEntry;
                 }
-                AnnotationMetadata typeAnnotations = metadataBuilder.buildForType(nativeOwnerType);
-                return new AnnotationMetadataHierarchy(typeAnnotations, methodAnnotations);
-            }
+                AbstractAnnotationMetadataBuilder.CacheEntry typeCacheEntry = metadataBuilder.lookupOrBuildForType(ownerType);
+                AnnotationMetadata typeAnnotations = typeCacheEntry.get();
 
-            @Override
-            protected K getNativeOwnerType() {
-                return (K) methodElement.getOwningType().getNativeType();
-            }
-
-            @Override
-            protected K getNativeType() {
-                return (K) methodElement.getNativeType();
+                return methodCacheEntry.withAnnotationMetadata(
+                    new AnnotationMetadataHierarchy(typeAnnotations, methodAnnotations)
+                );
             }
 
             @Override
@@ -267,18 +221,11 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
         return new AbstractElementAnnotationMetadata(defaultAnnotationMetadata) {
 
             @Override
-            protected AnnotationMetadata createOnMissing(K nativeOwnerType, K nativeType) {
-                return metadataBuilder.build(nativeOwnerType, nativeType);
-            }
-
-            @Override
-            protected K getNativeOwnerType() {
-                return (K) constructorElement.getOwningType().getNativeType();
-            }
-
-            @Override
-            protected K getNativeType() {
-                return (K) constructorElement.getNativeType();
+            protected AbstractAnnotationMetadataBuilder.CacheEntry lookup() {
+                return metadataBuilder.lookupOrBuildForMethod(
+                    (K) constructorElement.getOwningType().getNativeType(),
+                    (K) constructorElement.getNativeType()
+                );
             }
 
             @Override
@@ -293,18 +240,8 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
         return new AbstractElementAnnotationMetadata(defaultAnnotationMetadata) {
 
             @Override
-            protected AnnotationMetadata createOnMissing(K nativeOwnerType, K nativeType) {
-                return metadataBuilder.buildForType((K) classElement.getNativeType());
-            }
-
-            @Override
-            protected K getNativeOwnerType() {
-                return (K) classElement.getNativeType();
-            }
-
-            @Override
-            protected K getNativeType() {
-                return (K) classElement.getNativeType();
+            protected AbstractAnnotationMetadataBuilder.CacheEntry lookup() {
+                return metadataBuilder.lookupOrBuildForType((K) classElement.getNativeType());
             }
 
             @Override
@@ -317,7 +254,8 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
     protected abstract class AbstractElementAnnotationMetadata implements ElementAnnotationMetadata {
 
         private final boolean readOnly;
-        protected AnnotationMetadata annotationMetadata;
+        private AnnotationMetadata annotationMetadata;
+        private AbstractAnnotationMetadataBuilder.CacheEntry cacheEntry;
 
         protected AbstractElementAnnotationMetadata(@Nullable AnnotationMetadata annotationMetadata) {
             this(AbstractElementAnnotationMetadataFactory.this.isReadOnly, annotationMetadata);
@@ -328,11 +266,7 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
             this.annotationMetadata = annotationMetadata;
         }
 
-        protected abstract AnnotationMetadata createOnMissing(K nativeOwnerType, K nativeType);
-
-        protected abstract K getNativeOwnerType();
-
-        protected abstract K getNativeType();
+        protected abstract AbstractAnnotationMetadataBuilder.CacheEntry lookup();
 
         private void updateAnnotationCaches() {
             if (!readOnly) {
@@ -341,15 +275,21 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
         }
 
         protected void addMutatedData() {
-            metadataBuilder.addMutatedMetadata(getNativeOwnerType(), getNativeType(), annotationMetadata);
+            getCacheEntry().update(annotationMetadata);
+
+        }
+
+        private AbstractAnnotationMetadataBuilder.CacheEntry getCacheEntry() {
+            if (cacheEntry == null) {
+                cacheEntry = lookup();
+            }
+            return cacheEntry;
         }
 
         @Override
         public AnnotationMetadata get() {
             if (annotationMetadata == null) {
-                K nativeOwnerType = getNativeOwnerType();
-                K nativeType = getNativeType();
-                annotationMetadata = createOnMissing(nativeOwnerType, nativeType);
+                annotationMetadata = getCacheEntry().get();
             }
             return annotationMetadata;
         }

@@ -24,7 +24,7 @@ class Test {
     void someMethod() {}
 }
 '''
-        AnnotationMetadata methodMetadata = buildDeclaredMethodAnnotationMetadata(source, 'someMethod')
+        AnnotationMetadata methodMetadata = buildMethodAnnotationMetadata(source, 'someMethod')
         AnnotationMetadata typeMetadata = buildTypeAnnotationMetadata(source)
         AnnotationMetadata annotationMetadata = new AnnotationMetadataHierarchy(typeMetadata, methodMetadata)
 
@@ -63,9 +63,9 @@ package test;
 import io.micronaut.inject.annotation.repeatable.*;
 import io.micronaut.context.annotation.*;
 
-@Property(name="prop2", value="value2")    
-@Property(name="prop3", value="value33")    
-@Property(name="prop4", value="value4")    
+@Property(name="prop2", value="value2")
+@Property(name="prop3", value="value33")
+@Property(name="prop4", value="value4")
 class Test {
 }
 ''')
@@ -108,7 +108,7 @@ class Test {
     void someMethod() {}
 }
 '''
-        AnnotationMetadata methodMetadata = buildDeclaredMethodAnnotationMetadata(source, 'someMethod')
+        AnnotationMetadata methodMetadata = buildMethodAnnotationMetadata(source, 'someMethod')
         AnnotationMetadata typeMetadata = buildTypeAnnotationMetadata(source)
         AnnotationMetadata annotationMetadata = new AnnotationMetadataHierarchy(typeMetadata, methodMetadata)
 

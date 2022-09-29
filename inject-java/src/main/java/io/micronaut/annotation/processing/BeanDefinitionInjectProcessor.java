@@ -158,7 +158,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     String packageName = NameUtils.getPackageName(name);
                     return !name.equals(AnnotationUtil.KOTLIN_METADATA) && !AnnotationUtil.STEREOTYPE_EXCLUDES.contains(packageName);
                 })
-                .filter(ann -> annotationMetadataBuilder.buildForType(ann).hasStereotype(ANNOTATION_STEREOTYPES)
+                .filter(ann -> annotationMetadataBuilder.lookupOrBuildForType(ann).get().hasStereotype(ANNOTATION_STEREOTYPES)
                     || isProcessedAnnotation(ann.getQualifiedName().toString()))
                 .collect(Collectors.toSet());
 
@@ -176,7 +176,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             return;
                         }
                         if (element.getKind() == ENUM) {
-                            final AnnotationMetadata am = annotationMetadataBuilder.buildForType(element);
+                            final AnnotationMetadata am = annotationMetadataBuilder.lookupOrBuildForType(element).get();
                             if (isDeclaredBeanInMetadata(am)) {
                                 error(element, "Enum types cannot be defined as beans");
                             }
@@ -193,7 +193,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             if (!isInterface) {
                                 beanDefinitions.add(name);
                             } else {
-                                AnnotationMetadata annotationMetadata = annotationMetadataBuilder.buildForType(typeElement);
+                                AnnotationMetadata annotationMetadata = annotationMetadataBuilder.lookupOrBuildForType(typeElement).get();
                                 if (annotationMetadata.hasStereotype(INTRODUCTION_TYPE) || annotationMetadata.hasStereotype(ConfigurationReader.class)) {
                                     beanDefinitions.add(name);
                                 }

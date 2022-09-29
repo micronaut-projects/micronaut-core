@@ -223,48 +223,6 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     }
 
     @Override
-    protected boolean isMethodOrClassElement(Element element) {
-        return element instanceof TypeElement || element instanceof ExecutableElement;
-    }
-
-    @NonNull
-    @Override
-    protected String getDeclaringType(@NonNull Element element) {
-        TypeElement typeElement = modelUtils.classElementFor(element);
-        if (typeElement != null) {
-            return typeElement.getQualifiedName().toString();
-        }
-        return element.getSimpleName().toString();
-    }
-
-    @Override
-    protected String getElementAsString(Element element) {
-        if (element instanceof ExecutableElement) {
-            ExecutableElement executableElement = (ExecutableElement) element;
-            return executableElement.getSimpleName().toString() + "(" + executableElement.getParameters().stream()
-                .map(p -> p.asType().toString())
-                .collect(Collectors.joining(",")) + ")";
-        }
-        if (element instanceof VariableElement) {
-            VariableElement variableElement = (VariableElement) element;
-            return variableElement.getSimpleName().toString();
-        }
-        if (element instanceof TypeElement) {
-            TypeElement typeElement = (TypeElement) element;
-            return typeElement.toString();
-        }
-        if (element instanceof TypeParameterElement) {
-            TypeParameterElement typeParameterElement = (TypeParameterElement) element;
-            return typeParameterElement.getSimpleName().toString();
-        }
-        if (element instanceof PackageElement) {
-            PackageElement packageElement = (PackageElement) element;
-            return packageElement.getSimpleName().toString();
-        }
-        throw new IllegalStateException("Cannot convert element: " + element + " " + element.getClass());
-    }
-
-    @Override
     protected Element getTypeForAnnotation(AnnotationMirror annotationMirror) {
         return annotationMirror.getAnnotationType().asElement();
     }

@@ -110,16 +110,7 @@ abstract class AbstractTypeElementSpec extends Specification {
     AnnotationMetadata buildTypeAnnotationMetadata(@Language("java") String cls) {
         Element element = buildTypeElement(cls)
         JavaAnnotationMetadataBuilder builder = newJavaAnnotationBuilder()
-        AnnotationMetadata metadata = element != null ? builder.buildForType(element) : null
-        AbstractAnnotationMetadataBuilder.copyToRuntime()
-        return metadata
-    }
-
-    AnnotationMetadata buildDeclaredMethodAnnotationMetadata(@Language("java") String cls, String methodName) {
-        TypeElement element = buildTypeElement(cls)
-        Element method = element.getEnclosedElements().find() { it.simpleName.toString() == methodName }
-        JavaAnnotationMetadataBuilder builder = newJavaAnnotationBuilder()
-        AnnotationMetadata metadata = method != null ? builder.buildDeclared(method) : null
+        AnnotationMetadata metadata = element != null ? builder.lookupOrBuildForType(element).get() : null
         AbstractAnnotationMetadataBuilder.copyToRuntime()
         return metadata
     }
@@ -129,7 +120,7 @@ abstract class AbstractTypeElementSpec extends Specification {
         ExecutableElement method = (ExecutableElement)element.getEnclosedElements().find() { it.simpleName.toString() == methodName }
         VariableElement argument = method.parameters.find() { it.simpleName.toString() == argumentName }
         JavaAnnotationMetadataBuilder builder = newJavaAnnotationBuilder()
-        AnnotationMetadata metadata = argument != null ? builder.build(element, argument) : null
+        AnnotationMetadata metadata = argument != null ? builder.lookupOrBuildForMethod(element, argument).get() : null
         AbstractAnnotationMetadataBuilder.copyToRuntime()
         return metadata
     }
@@ -317,7 +308,7 @@ class Test {
         TypeElement element = buildTypeElement(cls)
         Element method = element.getEnclosedElements().find() { it.simpleName.toString() == methodName }
         JavaAnnotationMetadataBuilder builder = newJavaAnnotationBuilder()
-        AnnotationMetadata metadata = method != null ? builder.build(element, method) : null
+        AnnotationMetadata metadata = method != null ? builder.lookupOrBuildForMethod(element, method).get() : null
         return metadata
     }
 
@@ -333,7 +324,7 @@ class Test {
         ExecutableElement method = (ExecutableElement)element.getEnclosedElements().find() { it.simpleName.toString() == methodName }
         VariableElement argument = method.parameters.find() { it.simpleName.toString() == fieldName }
         JavaAnnotationMetadataBuilder builder = newJavaAnnotationBuilder()
-        AnnotationMetadata metadata = argument != null ? builder.build(element, argument) : null
+        AnnotationMetadata metadata = argument != null ? builder.lookupOrBuildForField(element, argument).get() : null
         return metadata
     }
 
