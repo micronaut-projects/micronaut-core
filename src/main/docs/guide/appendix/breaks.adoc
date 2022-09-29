@@ -12,6 +12,18 @@ https://github.com/ben-manes/caffeine[Caffeine] is no longer shaded into the `io
 
 In previous versions of the Micronaut framework probes were used to attempt to deduce the running environment and establish whether the application was running in the Cloud. These probes involved network calls which resulted in issues with startup performance and security concerns. These probes have been disabled by default and can be re-enabled as necessary by calling `ApplicationContextBuilder.deduceCloudEnvironment(true)` if your application still requires this functionality.
 
+==== SnakeYAML no longer a direct dependency
+
+SnakeYAML is no longer a direct dependency, if you need YAML configuration you should add SnakeYAML to your classpath explicitly
+
+==== `javax.annotation` no longer a directory dependency
+
+The `javax.annotation` library is no longer a directory dependency. Any references to types in the `javax.anotation` package should be changed to `jakarta.annotation`
+
+==== Kotlin base version updated to 1.7.10
+
+Kotlin has been updated to 1.7.10, which may cause issues when compiling or linking to Kotlin libraries.
+
 == 3.3.0
 
 - The <<environmentEndpoint, environmental endpoint>> is now disabled by default. To enable it, you must update your endpoint config:
