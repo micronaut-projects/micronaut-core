@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.exceptions.HttpClientException;
@@ -74,6 +75,9 @@ import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.resolver.NoopAddressResolverGroup;
 import io.netty.util.AttributeKey;
 import io.netty.util.ReferenceCountUtil;
+import io.netty.util.ResourceLeakDetector;
+import io.netty.util.ResourceLeakDetectorFactory;
+import io.netty.util.ResourceLeakTracker;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 import io.netty.util.concurrent.ScheduledFuture;
@@ -101,6 +105,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Supplier;
 
 /**
  * Connection manager for {@link DefaultHttpClient}. This class manages the lifecycle of netty
@@ -680,9 +685,15 @@ class ConnectionManager {
         }
     }
 
-    abstract class PoolHandle {
+    static abstract class PoolHandle {
+        private static final Supplier<ResourceLeakDetector<PoolHandle>> LEAK_DETECTOR = SupplierUtil.memoized(() ->
+            ResourceLeakDetectorFactory.instance().newResourceLeakDetector(PoolHandle.class));
+
+        private final ResourceLeakTracker<PoolHandle> tracker = LEAK_DETECTOR.get().track(this);
         final boolean http2;
         final Channel channel;
+
+        boolean released = false;
 
         /**
          * Prevent this connection from being reused.
@@ -697,7 +708,15 @@ class ConnectionManager {
         /**
          * Close this connection or release it back to the pool.
          */
-        abstract void release();
+        void release() {
+            if (released) {
+                throw new IllegalStateException("Already released");
+            }
+            released = true;
+            if (tracker != null) {
+                tracker.close(this);
+            }
+        }
 
         /**
          * Whether this connection may be returned to a connection pool (i.e. should be kept
@@ -710,9 +729,7 @@ class ConnectionManager {
         /**
          * Notify any {@link NettyClientCustomizer} that the request pipeline has been built.
          */
-        void notifyRequestPipelineBuilt() {
-            channel.attr(CHANNEL_CUSTOMIZER_KEY).get().onRequestPipelineBuilt();
-        }
+        abstract void notifyRequestPipelineBuilt();
     }
 
     private final class Pool extends PoolResizer {
@@ -959,7 +976,6 @@ class ConnectionManager {
                 }
                 PoolHandle ph = new PoolHandle(false, channel) {
                     final ChannelHandlerContext lastContext = channel.pipeline().lastContext();
-                    boolean released = false;
 
                     @Override
                     void taint() {
@@ -968,11 +984,7 @@ class ConnectionManager {
 
                     @Override
                     void release() {
-                        if (released) {
-                            throw new IllegalStateException("Already released");
-                        }
-                        released = true;
-
+                        super.release();
                         if (!windDownConnection) {
                             ChannelHandlerContext newLast = channel.pipeline().lastContext();
                             if (lastContext != newLast) {
@@ -1073,8 +1085,6 @@ class ConnectionManager {
                             .addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECOMPRESSOR, new HttpContentDecompressor());
                         NettyClientCustomizer streamCustomizer = connectionCustomizer.specializeForChannel(streamChannel, NettyClientCustomizer.ChannelRole.HTTP2_STREAM);
                         PoolHandle ph = new PoolHandle(true, streamChannel) {
-                            boolean released = false;
-
                             @Override
                             void taint() {
                                 // do nothing, we don't reuse stream channels
@@ -1082,11 +1092,7 @@ class ConnectionManager {
 
                             @Override
                             void release() {
-                                if (released) {
-                                    throw new IllegalStateException("Already released");
-                                }
-                                released = true;
-
+                                super.release();
                                 liveStreamChannels.remove(streamChannel);
                                 streamChannel.close();
                                 int newCount = liveRequests.decrementAndGet();
