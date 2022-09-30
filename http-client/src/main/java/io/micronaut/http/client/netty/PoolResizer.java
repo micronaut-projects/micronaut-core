@@ -192,7 +192,8 @@ abstract class PoolResizer {
 
     // can be overridden, so `throws Exception` ensures we handle any errors
     void onNewConnectionFailure(@Nullable Throwable error) throws Exception {
-        // todo: circuit breaker?
+        // todo: implement a circuit breaker here? right now, we just fail one connection in the
+        //  subclass implementation, but maybe we should do more.
         pendingConnectionCount.decrementAndGet();
         dirty();
     }

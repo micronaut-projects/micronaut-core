@@ -593,7 +593,6 @@ class ConnectionManager {
         Http2MultiplexHandler multiplexHandler = new Http2MultiplexHandler(new ChannelInitializer<Http2StreamChannel>() {
             @Override
             protected void initChannel(Http2StreamChannel ch) throws Exception {
-                // todo: fail connection?
                 log.warn("Server opened HTTP2 stream {}, closing immediately", ch.stream().id());
                 ch.close();
             }
@@ -629,7 +628,7 @@ class ConnectionManager {
 
             @Override
             public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-                // todo: log
+                log.warn("Unexpected message on HTTP2 connection channel: {}", msg);
                 ReferenceCountUtil.release(msg);
                 ctx.read();
             }
