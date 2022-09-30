@@ -29,7 +29,6 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 import io.micronaut.runtime.server.EmbeddedServer
 import reactor.core.publisher.Flux
-import spock.lang.Ignore
 import spock.lang.Shared
 import spock.lang.Unroll
 
@@ -229,7 +228,6 @@ class HttpResponseSpec extends AbstractMicronautSpec {
         server.close()
     }
 
-    @Ignore // why wouldn't keep-alive be set?
     void "test keep alive connection header is not set by default for > 499 response"() {
         when:
         EmbeddedServer server = applicationContext.run(EmbeddedServer, [(SPEC_NAME_PROPERTY):getClass().simpleName])
