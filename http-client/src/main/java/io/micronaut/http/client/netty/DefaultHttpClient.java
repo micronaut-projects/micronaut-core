@@ -81,7 +81,6 @@ import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.NettyHttpRequestBuilder;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
-import io.micronaut.http.netty.channel.ChannelPipelineListener;
 import io.micronaut.http.netty.stream.DefaultStreamedHttpResponse;
 import io.micronaut.http.netty.stream.HttpStreamsClientHandler;
 import io.micronaut.http.netty.stream.JsonSubscriber;
@@ -289,7 +288,6 @@ public class DefaultHttpClient implements
             new DefaultRequestBinderRegistry(ConversionService.SHARED),
             null,
             NioSocketChannel::new,
-            Collections.emptySet(),
             CompositeNettyClientCustomizer.EMPTY,
             invocationInstrumenterFactories, null);
     }
@@ -309,7 +307,6 @@ public class DefaultHttpClient implements
      * @param requestBinderRegistry           The request binder registry
      * @param eventLoopGroup                  The event loop group to use
      * @param socketChannelFactory            The socket channel factory
-     * @param pipelineListeners               The listeners to call for pipeline customization
      * @param clientCustomizer                The pipeline customizer
      * @param invocationInstrumenterFactories The invocation instrumeter factories to instrument netty handlers execution with
      * @param informationalServiceId          Optional service ID that will be passed to exceptions created by this client
@@ -327,7 +324,6 @@ public class DefaultHttpClient implements
                              @NonNull RequestBinderRegistry requestBinderRegistry,
                              @Nullable EventLoopGroup eventLoopGroup,
                              @NonNull ChannelFactory socketChannelFactory,
-                             Collection<ChannelPipelineListener> pipelineListeners,
                              NettyClientCustomizer clientCustomizer,
                              List<InvocationInstrumenterFactory> invocationInstrumenterFactories,
                              @Nullable String informationalServiceId
@@ -378,7 +374,6 @@ public class DefaultHttpClient implements
             socketChannelFactory,
             nettyClientSslBuilder,
             clientCustomizer,
-            pipelineListeners,
             informationalServiceId);
     }
 
