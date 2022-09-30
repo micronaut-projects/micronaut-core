@@ -73,7 +73,6 @@ import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.handler.timeout.ReadTimeoutException;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.resolver.NoopAddressResolverGroup;
-import io.netty.util.AttributeKey;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.ResourceLeakDetector;
 import io.netty.util.ResourceLeakDetectorFactory;
@@ -113,12 +112,9 @@ import java.util.function.Supplier;
  */
 @Internal
 class ConnectionManager {
-    private final AttributeKey<NettyClientCustomizer> CHANNEL_CUSTOMIZER_KEY =
-        AttributeKey.valueOf("micronaut.http.customizer");
-
     final InvocationInstrumenter instrumenter;
-    final HttpVersionSelection httpVersion;
 
+    private final HttpVersionSelection httpVersion;
     private final Logger log;
     private final Map<DefaultHttpClient.RequestKey, Pool> pools = new ConcurrentHashMap<>();
     private EventLoopGroup group;
@@ -235,7 +231,9 @@ class ConnectionManager {
     }
 
     /**
-     * For testing
+     * For testing.
+     *
+     * @return Connected channels in all pools
      */
     List<Channel> getChannels() {
         List<Channel> channels = new ArrayList<>();
@@ -246,7 +244,9 @@ class ConnectionManager {
     }
 
     /**
-     * For testing
+     * For testing.
+     *
+     * @return Number of running requests
      */
     int liveRequestCount() {
         AtomicInteger count = new AtomicInteger();
@@ -492,83 +492,6 @@ class ConnectionManager {
         return builder.build();
     }
 
-    private class AdaptiveAlpnChannelInitializer extends ChannelInitializer<Channel> {
-        private final Pool pool;
-
-        final SslContext sslContext;
-        final String host;
-        final int port;
-        private NettyClientCustomizer channelCustomizer;
-
-        AdaptiveAlpnChannelInitializer(Pool pool,
-                                       SslContext sslContext,
-                                       String host,
-                                       int port) {
-            this.pool = pool;
-            this.sslContext = sslContext;
-            this.host = host;
-            this.port = port;
-        }
-
-        /**
-         * @param ch The channel
-         */
-        @Override
-        protected void initChannel(Channel ch) {
-            channelCustomizer = clientCustomizer.specializeForChannel(ch, NettyClientCustomizer.ChannelRole.CONNECTION);
-            ch.attr(CHANNEL_CUSTOMIZER_KEY).set(channelCustomizer);
-
-            configureProxy(ch.pipeline(), true, host, port);
-
-            SslHandler sslHandler = sslContext.newHandler(ch.alloc(), host, port);
-            sslHandler.setHandshakeTimeoutMillis(configuration.getSslConfiguration().getHandshakeTimeout().toMillis());
-            ch.pipeline()
-                .addLast(ChannelPipelineCustomizer.HANDLER_SSL, sslHandler)
-                .addLast(
-                    ChannelPipelineCustomizer.HANDLER_HTTP2_PROTOCOL_NEGOTIATOR,
-                    new ApplicationProtocolNegotiationHandler(ApplicationProtocolNames.HTTP_1_1) {
-                        @Override
-                        protected void configurePipeline(ChannelHandlerContext ctx, String protocol) {
-                            if (ApplicationProtocolNames.HTTP_2.equals(protocol)) {
-                                ctx.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION, makeFrameCodec());
-                                initHttp2(pool, ctx.channel(), channelCustomizer);
-                            } else if (ApplicationProtocolNames.HTTP_1_1.equals(protocol)) {
-                                initHttp1(ctx.channel());
-                                pool.new Http1ConnectionHolder(ch, channelCustomizer).init(false);
-                                ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_INITIAL_ERROR);
-                            } else {
-                                ctx.close();
-                                throw customizeException(new HttpClientException("Unknown Protocol: " + protocol));
-                            }
-                        }
-
-                        @Override
-                        public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
-                            if (evt instanceof SslHandshakeCompletionEvent) {
-                                SslHandshakeCompletionEvent event = (SslHandshakeCompletionEvent) evt;
-                                if (!event.isSuccess()) {
-                                    InitialConnectionErrorHandler.setFailureCause(ctx.channel(), event.cause());
-                                }
-                            }
-                            super.userEventTriggered(ctx, evt);
-                        }
-
-                        @Override
-                        public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-                            // let the HANDLER_INITIAL_ERROR handle the failure
-                            if (cause instanceof DecoderException && cause.getCause() instanceof SSLException) {
-                                // unwrap DecoderException
-                                cause = cause.getCause();
-                            }
-                            ctx.fireExceptionCaught(cause);
-                        }
-                    })
-                .addLast(ChannelPipelineCustomizer.HANDLER_INITIAL_ERROR, pool.initialErrorHandler);
-
-            channelCustomizer.onInitialPipelineBuilt();
-        }
-    }
-
     private void initHttp1(Channel ch) {
         addLogHandler(ch);
 
@@ -635,6 +558,81 @@ class ConnectionManager {
         });
     }
 
+    private class AdaptiveAlpnChannelInitializer extends ChannelInitializer<Channel> {
+        private final Pool pool;
+
+        private final SslContext sslContext;
+        private final String host;
+        private final int port;
+
+        AdaptiveAlpnChannelInitializer(Pool pool,
+                                       SslContext sslContext,
+                                       String host,
+                                       int port) {
+            this.pool = pool;
+            this.sslContext = sslContext;
+            this.host = host;
+            this.port = port;
+        }
+
+        /**
+         * @param ch The channel
+         */
+        @Override
+        protected void initChannel(Channel ch) {
+            NettyClientCustomizer channelCustomizer = clientCustomizer.specializeForChannel(ch, NettyClientCustomizer.ChannelRole.CONNECTION);
+
+            configureProxy(ch.pipeline(), true, host, port);
+
+            SslHandler sslHandler = sslContext.newHandler(ch.alloc(), host, port);
+            sslHandler.setHandshakeTimeoutMillis(configuration.getSslConfiguration().getHandshakeTimeout().toMillis());
+            ch.pipeline()
+                .addLast(ChannelPipelineCustomizer.HANDLER_SSL, sslHandler)
+                .addLast(
+                    ChannelPipelineCustomizer.HANDLER_HTTP2_PROTOCOL_NEGOTIATOR,
+                    new ApplicationProtocolNegotiationHandler(ApplicationProtocolNames.HTTP_1_1) {
+                        @Override
+                        protected void configurePipeline(ChannelHandlerContext ctx, String protocol) {
+                            if (ApplicationProtocolNames.HTTP_2.equals(protocol)) {
+                                ctx.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION, makeFrameCodec());
+                                initHttp2(pool, ctx.channel(), channelCustomizer);
+                            } else if (ApplicationProtocolNames.HTTP_1_1.equals(protocol)) {
+                                initHttp1(ctx.channel());
+                                pool.new Http1ConnectionHolder(ch, channelCustomizer).init(false);
+                                ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_INITIAL_ERROR);
+                            } else {
+                                ctx.close();
+                                throw customizeException(new HttpClientException("Unknown Protocol: " + protocol));
+                            }
+                        }
+
+                        @Override
+                        public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+                            if (evt instanceof SslHandshakeCompletionEvent) {
+                                SslHandshakeCompletionEvent event = (SslHandshakeCompletionEvent) evt;
+                                if (!event.isSuccess()) {
+                                    InitialConnectionErrorHandler.setFailureCause(ctx.channel(), event.cause());
+                                }
+                            }
+                            super.userEventTriggered(ctx, evt);
+                        }
+
+                        @Override
+                        public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+                            // let the HANDLER_INITIAL_ERROR handle the failure
+                            if (cause instanceof DecoderException && cause.getCause() instanceof SSLException) {
+                                // unwrap DecoderException
+                                cause = cause.getCause();
+                            }
+                            ctx.fireExceptionCaught(cause);
+                        }
+                    })
+                .addLast(ChannelPipelineCustomizer.HANDLER_INITIAL_ERROR, pool.initialErrorHandler);
+
+            channelCustomizer.onInitialPipelineBuilt();
+        }
+    }
+
     private class Http2UpgradeInitializer extends ChannelInitializer<Channel> {
         private final Pool pool;
 
@@ -684,25 +682,26 @@ class ConnectionManager {
         }
     }
 
-    static abstract class PoolHandle {
+    abstract static class PoolHandle {
         private static final Supplier<ResourceLeakDetector<PoolHandle>> LEAK_DETECTOR = SupplierUtil.memoized(() ->
             ResourceLeakDetectorFactory.instance().newResourceLeakDetector(PoolHandle.class));
 
-        private final ResourceLeakTracker<PoolHandle> tracker = LEAK_DETECTOR.get().track(this);
         final boolean http2;
         final Channel channel;
 
         boolean released = false;
 
-        /**
-         * Prevent this connection from being reused.
-         */
-        abstract void taint();
+        private final ResourceLeakTracker<PoolHandle> tracker = LEAK_DETECTOR.get().track(this);
 
         private PoolHandle(boolean http2, Channel channel) {
             this.http2 = http2;
             this.channel = channel;
         }
+
+        /**
+         * Prevent this connection from being reused.
+         */
+        abstract void taint();
 
         /**
          * Close this connection or release it back to the pool.
@@ -734,7 +733,7 @@ class ConnectionManager {
     private final class Pool extends PoolResizer {
         private final DefaultHttpClient.RequestKey requestKey;
 
-        final InitialConnectionErrorHandler initialErrorHandler = new InitialConnectionErrorHandler() {
+        private final InitialConnectionErrorHandler initialErrorHandler = new InitialConnectionErrorHandler() {
             @Override
             protected void onNewConnectionFailure(@Nullable Throwable cause) throws Exception {
                 Pool.this.onNewConnectionFailure(cause);

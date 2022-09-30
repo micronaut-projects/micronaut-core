@@ -32,11 +32,11 @@ import java.util.Arrays;
  */
 public final class HttpVersionSelection {
     /**
-     * ALPN protocol ID for HTTP/1.1
+     * ALPN protocol ID for HTTP/1.1.
      */
     public static final String ALPN_HTTP_1 = "http/1.1";
     /**
-     * ALPN protocol ID for HTTP/2
+     * ALPN protocol ID for HTTP/2.
      */
     public static final String ALPN_HTTP_2 = "h2";
 

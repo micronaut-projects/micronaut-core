@@ -835,26 +835,58 @@ public abstract class HttpClientConfiguration {
             this.maxPendingConnections = maxPendingConnections;
         }
 
+        /**
+         * The maximum number of requests (streams) that can run concurrently on one HTTP2
+         * connection.
+         *
+         * @return The maximum concurrent request count
+         */
         public int getMaxConcurrentRequestsPerHttp2Connection() {
             return maxConcurrentRequestsPerHttp2Connection;
         }
 
+        /**
+         * The maximum number of requests (streams) that can run concurrently on one HTTP2
+         * connection.
+         *
+         * @param maxConcurrentRequestsPerHttp2Connection The maximum concurrent request count
+         */
         public void setMaxConcurrentRequestsPerHttp2Connection(int maxConcurrentRequestsPerHttp2Connection) {
             this.maxConcurrentRequestsPerHttp2Connection = maxConcurrentRequestsPerHttp2Connection;
         }
 
+        /**
+         * The maximum number of concurrent HTTP1 connections in the pool.
+         *
+         * @return The maximum concurrent connection count
+         */
         public int getMaxConcurrentHttp1Connections() {
             return maxConcurrentHttp1Connections;
         }
 
+        /**
+         * The maximum number of concurrent HTTP1 connections in the pool.
+         *
+         * @param maxConcurrentHttp1Connections The maximum concurrent connection count
+         */
         public void setMaxConcurrentHttp1Connections(int maxConcurrentHttp1Connections) {
             this.maxConcurrentHttp1Connections = maxConcurrentHttp1Connections;
         }
 
+        /**
+         * The maximum number of concurrent HTTP2 connections in the pool.
+         *
+         * @return The maximum concurrent connection count
+         */
         public int getMaxConcurrentHttp2Connections() {
             return maxConcurrentHttp2Connections;
         }
 
+        /**
+         * The maximum number of concurrent HTTP2 connections in the pool.
+         *
+         * @param maxConcurrentHttp2Connections The maximum concurrent connection count
+         */
         public void setMaxConcurrentHttp2Connections(int maxConcurrentHttp2Connections) {
             this.maxConcurrentHttp2Connections = maxConcurrentHttp2Connections;
         }

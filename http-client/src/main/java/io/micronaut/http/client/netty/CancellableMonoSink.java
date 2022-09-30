@@ -26,6 +26,8 @@ import reactor.core.publisher.Sinks;
 /**
  * Version of {@link Sinks#one()} where cancellation of the {@link Mono} will make future emit
  * calls fail.
+ *
+ * @param <T> Element type
  */
 @Internal
 final class CancellableMonoSink<T> implements Publisher<T>, Sinks.One<T>, Subscription {

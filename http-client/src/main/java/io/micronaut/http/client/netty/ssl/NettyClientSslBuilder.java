@@ -54,7 +54,7 @@ import java.util.Optional;
 @Singleton
 @Internal
 @BootstrapContextCompatible
-public class NettyClientSslBuilder extends SslBuilder<SslContext> {
+public final class NettyClientSslBuilder extends SslBuilder<SslContext> {
     private static final Logger LOG = LoggerFactory.getLogger(NettyClientSslBuilder.class);
 
     /**

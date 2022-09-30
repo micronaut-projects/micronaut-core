@@ -32,8 +32,8 @@ import java.util.function.Consumer;
 /**
  * This class handles the sizing of a connection pool to conform to the configuration in
  * {@link io.micronaut.http.client.HttpClientConfiguration.ConnectionPoolConfiguration}.
- *
- * @implNote This class consists of various mutator methods (e.g. {@link #addPendingRequest}) that
+ * <p>
+ * This class consists of various mutator methods (e.g. {@link #addPendingRequest}) that
  * may be called concurrently and in a reentrant fashion (e.g. inside {@link #openNewConnection()}).
  * These mutator methods update their respective fields and then mark this class as
  * {@link #dirty()}. The state management logic ensures that {@link #doSomeWork()} is called in a
