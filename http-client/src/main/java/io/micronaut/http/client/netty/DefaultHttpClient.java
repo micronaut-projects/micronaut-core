@@ -150,6 +150,7 @@ import io.netty.util.AttributeKey;
 import io.netty.util.CharsetUtil;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.DefaultThreadFactory;
+import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.Promise;
 import org.reactivestreams.Processor;
 import org.reactivestreams.Publisher;
@@ -852,7 +853,7 @@ public class DefaultHttpClient implements
     }
 
     private <I> Flux<HttpResponse<ByteBuffer<?>>> exchangeStreamImpl(io.micronaut.http.HttpRequest<Object> parentRequest, io.micronaut.http.HttpRequest<I> request, Argument<?> errorType, URI requestURI) {
-        Flux<HttpResponse<Object>> streamResponsePublisher = Flux.from(buildStreamExchange(parentRequest, request, requestURI, errorType));
+        Flux<HttpResponse<?>> streamResponsePublisher = Flux.from(buildStreamExchange(parentRequest, request, requestURI, errorType));
         return streamResponsePublisher.switchMap(response -> {
             StreamedHttpResponse streamedHttpResponse = NettyHttpResponseBuilder.toStreamResponse(response);
             Flux<HttpContent> httpContentReactiveSequence = Flux.from(streamedHttpResponse);
@@ -879,7 +880,7 @@ public class DefaultHttpClient implements
     }
 
     private <I, O> Flux<O> jsonStreamImpl(io.micronaut.http.HttpRequest<?> parentRequest, io.micronaut.http.HttpRequest<I> request, Argument<O> type, Argument<?> errorType, URI requestURI) {
-        Flux<HttpResponse<Object>> streamResponsePublisher =
+        Flux<HttpResponse<?>> streamResponsePublisher =
                 Flux.from(buildStreamExchange(parentRequest, request, requestURI, errorType));
         return streamResponsePublisher.switchMap(response -> {
             if (!(response instanceof NettyStreamedHttpResponse)) {
@@ -917,7 +918,7 @@ public class DefaultHttpClient implements
     }
 
     private <I> Flux<ByteBuffer<?>> dataStreamImpl(io.micronaut.http.HttpRequest<I> request, Argument<?> errorType, io.micronaut.http.HttpRequest<Object> parentRequest, URI requestURI) {
-        Flux<HttpResponse<Object>> streamResponsePublisher = Flux.from(buildStreamExchange(parentRequest, request, requestURI, errorType));
+        Flux<HttpResponse<?>> streamResponsePublisher = Flux.from(buildStreamExchange(parentRequest, request, requestURI, errorType));
         Function<HttpContent, ByteBuffer<?>> contentMapper = message -> {
             ByteBuf byteBuf = message.content();
             return byteBufferFactory.wrap(byteBuf);
@@ -951,14 +952,14 @@ public class DefaultHttpClient implements
      * Implementation of {@link #jsonStream}, {@link #dataStream}, {@link #exchangeStream}.
      */
     @SuppressWarnings("MagicNumber")
-    private  <I> Publisher<MutableHttpResponse<Object>> buildStreamExchange(
+    private  <I> Publisher<MutableHttpResponse<?>> buildStreamExchange(
             @Nullable io.micronaut.http.HttpRequest<?> parentRequest,
             @NonNull io.micronaut.http.HttpRequest<I> request,
             @NonNull URI requestURI,
             @Nullable Argument<?> errorType) {
 
         AtomicReference<io.micronaut.http.HttpRequest<?>> requestWrapper = new AtomicReference<>(request);
-        Flux<MutableHttpResponse<Object>> streamResponsePublisher = connectAndStream(parentRequest, request, requestURI, requestWrapper, false, true);
+        Flux<MutableHttpResponse<?>> streamResponsePublisher = connectAndStream(parentRequest, request, requestURI, requestWrapper, false, true);
 
         streamResponsePublisher = readBodyOnError(errorType, streamResponsePublisher);
 
@@ -989,7 +990,7 @@ public class DefaultHttpClient implements
                     }
 
                     AtomicReference<io.micronaut.http.HttpRequest<?>> requestWrapper = new AtomicReference<>(httpRequest);
-                    Flux<MutableHttpResponse<Object>> proxyResponsePublisher = connectAndStream(request, request, requestURI, requestWrapper, true, false);
+                    Flux<MutableHttpResponse<?>> proxyResponsePublisher = connectAndStream(request, request, requestURI, requestWrapper, true, false);
                     // apply filters
                     //noinspection unchecked
                     proxyResponsePublisher = Flux.from(
@@ -1005,7 +1006,7 @@ public class DefaultHttpClient implements
                 });
     }
 
-    private <I> Flux<MutableHttpResponse<Object>> connectAndStream(
+    private <I> Flux<MutableHttpResponse<?>> connectAndStream(
             io.micronaut.http.HttpRequest<?> parentRequest,
             io.micronaut.http.HttpRequest<I> request,
             URI requestURI,
@@ -1214,7 +1215,7 @@ public class DefaultHttpClient implements
         return null;
     }
 
-    private <I, O, R extends io.micronaut.http.HttpResponse<O>> Publisher<R> applyFilterToResponsePublisher(
+    private <I, R extends io.micronaut.http.HttpResponse<?>> Publisher<R> applyFilterToResponsePublisher(
             io.micronaut.http.HttpRequest<?> parentRequest,
             io.micronaut.http.HttpRequest<I> request,
             URI requestURI,
@@ -1406,7 +1407,7 @@ public class DefaultHttpClient implements
         return new NettyRequestWriter(nettyRequest, postRequestEncoder);
     }
 
-    private Flux<MutableHttpResponse<Object>> readBodyOnError(@Nullable Argument<?> errorType, @NonNull Flux<MutableHttpResponse<Object>> publisher) {
+    private Flux<MutableHttpResponse<?>> readBodyOnError(@Nullable Argument<?> errorType, @NonNull Flux<MutableHttpResponse<?>> publisher) {
         if (errorType != null && errorType != HttpClient.DEFAULT_ERROR_TYPE) {
             return publisher.onErrorResume(clientException -> {
                 if (clientException instanceof HttpClientResponseException) {
@@ -1542,13 +1543,13 @@ public class DefaultHttpClient implements
         requestWriter.write(poolHandle, secure, emitter);
     }
 
-    private Flux<MutableHttpResponse<Object>> streamRequestThroughChannel(
+    private Flux<MutableHttpResponse<?>> streamRequestThroughChannel(
             io.micronaut.http.HttpRequest<?> parentRequest,
             io.micronaut.http.HttpRequest<?> request,
             ConnectionManager.PoolHandle poolHandle,
             boolean failOnError,
             boolean secure) {
-        return Flux.<MutableHttpResponse<Object>>create(sink -> {
+        return Flux.<MutableHttpResponse<?>>create(sink -> {
             try {
                 streamRequestThroughChannel0(parentRequest, request, sink, poolHandle, secure);
             } catch (HttpPostRequestEncoder.ErrorDataEncoderException e) {
@@ -1572,7 +1573,7 @@ public class DefaultHttpClient implements
     private void streamRequestThroughChannel0(
             io.micronaut.http.HttpRequest<?> parentRequest,
             final io.micronaut.http.HttpRequest<?> finalRequest,
-            FluxSink emitter,
+            FluxSink<? super MutableHttpResponse<?>> emitter,
             ConnectionManager.PoolHandle poolHandle,
             boolean secure) throws HttpPostRequestEncoder.ErrorDataEncoderException {
         if (!(finalRequest instanceof MutableHttpRequest)) {
@@ -1597,7 +1598,7 @@ public class DefaultHttpClient implements
         prepareHttpHeaders(poolHandle, requestURI, finalRequest, requestWriter.getNettyRequest(), permitsBody);
 
         HttpRequest nettyRequest = requestWriter.getNettyRequest();
-        Promise<HttpResponse<?>> responsePromise = poolHandle.channel.eventLoop().newPromise();
+        Promise<MutableHttpResponse<?>> responsePromise = poolHandle.channel.eventLoop().newPromise();
         ChannelPipeline pipeline = poolHandle.channel.pipeline();
         pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE_FULL, new StreamFullHttpResponseHandler(responsePromise, parentRequest, finalRequest));
         pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE_STREAM, new StreamStreamHttpResponseHandler(responsePromise, parentRequest, finalRequest));
@@ -1612,7 +1613,7 @@ public class DefaultHttpClient implements
         }
 
         requestWriter.write(poolHandle, secure, emitter);
-        responsePromise.addListener(future -> {
+        responsePromise.addListener((Future<MutableHttpResponse<?>> future) -> {
             if (future.isSuccess()) {
                 emitter.next(future.getNow());
                 emitter.complete();
@@ -2039,11 +2040,11 @@ public class DefaultHttpClient implements
     }
 
     private abstract class BaseHttpResponseHandler<R extends io.netty.handler.codec.http.HttpResponse, O> extends SimpleChannelInboundHandlerInstrumented<R> {
-        private final Promise<O> responsePromise;
+        private final Promise<? super O> responsePromise;
         private final io.micronaut.http.HttpRequest<?> parentRequest;
         private final io.micronaut.http.HttpRequest<?> finalRequest;
 
-        public BaseHttpResponseHandler(Promise<O> responsePromise, io.micronaut.http.HttpRequest<?> parentRequest, io.micronaut.http.HttpRequest<?> finalRequest) {
+        public BaseHttpResponseHandler(Promise<? super O> responsePromise, io.micronaut.http.HttpRequest<?> parentRequest, io.micronaut.http.HttpRequest<?> finalRequest) {
             super(connectionManager.instrumenter);
             this.responsePromise = responsePromise;
             this.parentRequest = parentRequest;
@@ -2340,8 +2341,12 @@ public class DefaultHttpClient implements
         }
     }
 
-    private class StreamFullHttpResponseHandler extends BaseHttpResponseHandler<FullHttpResponse, HttpResponse<?>> {
-        public StreamFullHttpResponseHandler(Promise<HttpResponse<?>> responsePromise, io.micronaut.http.HttpRequest<?> parentRequest, io.micronaut.http.HttpRequest<?> finalRequest) {
+    private class StreamFullHttpResponseHandler extends BaseHttpResponseHandler<FullHttpResponse, MutableHttpResponse<?>> {
+        public StreamFullHttpResponseHandler(
+            Promise<? super MutableHttpResponse<?>> responsePromise,
+            io.micronaut.http.HttpRequest<?> parentRequest,
+            io.micronaut.http.HttpRequest<?> finalRequest) {
+
             super(responsePromise, parentRequest, finalRequest);
         }
 
@@ -2357,7 +2362,7 @@ public class DefaultHttpClient implements
         }
 
         @Override
-        protected void buildResponse(Promise<? super HttpResponse<?>> promise, FullHttpResponse msg, HttpStatus httpStatus) {
+        protected void buildResponse(Promise<? super MutableHttpResponse<?>> promise, FullHttpResponse msg, HttpStatus httpStatus) {
             Publisher<HttpContent> bodyPublisher;
             if (msg.content() instanceof EmptyByteBuf) {
                 bodyPublisher = Publishers.empty();
@@ -2374,13 +2379,17 @@ public class DefaultHttpClient implements
         }
 
         @Override
-        protected Function<URI, Publisher<? extends HttpResponse<?>>> makeRedirectHandler(io.micronaut.http.HttpRequest<?> parentRequest, MutableHttpRequest<Object> redirectRequest) {
+        protected Function<URI, Publisher<? extends MutableHttpResponse<?>>> makeRedirectHandler(io.micronaut.http.HttpRequest<?> parentRequest, MutableHttpRequest<Object> redirectRequest) {
             return uri -> buildStreamExchange(parentRequest, redirectRequest, uri, null);
         }
     }
 
-    private class StreamStreamHttpResponseHandler extends BaseHttpResponseHandler<StreamedHttpResponse, HttpResponse<?>> {
-        public StreamStreamHttpResponseHandler(Promise<HttpResponse<?>> responsePromise, io.micronaut.http.HttpRequest<?> parentRequest, io.micronaut.http.HttpRequest<?> finalRequest) {
+    private class StreamStreamHttpResponseHandler extends BaseHttpResponseHandler<StreamedHttpResponse, MutableHttpResponse<?>> {
+        public StreamStreamHttpResponseHandler(
+            Promise<? super MutableHttpResponse<?>> responsePromise,
+            io.micronaut.http.HttpRequest<?> parentRequest,
+            io.micronaut.http.HttpRequest<?> finalRequest) {
+
             super(responsePromise, parentRequest, finalRequest);
         }
 
@@ -2396,12 +2405,12 @@ public class DefaultHttpClient implements
         }
 
         @Override
-        protected void buildResponse(Promise<? super HttpResponse<?>> promise, StreamedHttpResponse msg, HttpStatus httpStatus) {
+        protected void buildResponse(Promise<? super MutableHttpResponse<?>> promise, StreamedHttpResponse msg, HttpStatus httpStatus) {
             promise.trySuccess(new NettyStreamedHttpResponse<>(msg, httpStatus));
         }
 
         @Override
-        protected Function<URI, Publisher<? extends HttpResponse<?>>> makeRedirectHandler(io.micronaut.http.HttpRequest<?> parentRequest, MutableHttpRequest<Object> redirectRequest) {
+        protected Function<URI, Publisher<? extends MutableHttpResponse<?>>> makeRedirectHandler(io.micronaut.http.HttpRequest<?> parentRequest, MutableHttpRequest<Object> redirectRequest) {
             return uri -> buildStreamExchange(parentRequest, redirectRequest, uri, null);
         }
     }
