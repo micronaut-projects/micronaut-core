@@ -968,8 +968,7 @@ public class DefaultHttpClient implements
                 applyFilterToResponsePublisher(parentRequest, request, requestURI, requestWrapper, streamResponsePublisher)
         );
 
-        //return streamResponsePublisher.subscribeOn(connectionManager.getEventLoopScheduler());
-        return streamResponsePublisher; // todo
+        return streamResponsePublisher;
     }
 
     @Override
