@@ -23,7 +23,6 @@ import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
-import io.micronaut.http.client.DefaultHttpClientConfiguration
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.server.netty.AbstractMicronautSpec
@@ -231,11 +230,11 @@ class HttpResponseSpec extends AbstractMicronautSpec {
     void "test keep alive connection header is not set for 500 response"() {
         when:
         EmbeddedServer server = applicationContext.run(EmbeddedServer, [
+                'micronaut.server.netty.keepAliveOnServerError': false,
                 (SPEC_NAME_PROPERTY):getClass().simpleName,
-                'micronaut.server.netty.keepAliveOnServerError': false
         ])
         ApplicationContext ctx = server.getApplicationContext()
-        HttpClient client = applicationContext.createBean(HttpClient, embeddedServer.getURL())
+        HttpClient client = applicationContext.createBean(HttpClient, server.getURL())
 
         Flux.from(client.exchange(
           HttpRequest.GET('/test-header/fail')
@@ -254,14 +253,11 @@ class HttpResponseSpec extends AbstractMicronautSpec {
 
     void "test connection header is defaulted to keep-alive by default for > 499 response"() {
         when:
-        DefaultHttpClientConfiguration config = new DefaultHttpClientConfiguration()
-        // The client will explicitly request "Connection: keep-alive" unless using a connection pool, so set it up
-        config.connectionPoolConfiguration.enabled = true
         EmbeddedServer server = applicationContext.run(EmbeddedServer, [
           (SPEC_NAME_PROPERTY):getClass().simpleName
         ])
         def ctx = server.getApplicationContext()
-        HttpClient client = applicationContext.createBean(HttpClient, embeddedServer.getURL(), config)
+        HttpClient client = applicationContext.createBean(HttpClient, server.getURL())
 
         Flux.from(client.exchange(
           HttpRequest.GET('/test-header/fail')
