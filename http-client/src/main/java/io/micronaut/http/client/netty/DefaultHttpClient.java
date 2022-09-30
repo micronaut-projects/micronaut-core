@@ -1066,10 +1066,9 @@ public class DefaultHttpClient implements
                     @Override
                     protected void finishAggregation(FullHttpMessage aggregated) throws Exception {
                         // only set content-length if there's any content
-                        if (!HttpUtil.isContentLengthSet(aggregated)) {
-                            if (aggregated.content().readableBytes() > 0) {
-                                super.finishAggregation(aggregated);
-                            }
+                        if (!HttpUtil.isContentLengthSet(aggregated) &&
+                            aggregated.content().readableBytes() > 0) {
+                            super.finishAggregation(aggregated);
                         }
                     }
                 })

@@ -125,7 +125,7 @@ class ConnectionManager {
     private final String informationalServiceId;
 
     /**
-     * Copy constructor used by the test suite to patch this manager
+     * Copy constructor used by the test suite to patch this manager.
      *
      * @param from Original connection manager
      */

@@ -123,16 +123,16 @@ abstract class PoolResizer {
         }
 
         // snapshot our fields
-        int pendingRequests = this.pendingRequests.size();
+        int pendingRequestCount = this.pendingRequests.size();
         int pendingConnectionCount = this.pendingConnectionCount.get();
         int http1ConnectionCount = this.http1Connections.size();
         int http2ConnectionCount = this.http2Connections.size();
 
-        if (pendingRequests == 0) {
+        if (pendingRequestCount == 0) {
             // if there are no pending requests, there is nothing to do.
             return;
         }
-        int connectionsToOpen = pendingRequests - pendingConnectionCount;
+        int connectionsToOpen = pendingRequestCount - pendingConnectionCount;
         // make sure we won't exceed our config setting for pending connections
         connectionsToOpen = Math.min(connectionsToOpen, connectionPoolConfiguration.getMaxPendingConnections() - pendingConnectionCount);
         // limit the connection count to the protocol-specific settings, but only if that protocol was seen for this pool.
