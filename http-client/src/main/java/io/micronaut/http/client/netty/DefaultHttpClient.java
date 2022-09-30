@@ -874,8 +874,6 @@ public class DefaultHttpClient implements
                         thisResponse.setBody(byteBuffer);
                         return (HttpResponse<ByteBuffer<?>>) new HttpResponseWrapper<>(thisResponse);
                     });
-        }).doOnTerminate(() -> {
-            terminateRequestChannel(request);
         });
     }
 
@@ -912,8 +910,6 @@ public class DefaultHttpClient implements
             }, streamArray);
             return Flux.from(jsonProcessor)
                     .map(jsonNode -> mediaTypeCodec.decode(type, jsonNode));
-        }).doOnTerminate(() -> {
-            terminateRequestChannel(request);
         });
     }
 
@@ -932,20 +928,7 @@ public class DefaultHttpClient implements
                     return httpContentReactiveSequence
                             .filter(message -> !(message.content() instanceof EmptyByteBuf))
                             .map(contentMapper);
-                })
-                .doOnTerminate(() -> {
-                    terminateRequestChannel(request);
                 });
-    }
-
-    private static void terminateRequestChannel(io.micronaut.http.HttpRequest<?> req) {
-        final Object o = req.getAttribute(NettyClientHttpRequest.CHANNEL).orElse(null);
-        if (o instanceof Channel) {
-            final Channel c = (Channel) o;
-            if (c.isOpen()) {
-                //c.close(); TODO
-            }
-        }
     }
 
     /**
