@@ -74,7 +74,6 @@ import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.ssl.SslHandshakeCompletionEvent;
-import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.handler.timeout.ReadTimeoutException;
 import io.netty.handler.timeout.ReadTimeoutHandler;
@@ -376,20 +375,7 @@ class ConnectionManager {
                     }
                 }
             });
-            ph.channel.pipeline().addLast(
-                ChannelPipelineCustomizer.HANDLER_HTTP_STREAM,
-                new HttpStreamsClientHandler() {
-                    @Override
-                    public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
-                        if (evt instanceof IdleStateEvent) {
-                            // close the connection if it is idle for too long
-                            ph.taint();
-                            ph.release();
-                        }
-                        super.userEventTriggered(ctx, evt);
-                    }
-                }
-            );
+            ph.channel.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP_STREAM, new HttpStreamsClientHandler());
             return ph;
         });
     }
@@ -435,20 +421,7 @@ class ConnectionManager {
                 if (sse) {
                     ph.channel.pipeline().addLast(HttpLineBasedFrameDecoder.NAME, new HttpLineBasedFrameDecoder(configuration.getMaxContentLength(), true, true));
                 }
-                ph.channel.pipeline().addLast(
-                        ChannelPipelineCustomizer.HANDLER_HTTP_STREAM,
-                        new HttpStreamsClientHandler() {
-                            @Override
-                            public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
-                                if (evt instanceof IdleStateEvent) {
-                                    // close the connection if it is idle for too long
-                                    ph.taint();
-                                    ph.release();
-                                }
-                                super.userEventTriggered(ctx, evt);
-                            }
-                        }
-                );
+                ph.channel.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP_STREAM, new HttpStreamsClientHandler());
                 return ph;
             });
     }
