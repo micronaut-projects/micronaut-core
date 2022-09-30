@@ -959,6 +959,7 @@ class ConnectionManager {
                 }
                 PoolHandle ph = new PoolHandle(false, channel) {
                     final ChannelHandlerContext lastContext = channel.pipeline().lastContext();
+                    boolean released = false;
 
                     @Override
                     void taint() {
@@ -967,6 +968,11 @@ class ConnectionManager {
 
                     @Override
                     void release() {
+                        if (released) {
+                            throw new IllegalStateException("Already released");
+                        }
+                        released = true;
+
                         if (!windDownConnection) {
                             ChannelHandlerContext newLast = channel.pipeline().lastContext();
                             if (lastContext != newLast) {
@@ -1067,6 +1073,8 @@ class ConnectionManager {
                             .addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECOMPRESSOR, new HttpContentDecompressor());
                         NettyClientCustomizer streamCustomizer = connectionCustomizer.specializeForChannel(streamChannel, NettyClientCustomizer.ChannelRole.HTTP2_STREAM);
                         PoolHandle ph = new PoolHandle(true, streamChannel) {
+                            boolean released = false;
+
                             @Override
                             void taint() {
                                 // do nothing, we don't reuse stream channels
@@ -1074,6 +1082,11 @@ class ConnectionManager {
 
                             @Override
                             void release() {
+                                if (released) {
+                                    throw new IllegalStateException("Already released");
+                                }
+                                released = true;
+
                                 liveStreamChannels.remove(streamChannel);
                                 streamChannel.close();
                                 int newCount = liveRequests.decrementAndGet();
