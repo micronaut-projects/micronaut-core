@@ -248,4 +248,44 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
                 .map(gt -> (GenericPlaceholderElement) visitorContext.getElementFactory().newClassElement(gt.getType(), elementAnnotationMetadataFactory))
                 .collect(Collectors.toList());
     }
+
+    @Override
+    public boolean overrides(MethodElement overridden) {
+        if (this.equals(overridden)) {
+            return false;
+        }
+        return matches(overridden, this);
+    }
+
+    private static boolean matches(MethodElement existingMethod, MethodElement newMethod) {
+        if (!newMethod.getName().equals(existingMethod.getName()) || existingMethod.getParameters().length != newMethod.getParameters().length) {
+            return false;
+        }
+        for (int i = 0; i < existingMethod.getParameters().length; i++) {
+            ParameterElement existingParameter = existingMethod.getParameters()[i];
+            ParameterElement newParameter = newMethod.getParameters()[i];
+            ClassElement existingType = existingParameter.getGenericType();
+            ClassElement newType = newParameter.getGenericType();
+            if (!newType.isAssignable(existingType)) {
+                return false;
+            }
+        }
+        ClassElement existingReturnType = existingMethod.getReturnType().getGenericType();
+        ClassElement newTypeReturn = newMethod.getReturnType().getGenericType();
+        if (!newTypeReturn.isAssignable(existingReturnType)) {
+            return false;
+        }
+        return isOverriddenByAccessRight(existingMethod, newMethod);
+    }
+
+    private static boolean isOverriddenByAccessRight(MethodElement existingMethod, MethodElement newMethod) {
+        // Cannot override existing private/package private methods even if the signature is the same
+        if (existingMethod.isPrivate()) {
+            return false;
+        }
+        if (existingMethod.isPackagePrivate()) {
+            return newMethod.getDeclaringType().getPackageName().equals(existingMethod.getDeclaringType().getPackageName());
+        }
+        return true;
+    }
 }

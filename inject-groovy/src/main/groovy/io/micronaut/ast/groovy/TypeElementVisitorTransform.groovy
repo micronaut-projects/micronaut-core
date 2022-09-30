@@ -18,13 +18,14 @@ package io.micronaut.ast.groovy
 import groovy.transform.CompilationUnitAware
 import groovy.transform.CompileStatic
 import groovy.transform.PackageScope
-import io.micronaut.ast.groovy.utils.AstClassUtils
 import io.micronaut.ast.groovy.visitor.GroovyClassElement
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.ast.groovy.visitor.LoadedVisitor
 import io.micronaut.core.annotation.Generated
 import io.micronaut.core.order.OrderUtil
 import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.ast.ElementQuery
+import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.PropertyElement
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder
 import org.codehaus.groovy.ast.ASTNode
@@ -33,7 +34,6 @@ import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.ConstructorNode
 import org.codehaus.groovy.ast.FieldNode
 import org.codehaus.groovy.ast.InnerClassNode
-import org.codehaus.groovy.ast.MethodNode
 import org.codehaus.groovy.ast.ModuleNode
 import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.CompilePhase
@@ -152,8 +152,8 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
             for (ConstructorNode cn : node.getDeclaredConstructors()) {
                 visitConstructor(cn)
             }
-            for (MethodNode mn : AstClassUtils.getAllMethods(node)) {
-                visitMethod(mn)
+            for (MethodElement methodElement : classElement.getEnclosedElements(ElementQuery.ALL_METHODS, true)) {
+                visitMethod(methodElement)
             }
         }
 
@@ -167,9 +167,7 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
             }
         }
 
-        void visitMethod(MethodNode node) {
-            def e = visitorContext.getElementFactory()
-                    .newSourceMethodElement(targetClassElement, node, visitorContext.getElementAnnotationMetadataFactory())
+        void visitMethod(MethodElement e) {
             for (LoadedVisitor it : typeElementVisitors) {
                 if (it.matchesElement(e)) {
                     it.getVisitor().visitMethod(e, visitorContext)

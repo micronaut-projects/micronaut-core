@@ -253,16 +253,17 @@ public class AopHelperImpl implements AopHelper {
         ClassElement declaringType = methodElement.getDeclaringType();
         if (methodElement.isAbstract()) {
             aopProxyWriter.visitIntroductionMethod(declaringType, methodElement);
-        } else if (false) {
-            boolean isInterface = methodElement.getDeclaringType().isInterface();
-            boolean isDefault = methodElement.isDefault();
-            if (isInterface && isDefault) {
-                // Default methods cannot be "super" accessed on the defined type
-                declaringType = classElement;
-            }
-            // only apply around advise to non-abstract methods of introduction advise
-            aopProxyWriter.visitAroundMethod(declaringType, methodElement);
         }
+//        else if (false) {
+//            boolean isInterface = methodElement.getDeclaringType().isInterface();
+//            boolean isDefault = methodElement.isDefault();
+//            if (isInterface && isDefault) {
+//                // Default methods cannot be "super" accessed on the defined type
+//                declaringType = classElement;
+//            }
+//            // only apply around advise to non-abstract methods of introduction advise
+//            aopProxyWriter.visitAroundMethod(declaringType, methodElement);
+//        }
     }
 
     @Override

@@ -651,4 +651,93 @@ enum Test {
         }
         allFields.size() == expected.size()
     }
+
+    // Groovy bug?
+    void "test unrecognized default method"() {
+        given:
+            ClassElement classElement = buildClassElement('elementquery.MyBean', '''
+package elementquery;
+
+class Generic {
+}
+class Specific extends Generic {
+}
+interface GenericInterface {
+    Generic getObject()
+}
+interface SpecificInterface {
+    Specific getObject()
+}
+
+interface MyBean extends GenericInterface, SpecificInterface {
+
+    default Specific getObject() {
+        return null
+    }
+
+}
+
+''')
+        when:
+            def allMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS)
+        then:
+            allMethods.size() == 3
+        when:
+            def declaredMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared())
+        then:
+            declaredMethods.size() == 1
+            // Strange groovy case where default methods is not recognized
+            declaredMethods.get(0).isAbstract() == true
+            declaredMethods.get(0).isDefault() == false
+    }
+
+    // Groovy bug?
+    void "test unrecognized default method 2"() {
+        given:
+            ClassElement classElement = buildClassElement('elementquery.MyBean', '''
+package elementquery;
+
+interface MyBean {
+
+    default String getObject() {
+        return null
+    }
+
+}
+
+''')
+        when:
+            def allMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS)
+        then:
+            allMethods.size() == 1
+            allMethods.get(0).isAbstract() == true
+            allMethods.get(0).isDefault() == false
+    }
+
+    // Groovy bug?
+    void "test default method"() {
+        given:
+            ClassElement classElement = buildClassElement('elementquery.MyBean', '''
+package elementquery;
+
+interface MyInt {
+
+    default String getObject() {
+        return null
+    }
+
+}
+
+class MyBean implements MyInt {
+}
+
+''')
+        when:
+            def allMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS)
+        then:
+            // In this case the default method is not abstract but still not default
+            allMethods.size() == 1
+            allMethods.get(0).isAbstract() == false
+            allMethods.get(0).isDefault() == false
+    }
 }

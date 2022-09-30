@@ -18,8 +18,6 @@ package io.micronaut.ast.groovy.utils
 import groovy.transform.CompileStatic
 import org.codehaus.groovy.ast.ClassHelper
 import org.codehaus.groovy.ast.ClassNode
-import org.codehaus.groovy.ast.MethodNode
-import org.objectweb.asm.Opcodes
 
 import static org.codehaus.groovy.ast.ClassHelper.make
 /**
@@ -105,86 +103,4 @@ class AstClassUtils {
         return false
     }
 
-    static Collection<MethodNode> getAllMethods(ClassNode classNode) {
-        // This method will return private/package private methods that
-        // cannot be overridden by defining a method with the same signature
-        List<MethodNode> methods = new ArrayList<>()
-        List<List<MethodNode>> hierarchy = new ArrayList<>()
-        collectHierarchyMethods(classNode, hierarchy)
-        for (List<MethodNode> classMethods : hierarchy) {
-            List<MethodNode> addedFromClassMethods = new ArrayList<>(classMethods.size())
-            classMethodsLoop:
-                for (MethodNode newMethod : classMethods) {
-                    existingMethods:
-                    for (ListIterator<MethodNode> iterator = methods.listIterator(); iterator.hasNext();) {
-                        MethodNode existingMethod = iterator.next()
-                        if (newMethod.getName() == existingMethod.getName() && existingMethod.getParameters().length == newMethod.getParameters().length) {
-                            for (int i = 0; i < existingMethod.getParameters().length; i++) {
-                                def existingParameter = existingMethod.getParameters()[i]
-                                def newParameter = newMethod.getParameters()[i]
-                                def existingType = existingParameter.getType()
-                                def newType = newParameter.getType()
-                                if (!isSubclassOfOrImplementsInterface(newType, existingType)) {
-                                    continue existingMethods
-                                }
-                            }
-                            def existingReturnType = existingMethod.getReturnType()
-                            def newTypeReturn = newMethod.getReturnType()
-                            if (!isSubclassOfOrImplementsInterface(newTypeReturn, existingReturnType)) {
-                                continue existingMethods
-                            }
-                            if (isOverridden(classNode, existingMethod, newMethod)) {
-                                if (!existingMethod.isAbstract() && newMethod.isAbstract()) {
-                                    continue classMethodsLoop
-                                }
-                                iterator.remove()
-                            }
-                            addedFromClassMethods.add(newMethod)
-                            continue classMethodsLoop
-                        }
-                    }
-                    addedFromClassMethods.add(newMethod)
-                }
-                methods.addAll(addedFromClassMethods)
-        }
-        return methods
-    }
-
-    private static boolean isOverridden(ClassNode owner, MethodNode existingMethod, MethodNode newMethod) {
-        // Cannot override existing private/package private methods even if the signature is the same
-        if (existingMethod.isPrivate()) {
-            return false
-        }
-        if (existingMethod.isPackageScope()) {
-            return owner.getPackageName().equals(existingMethod.getDeclaringClass().getPackageName())
-        }
-        return true
-    }
-
-    private static void collectHierarchyMethods(ClassNode classNode, List<List<MethodNode>> hierarchy) {
-        if (Object.class.getName().equals(classNode.getName())
-                || Enum.class.getName().equals(classNode.getName())
-                || GroovyObjectSupport.class.getName().equals(classNode.getName())
-                || Script.class.getName().equals(classNode.getName())) {
-            return
-        }
-        ClassNode parent = classNode.getSuperClass()
-        if (parent != null) {
-            collectHierarchyMethods(parent, hierarchy)
-        }
-        for (ClassNode iface : classNode.getInterfaces()) {
-            if (iface.getName().equals(GroovyObject.class.getName())) {
-                continue
-            }
-            List<List<MethodNode>> interfaceMethods = new ArrayList<>()
-            collectHierarchyMethods(iface, interfaceMethods)
-            interfaceMethods.forEach(methodNodes -> methodNodes.removeIf{methodNode ->
-
-                def b = (methodNode.getModifiers() & Opcodes.ACC_SYNTHETIC) != 0
-                return b
-            })
-            hierarchy.addAll(interfaceMethods)
-        }
-        hierarchy.add(classNode.getMethods())
-    }
 }

@@ -1,10 +1,17 @@
-package io.micronaut.inject.ast;
+package io.micronaut.inject.ast.utils;
 
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.BeanProperties;
 import io.micronaut.core.naming.NameUtils;
+import io.micronaut.inject.ast.BeanPropertiesConfiguration;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ElementQuery;
+import io.micronaut.inject.ast.FieldElement;
+import io.micronaut.inject.ast.MemberElement;
+import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.PropertyElement;
 
 import java.util.ArrayList;
 import java.util.Collections;

@@ -26,7 +26,7 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ArrayableClassElement;
-import io.micronaut.inject.ast.AstBeanPropertiesUtils;
+import io.micronaut.inject.ast.utils.AstBeanPropertiesUtils;
 import io.micronaut.inject.ast.BeanPropertiesConfiguration;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;

@@ -205,12 +205,12 @@ public class GroovyElementFactory implements ElementFactory<AnnotatedNode, Class
 
     @NonNull
     @Override
-    public MethodElement newSourceMethodElement(ClassElement declaringClass, @NonNull MethodNode method, @NonNull AnnotationMetadata annotationMetadata) {
+    public GroovyMethodElement newSourceMethodElement(ClassElement declaringClass, @NonNull MethodNode method, @NonNull AnnotationMetadata annotationMetadata) {
         return newSourceMethodElement(declaringClass, method, defaultAnnotationMetadata(method, annotationMetadata));
     }
 
     @Override
-    public MethodElement newSourceMethodElement(ClassElement owningType,
+    public GroovyMethodElement newSourceMethodElement(ClassElement owningType,
                                                 MethodNode method,
                                                 ElementAnnotationMetadataFactory elementAnnotationMetadataFactory) {
         if (!(owningType instanceof GroovyClassElement)) {

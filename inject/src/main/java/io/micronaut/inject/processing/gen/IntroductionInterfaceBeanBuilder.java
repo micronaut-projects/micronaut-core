@@ -6,6 +6,10 @@ import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.BeanDefinitionVisitor;
 
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
 final class IntroductionInterfaceBeanBuilder extends AbstractBeanBuilder {
 
     private final String factoryBeanDefinitionName;
@@ -30,19 +34,19 @@ final class IntroductionInterfaceBeanBuilder extends AbstractBeanBuilder {
         }
 
         // The introduction will include overridden methods* (find(List) <- find(Iterable)*) but ordinary class introduction doesn't
-        for (MethodElement methodElement : classElement.getEnclosedElements(ElementQuery.ALL_METHODS.includeHiddenElements().includeOverriddenMethods())) {
-            if (aopHelper.visitIntrospectedMethod(aopProxyWriter, classElement, methodElement)) {
+        // Because of the caching we need to process declared methods first
+        Set<MethodElement> processed = new HashSet<>();
+        List<MethodElement> declaredEnclosedElements = classElement.getEnclosedElements(ElementQuery.ALL_METHODS.includeHiddenElements().includeOverriddenMethods().onlyDeclared());
+        for (MethodElement methodElement : declaredEnclosedElements) {
+            aopHelper.visitIntrospectedMethod(aopProxyWriter, classElement, methodElement);
+            processed.add(methodElement);
+        }
+        List<MethodElement> otherEnclosedElements = classElement.getEnclosedElements(ElementQuery.ALL_METHODS.includeHiddenElements().includeOverriddenMethods());
+        for (MethodElement methodElement : otherEnclosedElements) {
+            if (processed.contains(methodElement)) {
                 continue;
             }
-//            else if (methodElement.hasStereotype(Executable.class)) {
-//                boolean preprocess = methodElement.isTrue(Executable.class, "processOnStartup");
-//                if (preprocess) {
-//                    aopProxyWriter.setRequiresMethodProcessing(true);
-//                }
-//                if (methodElement.isAccessible(classElement)) {
-//                    aopProxyWriter.visitExecutableMethod(classElement, methodElement, visitorContext);
-//                }
-//            }
+            aopHelper.visitIntrospectedMethod(aopProxyWriter, classElement, methodElement);
         }
 
         if (classElement.hasAnnotation(ANN_REQUIRES_VALIDATION)) {
