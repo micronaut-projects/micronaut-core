@@ -1589,8 +1589,8 @@ public class DefaultHttpClient implements
             permitsBody,
             null,
             throwable -> {
-                if (!((FluxSink<HttpResponse<Object>>) emitter).isCancelled()) {
-                    ((FluxSink<HttpResponse<Object>>) emitter).error(throwable);
+                if (!emitter.isCancelled()) {
+                    emitter.error(throwable);
                 }
             }
         );
