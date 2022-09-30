@@ -26,7 +26,6 @@ import io.micronaut.http.client.netty.ssl.NettyClientSslBuilder;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.channel.ChannelPipelineListener;
 import io.micronaut.http.netty.channel.NettyThreadFactory;
-import io.micronaut.http.netty.stream.HttpStreamsClientHandler;
 import io.micronaut.scheduling.instrument.Instrumentation;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.micronaut.websocket.exceptions.WebSocketSessionException;
@@ -45,17 +44,12 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.handler.codec.DecoderException;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
-import io.netty.handler.codec.http.FullHttpMessage;
 import io.netty.handler.codec.http.HttpClientCodec;
 import io.netty.handler.codec.http.HttpClientUpgradeHandler;
 import io.netty.handler.codec.http.HttpContentDecompressor;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpObjectAggregator;
-import io.netty.handler.codec.http.HttpResponse;
-import io.netty.handler.codec.http.HttpResponseStatus;
-import io.netty.handler.codec.http.HttpUtil;
-import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketClientCompressionHandler;
 import io.netty.handler.codec.http2.Http2ClientUpgradeCodec;
 import io.netty.handler.codec.http2.Http2FrameCodec;
@@ -354,76 +348,13 @@ class ConnectionManager {
     }
 
     /**
-     * Get a connection for exchange-like (non-streaming) http client methods.
+     * Get a connection for non-websocket http client methods.
      *
      * @param requestKey The remote to connect to
-     * @param multipart Whether the request should be multipart
-     * @param acceptEvents Whether the response may be an event stream
      * @return A mono that will complete once the channel is ready for transmission
      */
-    Mono<PoolHandle> connectForExchange(DefaultHttpClient.RequestKey requestKey, boolean multipart, boolean acceptEvents) {
-        Pool pool = pools.computeIfAbsent(requestKey, Pool::new);
-        return pool.acquire().map(ph -> {
-            // TODO: this sucks
-            ph.channel.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP_AGGREGATOR, new HttpObjectAggregator(configuration.getMaxContentLength()) {
-                @Override
-                protected void finishAggregation(FullHttpMessage aggregated) throws Exception {
-                    if (!HttpUtil.isContentLengthSet(aggregated)) {
-                        if (aggregated.content().readableBytes() > 0) {
-                            super.finishAggregation(aggregated);
-                        }
-                    }
-                }
-            });
-            ph.channel.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP_STREAM, new HttpStreamsClientHandler());
-            return ph;
-        });
-    }
-
-    /**
-     * Get a connection for streaming http client methods.
-     *
-     * @param requestKey The remote to connect to
-     * @param isProxy Whether the request is for a {@link io.micronaut.http.client.ProxyHttpClient} call
-     * @param acceptEvents Whether the response may be an event stream
-     * @return A mono that will complete once the channel is ready for transmission
-     */
-    Mono<PoolHandle> connectForStream(DefaultHttpClient.RequestKey requestKey, boolean isProxy, boolean acceptEvents) {
-        Pool pool = pools.computeIfAbsent(requestKey, Pool::new);
-        return pool.acquire()
-            .map(ph -> {
-                // TODO: this sucks
-                boolean sse = !isProxy && acceptEvents;
-                ph.channel.pipeline().addLast(new ChannelInboundHandlerAdapter() {
-                    boolean ignoreOneLast = false;
-
-                    @Override
-                    public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-                        if (msg instanceof HttpResponse &&
-                            ((HttpResponse) msg).status().equals(HttpResponseStatus.CONTINUE)) {
-                            ignoreOneLast = true;
-                        }
-
-                        super.channelRead(ctx, msg);
-
-                        if (msg instanceof LastHttpContent) {
-                            if (ignoreOneLast) {
-                                ignoreOneLast = false;
-                            } else {
-                                ctx.pipeline()
-                                    .remove(this)
-                                    .remove(ChannelPipelineCustomizer.HANDLER_HTTP_STREAM);
-                                ph.release();
-                            }
-                        }
-                    }
-                });
-                if (sse) {
-                    ph.channel.pipeline().addLast(HttpLineBasedFrameDecoder.NAME, new HttpLineBasedFrameDecoder(configuration.getMaxContentLength(), true, true));
-                }
-                ph.channel.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP_STREAM, new HttpStreamsClientHandler());
-                return ph;
-            });
+    Mono<PoolHandle> connect(DefaultHttpClient.RequestKey requestKey) {
+        return pools.computeIfAbsent(requestKey, Pool::new).acquire();
     }
 
     /**

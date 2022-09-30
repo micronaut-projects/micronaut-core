@@ -83,6 +83,7 @@ import io.micronaut.http.netty.NettyHttpResponseBuilder;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.channel.ChannelPipelineListener;
 import io.micronaut.http.netty.stream.DefaultStreamedHttpResponse;
+import io.micronaut.http.netty.stream.HttpStreamsClientHandler;
 import io.micronaut.http.netty.stream.JsonSubscriber;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
@@ -113,6 +114,7 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelFactory;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.MultithreadEventLoopGroup;
@@ -123,16 +125,19 @@ import io.netty.handler.codec.http.DefaultHttpContent;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.DefaultLastHttpContent;
 import io.netty.handler.codec.http.EmptyHttpHeaders;
+import io.netty.handler.codec.http.FullHttpMessage;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpHeaders;
+import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpScheme;
 import io.netty.handler.codec.http.HttpUtil;
+import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.codec.http.multipart.DefaultHttpDataFactory;
 import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.handler.codec.http.multipart.HttpDataFactory;
@@ -1014,8 +1019,39 @@ public class DefaultHttpClient implements
         } catch (Exception e) {
             return Flux.error(e);
         }
-        return connectionManager.connectForStream(requestKey, isProxy, isAcceptEvents(request)).flatMapMany(poolHandle -> {
+        return connectionManager.connect(requestKey).flatMapMany(poolHandle -> {
             request.setAttribute(NettyClientHttpRequest.CHANNEL, poolHandle.channel);
+
+            boolean sse = !isProxy && isAcceptEvents(request);
+            poolHandle.channel.pipeline().addLast(new ChannelInboundHandlerAdapter() {
+                boolean ignoreOneLast = false;
+
+                @Override
+                public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+                    if (msg instanceof io.netty.handler.codec.http.HttpResponse &&
+                        ((io.netty.handler.codec.http.HttpResponse) msg).status().equals(HttpResponseStatus.CONTINUE)) {
+                        ignoreOneLast = true;
+                    }
+
+                    super.channelRead(ctx, msg);
+
+                    if (msg instanceof LastHttpContent) {
+                        if (ignoreOneLast) {
+                            ignoreOneLast = false;
+                        } else {
+                            ctx.pipeline()
+                                .remove(this)
+                                .remove(ChannelPipelineCustomizer.HANDLER_HTTP_STREAM);
+                            poolHandle.release();
+                        }
+                    }
+                }
+            });
+            if (sse) {
+                poolHandle.channel.pipeline().addLast(HttpLineBasedFrameDecoder.NAME, new HttpLineBasedFrameDecoder(configuration.getMaxContentLength(), true, true));
+            }
+            poolHandle.channel.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP_STREAM, new HttpStreamsClientHandler());
+
             return this.streamRequestThroughChannel(
                 parentRequest,
                 requestWrapper.get(),
@@ -1044,9 +1080,23 @@ public class DefaultHttpClient implements
             return Flux.error(e);
         }
 
-        Mono<ConnectionManager.PoolHandle> handlePublisher = connectionManager.connectForExchange(requestKey, MediaType.MULTIPART_FORM_DATA_TYPE.equals(request.getContentType().orElse(null)), isAcceptEvents(request));
+        Mono<ConnectionManager.PoolHandle> handlePublisher = connectionManager.connect(requestKey);
 
         Flux<io.micronaut.http.HttpResponse<O>> responsePublisher = handlePublisher.flatMapMany(poolHandle -> {
+            poolHandle.channel.pipeline()
+                .addLast(ChannelPipelineCustomizer.HANDLER_HTTP_AGGREGATOR, new HttpObjectAggregator(configuration.getMaxContentLength()) {
+                    @Override
+                    protected void finishAggregation(FullHttpMessage aggregated) throws Exception {
+                        // only set content-length if there's any content
+                        if (!HttpUtil.isContentLengthSet(aggregated)) {
+                            if (aggregated.content().readableBytes() > 0) {
+                                super.finishAggregation(aggregated);
+                            }
+                        }
+                    }
+                })
+                .addLast(ChannelPipelineCustomizer.HANDLER_HTTP_STREAM, new HttpStreamsClientHandler());
+
             return Flux.create(emitter -> {
                 try {
                     sendRequestThroughChannel(
