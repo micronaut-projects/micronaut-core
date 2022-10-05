@@ -386,6 +386,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         Map<String, Object> map = new HashMap<>();
         boolean isNested = transformation == MapFormat.MapTransformation.NESTED;
 
+        final Map<String, Object>[] catalog = getCatalog(keyConvention == StringConvention.RAW ? PropertyCatalog.RAW : PropertyCatalog.GENERATED);
         Arrays
             .stream(catalog)
             .filter(Objects::nonNull)
