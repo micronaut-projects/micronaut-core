@@ -34,7 +34,6 @@ import java.util.Set;
 @Internal
 final class JavaEnumConstantElement extends AbstractJavaElement implements EnumConstantElement {
 
-    private final JavaVisitorContext visitorContext;
     private final VariableElement variableElement;
     private final JavaEnumElement declaringEnum;
 
@@ -52,7 +51,6 @@ final class JavaEnumConstantElement extends AbstractJavaElement implements EnumC
 
         this.declaringEnum = declaringEnum;
         this.variableElement = variableElement;
-        this.visitorContext = visitorContext;
     }
 
     @Override

@@ -38,7 +38,7 @@ import java.util.Set;
 public final class BeanPropertiesConfiguration {
 
     private BeanProperties.Visibility visibility = BeanProperties.Visibility.DEFAULT;
-    private EnumSet<BeanProperties.AccessKind> accessKinds = EnumSet.of(BeanProperties.AccessKind.METHOD);
+    private Set<BeanProperties.AccessKind> accessKinds = EnumSet.of(BeanProperties.AccessKind.METHOD);
     private Set<String> includes = Collections.emptySet();
     private Set<String> excludes = Collections.emptySet();
     private String[] readPrefixes = new String[]{AccessorsStyle.DEFAULT_READ_PREFIX};
@@ -99,11 +99,11 @@ public final class BeanPropertiesConfiguration {
         this.visibility = visibility;
     }
 
-    public EnumSet<BeanProperties.AccessKind> getAccessKinds() {
+    public Set<BeanProperties.AccessKind> getAccessKinds() {
         return accessKinds;
     }
 
-    public void setAccessKinds(EnumSet<BeanProperties.AccessKind> accessKinds) {
+    public void setAccessKinds(Set<BeanProperties.AccessKind> accessKinds) {
         this.accessKinds = accessKinds;
     }
 

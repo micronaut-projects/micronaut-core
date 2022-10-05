@@ -1459,13 +1459,13 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     protected final <X, Y, K> Map<K, Map<X, Y>> cloneMapOfMapValue(Map<K, Map<X, Y>> toClone) {
         return toClone.entrySet().stream()
                 .map(e -> new AbstractMap.SimpleEntry<>(e.getKey(), cloneMap(e.getValue())))
-                .collect(Collectors.toMap(AbstractMap.SimpleEntry::getKey, AbstractMap.SimpleEntry::getValue, (a, b) -> a, () -> new LinkedHashMap<>()));
+                .collect(Collectors.toMap(AbstractMap.SimpleEntry::getKey, AbstractMap.SimpleEntry::getValue, (a, b) -> a, LinkedHashMap::new));
     }
 
     protected final <K, V> Map<K, List<V>> cloneMapOfListValue(Map<K, List<V>> toClone) {
         return toClone.entrySet().stream()
                 .map(e -> new AbstractMap.SimpleEntry<>(e.getKey(), new ArrayList<>(e.getValue())))
-                .collect(Collectors.toMap(AbstractMap.SimpleEntry::getKey, AbstractMap.SimpleEntry::getValue, (a, b) -> a, () -> new LinkedHashMap<>()));
+                .collect(Collectors.toMap(AbstractMap.SimpleEntry::getKey, AbstractMap.SimpleEntry::getValue, (a, b) -> a, LinkedHashMap::new));
     }
 
     protected final <K, V> Map<K, V> cloneMap(Map<K, V> map) {

@@ -16,19 +16,16 @@
 package io.micronaut.ast.groovy.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.NextMajorVersion;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.ElementModifier;
 import io.micronaut.inject.ast.FieldElement;
-import org.apache.groovy.util.concurrent.LazyInitializable;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.FieldNode;
 
-import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.Set;
 
@@ -56,7 +53,7 @@ public class GroovyFieldElement extends AbstractGroovyElement implements FieldEl
                        ElementAnnotationMetadataFactory annotationMetadataFactory) {
         super(visitorContext, fieldNode, annotationMetadataFactory);
         this.owningType = owningType;
-        this.fieldNode = unwrapLazyField(fieldNode);
+        this.fieldNode = fieldNode;
     }
 
     @Override
@@ -69,24 +66,6 @@ public class GroovyFieldElement extends AbstractGroovyElement implements FieldEl
         return (FieldElement) super.withAnnotationMetadata(annotationMetadata);
     }
 
-    @Deprecated
-    @NextMajorVersion("This should be removed")
-    private static FieldNode unwrapLazyField(FieldNode fieldNode) {
-        if (fieldNode instanceof LazyInitializable) {
-            //this nonsense is to work around https://issues.apache.org/jira/browse/GROOVY-10398
-            ((LazyInitializable) fieldNode).lazyInit();
-            try {
-                Field delegate = fieldNode.getClass().getDeclaredField("delegate");
-                delegate.setAccessible(true);
-                fieldNode = (FieldNode) delegate.get(fieldNode);
-            } catch (NoSuchFieldException | IllegalAccessException e) {
-                // no op
-            }
-        }
-        return fieldNode;
-    }
-
-    @Override
     public FieldNode getNativeType() {
         return fieldNode;
     }

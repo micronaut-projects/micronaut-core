@@ -36,7 +36,6 @@ import javax.lang.model.type.TypeMirror;
 @Internal
 class JavaFieldElement extends AbstractJavaElement implements FieldElement {
 
-    private final JavaVisitorContext visitorContext;
     private final VariableElement variableElement;
     private JavaClassElement owningType;
     private ClassElement typeElement;
@@ -53,7 +52,6 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
                      JavaVisitorContext visitorContext) {
         super(variableElement, annotationMetadataFactory, visitorContext);
         this.variableElement = variableElement;
-        this.visitorContext = visitorContext;
     }
 
     /**

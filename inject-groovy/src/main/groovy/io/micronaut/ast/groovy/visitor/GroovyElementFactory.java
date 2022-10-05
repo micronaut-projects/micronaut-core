@@ -15,8 +15,6 @@
  */
 package io.micronaut.ast.groovy.visitor;
 
-import io.micronaut.ast.groovy.annotation.GroovyElementAnnotationMetadataFactory;
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
@@ -46,12 +44,6 @@ public class GroovyElementFactory implements ElementFactory<AnnotatedNode, Class
 
     public GroovyElementFactory(GroovyVisitorContext groovyVisitorContext) {
         this.visitorContext = groovyVisitorContext;
-    }
-
-    private ElementAnnotationMetadataFactory defaultAnnotationMetadata(Object nativeType,
-                                                                       AnnotationMetadata annotationMetadata) {
-        GroovyElementAnnotationMetadataFactory elementAnnotationMetadataFactory = visitorContext.getElementAnnotationMetadataFactory();
-        return elementAnnotationMetadataFactory.overrideForNativeType(nativeType, element -> elementAnnotationMetadataFactory.build(element, annotationMetadata));
     }
 
     @Override

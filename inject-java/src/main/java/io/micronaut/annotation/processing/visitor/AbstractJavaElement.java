@@ -114,6 +114,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
         copyValues(element);
         return element;
     }
+
     @Override
     public io.micronaut.inject.ast.Element withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
         AbstractJavaElement abstractJavaElement = makeCopy();

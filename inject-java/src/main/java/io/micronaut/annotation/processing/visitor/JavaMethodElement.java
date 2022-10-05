@@ -54,7 +54,6 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
 
     protected final JavaClassElement owningType;
     protected final ExecutableElement executableElement;
-    protected final JavaVisitorContext visitorContext;
     private JavaClassElement resolvedDeclaringClass;
     private ParameterElement[] parameters;
     private ParameterElement continuationParameter;
@@ -73,7 +72,6 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
                              JavaVisitorContext visitorContext) {
         super(executableElement, annotationMetadataFactory, visitorContext);
         this.executableElement = executableElement;
-        this.visitorContext = visitorContext;
         this.owningType = owningType;
     }
 

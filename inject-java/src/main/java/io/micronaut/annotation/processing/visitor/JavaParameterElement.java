@@ -36,7 +36,6 @@ import java.util.Map;
 @Internal
 class JavaParameterElement extends AbstractJavaElement implements ParameterElement {
 
-    private final JavaVisitorContext visitorContext;
     private final JavaClassElement owningType;
     private final MethodElement methodElement;
     private final VariableElement variableElement;
@@ -61,7 +60,6 @@ class JavaParameterElement extends AbstractJavaElement implements ParameterEleme
         this.owningType = owningType;
         this.methodElement = methodElement;
         this.variableElement = element;
-        this.visitorContext = visitorContext;
     }
 
     @Override

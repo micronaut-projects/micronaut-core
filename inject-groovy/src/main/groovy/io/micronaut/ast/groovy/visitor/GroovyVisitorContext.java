@@ -42,11 +42,8 @@ import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.control.CompilationUnit;
-import org.codehaus.groovy.control.ErrorCollector;
 import org.codehaus.groovy.control.Janitor;
 import org.codehaus.groovy.control.SourceUnit;
-import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
-import org.codehaus.groovy.syntax.SyntaxException;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -69,7 +66,6 @@ import java.util.Set;
  */
 public class GroovyVisitorContext implements VisitorContext {
     private static final MutableConvertibleValues<Object> VISITOR_ATTRIBUTES = new MutableConvertibleValuesMap<>();
-    private final ErrorCollector errorCollector;
     private final CompilationUnit compilationUnit;
     private final ClassWriterOutputVisitor outputVisitor;
     private final SourceUnit sourceUnit;
@@ -94,7 +90,6 @@ public class GroovyVisitorContext implements VisitorContext {
      */
     public GroovyVisitorContext(SourceUnit sourceUnit, @Nullable CompilationUnit compilationUnit, ClassWriterOutputVisitor outputVisitor) {
         this.sourceUnit = sourceUnit;
-        this.errorCollector = sourceUnit != null ? sourceUnit.getErrorCollector() : null;
         this.compilationUnit = compilationUnit;
         this.outputVisitor = outputVisitor;
         this.attributes = VISITOR_ATTRIBUTES;
@@ -277,12 +272,6 @@ public class GroovyVisitorContext implements VisitorContext {
     @Override
     public Map<String, String> getOptions() {
         return VisitorContextUtils.getSystemOptions();
-    }
-
-    private SyntaxErrorMessage buildErrorMessage(String message, ASTNode expr) {
-        return new SyntaxErrorMessage(
-            new SyntaxException(message + '\n', expr.getLineNumber(), expr.getColumnNumber(),
-                expr.getLastLineNumber(), expr.getLastColumnNumber()), sourceUnit);
     }
 
     @Override

@@ -50,7 +50,7 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
     protected final boolean isReadOnly;
     protected final AbstractAnnotationMetadataBuilder<K, A> metadataBuilder;
 
-    public AbstractElementAnnotationMetadataFactory(boolean isReadOnly, AbstractAnnotationMetadataBuilder<K, A> metadataBuilder) {
+    protected AbstractElementAnnotationMetadataFactory(boolean isReadOnly, AbstractAnnotationMetadataBuilder<K, A> metadataBuilder) {
         this.isReadOnly = isReadOnly;
         this.metadataBuilder = metadataBuilder;
     }

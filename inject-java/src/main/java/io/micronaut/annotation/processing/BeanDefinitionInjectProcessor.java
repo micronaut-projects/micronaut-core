@@ -28,7 +28,6 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ProcessingException;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
-import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.processing.BeanDefinitionBuilder;
 import io.micronaut.inject.processing.BeanDefinitionBuilderFactory;
 import io.micronaut.inject.processing.JavaModelUtils;
@@ -95,7 +94,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         INTRODUCTION_TYPE
     };
 
-    private ConfigurationMetadataBuilder metadataBuilder;
     private Set<String> beanDefinitions;
     private boolean processingOver;
     private final Set<String> processed = new HashSet<>();
@@ -103,7 +101,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
     @Override
     public final synchronized void init(ProcessingEnvironment processingEnv) {
         super.init(processingEnv);
-        this.metadataBuilder = ConfigurationMetadataBuilder.INSTANCE;
         this.beanDefinitions = new LinkedHashSet<>();
 
         for (BeanElementVisitor<?> visitor : BeanElementVisitor.VISITORS) {

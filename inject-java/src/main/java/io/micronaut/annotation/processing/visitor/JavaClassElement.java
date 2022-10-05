@@ -67,7 +67,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.BiFunction;
+import java.util.function.BiPredicate;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -84,7 +84,6 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     private static final String KOTLIN_METADATA = "kotlin.Metadata";
     private static final String PREFIX_IS = "is";
     protected final TypeElement classElement;
-    protected final JavaVisitorContext visitorContext;
     final List<? extends TypeMirror> typeArguments;
     private final int arrayDimensions;
     private final boolean isTypeVariable;
@@ -178,7 +177,6 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         boolean isTypeVariable) {
         super(classElement, annotationMetadataFactory, visitorContext);
         this.classElement = classElement;
-        this.visitorContext = visitorContext;
         this.typeArguments = typeArguments;
         this.genericTypeInfo = genericsInfo;
         this.arrayDimensions = arrayDimensions;
@@ -404,8 +402,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             public Object visitDeclared(DeclaredType type, Object o) {
                 Element element = type.asElement();
                 if (isAcceptable(element)) {
-                    List<? extends Element> enclosedElements = element.getEnclosedElements();
-                    for (Element enclosedElement : enclosedElements) {
+                    for (Element enclosedElement : element.getEnclosedElements()) {
                         if (JavaModelUtils.isRecordComponent(enclosedElement) || enclosedElement instanceof ExecutableElement) {
                             if (enclosedElement.getKind() != ElementKind.CONSTRUCTOR) {
                                 accept(type, enclosedElement, o);
@@ -449,10 +446,10 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                 if (isAcceptable(element)) {
                     List<? extends Element> enclosedElements = element.getEnclosedElements();
                     for (Element enclosedElement : enclosedElements) {
-                        if (JavaModelUtils.isRecordComponent(enclosedElement) || enclosedElement instanceof ExecutableElement) {
-                            if (enclosedElement.getKind() != ElementKind.CONSTRUCTOR) {
-                                accept(type, enclosedElement, o);
-                            }
+                        if ((JavaModelUtils.isRecordComponent(enclosedElement)
+                            || enclosedElement instanceof ExecutableElement)
+                            && enclosedElement.getKind() != ElementKind.CONSTRUCTOR) {
+                            accept(type, enclosedElement, o);
                         }
                     }
                 }
@@ -493,116 +490,110 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         }
         Elements elements = visitorContext.getElements();
         ElementKind kind = getElementKind(result.getElementType());
-        Predicate<Element> predicate = new Predicate<Element>() {
-
-            @Override
-            public boolean test(Element element) {
-                Element enclosingElement = element.getEnclosingElement();
-                if (enclosingElement instanceof TypeElement
-                    && ((TypeElement) enclosingElement).getQualifiedName().toString().equals(Enum.class.getName())
-                    && element.getKind() == ElementKind.FIELD) {
-                    // Skip any fields on Enum but allow to query methods
-                    return false;
-                }
-                ElementKind enclosedElementKind = element.getKind();
-                return enclosedElementKind == kind
-                    || result.isIncludeEnumConstants() && kind == ElementKind.FIELD && enclosedElementKind == ElementKind.ENUM_CONSTANT
-                    || (enclosedElementKind == ElementKind.ENUM && kind == ElementKind.CLASS);
+        Predicate<Element> predicate = element -> {
+            Element enclosingElement = element.getEnclosingElement();
+            if (enclosingElement instanceof TypeElement
+                && ((TypeElement) enclosingElement).getQualifiedName().toString().equals(Enum.class.getName())
+                && element.getKind() == ElementKind.FIELD) {
+                // Skip any fields on Enum but allow to query methods
+                return false;
             }
+            ElementKind enclosedElementKind = element.getKind();
+            return enclosedElementKind == kind
+                || result.isIncludeEnumConstants() && kind == ElementKind.FIELD && enclosedElementKind == ElementKind.ENUM_CONSTANT
+                || (enclosedElementKind == ElementKind.ENUM && kind == ElementKind.CLASS);
         };
 
-        Predicate<io.micronaut.inject.ast.Element> filter = new Predicate<io.micronaut.inject.ast.Element>() {
-            @Override
-            public boolean test(io.micronaut.inject.ast.Element element) {
-                if (excludeElements.contains(element.getNativeType())) {
-                    return false;
-                }
-                List<Predicate<T>> elementPredicates = result.getElementPredicates();
-                if (!elementPredicates.isEmpty()) {
-                    for (Predicate<T> elementPredicate : elementPredicates) {
-                        if (!elementPredicate.test((T) element)) {
-                            return false;
-                        }
-                    }
-                }
-                if (element instanceof MethodElement) {
-                    MethodElement methodElement = (MethodElement) element;
-                    if (result.isOnlyAbstract()) {
-                        if (methodElement.getDeclaringType().isInterface() && methodElement.isDefault()) {
-                            return false;
-                        } else if (!element.isAbstract()) {
-                            return false;
-                        }
-                    } else if (result.isOnlyConcrete()) {
-                        if (methodElement.getDeclaringType().isInterface() && !methodElement.isDefault()) {
-                            return false;
-                        } else if (element.isAbstract()) {
-                            return false;
-                        }
-                    }
-                }
-                if (result.isOnlyInstance() && element.isStatic()) {
-                    return false;
-                } else if (result.isOnlyStatic() && !element.isStatic()) {
-                    return false;
-                }
-                if (result.isOnlyAccessible()) {
-                    // exclude private members
-                    // exclude synthetic members or bridge methods that start with $
-                    if (element.isPrivate() || element.getName().startsWith("$")) {
-                        return false;
-                    }
-                    if (element instanceof MemberElement && !((MemberElement) element).isAccessible()) {
+        Predicate<io.micronaut.inject.ast.Element> filter = element -> {
+            if (excludeElements.contains(element.getNativeType())) {
+                return false;
+            }
+            List<Predicate<T>> elementPredicates = result.getElementPredicates();
+            if (!elementPredicates.isEmpty()) {
+                for (Predicate<T> elementPredicate : elementPredicates) {
+                    if (!elementPredicate.test((T) element)) {
                         return false;
                     }
                 }
-                if (!result.getModifierPredicates().isEmpty()) {
-                    Set<ElementModifier> modifiers = element.getModifiers();
-                    for (Predicate<Set<ElementModifier>> modifierPredicate : result.getModifierPredicates()) {
-                        if (!modifierPredicate.test(modifiers)) {
-                            return false;
-                        }
+            }
+            if (element instanceof MethodElement) {
+                MethodElement methodElement = (MethodElement) element;
+                if (result.isOnlyAbstract()) {
+                    if (methodElement.getDeclaringType().isInterface() && methodElement.isDefault()) {
+                        return false;
+                    } else if (!element.isAbstract()) {
+                        return false;
+                    }
+                } else if (result.isOnlyConcrete()) {
+                    if (methodElement.getDeclaringType().isInterface() && !methodElement.isDefault()) {
+                        return false;
+                    } else if (element.isAbstract()) {
+                        return false;
                     }
                 }
-                if (!result.getNamePredicates().isEmpty()) {
-                    for (Predicate<String> namePredicate : result.getNamePredicates()) {
-                        if (!namePredicate.test(element.getName())) {
-                            return false;
-                        }
+            }
+            if (result.isOnlyInstance() && element.isStatic()) {
+                return false;
+            } else if (result.isOnlyStatic() && !element.isStatic()) {
+                return false;
+            }
+            if (result.isOnlyAccessible()) {
+                // exclude private members
+                // exclude synthetic members or bridge methods that start with $
+                if (element.isPrivate() || element.getName().startsWith("$")) {
+                    return false;
+                }
+                if (element instanceof MemberElement && !((MemberElement) element).isAccessible()) {
+                    return false;
+                }
+            }
+            if (!result.getModifierPredicates().isEmpty()) {
+                Set<ElementModifier> modifiers = element.getModifiers();
+                for (Predicate<Set<ElementModifier>> modifierPredicate : result.getModifierPredicates()) {
+                    if (!modifierPredicate.test(modifiers)) {
+                        return false;
                     }
                 }
-                if (!result.getAnnotationPredicates().isEmpty()) {
-                    for (Predicate<AnnotationMetadata> annotationPredicate : result.getAnnotationPredicates()) {
-                        if (!annotationPredicate.test(element)) {
-                            return false;
-                        }
+            }
+            if (!result.getNamePredicates().isEmpty()) {
+                for (Predicate<String> namePredicate : result.getNamePredicates()) {
+                    if (!namePredicate.test(element.getName())) {
+                        return false;
                     }
                 }
-                if (!result.getTypePredicates().isEmpty()) {
-                    for (Predicate<ClassElement> typePredicate : result.getTypePredicates()) {
-                        ClassElement classElement;
-                        if (element instanceof ConstructorElement) {
-                            classElement = JavaClassElement.this;
-                        } else if (element instanceof MethodElement) {
-                            classElement = ((MethodElement) element).getGenericReturnType();
-                        } else if (element instanceof ClassElement) {
-                            classElement = (ClassElement) element;
-                        } else {
-                            classElement = ((FieldElement) element).getGenericField();
-                        }
-                        if (!typePredicate.test(classElement)) {
-                            return false;
-                        }
+            }
+            if (!result.getAnnotationPredicates().isEmpty()) {
+                for (Predicate<AnnotationMetadata> annotationPredicate : result.getAnnotationPredicates()) {
+                    if (!annotationPredicate.test(element)) {
+                        return false;
                     }
                 }
+            }
+            if (!result.getTypePredicates().isEmpty()) {
+                for (Predicate<ClassElement> typePredicate : result.getTypePredicates()) {
+                    ClassElement classElement;
+                    if (element instanceof ConstructorElement) {
+                        classElement = JavaClassElement.this;
+                    } else if (element instanceof MethodElement) {
+                        classElement = ((MethodElement) element).getGenericReturnType();
+                    } else if (element instanceof ClassElement) {
+                        classElement = (ClassElement) element;
+                    } else {
+                        classElement = ((FieldElement) element).getGenericField();
+                    }
+                    if (!typePredicate.test(classElement)) {
+                        return false;
+                    }
+                }
+            }
+// TODO: FIX only injected
 //                if (result.isOnlyInjected() && !element.hasDeclaredAnnotation(AnnotationUtil.INJECT)) {
 //                    return false;
 //                }
-                return true;
-            }
+            return true;
         };
 
-        BiFunction<io.micronaut.inject.ast.Element, io.micronaut.inject.ast.Element, Boolean> reduce;
+        BiPredicate<io.micronaut.inject.ast.Element, io.micronaut.inject.ast.Element> reduce;
         if (result.isIncludeHiddenElements() && result.isIncludeOverriddenMethods()) {
             reduce = (t1, t2) -> false;
         } else {
@@ -640,7 +631,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     private Collection<io.micronaut.inject.ast.Element> getAllElements(TypeElement classNode,
                                                                        boolean onlyDeclared,
                                                                        Predicate<Element> predicate,
-                                                                       BiFunction<io.micronaut.inject.ast.Element, io.micronaut.inject.ast.Element, Boolean> reduce) {
+                                                                       BiPredicate<io.micronaut.inject.ast.Element, io.micronaut.inject.ast.Element> reduce) {
         Set<io.micronaut.inject.ast.Element> elements = new LinkedHashSet<>();
         List<List<Element>> hierarchy = new ArrayList<>();
         collectHierarchy(classNode, onlyDeclared, predicate, hierarchy);
@@ -654,10 +645,10 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                     if (newElement.equals(existingElement)) {
                         continue;
                     }
-                    if (reduce.apply(newElement, existingElement)) {
+                    if (reduce.test(newElement, existingElement)) {
                         iterator.remove();
                         addedFromClassElements.add(newElement);
-                    } else if (reduce.apply(existingElement, newElement)) {
+                    } else if (reduce.test(existingElement, newElement)) {
                         continue classElements;
                     }
                 }

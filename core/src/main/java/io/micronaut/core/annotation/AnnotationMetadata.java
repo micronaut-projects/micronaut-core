@@ -1638,6 +1638,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @return unwrapped
      * @since 4.0.0
      */
+    @Override
     default AnnotationMetadata unwrapAnnotationMetadata() {
         return this;
     }

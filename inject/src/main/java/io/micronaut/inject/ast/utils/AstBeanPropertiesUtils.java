@@ -15,10 +15,10 @@
  */
 package io.micronaut.inject.ast.utils;
 
+import io.micronaut.context.annotation.BeanProperties;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.AnnotationUtil;
-import io.micronaut.context.annotation.BeanProperties;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.inject.ast.BeanPropertiesConfiguration;
 import io.micronaut.inject.ast.ClassElement;
@@ -30,7 +30,6 @@ import io.micronaut.inject.ast.PropertyElement;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -74,7 +73,7 @@ public final class AstBeanPropertiesUtils {
                                                               Function<MethodElement, Optional<String>> customWriterPropertyNameResolver,
                                                               Function<BeanPropertyData, PropertyElement> propertyCreator) {
         BeanProperties.Visibility visibility = configuration.getVisibility();
-        EnumSet<BeanProperties.AccessKind> accessKinds = configuration.getAccessKinds();
+        Set<BeanProperties.AccessKind> accessKinds = configuration.getAccessKinds();
 
         Set<String> includes = configuration.getIncludes();
         Set<String> excludes = configuration.getExcludes();
@@ -295,7 +294,7 @@ public final class AstBeanPropertiesUtils {
     }
 
     private static boolean canFieldBeUsedForAccess(FieldElement fieldElement,
-                                                   EnumSet<BeanProperties.AccessKind> accessKinds,
+                                                   Set<BeanProperties.AccessKind> accessKinds,
                                                    BeanProperties.Visibility visibility) {
         if (fieldElement.getOwningType().isRecord()) {
             return false;
@@ -307,7 +306,7 @@ public final class AstBeanPropertiesUtils {
     }
 
     private static boolean canMethodBeUsedForAccess(MethodElement methodElement,
-                                                    EnumSet<BeanProperties.AccessKind> accessKinds,
+                                                    Set<BeanProperties.AccessKind> accessKinds,
                                                     BeanProperties.Visibility visibility) {
         return accessKinds.contains(BeanProperties.AccessKind.METHOD) && isAccessible(methodElement, visibility);
     }

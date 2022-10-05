@@ -2326,6 +2326,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
          * @return annotation metadata in the cache or empty
          */
         @NonNull
+        @Override
         AnnotationMetadata getAnnotationMetadata();
 
         /**

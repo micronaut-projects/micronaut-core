@@ -87,8 +87,7 @@ public class AopHelperImpl implements AopHelper {
             sourceMethod,
             new AnnotationMetadataHierarchy(classElement.getAnnotationMetadata(), methodAnnotationMetadata),
             new ClassElement[]{interfaceToAdapt},
-            visitorContext,
-            new io.micronaut.core.annotation.AnnotationValue[0]
+            visitorContext
         );
 
         aopProxyWriter.visitDefaultConstructor(methodAnnotationMetadata, visitorContext);
@@ -154,7 +153,7 @@ public class AopHelperImpl implements AopHelper {
 
         targetMethod = targetMethod.withNewOwningType(classElement);
 
-        targetMethod.annotate(Adapter.class, (builder) -> {
+        targetMethod.annotate(Adapter.class, builder -> {
             builder.member(Adapter.InternalAttributes.ADAPTED_BEAN, new AnnotationClassValue<>(JavaModelUtils.getClassname(classElement)));
             builder.member(Adapter.InternalAttributes.ADAPTED_METHOD, sourceMethod.getName());
             builder.member(Adapter.InternalAttributes.ADAPTED_ARGUMENT_TYPES, adaptedArgumentTypes);

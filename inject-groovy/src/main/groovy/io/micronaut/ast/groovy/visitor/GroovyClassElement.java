@@ -227,10 +227,10 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
             excludeFieldNodes = new HashSet<>();
             for (PropertyElement excludePropertyElement : getBeanProperties()) {
                 excludePropertyElement.getReadMethod()
-                    .filter(m -> m instanceof AbstractGroovyElement)
+                    .filter(m -> !m.isSynthetic())
                     .ifPresent(methodElement -> excludeMethodNodes.add((AnnotatedNode) methodElement.getNativeType()));
                 excludePropertyElement.getWriteMethod()
-                    .filter(m -> m instanceof AbstractGroovyElement)
+                    .filter(m -> !m.isSynthetic())
                     .ifPresent(methodElement -> excludeMethodNodes.add((AnnotatedNode) methodElement.getNativeType()));
                 excludePropertyElement.getField().ifPresent(fieldElement -> excludeFieldNodes.add((AnnotatedNode) fieldElement.getNativeType()));
             }
@@ -665,9 +665,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
 
         genericInfo.forEach((name, generics) -> {
             Map<String, ClassElement> resolved = new LinkedHashMap<>(generics.size());
-            generics.forEach((variable, type) -> {
-                resolved.put(variable, new GroovyClassElement(visitorContext, type, resolveElementAnnotationMetadataFactory(classNode)));
-            });
+            generics.forEach((variable, type) -> resolved.put(variable, new GroovyClassElement(visitorContext, type, resolveElementAnnotationMetadataFactory(classNode))));
             results.put(name, resolved);
         });
         results.put(getName(), getTypeArguments());
