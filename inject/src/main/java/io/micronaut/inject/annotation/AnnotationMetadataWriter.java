@@ -337,7 +337,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             Map<String, Integer> defaultsStorage,
             Map<String, GeneratorAdapter> loadTypeMethods,
             AnnotationMetadata annotationMetadata) {
-        annotationMetadata = annotationMetadata.unwrap();
+        annotationMetadata = annotationMetadata.unwrapAnnotationMetadata();
         if (annotationMetadata.isEmpty()) {
             generatorAdapter.getStatic(Type.getType(AnnotationMetadata.class), "EMPTY_METADATA", Type.getType(AnnotationMetadata.class));
         } else if (annotationMetadata instanceof DefaultAnnotationMetadata) {

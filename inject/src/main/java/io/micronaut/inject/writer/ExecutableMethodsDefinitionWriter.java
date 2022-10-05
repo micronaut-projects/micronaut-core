@@ -364,7 +364,7 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
         Type typeReference = JavaModelUtils.getTypeReference(declaringType.getType());
         staticInit.push(typeReference);
         // 2: annotationMetadata
-        AnnotationMetadata annotationMetadata = methodElement.getAnnotationMetadata().unwrap();
+        AnnotationMetadata annotationMetadata = methodElement.unwrapAnnotationMetadata();
 
         if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
             AnnotationMetadataHierarchy hierarchy = (AnnotationMetadataHierarchy) annotationMetadata;

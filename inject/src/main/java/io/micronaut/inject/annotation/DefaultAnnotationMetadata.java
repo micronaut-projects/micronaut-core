@@ -1430,7 +1430,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     }
 
     @Override
-    public AnnotationMetadata copy() {
+    public AnnotationMetadata copyAnnotationMetadata() {
         return clone();
     }
 
@@ -2235,7 +2235,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      */
     @Internal
     public static void contributeDefaults(AnnotationMetadata target, AnnotationMetadata source) {
-        source = source.unwrap();
+        source = source.unwrapAnnotationMetadata();
         if (source instanceof AnnotationMetadataHierarchy) {
             source = ((AnnotationMetadataHierarchy) source).merge();
         }
@@ -2270,7 +2270,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      */
     @Internal
     public static void contributeRepeatable(AnnotationMetadata target, AnnotationMetadata source) {
-        source = source.unwrap();
+        source = source.unwrapAnnotationMetadata();
         if (source instanceof AnnotationMetadataHierarchy) {
             source = ((AnnotationMetadataHierarchy) source).merge();
         }

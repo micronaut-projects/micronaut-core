@@ -1631,14 +1631,14 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @return the copy
      * @since 4.0.0
      */
-    AnnotationMetadata copy();
+    AnnotationMetadata copyAnnotationMetadata();
 
     /**
      * Unwraps possible delegate or provider.
      * @return unwrapped
      * @since 4.0.0
      */
-    default AnnotationMetadata unwrap() {
+    default AnnotationMetadata unwrapAnnotationMetadata() {
         return this;
     }
 

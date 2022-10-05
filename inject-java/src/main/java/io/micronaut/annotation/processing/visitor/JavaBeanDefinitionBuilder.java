@@ -100,7 +100,7 @@ class JavaBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
             @Override
             protected BeanDefinitionVisitor createBeanDefinitionWriter() {
                 final BeanDefinitionVisitor writer = super.createBeanDefinitionWriter();
-                ClassElement newParent = parentType.withAnnotationMetadata(parentType.getAnnotationMetadata().copy()); // Just a copy
+                ClassElement newParent = parentType.withAnnotationMetadata(parentType.copyAnnotationMetadata()); // Just a copy
                 writer.visitBeanFactoryField(
                     newParent,
                     producerField.withAnnotationMetadata(
@@ -170,7 +170,7 @@ class JavaBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
             @Override
             protected BeanDefinitionVisitor createBeanDefinitionWriter() {
                 final BeanDefinitionVisitor writer = super.createBeanDefinitionWriter();
-                ClassElement newParent = parentType.withAnnotationMetadata(parentType.getAnnotationMetadata().copy()); // Just a copy
+                ClassElement newParent = parentType.withAnnotationMetadata(parentType.copyAnnotationMetadata()); // Just a copy
                 writer.visitBeanFactoryMethod(
                     newParent,
                     producerMethod.withAnnotationMetadata(

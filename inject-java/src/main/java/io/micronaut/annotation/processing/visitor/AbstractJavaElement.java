@@ -403,7 +403,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
             if (!annotationMirrors.isEmpty()) {
                 newAnnotationMetadata = annotationUtils.newAnnotationBuilder().buildDeclared(typeElement, annotationMirrors, includeTypeAnnotations);
             } else {
-                newAnnotationMetadata = includeTypeAnnotations ? annotationUtils.newAnnotationBuilder().lookupOrBuildForType(typeElement).copy() : AnnotationMetadata.EMPTY_METADATA;
+                newAnnotationMetadata = includeTypeAnnotations ? annotationUtils.newAnnotationBuilder().lookupOrBuildForType(typeElement).copyAnnotationMetadata() : AnnotationMetadata.EMPTY_METADATA;
             }
             return elementAnnotationMetadataFactory.build(element, newAnnotationMetadata);
         });

@@ -667,12 +667,12 @@ public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, 
     }
 
     @Override
-    default AnnotationMetadata copy() {
-        return getAnnotationMetadata().copy();
+    default AnnotationMetadata copyAnnotationMetadata() {
+        return getAnnotationMetadata().copyAnnotationMetadata();
     }
 
     @Override
-    default AnnotationMetadata unwrap() {
-        return getAnnotationMetadata().unwrap();
+    default AnnotationMetadata unwrapAnnotationMetadata() {
+        return getAnnotationMetadata().unwrapAnnotationMetadata();
     }
 }

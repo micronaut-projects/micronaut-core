@@ -305,7 +305,7 @@ public interface AnnotationSource {
      * @return unwrapped
      * @since 4.0.0
      */
-    default AnnotationSource unwrap() {
+    default AnnotationSource unwrapAnnotationMetadata() {
         return this;
     }
 }

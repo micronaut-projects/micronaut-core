@@ -64,7 +64,7 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
             boolean writeAnnotationDefaults) {
         super(originatingElements);
         this.targetClassType = getTypeReferenceForName(className);
-        this.annotationMetadata = annotationMetadata.unwrap();
+        this.annotationMetadata = annotationMetadata.unwrapAnnotationMetadata();
         this.writeAnnotationDefault = writeAnnotationDefaults;
     }
 
@@ -81,7 +81,7 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
             boolean writeAnnotationDefaults) {
         super(new Element[]{ originatingElement });
         this.targetClassType = getTypeReferenceForName(className);
-        this.annotationMetadata = annotationMetadata.unwrap();
+        this.annotationMetadata = annotationMetadata.unwrapAnnotationMetadata();
         this.writeAnnotationDefault = writeAnnotationDefaults;
     }
 
@@ -94,7 +94,7 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
 
         // in order to save memory of a method doesn't have any annotations of its own but merely references class metadata
         // then we setup an annotation metadata reference from the method to the class (or inherited method) metadata
-        AnnotationMetadata annotationMetadata = this.annotationMetadata.unwrap();
+        AnnotationMetadata annotationMetadata = this.annotationMetadata.unwrapAnnotationMetadata();
         if (annotationMetadata.isEmpty()) {
             annotationMetadataMethod.getStatic(Type.getType(AnnotationMetadata.class), "EMPTY_METADATA", Type.getType(AnnotationMetadata.class));
         } else if (annotationMetadata instanceof AnnotationMetadataReference) {
@@ -138,7 +138,7 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
             GeneratorAdapter staticInit = visitStaticInitializer(classWriter);
             staticInit.visitCode();
             if (writeAnnotationDefault) {
-                AnnotationMetadata annotationMetadata = this.annotationMetadata.unwrap();
+                AnnotationMetadata annotationMetadata = this.annotationMetadata.unwrapAnnotationMetadata();
                 if (annotationMetadata.isEmpty()) {
                     staticInit.getStatic(Type.getType(AnnotationMetadata.class), "EMPTY_METADATA", Type.getType(AnnotationMetadata.class));
                 } else {
@@ -177,7 +177,7 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
         Type annotationMetadataType = Type.getType(AnnotationMetadata.class);
         classWriter.visitField(ACC_PUBLIC | ACC_FINAL | ACC_STATIC, FIELD_ANNOTATION_METADATA, annotationMetadataType.getDescriptor(), null, null);
 
-        AnnotationMetadata annotationMetadata = this.annotationMetadata.unwrap();
+        AnnotationMetadata annotationMetadata = this.annotationMetadata.unwrapAnnotationMetadata();
         if (annotationMetadata.isEmpty()) {
             staticInit.getStatic(Type.getType(AnnotationMetadata.class), "EMPTY_METADATA", Type.getType(AnnotationMetadata.class));
         } else if (annotationMetadata instanceof DefaultAnnotationMetadata) {

@@ -97,7 +97,7 @@ public interface AnnotationMetadataProvider extends AnnotationSource {
     }
 
     @Override
-    default AnnotationSource unwrap() {
-        return getAnnotationMetadata().unwrap();
+    default AnnotationSource unwrapAnnotationMetadata() {
+        return getAnnotationMetadata().unwrapAnnotationMetadata();
     }
 }

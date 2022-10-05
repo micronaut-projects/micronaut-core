@@ -303,11 +303,11 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
         private AnnotationMetadata getAnnotationMetadataToModify() {
             if (preloadedAnnotationMetadata != null) {
                 if (preloadedAnnotationMetadata instanceof AnnotationMetadataHierarchy) {
-                    return preloadedAnnotationMetadata.getDeclaredMetadata().copy();
+                    return preloadedAnnotationMetadata.getDeclaredMetadata().copyAnnotationMetadata();
                 }
                 return preloadedAnnotationMetadata;
             }
-            return getCacheEntry().copy();
+            return getCacheEntry().copyAnnotationMetadata();
         }
 
         private AnnotationMetadata replaceAnnotationsInternal(AnnotationMetadata annotationMetadata) {

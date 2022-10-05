@@ -493,13 +493,13 @@ public abstract class AbstractEnvironmentAnnotationMetadata implements Annotatio
     }
 
     @Override
-    public AnnotationMetadata copy() {
-        return environmentAnnotationMetadata.copy();
+    public AnnotationMetadata copyAnnotationMetadata() {
+        return environmentAnnotationMetadata.copyAnnotationMetadata();
     }
 
     @Override
-    public AnnotationMetadata unwrap() {
-        return environmentAnnotationMetadata.unwrap();
+    public AnnotationMetadata unwrapAnnotationMetadata() {
+        return environmentAnnotationMetadata.unwrapAnnotationMetadata();
     }
 
     /**

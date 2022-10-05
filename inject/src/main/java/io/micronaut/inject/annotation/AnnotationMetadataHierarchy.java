@@ -1038,7 +1038,7 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     public MutableAnnotationMetadata merge() {
         MutableAnnotationMetadata newAnnotationMetadata = new MutableAnnotationMetadata();
         for (AnnotationMetadata annotationMetadata : hierarchy) {
-            annotationMetadata = annotationMetadata.unwrap();
+            annotationMetadata = annotationMetadata.unwrapAnnotationMetadata();
             if (annotationMetadata.isEmpty()) {
                 continue;
             }
@@ -1054,13 +1054,13 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     }
 
     @Override
-    public AnnotationMetadata copy() {
+    public AnnotationMetadata copyAnnotationMetadata() {
         AnnotationMetadata[] copy = new AnnotationMetadata[hierarchy.length];
         System.arraycopy(hierarchy, 0, copy, 0, hierarchy.length);
         ArrayUtils.reverse(copy);
         return new AnnotationMetadataHierarchy(
             delegateDeclaredToAllElements,
-            Arrays.stream(copy).map(AnnotationMetadata::copy).toArray(AnnotationMetadata[]::new)
+            Arrays.stream(copy).map(AnnotationMetadata::copyAnnotationMetadata).toArray(AnnotationMetadata[]::new)
         );
     }
 

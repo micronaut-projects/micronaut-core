@@ -560,7 +560,7 @@ final class EmptyAnnotationMetadata implements AnnotationMetadata {
     }
 
     @Override
-    public AnnotationMetadata copy() {
+    public AnnotationMetadata copyAnnotationMetadata() {
         return this;
     }
 }

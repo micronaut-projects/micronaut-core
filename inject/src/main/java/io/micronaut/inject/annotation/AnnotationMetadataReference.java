@@ -54,7 +54,7 @@ public class AnnotationMetadataReference implements AnnotationMetadataDelegate {
     }
 
     @Override
-    public AnnotationMetadata unwrap() {
+    public AnnotationMetadata unwrapAnnotationMetadata() {
         // Don't unwrap the reference
         return this;
     }

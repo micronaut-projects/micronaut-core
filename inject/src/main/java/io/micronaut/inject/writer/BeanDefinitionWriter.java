@@ -655,7 +655,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             throw new IllegalArgumentException("Unsupported element type: " + beanProducingElement.getClass().getName());
         }
         this.isPrimitiveBean = beanTypeElement.isPrimitive() && !beanTypeElement.isArray();
-        this.annotationMetadata = beanProducingElement.getAnnotationMetadata().unwrap();
+        this.annotationMetadata = beanProducingElement.unwrapAnnotationMetadata();
         this.beanDefinitionType = getTypeReferenceForName(this.beanDefinitionName);
         this.beanType = getTypeReference(beanTypeElement);
         this.beanDefinitionInternalName = getInternalName(this.beanDefinitionName);
@@ -4115,7 +4115,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     private void pushAnnotationMetadata(GeneratorAdapter staticInit, AnnotationMetadata annotationMetadata) {
-        annotationMetadata = annotationMetadata.unwrap();
+        annotationMetadata = annotationMetadata.unwrapAnnotationMetadata();
         if (annotationMetadata == AnnotationMetadata.EMPTY_METADATA || annotationMetadata.isEmpty()) {
             staticInit.push((String) null);
         } else if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
