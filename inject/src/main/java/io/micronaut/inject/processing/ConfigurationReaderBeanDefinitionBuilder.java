@@ -133,10 +133,12 @@ final class ConfigurationReaderBeanDefinitionBuilder extends DeclaredBeanDefinit
 
     @Override
     protected boolean visitProperty(BeanDefinitionVisitor visitor, PropertyElement propertyElement) {
+        Optional<MethodElement> readMethod = propertyElement.getReadMethod();
+        Optional<FieldElement> field = propertyElement.getField();
         if (propertyElement.hasStereotype(ConfigurationBuilder.class)) {
             // Exclude / ignore shouldn't affect builders
-            if (propertyElement.getReadMethod().isPresent()) {
-                MethodElement methodElement = propertyElement.getReadMethod().get();
+            if (readMethod.isPresent()) {
+                MethodElement methodElement = readMethod.get();
                 ClassElement builderType = methodElement.getReturnType();
                 visitor.visitConfigBuilderMethod(
                     builderType,
@@ -148,8 +150,8 @@ final class ConfigurationReaderBeanDefinitionBuilder extends DeclaredBeanDefinit
                 visitConfigurationBuilder(visitor, propertyElement, builderType);
                 return true;
             }
-            if (propertyElement.getField().isPresent()) {
-                FieldElement fieldElement = propertyElement.getField().get();
+            if (field.isPresent()) {
+                FieldElement fieldElement = field.get();
                 if (fieldElement.isAccessible(classElement)) {
                     ClassElement builderType = fieldElement.getType();
                     visitor.visitConfigBuilderField(
@@ -166,9 +168,10 @@ final class ConfigurationReaderBeanDefinitionBuilder extends DeclaredBeanDefinit
             }
         } else if (!propertyElement.isExcluded()) {
             boolean claimed = false;
-            if (propertyElement.getWriteAccessKind() == PropertyElement.AccessKind.METHOD && propertyElement.getWriteMethod().isPresent()) {
+            Optional<MethodElement> writeMethod = propertyElement.getWriteMethod();
+            if (propertyElement.getWriteAccessKind() == PropertyElement.AccessKind.METHOD && writeMethod.isPresent()) {
                 visitor.setValidated(visitor.isValidated() || propertyElement.hasAnnotation(ANN_REQUIRES_VALIDATION));
-                MethodElement methodElement = propertyElement.getWriteMethod().get();
+                MethodElement methodElement = writeMethod.get();
                 ParameterElement parameter = methodElement.getParameters()[0];
                 AnnotationMetadata annotationMetadata = new AnnotationMetadataHierarchy(
                     propertyElement,
@@ -185,16 +188,16 @@ final class ConfigurationReaderBeanDefinitionBuilder extends DeclaredBeanDefinit
                     );
                 visitor.visitSetterValue(methodElement.getDeclaringType(), methodElement, annotationMetadata, methodElement.isReflectionRequired(classElement), true);
                 claimed = true;
-            } else if (propertyElement.getWriteAccessKind() == PropertyElement.AccessKind.FIELD && propertyElement.getField().isPresent()) {
+            } else if (propertyElement.getWriteAccessKind() == PropertyElement.AccessKind.FIELD && field.isPresent()) {
                 visitor.setValidated(visitor.isValidated() || propertyElement.hasAnnotation(ANN_REQUIRES_VALIDATION));
-                FieldElement fieldElement = propertyElement.getField().get();
+                FieldElement fieldElement = field.get();
                 AnnotationMetadata annotationMetadata = MutableAnnotationMetadata.of(propertyElement.getAnnotationMetadata());
                 annotationMetadata = calculatePath(propertyElement, fieldElement, annotationMetadata);
                 visitor.visitFieldValue(fieldElement.getDeclaringType(), fieldElement.withAnnotationMetadata(annotationMetadata), true, fieldElement.isReflectionRequired(classElement));
                 claimed = true;
             }
-            if (propertyElement.getReadMethod().isPresent()) {
-                MethodElement methodElement = propertyElement.getReadMethod().get();
+            if (readMethod.isPresent()) {
+                MethodElement methodElement = readMethod.get();
                 if (methodElement.hasStereotype(Executable.class)) {
                     claimed |= visitExecutableMethod(visitor, methodElement);
                 }

@@ -58,8 +58,9 @@ public final class ConfigurationUtils {
         }
         String path = getPath(classElement);
         path = prependSuperclasses(classElement, path);
-        if (classElement.isInner()) {
-            ClassElement enclosingType = classElement.getEnclosingType().get();
+        Optional<ClassElement> inner = classElement.getEnclosingType();
+        if (classElement.isInner() && inner.isPresent()) {
+            ClassElement enclosingType = inner.get();
             String parentPrefix = getTypePath(enclosingType).orElse("");
             path = combinePaths(parentPrefix, path);
         }

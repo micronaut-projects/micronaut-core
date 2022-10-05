@@ -956,9 +956,9 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                     ((JavaClassElement) element).classElement,
                     ((JavaClassElement) element).typeArguments.toArray(new TypeMirror[0]));
             } else {
-                Optional<ClassElement> classElement1 = visitorContext.getClassElement(element.getName(), elementAnnotationMetadataFactory);
+                ClassElement classElement1 = visitorContext.getRequiredClassElement(element.getName(), elementAnnotationMetadataFactory);
                 return visitorContext.getTypes().getDeclaredType(
-                    ((JavaClassElement) classElement1.get()).classElement,
+                    ((JavaClassElement) classElement1).classElement,
                     element.getBoundGenericTypes().stream().map(ce -> toTypeMirror(visitorContext, ce)).toArray(TypeMirror[]::new));
             }
         }

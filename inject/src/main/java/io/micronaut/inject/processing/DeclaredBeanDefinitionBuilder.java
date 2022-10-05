@@ -229,8 +229,9 @@ public class DeclaredBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder
             claimed |= visitPropertyReadElement(visitor, propertyElement, readElement);
         }
         // Process property's field if no methods were processed
-        if (!claimed && propertyElement.getField().isPresent()) {
-            FieldElement writeElement = propertyElement.getField().get();
+        Optional<FieldElement> field = propertyElement.getField();
+        if (!claimed && field.isPresent()) {
+            FieldElement writeElement = field.get();
             claimed = visitField(visitor, writeElement);
         }
         return claimed;

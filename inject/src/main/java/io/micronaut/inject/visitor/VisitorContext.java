@@ -215,6 +215,18 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     }
 
     /**
+     * This method will lookup another class element by name. If it cannot be found an exception thrown.
+     *
+     * @param name                      The name
+     * @param annotationMetadataFactory The element annotation metadata factory
+     * @return The class element
+     * @since 4.0.0
+     */
+    default ClassElement getRequiredClassElement(String name, ElementAnnotationMetadataFactory annotationMetadataFactory) {
+        return getClassElement(name, annotationMetadataFactory).orElseThrow(() -> new IllegalStateException("Unknown type: " + name));
+    }
+
+    /**
      * This method will lookup another class element by name. If it cannot be found an empty optional will be returned.
      *
      * @param type The name
