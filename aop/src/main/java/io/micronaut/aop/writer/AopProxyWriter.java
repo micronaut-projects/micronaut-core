@@ -116,12 +116,6 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             Argument.class,
             Qualifier.class
     ));
-    public static final Method METHOD_GET_PROXY_TARGET_BEAN = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(
-            BeanLocator.class,
-            "getProxyTargetBean",
-            Argument.class,
-            Qualifier.class
-    ));
 
     public static final Method METHOD_HAS_CACHED_INTERCEPTED_METHOD = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(
             InterceptedProxy.class,
@@ -309,21 +303,6 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         this.interceptorBinding = toInterceptorBindingMap(interceptorBinding);
         this.interfaceTypes = interfaceTypes != null ? new LinkedHashSet<>(Arrays.asList(interfaceTypes)) : Collections.emptySet();
         this.classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
-//        if (configurationMetadata != null) {
-//            // unfortunate we have to do this
-//            String existingPrefix = annotationMetadata.stringValue(
-//                    ConfigurationReader.class,
-//                    "prefix")
-//                    .orElse("");
-//
-//            String computedPrefix = StringUtils.isNotEmpty(existingPrefix) ? existingPrefix + "." + configurationMetadata.getName() : configurationMetadata.getName();
-//            annotationMetadata = DefaultAnnotationMetadata.mutateMember(
-//                    annotationMetadata,
-//                    ConfigurationReader.class.getName(),
-//                    "prefix",
-//                    computedPrefix
-//            );
-//        }
         ClassElement aopElement = ClassElement.of(
                 proxyFullName,
                 isInterface,
