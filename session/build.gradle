@@ -9,6 +9,7 @@ dependencies {
 
     compileOnly project(":http-server")
     compileOnly project(":http-server-netty")
+    compileOnly libs.managed.graal
 
     implementation libs.managed.reactor
     implementation libs.caffeine
