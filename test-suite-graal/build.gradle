@@ -9,19 +9,17 @@ micronautBuild {
 }
 
 dependencies {
-    annotationProcessor libs.bundles.asm
-    annotationProcessor project(":inject-java")
-    implementation project(":context")
-    implementation project(":core")
-    implementation project(":inject")
-    implementation project(":graal")
-    implementation project(":http-server-netty")
-    implementation project(":http-client")
-    implementation project(":validation")
-    implementation project(":inject-java")
-
     testAnnotationProcessor libs.bundles.asm
     testAnnotationProcessor project(":inject-java")
+    testImplementation project(":context")
+    testImplementation project(":core")
+    testImplementation project(":inject")
+    testImplementation project(":graal")
+    testImplementation project(":http-server-netty")
+    testImplementation project(":http-client")
+    testImplementation project(":validation")
+    testImplementation project(":inject-java")
+    testImplementation project(":session")
     testImplementation libs.managed.micronaut.test.junit5
 }
 
@@ -29,9 +27,15 @@ tasks.withType(Test).configureEach {
     useJUnitPlatform()
 }
 
+configurations {
+    // Exclude Groovy from the nativeTestCompilation classpath
+    nativeImageTestClasspath {
+        exclude module: 'groovy-test'
+    }
+}
+
 tasks.named("check") { task ->
     def graal = ["jvmci.Compiler", "java.vendor.version", "java.vendor"].any {
-        println "$it ${System.getProperty(it)}"
         System.getProperty(it)?.toLowerCase(Locale.ENGLISH)?.contains("graal")
     }
     if (graal) {
@@ -49,6 +53,7 @@ graalvmNative {
     toolchainDetection = false
     binaries {
         all {
+            buildArgs.add("-H:-UseServiceLoaderFeature")
             openGraalModules.each { module ->
                 jvmArgs.add("--add-exports=" + module + "=ALL-UNNAMED")
             }
