@@ -527,7 +527,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
             );
 
             int ourStream = ((Http2StreamChannel) channelHandlerContext.channel()).stream().id();
-            HttpPipelineBuilder.StreamPipeline originalStreamPipeline = channelHandlerContext.channel().attr(HttpPipelineBuilder.STREAM_PIPELINE_ATTRIBUTE).get();
+            HttpPipelineBuilder.StreamPipeline originalStreamPipeline = channelHandlerContext.channel().attr(HttpPipelineBuilder.getStreamPipelineAttribute().get()).get();
 
             new Http2StreamChannelBootstrap(channelHandlerContext.channel().parent())
                     .handler(new ChannelInitializer<Http2StreamChannel>() {

@@ -74,6 +74,7 @@ import java.nio.channels.ClosedChannelException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.Supplier;
 
 /**
  * Helper class that manages the {@link ChannelPipeline} of incoming HTTP connections.
@@ -85,8 +86,6 @@ import java.util.concurrent.ThreadLocalRandom;
  * @author ywkat
  */
 final class HttpPipelineBuilder {
-    static final AttributeKey<StreamPipeline> STREAM_PIPELINE_ATTRIBUTE = AttributeKey.newInstance("stream-pipeline");
-
     private static final Logger LOG = LoggerFactory.getLogger(HttpPipelineBuilder.class);
 
     private final NettyHttpServer server;
@@ -135,6 +134,11 @@ final class HttpPipelineBuilder {
 
     boolean supportsSsl() {
         return sslContext != null;
+    }
+
+    static Supplier<AttributeKey<StreamPipeline>> getStreamPipelineAttribute() {
+        AttributeKey<StreamPipeline> attributeKey = AttributeKey.newInstance("stream-pipeline");
+        return () -> attributeKey;
     }
 
     final class ConnectionPipeline {
@@ -464,7 +468,7 @@ final class HttpPipelineBuilder {
          * and netty requests, and routing.
          */
         private void insertMicronautHandlers() {
-            channel.attr(STREAM_PIPELINE_ATTRIBUTE).set(this);
+            channel.attr(getStreamPipelineAttribute().get()).set(this);
 
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_COMPRESSOR, new SmartHttpContentCompressor(embeddedServices.getHttpCompressionStrategy()));
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECOMPRESSOR, new HttpContentDecompressor());
