@@ -74,6 +74,7 @@ import java.nio.channels.ClosedChannelException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
 /**
@@ -528,15 +529,17 @@ final class HttpPipelineBuilder {
     // as it would fail in Graal
     static class StreamPipelineAttributeKeyHolder {
 
+        private static final AtomicReference<AttributeKey<StreamPipeline>> instance = new AtomicReference<>();
+
         private StreamPipelineAttributeKeyHolder() {
         }
 
-        private static class InstanceHolder {
-            private static final AttributeKey<StreamPipeline> INSTANCE = AttributeKey.newInstance("stream-pipeline");
-        }
-
         static AttributeKey<StreamPipeline> getInstance() {
-            return InstanceHolder.INSTANCE;
+            return instance.updateAndGet(key -> {
+                if (key == null) {
+                    return AttributeKey.newInstance("micronaut-stream-pipeline");
+                }
+                return key;
+            });
         }
-    }
-}
+    }}
