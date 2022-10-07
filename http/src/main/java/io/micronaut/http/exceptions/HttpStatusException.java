@@ -20,7 +20,7 @@ import io.micronaut.http.HttpStatus;
 import java.util.Optional;
 
 /**
- * Exception thrown to return an specific HttpStatus and an error message.
+ * Exception thrown to return a specific HttpStatus and an error message.
  *
  * @author Iván López
  * @since 1.0
@@ -44,6 +44,27 @@ public class HttpStatusException extends HttpException {
      * @param body   The arbitrary object to return
      */
     public HttpStatusException(HttpStatus status, Object body) {
+        this.status = status;
+        this.body = body;
+    }
+
+    /**
+     * @param status  The {@link io.micronaut.http.HttpStatus}
+     * @param message The message
+     * @param cause   The throwable
+     */
+    public HttpStatusException(HttpStatus status, String message, Throwable cause) {
+        super(message, cause);
+        this.status = status;
+    }
+
+    /**
+     * @param status The {@link io.micronaut.http.HttpStatus}
+     * @param body   The arbitrary object to return
+     * @param cause   The throwable
+     */
+    public HttpStatusException(HttpStatus status, Object body, Throwable cause) {
+        super(cause);
         this.status = status;
         this.body = body;
     }
