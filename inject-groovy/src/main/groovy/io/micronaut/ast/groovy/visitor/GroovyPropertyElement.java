@@ -15,6 +15,7 @@
  */
 package io.micronaut.ast.groovy.visitor;
 
+import io.micronaut.ast.groovy.utils.AstAnnotationUtils;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.CollectionUtils;
@@ -22,6 +23,7 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementModifier;
 import io.micronaut.inject.ast.PropertyElement;
 import org.codehaus.groovy.ast.AnnotatedNode;
+import org.codehaus.groovy.ast.PropertyNode;
 
 import java.util.Collections;
 import java.util.Set;
@@ -34,16 +36,18 @@ import java.util.Set;
  */
 @Internal
 abstract class GroovyPropertyElement extends AbstractGroovyElement implements PropertyElement {
+
     private final String name;
     private final boolean readOnly;
     private final Object nativeType;
-    private final GroovyClassElement declaringElement;
+    private final GroovyClassElement declaringClass;
+    private ClassElement declaringElement;
 
     /**
      * Default constructor.
      *
      * @param visitorContext The visitor context
-     * @param declaringElement The declaring element
+     * @param declaringClass The declaring class
      * @param annotatedNode    The annotated node
      * @param annotationMetadata the annotation metadata
      * @param name the name
@@ -52,7 +56,7 @@ abstract class GroovyPropertyElement extends AbstractGroovyElement implements Pr
      */
     GroovyPropertyElement(
             GroovyVisitorContext visitorContext,
-            GroovyClassElement declaringElement,
+            GroovyClassElement declaringClass,
             AnnotatedNode annotatedNode,
             AnnotationMetadata annotationMetadata,
             String name,
@@ -62,7 +66,7 @@ abstract class GroovyPropertyElement extends AbstractGroovyElement implements Pr
         this.name = name;
         this.readOnly = readOnly;
         this.nativeType = nativeType;
-        this.declaringElement = declaringElement;
+        this.declaringClass = declaringClass;
     }
 
     @Override
@@ -106,6 +110,26 @@ abstract class GroovyPropertyElement extends AbstractGroovyElement implements Pr
 
     @Override
     public ClassElement getDeclaringType() {
-        return declaringElement;
+        if (declaringElement == null && nativeType instanceof PropertyNode) {
+            PropertyNode propertyNode = (PropertyNode) nativeType;
+            declaringElement = visitorContext.getElementFactory().newClassElement(
+                propertyNode.getDeclaringClass(),
+                AstAnnotationUtils.getAnnotationMetadata(
+                    sourceUnit,
+                    compilationUnit,
+                    propertyNode.getDeclaringClass()
+                )
+            );
+        }
+        if (declaringElement != null) {
+            return declaringElement;
+        }
+        return declaringClass;
     }
+
+    @Override
+    public ClassElement getOwningType() {
+        return declaringClass;
+    }
+
 }

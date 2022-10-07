@@ -22,7 +22,6 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
-import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandler;
 import io.micronaut.http.server.netty.types.NettyFileCustomizableResponseType;
@@ -89,9 +88,6 @@ public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Obj
             long fileLastModifiedSeconds = lastModified / 1000;
             if (ifModifiedSinceDateSeconds == fileLastModifiedSeconds) {
                 FullHttpResponse nettyResponse = notModified(response);
-                if (request instanceof NettyHttpRequest) {
-                    ((NettyHttpRequest<?>) request).prepareHttp2ResponseIfNecessary(nettyResponse);
-                }
                 return context.writeAndFlush(nettyResponse);
             }
         }

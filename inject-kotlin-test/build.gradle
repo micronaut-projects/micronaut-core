@@ -41,7 +41,7 @@ tasks.named("compileKotlin") {
 tasks.named("compileGroovy") {
     // this allows groovy to access kotlin classes.
     dependsOn tasks.getByPath('compileKotlin')
-    classpath += files(compileKotlin.destinationDir)
+    classpath += files(compileKotlin.destinationDirectory)
 }
 
 tasks.named("test", Test) {

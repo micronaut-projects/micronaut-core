@@ -253,6 +253,16 @@ ext.extraPomInfo = {
                                     }
                                     transformer(implementation:'org.apache.maven.plugins.shade.resource.ServicesResourceTransformer')
                                 }
+                                filters{
+                                    filter {
+                                        artifact '*.*'
+                                        excludes {
+                                            exclude "META-INF/*.SF"
+                                            exclude "META-INF/*.DSA"
+                                            exclude "META-INF/*.RSA"
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

@@ -51,7 +51,10 @@ import java.io.IOException
 import java.net.URL
 import java.net.URLClassLoader
 import java.nio.charset.StandardCharsets
-import java.nio.file.*
+import java.nio.file.FileVisitResult
+import java.nio.file.FileVisitor
+import java.nio.file.Files
+import java.nio.file.Path
 import java.nio.file.attribute.BasicFileAttributes
 import java.util.*
 import javax.annotation.processing.Processor
@@ -126,6 +129,7 @@ object KotlinCompileHelper {
         configuration.put(CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY, messageCollector)
         configuration.put(JVMConfigurationKeys.IR, false)
         configuration.put(JVMConfigurationKeys.OUTPUT_DIRECTORY, outDir.toFile())
+        configuration.put(JVMConfigurationKeys.JDK_HOME, File(System.getProperty("java.home")))
 
         val env =
             KotlinCoreEnvironment.createForTests({ }, configuration, EnvironmentConfigFiles.JVM_CONFIG_FILES)

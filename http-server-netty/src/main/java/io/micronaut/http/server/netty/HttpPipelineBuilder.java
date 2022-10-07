@@ -17,11 +17,9 @@ package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.naming.Named;
-import io.micronaut.http.netty.AbstractNettyHttpRequest;
 import io.micronaut.http.context.event.HttpRequestReceivedEvent;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.stream.HttpStreamsServerHandler;
-import io.micronaut.http.netty.stream.StreamingInboundHttp2ToHttpAdapter;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.decoders.HttpRequestDecoder;
 import io.micronaut.http.server.netty.encoders.HttpResponseEncoder;
@@ -32,27 +30,26 @@ import io.micronaut.http.server.util.HttpHostResolver;
 import io.micronaut.http.ssl.ServerSslConfiguration;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOutboundHandler;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpContentDecompressor;
 import io.netty.handler.codec.http.HttpMessage;
-import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.HttpServerKeepAliveHandler;
 import io.netty.handler.codec.http.HttpServerUpgradeHandler;
 import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketServerCompressionHandler;
 import io.netty.handler.codec.http2.CleartextHttp2ServerUpgradeHandler;
-import io.netty.handler.codec.http2.DefaultHttp2Connection;
 import io.netty.handler.codec.http2.Http2CodecUtil;
-import io.netty.handler.codec.http2.Http2Connection;
-import io.netty.handler.codec.http2.Http2FrameListener;
+import io.netty.handler.codec.http2.Http2FrameCodec;
+import io.netty.handler.codec.http2.Http2FrameCodecBuilder;
 import io.netty.handler.codec.http2.Http2FrameLogger;
+import io.netty.handler.codec.http2.Http2MultiplexHandler;
 import io.netty.handler.codec.http2.Http2ServerUpgradeCodec;
-import io.netty.handler.codec.http2.HttpConversionUtil;
-import io.netty.handler.codec.http2.HttpToHttp2ConnectionHandler;
-import io.netty.handler.codec.http2.HttpToHttp2ConnectionHandlerBuilder;
+import io.netty.handler.codec.http2.Http2StreamChannel;
+import io.netty.handler.codec.http2.Http2StreamFrameToHttpObjectCodec;
 import io.netty.handler.flow.FlowControlHandler;
 import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.pcap.PcapWriteHandler;
@@ -64,6 +61,7 @@ import io.netty.handler.ssl.SslHandshakeCompletionEvent;
 import io.netty.handler.stream.ChunkedWriteHandler;
 import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.util.AsciiString;
+import io.netty.util.AttributeKey;
 import io.netty.util.ReferenceCountUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -87,6 +85,8 @@ import java.util.concurrent.ThreadLocalRandom;
  * @author ywkat
  */
 final class HttpPipelineBuilder {
+    static final AttributeKey<StreamPipeline> STREAM_PIPELINE_ATTRIBUTE = AttributeKey.newInstance("stream-pipeline");
+
     private static final Logger LOG = LoggerFactory.getLogger(HttpPipelineBuilder.class);
 
     private final NettyHttpServer server;
@@ -234,7 +234,6 @@ final class HttpPipelineBuilder {
 
         private void onRequestPipelineBuilt() {
             server.triggerPipelineListeners(pipeline);
-            connectionCustomizer.onStreamPipelineBuilt();
         }
 
         /**
@@ -252,28 +251,6 @@ final class HttpPipelineBuilder {
         }
 
         /**
-         * Insert the handlers that manage the micronaut message handling, e.g. conversion between micronaut requests
-         * and netty requests, and routing.
-         */
-        private void insertMicronautHandlers() {
-            pipeline.addLast(NettyServerWebSocketUpgradeHandler.COMPRESSION_HANDLER, new WebSocketServerCompressionHandler());
-            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_STREAM, new HttpStreamsServerHandler());
-            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_CHUNK, new ChunkedWriteHandler());
-            pipeline.addLast(HttpRequestDecoder.ID, requestDecoder);
-            if (server.getServerConfiguration().isDualProtocol() && server.getServerConfiguration().isHttpToHttpsRedirect() && !ssl) {
-                pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_TO_HTTPS_REDIRECT, new HttpToHttpsRedirectHandler(sslConfiguration, hostResolver));
-            }
-            if (ssl) {
-                pipeline.addLast("request-certificate-handler", requestCertificateHandler);
-            }
-            pipeline.addLast(HttpResponseEncoder.ID, responseEncoder);
-            pipeline.addLast(NettyServerWebSocketUpgradeHandler.ID, new NettyServerWebSocketUpgradeHandler(
-                    embeddedServices,
-                    server.getWebSocketSessionRepository()));
-            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_INBOUND, routingInBoundHandler);
-        }
-
-        /**
          * Configure this pipeline for normal HTTP 1.
          */
         void configureForHttp1() {
@@ -281,28 +258,11 @@ final class HttpPipelineBuilder {
 
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_SERVER_CODEC, createServerCodec());
 
-            insertHttp1DownstreamHandlers();
+            new StreamPipeline(channel, ssl, connectionCustomizer).insertHttp1DownstreamHandlers();
 
             connectionCustomizer.onInitialPipelineBuilt();
+            connectionCustomizer.onStreamPipelineBuilt();
             onRequestPipelineBuilt();
-        }
-
-        /**
-         * Insert the handlers for HTTP 1 that are upstream of the
-         * {@value ChannelPipelineCustomizer#HANDLER_HTTP_SERVER_CODEC}. Used both for normal HTTP 1 connections, and
-         * after a H2C negotiation failure.
-         */
-        private void insertHttp1DownstreamHandlers() {
-            if (accessLogHandler != null) {
-                pipeline.addLast(ChannelPipelineCustomizer.HANDLER_ACCESS_LOGGER, accessLogHandler);
-            }
-            registerMicronautChannelHandlers();
-            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_FLOW_CONTROL, new FlowControlHandler());
-            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_KEEP_ALIVE, new HttpServerKeepAliveHandler());
-            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_COMPRESSOR, new SmartHttpContentCompressor(embeddedServices.getHttpCompressionStrategy()));
-            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECOMPRESSOR, new HttpContentDecompressor());
-
-            insertMicronautHandlers();
         }
 
         /**
@@ -311,50 +271,27 @@ final class HttpPipelineBuilder {
         private void configureForHttp2() {
             insertIdleStateHandler();
 
-            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION, newHttpToHttp2ConnectionHandler());
-            registerMicronautChannelHandlers();
-
-            insertHttp2DownstreamHandlers();
+            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION, createHttp2FrameCodec());
+            pipeline.addLast(new Http2MultiplexHandler(new ChannelInitializer<Channel>() {
+                @Override
+                protected void initChannel(@NonNull Channel ch) {
+                    StreamPipeline streamPipeline = new StreamPipeline(ch, ssl, connectionCustomizer.specializeForChannel(ch, NettyServerCustomizer.ChannelRole.REQUEST_STREAM));
+                    streamPipeline.insertHttp2FrameHandlers();
+                    streamPipeline.streamCustomizer.onStreamPipelineBuilt();
+                }
+            }));
 
             connectionCustomizer.onInitialPipelineBuilt();
             onRequestPipelineBuilt();
         }
 
-        /**
-         * Insert the handlers downstream of the {@value ChannelPipelineCustomizer#HANDLER_HTTP2_CONNECTION}. Used both
-         * for ALPN HTTP 2 and h2c.
-         */
-        private void insertHttp2DownstreamHandlers() {
-            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_FLOW_CONTROL, new FlowControlHandler());
-            if (accessLogHandler != null) {
-                pipeline.addLast(ChannelPipelineCustomizer.HANDLER_ACCESS_LOGGER, accessLogHandler);
-            }
-
-            insertMicronautHandlers();
-        }
-
-        /**
-         * Create the HTTP 2 <-> HTTP 1 converter, inserted as
-         * {@value ChannelPipelineCustomizer#HANDLER_HTTP2_CONNECTION}.
-         */
-        private HttpToHttp2ConnectionHandler newHttpToHttp2ConnectionHandler() {
-            Http2Connection connection = new DefaultHttp2Connection(true);
-            final Http2FrameListener http2ToHttpAdapter = new StreamingInboundHttp2ToHttpAdapter(
-                    connection,
-                    (int) server.getServerConfiguration().getMaxRequestSize(),
-                    server.getServerConfiguration().isValidateHeaders(),
-                    true
-            );
-            final HttpToHttp2ConnectionHandlerBuilder builder = new HttpToHttp2ConnectionHandlerBuilder()
-                    .frameListener(http2ToHttpAdapter)
+        private Http2FrameCodec createHttp2FrameCodec() {
+            Http2FrameCodecBuilder builder = Http2FrameCodecBuilder.forServer()
                     .validateHeaders(server.getServerConfiguration().isValidateHeaders())
                     .initialSettings(server.getServerConfiguration().getHttp2().http2Settings());
-
             server.getServerConfiguration().getLogLevel().ifPresent(logLevel ->
-                    builder.frameLogger(new Http2FrameLogger(logLevel,
-                            NettyHttpServer.class))
-            );
-            return builder.connection(connection).build();
+                    builder.frameLogger(new Http2FrameLogger(logLevel, NettyHttpServer.class)));
+            return builder.build();
         }
 
         /**
@@ -389,7 +326,7 @@ final class HttpPipelineBuilder {
                 }
 
                 @Override
-                protected void configurePipeline(ChannelHandlerContext ctx, String protocol) throws Exception {
+                protected void configurePipeline(ChannelHandlerContext ctx, String protocol) {
                     switch (protocol) {
                         case ApplicationProtocolNames.HTTP_2:
                             configureForHttp2();
@@ -413,21 +350,24 @@ final class HttpPipelineBuilder {
         void configureForH2cSupport() {
             insertIdleStateHandler();
 
-            final HttpToHttp2ConnectionHandler connectionHandler = newHttpToHttp2ConnectionHandler();
+            final Http2FrameCodec connectionHandler = createHttp2FrameCodec();
             final String fallbackHandlerName = "http1-fallback-handler";
             HttpServerUpgradeHandler.UpgradeCodecFactory upgradeCodecFactory = protocol -> {
                 if (AsciiString.contentEquals(Http2CodecUtil.HTTP_UPGRADE_PROTOCOL_NAME, protocol)) {
 
-                    return new Http2ServerUpgradeCodec(ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION, connectionHandler) {
+                    return new Http2ServerUpgradeCodec(connectionHandler, new Http2MultiplexHandler(new ChannelInitializer<Http2StreamChannel>() {
+                        @Override
+                        protected void initChannel(@NonNull Http2StreamChannel ch) {
+                            StreamPipeline streamPipeline = new StreamPipeline(ch, ssl, connectionCustomizer.specializeForChannel(ch, NettyServerCustomizer.ChannelRole.REQUEST_STREAM));
+                            streamPipeline.insertHttp2FrameHandlers();
+                            streamPipeline.streamCustomizer.onStreamPipelineBuilt();
+                        }
+                    })) {
                         @Override
                         public void upgradeTo(ChannelHandlerContext ctx, FullHttpRequest upgradeRequest) {
-                            pipeline.remove(fallbackHandlerName);
-                            insertHttp2DownstreamHandlers();
-                            onRequestPipelineBuilt();
                             super.upgradeTo(ctx, upgradeRequest);
-                            // HTTP1 request is on the implicit stream 1
-                            upgradeRequest.headers().set(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text(), 1);
-                            ctx.fireChannelRead(ReferenceCountUtil.retain(upgradeRequest));
+                            pipeline.remove(fallbackHandlerName);
+                            onRequestPipelineBuilt();
                         }
                     };
                 } else {
@@ -449,15 +389,6 @@ final class HttpPipelineBuilder {
                 @Override
                 protected void channelRead0(ChannelHandlerContext ctx, HttpMessage msg) {
                     // If this handler is hit then no upgrade has been attempted and the client is just talking HTTP.
-                    if (msg instanceof HttpRequest) {
-                        HttpRequest req = (HttpRequest) msg;
-                        if (req.headers().contains(AbstractNettyHttpRequest.STREAM_ID)) {
-                            ChannelPipeline pipeline = ctx.pipeline();
-                            pipeline.remove(this);
-                            pipeline.fireChannelRead(ReferenceCountUtil.retain(msg));
-                            return;
-                        }
-                    }
                     ChannelPipeline pipeline = ctx.pipeline();
 
                     // remove the handlers we don't need anymore
@@ -466,13 +397,109 @@ final class HttpPipelineBuilder {
 
                     // reconfigure for http1
                     // note: we have to reuse the serverCodec in case it still has some data buffered
-                    insertHttp1DownstreamHandlers();
-
+                    new StreamPipeline(channel, ssl, connectionCustomizer).insertHttp1DownstreamHandlers();
+                    connectionCustomizer.onStreamPipelineBuilt();
                     onRequestPipelineBuilt();
                     pipeline.fireChannelRead(ReferenceCountUtil.retain(msg));
                 }
             });
             connectionCustomizer.onInitialPipelineBuilt();
+        }
+
+        @NonNull
+        private HttpServerCodec createServerCodec() {
+            return new HttpServerCodec(
+                    server.getServerConfiguration().getMaxInitialLineLength(),
+                    server.getServerConfiguration().getMaxHeaderSize(),
+                    server.getServerConfiguration().getMaxChunkSize(),
+                    server.getServerConfiguration().isValidateHeaders(),
+                    server.getServerConfiguration().getInitialBufferSize()
+            );
+        }
+    }
+
+    final class StreamPipeline {
+        private final Channel channel;
+        private final ChannelPipeline pipeline;
+        private final boolean ssl;
+
+        private final NettyServerCustomizer streamCustomizer;
+
+        private StreamPipeline(Channel channel, boolean ssl, NettyServerCustomizer streamCustomizer) {
+            this.channel = channel;
+            this.pipeline = channel.pipeline();
+            this.ssl = ssl;
+            this.streamCustomizer = streamCustomizer;
+        }
+
+        void initializeChildPipelineForPushPromise(Channel childChannel) {
+            StreamPipeline promisePipeline = new StreamPipeline(childChannel, ssl, streamCustomizer.specializeForChannel(childChannel, NettyServerCustomizer.ChannelRole.PUSH_PROMISE_STREAM));
+            promisePipeline.insertHttp2FrameHandlers();
+            promisePipeline.streamCustomizer.onStreamPipelineBuilt();
+        }
+
+        private void insertHttp2FrameHandlers() {
+            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECODER, new Http2StreamFrameToHttpObjectCodec(true, server.getServerConfiguration().isValidateHeaders()));
+
+            insertHttp2DownstreamHandlers();
+        }
+
+        /**
+         * Insert the handlers downstream of the {@value ChannelPipelineCustomizer#HANDLER_HTTP2_CONNECTION}. Used both
+         * for ALPN HTTP 2 and h2c.
+         */
+        private void insertHttp2DownstreamHandlers() {
+            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_FLOW_CONTROL, new FlowControlHandler());
+            if (accessLogHandler != null) {
+                pipeline.addLast(ChannelPipelineCustomizer.HANDLER_ACCESS_LOGGER, accessLogHandler);
+            }
+
+            registerMicronautChannelHandlers();
+
+            insertMicronautHandlers();
+        }
+
+        /**
+         * Insert the handlers that manage the micronaut message handling, e.g. conversion between micronaut requests
+         * and netty requests, and routing.
+         */
+        private void insertMicronautHandlers() {
+            channel.attr(STREAM_PIPELINE_ATTRIBUTE).set(this);
+
+            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_COMPRESSOR, new SmartHttpContentCompressor(embeddedServices.getHttpCompressionStrategy()));
+            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECOMPRESSOR, new HttpContentDecompressor());
+
+            pipeline.addLast(NettyServerWebSocketUpgradeHandler.COMPRESSION_HANDLER, new WebSocketServerCompressionHandler());
+            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_STREAM, new HttpStreamsServerHandler());
+            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_CHUNK, new ChunkedWriteHandler());
+            pipeline.addLast(HttpRequestDecoder.ID, requestDecoder);
+            if (server.getServerConfiguration().isDualProtocol() && server.getServerConfiguration().isHttpToHttpsRedirect() && !ssl) {
+                pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_TO_HTTPS_REDIRECT, new HttpToHttpsRedirectHandler(sslConfiguration, hostResolver));
+            }
+            if (ssl) {
+                pipeline.addLast("request-certificate-handler", requestCertificateHandler);
+            }
+            pipeline.addLast(HttpResponseEncoder.ID, responseEncoder);
+            pipeline.addLast(NettyServerWebSocketUpgradeHandler.ID, new NettyServerWebSocketUpgradeHandler(
+                    embeddedServices,
+                    server.getWebSocketSessionRepository()));
+            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_INBOUND, routingInBoundHandler);
+        }
+
+        /**
+         * Insert the handlers for HTTP 1 that are upstream of the
+         * {@value ChannelPipelineCustomizer#HANDLER_HTTP_SERVER_CODEC}. Used both for normal HTTP 1 connections, and
+         * after a H2C negotiation failure.
+         */
+        private void insertHttp1DownstreamHandlers() {
+            if (accessLogHandler != null) {
+                pipeline.addLast(ChannelPipelineCustomizer.HANDLER_ACCESS_LOGGER, accessLogHandler);
+            }
+            registerMicronautChannelHandlers();
+            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_FLOW_CONTROL, new FlowControlHandler());
+            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_KEEP_ALIVE, new HttpServerKeepAliveHandler());
+
+            insertMicronautHandlers();
         }
 
         /**
@@ -489,17 +516,6 @@ final class HttpPipelineBuilder {
                 }
                 pipeline.addLast(name, outboundHandlerAdapter);
             }
-        }
-
-        @NonNull
-        private HttpServerCodec createServerCodec() {
-            return new HttpServerCodec(
-                    server.getServerConfiguration().getMaxInitialLineLength(),
-                    server.getServerConfiguration().getMaxHeaderSize(),
-                    server.getServerConfiguration().getMaxChunkSize(),
-                    server.getServerConfiguration().isValidateHeaders(),
-                    server.getServerConfiguration().getInitialBufferSize()
-            );
         }
     }
 }
