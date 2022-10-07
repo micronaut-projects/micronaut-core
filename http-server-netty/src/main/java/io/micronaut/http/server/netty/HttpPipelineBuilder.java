@@ -75,7 +75,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Supplier;
 
 /**
  * Helper class that manages the {@link ChannelPipeline} of incoming HTTP connections.
@@ -136,11 +135,6 @@ final class HttpPipelineBuilder {
 
     boolean supportsSsl() {
         return sslContext != null;
-    }
-
-    static Supplier<AttributeKey<StreamPipeline>> getStreamPipelineAttribute() {
-        AttributeKey<StreamPipeline> attributeKey = AttributeKey.newInstance("stream-pipeline");
-        return () -> attributeKey;
     }
 
     final class ConnectionPipeline {
