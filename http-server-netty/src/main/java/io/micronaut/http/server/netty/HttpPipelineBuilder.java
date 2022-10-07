@@ -86,6 +86,7 @@ import java.util.function.Supplier;
  * @author ywkat
  */
 final class HttpPipelineBuilder {
+
     private static final Logger LOG = LoggerFactory.getLogger(HttpPipelineBuilder.class);
 
     private final NettyHttpServer server;
@@ -468,7 +469,7 @@ final class HttpPipelineBuilder {
          * and netty requests, and routing.
          */
         private void insertMicronautHandlers() {
-            channel.attr(getStreamPipelineAttribute().get()).set(this);
+            channel.attr(StreamPipelineAttributeKeyHolder.getInstance()).set(this);
 
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_COMPRESSOR, new SmartHttpContentCompressor(embeddedServices.getHttpCompressionStrategy()));
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECOMPRESSOR, new HttpContentDecompressor());
@@ -520,6 +521,22 @@ final class HttpPipelineBuilder {
                 }
                 pipeline.addLast(name, outboundHandlerAdapter);
             }
+        }
+    }
+
+    // We need the AttributeKey to be static, as it's used in NettyHttpRequest, but we can't eagerly initialize it
+    // as it would fail in Graal
+    static class StreamPipelineAttributeKeyHolder {
+
+        private StreamPipelineAttributeKeyHolder() {
+        }
+
+        private static class InstanceHolder {
+            private static final AttributeKey<StreamPipeline> INSTANCE = AttributeKey.newInstance("stream-pipeline");
+        }
+
+        static AttributeKey<StreamPipeline> getInstance() {
+            return InstanceHolder.INSTANCE;
         }
     }
 }
