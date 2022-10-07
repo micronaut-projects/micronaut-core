@@ -521,19 +521,20 @@ final class HttpPipelineBuilder {
 
     // We need the AttributeKey to be static, as it's used in NettyHttpRequest, but we can't eagerly initialize it
     // as it would fail in Graal
-    static class StreamPipelineAttributeKeyHolder {
+    static final class StreamPipelineAttributeKeyHolder {
 
-        private static final AtomicReference<AttributeKey<StreamPipeline>> instance = new AtomicReference<>();
+        private static final AtomicReference<AttributeKey<StreamPipeline>> INSTANCE = new AtomicReference<>();
 
         private StreamPipelineAttributeKeyHolder() {
         }
 
         static AttributeKey<StreamPipeline> getInstance() {
-            return instance.updateAndGet(key -> {
+            return INSTANCE.updateAndGet(key -> {
                 if (key == null) {
                     return AttributeKey.newInstance("micronaut-stream-pipeline");
                 }
                 return key;
             });
         }
-    }}
+    }
+}
