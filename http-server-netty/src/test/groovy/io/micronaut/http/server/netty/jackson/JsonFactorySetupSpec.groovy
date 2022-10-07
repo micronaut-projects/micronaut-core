@@ -16,15 +16,11 @@
 package io.micronaut.http.server.netty.jackson
 
 import com.fasterxml.jackson.core.JsonFactory
-import com.fasterxml.jackson.core.util.BufferRecycler
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.MapPropertySource
-import io.micronaut.docs.context.annotation.primary.ColorPicker
-import io.micronaut.http.HttpRequest
-import io.micronaut.http.HttpResponse
-import io.micronaut.http.HttpStatus
+import io.micronaut.context.env.PropertySource
 import spock.lang.Specification
 
 /**
@@ -34,7 +30,6 @@ import spock.lang.Specification
 class JsonFactorySetupSpec extends Specification {
 
     void "verify default jackson setup with JsonFactory bean"() {
-
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test").start()
 
@@ -49,7 +44,7 @@ class JsonFactorySetupSpec extends Specification {
     void "verify JsonFactory properties are injected into the bean"() {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
-        applicationContext.environment.addPropertySource(MapPropertySource.of(
+        applicationContext.environment.addPropertySource((MapPropertySource) PropertySource.of(
                 'jackson.factory.use-thread-local-for-buffer-recycling': false
         ))
         applicationContext.start()

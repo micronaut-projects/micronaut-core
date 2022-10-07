@@ -8,6 +8,12 @@ This section documents breaking changes between Micronaut versions
 
 https://github.com/ben-manes/caffeine[Caffeine] is no longer shaded into the `io.micronaut.caffeine` package. If you depend on this library you should directly depend on the latest version of Caffeine.
 
+==== Update to Groovy 4
+
+Micronaut now uses Groovy 4.
+This means that Groovy 4 is now the minimum version required to run Groovy Micronaut applications.
+There have been several core differences in Groovy parsing and behavior for version 4 which can be found in the breaking changes section of the https://groovy-lang.org/releasenotes/groovy-4.0.html[4.0.0 release notes].
+
 ==== SnakeYAML no longer a direct dependency
 
 SnakeYAML is no longer a direct dependency, if you need YAML configuration you should add SnakeYAML to your classpath explicitly

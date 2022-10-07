@@ -15,7 +15,9 @@ dependencies {
     api project(":core-reactive")
     api libs.managed.validation
 
-    compileOnly libs.managed.gorm
+    compileOnly(libs.managed.gorm) {
+        exclude(module: 'groovy')
+    }
     compileOnly project(":http-server")
 
     implementation libs.managed.reactor

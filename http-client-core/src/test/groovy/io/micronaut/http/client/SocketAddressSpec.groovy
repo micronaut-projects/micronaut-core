@@ -13,7 +13,7 @@ class SocketAddressSpec extends Specification {
         ConversionService converter = ctx.getBean(ConversionService)
 
         when:
-        Optional<SocketAddress> address = converter.convert("1.2.3.4:8080", SocketAddress.class)
+        Optional<SocketAddress> address = converter.convert("1.2.3.4:8080", SocketAddress)
 
         then:
         address.isPresent()
@@ -22,7 +22,7 @@ class SocketAddressSpec extends Specification {
         ((InetSocketAddress) address.get()).getPort() == 8080
 
         when:
-        address = converter.convert("https://foo.bar:8081", SocketAddress.class)
+        address = converter.convert("https://foo.bar:8081", SocketAddress)
 
         then:
         address.isPresent()
@@ -31,7 +31,7 @@ class SocketAddressSpec extends Specification {
         ((InetSocketAddress) address.get()).getPort() == 8081
 
         when:
-        ConversionContext conversionContext = ArgumentConversionContext.of(SocketAddress.class)
+        ConversionContext conversionContext = ConversionContext.of(SocketAddress)
         address = converter.convert("abc:456456456456", conversionContext)
 
         then:

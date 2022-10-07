@@ -906,7 +906,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                     private String getGetterName(String propertyName, ClassElement type) {
                         return NameUtils.getterNameFor(
                                 propertyName,
-                                type.equals(PrimitiveElement.BOOLEAN) || type.getName().equals(Boolean.class.getName())
+                                type.equals(PrimitiveElement.BOOLEAN)
                         );
                     }
                 };

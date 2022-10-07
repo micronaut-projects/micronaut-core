@@ -1,0 +1,21 @@
+plugins {
+    id "io.micronaut.build.internal.convention-geb-base"
+}
+
+micronautBuild {
+    core {
+        usesMicronautTestJunit()
+        usesMicronautTestSpock()
+    }
+}
+
+dependencies {
+    testImplementation(project(":inject-groovy")) {
+        exclude module: 'groovy'
+    }
+
+    testImplementation project(':http')
+    testImplementation project(':http-server-netty')
+
+    testRuntimeOnly "ch.qos.logback:logback-classic:1.2.3"
+}
