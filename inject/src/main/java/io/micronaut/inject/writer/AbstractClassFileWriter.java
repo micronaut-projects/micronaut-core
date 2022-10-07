@@ -31,10 +31,10 @@ import io.micronaut.inject.annotation.AnnotationMetadataWriter;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.TypedElement;
-import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.processing.JavaModelUtils;
 import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.ClassVisitor;
@@ -186,15 +186,6 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
     );
 
     protected final OriginatingElements originatingElements;
-
-    /**
-     * @param originatingElement The originating element
-     * @deprecated Use {@link #AbstractClassFileWriter(Element...)} instead
-     */
-    @Deprecated
-    protected AbstractClassFileWriter(Element originatingElement) {
-        this(OriginatingElements.of(originatingElement));
-    }
 
     /**
      * @param originatingElements The originating elements
