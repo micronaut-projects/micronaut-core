@@ -15,6 +15,16 @@
  */
 package io.micronaut.inject.qualifiers;
 
+import io.micronaut.context.Qualifier;
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.inject.BeanType;
+
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -26,17 +36,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
-import io.micronaut.context.Qualifier;
-import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.AnnotationUtil;
-import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
-import io.micronaut.core.util.ArrayUtils;
-import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.inject.BeanType;
 
 /**
  * Qualifier used to resolve the interceptor binding when injection method interceptors for AOP.
@@ -98,24 +97,6 @@ public final class InterceptorBindingQualifier<T> implements Qualifier<T> {
                         supportedAnnotationNames.putIfAbsent(name, null);
                     }
                 }
-            }
-        } else {
-            this.supportedAnnotationNames = Collections.emptyMap();
-        }
-        this.supportedInterceptorTypes = Collections.emptySet();
-    }
-
-    /**
-     * Interceptor binding qualifiers.
-     * @param bindingAnnotations The binding annotations
-     * @deprecated Use {@link #InterceptorBindingQualifier(java.util.Collection)} instead
-     */
-    @Deprecated
-    InterceptorBindingQualifier(String[] bindingAnnotations) {
-        if (ArrayUtils.isNotEmpty(bindingAnnotations)) {
-            this.supportedAnnotationNames = new HashMap<>(bindingAnnotations.length);
-            for (String bindingAnnotation : bindingAnnotations) {
-                supportedAnnotationNames.put(bindingAnnotation, null);
             }
         } else {
             this.supportedAnnotationNames = Collections.emptyMap();

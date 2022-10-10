@@ -18,10 +18,10 @@ package io.micronaut.inject.ast;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArgumentUtils;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
 
 import java.lang.reflect.GenericArrayType;
@@ -29,9 +29,15 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
 import java.lang.reflect.WildcardType;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Function;
-import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import static io.micronaut.inject.writer.BeanDefinitionVisitor.PROXY_SUFFIX;
@@ -243,19 +249,6 @@ public interface ClassElement extends TypedElement {
      */
     default List<FieldElement> getFields() {
         return getEnclosedElements(ElementQuery.ALL_FIELDS);
-    }
-
-    /**
-     * Return fields contained with the given modifiers include / exclude rules.
-     *
-     * @param modifierFilter Can be used to filter fields by modifier
-     * @return The fields
-     * @deprecated Use {@link #getEnclosedElements(ElementQuery)} instead
-     */
-    @Deprecated
-    default List<FieldElement> getFields(@NonNull Predicate<Set<ElementModifier>> modifierFilter) {
-        Objects.requireNonNull(modifierFilter, "The modifier filter cannot be null");
-        return getEnclosedElements(ElementQuery.ALL_FIELDS.modifiers(modifierFilter));
     }
 
     /**

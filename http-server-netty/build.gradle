@@ -45,6 +45,7 @@ dependencies {
     testImplementation(libs.managed.micronaut.xml) {
         exclude module:'micronaut-inject'
         exclude module:'micronaut-http'
+        exclude module:'micronaut-bom'
     }
     testImplementation libs.managed.jackson.databind
 

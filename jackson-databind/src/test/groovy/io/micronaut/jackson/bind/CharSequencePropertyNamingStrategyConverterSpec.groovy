@@ -18,7 +18,6 @@ package io.micronaut.jackson.bind
 import com.fasterxml.jackson.databind.PropertyNamingStrategies
 import com.fasterxml.jackson.databind.PropertyNamingStrategy
 import io.micronaut.context.ApplicationContext
-import io.micronaut.core.convert.ArgumentConversionContext
 import io.micronaut.core.convert.ConversionContext
 import io.micronaut.core.convert.ConversionError
 import io.micronaut.core.convert.ConversionService
@@ -61,7 +60,7 @@ class CharSequencePropertyNamingStrategyConverterSpec extends Specification {
         def converter = ctx.getBean(ConversionService)
 
         when:
-        ConversionContext conversionContext = ArgumentConversionContext.of(CharSequence)
+        ConversionContext conversionContext = ConversionContext.of(CharSequence)
         converter.convert(invalidString, PropertyNamingStrategy, conversionContext)
         ConversionError conversionError = conversionContext.last()
 

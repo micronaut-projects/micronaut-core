@@ -5,7 +5,11 @@ bcpkix = "1.70"
 blaze = "1.6.7"
 caffeine = "2.9.3"
 compile-testing = "0.19"
+
 geb = "3.4.1"
+geb-groovy = "3.0.12"
+geb-spock = "2.2-groovy-3.0"
+
 hibernate = "5.5.9.Final"
 hibernate-validator = "6.1.6.Final"
 htmlSanityCheck = "1.1.6"
@@ -36,9 +40,9 @@ wiremock = "2.33.2"
 managed-dekorate = "1.0.3"
 managed-elasticsearch = "7.16.3"
 managed-ignite = "2.13.0"
-managed-junit5 = "5.9.0"
-managed-kotlin = "1.6.21"
-managed-kotlin-coroutines = "1.5.1"
+managed-junit5 = "5.9.1"
+managed-kotlin = "1.7.10"
+managed-kotlin-coroutines = "1.6.4"
 managed-google-function-framework = "1.0.4"
 managed-google-function-invoker = "1.0.0"
 managed-gorm = "7.3.2"
@@ -48,7 +52,7 @@ managed-gorm-hibernate = "7.3.0"
 managed-graal-sdk = "22.0.0.2"
 managed-graal = "22.2.0"
 managed-graal-svm = "22.0.0.2"
-managed-groovy = "3.0.13"
+managed-groovy = "4.0.5"
 managed-h2 = "2.1.210"
 managed-hystrix = "1.5.18"
 managed-jakarta-annotation-api = "2.1.1"
@@ -58,7 +62,7 @@ managed-javax-annotation-api = "1.3.2"
 managed-jcache = "1.1.1"
 managed-jna = "5.12.1"
 managed-jsr305 = "3.0.2"
-managed-kafka = "2.8.1"
+managed-kafka = "2.8.2"
 managed-ktor = "1.6.8"
 managed-logback = "1.2.11"
 managed-lombok = "1.18.24"
@@ -79,7 +83,7 @@ managed-micronaut-elasticsearch = "4.3.0"
 managed-micronaut-email = "1.3.2"
 managed-micronaut-flyway = "5.4.1"
 managed-micronaut-gcp = "4.6.0"
-managed-micronaut-graphql = "3.1.0"
+managed-micronaut-graphql = "3.2.0"
 managed-micronaut-groovy = "3.3.1"
 managed-micronaut-grpc = "3.3.1"
 managed-micronaut-hibernate-validator = "3.2.0"
@@ -99,7 +103,7 @@ managed-micronaut-multitenancy = "4.2.0"
 managed-micronaut-neo4j = "5.2.0"
 managed-micronaut-nats = "3.1.0"
 managed-micronaut-netflix = "2.1.0"
-managed-micronaut-object-storage = "1.0.0"
+managed-micronaut-object-storage = "1.1.0"
 managed-micronaut-openapi = "4.5.2"
 managed-micronaut-oraclecloud = "2.2.1"
 managed-micronaut-picocli = "4.3.0"
@@ -116,9 +120,9 @@ managed-micronaut-security = "3.8.0"
 managed-micronaut-serialization = "1.3.2"
 managed-micronaut-servlet = "3.3.1"
 managed-micronaut-spring = "4.3.1"
-managed-micronaut-sql = "4.7.0"
+managed-micronaut-sql = "4.7.2"
 managed-micronaut-test = "3.6.2"
-managed-micronaut-test-resources = "1.1.1"
+managed-micronaut-test-resources = "1.1.2"
 managed-micronaut-toml = "1.1.1"
 managed-micronaut-tracing = "4.4.0"
 managed-micronaut-tracing-legacy = "3.2.7"
@@ -134,13 +138,13 @@ managed-reactor = "3.4.23"
 managed-rxjava1 = "1.3.8"
 managed-rxjava1-interop = "0.13.7"
 managed-slf4j = "1.7.36"
-managed-spock = "2.0-groovy-3.0"
+managed-spock = "2.2-groovy-4.0"
 managed-spotbugs = "4.7.1"
 managed-spring = "5.3.23"
 managed-springboot = "2.7.0"
-managed-swagger = "2.2.2"
+managed-swagger = "2.2.3"
 managed-validation = "2.0.1.Final"
-managed-testcontainers = "1.17.3"
+managed-testcontainers = "1.17.5"
 managed-snakeyaml = "1.32"
 micronaut-docs = "2.0.0"
 
@@ -186,7 +190,7 @@ boms-micronaut-r2dbc = { module = "io.micronaut.r2dbc:micronaut-r2dbc-bom", vers
 boms-micronaut-flyway = { module = "io.micronaut.flyway:micronaut-flyway-bom", version.ref = "managed-micronaut-flyway" }
 boms-micronaut-test-resources = { module = "io.micronaut.testresources:micronaut-test-resources-bom", version.ref = "managed-micronaut-test-resources" }
 
-boms-groovy = { module = "org.codehaus.groovy:groovy-bom", version.ref = "managed-groovy" }
+boms-groovy = { module = "org.apache.groovy:groovy-bom", version.ref = "managed-groovy" }
 boms-jackson = { module = "com.fasterxml.jackson:jackson-bom", version.ref = "managed-jackson" }
 boms-junit5 = { module = "org.junit:junit-bom", version.ref = "managed-junit5" }
 boms-kotlin = { module = "org.jetbrains.kotlin:kotlin-bom", version.ref = "managed-kotlin" }
@@ -227,10 +231,10 @@ managed-gorm-hibernate = { module = "org.grails:grails-datastore-gorm-hibernate5
 managed-graal = { module = "org.graalvm.nativeimage:svm", version.ref = "managed-graal-svm" }
 managed-graal-sdk = { module = "org.graalvm.sdk:graal-sdk", version.ref = "managed-graal-sdk" }
 
-managed-groovy = { module = "org.codehaus.groovy:groovy", version.ref = "managed-groovy" }
-managed-groovy-json = { module = "org.codehaus.groovy:groovy-json", version.ref = "managed-groovy" }
-managed-groovy-sql = { module = "org.codehaus.groovy:groovy-sql", version.ref = "managed-groovy" }
-managed-groovy-templates = { module = "org.codehaus.groovy:groovy-templates", version.ref = "managed-groovy" }
+managed-groovy = { module = "org.apache.groovy:groovy", version.ref = "managed-groovy" }
+managed-groovy-json = { module = "org.apache.groovy:groovy-json", version.ref = "managed-groovy" }
+managed-groovy-sql = { module = "org.apache.groovy:groovy-sql", version.ref = "managed-groovy" }
+managed-groovy-templates = { module = "org.apache.groovy:groovy-templates", version.ref = "managed-groovy" }
 
 managed-h2 = { module = "com.h2database:h2", version.ref = "managed-h2" }
 
@@ -315,6 +319,7 @@ managed-micronaut-test-bom = { module = "io.micronaut.test:micronaut-test-bom", 
 managed-micronaut-test-core = { module = "io.micronaut.test:micronaut-test-core", version.ref = "managed-micronaut-test" }
 managed-micronaut-test-junit5 = { module = "io.micronaut.test:micronaut-test-junit5", version.ref = "managed-micronaut-test" }
 managed-micronaut-test-kotest = { module = "io.micronaut.test:micronaut-test-kotest", version.ref = "managed-micronaut-test" }
+managed-micronaut-test-kotest5 = { module = "io.micronaut.test:micronaut-test-kotest5", version.ref = "managed-micronaut-test" }
 managed-micronaut-test-spock = { module = "io.micronaut.test:micronaut-test-spock", version.ref = "managed-micronaut-test" }
 managed-micronaut-toml = { module = "io.micronaut.toml:micronaut-toml", version.ref = "managed-micronaut-toml" }
 managed-micronaut-tracing-legacy = { module = "io.micronaut:micronaut-tracing", version.ref = "managed-micronaut-tracing-legacy" }
@@ -364,8 +369,10 @@ caffeine = { module = "com.github.ben-manes.caffeine:caffeine", version.ref = "c
 compile-testing = { module = "com.google.testing.compile:compile-testing", version.ref = "compile-testing" }
 
 geb-spock = { module = "org.gebish:geb-spock", version.ref = "geb" }
+spock-for-geb = { module = "org.spockframework:spock-core", version.ref = "geb-spock" }
+geb-groovy-test = { module = "org.codehaus.groovy:groovy-test", version.ref = "geb-groovy" }
 
-groovy-test-junit5 = { module = "org.codehaus.groovy:groovy-test-junit5", version.ref = "managed-groovy" }
+groovy-test-junit5 = { module = "org.apache.groovy:groovy-test-junit5", version.ref = "managed-groovy" }
 
 hibernate = { module = "org.hibernate:hibernate-core", version.ref = "hibernate" }
 hibernate-validator = { module = "org.hibernate:hibernate-validator", version.ref = "hibernate-validator" }

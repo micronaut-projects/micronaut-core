@@ -21,6 +21,7 @@ import com.fasterxml.jackson.databind.SerializationFeature
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.MapPropertySource
+import io.micronaut.context.env.PropertySource
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -61,7 +62,7 @@ class JacksonSetupSpec extends Specification {
 
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
-        applicationContext.environment.addPropertySource(MapPropertySource.of(
+        applicationContext.environment.addPropertySource((MapPropertySource) PropertySource.of(
                 'jackson.dateFormat': 'yyMMdd',
                 'jackson.serialization.indentOutput': true,
                 'jackson.json-view.enabled': true
@@ -83,7 +84,7 @@ class JacksonSetupSpec extends Specification {
     void "verify that the defaultTyping configuration option is correctly converted and set on the object mapper"() {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
-        applicationContext.environment.addPropertySource(MapPropertySource.of(
+        applicationContext.environment.addPropertySource((MapPropertySource) PropertySource.of(
                 'jackson.dateFormat': 'yyMMdd',
                 'jackson.defaultTyping': 'NON_FINAL'
         ))
@@ -103,7 +104,7 @@ class JacksonSetupSpec extends Specification {
     @Unroll
     void 'Configuring #configuredJackonPropertyNamingStrategy sets PropertyNamingStrategy on the Context ObjectMapper.'() {
         when:
-        ApplicationContext applicationContext = ApplicationContext.run(MapPropertySource.of(
+        ApplicationContext applicationContext = ApplicationContext.run((MapPropertySource) PropertySource.of(
                 'jackson.property-naming-strategy': configuredJackonPropertyNamingStrategy.toString()
         ))
 
@@ -137,7 +138,7 @@ class JacksonSetupSpec extends Specification {
     void "verify trim strings with custom property enabled"() {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
-        applicationContext.environment.addPropertySource(MapPropertySource.of(
+        applicationContext.environment.addPropertySource((MapPropertySource) PropertySource.of(
                 'jackson.trim-strings': true
         ))
         applicationContext.start()

@@ -2,7 +2,9 @@ import io.micronaut.build.internal.ext.MicronautCoreExtension
 import io.micronaut.build.internal.ext.DefaultMicronautCoreExtension
 
 plugins {
-    id "io.micronaut.build.internal.common"
+    id "io.micronaut.build.internal.base"
+    id "groovy"
+    id "java-library"
 }
 
 micronautBuild {
@@ -16,6 +18,15 @@ def micronautBuild = (ExtensionAware) project.extensions.getByName("micronautBui
 def micronautCore = micronautBuild.extensions.create(MicronautCoreExtension, "core", DefaultMicronautCoreExtension, extensions.findByType(VersionCatalogsExtension))
 micronautCore.documented.convention(true)
 
+if (System.getProperty('geb.env')) {
+    apply plugin:"com.energizedwork.webdriver-binaries"
+
+    webdriverBinaries {
+        chromedriver "${chromedriverVersion}"
+        geckodriver "${geckodriverVersion}"
+    }
+}
+
 tasks.withType(Test).configureEach {
     useJUnitPlatform()
     jvmArgs '-Xmx2048m'
@@ -23,6 +34,12 @@ tasks.withType(Test).configureEach {
     if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_15)) {
         jvmArgs "--enable-preview"
     }
+}
+
+tasks.named("test") {
+    systemProperty "geb.env", System.getProperty('geb.env')
+    systemProperty "webdriver.chrome.driver", System.getProperty('webdriver.chrome.driver')
+    systemProperty "webdriver.gecko.driver", System.getProperty('webdriver.gecko.driver')
 }
 
 tasks.withType(JavaCompile).configureEach {
@@ -46,15 +63,6 @@ tasks.withType(Jar).configureEach {
     preserveFileTimestamps = false
 }
 
-configurations.all {
-    resolutionStrategy.eachDependency { DependencyResolveDetails details ->
-        if (details.requested.group == 'org.codehaus.groovy') {
-            details.useTarget("org.apache.groovy:${details.requested.name}:${details.requested.version}")
-            details.because "Plugin 'io.micronaut.build.internal.common' isn't Groovy 4 yet and it's pulling in old versions"
-        }
-    }
-}
-
 dependencies {
     annotationProcessor libs.bundles.asm
     annotationProcessor(libs.micronaut.docs.map {
@@ -75,32 +83,18 @@ dependencies {
     testAnnotationProcessor libs.bundles.asm
 
     testImplementation libs.caffeine
-    testImplementation libs.managed.groovy
-    testImplementation(libs.managed.spock) {
-        exclude module: 'groovy-all'
-    }
-
-    testImplementation libs.groovy.test.junit5
     testImplementation libs.bundles.asm
-}
 
-spotless {
-    java {
-        targetExclude '**/io/micronaut/core/io/scan/AnnotationClassReader.java'
-        targetExclude '**/io/micronaut/core/io/scan/Attribute.java'
-        targetExclude '**/io/micronaut/core/io/scan/Context.java'
-        targetExclude '**/io/micronaut/core/util/clhm/**'
-        targetExclude '**/io/micronaut/core/util/AntPathMatcher.java'
-        targetExclude '**/io/micronaut/discovery/eureka/client/v2/AmazonInfo.java'
-        targetExclude '**/io/micronaut/discovery/eureka/client/v2/DataCenterInfo.java'
-        targetExclude '**/io/micronaut/discovery/eureka/client/v2/LeaseInfo.java'
-        targetExclude '**/io/micronaut/support/InMemoryJavaFileManager.java'
-        targetExclude '**/io/micronaut/scheduling/cron/CronExpression.java'
-        targetExclude '**/org/atinject/tck/auto/Tck.kt'
-        targetExclude '**/io/micronaut/http/uri/QueryStringDecoder.java'
-    }
-    format 'javaMisc', {
-        targetExclude '**/io/micronaut/core/util/clhm/**'
-        targetExclude '**/io/micronaut/http/netty/stream/package-info.java'
-    }
+    // Geb currently requires Groovy 3, and Spock for Groovy 3
+    testImplementation libs.geb.spock
+    testImplementation libs.spock.for.geb
+    testImplementation libs.geb.groovy.test
+    testImplementation libs.selenium.driver.htmlunit
+    testImplementation libs.selenium.remote.driver
+    testImplementation libs.selenium.api
+    testImplementation libs.selenium.support
+
+    testRuntimeOnly libs.htmlunit
+    testRuntimeOnly libs.selenium.driver.chrome
+    testRuntimeOnly libs.selenium.driver.firefox
 }

@@ -157,7 +157,7 @@ class HttpResponseSpec extends AbstractMicronautSpec {
 
     void "test server header"() {
         given:
-        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['micronaut.server.serverHeader': 'Foo!', (SPEC_NAME_PROPERTY):getClass().simpleName])
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['micronaut.server.server-header': 'Foo!', (SPEC_NAME_PROPERTY):getClass().simpleName])
         def ctx = server.getApplicationContext()
         HttpClient client = ctx.createBean(HttpClient, server.getURL())
 
@@ -211,7 +211,7 @@ class HttpResponseSpec extends AbstractMicronautSpec {
 
     void "test date header turned off"() {
         given:
-        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['micronaut.server.dateHeader': false, (SPEC_NAME_PROPERTY):getClass().simpleName])
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['micronaut.server.date-header': false, (SPEC_NAME_PROPERTY):getClass().simpleName])
         ApplicationContext ctx = server.getApplicationContext()
         HttpClient client = ctx.createBean(HttpClient, server.getURL())
 
@@ -229,12 +229,13 @@ class HttpResponseSpec extends AbstractMicronautSpec {
 
     void "test keep alive connection header is not set for 500 response"() {
         when:
-        EmbeddedServer server = applicationContext.run(EmbeddedServer, [
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
                 'micronaut.server.netty.keepAliveOnServerError': false,
+                'micronaut.server.date-header': false,
                 (SPEC_NAME_PROPERTY):getClass().simpleName,
         ])
         ApplicationContext ctx = server.getApplicationContext()
-        HttpClient client = applicationContext.createBean(HttpClient, server.getURL())
+        HttpClient client = ctx.createBean(HttpClient, server.getURL())
 
         Flux.from(client.exchange(
           HttpRequest.GET('/test-header/fail')
@@ -253,11 +254,11 @@ class HttpResponseSpec extends AbstractMicronautSpec {
 
     void "test connection header is defaulted to keep-alive by default for > 499 response"() {
         when:
-        EmbeddedServer server = applicationContext.run(EmbeddedServer, [
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
           (SPEC_NAME_PROPERTY):getClass().simpleName
         ])
         def ctx = server.getApplicationContext()
-        HttpClient client = applicationContext.createBean(HttpClient, server.getURL())
+        HttpClient client = ctx.createBean(HttpClient, server.getURL())
 
         Flux.from(client.exchange(
           HttpRequest.GET('/test-header/fail')
@@ -295,6 +296,6 @@ class HttpResponseSpec extends AbstractMicronautSpec {
 
     @Override
     Map<String, Object> getConfiguration() {
-        super.getConfiguration() << ['micronaut.server.dateHeader': false]
+        super.getConfiguration() << ['micronaut.server.date-header': false]
     }
 }

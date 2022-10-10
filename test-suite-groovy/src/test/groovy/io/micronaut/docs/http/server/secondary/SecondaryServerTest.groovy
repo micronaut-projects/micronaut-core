@@ -19,11 +19,6 @@ import spock.util.environment.Jvm
 @MicronautTest
 @Property(name = "secondary.enabled", value = StringUtils.TRUE)
 @Property(name = "micronaut.http.client.ssl.insecure-trust-all-certificates", value = StringUtils.TRUE)
-// fails due to https://issues.apache.org/jira/browse/GROOVY-10145
-@Requires({
-    SemanticVersion.isAtLeastMajorMinor(GroovySystem.version, 4, 0) ||
-            !Jvm.current.isJava16Compatible()
-})
 class SecondaryServerTest extends Specification {
     // tag::inject[]
     @Client(path = "/", id = SecondaryNettyServer.SERVER_ID)

@@ -99,6 +99,7 @@ public interface ClassWriterOutputVisitor {
      * @return An optional file it was possible to create it
      * @deprecated Visiting a file should supply the originating elements. Use {@link #visitMetaInfFile(String, Element...)} instead
      */
+    // this is still needed
     @Deprecated
     default Optional<GeneratedFile> visitMetaInfFile(String path) {
         return visitMetaInfFile(path, Element.EMPTY_ELEMENT_ARRAY);
@@ -143,6 +144,7 @@ public interface ClassWriterOutputVisitor {
      * @param classname the fully qualified classname
      * @deprecated Use {@link #visitServiceDescriptor(String, String, io.micronaut.inject.ast.Element)}
      */
+    // this is still used
     @Deprecated
     @SuppressWarnings("java:S1133")
     default void visitServiceDescriptor(Class<?> type, String classname) {
