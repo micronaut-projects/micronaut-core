@@ -18,6 +18,7 @@ package io.micronaut.http.client.netty;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.client.HttpClientConfiguration;
+import io.micronaut.http.client.exceptions.HttpClientException;
 import org.slf4j.Logger;
 import reactor.core.publisher.Sinks;
 
@@ -221,6 +222,10 @@ abstract class PoolResizer {
     }
 
     final void addPendingRequest(Sinks.One<ConnectionManager.PoolHandle> sink) {
+        if (pendingRequests.size() >= connectionPoolConfiguration.getMaxPendingAcquires()) {
+            sink.tryEmitError(new HttpClientException("Cannot acquire connection, exceeded max pending acquires configuration"));
+            return;
+        }
         pendingRequests.addLast(sink);
         dirty();
     }

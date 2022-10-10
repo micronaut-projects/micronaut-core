@@ -722,19 +722,11 @@ public abstract class HttpClientConfiguration {
         @SuppressWarnings("WeakerAccess")
         public static final boolean DEFAULT_ENABLED = true;
 
-        /**
-         * The default max connections value.
-         */
-        @SuppressWarnings("WeakerAccess")
-        public static final int DEFAULT_MAXCONNECTIONS = -1;
-
         private int maxPendingConnections = 4;
 
         private int maxConcurrentRequestsPerHttp2Connection = Integer.MAX_VALUE;
         private int maxConcurrentHttp1Connections = Integer.MAX_VALUE;
         private int maxConcurrentHttp2Connections = 1;
-
-        private int maxConnections = DEFAULT_MAXCONNECTIONS;
 
         private int maxPendingAcquires = Integer.MAX_VALUE;
 
@@ -759,24 +751,6 @@ public abstract class HttpClientConfiguration {
          */
         public void setEnabled(boolean enabled) {
             this.enabled = enabled;
-        }
-
-        /**
-         * The maximum number of connections. Defaults to ({@value io.micronaut.http.client.HttpClientConfiguration.ConnectionPoolConfiguration#DEFAULT_MAXCONNECTIONS}); no maximum.
-         *
-         * @return The max connections
-         */
-        public int getMaxConnections() {
-            return maxConnections;
-        }
-
-        /**
-         * Sets the maximum number of connections. Defaults to no maximum.
-         *
-         * @param maxConnections The count
-         */
-        public void setMaxConnections(int maxConnections) {
-            this.maxConnections = maxConnections;
         }
 
         /**
