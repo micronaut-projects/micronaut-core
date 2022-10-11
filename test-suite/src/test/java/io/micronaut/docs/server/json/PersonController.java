@@ -17,9 +17,11 @@ package io.micronaut.docs.server.json;
 
 import com.fasterxml.jackson.core.JsonParseException;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
+import io.micronaut.http.HttpStatusStandard;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Error;
@@ -29,12 +31,12 @@ import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.http.hateoas.Link;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
+
 import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import io.micronaut.core.async.annotation.SingleResult;
 
 @Requires(property = "spec.name", value = "PersonControllerSpec")
 // tag::class[]
@@ -127,7 +129,7 @@ public class PersonController {
     // end::globalError[]
 
     // tag::statusError[]
-    @Error(status = HttpStatus.NOT_FOUND)
+    @Error(status = HttpStatusStandard.NOT_FOUND)
     public HttpResponse<JsonError> notFound(HttpRequest request) { // <1>
         JsonError error = new JsonError("Person Not Found") // <2>
                 .link(Link.SELF, Link.of(request.getUri()));

@@ -15,21 +15,18 @@
  */
 package io.micronaut.docs.basics
 
-import io.micronaut.context.annotation.Requires
 // tag::imports[]
+import io.micronaut.context.annotation.Requires
+import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.http.HttpRequest.GET
-import io.micronaut.http.HttpStatus.CREATED
+import io.micronaut.http.HttpStatusStandard
 import io.micronaut.http.MediaType.TEXT_PLAIN
-import io.micronaut.http.annotation.Body
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Get
-import io.micronaut.http.annotation.Post
-import io.micronaut.http.annotation.Status
+import io.micronaut.http.annotation.*
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
-import io.micronaut.core.async.annotation.SingleResult
+
 // end::imports[]
 
 @Requires(property = "spec.name", value = "HelloControllerSpec")
@@ -58,13 +55,13 @@ class HelloController(@param:Client("/endpoint") private val httpClient: HttpCli
     // end::json[]
 
     @Post("/greet")
-    @Status(CREATED)
+    @Status(HttpStatusStandard.CREATED)
     internal fun echo(@Body message: Message): Message {
         return message
     }
 
     @Post(value = "/hello", consumes = [TEXT_PLAIN], produces = [TEXT_PLAIN])
-    @Status(CREATED)
+    @Status(HttpStatusStandard.CREATED)
     internal fun echoHello(@Body message: String): String {
         return message
     }

@@ -8,6 +8,7 @@ import io.micronaut.http.HttpAttributes
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
+import io.micronaut.http.HttpStatusStandard
 import io.micronaut.http.MutableHttpResponse
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Error
@@ -335,11 +336,11 @@ class FilterErrorSpec extends Specification {
         }
 
         @Error(exception = FilterExceptionException)
-        @Status(HttpStatus.OK)
+        @Status(HttpStatusStandard.OK)
         void testException() {}
 
-        @Error(status = HttpStatus.NOT_FOUND)
-        @Status(HttpStatus.OK)
+        @Error(status = HttpStatusStandard.NOT_FOUND)
+        @Status(HttpStatusStandard.OK)
         void testStatus() {}
     }
 }

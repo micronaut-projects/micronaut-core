@@ -5,6 +5,7 @@ import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
+import io.micronaut.http.HttpStatusStandard
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Error
@@ -245,13 +246,13 @@ class ContentNegotiationSpec extends Specification {
             "<bad>${e.message}</bad>"
         }
 
-        @Error(status = HttpStatus.BAD_REQUEST)
+        @Error(status = HttpStatusStandard.BAD_REQUEST)
         @Produces(MediaType.APPLICATION_JSON)
         HttpResponse<JsonError> jsonBad() {
             HttpResponse.badRequest(new JsonError("not a good request"))
         }
 
-        @Error(status = HttpStatus.BAD_REQUEST)
+        @Error(status = HttpStatusStandard.BAD_REQUEST)
         @Produces([MediaType.APPLICATION_XML, MediaType.ALL])
         HttpResponse<String> xmlBad() {
             HttpResponse.badRequest("<bad>not a good request</bad>")

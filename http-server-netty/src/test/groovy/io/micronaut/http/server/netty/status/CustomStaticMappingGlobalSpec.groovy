@@ -19,8 +19,13 @@ import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
+import io.micronaut.http.HttpStatusStandard
 import io.micronaut.http.MediaType
-import io.micronaut.http.annotation.*
+import io.micronaut.http.annotation.Consumes
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Error
+import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 import reactor.core.publisher.Flux
@@ -116,12 +121,12 @@ class CustomStaticMappingGlobalSpec extends AbstractMicronautSpec {
             "name: $name, age: $age"
         }
 
-        @Error(status = HttpStatus.BAD_REQUEST, global = true)
+        @Error(status = HttpStatusStandard.BAD_REQUEST, global = true)
         HttpResponse badHandler(HttpRequest request) {
             HttpResponse.status(HttpStatus.BAD_REQUEST, "You sent me bad stuff - from Test2Controller.badHandler()")
         }
 
-        @Error(status = HttpStatus.NOT_FOUND, global = true)
+        @Error(status = HttpStatusStandard.NOT_FOUND, global = true)
         HttpResponse notFoundHandler(HttpRequest request) {
             HttpResponse.status(HttpStatus.NOT_FOUND, "We cannot find anything - from Test2Controller.notFoundHandler()")
         }

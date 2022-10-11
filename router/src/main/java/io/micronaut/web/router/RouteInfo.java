@@ -22,6 +22,7 @@ import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
+import io.micronaut.http.HttpStatusStandard;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
@@ -196,7 +197,13 @@ public interface RouteInfo<R> extends AnnotationMetadataProvider {
      */
     @NonNull
     default HttpStatus findStatus(HttpStatus defaultStatus) {
-        return getAnnotationMetadata().enumValue(Status.class, HttpStatus.class).orElse(defaultStatus);
+        Optional<? extends HttpStatus> opt = getAnnotationMetadata().enumValue(Status.class, HttpStatusStandard.class);
+        // Optional.orElse doesn't work with the generics here
+        if (opt.isPresent()) {
+            return opt.get();
+        } else {
+            return defaultStatus;
+        }
     }
 
     /**

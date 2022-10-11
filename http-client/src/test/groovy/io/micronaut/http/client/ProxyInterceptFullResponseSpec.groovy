@@ -2,10 +2,9 @@ package io.micronaut.http.client
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
-import io.micronaut.core.async.publisher.Publishers
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
-import io.micronaut.http.HttpStatus
+import io.micronaut.http.HttpStatusStandard
 import io.micronaut.http.MutableHttpRequest
 import io.micronaut.http.MutableHttpResponse
 import io.micronaut.http.annotation.Controller
@@ -51,7 +50,7 @@ class ProxyInterceptFullResponseSpec extends Specification {
             return "from server"
         }
 
-        @Error(global = true, status = HttpStatus.NOT_FOUND)
+        @Error(global = true, status = HttpStatusStandard.NOT_FOUND)
         HttpResponse error(HttpRequest<?> request) {
 
         }

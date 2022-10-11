@@ -19,8 +19,13 @@ import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
+import io.micronaut.http.HttpStatusStandard
 import io.micronaut.http.MediaType
-import io.micronaut.http.annotation.*
+import io.micronaut.http.annotation.Consumes
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Error
+import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 import reactor.core.publisher.Flux
@@ -118,17 +123,17 @@ class CustomStaticMappingLocalSpec extends AbstractMicronautSpec {
             null // return a null to simulate a query is not found
         }
 
-        @Error(status = HttpStatus.BAD_REQUEST)
+        @Error(status = HttpStatusStandard.BAD_REQUEST)
         HttpResponse badHandler() {
             HttpResponse.status(HttpStatus.BAD_REQUEST, "You sent me bad stuff - from Test1Controller.badHandler()")
         }
 
-        @Error(status = HttpStatus.NOT_FOUND)
+        @Error(status = HttpStatusStandard.NOT_FOUND)
         HttpResponse notFoundHandler() {
             HttpResponse.status(HttpStatus.NOT_FOUND, "We cannot find anything - from Test1Controller.notFoundHandler()")
         }
 
-        @Error(status = HttpStatus.UNSUPPORTED_MEDIA_TYPE, global = true)
+        @Error(status = HttpStatusStandard.UNSUPPORTED_MEDIA_TYPE, global = true)
         String unsupportedMediaTypeHandler() {
             "You sent an unsupported media type - from Test1Controller.unsupportedMediaTypeHandler()"
         }
@@ -148,7 +153,7 @@ class CustomStaticMappingLocalSpec extends AbstractMicronautSpec {
             "name: $name, age: $age"
         }
 
-        @Error(status = HttpStatus.BAD_REQUEST)
+        @Error(status = HttpStatusStandard.BAD_REQUEST)
         HttpResponse badHandler() {
             HttpResponse.status(HttpStatus.BAD_REQUEST, "You sent me bad stuff - from Test2Controller.badHandler()")
         }

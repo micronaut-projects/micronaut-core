@@ -16,7 +16,11 @@
 package io.micronaut.docs.basics
 
 import io.micronaut.context.annotation.Requires
+import io.micronaut.core.async.annotation.SingleResult
+import io.micronaut.http.HttpStatusStandard
+
 // tag::imports[]
+
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
@@ -25,11 +29,11 @@ import io.micronaut.http.annotation.Status
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
 import org.reactivestreams.Publisher
-import io.micronaut.core.async.annotation.SingleResult
 import reactor.core.publisher.Mono
+
 import static io.micronaut.http.HttpRequest.GET
-import static io.micronaut.http.HttpStatus.CREATED
 import static io.micronaut.http.MediaType.TEXT_PLAIN
+
 // end::imports[]
 
 @Requires(property = "spec.name", value = "HelloControllerSpec")
@@ -63,13 +67,13 @@ class HelloController {
     // end::json[]
 
     @Post("/greet")
-    @Status(CREATED)
+    @Status(HttpStatusStandard.CREATED)
     Message echo(@Body Message message) {
         message
     }
 
     @Post(value = "/hello", consumes = TEXT_PLAIN, produces = TEXT_PLAIN)
-    @Status(CREATED)
+    @Status(HttpStatusStandard.CREATED)
     String echoHello(@Body String message) {
         message
     }

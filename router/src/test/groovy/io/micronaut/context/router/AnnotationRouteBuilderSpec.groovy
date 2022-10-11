@@ -19,11 +19,12 @@ import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
+import io.micronaut.http.HttpStatusStandard
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Error
-import io.micronaut.web.router.Router
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
+import io.micronaut.web.router.Router
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -84,7 +85,7 @@ class AnnotationRouteBuilderSpec extends Specification {
             return HttpResponse.<String>status(HttpStatus.BAD_REQUEST).body(e.getMessage())
         }
 
-        @Error(status = HttpStatus.INSUFFICIENT_STORAGE)
+        @Error(status = HttpStatusStandard.INSUFFICIENT_STORAGE)
         HttpResponse<String> handleStatus(HttpRequest request) {
             return HttpResponse.<String>status(HttpStatus.BAD_REQUEST)
         }
@@ -118,7 +119,7 @@ class AnnotationRouteBuilderSpec extends Specification {
             return HttpResponse.<String>status(HttpStatus.BAD_REQUEST).body(e.getMessage())
         }
 
-        @Error(status = HttpStatus.INSUFFICIENT_STORAGE)
+        @Error(status = HttpStatusStandard.INSUFFICIENT_STORAGE)
         HttpResponse<String> handleStatus(HttpRequest request) {
             return HttpResponse.<String>status(HttpStatus.BAD_REQUEST)
         }
