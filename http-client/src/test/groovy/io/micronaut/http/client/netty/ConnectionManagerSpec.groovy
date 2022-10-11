@@ -770,6 +770,38 @@ class ConnectionManagerSpec extends Specification {
         ctx.close()
     }
 
+    def 'max http1 connections'() {
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.pool.max-pending-connections': 1,
+                'micronaut.http.client.pool.max-concurrent-http1-connections': 2,
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn1 = new EmbeddedTestConnectionHttp1()
+        conn1.setupHttp1()
+        def conn2 = new EmbeddedTestConnectionHttp1()
+        conn2.setupHttp1()
+
+        patch(client, conn1, conn2)
+
+        // we open four requests, the first two of which will open connections.
+        List<CompletableFuture<HttpResponse<?>>> futures = [
+                conn1.testExchangeRequest(client),
+                conn2.testExchangeRequest(client),
+                conn1.testExchangeRequest(client),
+                conn1.testExchangeRequest(client),
+        ]
+
+        conn1.testExchangeResponse(futures.get(0))
+        conn1.testExchangeResponse(futures.get(2))
+        conn1.testExchangeResponse(futures.get(3))
+        conn2.testExchangeResponse(futures.get(1))
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
     def 'multipart request'() {
         def ctx = ApplicationContext.run()
         def client = ctx.getBean(DefaultHttpClient)
