@@ -265,7 +265,7 @@ final class ConfigurationReaderBeanElementCreator extends DeclaredBeanElementCre
                         PropertyMetadata metadata = metadataBuilder.visitProperty(
                             classElement,
                             builderElement.getDeclaringType(),
-                            methodElement.getReturnType().getGenericType(),
+                            propertyElement.getType(),
                             configurationPrefix + propertyName,
                             null,
                             null

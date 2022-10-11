@@ -27,6 +27,7 @@ import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.PropertyElement;
 
 import java.util.ArrayList;
@@ -208,8 +209,8 @@ public final class AstBeanPropertiesUtils {
 
     private static void processSetter(Map<String, BeanPropertyData> props, MethodElement methodElement, String propertyName, boolean isAccessor) {
         BeanPropertyData beanPropertyData = props.computeIfAbsent(propertyName, BeanPropertyData::new);
-        ClassElement paramType = methodElement.getParameters().length == 0 ? null : methodElement.getParameters()[0].getGenericType();
-        ClassElement setterType = paramType == null ? null : unwrapType(paramType);
+        ClassElement paramType = methodElement.getParameters().length == 0 ? PrimitiveElement.BOOLEAN : methodElement.getParameters()[0].getGenericType();
+        ClassElement setterType = unwrapType(paramType);
         if (setterType != null && beanPropertyData.setter != null) {
             if (setterType.isAssignable(unwrapType(beanPropertyData.type))) {
                 // Override the setter because the type is higher

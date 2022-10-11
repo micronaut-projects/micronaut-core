@@ -17,11 +17,20 @@ package io.micronaut.annotation.processing.test
 
 import com.sun.source.util.JavacTask
 import groovy.transform.CompileStatic
-import io.micronaut.annotation.processing.*
+import io.micronaut.annotation.processing.AggregatingTypeElementVisitorProcessor
+import io.micronaut.annotation.processing.AnnotationUtils
+import io.micronaut.annotation.processing.GenericUtils
+import io.micronaut.annotation.processing.JavaAnnotationMetadataBuilder
+import io.micronaut.annotation.processing.ModelUtils
+import io.micronaut.annotation.processing.TypeElementVisitorProcessor
 import io.micronaut.annotation.processing.visitor.JavaElementFactory
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext
 import io.micronaut.aop.internal.InterceptorRegistryBean
-import io.micronaut.context.*
+import io.micronaut.context.ApplicationContext
+import io.micronaut.context.ApplicationContextBuilder
+import io.micronaut.context.ApplicationContextConfiguration
+import io.micronaut.context.DefaultApplicationContext
+import io.micronaut.context.Qualifier
 import io.micronaut.context.event.ApplicationEventPublisherFactory
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.Experimental
@@ -30,6 +39,7 @@ import io.micronaut.core.annotation.Nullable
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap
 import io.micronaut.core.graal.GraalReflectionConfigurer
+import io.micronaut.core.io.IOUtils
 import io.micronaut.core.naming.NameUtils
 import io.micronaut.inject.BeanConfiguration
 import io.micronaut.inject.BeanDefinition
@@ -339,6 +349,11 @@ class Test {
                 typeElement: element,
                 javaParser: parser
         )
+    }
+
+    protected String buildAndReadResourceAsString(String resourceName, @Language("java") String cls) {
+        ClassLoader classLoader = buildClassLoader("test.Test", cls)
+        return IOUtils.readText(new BufferedReader(new InputStreamReader(classLoader.getResources(resourceName).toList().last().openStream())))
     }
 
     protected BeanDefinition buildBeanDefinition(String className, @Language("java") String cls) {

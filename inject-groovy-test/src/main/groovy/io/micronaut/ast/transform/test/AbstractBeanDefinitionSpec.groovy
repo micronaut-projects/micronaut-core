@@ -131,7 +131,7 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
         def beanDefName= (className.startsWith('$') ? '' : '$') + className + BeanDefinitionWriter.CLASS_SUFFIX
         String beanFullName = "${packageName}.${beanDefName}"
 
-        def classLoader = new InMemoryByteCodeGroovyClassLoader()
+        def classLoader = new InMemoryByteCodeGroovyClassLoader() {}
         classLoader.parseClass(classStr)
         try {
             return (BeanDefinition) classLoader.loadClass(beanFullName).newInstance()

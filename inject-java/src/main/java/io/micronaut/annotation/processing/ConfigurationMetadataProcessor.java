@@ -70,7 +70,6 @@ public class ConfigurationMetadataProcessor extends AbstractInjectAnnotationProc
             ConfigurationMetadataBuilder builder = ConfigurationMetadataBuilder.INSTANCE;
             if (builder.hasMetadata()) {
                 ServiceLoader<ConfigurationMetadataWriter> writers = ServiceLoader.load(ConfigurationMetadataWriter.class, getClass().getClassLoader());
-
                 try {
                     for (ConfigurationMetadataWriter writer : writers) {
                         writeConfigurationMetadata(builder, writer);
@@ -85,7 +84,7 @@ public class ConfigurationMetadataProcessor extends AbstractInjectAnnotationProc
 
     }
 
-    private void writeConfigurationMetadata(ConfigurationMetadataBuilder metadataBuilder, ConfigurationMetadataWriter writer) {
+    protected void writeConfigurationMetadata(ConfigurationMetadataBuilder metadataBuilder, ConfigurationMetadataWriter writer) {
         try {
             writer.write(metadataBuilder, classWriterOutputVisitor);
         } catch (IOException e) {

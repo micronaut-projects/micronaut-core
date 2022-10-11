@@ -36,7 +36,6 @@ import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.PackageElement;
-import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.WildcardElement;
 import io.micronaut.inject.ast.utils.AstBeanPropertiesUtils;
@@ -369,10 +368,6 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     }
 
     private JavaPropertyElement mapToPropertyElement(AstBeanPropertiesUtils.BeanPropertyData value) {
-        if (value.type == null) {
-            // withSomething() builder setter
-            value.type = PrimitiveElement.VOID;
-        }
         return new JavaPropertyElement(
             JavaClassElement.this,
             value.type,
