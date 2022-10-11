@@ -657,7 +657,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
             Map<String, ClassElement> typeArgs = new LinkedHashMap<>(forType.size());
             for (Map.Entry<String, ClassNode> entry : forType.entrySet()) {
                 ClassNode classNode = entry.getValue();
-                ClassElement rawElement = visitorContext.getElementFactory().newClassElement(classNode, elementAnnotationMetadataFactory);
+                ClassElement rawElement = new GroovyClassElement(visitorContext, classNode, elementAnnotationMetadataFactory);
                 rawElement = adjustTypeAnnotationMetadata(rawElement);
                 if (thisSpec != null) {
                     rawElement = getGenericElement(sourceUnit, classNode, rawElement, thisSpec);
@@ -679,7 +679,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
         genericInfo.forEach((name, generics) -> {
             Map<String, ClassElement> resolved = new LinkedHashMap<>(generics.size());
             generics.forEach((variable, type) -> {
-                ClassElement classElement = visitorContext.getElementFactory().newClassElement(type, elementAnnotationMetadataFactory);
+                ClassElement classElement = new GroovyClassElement(visitorContext, type, elementAnnotationMetadataFactory);
                 classElement = adjustTypeAnnotationMetadata(classElement);
                 resolved.put(variable, classElement);
             });
@@ -863,7 +863,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
             if (value.readAccessKind != BeanProperties.AccessKind.METHOD) {
                 String getterName = NameUtils.getterNameFor(
                     value.propertyName,
-                    value.type.equals(PrimitiveElement.BOOLEAN) || value.type.getName().equals(Boolean.class.getName())
+                    value.type.equals(PrimitiveElement.BOOLEAN)
                 );
                 value.getter = MethodElement.of(
                     this,

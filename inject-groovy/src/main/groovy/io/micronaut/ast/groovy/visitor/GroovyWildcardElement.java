@@ -51,6 +51,11 @@ final class GroovyWildcardElement extends GroovyClassElement implements Wildcard
         this.lowerBounds = lowerBounds;
     }
 
+    @Override
+    protected GroovyClassElement copyConstructor() {
+        return new GroovyWildcardElement(upperBounds, lowerBounds, elementAnnotationMetadataFactory);
+    }
+
     @NonNull
     @Override
     public List<? extends ClassElement> getUpperBounds() {

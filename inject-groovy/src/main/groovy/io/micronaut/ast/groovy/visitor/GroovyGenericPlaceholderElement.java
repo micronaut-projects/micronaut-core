@@ -45,6 +45,11 @@ final class GroovyGenericPlaceholderElement extends GroovyClassElement implement
         super(visitorContext, classNode, annotationMetadataFactory, null, arrayDimensions);
     }
 
+    @Override
+    protected GroovyClassElement copyConstructor() {
+        return new GroovyGenericPlaceholderElement(visitorContext, classNode, elementAnnotationMetadataFactory, getArrayDimensions());
+    }
+
     @NonNull
     @Override
     public List<? extends ClassElement> getBounds() {
