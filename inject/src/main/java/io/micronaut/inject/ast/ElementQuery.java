@@ -34,6 +34,13 @@ import java.util.function.Predicate;
 public interface ElementQuery<T extends Element> {
 
     /**
+     * Constant to retrieve inner classes.
+     *
+     * @since 3.1.0
+     */
+    ElementQuery<ClassElement> ALL_INNER_CLASSES = ElementQuery.of(ClassElement.class);
+
+    /**
      * Constant to retrieve all fields.
      */
     ElementQuery<FieldElement> ALL_FIELDS = ElementQuery.of(FieldElement.class);
@@ -44,12 +51,23 @@ public interface ElementQuery<T extends Element> {
     ElementQuery<MethodElement> ALL_METHODS = ElementQuery.of(MethodElement.class);
 
     /**
+     * Constant to retrieve instance constructors, not including those of the parent class.
+     */
+    // static initializers are never returned, so we don't need onlyInstance()
+    ElementQuery<ConstructorElement> CONSTRUCTORS = ElementQuery.of(ConstructorElement.class).onlyDeclared();
+
+    /**
      * Indicates that only declared members should be returned and not members from parent classes.
      *
      * @return This query
      */
     @NonNull ElementQuery<T> onlyDeclared();
 
+    /**
+     * Search for methods that are injection points.
+     * @return This query
+     */
+    ElementQuery<T> onlyInjected();
 
     /**
      * Indicates that only concrete members should be returned.
@@ -99,11 +117,42 @@ public interface ElementQuery<T extends Element> {
     ElementQuery<T> onlyInstance();
 
     /**
+     * Indicates to include enum constants, only applicable for fields query.
+     * @since 3.4.0
+     * @return The query
+     */
+    ElementQuery<T> includeEnumConstants();
+
+    /**
+     * Indicates to include overridden methods, only applicable for methods query.
+     * @since 3.4.0
+     * @return The query
+     */
+    ElementQuery<T> includeOverriddenMethods();
+
+    /**
+     * Indicates to include hidden methods/fields, only applicable for methods/fields query.
+     * @since 3.4.0
+     * @return The query
+     */
+    ElementQuery<T> includeHiddenElements();
+
+    /**
      * Allows filtering elements by name.
      * @param predicate The predicate to use. Should return true to include the element.
      * @return This query
      */
     @NonNull ElementQuery<T> named(@NonNull Predicate<String> predicate);
+
+    /**
+     * Allows filtering elements by name.
+     * @param name The name to filter by
+     * @return This query
+     * @since 3.5.2
+     */
+    default @NonNull ElementQuery<T> named(@NonNull String name) {
+        return named(n -> n.equals(name));
+    }
 
     /**
      * Allows filtering elements by type. For {@link MethodElement} instances this is based on the return type.
@@ -165,6 +214,11 @@ public interface ElementQuery<T extends Element> {
         boolean isOnlyAbstract();
 
         /**
+         * @return Whether to return only injection points
+         */
+        boolean isOnlyInjected();
+
+        /**
          * @return Whether to return only concrete methods
          */
         boolean isOnlyConcrete();
@@ -193,6 +247,24 @@ public interface ElementQuery<T extends Element> {
          * @return Whether to return only instance methods
          */
         boolean isOnlyInstance();
+
+        /**
+         * @return Whether to include enum constants
+         * @since 3.4.0
+         */
+        boolean isIncludeEnumConstants();
+
+        /**
+         * @return Whether to include overridden methods
+         * @since 3.4.0
+         */
+        boolean isIncludeOverriddenMethods();
+
+        /**
+         * @return Whether to include hidden methods/fields
+         * @since 3.4.0
+         */
+        boolean isIncludeHiddenElements();
 
         /**
          * @return The name predicates

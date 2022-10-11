@@ -17,6 +17,7 @@ package io.micronaut.http.annotation;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
+import java.lang.annotation.Inherited;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
@@ -26,8 +27,8 @@ import java.lang.annotation.Target;
  * Example usage:
  * <pre><code>
  * {@literal @}RequestAttributes({
- *     {@literal @}RequestAttribute(name="api-key",value="my-key-value"),
- *     {@literal @}RequestAttribute(name="api-name",value="my-api-name")
+ *     {@literal @}RequestAttribute(name = "api-key", value = "my-key-value"),
+ *     {@literal @}RequestAttribute(name = "api-name", value = "my-api-name")
  * })
  * </code></pre>
  *
@@ -37,6 +38,7 @@ import java.lang.annotation.Target;
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.TYPE})
+@Inherited
 public @interface RequestAttributes {
 
     /**
@@ -44,8 +46,8 @@ public @interface RequestAttributes {
      * Example usage:
      * <pre><code>
      * {@literal @}RequestAttributes({
-     *     {@literal @}RequestAttribute(name="api-key",value="my-key-value"),
-     *     {@literal @}RequestAttribute(name="api-name",value="my-api-name")
+     *     {@literal @}RequestAttribute(name = "api-key", value = "my-key-value"),
+     *     {@literal @}RequestAttribute(name = "api-name", value = "my-api-name")
      * })
      * </code></pre>
      * @return The attributes

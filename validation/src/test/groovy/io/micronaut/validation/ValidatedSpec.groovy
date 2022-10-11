@@ -23,6 +23,7 @@ import io.micronaut.aop.MethodInvocationContext
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.ConfigurationProperties
 import io.micronaut.context.exceptions.BeanInstantiationException
+import io.micronaut.core.annotation.Nullable
 import io.micronaut.core.order.OrderUtil
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
@@ -37,7 +38,7 @@ import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
-import io.reactivex.Flowable
+import reactor.core.publisher.Flux
 import spock.lang.Specification
 
 import javax.validation.ConstraintViolationException
@@ -58,12 +59,14 @@ class ValidatedSpec extends Specification {
                 return InterceptPhase.CACHE.getPosition()
             }
 
+            @Nullable
             @Override
             Object intercept(MethodInvocationContext context) {
                 return null
             }
 
             @Override
+            @Nullable
             Object intercept(InvocationContext context) {
                 return null
             }
@@ -202,7 +205,7 @@ class ValidatedSpec extends Specification {
         def result = new JsonSlurper().parseText((String) e.response.getBody().get())
 
         then:
-        result.message == 'pojo.email: Email should be valid'
+        result._embedded.errors[0].message == 'pojo.email: Email should be valid'
 
         cleanup:
         server.close()
@@ -211,8 +214,7 @@ class ValidatedSpec extends Specification {
     def "test validated controller validates @Valid classes with standard embedded errors"() {
         given:
         ApplicationContext context = ApplicationContext.run([
-                'spec.name': getClass().simpleName,
-                'jackson.always-serialize-errors-as-list': true
+                'spec.name': getClass().simpleName
         ])
         EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
         HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
@@ -234,8 +236,42 @@ class ValidatedSpec extends Specification {
 
         then:
         result.message == 'Bad Request'
-        result._embedded.errors.size == 1
+        result._embedded.errors.size() == 1
         result._embedded.errors.find { it.message == 'pojo.email: Email should be valid' }
+
+        cleanup:
+        server.close()
+    }
+
+    def "test validated controller validates @Valid collection with standard embedded errors"() {
+        given:
+        ApplicationContext context = ApplicationContext.run([
+                'spec.name': getClass().simpleName
+        ])
+        EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
+
+        when:
+        HttpResponse<String> response = client.toBlocking().exchange(
+                HttpRequest.POST("/validated/pojos", '[{"email":"abc"},{"email":"a@b.c","name":"Micronaut"},{"email":"a@b.c"}]')
+                        .contentType(MediaType.APPLICATION_JSON_TYPE),
+                String
+        )
+
+        then:
+        def e = thrown(HttpClientResponseException)
+        e.response.code() == HttpStatus.BAD_REQUEST.code
+
+        when:
+        def result = new JsonSlurper().parseText((String) e.response.getBody().get())
+
+        then:
+        result.message == 'Bad Request'
+        result._embedded.errors.size() == 3
+        result._embedded.errors.find { it.message == 'pojos[0].email: Email should be valid' }
+        result._embedded.errors.find { it.message == 'pojos[0].name: must not be blank' }
+        result._embedded.errors.find { it.message == 'pojos[2].name: must not be blank' }
 
         cleanup:
         server.close()
@@ -266,7 +302,7 @@ class ValidatedSpec extends Specification {
 
         then:
         result.message == 'Bad Request'
-        result._embedded.errors.size == 2
+        result._embedded.errors.size() == 2
         result._embedded.errors.find { it.message == 'pojo.email: Email should be valid' }
         result._embedded.errors.find { it.message == 'pojo.name: must not be blank' }
 
@@ -284,12 +320,12 @@ class ValidatedSpec extends Specification {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
 
         when:
-        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
                 HttpRequest.POST("/validated/args", '{"amount":"xxx"}')
                         .contentType(MediaType.APPLICATION_JSON_TYPE),
                 String
         ))
-        flowable.blockingFirst()
+        flowable.blockFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -299,7 +335,7 @@ class ValidatedSpec extends Specification {
         def result = new JsonSlurper().parseText((String) e.response.getBody().get())
 
         then:
-        result.message == 'amount: numeric value out of bounds (<3 digits>.<2 digits> expected)'
+        result._embedded.errors[0].message == 'amount: numeric value out of bounds (<3 digits>.<2 digits> expected)'
 
         cleanup:
         server.close()
@@ -308,20 +344,19 @@ class ValidatedSpec extends Specification {
     def "test validated controller args with standard embedded errors"() {
         given:
         ApplicationContext context = ApplicationContext.run([
-                'spec.name': getClass().simpleName,
-                'jackson.always-serialize-errors-as-list': true
+                'spec.name': getClass().simpleName
         ])
         EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
         HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
 
         when:
-        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
                 HttpRequest.POST("/validated/args", '{"amount":"xxx"}')
                         .contentType(MediaType.APPLICATION_JSON_TYPE),
                 String
         ))
-        flowable.blockingFirst()
+        flowable.blockFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -332,7 +367,7 @@ class ValidatedSpec extends Specification {
 
         then:
         result.message == 'Bad Request'
-        result._embedded.errors.size == 1
+        result._embedded.errors.size() == 1
         result._embedded.errors.find { it.message == 'amount: numeric value out of bounds (<3 digits>.<2 digits> expected)' }
 
         cleanup:
@@ -349,12 +384,12 @@ class ValidatedSpec extends Specification {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
 
         when:
-        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
                 HttpRequest.GET("/validated/optional?limit=0"),
                 Argument.STRING,
                 Argument.of(Map, String, Object)
         ))
-        flowable.blockingFirst()
+        flowable.blockFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -364,7 +399,7 @@ class ValidatedSpec extends Specification {
         Map result = e.response.getBody(Argument.of(Map, String, Object)).get()
 
         then:
-        result.message == 'limit: must be greater than or equal to 1'
+        result._embedded.errors[0].message == 'limit: must be greater than or equal to 1'
 
         cleanup:
         server.close()
@@ -373,20 +408,19 @@ class ValidatedSpec extends Specification {
     void "test validated controller optional query param with standard embedded errors"() {
         given:
         ApplicationContext context = ApplicationContext.run([
-                'spec.name': getClass().simpleName,
-                'jackson.always-serialize-errors-as-list': true
+                'spec.name': getClass().simpleName
         ])
         EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
         HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
 
         when:
-        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
                 HttpRequest.GET("/validated/optional?limit=0"),
                 Argument.STRING,
                 Argument.of(Map, String, Object)
         ))
-        flowable.blockingFirst()
+        flowable.blockFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -397,7 +431,7 @@ class ValidatedSpec extends Specification {
 
         then:
         result.message == 'Bad Request'
-        result._embedded.errors.size == 1
+        result._embedded.errors.size() == 1
         result._embedded.errors.find { it.message == 'limit: must be greater than or equal to 1' }
 
         cleanup:
@@ -412,12 +446,12 @@ class ValidatedSpec extends Specification {
         HttpClient client = server.applicationContext.createBean(HttpClient, server.getURL())
 
         when:
-        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
                 HttpRequest.GET("/validated/optional"),
                 Argument.STRING,
                 Argument.of(Map, String, Object)
         ))
-        def resp = flowable.blockingFirst()
+        def resp = flowable.blockFirst()
 
         then:
         noExceptionThrown()
@@ -436,12 +470,12 @@ class ValidatedSpec extends Specification {
         HttpClient client = server.applicationContext.createBean(HttpClient, server.getURL())
 
         when:
-        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
                 HttpRequest.GET("/validated/optional/notNull"),
                 Argument.STRING,
                 Argument.of(Map, String, Object)
         ))
-        flowable.blockingFirst()
+        flowable.blockFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -451,7 +485,7 @@ class ValidatedSpec extends Specification {
         Map result = e.response.getBody(Argument.of(Map, String, Object)).get()
 
         then:
-        result.message == 'limit: must not be null'
+        result._embedded.errors[0].message == 'limit: must not be null'
 
         cleanup:
         server.close()
@@ -460,18 +494,17 @@ class ValidatedSpec extends Specification {
     void "test validated controller empty optional query param with not null with standard embedded errors"() {
         given:
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
-                'spec.name': getClass().simpleName,
-                'jackson.always-serialize-errors-as-list': true
+                'spec.name': getClass().simpleName
         ])
         HttpClient client = server.applicationContext.createBean(HttpClient, server.getURL())
 
         when:
-        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
                 HttpRequest.GET("/validated/optional/notNull"),
                 Argument.STRING,
                 Argument.of(Map, String, Object)
         ))
-        flowable.blockingFirst()
+        flowable.blockFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -482,7 +515,7 @@ class ValidatedSpec extends Specification {
 
         then:
         result.message == 'Bad Request'
-        result._embedded.errors.size == 1
+        result._embedded.errors.size() == 1
         result._embedded.errors.find { it.message == 'limit: must not be null' }
 
         cleanup:
@@ -499,8 +532,7 @@ class ValidatedSpec extends Specification {
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == 'value: size must be between 2 and 2147483647'
-
+        e.response.getBody(Map).get()._embedded.errors[0].message == 'value: size must be between 2 and 2147483647'
 
         cleanup:
         server.close()
@@ -508,9 +540,7 @@ class ValidatedSpec extends Specification {
 
     void "test validated response with annotation with standard embedded errors"() {
         given:
-        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
-                'jackson.always-serialize-errors-as-list': true
-        ])
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
         TestClient client = server.applicationContext.getBean(TestClient)
 
         when:
@@ -524,7 +554,7 @@ class ValidatedSpec extends Specification {
 
         then:
         result.message == 'Bad Request'
-        result._embedded.errors.size == 1
+        result._embedded.errors.size() == 1
         result._embedded.errors.find { it.message == 'value: size must be between 2 and 2147483647' }
 
         cleanup:
@@ -541,8 +571,7 @@ class ValidatedSpec extends Specification {
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == 'something is invalid'
-
+        e.response.getBody(Map).get()._embedded.errors[0].message == 'something is invalid'
 
         cleanup:
         server.close()
@@ -558,7 +587,7 @@ class ValidatedSpec extends Specification {
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == 'another thing is invalid'
+        e.response.getBody(Map).get()._embedded.errors[0].message == 'another thing is invalid'
 
         cleanup:
         server.close()
@@ -615,7 +644,7 @@ class ValidatedSpec extends Specification {
         def result = new JsonSlurper().parseText((String) e.response.getBody().get())
 
         then:
-        result.message == 'pojo: Cannot validate io.micronaut.validation.PojoNoIntrospection. No bean introspection present. Please add @Introspected to the class and ensure Micronaut annotation processing is enabled'
+        result._embedded.errors[0].message == 'pojo: Cannot validate io.micronaut.validation.PojoNoIntrospection. No bean introspection present. Please add @Introspected to the class and ensure Micronaut annotation processing is enabled'
 
         cleanup:
         server.close()
@@ -624,8 +653,7 @@ class ValidatedSpec extends Specification {
     void "test validated controller with non introspected pojo with standard embedded errors"() {
         given:
         ApplicationContext context = ApplicationContext.run([
-                'spec.name': getClass().simpleName,
-                'jackson.always-serialize-errors-as-list': true
+                'spec.name': getClass().simpleName
         ])
         EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
         HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
@@ -647,7 +675,7 @@ class ValidatedSpec extends Specification {
 
         then:
         result.message == 'Bad Request'
-        result._embedded.errors.size == 1
+        result._embedded.errors.size() == 1
         result._embedded.errors.find { it.message == 'pojo: Cannot validate io.micronaut.validation.PojoNoIntrospection. No bean introspection present. Please add @Introspected to the class and ensure Micronaut annotation processing is enabled' }
 
         cleanup:
@@ -739,5 +767,3 @@ class ValidatedSpec extends Specification {
         Integer count = 0
     }
 }
-
-

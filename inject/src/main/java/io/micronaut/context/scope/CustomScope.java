@@ -58,13 +58,25 @@ public interface CustomScope<A extends Annotation> {
     <T> Optional<T> remove(BeanIdentifier identifier);
 
     /**
-     * Get the {@link BeanDefinition} for the given bean.
+     * Get the {@link io.micronaut.inject.BeanDefinition} for the given bean.
      *
      * @param bean The bean
      * @param <T> The bean generic type
      * @return The bean definition if it can be resolved
      */
     default <T> Optional<BeanRegistration<T>> findBeanRegistration(T bean) {
+        return Optional.empty();
+    }
+
+    /**
+     * Get the {@link io.micronaut.inject.BeanDefinition} for the given bean.
+     *
+     * @param beanDefinition The bean definition
+     * @param <T> The bean generic type
+     * @return The bean definition if it can be resolved
+     * @since 3.5.0
+     */
+    default <T> Optional<BeanRegistration<T>> findBeanRegistration(BeanDefinition<T> beanDefinition) {
         return Optional.empty();
     }
 }

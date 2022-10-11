@@ -18,6 +18,7 @@ package io.micronaut.aop.introduction;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 
+import io.micronaut.core.annotation.Nullable;
 import jakarta.inject.Singleton;
 import java.util.HashSet;
 import java.util.Set;
@@ -27,7 +28,7 @@ import java.util.Set;
  * @since 1.0
  */
 @Singleton
-public class ListenerAdviceInterceptor implements MethodInterceptor<Object,Object> {
+public class ListenerAdviceInterceptor implements MethodInterceptor<Object, Object> {
 
     private Set<Object> recievedMessages = new HashSet<>();
 
@@ -40,6 +41,7 @@ public class ListenerAdviceInterceptor implements MethodInterceptor<Object,Objec
         return recievedMessages;
     }
 
+    @Nullable
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
         if(context.getMethodName().equalsIgnoreCase("onApplicationEvent")) {

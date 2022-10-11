@@ -19,6 +19,8 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.env.Environment;
 import org.junit.Test;
 
+import java.util.Collections;
+
 import static org.junit.Assert.assertFalse;
 
 public class DefaultEnvironmentSpec {
@@ -26,7 +28,10 @@ public class DefaultEnvironmentSpec {
     // tag::disableEnvDeduction[]
     @Test
     public void testDisableEnvironmentDeductionViaBuilder() {
-        ApplicationContext ctx = ApplicationContext.builder().deduceEnvironment(false).start();
+        ApplicationContext ctx = ApplicationContext.builder()
+                .deduceEnvironment(false)
+                .properties(Collections.singletonMap("micronaut.server.port", -1))
+                .start();
         assertFalse(ctx.getEnvironment().getActiveNames().contains(Environment.TEST));
         ctx.close();
     }

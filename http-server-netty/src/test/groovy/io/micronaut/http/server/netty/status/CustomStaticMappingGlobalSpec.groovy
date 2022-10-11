@@ -23,6 +23,7 @@ import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.*
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.server.netty.AbstractMicronautSpec
+import reactor.core.publisher.Flux
 
 /**
  * Tests the global attribute for @Error
@@ -31,15 +32,15 @@ class CustomStaticMappingGlobalSpec extends AbstractMicronautSpec {
 
     void "test that a bad request is handled is handled by a globally marked controller method"() {
         when:
-        rxClient.exchange('/test1/bad').blockingFirst()
+        rxClient.toBlocking().exchange('/test1/bad')
 
         then:
-        def e = thrown(HttpClientResponseException)
+        HttpClientResponseException e = thrown()
         e.response.code() == HttpStatus.BAD_REQUEST.code
         e.response.reason() == "You sent me bad stuff - from Test2Controller.badHandler()"
 
         when:
-        rxClient.exchange('/test2/bad').blockingFirst()
+        rxClient.toBlocking().exchange('/test2/bad')
 
         then:
         e = thrown(HttpClientResponseException)
@@ -49,13 +50,13 @@ class CustomStaticMappingGlobalSpec extends AbstractMicronautSpec {
 
     void "test that a bad request response for invalid request data can be handled by a globally marked controller method"() {
         when:
-        rxClient.exchange(
+        Flux.from(rxClient.exchange(
                 HttpRequest.POST('/test1/simple', [name:"Fred"])
                         .contentType(MediaType.FORM)
-        ).blockingFirst()
+        )).blockFirst()
 
         then:
-        def e = thrown(HttpClientResponseException)
+        HttpClientResponseException e = thrown()
         e.response.code() == HttpStatus.BAD_REQUEST.code
         e.response.reason() == "You sent me bad stuff - from Test2Controller.badHandler()"
 
@@ -63,7 +64,7 @@ class CustomStaticMappingGlobalSpec extends AbstractMicronautSpec {
         rxClient.exchange(
                 HttpRequest.POST('/test2/simple', [name:"Fred"])
                         .contentType(MediaType.FORM)
-        ).blockingFirst()
+        ).blockFirst()
 
         then:
         e = thrown(HttpClientResponseException)
@@ -73,7 +74,7 @@ class CustomStaticMappingGlobalSpec extends AbstractMicronautSpec {
 
     void "test that a not found response request data can be handled by a local method"() {
         when:
-        rxClient.exchange('/test1/notFound').blockingFirst()
+        rxClient.exchange('/test1/notFound').blockFirst()
 
         then:
         def e = thrown(HttpClientResponseException)

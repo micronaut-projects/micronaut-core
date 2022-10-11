@@ -31,8 +31,11 @@ public interface ErrorResponseProcessor<T> {
 
     /**
      * Modifies the http response representing the error. Callers of this
-     * method should return the response that was passed in {@param baseResponse},
+     * method should return the response that was passed in baseResponse parameter,
      * however that isn't required.
+     *
+     * Error response processors should not set the body or content type if
+     * the request method is HEAD.
      *
      * @param errorContext The error context
      * @param baseResponse The base response to retrieve information or

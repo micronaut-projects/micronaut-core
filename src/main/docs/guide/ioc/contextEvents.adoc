@@ -4,7 +4,7 @@ Micronaut supports a general event system through the context. The api:context.e
 
 The api:context.event.ApplicationEventPublisher[] API supports events of any type, although all events that Micronaut publishes extend api:context.event.ApplicationEvent[].
 
-To publish an event, obtain an instance of api:context.event.ApplicationEventPublisher[] either directly from the context or through dependency injection, and invoke the `publishEvent` method with your event object.
+To publish an event, use dependency injection to obtain an instance of api:context.event.ApplicationEventPublisher[] where the generic type is the type of event and invoke the `publishEvent` method with your event object.
 
 snippet::io.micronaut.docs.context.events.SampleEvent,io.micronaut.docs.context.events.SampleEventEmitterBean[tags="class",indent=0,title="Publishing an Event]
 

@@ -38,13 +38,13 @@ import java.util.Set;
 public class RefreshEndpoint {
 
     private final Environment environment;
-    private final ApplicationEventPublisher eventPublisher;
+    private final ApplicationEventPublisher<RefreshEvent> eventPublisher;
 
     /**
      * @param environment    The Environment
-     * @param eventPublisher The Application event publiser
+     * @param eventPublisher The Application event publisher
      */
-    public RefreshEndpoint(Environment environment, ApplicationEventPublisher eventPublisher) {
+    public RefreshEndpoint(Environment environment, ApplicationEventPublisher<RefreshEvent> eventPublisher) {
         this.environment = environment;
         this.eventPublisher = eventPublisher;
     }

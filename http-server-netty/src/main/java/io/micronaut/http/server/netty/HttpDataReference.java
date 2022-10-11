@@ -23,9 +23,9 @@ import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.handler.codec.http.multipart.HttpData;
-import io.reactivex.processors.UnicastProcessor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.publisher.Sinks;
 
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -48,7 +48,7 @@ public class HttpDataReference {
 
     private static final Logger LOG = LoggerFactory.getLogger(HttpDataReference.class);
 
-    final AtomicReference<UnicastProcessor> subject = new AtomicReference<>();
+    final AtomicReference<Sinks.Many<Object>> subject = new AtomicReference<>();
     final AtomicReference<StreamingFileUpload> upload = new AtomicReference<>();
 
     private final HttpData data;

@@ -18,7 +18,6 @@ package io.micronaut.inject.ast;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
-import org.jetbrains.annotations.NotNull;
 
 import java.util.Collections;
 import java.util.Map;
@@ -91,7 +90,7 @@ final class SimpleClassElement implements ClassElement {
         throw new UnsupportedOperationException("Cannot convert class elements produced by from an array");
     }
 
-    @NotNull
+    @NonNull
     @Override
     public String getName() {
         return typeName;
@@ -112,7 +111,7 @@ final class SimpleClassElement implements ClassElement {
         return false;
     }
 
-    @NotNull
+    @NonNull
     @Override
     public Object getNativeType() {
         return typeName;

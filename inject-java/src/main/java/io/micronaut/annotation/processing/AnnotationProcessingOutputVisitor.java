@@ -37,7 +37,12 @@ import java.io.Writer;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.net.URI;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * An implementation of {@link io.micronaut.inject.writer.ClassWriterOutputVisitor} for annotation processing.
@@ -134,6 +139,25 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
         return unwrapFilterOutputStream(os);
     }
 
+    @Override
+    @SuppressWarnings("java:S1075")
+    public void visitServiceDescriptor(String type, String classname, io.micronaut.inject.ast.Element originatingElement) {
+        final String path = "META-INF/micronaut/" + type + "/" + classname;
+        try {
+            final FileObject fileObject = filer.createResource(
+                    StandardLocation.CLASS_OUTPUT,
+                    "",
+                    path,
+                    (Element) originatingElement.getNativeType()
+            );
+            try (Writer w = fileObject.openWriter()) {
+                w.write("");
+            }
+        } catch (IOException e) {
+            throw new ClassGenerationException("Unable to generate Bean entry at path: " + path, e);
+        }
+    }
+
     private OutputStream unwrapFilterOutputStream(OutputStream os) {
         // https://bugs.openjdk.java.net/browse/JDK-8255729
         // FilterOutputStream and JavacFiler$FilerOutputStream is always using write(int) and killing performance, unwrap if possible
@@ -176,12 +200,6 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
             }
         }
         return os;
-    }
-
-    @Override
-    @Deprecated
-    public Optional<GeneratedFile> visitMetaInfFile(String path) {
-        return visitMetaInfFile(path, io.micronaut.inject.ast.Element.EMPTY_ELEMENT_ARRAY);
     }
 
     @Override

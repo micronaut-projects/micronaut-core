@@ -82,10 +82,6 @@ public interface ObjectSerializer {
      * @throws SerializationException if there is a serialization problem
      */
     default Optional<byte[]> serialize(@Nullable Object object) throws SerializationException {
-        if (object == null) {
-            return Optional.empty();
-        }
-
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         serialize(object, outputStream);
         return Optional.of(outputStream.toByteArray());

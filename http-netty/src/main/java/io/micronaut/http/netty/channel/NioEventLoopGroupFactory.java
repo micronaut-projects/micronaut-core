@@ -25,6 +25,7 @@ import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.channel.unix.ServerDomainSocketChannel;
 import jakarta.inject.Singleton;
 
 import java.util.concurrent.Executor;
@@ -74,6 +75,11 @@ public class NioEventLoopGroupFactory implements EventLoopGroupFactory {
     @Override
     public Class<? extends ServerSocketChannel> serverSocketChannelClass() {
         return NioServerSocketChannel.class;
+    }
+
+    @Override
+    public Class<? extends ServerDomainSocketChannel> domainServerSocketChannelClass() throws UnsupportedOperationException {
+        throw new UnsupportedOperationException("UNIX domain sockets are not supported by the NIO implementation right now, please switch to epoll or kqueue");
     }
 
     @Override

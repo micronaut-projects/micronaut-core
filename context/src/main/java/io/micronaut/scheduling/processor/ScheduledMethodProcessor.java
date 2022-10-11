@@ -32,6 +32,7 @@ import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.TaskScheduler;
 import io.micronaut.scheduling.annotation.Scheduled;
 import io.micronaut.scheduling.exceptions.SchedulerConfigurationException;
+import jakarta.annotation.PreDestroy;
 import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,6 +61,7 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
     private static final String MEMBER_FIXED_RATE = "fixedRate";
     private static final String MEMBER_INITIAL_DELAY = "initialDelay";
     private static final String MEMBER_CRON = "cron";
+    private static final String MEMBER_ZONE_ID = "zoneId";
     private static final String MEMBER_FIXED_DELAY = "fixedDelay";
     private static final String MEMBER_SCHEDULER = "scheduler";
 
@@ -141,13 +143,16 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
             };
 
             String cronExpr = scheduledAnnotation.get(MEMBER_CRON, String.class, null);
+            String zoneIdStr = scheduledAnnotation.get(MEMBER_ZONE_ID, String.class, null);
             String fixedDelay = scheduledAnnotation.get(MEMBER_FIXED_DELAY, String.class).orElse(null);
 
             if (StringUtils.isNotEmpty(cronExpr)) {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Scheduling cron task [{}] for method: {}", cronExpr, method);
                 }
-                taskScheduler.schedule(cronExpr, task);
+
+                ScheduledFuture<?> scheduledFuture = taskScheduler.schedule(cronExpr, zoneIdStr, task);
+                scheduledTasks.add(scheduledFuture);
             } else if (StringUtils.isNotEmpty(fixedRate)) {
                 Optional<Duration> converted = conversionService.convert(fixedRate, Duration.class);
                 Duration duration = converted.orElseThrow(() ->
@@ -184,6 +189,7 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
     }
 
     @Override
+    @PreDestroy
     public void close() {
         for (ScheduledFuture<?> scheduledTask : scheduledTasks) {
             if (!scheduledTask.isCancelled()) {

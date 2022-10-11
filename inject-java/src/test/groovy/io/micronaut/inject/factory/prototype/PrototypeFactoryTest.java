@@ -9,7 +9,12 @@ import jakarta.inject.Named;
 @Factory
 @Prototype
 class PrototypeFactoryTest {
-    int counter = 0;
+    int counter;
+
+    public PrototypeFactoryTest() {
+        counter = 0;
+    }
+
     @Bean
     @Primary
     Result result() {
@@ -19,7 +24,12 @@ class PrototypeFactoryTest {
 
 @Factory
 class NonPrototypeFactoryTest {
-    int counter = 0;
+    int counter;
+
+    public NonPrototypeFactoryTest() {
+        this.counter = 0;
+    }
+
     @Bean
     @Named("another")
     Result result() {

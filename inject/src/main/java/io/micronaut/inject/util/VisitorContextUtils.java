@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.util;
 
+import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.visitor.VisitorContext;
 
@@ -44,7 +45,7 @@ public class VisitorContextUtils {
                         properties.stringPropertyNames()
                                 .stream()
                                 .filter(name -> name.startsWith(VisitorContext.MICRONAUT_BASE_OPTION_NAME))
-                                .map(k -> new AbstractMap.SimpleEntry<>(k, System.getProperty(k)))
+                                .map(k -> new AbstractMap.SimpleEntry<>(k, CachedEnvironment.getProperty(k)))
                                 .collect(Collectors.toMap(AbstractMap.SimpleEntry::getKey, AbstractMap.SimpleEntry::getValue)))
                 .orElse(Collections.emptyMap());
     }

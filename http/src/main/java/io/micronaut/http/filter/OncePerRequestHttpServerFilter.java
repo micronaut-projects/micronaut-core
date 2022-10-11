@@ -24,7 +24,7 @@ import org.reactivestreams.Publisher;
  * A filter that is only executed once per request. A filter may be executed more
  * than once per request if the original route throws an exception.
  *
- * @deprecated All filters are executed once per request starting in Micronaut 3.0. Directly mplement
+ * @deprecated All filters are executed once per request starting in Micronaut 3.0. Directly implement
  * {@link HttpServerFilter} instead of extending this class and replace any usages of `micronaut.once`
  * attributes with a custom attribute name.
  * @author Graeme Rocher

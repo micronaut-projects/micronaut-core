@@ -82,7 +82,7 @@ public class KubernetesEnvironmentPropertySource extends MapPropertySource {
     }
 
     static Map<String, String> getEnvNoK8s() {
-        Map<String, String> props = new HashMap<>(System.getenv());
+        Map<String, String> props = new HashMap<>(CachedEnvironment.getenv());
         props.entrySet().removeIf(entry -> VAR_SUFFIXES.stream().anyMatch(s -> entry.getKey().endsWith(s)));
         props.entrySet().removeIf(entry -> entry.getKey().endsWith("_PORT") && entry.getValue().startsWith("tcp://"));
         return props;

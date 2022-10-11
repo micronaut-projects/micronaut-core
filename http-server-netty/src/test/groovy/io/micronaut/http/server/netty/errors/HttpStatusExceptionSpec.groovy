@@ -18,12 +18,15 @@ package io.micronaut.http.server.netty.errors
 import groovy.json.JsonSlurper
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.exceptions.HttpStatusException
 import io.micronaut.http.server.netty.AbstractMicronautSpec
+import reactor.core.publisher.Flux
 
 /**
  * @author Iván López
@@ -33,9 +36,14 @@ class HttpStatusExceptionSpec extends AbstractMicronautSpec {
 
     void 'test HttpStatusException'() {
         when:
-        def response = rxClient
-            .exchange(HttpRequest.GET('/errors'))
-            .onErrorReturn({ t -> t.response.getBody(String); return t.response } ).blockingFirst()
+        HttpResponse response = Flux.from(rxClient
+            .exchange(HttpRequest.GET('/errors')))
+                .onErrorResume( t -> {
+                    if (t instanceof HttpClientResponseException) {
+                        return Flux.just(((HttpClientResponseException) t).response)
+                    }
+                    throw t
+                }).blockFirst()
 
         then:
         response.code() == HttpStatus.UNPROCESSABLE_ENTITY.code
@@ -45,14 +53,14 @@ class HttpStatusExceptionSpec extends AbstractMicronautSpec {
         def json = new JsonSlurper().parseText(response.getBody(String).orElse(null))
 
         then:
-        json.message == 'The error message'
+        json._embedded.errors[0].message == 'The error message'
         json._links.self.href == '/errors'
     }
 
     void 'test returning an arbitrary POGO'() {
         when:
-        def response = rxClient
-            .exchange((HttpRequest.GET('/errors/book')), String).blockingFirst()
+        HttpResponse<String> response = Flux.from(rxClient
+            .exchange((HttpRequest.GET('/errors/book')), String)).blockFirst()
 
         then:
         response.code() == HttpStatus.ACCEPTED.code

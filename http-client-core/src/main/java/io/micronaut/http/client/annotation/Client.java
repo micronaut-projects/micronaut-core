@@ -57,6 +57,7 @@ public @interface Client {
     @AliasFor(member = "value") // <2>
     String id() default "";
 // end::value[]
+
     /**
      * The base URI for the client. Only to be used in
      * conjunction with {@link #id()}.

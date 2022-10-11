@@ -38,16 +38,6 @@ public class ExecutorFactory {
     private final ThreadFactory threadFactory;
 
     /**
-     * @param threadFactory The factory to create new threads
-     * @deprecated Use {@link #ExecutorFactory(BeanLocator, ThreadFactory)} instead
-     */
-    @Deprecated
-    public ExecutorFactory(ThreadFactory threadFactory) {
-        this.threadFactory = threadFactory;
-        this.beanLocator = null;
-    }
-
-    /**
      *
      * @param beanLocator The bean beanLocator
      * @param threadFactory The factory to create new threads
@@ -99,7 +89,7 @@ public class ExecutorFactory {
         return executorConfiguration
                 .getThreadFactoryClass()
                 .flatMap(InstantiationUtils::tryInstantiate)
-                .map(tf -> (ThreadFactory) tf)
+                .map(ThreadFactory.class::cast)
                 .orElseGet(() -> {
                     if (beanLocator != null) {
                         if (executorConfiguration.getName() == null) {

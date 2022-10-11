@@ -22,6 +22,7 @@ import io.micronaut.discovery.exceptions.NoAvailableServiceException;
 import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
 import org.reactivestreams.Publisher;
 
+import java.net.URI;
 import java.net.URL;
 import java.util.Optional;
 
@@ -59,9 +60,21 @@ public interface LoadBalancer {
      *
      * @param url The URL
      * @return The {@link LoadBalancer}
+     * @deprecated Use {@link #fixed(URI)} instead
      */
+    @Deprecated
     static LoadBalancer fixed(URL url) {
         return new FixedLoadBalancer(url);
+    }
+
+    /**
+     * A {@link LoadBalancer} that does no load balancing and always hits the given URI.
+     *
+     * @param uri The URI
+     * @return The {@link LoadBalancer}
+     */
+    static LoadBalancer fixed(URI uri) {
+        return new FixedLoadBalancer(uri);
     }
 
     /**

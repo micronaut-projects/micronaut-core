@@ -23,7 +23,7 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.annotation.Put
 import io.micronaut.http.client.HttpClientConfiguration
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.ServiceHttpClientConfiguration
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.netty.DefaultHttpClient
@@ -35,6 +35,7 @@ import io.micronaut.runtime.server.EmbeddedServer
 import io.netty.handler.ssl.SslHandler
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
+import reactor.core.publisher.Flux
 import spock.lang.Specification
 
 import java.security.cert.X509Certificate
@@ -95,8 +96,8 @@ class ManualHttpServiceDefinitionSpec extends Specification {
 
 
         when:
-        RxHttpClient client = clientApp.getBean(TestBean).fooClient
-        String result = client.retrieve('/').blockingFirst()
+        HttpClient client = clientApp.getBean(TestBean).fooClient
+        String result = client.toBlocking().retrieve('/')
 
         then:
         client.configuration == config
@@ -116,7 +117,7 @@ class ManualHttpServiceDefinitionSpec extends Specification {
 
         when:
         client = clientApp.getBean(TestBean).barClient
-        result = client.retrieve(HttpRequest.POST('/', '')).blockingFirst()
+        result = client.toBlocking().retrieve(HttpRequest.POST('/', ''))
 
         then:
         client.configuration == config
@@ -177,7 +178,7 @@ class ManualHttpServiceDefinitionSpec extends Specification {
         !config.getConnectionPoolConfiguration().isEnabled()
 
         when:
-        def opt = clientApp.findBean(RxHttpClient, Qualifiers.byName("foo"))
+        def opt = clientApp.findBean(HttpClient, Qualifiers.byName("foo"))
 
         then:
         !opt.isPresent()
@@ -188,9 +189,9 @@ class ManualHttpServiceDefinitionSpec extends Specification {
 
     void "test working SSL configuration"() {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
-                'micronaut.ssl.enabled': true,
+                'micronaut.server.ssl.enabled': true,
                 // let the HTTPS port be random
-                'micronaut.ssl.port': -1,
+                'micronaut.server.ssl.port': -1,
                 'micronaut.server.ssl.client-authentication': 'NEED',
                 'micronaut.server.ssl.key-store.path': 'classpath:certs/server.p12',
                 'micronaut.server.ssl.key-store.password': 'secret',
@@ -204,14 +205,15 @@ class ManualHttpServiceDefinitionSpec extends Specification {
                 'micronaut.http.services.client1.ssl.enabled': true,
                 'micronaut.http.services.client1.ssl.client-authentication': 'NEED',
                 'micronaut.http.services.client1.ssl.key-store.path': 'classpath:certs/client1.p12',
-                'micronaut.http.services.client1.ssl.key-store.password': 'secret'
+                'micronaut.http.services.client1.ssl.key-store.password': 'secret',
+                'micronaut.http.services.client1.ssl.insecure-trust-all-certificates': true,
         )
         SslClient client1 = ctx.getBean(SslClient)
         final String DN = "CN=client1.test.example.com, OU=IT, O=Whatever, L=Munich, ST=Bavaria, C=DE, EMAILADDRESS=info@example.com"
 
 
         when:
-        def client = new DefaultHttpClient(embeddedServer.getURL(), ctx.getBean(HttpClientConfiguration, Qualifiers.byName("client1")))
+        def client = new DefaultHttpClient(embeddedServer.getURI(), ctx.getBean(HttpClientConfiguration, Qualifiers.byName("client1")))
 
         then:
         client.toBlocking().retrieve(HttpRequest.GET("/ssl-test"), String) == DN
@@ -235,18 +237,18 @@ class ManualHttpServiceDefinitionSpec extends Specification {
     static class TestBean {
         @Client(id = "foo")
         @Inject
-        RxHttpClient fooClient
+        HttpClient fooClient
 
         @Client(id = "bar")
         @Inject
-        RxHttpClient barClient
+        HttpClient barClient
     }
 
     @Singleton
     static class TestSslBean {
         @Client(id = "client1")
         @Inject
-        RxHttpClient client
+        HttpClient client
     }
 
     @Client(id = "foo")

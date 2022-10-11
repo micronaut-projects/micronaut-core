@@ -16,18 +16,24 @@
 package io.micronaut.http.server.netty.multipart;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.naming.NameUtils;
+import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.multipart.CompletedFileUpload;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.handler.codec.http.multipart.FileUpload;
+import io.netty.util.ResourceLeakDetector;
+import io.netty.util.ResourceLeakDetectorFactory;
+import io.netty.util.ResourceLeakTracker;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 /**
  * A Netty implementation of {@link CompletedFileUpload}.
@@ -37,9 +43,14 @@ import java.util.Optional;
  */
 @Internal
 public class NettyCompletedFileUpload implements CompletedFileUpload {
+    //to avoid initializing Netty at build time
+    private static final Supplier<ResourceLeakDetector<NettyCompletedFileUpload>> RESOURCE_LEAK_DETECTOR = SupplierUtil.memoized(() ->
+            ResourceLeakDetectorFactory.instance().newResourceLeakDetector(NettyCompletedFileUpload.class));
 
     private final FileUpload fileUpload;
     private final boolean controlRelease;
+
+    private final ResourceLeakTracker<NettyCompletedFileUpload> tracker;
 
     /**
      * @param fileUpload The file upload
@@ -57,16 +68,19 @@ public class NettyCompletedFileUpload implements CompletedFileUpload {
         this.controlRelease = controlRelease;
         if (controlRelease) {
             fileUpload.retain();
+            tracker = RESOURCE_LEAK_DETECTOR.get().track(this);
+        } else {
+            tracker = null;
         }
     }
 
     /**
-     * Gets the content of this part as a <tt>InputStream</tt>.
+     * Gets the content of this part as a {@code InputStream}.
      *
      * <p>The contents of the file will be released when the stream is closed.
      * This method should only be called <strong>once</strong></p>
      *
-     * @return The content of this part as a <tt>InputStream</tt>
+     * @return The content of this part as a {@code InputStream}
      * @throws IOException If an error occurs in retrieving the content
      */
     @Override
@@ -76,23 +90,25 @@ public class NettyCompletedFileUpload implements CompletedFileUpload {
             if (byteBuf == null) {
                 throw new IOException("The input stream has already been released");
             }
+            closeTracker();
             return new ByteBufInputStream(byteBuf, controlRelease);
         } else {
             File file = fileUpload.getFile();
             if (file == null) {
                 throw new IOException("The input stream has already been released");
             }
+            closeTracker();
             return new NettyFileUploadInputStream(fileUpload, controlRelease);
         }
     }
 
     /**
-     * Gets the content of this part as a <tt>byte[]</tt>.
+     * Gets the content of this part as a {@code byte[]}.
      *
      * <p>Because the contents of the file are released after being retrieved,
      * this method can only be called <strong>once</strong></p>
      *
-     * @return The content of this part as a <tt>byte[]</tt>
+     * @return The content of this part as a {@code byte[]}
      * @throws IOException If an error occurs in retrieving the content
      */
     @Override
@@ -104,19 +120,17 @@ public class NettyCompletedFileUpload implements CompletedFileUpload {
         try {
             return ByteBufUtil.getBytes(byteBuf);
         } finally {
-            if (controlRelease) {
-                byteBuf.release();
-            }
+            discard();
         }
     }
 
     /**
-     * Gets the content of this part as a <tt>ByteBuffer</tt>.
+     * Gets the content of this part as a {@code ByteBuffer}.
      *
      * <p>Because the contents of the file are released after being retrieved,
      * this method can only be called <strong>once</strong></p>
      *
-     * @return The content of this part as a <tt>ByteBuffer</tt>
+     * @return The content of this part as a {@code ByteBuffer}
      * @throws IOException If an error occurs in retrieving the content
      */
     @Override
@@ -128,15 +142,13 @@ public class NettyCompletedFileUpload implements CompletedFileUpload {
         try {
             return byteBuf.nioBuffer();
         } finally {
-            if (controlRelease) {
-                byteBuf.release();
-            }
+            discard();
         }
     }
 
     @Override
     public Optional<MediaType> getContentType() {
-        return Optional.of(MediaType.of(fileUpload.getContentType()));
+        return Optional.of(new MediaType(fileUpload.getContentType(), NameUtils.extension(fileUpload.getFilename())));
     }
 
     @Override
@@ -165,7 +177,16 @@ public class NettyCompletedFileUpload implements CompletedFileUpload {
     }
 
     @Override
-    public void discard() {
-        fileUpload.release();
+    public final void discard() {
+        if (controlRelease) {
+            fileUpload.release();
+        }
+        closeTracker();
+    }
+
+    private void closeTracker() {
+        if (tracker != null) {
+            tracker.close(this);
+        }
     }
 }

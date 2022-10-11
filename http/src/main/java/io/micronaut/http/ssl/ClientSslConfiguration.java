@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2022 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@ import jakarta.inject.Inject;
  */
 @ConfigurationProperties(ClientSslConfiguration.PREFIX)
 @BootstrapContextCompatible
-public class ClientSslConfiguration extends SslConfiguration {
+public class ClientSslConfiguration extends AbstractClientSslConfiguration {
 
     /**
      * The prefix used to resolve this configuration.
@@ -52,7 +52,6 @@ public class ClientSslConfiguration extends SslConfiguration {
             SslConfiguration.TrustStoreConfiguration defaultTrustStoreConfiguration) {
         readExisting(defaultSslConfiguration, defaultKeyConfiguration, defaultKeyStoreConfiguration, defaultTrustStoreConfiguration);
         setEnabled(true);
-        setBuildSelfSigned(true);
     }
 
     /**
@@ -105,6 +104,7 @@ public class ClientSslConfiguration extends SslConfiguration {
      */
     @SuppressWarnings("WeakerAccess")
     @ConfigurationProperties(KeyConfiguration.PREFIX)
+    @BootstrapContextCompatible
     @Requires(property = ClientSslConfiguration.PREFIX + "." + KeyConfiguration.PREFIX)
     public static class DefaultKeyConfiguration extends KeyConfiguration {
     }
@@ -114,6 +114,7 @@ public class ClientSslConfiguration extends SslConfiguration {
      */
     @SuppressWarnings("WeakerAccess")
     @ConfigurationProperties(KeyStoreConfiguration.PREFIX)
+    @BootstrapContextCompatible
     @Requires(property = ClientSslConfiguration.PREFIX + "." + KeyStoreConfiguration.PREFIX)
     public static class DefaultKeyStoreConfiguration extends KeyStoreConfiguration {
     }
@@ -123,6 +124,7 @@ public class ClientSslConfiguration extends SslConfiguration {
      */
     @SuppressWarnings("WeakerAccess")
     @ConfigurationProperties(TrustStoreConfiguration.PREFIX)
+    @BootstrapContextCompatible
     @Requires(property = ClientSslConfiguration.PREFIX + "." + TrustStoreConfiguration.PREFIX)
     public static class DefaultTrustStoreConfiguration extends TrustStoreConfiguration {
     }

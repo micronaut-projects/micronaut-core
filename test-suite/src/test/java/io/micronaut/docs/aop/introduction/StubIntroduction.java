@@ -17,14 +17,16 @@ package io.micronaut.docs.aop.introduction;
 
 // tag::imports[]
 import io.micronaut.aop.*;
+import io.micronaut.core.annotation.Nullable;
 import jakarta.inject.Singleton;
 // end::imports[]
 
 // tag::class[]
 @Singleton
 @InterceptorBean(Stub.class) // <1>
-public class StubIntroduction implements MethodInterceptor<Object,Object> { // <2>
+public class StubIntroduction implements MethodInterceptor<Object, Object> { // <2>
 
+    @Nullable
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
         return context.getValue( // <3>

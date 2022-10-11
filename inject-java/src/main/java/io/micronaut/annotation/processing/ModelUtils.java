@@ -33,7 +33,6 @@ import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 import java.util.*;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static javax.lang.model.element.Modifier.*;
 import static javax.lang.model.type.TypeKind.NONE;
@@ -375,19 +374,6 @@ public class ModelUtils {
     }
 
     /**
-     * Finds a no argument method of the given name.
-     *
-     * @param classElement The class element
-     * @param methodName The method name
-     * @return The executable element
-     */
-    Optional<ExecutableElement> findAccessibleNoArgumentInstanceMethod(TypeElement classElement, String methodName) {
-        return ElementFilter.methodsIn(elementUtils.getAllMembers(classElement))
-                .stream().filter(m -> m.getSimpleName().toString().equals(methodName) && !isPrivate(m) && !isStatic(m))
-                .findFirst();
-    }
-
-    /**
      * Obtains the super type element for a given type element.
      *
      * @param element The type element
@@ -481,37 +467,24 @@ public class ModelUtils {
      */
     @SuppressWarnings("Duplicates")
     private Set<TypeElement> populateInterfaces(TypeElement aClass, Set<TypeElement> interfaces) {
-        List<? extends TypeMirror> theInterfaces = aClass.getInterfaces();
-        interfaces.addAll(theInterfaces.stream().flatMap(tm -> {
-            TypeMirror erased = typeUtils.erasure(tm);
-            if (erased instanceof DeclaredType) {
-                Element e = ((DeclaredType) erased).asElement();
-                if (e instanceof TypeElement) {
-                    return Stream.of((TypeElement) e);
-                }
-            }
-            return Stream.empty();
-        }).collect(Collectors.toSet()));
-        for (TypeMirror theInterface : theInterfaces) {
-            TypeMirror erased = typeUtils.erasure(theInterface);
-            if (erased instanceof DeclaredType) {
-                Element e = ((DeclaredType) erased).asElement();
-                if (e instanceof TypeElement) {
-                    populateInterfaces(((TypeElement) e), interfaces);
+        for (TypeMirror anInterface : aClass.getInterfaces()) {
+            final Element e = typeUtils.asElement(anInterface);
+            if (e instanceof TypeElement) {
+                final TypeElement te = (TypeElement) e;
+                if (!interfaces.contains(te)) {
+                    interfaces.add(te);
+                    populateInterfaces(te, interfaces);
                 }
             }
         }
         if (aClass.getKind() != ElementKind.INTERFACE) {
             TypeMirror superclass = aClass.getSuperclass();
             while (superclass != null) {
-                TypeMirror erased = typeUtils.erasure(superclass);
-                if (erased instanceof DeclaredType) {
-                    Element e = ((DeclaredType) erased).asElement();
-                    if (e instanceof TypeElement) {
-                        TypeElement superTypeElement = (TypeElement) e;
-                        populateInterfaces(superTypeElement, interfaces);
-                        superclass = superTypeElement.getSuperclass();
-                    }
+                final Element e = typeUtils.asElement(superclass);
+                if (e instanceof TypeElement) {
+                    TypeElement superTypeElement = (TypeElement) e;
+                    populateInterfaces(superTypeElement, interfaces);
+                    superclass = superTypeElement.getSuperclass();
                 } else {
                     break;
                 }
@@ -562,7 +535,7 @@ public class ModelUtils {
      * @param strict       Whether to use strict checks for overriding and not include logic to handle method overloading
      * @return the overriding method
      */
-    Optional<ExecutableElement> overridingOrHidingMethod(ExecutableElement overridden, TypeElement classElement, boolean strict) {
+    public Optional<ExecutableElement> overridingOrHidingMethod(ExecutableElement overridden, TypeElement classElement, boolean strict) {
         List<ExecutableElement> methods = ElementFilter.methodsIn(elementUtils.getAllMembers(classElement));
         for (ExecutableElement method : methods) {
             if (strict) {

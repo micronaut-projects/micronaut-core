@@ -31,7 +31,7 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 @Internal
-class CompositeQualifier<T> implements Qualifier<T> {
+final class CompositeQualifier<T> implements Qualifier<T> {
 
     private final Qualifier[] qualifiers;
 
@@ -51,10 +51,22 @@ class CompositeQualifier<T> implements Qualifier<T> {
         return reduced;
     }
 
+    public Qualifier[] getQualifiers() {
+        return qualifiers;
+    }
+
     @Override
     public boolean contains(Qualifier<T> qualifier) {
+        if (qualifier instanceof CompositeQualifier) {
+            for (Qualifier q : ((CompositeQualifier<Object>) qualifier).qualifiers) {
+                if (!contains(q)) {
+                    return false;
+                }
+            }
+            return true;
+        }
         for (Qualifier q : qualifiers) {
-            if (q.equals(qualifier)) {
+            if (q.contains(qualifier)) {
                 return true;
             }
         }

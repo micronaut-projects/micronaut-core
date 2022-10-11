@@ -17,6 +17,7 @@ package io.micronaut.inject.injectionpoint;
 
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Prototype;
+import io.micronaut.core.naming.Named;
 import io.micronaut.inject.InjectionPoint;
 
 @Factory

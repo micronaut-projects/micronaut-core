@@ -49,6 +49,7 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
     protected final Type targetClassType;
     protected final AnnotationMetadata annotationMetadata;
     protected final Map<String, GeneratorAdapter> loadTypeMethods = new HashMap<>();
+    protected final Map<String, Integer> defaults = new HashMap<>();
     private final boolean writeAnnotationDefault;
 
     /**
@@ -123,13 +124,19 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
      * @param classWriter The {@link ClassWriter}
      */
     protected void writeAnnotationMetadataStaticInitializer(ClassWriter classWriter) {
+        writeAnnotationMetadataStaticInitializer(classWriter, defaults);
+    }
+
+    /**
+     * @param classWriter The {@link ClassWriter}
+     * @param defaults    The annotation defaults
+     */
+    protected void writeAnnotationMetadataStaticInitializer(ClassWriter classWriter, Map<String, Integer> defaults) {
         if (!(annotationMetadata instanceof AnnotationMetadataReference)) {
 
             // write the static initializers for the annotation metadata
             GeneratorAdapter staticInit = visitStaticInitializer(classWriter);
             staticInit.visitCode();
-            staticInit.visitLabel(new Label());
-            initializeAnnotationMetadata(staticInit, classWriter);
             if (writeAnnotationDefault && annotationMetadata instanceof DefaultAnnotationMetadata) {
                 DefaultAnnotationMetadata dam = (DefaultAnnotationMetadata) annotationMetadata;
                 AnnotationMetadataWriter.writeAnnotationDefaults(
@@ -137,10 +144,12 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
                         classWriter,
                         staticInit,
                         dam,
+                        defaults,
                         loadTypeMethods
                 );
-
             }
+            staticInit.visitLabel(new Label());
+            initializeAnnotationMetadata(staticInit, classWriter, defaults);
             staticInit.visitInsn(RETURN);
             staticInit.visitMaxs(1, 1);
             staticInit.visitEnd();
@@ -150,8 +159,9 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
     /**
      * @param staticInit  The {@link GeneratorAdapter}
      * @param classWriter The {@link ClassWriter}
+     * @param defaults    The annotation defaults
      */
-    protected void initializeAnnotationMetadata(GeneratorAdapter staticInit, ClassWriter classWriter) {
+    protected void initializeAnnotationMetadata(GeneratorAdapter staticInit, ClassWriter classWriter, Map<String, Integer> defaults) {
         Type annotationMetadataType = Type.getType(AnnotationMetadata.class);
         classWriter.visitField(ACC_PUBLIC | ACC_FINAL | ACC_STATIC, FIELD_ANNOTATION_METADATA, annotationMetadataType.getDescriptor(), null, null);
 
@@ -161,6 +171,7 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
                     classWriter,
                     staticInit,
                     (DefaultAnnotationMetadata) annotationMetadata,
+                    defaults,
                     loadTypeMethods
             );
         } else if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
@@ -169,6 +180,7 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
                     classWriter,
                     staticInit,
                     (AnnotationMetadataHierarchy) annotationMetadata,
+                    defaults,
                     loadTypeMethods
             );
         } else {

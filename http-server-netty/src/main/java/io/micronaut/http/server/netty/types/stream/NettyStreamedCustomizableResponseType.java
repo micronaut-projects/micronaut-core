@@ -15,12 +15,12 @@
  */
 package io.micronaut.http.server.netty.types.stream;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.netty.AbstractNettyHttpRequest;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
-import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.types.NettyCustomizableResponseType;
+import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.DefaultHttpResponse;
@@ -41,6 +41,7 @@ import java.io.InputStream;
  * @author James Kleeh
  * @since 2.5.0
  */
+@Internal
 public interface NettyStreamedCustomizableResponseType extends NettyCustomizableResponseType {
 
     Logger LOG = LoggerFactory.getLogger(NettyStreamedCustomizableResponseType.class);
@@ -48,21 +49,12 @@ public interface NettyStreamedCustomizableResponseType extends NettyCustomizable
     InputStream getInputStream();
 
     @Override
-    default void write(HttpRequest<?> request, MutableHttpResponse<?> response, ChannelHandlerContext context) {
+    default ChannelFuture write(HttpRequest<?> request, MutableHttpResponse<?> response, ChannelHandlerContext context) {
         if (response instanceof NettyMutableHttpResponse) {
             NettyMutableHttpResponse nettyResponse = ((NettyMutableHttpResponse) response);
 
             // Write the request data
             final DefaultHttpResponse finalResponse = new DefaultHttpResponse(nettyResponse.getNettyHttpVersion(), nettyResponse.getNettyHttpStatus(), nettyResponse.getNettyHeaders());
-            final io.micronaut.http.HttpVersion httpVersion = request.getHttpVersion();
-            final boolean isHttp2 = httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0;
-            if (isHttp2 && request instanceof NettyHttpRequest) {
-                final io.netty.handler.codec.http.HttpHeaders nativeHeaders = ((NettyHttpRequest<?>) request).getNativeRequest().headers();
-                final String streamId = nativeHeaders.get(AbstractNettyHttpRequest.STREAM_ID);
-                if (streamId != null) {
-                    finalResponse.headers().set(AbstractNettyHttpRequest.STREAM_ID, streamId);
-                }
-            }
             InputStream inputStream = getInputStream();
             //  can be null if the stream was closed
             context.write(finalResponse, context.voidPromise());
@@ -76,9 +68,9 @@ public interface NettyStreamedCustomizableResponseType extends NettyCustomizable
                     }
                 };
                 final HttpChunkedInput chunkedInput = new HttpChunkedInput(new ChunkedStream(inputStream));
-                context.writeAndFlush(chunkedInput).addListener(closeListener);
+                return context.writeAndFlush(chunkedInput).addListener(closeListener);
             } else {
-                context.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT);
+                return context.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT);
             }
 
         } else {

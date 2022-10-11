@@ -21,7 +21,6 @@ import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
-import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
 import io.micronaut.inject.annotation.AnnotatedElementValidator;
@@ -95,18 +94,8 @@ public class AnnotationUtils {
         this.filer = filer;
         this.visitorAttributes = visitorAttributes;
         this.processingEnv = processingEnv;
-        final SoftServiceLoader<AnnotatedElementValidator> validators = SoftServiceLoader.load(AnnotatedElementValidator.class);
-        final Iterator<ServiceDefinition<AnnotatedElementValidator>> i = validators.iterator();
-        AnnotatedElementValidator elementValidator = null;
-        while (i.hasNext()) {
-            final ServiceDefinition<AnnotatedElementValidator> validator = i.next();
-            if (validator.isPresent()) {
-                elementValidator = validator.load();
-                break;
-            }
-        }
+        this.elementValidator = SoftServiceLoader.load(AnnotatedElementValidator.class).firstAvailable().orElse(null);
         this.javaAnnotationMetadataBuilder = newAnnotationBuilder();
-        this.elementValidator = elementValidator;
     }
 
     /**
@@ -221,6 +210,20 @@ public class AnnotationUtils {
      */
     public AnnotationMetadata getAnnotationMetadata(Element parent, Element element) {
         return newAnnotationBuilder().buildForParent(parent, element);
+    }
+
+    /**
+     * Get the annotation metadata for the given element and the given parents.
+     * This method is used for cases when you need to combine annotation metadata for
+     * two elements, for example a JavaBean property where the field and the method metadata
+     * need to be combined.
+     *
+     * @param parents The parents
+     * @param element The element
+     * @return The {@link AnnotationMetadata}
+     */
+    public AnnotationMetadata getAnnotationMetadata(List<Element> parents, Element element) {
+        return newAnnotationBuilder().buildForParents(parents, element);
     }
 
     /**

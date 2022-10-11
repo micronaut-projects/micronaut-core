@@ -120,6 +120,23 @@ public interface ElementFactory<E, C extends E, M extends E, F extends E> {
             @NonNull AnnotationMetadata annotationMetadata);
 
     /**
+     * Builds a new enum constant element for the given type.
+     *
+     * @param declaringClass     The declaring class
+     * @param enumConstant        The enum constant
+     * @param annotationMetadata The resolved annotation metadata
+     *
+     * @return The enum constant element
+     *
+     * @since 3.6.0
+     */
+    @NonNull
+    EnumConstantElement newEnumConstantElement(
+            ClassElement declaringClass,
+            @NonNull F enumConstant,
+            @NonNull AnnotationMetadata annotationMetadata);
+
+    /**
      * Builds a new field element for the given type.
      *
      * @param declaringClass     The declaring class

@@ -1,13 +1,11 @@
 package io.micronaut.inject.annotation
 
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.annotation.Executable
 import io.micronaut.context.annotation.Property
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.AnnotationValue
-import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
-
-import jakarta.inject.Singleton
 
 class AnnotationMetadataHierarchySpec extends AbstractTypeElementSpec{
 
@@ -90,6 +88,10 @@ class Test {
         properties[3].get("name", String).get() == "prop1"
         properties[4].get("name", String).get() == "prop3"
         properties[4].getValue(String).get() == "value3"
+        hierarchy.synthesizeAll().length == 2
+        hierarchy.synthesizeDeclared().length == 2
+        hierarchy.synthesizeAnnotationsByType(Property).length == 5
+        hierarchy.synthesizeDeclaredAnnotationsByType(Property).length == 5
     }
 
     void "test default values are propagated"() {

@@ -17,16 +17,43 @@ package io.micronaut.http.server.netty.errors
 
 import groovy.json.JsonSlurper
 import io.micronaut.context.annotation.Property
+import io.micronaut.core.annotation.NonNull
 import io.micronaut.http.*
+import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Error
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Post
 import io.micronaut.http.annotation.Produces
+import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.hateoas.JsonError
 import io.micronaut.http.server.exceptions.ExceptionHandler
 import io.micronaut.http.server.netty.AbstractMicronautSpec
-import io.reactivex.Single
+import io.netty.bootstrap.Bootstrap
+import io.netty.buffer.ByteBuf
+import io.netty.buffer.CompositeByteBuf
+import io.netty.buffer.Unpooled
+import io.netty.channel.Channel
+import io.netty.channel.ChannelHandlerContext
+import io.netty.channel.ChannelInboundHandlerAdapter
+import io.netty.channel.ChannelInitializer
+import io.netty.channel.nio.NioEventLoopGroup
+import io.netty.channel.socket.nio.NioSocketChannel
+import io.netty.handler.codec.http.FullHttpResponse
+import io.netty.handler.codec.http.HttpClientCodec
+import io.netty.handler.codec.http.HttpObjectAggregator
+import io.netty.handler.codec.http.HttpResponseDecoder
 import jakarta.inject.Singleton
+import org.reactivestreams.Publisher
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
+import io.micronaut.core.async.annotation.SingleResult
+import spock.lang.Issue
+import spock.lang.PendingFeature
+import spock.lang.Timeout
+
+import java.nio.charset.StandardCharsets
+import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * Tests for different kinds of errors and the expected responses
@@ -38,36 +65,85 @@ class ErrorSpec extends AbstractMicronautSpec {
 
     void "test 500 server error"() {
         given:
-        def response = rxClient.exchange(
+        HttpResponse response = Flux.from(rxClient.exchange(
                 HttpRequest.GET('/errors/server-error')
-
-        ).onErrorReturn({ t -> t.response.getBody(JsonError); return t.response } ).blockingFirst()
+        )).onErrorResume(t -> {
+            if (t instanceof HttpClientResponseException) {
+                return Flux.just(((HttpClientResponseException) t).response)
+            }
+            throw t
+        }).blockFirst()
 
         expect:
         response.code() == HttpStatus.INTERNAL_SERVER_ERROR.code
         response.header(HttpHeaders.CONTENT_TYPE) == MediaType.APPLICATION_JSON
-        response.getBody(JsonError).get().message == 'Internal Server Error: bad'
+        response.getBody(Map).get()._embedded.errors[0].message == 'Internal Server Error: bad'
     }
 
     void "test 500 server error IOException"() {
         given:
-        def response = rxClient.exchange(
+        HttpResponse response = Flux.from(rxClient.exchange(
                 HttpRequest.GET('/errors/io-error')
 
-        ).onErrorReturn({ t -> t.response.getBody(JsonError); return t.response } ).blockingFirst()
+        )).onErrorResume(t -> {
+            if (t instanceof HttpClientResponseException) {
+                return Flux.just(((HttpClientResponseException) t).response)
+            }
+            throw t
+        }).blockFirst()
 
         expect:
         response.code() == HttpStatus.INTERNAL_SERVER_ERROR.code
         response.header(HttpHeaders.CONTENT_TYPE) == MediaType.APPLICATION_JSON
-        response.getBody(JsonError).get().message == 'Internal Server Error: null'
+        response.getBody(Map).get()._embedded.errors[0].message == 'Internal Server Error: null'
+    }
+
+    void "test an error route throwing the same exception it handles"() {
+        given:
+        HttpResponse response = Flux.from(rxClient.exchange(
+                HttpRequest.GET('/errors/loop')
+
+        )).onErrorResume(t -> {
+            if (t instanceof HttpClientResponseException) {
+                return Flux.just(((HttpClientResponseException) t).response)
+            }
+            throw t
+        }).blockFirst()
+
+        expect:
+        response.code() == HttpStatus.INTERNAL_SERVER_ERROR.code
+        response.header(HttpHeaders.CONTENT_TYPE) == MediaType.APPLICATION_JSON
+        response.getBody(Map).get()._embedded.errors[0].message == 'Internal Server Error: null'
+    }
+
+    void "test an exception handler throwing the same exception it handles"() {
+        given:
+        HttpResponse response = Flux.from(rxClient.exchange(
+                HttpRequest.GET('/errors/loop/handler')
+
+        )).onErrorResume(t -> {
+            if (t instanceof HttpClientResponseException) {
+                return Flux.just(((HttpClientResponseException) t).response)
+            }
+            throw t
+        }).blockFirst()
+
+        expect:
+        response.code() == HttpStatus.INTERNAL_SERVER_ERROR.code
+        response.header(HttpHeaders.CONTENT_TYPE) == MediaType.APPLICATION_JSON
+        response.getBody(Map).get()._embedded.errors[0].message == 'Internal Server Error: null'
     }
 
     void "test 404 error"() {
         when:
-        def response = rxClient.exchange(
+        HttpResponse response = Flux.from(rxClient.exchange(
                 HttpRequest.GET('/errors/blah')
-
-        ).onErrorReturn({ t -> t.response.getBody(String); return t.response } ).blockingFirst()
+        )).onErrorResume(t -> {
+            if (t instanceof HttpClientResponseException) {
+                return Flux.just(((HttpClientResponseException) t).response)
+            }
+            throw t
+        }).blockFirst()
 
         then:
         response.code() == HttpStatus.NOT_FOUND.code
@@ -77,16 +153,20 @@ class ErrorSpec extends AbstractMicronautSpec {
         def json = new JsonSlurper().parseText(response.getBody(String).orElse(null))
 
         then:
-        json.message == 'Page Not Found'
+        json._embedded.errors[0].message == 'Page Not Found'
         json._links.self.href == '/errors/blah'
     }
 
     void "test 405 error"() {
         when:
-        def response = rxClient.exchange(
+        HttpResponse response = Flux.from(rxClient.exchange(
                 HttpRequest.POST('/errors/server-error', 'blah')
-
-        ).onErrorReturn({ t -> t.response.getBody(String); return t.response } ).blockingFirst()
+        )).onErrorResume(t -> {
+            if (t instanceof HttpClientResponseException) {
+                return Flux.just(((HttpClientResponseException) t).response)
+            }
+            throw t
+        }).blockFirst()
 
         then:
         response.code() == HttpStatus.METHOD_NOT_ALLOWED.code
@@ -96,16 +176,20 @@ class ErrorSpec extends AbstractMicronautSpec {
         def json = new JsonSlurper().parseText(response.getBody(String).orElse(null))
 
         then:
-        json.message.matches('Method \\[POST\\] not allowed for URI \\[/errors/server-error\\]. Allowed methods: \\[(GET|HEAD), (GET|HEAD)\\]')
+        json._embedded.errors[0].message.matches('Method \\[POST\\] not allowed for URI \\[/errors/server-error\\]. Allowed methods: \\[(GET|HEAD), (GET|HEAD)\\]')
         json._links.self.href == '/errors/server-error'
     }
 
     void "test content type for error handler"() {
         given:
-        def response = rxClient.exchange(
+        HttpResponse response = Flux.from(rxClient.exchange(
                 HttpRequest.GET('/errors/handler-content-type-error')
-
-        ).onErrorReturn({ t -> t.response; return t.response } ).blockingFirst()
+        )).onErrorResume(t -> {
+            if (t instanceof HttpClientResponseException) {
+                return Flux.just(((HttpClientResponseException) t).response)
+            }
+            throw t
+        }).blockFirst()
 
         expect:
         response.code() == HttpStatus.INTERNAL_SERVER_ERROR.code
@@ -113,16 +197,128 @@ class ErrorSpec extends AbstractMicronautSpec {
         response.getBody(String).get() == '<div>Error</div>'
     }
 
-    void "test calling a controller that fails to inject with a local error handler"() {
+    void "test encoding error"() {
         given:
-        def response = rxClient.exchange(
-                HttpRequest.GET('/errors/injection')
-
-        ).onErrorReturn({ t -> t.response; return t.response } ).blockingFirst()
+        HttpResponse response = Flux.from(rxClient.exchange(
+                HttpRequest.GET('/errors/encoding-error')
+        )).onErrorResume(t -> {
+            if (t instanceof HttpClientResponseException) {
+                return Flux.just(((HttpClientResponseException) t).response)
+            }
+            throw t
+        }).blockFirst()
 
         expect:
         response.code() == HttpStatus.INTERNAL_SERVER_ERROR.code
-        response.getBody(JsonError).get().message.contains("Failed to inject value for parameter [prop]")
+        response.header(HttpHeaders.CONTENT_TYPE) == MediaType.APPLICATION_JSON
+        response.getBody(Map).get()._embedded.errors[0].message.contains('foo')
+    }
+
+    @PendingFeature
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/7786')
+    void "test encoding error with handler"() {
+        given:
+        HttpResponse response = Flux.from(rxClient.exchange(
+                HttpRequest.GET('/errors/encoding-error/handled')
+        )).onErrorResume(t -> {
+            if (t instanceof HttpClientResponseException) {
+                return Flux.just(((HttpClientResponseException) t).response)
+            }
+            throw t
+        }).blockFirst()
+
+        expect:
+        response.code() == HttpStatus.INTERNAL_SERVER_ERROR.code
+        response.header(HttpHeaders.CONTENT_TYPE) == MediaType.APPLICATION_JSON
+        response.getBody(Map).get()._embedded.errors[0].message.contains('Server error')
+    }
+
+    void "test encoding error with handler loop"() {
+        given:
+        HttpResponse response = Flux.from(rxClient.exchange(
+                HttpRequest.GET('/errors/encoding-error/handled')
+        )).onErrorResume(t -> {
+            if (t instanceof HttpClientResponseException) {
+                return Flux.just(((HttpClientResponseException) t).response)
+            }
+            throw t
+        }).blockFirst()
+
+        expect:
+        response.code() == HttpStatus.INTERNAL_SERVER_ERROR.code
+        response.header(HttpHeaders.CONTENT_TYPE) == MediaType.APPLICATION_JSON
+        response.getBody(Map).get()._embedded.errors[0].message.contains('foo')
+    }
+
+    void "test calling a controller that fails to inject with a local error handler"() {
+        given:
+        HttpResponse response = Flux.from(rxClient.exchange(
+                HttpRequest.GET('/errors/injection')
+        )).onErrorResume(t -> {
+            if (t instanceof HttpClientResponseException) {
+                return Flux.just(((HttpClientResponseException) t).response)
+            }
+            throw t
+        }).blockFirst()
+
+        expect:
+        response.code() == HttpStatus.INTERNAL_SERVER_ERROR.code
+        response.getBody(Map).get()._embedded.errors[0].message.contains("Failed to inject value for parameter [prop]")
+    }
+
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/6526')
+    def 'test bad request from incorrect use of array'() {
+        when:
+        rxClient.toBlocking().exchange(HttpRequest.POST('/errors/feedBirds', '[ { "name": "eagle" }, { "name": "hen" } ]').contentType(MediaType.APPLICATION_JSON))
+        then:
+        def e = thrown HttpClientResponseException
+        e.status == HttpStatus.BAD_REQUEST
+    }
+
+    @Timeout(5)
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/6925')
+    void "test error for invalid headers with body"() {
+        given:
+        def eventLoopGroup = new NioEventLoopGroup(1)
+        FullHttpResponse response = null
+        Bootstrap bootstrap = new Bootstrap()
+                .group(eventLoopGroup)
+                .channel(NioSocketChannel)
+                .handler(new ChannelInitializer<Channel>() {
+                    @Override
+                    protected void initChannel(@NonNull Channel ch) throws Exception {
+                        ch.pipeline()
+                                .addLast(new HttpResponseDecoder())
+                                .addLast(new HttpObjectAggregator(8192))
+                                .addLast(new ChannelInboundHandlerAdapter() {
+                                    @Override
+                                    void channelRead(@NonNull ChannelHandlerContext ctx, @NonNull Object msg) throws Exception {
+                                        response = msg
+                                    }
+                                })
+                    }
+                })
+                .remoteAddress(embeddedServer.host, embeddedServer.port)
+        def longString = 'a' * 9000
+
+        when:
+        def channel = bootstrap.connect().sync().channel()
+        channel.writeAndFlush(Unpooled.wrappedBuffer("""POST /test HTTP/1.0\r
+Host: localhost\r
+Connection: close\r
+Content-Length: 26\r
+Accept: */*\r
+X-Long-Header: $longString\r
+\r
+{"message":"Hello World!"}""".getBytes(StandardCharsets.UTF_8)))
+        channel.read()
+        channel.closeFuture().await()
+
+        then:
+        response.status().code() == 413
+
+        cleanup:
+        response.release()
     }
 
     @Controller('/errors')
@@ -134,15 +330,70 @@ class ErrorSpec extends AbstractMicronautSpec {
         }
 
         @Get("/io-error")
-        Single<String> ioError() {
-            return Single.create({ emitter ->
-                emitter.onError(new IOException())
+        @SingleResult
+        Publisher<String> ioError() {
+            return Mono.create({ emitter ->
+                emitter.error(new IOException())
             })
         }
 
         @Get("/handler-content-type-error")
         String handlerContentTypeError() {
             throw new ContentTypeExceptionHandlerException()
+        }
+
+        @Post(value = "/feedBirds", processes = MediaType.APPLICATION_JSON)
+        void feedBirds(Flock flock) {
+        }
+
+        @Get('/encoding-error')
+        ErrorThrowingBean encodingError() {
+            return new ErrorThrowingBean()
+        }
+    }
+
+    static class Flock {
+        private Bird[] birds;
+
+        public Bird[] getBirds() { return birds; }
+
+        public void setBirds(Bird[] birds) { this.birds = birds; }
+    }
+
+    static class Bird {
+        private String name;
+
+        public String getName() { return name; }
+
+        public void setName(String name) { this.name = name; }
+    }
+
+    static class ErrorThrowingBean {
+        public String getName() {
+            throw new RuntimeException("foo")
+        }
+    }
+
+    @Controller('/errors/loop')
+    static class ErrorLoopController {
+
+        @Get()
+        String serverError() {
+            throw new LoopingException()
+        }
+
+        @Error(LoopingException)
+        String loop() {
+            throw new LoopingException()
+        }
+    }
+
+    @Controller('/errors/loop/handler')
+    static class ErrorLoopHandlerController {
+
+        @Get()
+        String serverError() {
+            throw new LoopingException()
         }
     }
 
@@ -162,6 +413,32 @@ class ErrorSpec extends AbstractMicronautSpec {
         }
     }
 
+    @Controller('/errors/encoding-error/handled')
+    static class ErrorEncodingHandlerController {
+        @Get
+        ErrorThrowingBean ok() {
+            return new ErrorThrowingBean()
+        }
+
+        @Error
+        HttpResponse<String> error(HttpRequest<?> request, Throwable e) {
+            HttpResponse.serverError("Server error")
+        }
+    }
+
+    @Controller('/errors/encoding-error/handled/loop')
+    static class ErrorEncodingHandlerLoopController {
+        @Get
+        ErrorThrowingBean ok() {
+            return new ErrorThrowingBean()
+        }
+
+        @Error
+        ErrorThrowingBean error(HttpRequest<?> request, Throwable e) {
+            return new ErrorThrowingBean()
+        }
+    }
+
 
     @Produces(value = MediaType.TEXT_HTML)
     @Singleton
@@ -175,4 +452,13 @@ class ErrorSpec extends AbstractMicronautSpec {
 
     static class ContentTypeExceptionHandlerException extends RuntimeException {}
 
+    static class LoopingException extends RuntimeException {}
+
+    @Singleton
+    static class LoopingExceptionHandler implements ExceptionHandler<LoopingException, String> {
+        @Override
+        String handle(HttpRequest request, LoopingException exception) {
+            throw new LoopingException()
+        }
+    }
 }

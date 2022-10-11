@@ -19,7 +19,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.text.SimpleDateFormat
 import java.util.*
-import javax.annotation.PostConstruct
+import jakarta.annotation.PostConstruct
 import jakarta.inject.Inject
 
 class RefreshEventSpec {
@@ -78,7 +78,7 @@ class RefreshEventSpec {
         private var forecast: String? = null
 
         @PostConstruct
-        fun init() {
+        open fun init() {
             forecast = "Scattered Clouds " + SimpleDateFormat("dd/MMM/yy HH:mm:ss.SSS").format(Date())// <2>
         }
 

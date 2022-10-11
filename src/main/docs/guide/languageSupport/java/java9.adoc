@@ -10,10 +10,4 @@ There are some considerations when using Java 9+ with Micronaut.
 If you create your project using the Micronaut CLI, the `javax.annotation` dependency is added to your project automatically if you use Java 9+.
 ====
 
-The `javax.annotation`, which includes `@PostConstruct`, `@PreDestroy`, etc. has been moved from the core JDK to a module. If you run under Java 9+, import the module or add the dependency to your build:
-
-.Adding the `javax.annotation` dependency
-[source,groovy]
-----
-implementation 'javax.annotation:javax.annotation-api:1.3.2'
-----
+The `javax.annotation`, which includes `@PostConstruct`, `@PreDestroy`, etc. has been moved from the core JDK to a module. In general annotations in this package should be avoided and instead the `jakarta.annotation` equivalents used.

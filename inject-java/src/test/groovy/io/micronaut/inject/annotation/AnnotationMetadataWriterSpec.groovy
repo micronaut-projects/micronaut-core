@@ -27,13 +27,17 @@ import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationClassValue
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.AnnotationValue
+import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.annotation.TypeHint
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.inject.BeanDefinition
 import io.micronaut.retry.annotation.Recoverable
 
 import jakarta.inject.Qualifier
 import jakarta.inject.Scope
 import jakarta.inject.Singleton
+import spock.lang.Unroll
+
 import java.lang.annotation.Documented
 import java.lang.annotation.Retention
 
@@ -42,6 +46,66 @@ import java.lang.annotation.Retention
  * @since 1.0
  */
 class AnnotationMetadataWriterSpec extends AbstractTypeElementSpec {
+
+    void "test inner annotations in metadata"() {
+        given:
+        def annotationMetadata = buildTypeAnnotationMetadata("""
+package inneranntest;
+
+import java.lang.annotation.Retention;
+import static java.lang.annotation.RetentionPolicy.*;
+import io.micronaut.inject.annotation.Outer;
+
+@Outer.Inner
+class Test {
+    
+}
+""")
+
+        annotationMetadata = writeAndLoadMetadata('annmetadatatest.Test', annotationMetadata)
+
+        expect:
+        annotationMetadata.hasAnnotation(Outer.Inner)
+        annotationMetadata.hasDeclaredAnnotation(Outer.Inner)
+    }
+
+    @Unroll
+    void "test read/write annotation array type #type"() {
+        given:
+        def annotationMetadata = buildTypeAnnotationMetadata("""
+package annmetadatatest;
+
+import java.lang.annotation.Retention;
+import static java.lang.annotation.RetentionPolicy.*;
+
+@TestAnn(${code})
+class Test {
+}
+
+@interface TestAnn {
+    ${method}[] value();
+}
+""")
+        annotationMetadata = writeAndLoadMetadata('annmetadatatest.Test', annotationMetadata)
+        AnnotationValue<?> av = annotationMetadata.getAnnotation("annmetadatatest.TestAnn")
+
+        expect:
+        av != null
+        av."${method.toLowerCase()}Values"(AnnotationMetadata.VALUE_MEMBER) == val
+
+        where:
+        code                            | val                          | method    | type
+        "{true, false}"                 | [true, false] as boolean[]   | "boolean" | boolean[].class
+        "{1, 2}"                        | [1, 2] as byte[]             | "byte"    | byte[].class
+        "{'a' , 'b'}"                   | ['a', 'b'] as char[]         | "char"    | char[].class
+        "{1.1d, 2.2d}"                  | [1.1d, 2.2d] as double[]     | "double"  | double[].class
+        "{1.1f, 2.2f}"                  | [1.1f, 2.2f] as float[]      | "float"   | float[].class
+        "{10, 20}"                      | [10, 20] as int[]            | "int"     | int[].class
+        "{30, 40}"                      | [30, 40] as long[]           | "long"    | long[].class
+        "{5, 10}"                       | [5, 10] as short[]           | "short"   | short[].class
+        '{"one", "two"}'                | ["one", "two"] as String[]   | "String"  | String[].class
+        '{String.class, Integer.class}' | [String, Integer] as Class[] | "Class"   | Class[].class
+    }
 
     void "test javax nullable on field"() {
         given:
@@ -55,7 +119,6 @@ class Test {
     void testMethod() {}
 }
 ''', 'testMethod')
-
 
 
         expect:
@@ -167,7 +230,7 @@ class Test {
         then:
         metadata != null
         metadata.getValue(Timed, "percentiles", double[].class).get() == [1.1d] as double[]
-        metadata.doubleValue(Timed,"percentiles").asDouble == 1.1d
+        metadata.doubleValue(Timed, "percentiles").asDouble == 1.1d
         metadata.getValue("test.MyAnn", "doubleArray", double[].class).get() == [1.1d] as double[]
     }
 
@@ -495,7 +558,7 @@ interface ITest {
     }
 
     void "test repeatable annotations are combined"() {
-        AnnotationMetadata toWrite = buildMethodAnnotationMetadata('''\
+        BeanDefinition definition = buildBeanDefinition('test.Test', '''\
 package test;
 
 import io.micronaut.inject.annotation.repeatable.*;
@@ -510,13 +573,13 @@ class Test {
     @Property(name="prop2", value="value2")    
     @Property(name="prop3", value="value33")    
     @Property(name="prop4", value="value4")    
+    @io.micronaut.context.annotation.Executable
     void someMethod() {}
 }
-''', 'someMethod')
+''')
 
         when:
-        def className = "test"
-        AnnotationMetadata metadata = writeAndLoadMetadata(className, toWrite)
+        AnnotationMetadata metadata = definition.getRequiredMethod("someMethod").getAnnotationMetadata()
 
         then:
         List<AnnotationValue<Property>> properties = metadata.getAnnotationValuesByType(Property)
@@ -530,6 +593,79 @@ class Test {
         properties[3].get("name", String).get() == "prop1"
         properties[4].get("name", String).get() == "prop3"
         properties[4].getValue(String).get() == "value3"
+    }
+
+    void "test repeatable annotations are combined, lookup by name"() {
+        BeanDefinition definition = buildBeanDefinition('test.Test', '''\
+package test;
+
+import io.micronaut.inject.annotation.repeatable.*;
+import io.micronaut.context.annotation.*;
+
+@Property(name="prop1", value="value1")
+@Property(name="prop2", value="value2")
+@Property(name="prop3", value="value3")
+@jakarta.inject.Singleton
+class Test {
+
+    @Property(name="prop2", value="value2")    
+    @Property(name="prop3", value="value33")    
+    @Property(name="prop4", value="value4")    
+    @io.micronaut.context.annotation.Executable
+    void someMethod() {}
+}
+''')
+
+        when:
+        AnnotationMetadata metadata = definition.getRequiredMethod("someMethod").getAnnotationMetadata()
+
+        then:
+        List<AnnotationValue<?>> properties = metadata.getAnnotationValuesByName(Property.name)
+
+        then:
+        properties.size() == 5
+        properties[0].get("name", String).get() == "prop2"
+        properties[1].get("name", String).get() == "prop3"
+        properties[1].getValue(String).get() == "value33"
+        properties[2].get("name", String).get() == "prop4"
+        properties[3].get("name", String).get() == "prop1"
+        properties[4].get("name", String).get() == "prop3"
+        properties[4].getValue(String).get() == "value3"
+    }
+
+    void "test declared repeatable annotations are combined, lookup by name"() {
+        BeanDefinition definition = buildBeanDefinition('test.Test', '''\
+package test;
+
+import io.micronaut.inject.annotation.repeatable.*;
+import io.micronaut.context.annotation.*;
+
+@Property(name="prop1", value="value1")
+@Property(name="prop2", value="value2")
+@Property(name="prop3", value="value3")
+@jakarta.inject.Singleton
+class Test {
+
+    @Property(name="prop2", value="value2")    
+    @Property(name="prop3", value="value33")    
+    @Property(name="prop4", value="value4")    
+    @io.micronaut.context.annotation.Executable
+    void someMethod() {}
+}
+''')
+
+        when:
+        AnnotationMetadata metadata = definition.getRequiredMethod("someMethod").getAnnotationMetadata()
+
+        then:
+        List<AnnotationValue<?>> properties = metadata.getDeclaredAnnotationValuesByName(Property.name)
+
+        then:
+        properties.size() == 3
+        properties[0].get("name", String).get() == "prop2"
+        properties[1].get("name", String).get() == "prop3"
+        properties[1].getValue(String).get() == "value33"
+        properties[2].get("name", String).get() == "prop4"
     }
 
     void "test annotation metadata string value array types"() {

@@ -17,7 +17,7 @@ package io.micronaut.websocket;
 
 import io.micronaut.http.MediaType;
 import io.micronaut.websocket.exceptions.WebSocketSessionException;
-import io.reactivex.Flowable;
+import reactor.core.publisher.Flux;
 import org.reactivestreams.Publisher;
 
 import java.util.Objects;
@@ -102,7 +102,7 @@ public interface WebSocketBroadcaster {
      */
     default <T> CompletableFuture<T> broadcastAsync(T message, MediaType mediaType, Predicate<WebSocketSession> filter) {
         CompletableFuture<T> future = new CompletableFuture<>();
-        Flowable.fromPublisher(broadcast(message, mediaType, filter)).subscribe(
+        Flux.from(broadcast(message, mediaType, filter)).subscribe(
                 o -> { },
                 future::completeExceptionally,
                 () -> future.complete(message)

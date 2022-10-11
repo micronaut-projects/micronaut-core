@@ -17,13 +17,12 @@ package io.micronaut.context;
 
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.attr.MutableAttributeHolder;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanIdentifier;
 import io.micronaut.inject.validation.BeanDefinitionValidator;
-
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 
 import java.util.Map;
 import java.util.Objects;
@@ -32,7 +31,7 @@ import java.util.Optional;
 /**
  * <p>The core BeanContext abstraction which allows for dependency injection of classes annotated with
  * {@link javax.inject.Inject}.</p>
- * <p>
+ *
  * <p>Apart of the standard {@code javax.inject} annotations for dependency injection, additional annotations within
  * the {@code io.micronaut.context.annotation} package allow control over configuration of the bean context.</p>
  *
@@ -44,9 +43,28 @@ public interface BeanContext extends
         ExecutionHandleLocator,
         BeanLocator,
         BeanDefinitionRegistry,
-        ApplicationEventPublisher,
+        ApplicationEventPublisher<Object>,
         AnnotationMetadataResolver,
         MutableAttributeHolder {
+
+    /**
+     * Obtains the configuration for this context.
+     * @return The {@link io.micronaut.context.BeanContextConfiguration}
+     * @since 3.0.0
+     */
+    @NonNull BeanContextConfiguration getContextConfiguration();
+
+    /**
+     * Obtain an {@link io.micronaut.context.event.ApplicationEventPublisher} for the given even type.
+     * @param eventType The event type
+     * @param <E> The event generic type
+     * @return The event publisher, never {@code null}
+     */
+    @SuppressWarnings("unchecked")
+    default @NonNull <E> ApplicationEventPublisher<E> getEventPublisher(@NonNull Class<E> eventType) {
+        Objects.requireNonNull(eventType, "Event type cannot be null");
+        return getBean(Argument.of(ApplicationEventPublisher.class, eventType));
+    }
 
     /**
      * Inject an existing instance.
@@ -87,10 +105,10 @@ public interface BeanContext extends
 
     /**
      * <p>Creates a new instance of the given bean performing dependency injection and returning a new instance.</p>
-     * <p>
+     *
      * <p>If the bean defines any {@link io.micronaut.context.annotation.Parameter} values then the values passed
      * in the {@code argumentValues} parameter will be used</p>
-     * <p>
+     *
      * <p>Note that the instance returned is not saved as a singleton in the context.</p>
      *
      * @param beanType       The bean type
@@ -104,10 +122,10 @@ public interface BeanContext extends
 
     /**
      * <p>Creates a new instance of the given bean performing dependency injection and returning a new instance.</p>
-     * <p>
+     *
      * <p>If the bean defines any {@link io.micronaut.context.annotation.Parameter} values then the values passed in
      * the {@code argumentValues} parameter will be used</p>
-     * <p>
+     *
      * <p>Note that the instance returned is not saved as a singleton in the context.</p>
      *
      * @param beanType  The bean type
@@ -121,10 +139,10 @@ public interface BeanContext extends
 
     /**
      * <p>Creates a new instance of the given bean performing dependency injection and returning a new instance.</p>
-     * <p>
+     *
      * <p>If the bean defines any {@link io.micronaut.context.annotation.Parameter} values then the values passed in
      * the {@code argumentValues} parameter will be used</p>
-     * <p>
+     *
      * <p>Note that the instance returned is not saved as a singleton in the context.</p>
      *
      * @param beanType The bean type
@@ -139,10 +157,10 @@ public interface BeanContext extends
 
     /**
      * <p>Creates a new instance of the given bean performing dependency injection and returning a new instance.</p>
-     * <p>
+     *
      * <p>If the bean defines any {@link io.micronaut.context.annotation.Parameter} values then the values passed in
      * the {@code argumentValues} parameter will be used</p>
-     * <p>
+     *
      * <p>Note that the instance returned is not saved as a singleton in the context.</p>
      *
      * @param beanType       The bean type
@@ -205,8 +223,18 @@ public interface BeanContext extends
     <T> T destroyBean(@NonNull T bean);
 
     /**
+     * Destroys the given bean.
+     *
+     * @param beanRegistration The bean registration
+     * @param <T>  The bean type
+     * @since 3.5.0
+     */
+    @NonNull
+    <T> void destroyBean(@NonNull BeanRegistration<T> beanRegistration);
+
+    /**
      * <p>Refresh the state of the given registered bean applying dependency injection and configuration wiring again.</p>
-     * <p>
+     *
      * <p>Note that if the bean was produced by a {@link io.micronaut.context.annotation.Factory} then this method will
      * refresh the factory too</p>
      *
@@ -216,6 +244,21 @@ public interface BeanContext extends
      */
     @NonNull
     <T> Optional<T> refreshBean(@Nullable BeanIdentifier identifier);
+
+    /**
+     * <p>Refresh the state of the given registered bean applying dependency injection and configuration wiring again.</p>
+     *
+     * <p>Note that if the bean was produced by a {@link io.micronaut.context.annotation.Factory} then this method will
+     * refresh the factory too</p>
+     *
+     * This methods skips an additional resolution of the {@link BeanRegistration}.
+     *
+     * @param beanRegistration The {@link BeanRegistration}
+     * @param <T>              The concrete class
+     * @since 3.5.0
+     */
+    @NonNull
+    <T> void refreshBean(@NonNull BeanRegistration<T> beanRegistration);
 
     /**
      * @return The class loader used by this context

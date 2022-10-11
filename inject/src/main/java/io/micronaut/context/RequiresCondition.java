@@ -21,6 +21,7 @@ import io.micronaut.context.condition.Condition;
 import io.micronaut.context.condition.ConditionContext;
 import io.micronaut.context.condition.OperatingSystem;
 import io.micronaut.context.condition.TrueCondition;
+import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -77,6 +78,8 @@ public class RequiresCondition implements Condition {
     public static final String MEMBER_MISSING_BEANS = "missingBeans";
     public static final String MEMBER_OS = "os";
     public static final String MEMBER_NOT_OS = "notOs";
+    public static final String MEMBER_BEAN = "bean";
+    public static final String MEMBER_BEAN_PROPERTY = "beanProperty";
 
     private final AnnotationMetadata annotationMetadata;
 
@@ -200,7 +203,7 @@ public class RequiresCondition implements Condition {
     }
 
     /**
-     * This method will run conditions that require all beans to be loaded. These conditions included "beans", "missingBeans" and custom conditions.
+     * This method will run conditions that require all beans to be loaded. These conditions included "beans", "bean", "missingBeans" and custom conditions.
      */
     private void processPostStartRequirements(ConditionContext context, AnnotationValue<Requires> requirements) {
         processPreStartRequirements(context, requirements);
@@ -408,7 +411,7 @@ public class RequiresCondition implements Condition {
                         }
                         return isSupported;
                     case JAVA:
-                        String javaVersion = System.getProperty("java.version");
+                        String javaVersion = CachedEnvironment.getProperty("java.version");
                         try {
                             boolean result = SemanticVersion.isAtLeast(javaVersion, version);
                             if (!result) {
@@ -416,14 +419,20 @@ public class RequiresCondition implements Condition {
                             }
                             return result;
                         } catch (Exception e) {
-                            // non-semantic versioning in play
-                            int majorVersion = resolveJavaMajorVersion(javaVersion);
-                            int requiredVersion = resolveJavaMajorVersion(version);
+                            if (javaVersion != null) {
 
-                            if (majorVersion >= requiredVersion) {
-                                return true;
+                                // non-semantic versioning in play
+                                int majorVersion = resolveJavaMajorVersion(javaVersion);
+                                int requiredVersion = resolveJavaMajorVersion(version);
+
+                                if (majorVersion >= requiredVersion) {
+                                    return true;
+                                } else {
+                                    context.fail("Java major version [" + majorVersion + "] must be at least " + requiredVersion);
+                                }
                             } else {
-                                context.fail("Java major version [" + majorVersion + "] must be at least " + requiredVersion);
+                                int requiredVersion = resolveJavaMajorVersion(version);
+                                context.fail("Java major version must be at least " + requiredVersion);
                             }
                         }
 
@@ -553,8 +562,14 @@ public class RequiresCondition implements Condition {
     }
 
     private boolean matchesPresenceOfBeans(ConditionContext context, AnnotationValue<Requires> requirements) {
-        if (requirements.contains(MEMBER_BEANS)) {
+        if (requirements.contains(MEMBER_BEANS) || requirements.contains(MEMBER_BEAN)) {
             Class[] beans = requirements.classValues(MEMBER_BEANS);
+            if (requirements.contains(MEMBER_BEAN)) {
+                Class<?> memberBean = requirements.classValue(MEMBER_BEAN).orElse(null);
+                if (memberBean != null) {
+                    beans = ArrayUtils.concat(beans, memberBean);
+                }
+            }
             if (ArrayUtils.isNotEmpty(beans)) {
                 BeanContext beanContext = context.getBeanContext();
                 for (Class type : beans) {

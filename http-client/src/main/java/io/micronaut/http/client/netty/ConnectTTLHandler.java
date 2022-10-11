@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client.netty;
 
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.util.AttributeKey;
@@ -54,7 +55,7 @@ public class ConnectTTLHandler extends ChannelDuplexHandler {
     @Override
     public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
         super.handlerAdded(ctx);
-        channelKiller = ctx.channel().eventLoop().schedule(() -> closeChannel(ctx), connectionTtlMillis, TimeUnit.MILLISECONDS);
+        channelKiller = ctx.channel().eventLoop().schedule(() -> markChannelExpired(ctx), connectionTtlMillis, TimeUnit.MILLISECONDS);
     }
 
     /**
@@ -70,9 +71,18 @@ public class ConnectTTLHandler extends ChannelDuplexHandler {
      * Will set RELEASE_CHANNEL as true for the channel attribute when connect-ttl is reached.
      * @param ctx The context to use
      */
-    private void closeChannel(ChannelHandlerContext ctx) {
+    private void markChannelExpired(ChannelHandlerContext ctx) {
         if (ctx.channel().isOpen()) {
             ctx.channel().attr(RELEASE_CHANNEL).set(true);
         }
+    }
+
+    /**
+     * Indicates whether the channels connection ttl has expired.
+     * @param channel The channel to check
+     * @return true if the channels ttl has expired
+     */
+    public static boolean isChannelExpired(Channel channel) {
+        return Boolean.TRUE.equals(channel.attr(ConnectTTLHandler.RELEASE_CHANNEL).get());
     }
 }

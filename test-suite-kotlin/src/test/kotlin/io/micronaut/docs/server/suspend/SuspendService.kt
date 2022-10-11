@@ -1,8 +1,11 @@
 package io.micronaut.docs.server.suspend
 
+import io.micronaut.http.HttpRequest
+import io.micronaut.http.context.ServerRequestContext
 import io.micronaut.retry.annotation.Retryable
 import kotlinx.coroutines.delay
 import jakarta.inject.Singleton
+import kotlin.coroutines.coroutineContext
 
 @Singleton
 open class SuspendService(
@@ -51,5 +54,37 @@ open class SuspendService(
             throw RuntimeException("error $counter4")
         }
         return "${suspendRequestScopedService.requestId},${Thread.currentThread().id}"
+    }
+
+    suspend fun requestContext(): String {
+        delay(1)
+        // called from a suspend controller function
+        val currentRequest = ServerRequestContext.currentRequest<HttpRequest<Any>>().orElseGet {
+            error("Expected a current http server request")
+        }
+        return currentRequest.path
+    }
+
+    suspend fun findMyContextValue(): String? {
+        return coroutineContext[MyContext]?.value
+    }
+
+    @MyContextInterceptorAnn
+    open suspend fun call1(): String? {
+        return findMyContextValue()
+    }
+
+    @MyContextInterceptorAnn
+    open suspend fun call2(): String? {
+        return call1()
+    }
+
+    open suspend fun call3(): String? {
+        return call1()
+    }
+
+    @MyContextInterceptorAnn
+    open suspend fun call4(): String? {
+        return call3()
     }
 }

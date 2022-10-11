@@ -15,12 +15,14 @@
  */
 package io.micronaut.http.client.docs.annotation.headers;
 
+import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Header;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.docs.annotation.Pet;
 import io.micronaut.http.client.docs.annotation.PetOperations;
-import io.reactivex.Single;
+import org.reactivestreams.Publisher;
+import reactor.core.publisher.Mono;
 
 /**
  * @author graemerocher
@@ -28,13 +30,14 @@ import io.reactivex.Single;
  */
 // tag::class[]
 @Client("/pets")
-@Header(name="X-Pet-Client", value="${pet.client.id}")
+@Header(name = "X-Pet-Client", value = "${pet.client.id}")
 public interface PetClient extends PetOperations {
 
     @Override
-    Single<Pet> save(String name, int age);
+    Publisher<Pet> save(String name, int age);
 
     @Get("/{name}")
-    Single<Pet> get(String name);
+    @SingleResult
+    Publisher<Pet> get(String name);
 }
 // end::class[]

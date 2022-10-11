@@ -3,11 +3,13 @@ package io.micronaut.scheduling
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.scheduling.annotation.Scheduled
+import spock.lang.Retry
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
 import java.util.concurrent.atomic.AtomicInteger
 
+@Retry
 class ScheduledCustomExecutorSpec extends Specification {
 
     void "test scheduled with a custom executor"() {
@@ -19,12 +21,12 @@ class ScheduledCustomExecutorSpec extends Specification {
 
         when:
         ScheduledBean bean = ctx.getBean(ScheduledBean)
-        PollingConditions conditions = new PollingConditions(timeout: 10)
+        PollingConditions conditions = new PollingConditions(timeout: 30)
 
         then:
         conditions.eventually {
             bean.ran
-            bean.cronEvents.get() >= 2
+            bean.cronEvents.get() >= 3
         }
     }
 
@@ -40,8 +42,9 @@ class ScheduledCustomExecutorSpec extends Specification {
             ran = true
         }
 
-        @Scheduled(cron = '1/3 0/1 * 1/1 * ?', scheduler = "dispatcher")
-        @Scheduled(cron = '1/4 0/1 * 1/1 * ?', scheduler = "dispatcher")
+        @Scheduled(cron = '1/31 0/1 * 1/1 * ?', scheduler = "dispatcher")
+        @Scheduled(cron = '1/32 0/1 * 1/1 * ?', scheduler = "dispatcher")
+        @Scheduled(cron = '1/33 0/1 * 1/1 * ?', zoneId = "America/Chicago", scheduler = "dispatcher")
         void runCron() {
             cronEvents.incrementAndGet()
         }

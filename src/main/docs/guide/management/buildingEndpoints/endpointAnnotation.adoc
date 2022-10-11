@@ -1,4 +1,4 @@
-An Endpoint can be created by annotating a class with the link:{api}/io/micronaut/management/endpoint/Endpoint.html[Endpoint] annotation, and supplying it with (at minimum) an endpoint id.
+An Endpoint can be created by annotating a class with the link:{api}/io/micronaut/management/endpoint/annotation/Endpoint.html[Endpoint] annotation, and supplying it with (at minimum) an endpoint id.
 
 [source,java]
 .FooEndpoint.java

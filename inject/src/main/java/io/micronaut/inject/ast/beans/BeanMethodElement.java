@@ -17,11 +17,10 @@ package io.micronaut.inject.ast.beans;
 
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.MethodElement;
 
-import javax.annotation.PostConstruct;
-import javax.annotation.PreDestroy;
 import java.util.Objects;
 import java.util.function.Consumer;
 
@@ -32,6 +31,22 @@ import java.util.function.Consumer;
  * @since 3.0.0
  */
 public interface BeanMethodElement extends MethodElement {
+
+    /**
+     * Intercept the method.
+     * @param annotationValue The annotation to intercept
+     * @return This bean method
+     * @since 3.5.2
+     */
+    default @NonNull BeanMethodElement intercept(AnnotationValue<?>... annotationValue) {
+        if (annotationValue != null) {
+            for (AnnotationValue<?> value : annotationValue) {
+                annotate(value);
+            }
+        }
+        return this;
+    }
+
     /**
      * Make the method executable.
      *
@@ -44,16 +59,31 @@ public interface BeanMethodElement extends MethodElement {
     }
 
     /**
+     * Make the method executable.
+     *
+     * @param processOnStartup Whether to process on startup
+     * @return This bean method
+     * @since 3.4.0
+     */
+    default @NonNull
+    BeanMethodElement executable(boolean processOnStartup) {
+        annotate(Executable.class, (builder) ->
+            builder.member("processOnStartup", processOnStartup)
+        );
+        return this;
+    }
+
+    /**
      * Make the method injected.
      *
      * @return This bean method
      */
     default @NonNull
     BeanMethodElement inject() {
-        if (hasAnnotation(PreDestroy.class)) {
+        if (hasAnnotation(AnnotationUtil.PRE_DESTROY)) {
             throw new IllegalStateException("Cannot inject a method annotated with @PreDestroy");
         }
-        if (hasAnnotation(PostConstruct.class)) {
+        if (hasAnnotation(AnnotationUtil.POST_CONSTRUCT)) {
             throw new IllegalStateException("Cannot inject a method annotated with @PostConstruct");
         }
         annotate(AnnotationUtil.INJECT);
@@ -61,7 +91,7 @@ public interface BeanMethodElement extends MethodElement {
     }
 
     /**
-     * Make the method a {@link PreDestroy} hook.
+     * Make the method a {@link jakarta.annotation.PreDestroy} hook.
      *
      * @return This bean method
      */
@@ -70,15 +100,15 @@ public interface BeanMethodElement extends MethodElement {
         if (hasAnnotation(AnnotationUtil.INJECT)) {
             throw new IllegalStateException("Cannot make a method annotated with @Inject a @PreDestroy handler");
         }
-        if (hasAnnotation(PostConstruct.class)) {
+        if (hasAnnotation(AnnotationUtil.POST_CONSTRUCT)) {
             throw new IllegalStateException("Cannot make a method annotated with @PostConstruct a @PreDestroy handler");
         }
-        annotate(PreDestroy.class);
+        annotate(AnnotationUtil.PRE_DESTROY);
         return this;
     }
 
     /**
-     * Make the method a {@link PostConstruct} hook.
+     * Make the method a {@link jakarta.annotation.PostConstruct} hook.
      *
      * @return This bean method
      */
@@ -87,10 +117,10 @@ public interface BeanMethodElement extends MethodElement {
         if (hasAnnotation(AnnotationUtil.INJECT)) {
             throw new IllegalStateException("Cannot make a method annotated with @Inject a @PostConstruct handler");
         }
-        if (hasAnnotation(PreDestroy.class)) {
+        if (hasAnnotation(AnnotationUtil.PRE_DESTROY)) {
             throw new IllegalStateException("Cannot make a method annotated with @PreDestroy a @PostConstruct handler");
         }
-        annotate(PostConstruct.class);
+        annotate(AnnotationUtil.POST_CONSTRUCT);
         return this;
     }
 

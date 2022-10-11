@@ -44,7 +44,7 @@ There are a few exceptions to this rule. Micronaut will not perform configuratio
 
 Once you have prepared a type-safe configuration it can be injected into your beans like any other bean:
 
-snippet::io.micronaut.docs.config.immutable.EngineImpl[tags="class",indent=0,title="@ConfigurationProperties Dependency Injection"]
+snippet::io.micronaut.docs.config.immutable.Engine[tags="class",indent=0,title="@ConfigurationProperties Dependency Injection"]
 
 <1> Inject the `EngineConfig` bean
 <2> Use the configuration properties
@@ -54,3 +54,45 @@ Configuration values can then be supplied when running the application. For exam
 snippet::io.micronaut.docs.config.immutable.VehicleSpec[tags="start",indent=0,title="Supply Configuration"]
 
 The above example prints: `"Ford Engine Starting V8 [rodLength=7B.0]"`
+
+== Customizing accessors
+
+As already explained in <<configurationPropertiesAccessorsStyle, Change accessors style>>, it is also possible to customize the accessors when creating immutable configuration properties:
+
+[source, java]
+----
+import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.core.annotation.AccessorsStyle;
+import io.micronaut.core.bind.annotation.Bindable;
+
+import javax.validation.constraints.Min;
+import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.NotNull;
+import java.util.Optional;
+
+@ConfigurationProperties("my.engine") // <1>
+@AccessorsStyle(readPrefixes = "read") // <2>
+public interface EngineConfigAccessors {
+
+    @Bindable(defaultValue = "Ford")
+    @NotBlank
+    String readManufacturer(); // <3>
+
+    @Min(1L)
+    int readCylinders(); // <3>
+
+    @NotNull
+    CrankShaft readCrankShaft(); // <3>
+
+    @ConfigurationProperties("crank-shaft")
+    @AccessorsStyle(readPrefixes = "read") // <4>
+    interface CrankShaft {
+        Optional<Double> readRodLength(); // <5>
+    }
+}
+----
+<1> The ann:context.annotation.ConfigurationProperties[] annotation takes the configuration prefix and is declared on an interface
+<2> The ann:core.annotation.AccessorsStyle[] annotation defines the `readPrefixes` as `read`.
+<3> The getters are all prefixed with `read`.
+<4> Nested immutable configuration can also be annotated with ann:context.annotation.ConfigurationProperties[].
+<5> The getter is prefixed with `read`.

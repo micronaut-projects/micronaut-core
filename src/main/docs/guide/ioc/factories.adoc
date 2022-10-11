@@ -2,6 +2,8 @@ In many cases, you may want to make available as a bean a class that is not part
 
 A factory is a class annotated with the link:{api}/io/micronaut/context/annotation/Factory.html[Factory] annotation that provides one or more methods annotated with a bean scope annotation. Which annotation you use depends on what scope you want the bean to be in. See the section on <<scopes, bean scopes>> for more information.
 
+NOTE: The factory has the default scope singleton and will be destroyed with the context. If you want to dispose the factory after it produces a bean, use @Prototype scope.
+
 The return types of methods annotated with a bean scope annotation are the bean types. This is best illustrated by an example:
 
 snippet::io.micronaut.docs.factories.CrankShaft,io.micronaut.docs.factories.V8Engine,io.micronaut.docs.factories.EngineFactory[tags="class",indent=0]
@@ -13,6 +15,45 @@ A factory can have multiple methods annotated with bean scope annotations, each 
 NOTE: If you take this approach you should not invoke other bean methods internally within the class. Instead, inject the types via parameters.
 
 TIP: To allow the resulting bean to participate in the application context shutdown process, annotate the method with link:{api}/io/micronaut/context/annotation/Bean.html[@Bean] and set the `preDestroy` argument to the name of the method to be called to close the bean.
+
+=== Beans from Fields
+
+With Micronaut 3.0 or above it is also possible to produce beans from fields by declaring the ann:context.annotation.Bean[] annotation on a field.
+
+Whilst generally this approach should be discouraged in favour for factory methods, which provide more flexibility it does simplify testing code. For example with bean fields you can easily produce mocks in your test code:
+
+snippet::io.micronaut.docs.factories.VehicleMockSpec[tags="imports, class",indent=0]
+
+<1> A bean is defined from a field that replaces the existing `Engine`.
+<2> The `Vehicle` is injected.
+<3> The code asserts that the mock implementation is called.
+
+Note that only public or package protected fields are supported on non-primitive types. If the field is `static`, `private`, or `protected` a compilation error will occur.
+
+NOTE: If the bean method/field includes a scope or a qualifier any scope or qualifiers from the type will be omitted.
+
+NOTE: Qualifiers from the factory instance aren't inherited to the beans.
+
+==== Primitive Beans and Arrays
+
+Since Micronaut 3.1 it is possible to define and inject primitive types and array types from factories.
+
+For example:
+
+snippet::io.micronaut.docs.factories.primitive.CylinderFactory[tags="imports, class",indent=0]
+
+<1> Two primitive integer beans are defined with different names
+
+Primitive beans can be injected like any other bean:
+
+snippet::io.micronaut.docs.factories.primitive.V8Engine[tags="imports, class",indent=0]
+
+Note that primitive beans and primitive array beans have the following limitations:
+
+* <<aop, AOP advice>> cannot be applied to primitives or wrapper types
+* Due to the above custom scopes that proxy are not supported
+* The `@Bean(preDestroy=..)` member is not supported
+
 
 === Programmatically Disabling Beans
 
@@ -45,17 +86,3 @@ snippet::io.micronaut.docs.injectionpoint.EngineFactory[tags="class",indent=0]
 <3> The value is used to construct an engine, throwing an exception if an engine cannot be constructed.
 
 NOTE: It is important to note that the factory is declared as ann:context.annotation.Prototype[] scope so the method is invoked for each injection point. If the `V8Engine` and `V6Engine` types are required to be singletons, the factory should use a Map to ensure the objects are only constructed once.
-
-=== Beans from Fields
-
-With Micronaut 3.0 or above it is also possible to produce beans from fields by declaring the ann:context.annotation.Bean[] annotation on a field.
-
-Whilst generally this approach should be discouraged in favour for factory methods, which provide more flexibility it does simplify testing code. For example with bean fields you can easily produce mocks in your test code:
-
-snippet::io.micronaut.docs.factories.VehicleMockSpec[tags="imports, class",indent=0]
-
-<1> A bean is defined from a field that replaces the existing `Engine`.
-<2> The `Vehicle` is injected.
-<3> The code asserts that the mock implementation is called.
-
-Note that only public or package protected fields are supported on non-primitive types. If the field is `static`, `private`, or `protected` a compilation error will occur.

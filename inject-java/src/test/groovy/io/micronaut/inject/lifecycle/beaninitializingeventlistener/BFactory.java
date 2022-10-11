@@ -17,7 +17,7 @@ package io.micronaut.inject.lifecycle.beaninitializingeventlistener;
 
 import io.micronaut.context.annotation.Factory;
 
-import javax.annotation.PostConstruct;
+import jakarta.annotation.PostConstruct;
 import jakarta.inject.Inject;
 import jakarta.inject.Provider;
 import jakarta.inject.Singleton;

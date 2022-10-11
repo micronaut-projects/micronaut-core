@@ -18,13 +18,15 @@ package io.micronaut.http.client.aop
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpResponse
+import io.micronaut.http.HttpVersion
 import io.micronaut.http.MediaType
 import io.micronaut.http.MutableHttpRequest
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Filter
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Header
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.HttpClient
+import io.micronaut.http.client.HttpClientRegistry
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.filter.ClientFilterChain
 import io.micronaut.http.filter.HttpClientFilter
@@ -40,13 +42,11 @@ import spock.lang.Specification
  */
 class ClientFilterSpec extends Specification{
 
-    @Shared
     @AutoCleanup
     ApplicationContext context = ApplicationContext.run([
             'spec.name': 'ClientFilterSpec',
     ])
 
-    @Shared
     EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
     void "test client filter includes header"() {
@@ -59,13 +59,46 @@ class ClientFilterSpec extends Specification{
 
     void "test a client with no service ids doesn't match a filter with a service id"() {
         given:
-        RxHttpClient client = context.createBean(RxHttpClient, embeddedServer.getURL())
+        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
 
         when:
         HttpResponse<String> response = client.toBlocking().exchange("/filters/name", String.class)
 
         then:
         response.body() == 'Fred'
+
+        cleanup:
+        client.close()
+    }
+
+    void "test a client doesn't match a filter with an excluded service id"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.builder([
+                'spec.name': 'ClientFilterSpec',
+                'micronaut.http.services.my-service.url': embeddedServer.getURL().toString()
+        ]).start()
+        HttpClient client = ctx.getBean(HttpClientRegistry).getClient(HttpVersion.HTTP_1_1, "my-service", null)
+
+        when:
+        HttpResponse<String> response = client.toBlocking().exchange("/excluded-filters/name", String.class)
+
+        then:
+        response.body() == 'Flintstone'
+
+        cleanup:
+        ctx.close()
+    }
+
+    void "test a client filter that throws an exception"() {
+        given:
+        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
+
+        when:
+        HttpResponse<String> response = client.toBlocking().exchange("/filter-exception/name", String.class)
+
+        then:
+        def ex = thrown(RuntimeException)
+        ex.message == "from filter"
 
         cleanup:
         client.close()
@@ -95,12 +128,17 @@ class ClientFilterSpec extends Specification{
     }
 
     @Requires(property = 'spec.name', value = "ClientFilterSpec")
-    @Controller('/filters')
+    @Controller
     static class TestController {
 
-        @Get(value = '/name', produces = MediaType.TEXT_PLAIN)
+        @Get(value = '/filters/name', produces = MediaType.TEXT_PLAIN)
         String name(@Header('X-Auth-Username') String username, @Header('X-Auth-Lastname') Optional<String> lastname) {
             return username + lastname.orElse('')
+        }
+
+        @Get(value = '/excluded-filters/name', produces = MediaType.TEXT_PLAIN)
+        String nameExcluded(@Header('X-Auth-Lastname') Optional<String> lastname) {
+            return lastname.orElse('')
         }
     }
 
@@ -173,6 +211,30 @@ class ClientFilterSpec extends Specification{
         }
     }
 
+    // this filter should match the test
+    @Requires(property = 'spec.name', value = "ClientFilterSpec")
+    @Filter(patterns = '/excluded-filters/**', excludeServiceId = 'otherClient')
+    static class Filter2 implements HttpClientFilter {
+
+        @Override
+        Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> request, ClientFilterChain chain) {
+            request.header("X-Auth-Lastname", "Flintstone")
+            return chain.proceed(request)
+        }
+    }
+
+    // this filter should not match the test
+    @Requires(property = 'spec.name', value = "ClientFilterSpec")
+    @Filter(patterns = '/excluded-filters/**', excludeServiceId = 'my-service')
+    static class Filter3 implements HttpClientFilter {
+
+        @Override
+        Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> request, ClientFilterChain chain) {
+            request.header("X-Auth-Lastname", "Fred")
+            return chain.proceed(request)
+        }
+    }
+
     // this filter should not match the test
     @Filter(serviceId = 'myClient')
     static class MyClientFilter implements HttpClientFilter {
@@ -192,6 +254,17 @@ class ClientFilterSpec extends Specification{
         Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> request, ClientFilterChain chain) {
             request.header("X-Root-Filter", "processed")
             return chain.proceed(request)
+        }
+    }
+
+    // this filter should not match the test
+    @Requires(property = 'spec.name', value = "ClientFilterSpec")
+    @Filter('/filter-exception/**')
+    static class ThrowingFilter implements HttpClientFilter {
+
+        @Override
+        Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> request, ClientFilterChain chain) {
+            throw new RuntimeException("from filter")
         }
     }
 }

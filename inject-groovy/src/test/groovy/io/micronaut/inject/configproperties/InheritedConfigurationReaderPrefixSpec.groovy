@@ -21,7 +21,6 @@ import io.micronaut.inject.BeanDefinition
 
 class InheritedConfigurationReaderPrefixSpec extends AbstractBeanDefinitionSpec {
 
-
     void "test property paths are correct"() {
         given:
         BeanDefinition beanDefinition = buildBeanDefinition('io.micronaut.inject.configproperties.MyBean', '''

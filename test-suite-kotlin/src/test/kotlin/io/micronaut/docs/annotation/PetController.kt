@@ -17,19 +17,22 @@ package io.micronaut.docs.annotation
 
 // tag::imports[]
 import io.micronaut.http.annotation.Controller
-import io.reactivex.Single
+import reactor.core.publisher.Mono
+import io.micronaut.core.async.annotation.SingleResult
+import org.reactivestreams.Publisher
 // end::imports[]
 
 // tag::class[]
 @Controller("/pets")
 open class PetController : PetOperations {
 
-    override fun save(name: String, age: Int): Single<Pet> {
+    @SingleResult
+    override fun save(name: String, age: Int): Publisher<Pet> {
         val pet = Pet()
         pet.name = name
         pet.age = age
         // save to database or something
-        return Single.just(pet)
+        return Mono.just(pet)
     }
 }
 // end::class[]

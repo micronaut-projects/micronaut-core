@@ -33,4 +33,20 @@ class ReflectionUtilsSpec extends Specification {
         "size"               | true
         "noField"            | false
     }
+
+    void "test set field"() {
+        given:
+        def f = ReflectionUtils.getRequiredField(Foo, "bar")
+        def foo = new Foo()
+
+        when:
+        ReflectionUtils.setField(f, foo, "test")
+
+        then:
+        foo.bar == 'test'
+    }
+
+    class Foo {
+        String bar
+    }
 }

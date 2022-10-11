@@ -80,9 +80,14 @@ final class PropertiesLoggingLevelsConfigurer implements ApplicationEventListene
     }
 
     private void configureLogLevels() {
-        Map<String, Object> properties = new HashMap<>(environment.getProperties(LOGGER_LEVELS_PROPERTY_PREFIX));
         // Using raw keys here allows configuring log levels for camelCase package names in application.yml
-        properties.putAll(environment.getProperties(LOGGER_LEVELS_PROPERTY_PREFIX, StringConvention.RAW));
+        final Map<String, Object> rawProperties = environment.getProperties(LOGGER_LEVELS_PROPERTY_PREFIX, StringConvention.RAW);
+        // Adding the generated properties allows environment variables and system properties to override names in application.yaml
+        final Map<String, Object> generatedProperties = environment.getProperties(LOGGER_LEVELS_PROPERTY_PREFIX);
+
+        final Map<String, Object> properties = new HashMap<>(generatedProperties.size() + rawProperties.size(), 1f);
+        properties.putAll(rawProperties);
+        properties.putAll(generatedProperties);
         properties.forEach(this::configureLogLevelForPrefix);
     }
 

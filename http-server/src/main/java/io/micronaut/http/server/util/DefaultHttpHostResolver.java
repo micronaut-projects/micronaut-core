@@ -121,7 +121,11 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
 
         URI uri = request.getUri();
         if (uri.getHost() != null) {
-            return createHost(uri.getScheme(), uri.getHost(), uri.getPort());
+            Integer port = uri.getPort();
+            if (port < 0) {
+                port = null;
+            }
+            return createHost(uri.getScheme(), uri.getHost(), port);
         }
 
         return getEmbeddedHost();

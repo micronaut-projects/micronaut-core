@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.codec;
 
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.MediaType;
 
 import java.util.Arrays;
@@ -65,7 +66,7 @@ public class DefaultMediaTypeCodecRegistry implements MediaTypeCodecRegistry {
     }
 
     @Override
-    public Optional<MediaTypeCodec> findCodec(MediaType mediaType) {
+    public Optional<MediaTypeCodec> findCodec(@Nullable MediaType mediaType) {
         if (mediaType == null) {
             return Optional.empty();
         }
@@ -77,7 +78,7 @@ public class DefaultMediaTypeCodecRegistry implements MediaTypeCodecRegistry {
     }
 
     @Override
-    public Optional<MediaTypeCodec> findCodec(MediaType mediaType, Class<?> type) {
+    public Optional<MediaTypeCodec> findCodec(@Nullable MediaType mediaType, Class<?> type) {
         Optional<MediaTypeCodec> codec = findCodec(mediaType);
         if (codec.isPresent()) {
             MediaTypeCodec mediaTypeCodec = codec.get();

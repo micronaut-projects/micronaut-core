@@ -17,6 +17,8 @@ package io.micronaut.core.convert;
 
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.convert.converters.MultiValuesConverterFactory;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.convert.format.Format;
 import io.micronaut.core.convert.format.FormattingTypeConverter;
@@ -25,6 +27,7 @@ import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.convert.value.ConvertibleValuesMap;
 import io.micronaut.core.io.IOUtils;
 import io.micronaut.core.io.buffer.ReferenceCounted;
+import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -55,7 +58,24 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Currency;
+import java.util.Date;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.OptionalInt;
+import java.util.OptionalLong;
+import java.util.Properties;
+import java.util.StringJoiner;
+import java.util.TimeZone;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
@@ -175,33 +195,41 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         return this;
     }
 
+
+    /**
+     * Reset internal state.
+     *
+     * @since 3.5.3
+     */
+    @Internal
+    public void reset() {
+        typeConverters.clear();
+        converterCache.clear();
+        registerDefaultConverters();
+    }
+
     /**
      * Default Converters.
      */
     @SuppressWarnings({"OptionalIsPresent", "unchecked"})
     protected void registerDefaultConverters() {
-
+        // primitive array to wrapper array
+        @SuppressWarnings("rawtypes")
+        Function primitiveArrayToWrapperArray = ArrayUtils::toWrapperArray;
+        addConverter(double[].class, Double[].class, primitiveArrayToWrapperArray);
+        addConverter(byte[].class, Byte[].class, primitiveArrayToWrapperArray);
+        addConverter(short[].class, Short[].class, primitiveArrayToWrapperArray);
+        addConverter(boolean[].class, Boolean[].class, primitiveArrayToWrapperArray);
+        addConverter(int[].class, Integer[].class, primitiveArrayToWrapperArray);
+        addConverter(float[].class, Float[].class, primitiveArrayToWrapperArray);
+        addConverter(double[].class, Double[].class, primitiveArrayToWrapperArray);
+        addConverter(char[].class, Character[].class, primitiveArrayToWrapperArray);
         // wrapper to primitive array converters
-        addConverter(Double[].class, double[].class, (object, targetType, context) -> {
-            double[] doubles = new double[object.length];
-            for (int i = 0; i < object.length; i++) {
-                Double aDouble = object[i];
-                if (aDouble != null) {
-                    doubles[i] = aDouble;
-                }
-            }
-            return Optional.of(doubles);
-        });
-        addConverter(Integer[].class, int[].class, (object, targetType, context) -> {
-            int[] integers = new int[object.length];
-            for (int i = 0; i < object.length; i++) {
-                Integer o = object[i];
-                if (o != null) {
-                    integers[i] = o;
-                }
-            }
-            return Optional.of(integers);
-        });
+        Function<Object[], Object> wrapperArrayToPrimitiveArray = ArrayUtils::toPrimitiveArray;
+        //noinspection rawtypes
+        addConverter(Double[].class, double[].class, (Function) wrapperArrayToPrimitiveArray);
+        //noinspection rawtypes
+        addConverter(Integer[].class, int[].class, (Function) wrapperArrayToPrimitiveArray);
 
         // Object -> List
         addConverter(Object.class, List.class, (object, targetType, context) -> {
@@ -548,7 +576,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         });
 
         // String -> Locale
-        addConverter(CharSequence.class, Locale.class, (object) -> StringUtils.parseLocale(object.toString()));
+        addConverter(CharSequence.class, Locale.class, object -> StringUtils.parseLocale(object.toString()));
 
         // String -> UUID
         addConverter(CharSequence.class, UUID.class, (CharSequence object, Class<UUID> targetType, ConversionContext context) -> {
@@ -645,9 +673,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         });
 
         // String -> Char Array
-        addConverter(String.class, char[].class, (String object, Class<char[]> targetType, ConversionContext context) -> {
-            return Optional.of(object.toCharArray());
-        });
+        addConverter(String.class, char[].class, (String object, Class<char[]> targetType, ConversionContext context) -> Optional.of(object.toCharArray()));
 
         // Object[] -> String[]
         addConverter(Object[].class, String[].class, (Object[] object, Class<String[]> targetType, ConversionContext context) -> {
@@ -915,6 +941,29 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             return Optional.of(result);
         });
 
+        // ConvertibleMultiValues -> [?]
+        addConverter(io.micronaut.core.convert.value.ConvertibleMultiValues.class, Iterable.class,
+                new MultiValuesConverterFactory.MultiValuesToIterableConverter(this));
+        addConverter(io.micronaut.core.convert.value.ConvertibleMultiValues.class, Map.class,
+                new MultiValuesConverterFactory.MultiValuesToMapConverter(this));
+        addConverter(io.micronaut.core.convert.value.ConvertibleMultiValues.class, Object.class,
+                new MultiValuesConverterFactory.MultiValuesToObjectConverter(this));
+
+        // [?] -> ConvertibleMultiValues
+        addConverter(Iterable.class, io.micronaut.core.convert.value.ConvertibleMultiValues.class,
+                new MultiValuesConverterFactory.IterableToMultiValuesConverter(this));
+        addConverter(Map.class, io.micronaut.core.convert.value.ConvertibleMultiValues.class,
+                new MultiValuesConverterFactory.MapToMultiValuesConverter(this));
+        addConverter(Object.class, io.micronaut.core.convert.value.ConvertibleMultiValues.class,
+                new MultiValuesConverterFactory.ObjectToMultiValuesConverter(this));
+
+        Collection<TypeConverterRegistrar> registrars = new ArrayList<>();
+        SoftServiceLoader.load(TypeConverterRegistrar.class)
+            .disableFork()
+            .collectAll(registrars);
+        for (TypeConverterRegistrar registrar : registrars) {
+            registrar.register(this);
+        }
     }
 
     /**

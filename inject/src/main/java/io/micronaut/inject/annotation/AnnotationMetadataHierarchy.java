@@ -16,6 +16,7 @@
 package io.micronaut.inject.annotation;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -23,8 +24,10 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.value.OptionalValues;
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Array;
 import java.util.*;
 import java.util.function.Function;
+import java.util.stream.Stream;
 
 /**
  * Used to represent an annotation metadata hierarchy. The first {@link AnnotationMetadata} instance passed
@@ -103,6 +106,7 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
      * @return The metadata that is actually declared in the element
      */
     @NonNull
+    @Override
     public AnnotationMetadata getDeclaredMetadata() {
         return hierarchy[0];
     }
@@ -139,6 +143,41 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
             }
         }
         return null;
+    }
+
+    @Override
+    public Annotation[] synthesizeAll() {
+        return Stream.of(hierarchy).flatMap(am -> Arrays.stream(am.synthesizeAll())).toArray(Annotation[]::new);
+    }
+
+    @Override
+    public Annotation[] synthesizeDeclared() {
+        return Stream.of(hierarchy).flatMap(am -> Arrays.stream(am.synthesizeDeclared())).toArray(Annotation[]::new);
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public <T extends Annotation> T[] synthesizeAnnotationsByType(Class<T> annotationClass) {
+        if (annotationClass == null) {
+            return (T[]) AnnotationUtil.ZERO_ANNOTATIONS;
+        }
+        return Stream.of(hierarchy)
+                .flatMap(am -> am.getAnnotationValuesByType(annotationClass).stream())
+                .distinct()
+                .map(entries -> AnnotationMetadataSupport.buildAnnotation(annotationClass, entries))
+                        .toArray(value -> (T[]) Array.newInstance(annotationClass, value));
+    }
+
+    @SuppressWarnings("unchecked")
+    public <T extends Annotation> T[] synthesizeDeclaredAnnotationsByType(Class<T> annotationClass) {
+        if (annotationClass == null) {
+            return (T[]) AnnotationUtil.ZERO_ANNOTATIONS;
+        }
+        return Stream.of(hierarchy)
+                .flatMap(am -> am.getAnnotationValuesByType(annotationClass).stream())
+                .distinct()
+                .map(entries -> AnnotationMetadataSupport.buildAnnotation(annotationClass, entries))
+                .toArray(value -> (T[]) Array.newInstance(annotationClass, value));
     }
 
     @Nullable
@@ -336,6 +375,15 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
         return list;
     }
 
+    @Override
+    public <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByStereotype(String stereotype) {
+        List<AnnotationValue<T>> list = new ArrayList<>();
+        for (AnnotationMetadata am : hierarchy) {
+            list.addAll(am.getAnnotationValuesByStereotype(stereotype));
+        }
+        return list;
+    }
+
     @NonNull
     @Override
     public Set<String> getDeclaredAnnotationNames() {
@@ -378,8 +426,8 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     @NonNull
     @Override
     public <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByType(@NonNull Class<T> annotationType) {
-        List<AnnotationValue<T>> list = new ArrayList<>();
-        Set<AnnotationValue<T>> uniqueValues = new HashSet<>();
+        List<AnnotationValue<T>> list = new ArrayList<>(10);
+        Set<AnnotationValue<T>> uniqueValues = new HashSet<>(10);
         for (AnnotationMetadata am : hierarchy) {
             for (AnnotationValue<T> tAnnotationValue : am.getAnnotationValuesByType(annotationType)) {
                 if (uniqueValues.add(tAnnotationValue)) {
@@ -390,10 +438,32 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
         return list;
     }
 
+    @Override
+    public <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByName(String annotationType) {
+        if (annotationType == null) {
+            return Collections.emptyList();
+        }
+        List<AnnotationValue<T>> list = new ArrayList<>(10);
+        Set<AnnotationValue<T>> uniqueValues = new HashSet<>(10);
+        for (AnnotationMetadata am : hierarchy) {
+            for (AnnotationValue<T> tAnnotationValue : am.<T>getAnnotationValuesByName(annotationType)) {
+                if (uniqueValues.add(tAnnotationValue)) {
+                    list.add(tAnnotationValue);
+                }
+            }
+        }
+        return Collections.unmodifiableList(list);
+    }
+
     @NonNull
     @Override
     public <T extends Annotation> List<AnnotationValue<T>> getDeclaredAnnotationValuesByType(@NonNull Class<T> annotationType) {
         return hierarchy[0].getDeclaredAnnotationValuesByType(annotationType);
+    }
+
+    @Override
+    public <T extends Annotation> List<AnnotationValue<T>> getDeclaredAnnotationValuesByName(String annotationType) {
+        return hierarchy[0].getDeclaredAnnotationValuesByName(annotationType);
     }
 
     @Override
@@ -829,6 +899,58 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
             final Optional<Class<? extends Annotation>> annotationType = annotationTypeSupplier.apply(metadata);
             if (annotationType.isPresent()) {
                 return annotationType;
+            }
+        }
+        return Optional.empty();
+    }
+
+    @Override
+    public boolean isEmpty() {
+        for (AnnotationMetadata metadata : hierarchy) {
+            if (!metadata.isEmpty()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    @Override
+    public boolean isRepeatableAnnotation(Class<? extends Annotation> annotation) {
+        for (AnnotationMetadata metadata : hierarchy) {
+            if (metadata.isRepeatableAnnotation(annotation)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public boolean isRepeatableAnnotation(String annotation) {
+        for (AnnotationMetadata metadata : hierarchy) {
+            if (metadata.isRepeatableAnnotation(annotation)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public Optional<String> findRepeatableAnnotation(Class<? extends Annotation> annotation) {
+        for (AnnotationMetadata metadata : hierarchy) {
+            Optional<String> repeatable = metadata.findRepeatableAnnotation(annotation);
+            if (repeatable.isPresent()) {
+                return repeatable;
+            }
+        }
+        return Optional.empty();
+    }
+
+    @Override
+    public Optional<String> findRepeatableAnnotation(String annotation) {
+        for (AnnotationMetadata metadata : hierarchy) {
+            Optional<String> repeatable = metadata.findRepeatableAnnotation(annotation);
+            if (repeatable.isPresent()) {
+                return repeatable;
             }
         }
         return Optional.empty();

@@ -35,9 +35,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * <p>A Fast Implementation of URI Template specification. See https://tools.ietf.org/html/rfc6570 and
- * https://medialize.github.io/URI.js/uri-template.html.</p>
- * <p>
+ * <p>A Fast Implementation of URI Template specification. See <a href="https://tools.ietf.org/html/rfc6570">rfc6570</a> and
+ * <a href="https://medialize.github.io/URI.js/uri-template.html">URI.js</a>.</p>
+ *
  * <p>Note: this class has a natural ordering that is inconsistent with equals.</p>
  *
  * @author Graeme Rocher
@@ -632,6 +632,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
                         if (c == ' ') {
                             continue;
                         }
+                        // fall through
                     case STATE_VAR_NEXT:
                     case STATE_VAR_CONTENT:
                         switch (c) {
@@ -646,6 +647,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
                                 continue;
                             case ',': // arrived to new variable
                                 state = STATE_VAR_NEXT;
+                                // fall through
                             case VAR_END: // arrived to variable end
 
                                 if (buff.length() > 0) {
@@ -751,6 +753,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
                             case AND_OPERATOR:
                             case HASH_OPERATOR:
                                 isQuerySegment = true;
+                                // fall through
                             case '+':
                             case DOT_OPERATOR:
                             case SLASH_OPERATOR:
@@ -760,6 +763,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
                             default:
                                 state = STATE_VAR_CONTENT;
                                 buff.append(c);
+                                continue;
                         }
                     default:
                         // no-op
@@ -1051,6 +1055,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
                                     finalResult.append(prefixToUse.substring(0, prefixToUse.length() - 1)).append(result);
                                     break;
                                 }
+                                // fall through
                             default:
                                 if (prefixToUse != null) {
                                     finalResult.append(prefixToUse).append(result);

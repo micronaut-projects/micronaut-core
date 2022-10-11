@@ -25,6 +25,7 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.context.ServerContextPathProvider;
+import io.micronaut.http.filter.FilterPatternStyle;
 import io.micronaut.http.filter.HttpClientFilter;
 import io.micronaut.http.filter.HttpFilter;
 import io.micronaut.inject.BeanDefinition;
@@ -71,6 +72,8 @@ public class AnnotatedFilterRouteBuilder extends DefaultRouteBuilder implements 
         String[] patterns = getPatterns(beanDefinition);
         if (ArrayUtils.isNotEmpty(patterns)) {
             HttpMethod[] methods = beanDefinition.enumValues(Filter.class, "methods", HttpMethod.class);
+            FilterPatternStyle patternStyle = beanDefinition.enumValue(Filter.class, "patternStyle",
+                FilterPatternStyle.class).orElse(FilterPatternStyle.ANT);
             String first = patterns[0];
             @SuppressWarnings("unchecked")
             FilterRoute filterRoute = addFilter(first, beanContext, (BeanDefinition<? extends HttpFilter>) beanDefinition);
@@ -83,6 +86,7 @@ public class AnnotatedFilterRouteBuilder extends DefaultRouteBuilder implements 
             if (ArrayUtils.isNotEmpty(methods)) {
                 filterRoute.methods(methods);
             }
+            filterRoute.patternStyle(patternStyle);
         }
     }
 

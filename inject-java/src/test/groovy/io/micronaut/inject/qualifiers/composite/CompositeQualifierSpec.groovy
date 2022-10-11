@@ -37,5 +37,16 @@ class CompositeQualifierSpec extends Specification {
         context.close()
     }
 
+    void 'test composite qualifier contains'() {
+        when:
+            Qualifier all = Qualifiers.byQualifiers(Qualifiers.byType(Runnable), Qualifiers.byName('thread'))
+            Qualifier single = Qualifiers.byName('thread')
+            Qualifier subset = Qualifiers.byQualifiers(single)
+        then:
+            all.contains(subset)
+            all.contains(single)
+            all.contains(Qualifiers.byQualifiers(all, single, subset, Qualifiers.byQualifiers(all, single, subset)))
+    }
+
 }
 

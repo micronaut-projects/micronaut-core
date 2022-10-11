@@ -21,7 +21,6 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.client.HttpClient;
-import io.micronaut.http.client.RxHttpClient;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.junit.AfterClass;
@@ -49,9 +48,7 @@ public class BindHttpClientExceptionBodySpec {
         map.put("spec.lang", "java");
 
         server = ApplicationContext.run(EmbeddedServer.class, map, Environment.TEST);
-        client = server
-                .getApplicationContext()
-                .createBean(RxHttpClient.class, server.getURL());
+        client = server.getApplicationContext().createBean(HttpClient.class, server.getURL());
     }
 
     @AfterClass

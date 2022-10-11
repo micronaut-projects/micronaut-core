@@ -169,6 +169,11 @@ public abstract class AbstractBeanIntrospection<T> implements BeanIntrospection<
         return Optional.ofNullable(beanProperties.get(name));
     }
 
+    @Override
+    public int propertyIndexOf(String name) {
+        return new ArrayList<>(beanProperties.keySet()).indexOf(name);
+    }
+
     @NonNull
     @Override
     public Collection<BeanProperty<T, Object>> getIndexedProperties(@NonNull Class<? extends Annotation> annotationType) {
@@ -282,7 +287,7 @@ public abstract class AbstractBeanIntrospection<T> implements BeanIntrospection<
     protected final void indexProperty(
             @NonNull Class<? extends Annotation> annotationType,
             @NonNull String propertyName,
-            @NonNull String annotationValue) {
+            @Nullable String annotationValue) {
         indexProperty(annotationType, propertyName);
         if (StringUtils.isNotEmpty(annotationValue) && StringUtils.isNotEmpty(propertyName)) {
             if (indexedValues == null) {

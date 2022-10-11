@@ -27,13 +27,12 @@ import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.context.scope.BeanCreationContext;
 import io.micronaut.context.scope.CreatedBean;
 import io.micronaut.context.scope.CustomScope;
+import io.micronaut.core.order.Ordered;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.context.scope.Refreshable;
-import io.micronaut.scheduling.TaskExecutors;
-import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 
 import java.util.Collection;
@@ -42,7 +41,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.Executor;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -57,20 +55,19 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  */
 @Singleton
 @Requires(notEnv = {Environment.FUNCTION, Environment.ANDROID})
-public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<RefreshScope>, ApplicationEventListener<RefreshEvent> {
+public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<RefreshScope>, ApplicationEventListener<RefreshEvent>, Ordered {
+
+    public static final int POSITION = RefreshEventListener.DEFAULT_POSITION - 100;
 
     private final Map<BeanIdentifier, CreatedBean<?>> refreshableBeans = new ConcurrentHashMap<>(10);
     private final ConcurrentMap<Object, ReadWriteLock> locks = new ConcurrentHashMap<>();
     private final BeanContext beanContext;
-    private final Executor executorService;
 
     /**
      * @param beanContext     The bean context to allow DI of beans annotated with @Inject
-     * @param executorService The executor service
      */
-    public RefreshScope(BeanContext beanContext, @Named(TaskExecutors.IO) Executor executorService) {
+    public RefreshScope(BeanContext beanContext) {
         this.beanContext = beanContext;
-        this.executorService = executorService;
     }
 
     @Override
@@ -116,7 +113,7 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
 
     @Override
     public void onApplicationEvent(RefreshEvent event) {
-        executorService.execute(() -> onRefreshEvent(event));
+        onRefreshEvent(event);
     }
 
     /**
@@ -136,6 +133,13 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
     }
 
     @Override
+    public int getOrder() {
+        // configuration properties refresh should run first
+        // so use a higher priority
+        return POSITION;
+    }
+
+    @Override
     public <T> Optional<BeanRegistration<T>> findBeanRegistration(T bean) {
         if (bean instanceof InterceptedProxy) {
             bean = ((InterceptedProxy<T>) bean).interceptedTarget();
@@ -143,7 +147,8 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
         for (CreatedBean<?> created : refreshableBeans.values()) {
             if (created.bean() == bean) {
                 //noinspection unchecked
-                return Optional.of(new BeanRegistration<>(
+                return Optional.of(BeanRegistration.of(
+                        beanContext,
                         created.id(),
                         (BeanDefinition<T>) created.definition(),
                         (T) created.bean()
@@ -174,7 +179,7 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
             if (value.isPresent()) {
                 String configPrefix = value.get();
                 if (keySet.stream().anyMatch(key -> key.startsWith(configPrefix))) {
-                    beanContext.refreshBean(registration.getIdentifier());
+                    beanContext.refreshBean(registration);
                 }
             }
         }
@@ -184,25 +189,24 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
         Collection<BeanRegistration<?>> registrations =
             beanContext.getActiveBeanRegistrations(Qualifiers.byStereotype(ConfigurationProperties.class));
         for (BeanRegistration<?> registration : registrations) {
-            beanContext.refreshBean(registration.getIdentifier());
+            beanContext.refreshBean(registration);
         }
     }
 
     private void disposeOfBeanSubset(Collection<String> keys) {
-        for (BeanIdentifier beanKey : refreshableBeans.keySet()) {
-            CreatedBean<?> createdBean = refreshableBeans.get(beanKey);
-            BeanDefinition<?> definition = createdBean.definition();
+        for (Map.Entry<BeanIdentifier, CreatedBean<?>> entry : refreshableBeans.entrySet()) {
+            BeanDefinition<?> definition = entry.getValue().definition();
             String[] strings = definition.stringValues(Refreshable.class);
             if (!ArrayUtils.isEmpty(strings)) {
                 for (String prefix : strings) {
                     for (String k : keys) {
                         if (k.startsWith(prefix)) {
-                            disposeOfBean(beanKey);
+                            disposeOfBean(entry.getKey());
                         }
                     }
                 }
             } else {
-                disposeOfBean(beanKey);
+                disposeOfBean(entry.getKey());
             }
         }
     }

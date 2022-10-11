@@ -19,7 +19,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Specification
@@ -34,10 +34,10 @@ class ServerStopEndpointSpec extends Specification {
     void "test the endpoint is disabled by default"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['endpoints.stop.sensitive': false], Environment.TEST)
-        RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+        HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         when:
-        rxClient.exchange("/stop").blockingFirst()
+        rxClient.exchange("/stop").blockFirst()
 
         then:
         HttpClientResponseException ex = thrown()
@@ -51,11 +51,11 @@ class ServerStopEndpointSpec extends Specification {
     void "test the server is stopped after exercising the endpoint"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['endpoints.stop.enabled': true, 'endpoints.stop.sensitive': false], Environment.TEST)
-        RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+        HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
         def conditions = new PollingConditions(timeout: 10, initialDelay: 3, delay: 1, factor: 1)
 
         when:
-        def response = rxClient.exchange(HttpRequest.POST("/stop", ""), String).blockingFirst()
+        def response = rxClient.exchange(HttpRequest.POST("/stop", ""), String).blockFirst()
 
         then:
         response.code() == HttpStatus.OK.code

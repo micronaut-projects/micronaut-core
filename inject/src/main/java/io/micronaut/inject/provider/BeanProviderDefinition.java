@@ -21,9 +21,12 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.type.Argument;
+import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.qualifiers.AnyQualifier;
+import io.micronaut.inject.qualifiers.Qualifiers;
 
 import java.util.Iterator;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 /**
@@ -58,17 +61,39 @@ public final class BeanProviderDefinition extends AbstractProviderDefinition<Bea
             @Nullable Qualifier<Object> qualifier,
             boolean singleton) {
         return new BeanProvider<Object>() {
+
             private final Qualifier<Object> finalQualifier =
                     qualifier instanceof AnyQualifier ? null : qualifier;
 
+            private Qualifier<Object> qualify(Qualifier<Object> qualifier) {
+                if (finalQualifier == null) {
+                    return qualifier;
+                } else if (qualifier == null) {
+                    return finalQualifier;
+                }
+
+                //noinspection unchecked
+                return Qualifiers.byQualifiers(finalQualifier, qualifier);
+            }
+
             @Override
             public Object get() {
-                return ((DefaultBeanContext) context).getBean(resolutionContext, argument, finalQualifier);
+                return ((DefaultBeanContext) context).getBean(resolutionContext.copy(), argument, finalQualifier);
+            }
+
+            @Override
+            public Optional<Object> find(Qualifier<Object> qualifier) {
+                return ((DefaultBeanContext) context).findBean(resolutionContext.copy(), argument, qualify(qualifier));
+            }
+
+            @Override
+            public BeanDefinition<Object> getDefinition() {
+                return context.getBeanDefinition(argument, finalQualifier);
             }
 
             @Override
             public Object get(Qualifier<Object> qualifier) {
-                return ((DefaultBeanContext) context).getBean(resolutionContext, argument, qualifier);
+                return ((DefaultBeanContext) context).getBean(resolutionContext.copy(), argument, qualify(qualifier));
             }
 
             @Override
@@ -88,13 +113,18 @@ public final class BeanProviderDefinition extends AbstractProviderDefinition<Bea
             @NonNull
             @Override
             public Iterator<Object> iterator() {
-                return ((DefaultBeanContext) context).getBeansOfType(resolutionContext, argument, finalQualifier).iterator();
+                return ((DefaultBeanContext) context).getBeansOfType(resolutionContext.copy(), argument, finalQualifier).iterator();
             }
 
             @Override
             public Stream<Object> stream() {
-                return ((DefaultBeanContext) context).streamOfType(resolutionContext, argument, finalQualifier);
+                return ((DefaultBeanContext) context).streamOfType(resolutionContext.copy(), argument, finalQualifier);
             }
         };
+    }
+
+    @Override
+    protected boolean isAllowEmptyProviders(BeanContext context) {
+        return true;
     }
 }

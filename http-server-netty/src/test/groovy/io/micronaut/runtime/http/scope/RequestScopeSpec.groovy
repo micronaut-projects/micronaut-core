@@ -15,18 +15,23 @@
  */
 package io.micronaut.runtime.http.scope
 
-
+import io.micronaut.context.annotation.Prototype
 import io.micronaut.context.event.ApplicationEventListener
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.context.ServerRequestContext
 import io.micronaut.http.context.event.HttpRequestTerminatedEvent
 import io.micronaut.http.server.netty.AbstractMicronautSpec
+import jakarta.annotation.PreDestroy
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
+import spock.lang.Shared
 import spock.util.concurrent.PollingConditions
+import java.util.concurrent.atomic.AtomicInteger
 
-import javax.annotation.PreDestroy
+import java.nio.charset.StandardCharsets
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * @author Marcel Overdijk
@@ -34,13 +39,51 @@ import javax.annotation.PreDestroy
  */
 class RequestScopeSpec extends AbstractMicronautSpec {
 
+    @Shared
+    PollingConditions conditions = new PollingConditions(delay: 0.5, timeout: 3)
+
+    def setupSpec() {
+        ServerRequestContext.set(null)
+    }
+
+    def setup() {
+        ReqTerminatedListener listener = applicationContext.getBean(ReqTerminatedListener)
+        listener.callCount = 0
+        SimpleBean.destroyed.set(0)
+    }
+
+    void "test dependent beans leak"() {
+        when:
+        (0..100).each {
+            rxClient.toBlocking().retrieve(HttpRequest.GET("/test-simple-request-scope"), String)
+        }
+        def controller = applicationContext.getBean(SimpleTestController)
+        then:
+        conditions.eventually {
+            SimpleBean.destroyed.get() == 101
+        }
+        (controller.simpleRequestBean.$beanResolutionContext.popDependentBeans() as Collection) == null
+    }
+
+    void 'test request scope no request'() {
+        when:
+        RequestBean requestBean = applicationContext.getBean(RequestBean)
+        requestBean.count()
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message == 'No request present'
+
+        cleanup:
+        RequestBean.BEANS_CREATED.clear()
+    }
+
     void "test @Request bean created per request"() {
         given:
-        PollingConditions conditions = new PollingConditions(delay: 0.5, timeout: 3)
         ReqTerminatedListener listener = applicationContext.getBean(ReqTerminatedListener)
 
         when:
-        def result = rxClient.retrieve(HttpRequest.GET("/test-request-scope"), String).blockingFirst()
+        def result = rxClient.toBlocking().retrieve(HttpRequest.GET("/test-request-scope"), String)
 
         then:
         result == "message count 1, count within request 1"
@@ -56,7 +99,7 @@ class RequestScopeSpec extends AbstractMicronautSpec {
         RequestBean.BEANS_CREATED.clear()
         RequestScopeFactoryBean.BEANS_CREATED.clear()
         listener.callCount = 0
-        result = rxClient.retrieve(HttpRequest.GET("/test-request-scope"), String).blockingFirst()
+        result = rxClient.toBlocking().retrieve(HttpRequest.GET("/test-request-scope"), String)
 
         then:
         result == "message count 2, count within request 1"
@@ -72,10 +115,26 @@ class RequestScopeSpec extends AbstractMicronautSpec {
         RequestBean.BEANS_CREATED.clear()
         RequestScopeFactoryBean.BEANS_CREATED.clear()
         listener.callCount = 0
-        result = rxClient.retrieve(HttpRequest.GET("/test-request-scope"), String).blockingFirst()
+        result = rxClient.toBlocking().retrieve(HttpRequest.GET("/test-request-scope"), String)
 
         then:
         result == "message count 3, count within request 1"
+        RequestBean.BEANS_CREATED.size() == 1
+        RequestScopeFactoryBean.BEANS_CREATED.size() == 1
+        conditions.eventually {
+            listener.callCount == 1
+            RequestBean.BEANS_CREATED.first().dead
+            RequestScopeFactoryBean.BEANS_CREATED.first().dead
+        }
+
+        when:
+        RequestBean.BEANS_CREATED.clear()
+        RequestScopeFactoryBean.BEANS_CREATED.clear()
+        listener.callCount = 0
+        result = rxClient.toBlocking().retrieve(HttpRequest.GET("/test-request-scope-stream"), String)
+
+        then:
+        result == "message count 4, count within request 1"
         RequestBean.BEANS_CREATED.size() == 1
         RequestScopeFactoryBean.BEANS_CREATED.size() == 1
         conditions.eventually {
@@ -87,7 +146,7 @@ class RequestScopeSpec extends AbstractMicronautSpec {
 
     void "test request scope bean that injects the request"() {
         when:
-        String result = rxClient.retrieve(HttpRequest.GET("/test-request-aware"), String).blockingFirst()
+        String result = rxClient.toBlocking().retrieve(HttpRequest.GET("/test-request-aware"), String)
 
         then:
         result == "OK"
@@ -115,6 +174,47 @@ class RequestScopeSpec extends AbstractMicronautSpec {
         @PreDestroy
         void killMe() {
             this.dead = true
+        }
+    }
+
+    @RequestScope
+    static class SimpleRequestBean {
+
+        private final SimpleBean simpleBean
+
+        SimpleRequestBean(SimpleBean simpleBean) {
+            this.simpleBean = simpleBean
+        }
+
+        String sayHello() {
+            return "HELLO"
+        }
+
+    }
+
+    @Prototype
+    static class SimpleBean {
+
+        static AtomicInteger destroyed = new AtomicInteger()
+
+        @PreDestroy
+        void destroy() {
+            destroyed.incrementAndGet()
+        }
+
+    }
+
+    @Controller
+    static class SimpleTestController {
+        final SimpleRequestBean simpleRequestBean
+
+        SimpleTestController(SimpleRequestBean simpleRequestBean) {
+            this.simpleRequestBean = simpleRequestBean
+        }
+
+        @Get("/test-simple-request-scope")
+        String test() {
+            return simpleRequestBean.sayHello()
         }
     }
 
@@ -165,6 +265,11 @@ class RequestScopeSpec extends AbstractMicronautSpec {
         @Get("/test-request-scope")
         String test() {
             return messageService.message
+        }
+
+        @Get("/test-request-scope-stream")
+        InputStream testStream() {
+            return new ByteArrayInputStream(messageService.message.getBytes(StandardCharsets.UTF_8))
         }
 
         @Get("/test-request-aware")

@@ -16,11 +16,12 @@
 package io.micronaut.aop.compile
 
 import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
+import io.micronaut.inject.writer.BeanDefinitionWriter
 
 class FinalModifierSpec extends AbstractBeanDefinitionSpec {
     void "test final modifier with AOP advice doesn't compile"() {
         when:
-        buildBeanDefinition('test.$FinalModifierMyBean1Definition$Intercepted', '''
+        buildBeanDefinition('test.$FinalModifierMyBean1' + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionWriter.PROXY_SUFFIX, '''
 package test;
 
 import io.micronaut.aop.proxytarget.*;
@@ -49,7 +50,7 @@ final class FinalModifierMyBean1 {
 
     void "test final modifier on method with AOP advice doesn't compile"() {
         when:
-        buildBeanDefinition('test.$FinalModifierMyBean2Definition$Intercepted', '''
+        buildBeanDefinition('test.$FinalModifierMyBean2' + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionWriter.PROXY_SUFFIX, '''
 package test;
 
 import io.micronaut.aop.proxytarget.*;
@@ -78,7 +79,7 @@ class FinalModifierMyBean2 {
 
     void "test final modifier on method with explicit AOP advice doesn't compile"() {
         when:
-        buildBeanDefinition('test.$FinalModifierMyBean2Definition$Intercepted', '''
+        buildBeanDefinition('test.$FinalModifierMyBean2' + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionWriter.PROXY_SUFFIX, '''
 package test;
 
 import io.micronaut.aop.proxytarget.*;

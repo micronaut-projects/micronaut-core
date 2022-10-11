@@ -1,7 +1,12 @@
+plugins {
+    id "io.micronaut.build.internal.convention-library"
+}
+
 dependencies {
     api project(":core")
     api project(":inject")
-    api dependencyModuleVersion("netty", "netty-buffer")
+    api libs.managed.netty.buffer
+    compileOnly libs.managed.graal
 
     annotationProcessor project(":inject-java")
 }

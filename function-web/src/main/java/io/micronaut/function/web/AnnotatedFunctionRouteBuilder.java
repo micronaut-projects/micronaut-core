@@ -19,6 +19,7 @@ import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
@@ -252,7 +253,7 @@ public class AnnotatedFunctionRouteBuilder
     }
 
     @Override
-    public Optional<MediaTypeCodec> findCodec(MediaType mediaType) {
+    public Optional<MediaTypeCodec> findCodec(@Nullable MediaType mediaType) {
         if (localFunctionRegistry instanceof MediaTypeCodecRegistry) {
             return ((MediaTypeCodecRegistry) localFunctionRegistry).findCodec(mediaType);
         }
@@ -260,7 +261,7 @@ public class AnnotatedFunctionRouteBuilder
     }
 
     @Override
-    public Optional<MediaTypeCodec> findCodec(MediaType mediaType, Class<?> type) {
+    public Optional<MediaTypeCodec> findCodec(@Nullable MediaType mediaType, Class<?> type) {
         if (localFunctionRegistry instanceof MediaTypeCodecRegistry) {
             return ((MediaTypeCodecRegistry) localFunctionRegistry).findCodec(mediaType, type);
         }

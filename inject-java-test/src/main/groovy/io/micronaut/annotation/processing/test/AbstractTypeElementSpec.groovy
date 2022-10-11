@@ -17,51 +17,48 @@ package io.micronaut.annotation.processing.test
 
 import com.sun.source.util.JavacTask
 import groovy.transform.CompileStatic
-import io.micronaut.annotation.processing.AggregatingTypeElementVisitorProcessor
-import io.micronaut.annotation.processing.AnnotationUtils
-import io.micronaut.annotation.processing.BeanDefinitionInjectProcessor
-import io.micronaut.annotation.processing.GenericUtils
-import io.micronaut.annotation.processing.JavaAnnotationMetadataBuilder
-import io.micronaut.annotation.processing.ModelUtils
-import io.micronaut.annotation.processing.TypeElementVisitorProcessor
-import io.micronaut.annotation.processing.visitor.JavaClassElement
+import io.micronaut.annotation.processing.*
 import io.micronaut.annotation.processing.visitor.JavaElementFactory
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext
 import io.micronaut.aop.internal.InterceptorRegistryBean
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultApplicationContext
-import io.micronaut.context.Qualifier
+import io.micronaut.context.*
+import io.micronaut.context.event.ApplicationEventPublisherFactory
 import io.micronaut.core.annotation.AnnotationMetadata
+import io.micronaut.core.annotation.Experimental
 import io.micronaut.core.annotation.NonNull
 import io.micronaut.core.annotation.Nullable
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap
-import io.micronaut.core.io.scan.ClassPathResourceLoader
+import io.micronaut.core.graal.GraalReflectionConfigurer
 import io.micronaut.core.naming.NameUtils
 import io.micronaut.inject.BeanConfiguration
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanDefinitionReference
+import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
 import io.micronaut.inject.annotation.AnnotationMapper
 import io.micronaut.inject.annotation.AnnotationMetadataWriter
 import io.micronaut.inject.annotation.AnnotationTransformer
 import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.ast.GenericPlaceholderElement
+import io.micronaut.inject.ast.WildcardElement
 import io.micronaut.inject.provider.BeanProviderDefinition
+import io.micronaut.inject.provider.JakartaProviderBeanDefinition
 import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.inject.writer.BeanConfigurationWriter
+import io.micronaut.inject.writer.BeanDefinitionReferenceWriter
 import io.micronaut.inject.writer.BeanDefinitionVisitor
+import io.micronaut.inject.writer.BeanDefinitionWriter
+import org.intellij.lang.annotations.Language
 import spock.lang.Specification
 
-import javax.annotation.processing.ProcessingEnvironment
 import javax.lang.model.element.Element
 import javax.lang.model.element.ExecutableElement
 import javax.lang.model.element.TypeElement
 import javax.lang.model.element.VariableElement
 import javax.tools.JavaFileObject
 import java.lang.annotation.Annotation
-import java.util.function.Predicate
 import java.util.stream.Collectors
 import java.util.stream.StreamSupport
-
 /**
  * Base class to extend from to allow compilation of Java sources
  * at runtime to allow testing of compile time behavior.
@@ -76,7 +73,7 @@ abstract class AbstractTypeElementSpec extends Specification {
      * @param cls The source
      * @return The class element
      */
-    ClassElement buildClassElement(String cls) {
+    ClassElement buildClassElement(@Language("java") String cls) {
         TypeElementInfo typeElementInfo = buildTypeElementInfo(cls)
         TypeElement typeElement = typeElementInfo.typeElement
         def lastTask = typeElementInfo.javaParser.lastTask.get()
@@ -111,27 +108,30 @@ abstract class AbstractTypeElementSpec extends Specification {
      * @return The annotation metadata for the class
      */
     @CompileStatic
-    AnnotationMetadata buildTypeAnnotationMetadata(String cls) {
+    AnnotationMetadata buildTypeAnnotationMetadata(@Language("java") String cls) {
         Element element = buildTypeElement(cls)
         JavaAnnotationMetadataBuilder builder = newJavaAnnotationBuilder()
         AnnotationMetadata metadata = element != null ? builder.build(element) : null
+        AbstractAnnotationMetadataBuilder.copyToRuntime()
         return metadata
     }
 
-    AnnotationMetadata buildDeclaredMethodAnnotationMetadata(String cls, String methodName) {
+    AnnotationMetadata buildDeclaredMethodAnnotationMetadata(@Language("java") String cls, String methodName) {
         TypeElement element = buildTypeElement(cls)
         Element method = element.getEnclosedElements().find() { it.simpleName.toString() == methodName }
         JavaAnnotationMetadataBuilder builder = newJavaAnnotationBuilder()
         AnnotationMetadata metadata = method != null ? builder.buildDeclared(method) : null
+        AbstractAnnotationMetadataBuilder.copyToRuntime()
         return metadata
     }
 
-    AnnotationMetadata buildMethodArgumentAnnotationMetadata(String cls, String methodName, String argumentName) {
+    AnnotationMetadata buildMethodArgumentAnnotationMetadata(@Language("java") String cls, String methodName, String argumentName) {
         TypeElement element = buildTypeElement(cls)
         ExecutableElement method = (ExecutableElement)element.getEnclosedElements().find() { it.simpleName.toString() == methodName }
         VariableElement argument = method.parameters.find() { it.simpleName.toString() == argumentName }
         JavaAnnotationMetadataBuilder builder = newJavaAnnotationBuilder()
         AnnotationMetadata metadata = argument != null ? builder.build(argument) : null
+        AbstractAnnotationMetadataBuilder.copyToRuntime()
         return metadata
     }
 
@@ -140,13 +140,27 @@ abstract class AbstractTypeElementSpec extends Specification {
     *
     * @return the introspection if it is correct
     **/
-    protected BeanIntrospection buildBeanIntrospection(String className, String cls) {
-        def beanDefName= '$' + NameUtils.getSimpleName(className) + '$Introspection'
+    protected BeanIntrospection buildBeanIntrospection(String className, @Language("java") String cls) {
+        def beanDefName= (className.startsWith('$') ? '' : '$') + NameUtils.getSimpleName(className) + '$Introspection'
         def packageName = NameUtils.getPackageName(className)
         String beanFullName = "${packageName}.${beanDefName}"
 
         ClassLoader classLoader = buildClassLoader(className, cls)
         return (BeanIntrospection)classLoader.loadClass(beanFullName).newInstance()
+    }
+
+    /**
+     * Build and return a {@link GraalReflectionConfigurer} for the given class name and class data.
+     *
+     * @return the GraalReflectionConfigurer if it is correct
+     **/
+    protected GraalReflectionConfigurer buildReflectionConfigurer(String className, @Language("java") String cls) {
+        String beanDefName = (className.startsWith('$') ? '' : '$') + NameUtils.getSimpleName(className) + GraalReflectionConfigurer.CLASS_SUFFIX
+        String packageName = NameUtils.getPackageName(className)
+        String beanFullName = "${packageName}.${beanDefName}"
+
+        ClassLoader classLoader = buildClassLoader(className, cls)
+        return (GraalReflectionConfigurer)classLoader.loadClass(beanFullName).newInstance()
     }
 
     /**
@@ -179,7 +193,7 @@ class Test {
      * @return The reader
      * @throws IOException
      */
-    public @Nullable Reader readGenerated(@NonNull String filePath, String className, String code) throws IOException {
+    public @Nullable Reader readGenerated(@NonNull String filePath, String className, @Language("java") String code) throws IOException {
         return newJavaParser().readGenerated(filePath, className, code)
     }
 
@@ -193,13 +207,24 @@ class Test {
         context.getBean(context.classLoader.loadClass(className), qualifier)
     }
 
+
+    /**
+     * Gets a bean definition from the context for the given class name
+     * @param context The context
+     * @param className The class name
+     * @return The bean instance
+     */
+    BeanDefinition<?> getBeanDefinition(ApplicationContext context, String className, Qualifier qualifier = null) {
+        context.getBeanDefinition(context.classLoader.loadClass(className), qualifier)
+    }
+
     /**
      * Builds a {@link ApplicationContext} containing only the classes produced by the given source.
      *
      * @param source The source code
      * @return The context. Should be shutdown after use
      */
-    ApplicationContext buildContext(String source) {
+    ApplicationContext buildContext(@Language("java") String source) {
         return buildContext("test.Source" + System.currentTimeMillis(), source)
     }
 
@@ -210,42 +235,43 @@ class Test {
      * @param cls The class data
      * @return The context. Should be shutdown after use
      */
-    ApplicationContext buildContext(String className, String cls, boolean includeAllBeans = false) {
+    ApplicationContext buildContext(String className, @Language("java") String cls, boolean includeAllBeans = false) {
         def files = newJavaParser().generate(className, cls)
-        ClassLoader classLoader = new ClassLoader() {
-            @Override
-            protected Class<?> findClass(String name) throws ClassNotFoundException {
-                String fileName = name.replace('.', '/') + '.class'
-                JavaFileObject generated = files.find { it.name.endsWith(fileName) }
-                if (generated != null) {
-                    def bytes = generated.openInputStream().bytes
-                    return defineClass(name, bytes, 0, bytes.length)
-                }
-                return super.findClass(name)
-            }
-        }
+        ClassLoader classLoader = new JavaFileObjectClassLoader(files)
 
-        return new DefaultApplicationContext(ClassPathResourceLoader.defaultLoader(classLoader), "test") {
+        def builder = ApplicationContext.builder()
+        builder.classLoader(classLoader)
+        builder.environments("test")
+        configureContext(builder)
+        return new DefaultApplicationContext((ApplicationContextConfiguration) builder) {
             @Override
-            protected List<BeanDefinitionReference> resolveBeanDefinitionReferences(Predicate<BeanDefinitionReference> predicate) {
+            protected List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
                 def references = StreamSupport.stream(files.spliterator(), false)
                         .filter({ JavaFileObject jfo ->
-                            jfo.kind == JavaFileObject.Kind.CLASS && jfo.name.endsWith("DefinitionClass.class")
+                            jfo.kind == JavaFileObject.Kind.CLASS && jfo.name.endsWith(BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionReferenceWriter.REF_SUFFIX + ".class")
                         })
                         .map({ JavaFileObject jfo ->
                             def name = jfo.toUri().toString().substring("mem:///CLASS_OUTPUT/".length())
                             name = name.replace('/', '.') - '.class'
                             return (BeanDefinitionReference) classLoader.loadClass(name).newInstance()
                         })
-                        .filter({ bdr -> predicate == null || predicate.test(bdr) })
                         .collect(Collectors.toList())
 
-                return references + (includeAllBeans ? super.resolveBeanDefinitionReferences(predicate) : [
-                        new InterceptorRegistryBean(),
-                        new BeanProviderDefinition()
-                ])
+                return references + (includeAllBeans ? super.resolveBeanDefinitionReferences() : getBuiltInBeanReferences())
             }
         }.start()
+    }
+
+    /**
+     * @return Obtains the built in bean references required for the context to function correctly
+     */
+    List<BeanDefinitionReference<?>> getBuiltInBeanReferences() {
+        return [
+                new InterceptorRegistryBean(),
+                new BeanProviderDefinition(),
+                new JakartaProviderBeanDefinition(),
+                new ApplicationEventPublisherFactory<>()
+        ]
     }
 
     /**
@@ -288,7 +314,7 @@ class Test {
      * @return The annotation metadata for the method
      */
     @CompileStatic
-    AnnotationMetadata buildMethodAnnotationMetadata(String cls, String methodName) {
+    AnnotationMetadata buildMethodAnnotationMetadata(@Language("java") String cls, String methodName) {
         TypeElement element = buildTypeElement(cls)
         Element method = element.getEnclosedElements().find() { it.simpleName.toString() == methodName }
         JavaAnnotationMetadataBuilder builder = newJavaAnnotationBuilder()
@@ -303,7 +329,7 @@ class Test {
      * @return The annotation metadata for the field
      */
     @CompileStatic
-    AnnotationMetadata buildFieldAnnotationMetadata(String cls, String methodName, String fieldName) {
+    AnnotationMetadata buildFieldAnnotationMetadata(@Language("java") String cls, String methodName, String fieldName) {
         TypeElement element = buildTypeElement(cls)
         ExecutableElement method = (ExecutableElement)element.getEnclosedElements().find() { it.simpleName.toString() == methodName }
         VariableElement argument = method.parameters.find() { it.simpleName.toString() == fieldName }
@@ -323,7 +349,7 @@ class Test {
         return (TypeElement) element
     }
 
-    protected TypeElementInfo buildTypeElementInfo(String cls) {
+    protected TypeElementInfo buildTypeElementInfo(@Language("java") String cls) {
         List<Element> elements = []
 
 
@@ -339,8 +365,9 @@ class Test {
         )
     }
 
-    protected BeanDefinition buildBeanDefinition(String className, String cls) {
-        def beanDefName= '$' + NameUtils.getSimpleName(className) + 'Definition'
+    protected BeanDefinition buildBeanDefinition(String className, @Language("java") String cls) {
+        def classSimpleName = NameUtils.getSimpleName(className)
+        def beanDefName = (classSimpleName.startsWith('$') ? '' : '$') + classSimpleName + BeanDefinitionWriter.CLASS_SUFFIX
         def packageName = NameUtils.getPackageName(className)
         String beanFullName = "${packageName}.${beanDefName}"
 
@@ -352,8 +379,8 @@ class Test {
         }
     }
 
-    protected BeanDefinition buildBeanDefinition(String packageName, String className, String cls) {
-        def beanDefName= '$' + className + 'Definition'
+    protected BeanDefinition buildBeanDefinition(String packageName, String className, @Language("java") String cls) {
+        def beanDefName= (className.startsWith('$') ? '' : '$') + className + BeanDefinitionWriter.CLASS_SUFFIX
         String beanFullName = "${packageName}.${beanDefName}"
 
         ClassLoader classLoader = buildClassLoader(className, cls)
@@ -370,8 +397,9 @@ class Test {
      * @param cls The class source
      * @return The bean definition
      */
-    protected BeanDefinition buildInterceptedBeanDefinition(String className, String cls) {
-        def beanDefName= '$$' + NameUtils.getSimpleName(className) + 'Definition' + BeanDefinitionVisitor.PROXY_SUFFIX + 'Definition'
+    protected BeanDefinition buildInterceptedBeanDefinition(String className, @Language("java") String cls) {
+        def classSimpleName = NameUtils.getSimpleName(className)
+        def beanDefName = (classSimpleName.startsWith('$') ? '' : '$') + classSimpleName + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionVisitor.PROXY_SUFFIX + BeanDefinitionWriter.CLASS_SUFFIX
         def packageName = NameUtils.getPackageName(className)
         String beanFullName = "${packageName}.${beanDefName}"
 
@@ -411,8 +439,9 @@ class Test {
      * @param cls The class source
      * @return The bean definition
      */
-    protected BeanDefinitionReference buildInterceptedBeanDefinitionReference(String className, String cls) {
-        def beanDefName= '$$' + NameUtils.getSimpleName(className) + 'Definition' + BeanDefinitionVisitor.PROXY_SUFFIX + 'DefinitionClass'
+    protected BeanDefinitionReference buildInterceptedBeanDefinitionReference(String className, @Language("java") String cls) {
+        def classSimpleName = NameUtils.getSimpleName(className)
+        def beanDefName = (classSimpleName.startsWith('$') ? '' : '$') + classSimpleName + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionVisitor.PROXY_SUFFIX + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionReferenceWriter.REF_SUFFIX
         def packageName = NameUtils.getPackageName(className)
         String beanFullName = "${packageName}.${beanDefName}"
 
@@ -420,8 +449,9 @@ class Test {
         return (BeanDefinitionReference)classLoader.loadClass(beanFullName).newInstance()
     }
 
-    protected BeanDefinitionReference buildBeanDefinitionReference(String className, String cls) {
-        def beanDefName= '$' + NameUtils.getSimpleName(className) + 'DefinitionClass'
+    protected BeanDefinitionReference buildBeanDefinitionReference(String className, @Language("java") String cls) {
+        def classSimpleName = NameUtils.getSimpleName(className)
+        def beanDefName= (classSimpleName.startsWith('$') ? '' : '$') + classSimpleName + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionReferenceWriter.REF_SUFFIX
         def packageName = NameUtils.getPackageName(className)
         String beanFullName = "${packageName}.${beanDefName}"
 
@@ -429,26 +459,15 @@ class Test {
         return (BeanDefinitionReference)classLoader.loadClass(beanFullName).newInstance()
     }
 
-    protected BeanConfiguration buildBeanConfiguration(String packageName, String cls) {
+    protected BeanConfiguration buildBeanConfiguration(String packageName, @Language("java") String cls) {
         ClassLoader classLoader = buildClassLoader("${packageName}.package-info", cls)
         return (BeanConfiguration)classLoader.loadClass(packageName + '.' + BeanConfigurationWriter.CLASS_SUFFIX).newInstance()
     }
 
-    protected ClassLoader buildClassLoader(String className, String cls) {
-        def files = newJavaParser().generate(className, cls)
-        ClassLoader classLoader = new ClassLoader() {
-            @Override
-            protected Class<?> findClass(String name) throws ClassNotFoundException {
-                String fileName = name.replace('.', '/') + '.class'
-                JavaFileObject generated = files.find { it.name.endsWith(fileName) }
-                if (generated != null) {
-                    def bytes = generated.openInputStream().bytes
-                    return defineClass(name, bytes, 0, bytes.length)
-                }
-                return super.findClass(name)
-            }
-        }
-        classLoader
+    @CompileStatic
+    protected ClassLoader buildClassLoader(String className, @Language("java") String cls) {
+        Iterable<? extends JavaFileObject> files = newJavaParser().generate(className, cls)
+        return new JavaFileObjectClassLoader(files)
     }
 
     protected AnnotationMetadata writeAndLoadMetadata(String className, AnnotationMetadata toWrite) {
@@ -471,7 +490,7 @@ class Test {
         return metadata
     }
 
-    private JavaAnnotationMetadataBuilder newJavaAnnotationBuilder() {
+    protected JavaAnnotationMetadataBuilder newJavaAnnotationBuilder() {
         JavaParser parser = newJavaParser()
         JavacTask javacTask = parser.getJavacTask()
         def elements = javacTask.elements
@@ -524,6 +543,56 @@ class Test {
             }
         }
         return builder
+    }
+
+    /**
+     * Allows configuring the context
+     * @param contextBuilder The context builder
+     */
+    protected void configureContext(ApplicationContextBuilder contextBuilder) {
+    }
+
+    /**
+     * Create a rough source signature of the given ClassElement, using {@link ClassElement#getBoundGenericTypes()}.
+     * Can be used to test that {@link ClassElement#getBoundGenericTypes()} returns the right types in the right
+     * context.
+     *
+     * @param classElement The class element to reconstruct
+     * @param typeVarsAsDeclarations Whether type variables should be represented as declarations
+     * @return a String representing the type signature.
+     */
+    @Experimental
+    protected static String reconstructTypeSignature(ClassElement classElement, boolean typeVarsAsDeclarations = false) {
+        if (classElement.isArray()) {
+            return reconstructTypeSignature(classElement.fromArray()) + "[]"
+        } else if (classElement.isGenericPlaceholder()) {
+            def freeVar = (GenericPlaceholderElement) classElement
+            def name = freeVar.variableName
+            if (typeVarsAsDeclarations) {
+                def bounds = freeVar.bounds
+                if (reconstructTypeSignature(bounds[0]) != 'Object') {
+                    name += bounds.stream().map(AbstractTypeElementSpec::reconstructTypeSignature).collect(Collectors.joining(" & ", " extends ", ""))
+                }
+            }
+            return name
+        } else if (classElement.isWildcard()) {
+            def we = (WildcardElement) classElement
+            if (!we.lowerBounds.isEmpty()) {
+                return we.lowerBounds.stream().map(AbstractTypeElementSpec::reconstructTypeSignature).collect(Collectors.joining(" | ", "? super ", ""))
+            } else if (we.upperBounds.size() == 1 && reconstructTypeSignature(we.upperBounds.get(0)) == "Object") {
+                return "?"
+            } else {
+                return we.upperBounds.stream().map(AbstractTypeElementSpec::reconstructTypeSignature).collect(Collectors.joining(" & ", "? extends ", ""))
+            }
+        } else {
+            def boundTypeArguments = classElement.getBoundGenericTypes()
+            if (boundTypeArguments.isEmpty()) {
+                return classElement.getSimpleName()
+            } else {
+                return classElement.getSimpleName() +
+                        boundTypeArguments.stream().map(AbstractTypeElementSpec::reconstructTypeSignature).collect(Collectors.joining(", ", "<", ">"))
+            }
+        }
     }
 
     static class TypeElementInfo {

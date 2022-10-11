@@ -5,22 +5,24 @@ import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Order
 import io.micronaut.core.async.publisher.Publishers
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
 import io.micronaut.http.MutableHttpResponse
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Filter
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.context.ServerRequestContext
 import io.micronaut.http.filter.HttpServerFilter
 import io.micronaut.http.filter.ServerFilterChain
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.scheduling.TaskExecutors
-import io.reactivex.Flowable
-import io.reactivex.Single
-import io.reactivex.schedulers.Schedulers
 import jakarta.inject.Inject
 import jakarta.inject.Named
 import org.reactivestreams.Publisher
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
+import reactor.core.scheduler.Schedulers
 import spock.lang.Ignore
 import spock.lang.Specification
 import spock.lang.Unroll
@@ -177,8 +179,8 @@ class FiltersSpec extends Specification {
         }
 
         @Get("/filters-reactive-get")
-        Single<String> getReactive(HttpRequest<?> request) {
-            return Single.fromCallable(new Callable<String>() {
+        Mono<String> getReactive(HttpRequest<?> request) {
+            return Mono.fromCallable(new Callable<String>() {
                 @Override
                 String call() throws Exception {
                     if (!ServerRequestContext.currentRequest().isPresent()) {
@@ -200,6 +202,7 @@ class FiltersSpec extends Specification {
 
     @Order(100) //to show that @Order is not supported
     @Filter(Filter.MATCH_ALL_PATTERN)
+    @Requires(property = 'spec.name', value = 'FiltersSpec')
     static class Filter1 extends AbstractFilter {
 
         @Override
@@ -209,6 +212,7 @@ class FiltersSpec extends Specification {
     }
 
     @Filter("/filters**")
+    @Requires(property = 'spec.name', value = 'FiltersSpec')
     static class Filter2 extends AbstractFilter {
 
         @Override
@@ -219,6 +223,7 @@ class FiltersSpec extends Specification {
 
     @Requires(property = 'enableFilter3', value = 'true')
     @Filter("/filters**")
+    @Requires(property = 'spec.name', value = 'FiltersSpec')
     static class Filter3 extends AbstractFilter {
 
         @Inject
@@ -227,7 +232,7 @@ class FiltersSpec extends Specification {
 
         @Override
         Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
-            return Flowable.fromPublisher(super.doFilter(request, chain)).subscribeOn(Schedulers.from(executor))
+            return Flux.from(super.doFilter(request, chain)).subscribeOn(Schedulers.fromExecutor(executor))
         }
 
         @Override
@@ -238,6 +243,7 @@ class FiltersSpec extends Specification {
 
     @Requires(property = 'badFilter', value = 'true')
     @Filter("/filters**")
+    @Requires(property = 'spec.name', value = 'FiltersSpec')
     static class FilterBadFilter3 extends AbstractFilter {
 
         @Override
@@ -252,6 +258,7 @@ class FiltersSpec extends Specification {
     }
 
     @Filter(Filter.MATCH_ALL_PATTERN)
+    @Requires(property = 'spec.name', value = 'FiltersSpec')
     static class Filter4 extends AbstractFilter {
 
         @Override
@@ -261,6 +268,7 @@ class FiltersSpec extends Specification {
     }
 
     @Filter("/filters**")
+    @Requires(property = 'spec.name', value = 'FiltersSpec')
     static class Filter5 extends AbstractFilter {
 
         @Override
@@ -270,6 +278,7 @@ class FiltersSpec extends Specification {
     }
 
     @Filter(Filter.MATCH_ALL_PATTERN)
+    @Requires(property = 'spec.name', value = 'FiltersSpec')
     static class Filter6 extends AbstractFilter {
 
         @Override
@@ -279,6 +288,7 @@ class FiltersSpec extends Specification {
     }
 
     @Filter("/filters**")
+    @Requires(property = 'spec.name', value = 'FiltersSpec')
     static class Filter7 extends AbstractFilter {
 
         @Override
@@ -287,7 +297,6 @@ class FiltersSpec extends Specification {
         }
     }
 
-    @Requires(property = 'spec.name', value = 'FiltersSpec')
     static abstract class AbstractFilter implements HttpServerFilter {
 
         String doFilterExecutedOn
@@ -317,6 +326,45 @@ class FiltersSpec extends Specification {
                     response
                 }
             })
+        }
+    }
+
+    def 'filter should pick json content type by default'() {
+        given:
+        def ctx = ApplicationContext.run([
+                'spec.name': 'FiltersSpec'
+        ])
+        def embeddedServer = ctx.getBean(EmbeddedServer)
+        embeddedServer.start()
+        def client = ctx.createBean(HttpClient, embeddedServer.URI)
+
+        when:
+        def response = client.toBlocking().exchange('/home', String)
+        then:
+        // response should be json
+        response.body() == '{"foo":"bar"}'
+        response.header('Content-Type') == 'application/json'
+
+        cleanup:
+        embeddedServer.close()
+        client.close()
+    }
+
+    @Requires(property = 'spec.name', value = 'FiltersSpec')
+    @Controller('/home')
+    static class HomeController {
+        @Get
+        def get() {
+            return 'not reached'
+        }
+    }
+
+    @Requires(property = 'spec.name', value = 'FiltersSpec')
+    @Filter('/home')
+    static class HomeFilter implements HttpServerFilter {
+        @Override
+        Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
+            return Publishers.just(HttpResponse.ok(['foo': 'bar']))
         }
     }
 }

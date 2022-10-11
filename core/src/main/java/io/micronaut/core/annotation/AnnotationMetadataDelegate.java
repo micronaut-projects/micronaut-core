@@ -29,6 +29,21 @@ import java.util.*;
  * @since 1.0
  */
 public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, AnnotationMetadata {
+    @Override
+    default Set<String> getStereotypeAnnotationNames() {
+        return getAnnotationMetadata().getStereotypeAnnotationNames();
+    }
+
+    @Override
+    default Set<String> getDeclaredStereotypeAnnotationNames() {
+        return getAnnotationMetadata().getDeclaredStereotypeAnnotationNames();
+    }
+
+    @NonNull
+    @Override
+    default AnnotationMetadata getDeclaredMetadata() {
+        return getAnnotationMetadata().getDeclaredMetadata();
+    }
 
     @Override
     default boolean hasSimpleAnnotation(@Nullable String annotation) {
@@ -615,4 +630,23 @@ public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, 
         return getAnnotationMetadata().getDeclaredAnnotationValuesByType(annotationType);
     }
 
+    @Override
+    default boolean isRepeatableAnnotation(Class<? extends Annotation> annotation) {
+        return getAnnotationMetadata().isRepeatableAnnotation(annotation);
+    }
+
+    @Override
+    default boolean isRepeatableAnnotation(String annotation) {
+        return getAnnotationMetadata().isRepeatableAnnotation(annotation);
+    }
+
+    @Override
+    default Optional<String> findRepeatableAnnotation(Class<? extends Annotation> annotation) {
+        return getAnnotationMetadata().findRepeatableAnnotation(annotation);
+    }
+
+    @Override
+    default Optional<String> findRepeatableAnnotation(String annotation) {
+        return getAnnotationMetadata().findRepeatableAnnotation(annotation);
+    }
 }

@@ -15,6 +15,7 @@
  */
 package io.micronaut.websocket;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.convert.value.ConvertibleMultiValues;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
@@ -160,6 +161,20 @@ public interface WebSocketSession extends MutableConvertibleValues<Object>, Auto
      */
     default void sendSync(Object message) {
         sendSync(message, MediaType.APPLICATION_JSON_TYPE);
+    }
+
+    /**
+     * Send a ping through this WebSocket. The pong reply can be intercepted using a
+     * {@link io.micronaut.websocket.annotation.OnMessage @OnMessage} method that accepts a
+     * {@link WebSocketPongMessage}.
+     *
+     * @param content The content of the ping. The remote should return the same content in its
+     * {@link WebSocketPongMessage}.
+     * @return A future that completes when the ping has been sent. (Not when the pong has been received!)
+     */
+    @NonNull
+    default CompletableFuture<?> sendPingAsync(@NonNull byte[] content) {
+        throw new UnsupportedOperationException("Ping not supported by this implementation");
     }
 
     /**

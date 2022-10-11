@@ -176,4 +176,14 @@ public interface MutableHttpResponse<B> extends HttpResponse<B>, MutableHttpMess
      * @return This response object
      */
     MutableHttpResponse<B> status(HttpStatus status);
+
+    /**
+     * Sets an attribute on the response.
+     * @param name The attribute name
+     * @param value The attribute value
+     * @return This response object
+     */
+    default MutableHttpResponse<B> attribute(CharSequence name, Object value) {
+        return (MutableHttpResponse<B>) setAttribute(name, value);
+    }
 }

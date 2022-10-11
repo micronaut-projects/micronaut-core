@@ -11,6 +11,7 @@ class BeanElementBuilderSpec extends AbstractBeanDefinitionSpec {
     }
 
     def cleanup() {
+        System.setProperty(TypeElementVisitorStart.ELEMENT_VISITORS_PROPERTY, "")
         AllElementsVisitor.clearVisited()
     }
 
@@ -37,7 +38,7 @@ class SomeBean {
     @Monitored
     void test() {}
 }
-''')
+''', false)
         when:
         def someBean = getBean(context, 'addbean.SomeBean')
 

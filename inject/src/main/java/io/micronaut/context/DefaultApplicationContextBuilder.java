@@ -15,18 +15,29 @@
  */
 package io.micronaut.context;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.context.env.CommandLinePropertySource;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.env.SystemPropertiesPropertySource;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.cli.CommandLine;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
+import io.micronaut.core.io.service.SoftServiceLoader;
+import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.StringUtils;
 
 import java.lang.annotation.Annotation;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
 /**
  * Implementation of {@link ApplicationContextBuilder}.
@@ -53,11 +64,40 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     private String[] overrideConfigLocations;
     private boolean banner = true;
     private ClassPathResourceLoader classPathResourceLoader;
+    private boolean allowEmptyProviders = false;
+    private Boolean bootstrapEnvironment = null;
+    private boolean enableDefaultPropertySources = true;
 
     /**
      * Default constructor.
      */
     protected DefaultApplicationContextBuilder() {
+        loadApplicationContextCustomizer(resolveClassLoader()).configure(this);
+    }
+
+    private ClassLoader resolveClassLoader() {
+        final ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
+        if (contextClassLoader != null) {
+            return contextClassLoader;
+        }
+        return DefaultApplicationContextBuilder.class.getClassLoader();
+    }
+
+    @Override
+    public boolean isAllowEmptyProviders() {
+        return allowEmptyProviders;
+    }
+
+    @Override
+    @NonNull 
+    public ApplicationContextBuilder enableDefaultPropertySources(boolean areEnabled) {
+        this.enableDefaultPropertySources = areEnabled;
+        return this;
+    }
+
+    @Override
+    public boolean isEnableDefaultPropertySources() {
+        return enableDefaultPropertySources;
     }
 
     @NonNull
@@ -84,6 +124,12 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     @Override
     public boolean isBannerEnabled() {
         return banner;
+    }
+
+    @Nullable
+    @Override
+    public Boolean isBootstrapEnvironmentEnabled() {
+        return bootstrapEnvironment;
     }
 
     @Override
@@ -246,6 +292,12 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     }
 
     @Override
+    public @NonNull ApplicationContextBuilder bootstrapEnvironment(boolean bootstrapEnv) {
+        this.bootstrapEnvironment = bootstrapEnv;
+        return this;
+    }
+
+    @Override
     @SuppressWarnings("MagicNumber")
     public @NonNull ApplicationContext build() {
         ApplicationContext applicationContext = newApplicationContext();
@@ -280,7 +332,6 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
         if (!configurationExcludes.isEmpty()) {
             environment.addConfigurationExcludes(configurationExcludes.toArray(StringUtils.EMPTY_STRING_ARRAY));
         }
-
         return applicationContext;
     }
 
@@ -292,7 +343,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     @NonNull
     protected ApplicationContext newApplicationContext() {
         return new DefaultApplicationContext(
-            this
+                this
         );
     }
 
@@ -328,5 +379,43 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     public @NonNull ApplicationContextBuilder banner(boolean isEnabled) {
         this.banner = isEnabled;
         return this;
+    }
+
+    @Override
+    public @NonNull ApplicationContextBuilder allowEmptyProviders(boolean shouldAllow) {
+        this.allowEmptyProviders = shouldAllow;
+        return this;
+    }
+
+    /**
+     * Returns a customizer which is the aggregation of all
+     * customizers found on classpath via service loading.
+     * @return an application customizer
+     * @param classLoader The class loader to use
+     */
+    @NonNull
+    private static ApplicationContextConfigurer loadApplicationContextCustomizer(@Nullable ClassLoader classLoader) {
+        SoftServiceLoader<ApplicationContextConfigurer> loader = classLoader != null ? SoftServiceLoader.load(
+                ApplicationContextConfigurer.class, classLoader
+        ) : SoftServiceLoader.load(ApplicationContextConfigurer.class);
+        List<ApplicationContextConfigurer> configurers = new ArrayList<>(10);
+        loader.collectAll(configurers);
+        if (configurers.isEmpty()) {
+            return ApplicationContextConfigurer.NO_OP;
+        }
+        if (configurers.size() == 1) {
+            return configurers.get(0);
+        }
+        OrderUtil.sort(configurers);
+        return new ApplicationContextConfigurer() {
+
+            @Override
+            public void configure(ApplicationContextBuilder builder) {
+                for (ApplicationContextConfigurer customizer : configurers) {
+                    customizer.configure(builder);
+                }
+            }
+
+        };
     }
 }

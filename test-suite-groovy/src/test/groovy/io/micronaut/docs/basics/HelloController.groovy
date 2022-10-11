@@ -22,10 +22,11 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.annotation.Status
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
-import io.reactivex.Maybe
-
+import org.reactivestreams.Publisher
+import io.micronaut.core.async.annotation.SingleResult
+import reactor.core.publisher.Mono
 import static io.micronaut.http.HttpRequest.GET
 import static io.micronaut.http.HttpStatus.CREATED
 import static io.micronaut.http.MediaType.TEXT_PLAIN
@@ -35,17 +36,17 @@ import static io.micronaut.http.MediaType.TEXT_PLAIN
 @Controller("/")
 class HelloController {
 
-    private final RxHttpClient httpClient
+    private final HttpClient httpClient
 
-    HelloController(@Client("/endpoint") RxHttpClient httpClient) {
+    HelloController(@Client("/endpoint") HttpClient httpClient) {
         this.httpClient = httpClient
     }
 
     // tag::nonblocking[]
     @Get("/hello/{name}")
-    Maybe<String> hello(String name) { // <1>
-        httpClient.retrieve( GET("/hello/" + name) )
-                  .firstElement() // <2>
+    @SingleResult
+    Publisher<String> hello(String name) { // <1>
+        Mono.from(httpClient.retrieve( GET("/hello/" + name))) // <2>
     }
     // end::nonblocking[]
 

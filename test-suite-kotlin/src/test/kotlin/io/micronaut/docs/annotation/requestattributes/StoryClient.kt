@@ -19,7 +19,8 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.RequestAttribute
 import io.micronaut.http.annotation.RequestAttributes
 import io.micronaut.http.client.annotation.Client
-import io.reactivex.Single
+import io.micronaut.core.async.annotation.SingleResult
+import org.reactivestreams.Publisher
 
 // tag::class[]
 @Client("/story")
@@ -27,6 +28,7 @@ import io.reactivex.Single
 interface StoryClient {
 
     @Get("/{storyId}")
-    fun getById(@RequestAttribute storyId: String): Single<Story>
+    @SingleResult
+    fun getById(@RequestAttribute storyId: String): Publisher<Story>
 }
 // end::class[]

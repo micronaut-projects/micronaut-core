@@ -2,6 +2,7 @@ package io.micronaut.inject.field.inheritance
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.inject.writer.BeanDefinitionWriter
 
 class FieldInheritanceInjectionSpec extends AbstractTypeElementSpec {
 
@@ -30,7 +31,7 @@ class Listener extends AbstractListener {
         noExceptionThrown()
 
         when:
-        context.classLoader.loadClass('test.$AbstractListenerDefinition')
+        context.classLoader.loadClass('test.$AbstractListener' + BeanDefinitionWriter.CLASS_SUFFIX)
 
         then:
         thrown(ClassNotFoundException)

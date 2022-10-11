@@ -47,7 +47,7 @@ public interface HttpMessage<B> extends MutableAttributeHolder {
 
     /**
      * <p>A {@link MutableConvertibleValues} of the attributes for this HTTP message.</p>
-     * <p>
+     *
      * <p>Attributes are designed for internal data sharing and hence are isolated from headers and parameters which are client supplied</p>
      *
      * @return The attributes of the message
@@ -119,7 +119,6 @@ public interface HttpMessage<B> extends MutableAttributeHolder {
      * @return The content type
      */
     default @NonNull Optional<MediaType> getContentType() {
-        return getHeaders()
-            .contentType();
+        return getHeaders().contentType();
     }
 }

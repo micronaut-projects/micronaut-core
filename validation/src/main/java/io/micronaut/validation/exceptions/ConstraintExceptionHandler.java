@@ -71,6 +71,7 @@ public class ConstraintExceptionHandler implements ExceptionHandler<ConstraintVi
                     exception.getConstraintViolations()
                             .stream()
                             .map(this::buildMessage)
+                            .sorted()
                             .collect(Collectors.toList())
             ).build(), response);
         }
@@ -86,17 +87,27 @@ public class ConstraintExceptionHandler implements ExceptionHandler<ConstraintVi
         Path propertyPath = violation.getPropertyPath();
         StringBuilder message = new StringBuilder();
         Iterator<Path.Node> i = propertyPath.iterator();
+
         while (i.hasNext()) {
             Path.Node node = i.next();
+
             if (node.getKind() == ElementKind.METHOD || node.getKind() == ElementKind.CONSTRUCTOR) {
                 continue;
             }
+
             message.append(node.getName());
+
+            if (node.getIndex() != null) {
+                message.append(String.format("[%d]", node.getIndex()));
+            }
+
             if (i.hasNext()) {
                 message.append('.');
             }
         }
+
         message.append(": ").append(violation.getMessage());
+
         return message.toString();
     }
 }

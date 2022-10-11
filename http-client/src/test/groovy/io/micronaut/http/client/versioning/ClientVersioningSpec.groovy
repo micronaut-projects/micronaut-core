@@ -16,6 +16,7 @@
 package io.micronaut.http.client.versioning
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.context.env.PropertySource
 import io.micronaut.core.version.annotation.Version
 import io.micronaut.http.HttpRequest
@@ -31,11 +32,12 @@ class ClientVersioningSpec extends Specification {
 
     @Shared
     @AutoCleanup
-    def server = ApplicationContext.run(EmbeddedServer, PropertySource.of([
+    EmbeddedServer server = ApplicationContext.run(EmbeddedServer,[
+            'spec.name':  'ClientVersioningSpec',
             "micronaut.http.client.versioning./.headers"         : ['X-API-VERSION'],
             "micronaut.http.client.versioning./.parameters"      : ['api-version'],
             "micronaut.http.client.versioning.default.parameters": ['version'],
-    ]), "test")
+    ])
 
     def "should has 'api-version' parameter inside client request"() {
         when:
@@ -85,6 +87,7 @@ class ClientVersioningSpec extends Specification {
         response == null
     }
 
+    @Requires(property = 'spec.name', value = 'ClientVersioningSpec')
     @Version("0")
     @Client("/")
     static interface VersionedClient {
@@ -106,6 +109,7 @@ class ClientVersioningSpec extends Specification {
 
     }
 
+    @Requires(property = 'spec.name', value = 'ClientVersioningSpec')
     @Client("/notconfigured")
     static interface DefaulConfVersionedClient {
 
@@ -118,6 +122,7 @@ class ClientVersioningSpec extends Specification {
         String request2();
     }
 
+    @Requires(property = 'spec.name', value = 'ClientVersioningSpec')
     @Controller("/")
     static class TestController {
 

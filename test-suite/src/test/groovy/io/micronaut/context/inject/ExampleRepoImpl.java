@@ -15,7 +15,7 @@
  */
 package io.micronaut.context.inject;
 
-import javax.annotation.PostConstruct;
+import jakarta.annotation.PostConstruct;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 

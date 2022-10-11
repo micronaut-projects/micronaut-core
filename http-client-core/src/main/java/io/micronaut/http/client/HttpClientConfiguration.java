@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.client;
 
-import io.micronaut.core.annotation.Internal;
+import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.format.ReadableBytes;
@@ -32,24 +32,18 @@ import java.net.ProxySelector;
 import java.net.SocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
-import java.util.ServiceLoader;
 import java.util.concurrent.ThreadFactory;
 
 /**
- * Configuration for the {@link HttpClient}. This configuration only takes affect for {@link HttpClient}
- * instances created outside the application context using {@link HttpClient#create(URL, HttpClientConfiguration)}.
- * For clients created within the context using, e.g. {@link javax.inject.Inject} or
- * {@link io.micronaut.context.ApplicationContext#createBean(Class)}, use event loop group configuration.
+ * Configuration for the {@link HttpClient}.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -103,8 +97,6 @@ public abstract class HttpClientConfiguration {
      */
     @SuppressWarnings("WeakerAccess")
     public static final boolean DEFAULT_EXCEPTION_ON_ERROR_STATUS = true;
-
-    private static RxHttpClientFactory clientFactory = null;
 
     private Map<String, Object> channelOptions = Collections.emptyMap();
 
@@ -286,14 +278,14 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
-     * @return Whether throwing an exception upon HTTP error status (>= 400) is preferred.
+     * @return Whether throwing an exception upon HTTP error status (&gt;= 400) is preferred.
      */
     public boolean isExceptionOnErrorStatus() {
         return exceptionOnErrorStatus;
     }
 
     /**
-     * Sets whether throwing an exception upon HTTP error status (>= 400) is preferred. Default value ({@link io.micronaut.http.client.HttpClientConfiguration#DEFAULT_EXCEPTION_ON_ERROR_STATUS})
+     * Sets whether throwing an exception upon HTTP error status (&gt;= 400) is preferred. Default value ({@link io.micronaut.http.client.HttpClientConfiguration#DEFAULT_EXCEPTION_ON_ERROR_STATUS})
      *
      * @param exceptionOnErrorStatus Whether
      */
@@ -517,7 +509,7 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
-     * Sets the maximum content length the client can consume. Default value ({@value io.micronaut.http.client.HttpClientConfiguration#DEFAULT_MAX_CONTENT_LENGTH} => 10MB).
+     * Sets the maximum content length the client can consume. Default value ({@value io.micronaut.http.client.HttpClientConfiguration#DEFAULT_MAX_CONTENT_LENGTH} =&gt; 10MB).
      *
      * @param maxContentLength The maximum content length the client can consume
      */
@@ -526,9 +518,9 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
-     * The proxy to use. For authentication specify http.proxyUser and http.proxyPassword system properties.
-     * <p>
-     * Alternatively configure a {@code java.net.ProxySelector}
+     * <p>The proxy to use. For authentication specify http.proxyUser and http.proxyPassword system properties.</p>
+     *
+     * <p>Alternatively configure a {@code java.net.ProxySelector}</p>
      *
      * @return The proxy type
      */
@@ -568,7 +560,7 @@ public abstract class HttpClientConfiguration {
      */
     public Optional<String> getProxyUsername() {
         String type = proxyType.name().toLowerCase();
-        return proxyUsername != null ? Optional.of(proxyUsername) : Optional.ofNullable(System.getProperty(type + ".proxyUser"));
+        return proxyUsername != null ? Optional.of(proxyUsername) : Optional.ofNullable(CachedEnvironment.getProperty(type + ".proxyUser"));
     }
 
     /**
@@ -586,7 +578,7 @@ public abstract class HttpClientConfiguration {
     @SuppressWarnings("WeakerAccess")
     public Optional<String> getProxyPassword() {
         String type = proxyType.name().toLowerCase();
-        return proxyPassword != null ? Optional.of(proxyPassword) : Optional.ofNullable(System.getProperty(type + ".proxyPassword"));
+        return proxyPassword != null ? Optional.of(proxyPassword) : Optional.ofNullable(CachedEnvironment.getProperty(type + ".proxyPassword"));
     }
 
     /**
@@ -643,88 +635,6 @@ public abstract class HttpClientConfiguration {
         } catch (URISyntaxException e) {
             throw new RuntimeException(e);
         }
-    }
-
-    /**
-     * Create a new {@link HttpClient}. Note that this method should only be used outside of the context of an application. Within Micronaut use
-     * {@link javax.inject.Inject} to inject a client instead
-     *
-     * @param url The base URL
-     * @return The client
-     */
-    @Internal
-    static RxHttpClient createClient(@Nullable URL url) {
-        RxHttpClientFactory clientFactory = getRxHttpClientFactory();
-
-        return clientFactory.createClient(url);
-    }
-
-    /**
-     * Create a new {@link HttpClient} with the specified configuration. Note that this method should only be used
-     * outside of the context of an application. Within Micronaut use {@link javax.inject.Inject} to inject a client instead
-     *
-     * @param url The base URL
-     * @param configuration the client configuration
-     * @return The client
-     * @since 2.2.0
-     */
-    @Internal
-    static RxHttpClient createClient(@Nullable URL url, HttpClientConfiguration configuration) {
-        RxHttpClientFactory clientFactory = getRxHttpClientFactory();
-
-        return clientFactory.createClient(url, configuration);
-    }
-
-    /**
-     * Create a new {@link HttpClient}. Note that this method should only be used outside of the context of an application. Within Micronaut use
-     * {@link javax.inject.Inject} to inject a client instead
-     *
-     * @param url The base URL
-     * @return The client
-     */
-    @Internal
-    static RxStreamingHttpClient createStreamingClient(@NonNull URL url) {
-        ArgumentUtils.requireNonNull("url", url);
-        RxHttpClientFactory clientFactory = getRxHttpClientFactory();
-        return clientFactory.createStreamingClient(url);
-    }
-
-    /**
-     * Create a new {@link HttpClient} with the specified configuration. Note that this method should only be used
-     * outside of the context of an application. Within Micronaut use {@link javax.inject.Inject} to inject a client instead
-     *
-     * @param url The base URL
-     * @param configuration The client configuration
-     * @return The client
-     * @since 2.2.0
-     */
-    @Internal
-    static RxStreamingHttpClient createStreamingClient(@NonNull URL url, HttpClientConfiguration configuration) {
-        ArgumentUtils.requireNonNull("url", url);
-        RxHttpClientFactory clientFactory = getRxHttpClientFactory();
-        return clientFactory.createStreamingClient(url, configuration);
-    }
-
-    private static RxHttpClientFactory getRxHttpClientFactory() {
-        RxHttpClientFactory clientFactory = HttpClientConfiguration.clientFactory;
-        if (clientFactory == null) {
-            synchronized (HttpClientConfiguration.class) { // double check
-                clientFactory = HttpClientConfiguration.clientFactory;
-                if (clientFactory == null) {
-                    clientFactory = resolveClientFactory();
-                    HttpClientConfiguration.clientFactory = clientFactory;
-                }
-            }
-        }
-        return clientFactory;
-    }
-
-    private static RxHttpClientFactory resolveClientFactory() {
-        final Iterator<RxHttpClientFactory> i = ServiceLoader.load(RxHttpClientFactory.class).iterator();
-        if (i.hasNext()) {
-            return i.next();
-        }
-        throw new IllegalStateException("No RxHttpClientFactory present on classpath, cannot create HTTP client");
     }
 
     /**
@@ -829,6 +739,4 @@ public abstract class HttpClientConfiguration {
             this.acquireTimeout = acquireTimeout;
         }
     }
-
-
 }

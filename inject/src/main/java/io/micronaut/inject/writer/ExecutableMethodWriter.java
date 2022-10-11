@@ -252,6 +252,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
                     genericReturnType,
                     genericReturnType.getAnnotationMetadata(),
                     genericReturnType.getTypeArguments(),
+                    new HashMap<>(),
                     loadTypeMethods
             );
         }
@@ -264,11 +265,13 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
                     classWriter,
                     constructorWriter,
                     argumentTypes,
+                    new HashMap<>(),
                     loadTypeMethods
             );
 
             for (ParameterElement pe : argumentTypes) {
                 DefaultAnnotationMetadata.contributeDefaults(this.annotationMetadata, pe.getAnnotationMetadata());
+                DefaultAnnotationMetadata.contributeRepeatable(this.annotationMetadata, pe.getGenericType());
             }
             // now invoke super(..) if no arg constructor
             invokeConstructor(

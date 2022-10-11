@@ -17,17 +17,41 @@ package io.micronaut.docs.i18n
 
 import io.micronaut.context.MessageSource
 import io.micronaut.context.i18n.ResourceBundleMessageSource
+import io.micronaut.test.extensions.junit5.annotation.MicronautTest
+import jakarta.inject.Inject
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
-import java.util.Locale
+import java.util.*
 
+@MicronautTest(startApplication = false)
 class I18nTest {
+    @Inject
+    lateinit var messageSource: MessageSource
+
     @Test
     fun itIsPossibleToCreateAMessageSourceFromResourceBundle() {
         //tag::test[]
-        val ms = ResourceBundleMessageSource("io.micronaut.docs.i18n.messages")
-        Assertions.assertEquals("Hola", ms.getMessage("hello", MessageSource.MessageContext.of(Locale("es"))).get())
-        Assertions.assertEquals("Hello", ms.getMessage("hello", MessageSource.MessageContext.of(Locale.ENGLISH)).get())
+        Assertions.assertEquals("Hola", messageSource.getMessage("hello", MessageSource.MessageContext.of(Locale("es"))).get())
+        Assertions.assertEquals("Hello", messageSource.getMessage("hello", MessageSource.MessageContext.of(Locale.ENGLISH)).get())
         //end::test[]
+
+        Assertions.assertEquals("Hola", messageSource.getMessage("hello", Locale("es")).get())
+        Assertions.assertEquals("Hello", messageSource.getMessage("hello", Locale.ENGLISH).get())
+
+        Assertions.assertTrue(messageSource.getMessage("hello.name", Locale("es"), "Sergio").isPresent)
+        Assertions.assertEquals("Hola Sergio", messageSource.getMessage("hello.name", Locale("es"), "Sergio").get())
+        Assertions.assertTrue(messageSource.getMessage("hello.name", Locale.ENGLISH, "Sergio").isPresent)
+        Assertions.assertEquals("Hello Sergio", messageSource.getMessage("hello.name", Locale.ENGLISH, "Sergio").get())
+
+        Assertions.assertTrue(messageSource.getMessage("hello.name", Locale("es"), mapOf(Pair("0", "Sergio"))).isPresent)
+        Assertions.assertEquals(
+            "Hola Sergio",
+            messageSource.getMessage("hello.name", Locale("es"), mapOf(Pair("0", "Sergio"))).get()
+        )
+        Assertions.assertTrue(messageSource.getMessage("hello.name", Locale.ENGLISH, mapOf(Pair("0", "Sergio"))).isPresent)
+        Assertions.assertEquals(
+            "Hello Sergio",
+            messageSource.getMessage("hello.name", Locale.ENGLISH, mapOf(Pair("0", "Sergio"))).get()
+        )
     }
 }

@@ -23,7 +23,7 @@ import org.codehaus.groovy.ast.ClassNode
  * @author graemerocher
  * @since 1.0
  */
-class GroovyConfigurationMetadataBuilderSpec extends AbstractBeanDefinitionSpec{
+class GroovyConfigurationMetadataBuilderSpec extends AbstractBeanDefinitionSpec {
 
     void "test build configuration metadata with annotation aliases"() {
         given:

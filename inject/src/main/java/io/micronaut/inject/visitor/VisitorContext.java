@@ -15,9 +15,9 @@
  */
 package io.micronaut.inject.visitor;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
@@ -91,20 +91,6 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      */
     default @NonNull VisitorConfiguration getConfiguration() {
         return VisitorConfiguration.DEFAULT;
-    }
-
-    /**
-     * Visit a file within the META-INF directory.
-     *
-     * @param path The path to the file
-     * @return An optional file it was possible to create it
-     * @deprecated Visiting a file should supply the originating elements. Use {@link #visitMetaInfFile(String, Element...)} instead
-     */
-    @Override
-    @Experimental
-    @Deprecated
-    default Optional<GeneratedFile> visitMetaInfFile(String path) {
-        return visitMetaInfFile(path, Element.EMPTY_ELEMENT_ARRAY);
     }
 
     /**
@@ -262,4 +248,5 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     default void addGeneratedResource(String resource) {
         info("EXPERIMENTAL: Compile time resource contribution to the context is experimental", null);
     }
+
 }

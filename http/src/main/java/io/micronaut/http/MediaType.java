@@ -19,8 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.convert.ArgumentConversionContext;
-import io.micronaut.core.convert.ConversionContext;
-import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.ImmutableArgumentConversionContext;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
@@ -37,7 +36,16 @@ import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
 import java.util.regex.Pattern;
 
 /**
@@ -124,6 +132,16 @@ public class MediaType implements CharSequence {
      * HTML: text/html.
      */
     public static final MediaType TEXT_HTML_TYPE = new MediaType(TEXT_HTML);
+
+    /**
+     * CSV: text/csv.
+     */
+    public static final String TEXT_CSV = "text/csv";
+
+    /**
+     * CSV: text/csv.
+     */
+    public static final MediaType TEXT_CSV_TYPE = new MediaType(TEXT_CSV);
 
     /**
      * XHTML: application/xhtml+xml.
@@ -364,7 +382,7 @@ public class MediaType implements CharSequence {
     static final Argument<MediaType> ARGUMENT = Argument.of(MediaType.class);
 
     @Internal
-    static final ArgumentConversionContext<MediaType> CONVERSION_CONTEXT = ConversionContext.of(ARGUMENT);
+    static final ArgumentConversionContext<MediaType> CONVERSION_CONTEXT = ImmutableArgumentConversionContext.of(ARGUMENT);
 
     private static final char SEMICOLON = ';';
 
@@ -384,13 +402,6 @@ public class MediaType implements CharSequence {
     private BigDecimal qualityNumberField = BigDecimal.ONE;
 
     static {
-        ConversionService.SHARED.addConverter(CharSequence.class, MediaType.class, charSequence -> {
-                    if (StringUtils.isNotEmpty(charSequence)) {
-                        return of(charSequence.toString());
-                    }
-                    return null;
-                }
-        );
         textTypePatterns.add(Pattern.compile("^text/.*$"));
         textTypePatterns.add(Pattern.compile("^.*\\+json$"));
         textTypePatterns.add(Pattern.compile("^.*\\+text$"));
@@ -515,6 +526,8 @@ public class MediaType implements CharSequence {
                 return MULTIPART_FORM_DATA_TYPE;
             case TEXT_HTML:
                 return TEXT_HTML_TYPE;
+            case TEXT_CSV:
+                return TEXT_CSV_TYPE;
             case APPLICATION_XHTML:
                 return APPLICATION_XHTML_TYPE;
             case APPLICATION_XML:

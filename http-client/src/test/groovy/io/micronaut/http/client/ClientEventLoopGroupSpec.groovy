@@ -15,7 +15,7 @@ class ClientEventLoopGroupSpec extends Specification {
                 'micronaut.http.client.event-loop-group': 'invalid'
         )
 
-        context.getBean(RxHttpClient)
+        context.getBean(HttpClient)
 
         then:
         def e = thrown(BeanInstantiationException)
@@ -31,11 +31,10 @@ class ClientEventLoopGroupSpec extends Specification {
                 'micronaut.netty.event-loops.other.num-threads': 0,
                 'micronaut.http.client.event-loop-group': 'other'
         )
-
-        RxHttpClient client = context.getBean(RxHttpClient)
+        HttpClient client = context.getBean(HttpClient)
 
         then:
-        client.group == context.getBean(EventLoopGroup, Qualifiers.byName("other"))
+        client.connectionManager.group == context.getBean(EventLoopGroup, Qualifiers.byName("other"))
 
         cleanup:
         context.close()

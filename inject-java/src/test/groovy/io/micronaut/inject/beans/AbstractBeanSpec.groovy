@@ -16,7 +16,8 @@
 package io.micronaut.inject.beans
 
 import io.micronaut.aop.Intercepted
-import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.ApplicationContext
+import io.micronaut.context.BeanContext
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 
@@ -25,6 +26,41 @@ import io.micronaut.inject.BeanDefinition
  * @since 1.0
  */
 class AbstractBeanSpec extends AbstractTypeElementSpec {
+
+    void "test abstract beans not included in injected collections"() {
+        given:
+        ApplicationContext context = buildContext('test.Test', '''
+package test;
+
+import io.micronaut.context.annotation.*;
+import jakarta.inject.Inject;
+import java.util.List;
+
+class Test {
+
+    @Inject
+    List<InterceptRule> list;
+}
+
+@jakarta.inject.Singleton
+abstract class AbstractBean implements InterceptRule {
+
+}
+@jakarta.inject.Singleton
+class ConcreteBean implements InterceptRule {
+
+}
+interface InterceptRule {}
+''')
+        def bean = getBean(context, 'test.Test')
+
+        expect:
+        bean.list.size() == 1
+        bean.list.first().getClass().name == 'test.ConcreteBean'
+
+        cleanup:
+        context.close()
+    }
 
     void "test that abstract bean definitions are built for abstract classes"() {
         when:
@@ -48,7 +84,7 @@ abstract class AbstractBean {
 
     void "test getBeansOfType filters proxy targets"() {
         when:
-        def ctx = DefaultBeanContext.run()
+        def ctx = BeanContext.run()
         def targetBean = ctx.getProxyTargetBean(InterceptedBean, null)
         def bean = ctx.getBean(InterceptedBean)
 
@@ -66,7 +102,7 @@ abstract class AbstractBean {
 
     void "test getBeansOfType filters proxy targets with context scoped beans"() {
         when:
-        def ctx = DefaultBeanContext.run()
+        def ctx = BeanContext.run()
         def targetBean = ctx.getProxyTargetBean(ContextScopedInterceptedBean, null)
         def bean = ctx.getBean(ContextScopedInterceptedBean)
 
@@ -84,7 +120,7 @@ abstract class AbstractBean {
 
     void "test getBeansOfType filters proxy targets with parallel beans"() {
         when:
-        def ctx = DefaultBeanContext.run()
+        def ctx = BeanContext.run()
         Thread.sleep(100)
         def targetBean = ctx.getProxyTargetBean(ParallelBean, null)
         def bean = ctx.getBean(ParallelBean)

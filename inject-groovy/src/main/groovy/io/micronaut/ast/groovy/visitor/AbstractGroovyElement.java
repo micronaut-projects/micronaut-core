@@ -27,21 +27,27 @@ import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.ast.ElementModifier;
 import io.micronaut.inject.ast.MemberElement;
 import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.ClassNode;
+import org.codehaus.groovy.ast.MethodNode;
+import org.codehaus.groovy.ast.FieldNode;
 import org.codehaus.groovy.ast.GenericsType;
 import org.codehaus.groovy.control.CompilationUnit;
 import org.codehaus.groovy.control.SourceUnit;
 
 import io.micronaut.core.annotation.NonNull;
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Modifier;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
+import java.util.regex.Pattern;
 
 /**
  * Abstract Groovy element.
@@ -51,6 +57,8 @@ import java.util.function.Predicate;
  */
 
 public abstract class AbstractGroovyElement implements AnnotationMetadataDelegate, Element {
+
+    private static final Pattern JAVADOC_PATTERN = Pattern.compile("(/\\s*\\*\\*)|\\s*\\*|(\\s*[*/])");
 
     protected final SourceUnit sourceUnit;
     protected final CompilationUnit compilationUnit;
@@ -64,7 +72,7 @@ public abstract class AbstractGroovyElement implements AnnotationMetadataDelegat
      * @param annotatedNode      The annotated node
      * @param annotationMetadata The annotation metadata
      */
-    public AbstractGroovyElement(GroovyVisitorContext visitorContext, AnnotatedNode annotatedNode, AnnotationMetadata annotationMetadata) {
+    protected AbstractGroovyElement(GroovyVisitorContext visitorContext, AnnotatedNode annotatedNode, AnnotationMetadata annotationMetadata) {
         this.visitorContext = visitorContext;
         this.compilationUnit = visitorContext.getCompilationUnit();
         this.annotatedNode = annotatedNode;
@@ -98,6 +106,17 @@ public abstract class AbstractGroovyElement implements AnnotationMetadataDelegat
             );
             updateAnnotationCaches();
         }
+        return this;
+    }
+
+    @Override
+    public <T extends Annotation> Element annotate(AnnotationValue<T> annotationValue) {
+        ArgumentUtils.requireNonNull("annotationValue", annotationValue);
+        this.annotationMetadata = new GroovyAnnotationMetadataBuilder(sourceUnit, compilationUnit).annotate(
+                this.annotationMetadata,
+                annotationValue
+        );
+        updateAnnotationCaches();
         return this;
     }
 
@@ -320,6 +339,14 @@ public abstract class AbstractGroovyElement implements AnnotationMetadataDelegat
         return null;
     }
 
+    @Override
+    public Optional<String> getDocumentation() {
+        if (annotatedNode.getGroovydoc() == null || annotatedNode.getGroovydoc().getContent() == null) {
+            return Optional.empty();
+        }
+        return Optional.of(JAVADOC_PATTERN.matcher(annotatedNode.getGroovydoc().getContent()).replaceAll(StringUtils.EMPTY_STRING).trim());
+    }
+
     /**
      * Resolves the annotation metadata for the given type.
      * @param type The type
@@ -350,6 +377,53 @@ public abstract class AbstractGroovyElement implements AnnotationMetadataDelegat
     @Override
     public int hashCode() {
         return Objects.hash(annotatedNode);
+    }
+
+    /**
+     * Resolve modifiers for a method node.
+     * @param methodNode The method node
+     * @return The modifiers
+     */
+    protected Set<ElementModifier> resolveModifiers(MethodNode methodNode) {
+        return resolveModifiers(methodNode.getModifiers());
+    }
+
+    /**
+     * Resolve modifiers for a field node.
+     * @param fieldNode The field node
+     * @return The modifiers
+     */
+    protected Set<ElementModifier> resolveModifiers(FieldNode fieldNode) {
+        return resolveModifiers(fieldNode.getModifiers());
+    }
+
+    /**
+     * Resolve modifiers for a class node.
+     * @param classNode The class node
+     * @return The modifiers
+     */
+    protected Set<ElementModifier> resolveModifiers(ClassNode classNode) {
+        return resolveModifiers(classNode.getModifiers());
+    }
+
+    private Set<ElementModifier> resolveModifiers(int mod) {
+        Set<ElementModifier> modifiers = new HashSet<>(5);
+        if (Modifier.isPrivate(mod)) {
+            modifiers.add(ElementModifier.PRIVATE);
+        } else if (Modifier.isProtected(mod)) {
+            modifiers.add(ElementModifier.PROTECTED);
+        } else if (Modifier.isPublic(mod)) {
+            modifiers.add(ElementModifier.PUBLIC);
+        }
+        if (Modifier.isAbstract(mod)) {
+            modifiers.add(ElementModifier.ABSTRACT);
+        } else if (Modifier.isStatic(mod)) {
+            modifiers.add(ElementModifier.STATIC);
+        }
+        if (Modifier.isFinal(mod)) {
+            modifiers.add(ElementModifier.FINAL);
+        }
+        return modifiers;
     }
 }
 

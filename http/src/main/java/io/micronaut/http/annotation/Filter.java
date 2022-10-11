@@ -17,6 +17,7 @@ package io.micronaut.http.annotation;
 
 import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.http.HttpMethod;
+import io.micronaut.http.filter.FilterPatternStyle;
 import jakarta.inject.Singleton;
 
 import java.lang.annotation.Documented;
@@ -29,7 +30,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 /**
  * <p>An annotation that can be applied to classes that implement {@link io.micronaut.http.filter.HttpFilter} to
  * specify the patterns.</p>
- * <p>
+ *
  * <p>Used as an alternative to applying filters manually via the {code Router} API</p>
  *
  * @author Graeme Rocher
@@ -52,6 +53,11 @@ public @interface Filter {
     String[] value() default {};
 
     /**
+     * @return The style of pattern this filter uses
+     */
+    FilterPatternStyle patternStyle() default FilterPatternStyle.ANT;
+
+    /**
      * Same as {@link #value()}.
      *
      * @return The patterns
@@ -66,9 +72,15 @@ public @interface Filter {
 
     /**
      * The service identifiers this filter applies to. Currently, applies only to {@link io.micronaut.http.filter.HttpClientFilter} instances.
-     * Equivalent to the {@code id()} of {@code io.micronaut.http.client.Client}.
      *
      * @return The service identifiers
      */
     String[] serviceId() default {};
+
+    /**
+     * The service identifiers this filter does not apply to. Currently, applies only to {@link io.micronaut.http.filter.HttpClientFilter} instances.
+     *
+     * @return The service identifiers
+     */
+    String[] excludeServiceId() default {};
 }

@@ -21,11 +21,7 @@ import ch.qos.logback.core.AppenderBase
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.PropertySource
-import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpMethod
-import io.micronaut.http.HttpRequest
-import io.micronaut.http.client.RxHttpClient
-import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.netty.channel.EventLoopGroupFactory
 import io.micronaut.http.netty.channel.converters.ChannelOptionFactory
 import io.micronaut.http.netty.channel.converters.DefaultChannelOptionFactory
@@ -33,8 +29,7 @@ import io.micronaut.http.netty.channel.converters.EpollChannelOptionFactory
 import io.micronaut.http.netty.channel.converters.KQueueChannelOptionFactory
 import io.micronaut.http.server.HttpServerConfiguration
 import io.micronaut.http.server.cors.CorsOriginConfiguration
-import io.micronaut.http.server.netty.NettyHttpServer
-import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.http.server.netty.NettyEmbeddedServer
 import io.netty.bootstrap.ServerBootstrap
 import io.netty.channel.ChannelOption
 import io.netty.channel.epoll.Epoll
@@ -45,7 +40,6 @@ import io.netty.channel.unix.UnixChannelOption
 import io.netty.util.internal.logging.InternalLogger
 import io.netty.util.internal.logging.InternalLoggerFactory
 import org.slf4j.LoggerFactory
-import spock.lang.Ignore
 import spock.lang.IgnoreIf
 import spock.lang.Specification
 import spock.lang.Unroll
@@ -265,7 +259,7 @@ class NettyHttpServerConfigurationSpec extends Specification {
         eventLoopGroupFactory.serverSocketChannelClass() == EpollServerSocketChannel.class
 
         when:
-        NettyHttpServer server = beanContext.getBean(NettyHttpServer)
+        NettyEmbeddedServer server = beanContext.getBean(NettyEmbeddedServer)
         server.start()
 
         then:
@@ -327,7 +321,7 @@ class NettyHttpServerConfigurationSpec extends Specification {
         config.worker.shutdownTimeout == Duration.ofSeconds(2)
 
         then:
-        NettyHttpServer server = beanContext.getBean(NettyHttpServer)
+        NettyEmbeddedServer server = beanContext.getBean(NettyEmbeddedServer)
         server.start()
 
         then:
@@ -356,7 +350,7 @@ class NettyHttpServerConfigurationSpec extends Specification {
 
         when:
         NettyHttpServerConfiguration config = beanContext.getBean(NettyHttpServerConfiguration)
-        NettyHttpServer server = beanContext.getBean(NettyHttpServer)
+        NettyEmbeddedServer server = beanContext.getBean(NettyEmbeddedServer)
         server.start()
 
         then:
@@ -458,7 +452,7 @@ class NettyHttpServerConfigurationSpec extends Specification {
         beanContext.start()
 
         when:
-        NettyHttpServer server = beanContext.getBean(NettyHttpServer)
+        NettyEmbeddedServer server = beanContext.getBean(NettyEmbeddedServer)
         server.start()
 
         then:

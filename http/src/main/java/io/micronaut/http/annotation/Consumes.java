@@ -23,12 +23,13 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
+import java.lang.annotation.Inherited;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
 /**
- * <p>An annotation to indicate the {@link io.micronaut.http.MediaType}s produced by a particular component.</p>
- * <p>
+ * <p>An annotation to indicate the {@link io.micronaut.http.MediaType}s consumed by a particular component.</p>
+ *
  * <p>Generally with controllers one can use the {@code consumes} attribute of the {@code Controller} annotation,
  * however this annotation is more generic and applies to any component</p>
  *
@@ -38,6 +39,7 @@ import java.lang.annotation.Target;
 @Documented
 @Retention(RUNTIME)
 @Target({ElementType.METHOD, ElementType.TYPE})
+@Inherited
 public @interface Consumes {
 
     /**
@@ -47,7 +49,7 @@ public @interface Consumes {
 
     /**
      * <p>Applies to clients that return reactive types.</p>
-     * <p>
+     *
      * <p>This member indicates whether the response handling should stream or wait until
      * the full response is read. Normally this annotation is unnecessary unless the declared type doesn't indicate
      * how many items are emitted.</p>

@@ -15,6 +15,8 @@
  */
 package io.micronaut.aop;
 
+import io.micronaut.core.annotation.Nullable;
+
 /**
  * A MethodInterceptor extends the generic {@link Interceptor} and provides an interface more specific to method interception.
  *
@@ -32,8 +34,10 @@ public interface MethodInterceptor<T, R> extends Interceptor<T, R> {
      * @param context The context
      * @return The result
      */
+    @Nullable
     R intercept(MethodInvocationContext<T, R> context);
 
+    @Nullable
     @Override
     default R intercept(InvocationContext<T, R> context) {
         if (context instanceof MethodInvocationContext) {

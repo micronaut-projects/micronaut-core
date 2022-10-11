@@ -17,16 +17,22 @@ package io.micronaut.context;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.value.ValueResolver;
-import io.micronaut.inject.*;
+import io.micronaut.inject.BeanDefinition;
+import io.micronaut.inject.BeanIdentifier;
+import io.micronaut.inject.FieldInjectionPoint;
+import io.micronaut.inject.InjectionPoint;
+import io.micronaut.inject.MethodInjectionPoint;
 
-import io.micronaut.core.annotation.Nullable;
-
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 /**
  * Represents the resolution context for a current resolve of a given bean.
@@ -41,6 +47,95 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     default void close() {
         // no-op
     }
+
+    /**
+     * Get a bean of the given type and qualifier.
+     *
+     * @param beanType          The bean type
+     * @param qualifier         The qualifier
+     * @param <T>               The bean type parameter
+     * @return The found bean
+     * @since 3.5.0
+     */
+    @NonNull
+    <T> T getBean(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier);
+
+    /**
+     * Get all beans of the given type and qualifier.
+     *
+     * @param beanType          The bean type
+     * @param qualifier         The qualifier
+     * @param <T>               The bean type parameter
+     * @return The found beans
+     * @since 3.5.0
+     */
+    @NonNull
+    <T> Collection<T> getBeansOfType(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier);
+
+    /**
+     * Obtains a stream of beans of the given type and qualifier.
+     *
+     * @param beanType          The bean type
+     * @param qualifier         The qualifier
+     * @param <T>               The bean concrete type
+     * @return A stream
+     * @since 3.5.0
+     */
+    @NonNull
+    <T> Stream<T> streamOfType(@NonNull  Argument<T> beanType, @Nullable  Qualifier<T> qualifier);
+
+    /**
+     * Find an optional bean of the given type and qualifier.
+     *
+     * @param beanType          The bean type
+     * @param qualifier         The qualifier
+     * @param <T>               The bean type parameter
+     * @return The found bean wrapped as an {@link Optional}
+     * @since 3.5.0
+     */
+    @NonNull
+    <T> Optional<T> findBean(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier);
+
+    /**
+     * Injects a bean.
+     *
+     * @param beanDefinition The requesting bean definition
+     * @param instance       The instance
+     * @param <T>            The instance type
+     * @return The instance
+     * @since 3.5.0
+     */
+    @NonNull
+    <T> T inject(@Nullable BeanDefinition<?> beanDefinition, @NonNull T instance);
+
+    /**
+     * Obtains the bean registrations for the given type and qualifier.
+     *
+     * @param beanType          The bean type
+     * @param qualifier         The qualifier
+     * @param <T>               The generic type
+     * @return A collection of {@link BeanRegistration}
+     * @since 3.5.0
+     */
+    @NonNull
+    <T> Collection<BeanRegistration<T>> getBeanRegistrations(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier);
+
+    /**
+     * Call back to destroy any {@link io.micronaut.context.annotation.InjectScope} beans.
+     *
+     * @see io.micronaut.context.annotation.InjectScope
+     * @since 3.1.0
+     */
+    @UsedByGeneratedCode
+    void destroyInjectScopedBeans();
+
+    /**
+     * Copy current context to be used later.
+     *
+     * @return The bean resolution context
+     * @since 3.1.0
+     */
+    BeanResolutionContext copy();
 
     /**
      * @return The context
@@ -81,10 +176,10 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     /**
      * Adds a bean that is created as part of the resolution. This is used to store references to instances passed to {@link BeanContext#inject(Object)}
      * @param beanIdentifier The bean identifier
-     * @param instance The instance
-     * @param <T> THe instance type
+     * @param beanRegistration The bean registration
+     * @param <T> The instance type
      */
-    <T> void addInFlightBean(BeanIdentifier beanIdentifier, T instance);
+    <T> void addInFlightBean(BeanIdentifier beanIdentifier, BeanRegistration<T> beanRegistration);
 
     /**
      * Removes a bean that is in the process of being created. This is used to store references to instances passed to {@link BeanContext#inject(Object)}
@@ -101,7 +196,7 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * @param <T> The bean type
      * @return The bean
      */
-    @Nullable <T> T getInFlightBean(BeanIdentifier beanIdentifier);
+    @Nullable <T> BeanRegistration<T> getInFlightBean(BeanIdentifier beanIdentifier);
 
     /**
      * @return The current bean identifier
@@ -116,12 +211,10 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
 
     /**
      * Adds a dependent bean to the resolution context.
-     * @param identifier The identifier
-     * @param definition The bean definition
-     * @param bean The bean
+     * @param beanRegistration The bean registration
      * @param <T> The generic type
      */
-    <T> void addDependentBean(BeanIdentifier identifier, BeanDefinition<T> definition, T bean);
+    <T> void addDependentBean(BeanRegistration<T> beanRegistration);
 
     /**
      * @return The dependent beans that must be destroyed by an upstream bean
@@ -131,17 +224,64 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     }
 
     /**
+     * @return The current dependent beans that must be destroyed by an upstream bean
+     *
+     * @since 3.5.0
+     */
+    default @Nullable List<BeanRegistration<?>> popDependentBeans() {
+        return null;
+    }
+
+    /**
+     * The push the current dependent beans that must be destroyed by an upstream bean.
+     *
+     * @param dependentBeans Dependent beans collection that can be used to add more dependents
+     * @since 3.5.0
+     */
+    default void pushDependentBeans(@Nullable List<BeanRegistration<?>> dependentBeans) {
+    }
+
+    /**
+     * Marks first dependent as factory.
+     * Dependent can be missing which means it's a singleton or scoped bean.
+     *
+     * @since 3.5.0
+     */
+    default void markDependentAsFactory() {
+    }
+
+    /**
+     * @return The dependent factory beans that was used to create the bean in context
+     * @since 3.5.0
+     */
+    default @Nullable BeanRegistration<?> getAndResetDependentFactoryBean() {
+        return null;
+    }
+
+    /**
      * Represents a path taken to resolve a bean definitions dependencies.
      */
-    interface Path extends Deque<Segment<?>> {
+    interface Path extends Deque<Segment<?>>, AutoCloseable {
         /**
          * Push an unresolved constructor call onto the queue.
          *
          * @param declaringType The type
-         * @param beanType      The bena type
+         * @param beanType      The bean type
          * @return This path
          */
         Path pushBeanCreate(BeanDefinition<?> declaringType, Argument<?> beanType);
+
+        /**
+         * Push an unresolved constructor call onto the queue.
+         *
+         * @param declaringType        The type
+         * @param methodName           The method name
+         * @param argument             The unresolved argument
+         * @param arguments            The arguments
+         * @param requiresReflection  is requires reflection
+         * @return This path
+         */
+        Path pushConstructorResolve(BeanDefinition declaringType, String methodName, Argument argument, Argument[] arguments, boolean requiresReflection);
 
         /**
          * Push an unresolved constructor call onto the queue.
@@ -163,6 +303,18 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
         Path pushMethodArgumentResolve(BeanDefinition declaringType, MethodInjectionPoint methodInjectionPoint, Argument argument);
 
         /**
+         * Push an unresolved method call onto the queue.
+         *
+         * @param declaringType        The type
+         * @param methodName           The method name
+         * @param argument             The unresolved argument
+         * @param arguments            The arguments
+         * @param requiresReflection  is requires reflection
+         * @return This path
+         */
+        Path pushMethodArgumentResolve(BeanDefinition declaringType, String methodName, Argument argument, Argument[] arguments, boolean requiresReflection);
+
+        /**
          * Push an unresolved field onto the queue.
          *
          * @param declaringType       declaring type
@@ -170,6 +322,18 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
          * @return This path
          */
         Path pushFieldResolve(BeanDefinition declaringType, FieldInjectionPoint fieldInjectionPoint);
+
+        /**
+         * Push an unresolved field onto the queue.
+         *
+         * @param declaringType       declaring type
+         * @param fieldAsArgument     The field as argument
+         * @param requiresReflection  is requires reflection
+         * @return This path
+         */
+        Path pushFieldResolve(BeanDefinition declaringType, Argument fieldAsArgument, boolean requiresReflection);
+
+        Path pushAnnotationResolve(BeanDefinition beanDefinition, Argument annotationMemberBeanAsArgument);
 
         /**
          * Converts the path to a circular string.
@@ -182,6 +346,11 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
          * @return The current path segment
          */
         Optional<Segment<?>> currentSegment();
+
+        @Override
+        default void close() {
+            pop();
+        }
     }
 
     /**

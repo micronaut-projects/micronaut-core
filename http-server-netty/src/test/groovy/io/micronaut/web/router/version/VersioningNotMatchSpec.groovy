@@ -40,16 +40,16 @@ class VersioningNotMatchSpec extends VersioningSpec {
         e.status == status
 
         when:
-        Optional<JsonError> jsonErrorOptional = e.response.getBody(JsonError)
+        Optional<Map> erroreBody = e.response.getBody(Map)
 
         then:
-        jsonErrorOptional.isPresent()
+        erroreBody.isPresent()
 
         when:
-        JsonError jsonError = jsonErrorOptional.get()
+        Map body = erroreBody.get()
         then:
-        jsonError
-        jsonError.message.contains(jsonErrorMessage)
+        body
+        body._embedded.errors[0].message.contains(jsonErrorMessage)
 
         cleanup:
         client.close()

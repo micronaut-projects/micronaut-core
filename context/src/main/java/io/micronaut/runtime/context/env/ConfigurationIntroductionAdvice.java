@@ -19,15 +19,18 @@ import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.Qualifier;
+import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Prototype;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.value.PropertyNotFoundException;
+import io.micronaut.inject.qualifiers.Qualifiers;
 
 import java.util.Optional;
 
@@ -41,7 +44,9 @@ import java.util.Optional;
  */
 @Prototype
 @Internal
+@BootstrapContextCompatible
 public class ConfigurationIntroductionAdvice implements MethodInterceptor<Object, Object> {
+
     private static final String MEMBER_BEAN = "bean";
     private static final String MEMBER_NAME = "name";
     private final Environment environment;
@@ -61,13 +66,16 @@ public class ConfigurationIntroductionAdvice implements MethodInterceptor<Object
         this.name = qualifier instanceof Named ? ((Named) qualifier).getName() : null;
     }
 
+    @Nullable
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
         final ReturnType<Object> rt = context.getReturnType();
         final Class<Object> returnType = rt.getType();
         if (context.isTrue(ConfigurationAdvice.class, MEMBER_BEAN)) {
+            final Qualifier<Object> qualifier = name != null ? Qualifiers.byName(name) : null;
+
             if (context.isNullable()) {
-                final Object v = beanContext.findBean(returnType).orElse(null);
+                final Object v = beanContext.findBean(returnType, qualifier).orElse(null);
                 if (v != null) {
                     return environment.convertRequired(v, returnType);
                 } else {
@@ -75,7 +83,7 @@ public class ConfigurationIntroductionAdvice implements MethodInterceptor<Object
                 }
             } else {
                 return environment.convertRequired(
-                        beanContext.getBean(returnType),
+                        beanContext.getBean(returnType, qualifier),
                         returnType
                 );
             }

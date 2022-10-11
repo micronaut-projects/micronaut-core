@@ -22,9 +22,9 @@ import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.management.endpoint.info.InfoEndpoint;
-import io.reactivex.Flowable;
 import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
 
 import java.util.Optional;
 import java.util.function.Supplier;
@@ -63,7 +63,7 @@ public class GitInfoSource implements PropertiesInfoSource {
     @Override
     public Publisher<PropertySource> getSource() {
         Optional<PropertySource> propertySource = supplier.get();
-        return propertySource.map(Flowable::just).orElse(Flowable.empty());
+        return propertySource.map(Flux::just).orElse(Flux.empty());
     }
 
     private Optional<PropertySource> retrieveGitInfo() {

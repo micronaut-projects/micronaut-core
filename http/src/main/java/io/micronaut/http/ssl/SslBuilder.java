@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.ssl;
 
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.http.HttpVersion;
 
@@ -59,8 +60,9 @@ public abstract class SslBuilder<T> {
     /**
      * @param ssl The ssl configuration
      *
-     * @return The {@link TrustManagerFactory}
+     * @return The {@link TrustManagerFactory}, or {@code null} for the default JDK trust store
      */
+    @Nullable
     protected TrustManagerFactory getTrustManagerFactory(SslConfiguration ssl) {
         try {
             Optional<KeyStore> store = getTrustStore(ssl);

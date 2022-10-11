@@ -71,7 +71,7 @@ public final class ArgumentBeanType<T> implements BeanType<T>, Argument<T> {
     }
 
     @Override
-    public boolean equalsType(Argument<?> other) {
+    public boolean equalsType(@Nullable Argument<?> other) {
         return argument.equals(other);
     }
 

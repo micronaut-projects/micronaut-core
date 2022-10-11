@@ -15,10 +15,8 @@
  */
 package io.micronaut.http.server.netty.types;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.CollectionUtils;
-import jakarta.inject.Inject;
-import jakarta.inject.Singleton;
-
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -31,7 +29,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * @author James Kleeh
  * @since 1.0
  */
-@Singleton
+@Internal
 public class DefaultCustomizableResponseTypeHandlerRegistry implements NettyCustomizableResponseTypeHandlerRegistry {
 
     private List<NettyCustomizableResponseTypeHandler> handlers;
@@ -44,11 +42,10 @@ public class DefaultCustomizableResponseTypeHandlerRegistry implements NettyCust
         this.handlers = Arrays.asList(typeHandlers);
     }
 
-
     /**
      * @param typeHandlers The Netty customizable response type handlers
      */
-    @Inject public DefaultCustomizableResponseTypeHandlerRegistry(List<NettyCustomizableResponseTypeHandler> typeHandlers) {
+    public DefaultCustomizableResponseTypeHandlerRegistry(List<NettyCustomizableResponseTypeHandler> typeHandlers) {
         this.handlers = CollectionUtils.isNotEmpty(typeHandlers) ? typeHandlers : Collections.emptyList();
     }
 

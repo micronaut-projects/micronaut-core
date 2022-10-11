@@ -16,10 +16,11 @@
 package io.micronaut.annotation.processing
 
 import io.micronaut.http.HttpRequest
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest
 import org.junit.jupiter.api.Test
+import reactor.core.publisher.Flux
 import javax.inject.Inject
 import kotlin.test.assertEquals
 
@@ -29,26 +30,26 @@ class SuspendMethodSpec {
 
     @Inject
     @field:Client("/demo")
-    lateinit var client: RxHttpClient
+    lateinit var client: HttpClient
 
     @Test
     fun testSyncMethodReturnTypeAny() {
-        val res = client
+        val res = Flux.from(client
             .retrieve(
                 HttpRequest.GET<Any>("/sync/any"),
                 Any::class.java
-            ).blockingFirst()
+            )).blockFirst()
 
         assertEquals("sync any", res)
     }
 
     @Test
     fun testSyncMethodReturnTypeString() {
-        val res = client
+        val res = Flux.from(client
             .retrieve(
                 HttpRequest.GET<String>("/sync/string"),
                 Any::class.java
-            ).blockingFirst()
+            )).blockFirst()
 
         assertEquals("sync string", res)
     }
@@ -56,22 +57,22 @@ class SuspendMethodSpec {
 
     @Test
     fun testAsyncMethodReturnTypeAny() {
-        val res = client
+        val res = Flux.from(client
             .retrieve(
                 HttpRequest.GET<Any>("/async/any"),
                 Any::class.java
-            ).blockingFirst()
+            )).blockFirst()
 
         assertEquals("async any", res)
     }
 
     @Test
     fun testAsyncMethodReturnTypeString() {
-        val res = client
+        val res = Flux.from(client
             .retrieve(
                 HttpRequest.GET<String>("/async/string"),
                 Any::class.java
-            ).blockingFirst()
+            )).blockFirst()
 
         assertEquals("async string", res)
     }

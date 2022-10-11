@@ -27,7 +27,7 @@ import org.reactivestreams.Subscriber;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Abtract implementation of the {@link HttpContentProcessor} interface that deals with limiting file upload sizes.
+ * Abstract implementation of the {@link HttpContentProcessor} interface that deals with limiting file upload sizes.
  *
  * @param <T> The type
  * @author Graeme Rocher
@@ -70,6 +70,7 @@ public abstract class AbstractHttpContentProcessor<T> extends SingleSubscriberPr
     protected final void doOnNext(ByteBufHolder message) {
         long receivedLength = this.receivedLength.addAndGet(message.content().readableBytes());
 
+        ReferenceCountUtil.touch(message);
         if (advertisedLength > requestMaxSize) {
             fireExceedsLength(advertisedLength, requestMaxSize, message);
         } else if (receivedLength > requestMaxSize) {

@@ -1,62 +1,84 @@
 plugins {
+    id "io.micronaut.build.internal.convention-test-library"
     id "org.jetbrains.kotlin.jvm"
     id "org.jetbrains.kotlin.kapt"
 }
 
+micronautBuild {
+    core {
+        usesMicronautTestJunit()
+        usesMicronautTestSpock()
+        usesMicronautTestKotest()
+    }
+}
+
 dependencies {
-    api "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion"
-    api "org.jetbrains.kotlin:kotlin-reflect:$kotlinVersion"
-    api "org.jetbrains.kotlinx:kotlinx-coroutines-core:$kotlinCoroutinesVersion"
-    api "org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:$kotlinCoroutinesVersion"
-    api "org.jetbrains.kotlinx:kotlinx-coroutines-rx2:$kotlinCoroutinesVersion"
+    api libs.kotlin.stdlib
+    api libs.kotlin.reflect
+    api libs.kotlinx.coroutines.core
+    api libs.kotlinx.coroutines.jdk8
+    api libs.kotlinx.coroutines.rx2
     api project(':http-server-netty')
     api project(':http-client')
     api project(':runtime')
 
-    testImplementation "org.jetbrains.kotlin:kotlin-test-junit:$kotlinVersion"
-    testImplementation "org.jetbrains.kotlin:kotlin-test:$kotlinVersion"
-    testImplementation "org.jetbrains.kotlinx:kotlinx-coroutines-rx2:$kotlinCoroutinesVersion"
+    testImplementation project(":context")
+    testImplementation libs.kotlin.test
+    testImplementation libs.kotlinx.coroutines.core
+    testImplementation libs.kotlinx.coroutines.rx2
+    testImplementation libs.kotlinx.coroutines.slf4j
+    testImplementation libs.kotlinx.coroutines.reactor
 
     // Adding these for now since micronaut-test isnt resolving correctly ... probably need to upgrade gradle there too
-    testImplementation("org.junit.jupiter:junit-jupiter-api:$junitVersion")
+    testImplementation libs.junit.jupiter.api
 
     testImplementation project(":validation")
     testImplementation project(":management")
     testImplementation project(':inject-java')
     testImplementation project(":inject")
-    testImplementation dependencyVersion("jcache")
+    testImplementation libs.managed.jcache
     testImplementation project(':validation')
     testImplementation project(":http-client")
     testImplementation project(":session")
-    testImplementation dependencyModuleVersion("groovy", "groovy-templates")
-    testImplementation dependencyModuleVersion("micronaut.test", "micronaut-test-junit5"), {
-        exclude module:'micronaut-runtime'
-        exclude module:'micronaut-inject'
-    }
-    testImplementation dependencyModuleVersion("micronaut.test", "micronaut-test-kotlintest"), {
-        exclude module:'micronaut-runtime'
-        exclude module:'micronaut-inject'
-    }
+    testImplementation libs.managed.groovy.templates
+
     testImplementation project(":function-client")
     testImplementation project(":function-web")
-    testImplementation 'io.kotlintest:kotlintest-runner-junit5:3.4.2'
-    testImplementation 'org.zalando:logbook-netty:2.4.1'
-    testImplementation project(':tracing')
+    testImplementation libs.kotlin.kotest.junit5
+    testImplementation libs.logbook.netty
     kaptTest project(':inject-java')
     kaptTest project(':validation')
-    testImplementation('javax.inject:javax.inject:1')
+    testImplementation libs.javax.inject
+    testImplementation(platform(libs.boms.micronaut.tracing))
+    testImplementation(libs.micronaut.tracing.zipkin) {
+        exclude module: 'micronaut-bom'
+        exclude module: 'micronaut-http-client'
+        exclude module: 'micronaut-inject'
+        exclude module: 'micronaut-runtime'
+    }
 
-    testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:$junitVersion"
-    testRuntimeOnly group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.920'
+    testRuntimeOnly libs.junit.jupiter.engine
+    testRuntimeOnly(platform(libs.boms.micronaut.aws))
+    testRuntimeOnly libs.aws.java.sdk.lambda
     if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_15)) {
-        testImplementation('org.bouncycastle:bcpkix-jdk15on:1.65')
+        testImplementation libs.bcpkix
+    }
+
+    testImplementation libs.managed.reactor
+}
+
+configurations.testRuntimeClasspath {
+    resolutionStrategy.eachDependency {
+        if (it.requested.group == 'org.jetbrains.kotlin') {
+            it.useVersion(libs.versions.managed.kotlin.asProvider().get())
+        }
     }
 }
 
-compileTestKotlin {
+tasks.named("compileTestKotlin") {
     kotlinOptions.jvmTarget = "1.8"
 }
 
-test {
+tasks.named("test") {
     useJUnitPlatform()
 }

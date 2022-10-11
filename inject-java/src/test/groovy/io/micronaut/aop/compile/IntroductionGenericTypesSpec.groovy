@@ -77,7 +77,7 @@ import java.net.*;
 
 interface MyInterface<T extends Person> {
 
-    io.reactivex.Single<java.util.List<T>> getPeopleSingle();
+    reactor.core.publisher.Mono<java.util.List<T>> getPeopleSingle();
     
     T getPerson();
     

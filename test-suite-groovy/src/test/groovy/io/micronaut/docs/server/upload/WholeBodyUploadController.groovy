@@ -22,9 +22,9 @@ import io.micronaut.http.annotation.Post
 import io.micronaut.http.multipart.CompletedFileUpload
 import io.micronaut.http.multipart.CompletedPart
 import io.micronaut.http.server.multipart.MultipartBody
-import io.reactivex.Single
 import org.reactivestreams.Subscriber
 import org.reactivestreams.Subscription
+import reactor.core.publisher.Mono
 
 import static io.micronaut.http.MediaType.MULTIPART_FORM_DATA
 import static io.micronaut.http.MediaType.TEXT_PLAIN
@@ -33,9 +33,9 @@ import static io.micronaut.http.MediaType.TEXT_PLAIN
 class WholeBodyUploadController {
 
     @Post(value = "/whole-body", consumes = MULTIPART_FORM_DATA, produces = TEXT_PLAIN) // <1>
-    Single<String> uploadBytes(@Body MultipartBody body) { // <2>
+    Mono<String> uploadBytes(@Body MultipartBody body) { // <2>
 
-        Single.<String>create({ emitter ->
+        Mono.<String>create({ emitter ->
             body.subscribe(new Subscriber<CompletedPart>() {
                 private Subscription s
 
@@ -55,12 +55,12 @@ class WholeBodyUploadController {
 
                 @Override
                 void onError(Throwable t) {
-                    emitter.onError(t)
+                    emitter.error(t)
                 }
 
                 @Override
                 void onComplete() {
-                    emitter.onSuccess("Uploaded")
+                    emitter.success("Uploaded")
                 }
             })
         })

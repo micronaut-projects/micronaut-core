@@ -16,6 +16,9 @@
 package io.micronaut.core.util;
 
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.annotation.UsedByGeneratedCode;
+import io.micronaut.core.reflect.ReflectionUtils;
+
 import java.lang.reflect.Array;
 import java.util.*;
 import java.util.function.IntFunction;
@@ -31,7 +34,48 @@ public class ArrayUtils {
     /**
      * An empty object array.
      */
+    @UsedByGeneratedCode
     public static final Object[] EMPTY_OBJECT_ARRAY = new Object[0];
+
+    /**
+     * An empty boolean array.
+     */
+    public static final boolean[] EMPTY_BOOLEAN_ARRAY = new boolean[0];
+
+    /**
+     * An empty byte array.
+     */
+    public static final byte[] EMPTY_BYTE_ARRAY = new byte[0];
+
+    /**
+     * An empty char array.
+     */
+    public static final char[] EMPTY_CHAR_ARRAY = new char[0];
+
+    /**
+     * An empty int array.
+     */
+    public static final int[] EMPTY_INT_ARRAY = new int[0];
+
+    /**
+     * An empty double array.
+     */
+    public static final double[] EMPTY_DOUBLE_ARRAY = new double[0];
+
+    /**
+     * An empty long array.
+     */
+    public static final long[] EMPTY_LONG_ARRAY = new long[0];
+
+    /**
+     * An empty float array.
+     */
+    public static final float[] EMPTY_FLOAT_ARRAY = new float[0];
+
+    /**
+     * An empty short array.
+     */
+    public static final short[] EMPTY_SHORT_ARRAY = new short[0];
 
     /**
      * Concatenate two arrays.
@@ -170,6 +214,69 @@ public class ArrayUtils {
     public static <T> T[] toArray(Collection<T> collection, IntFunction<T[]> createArrayFn) {
         T[] array = createArrayFn.apply(collection.size());
         return collection.toArray(array);
+    }
+
+    /**
+     * Returns an array containing all of the elements in this collection, using the item class.
+     *
+     * @param collection The collection
+     * @param arrayItemClass The array item class
+     * @param <T> The type of the array
+     * @return The array
+     * @since 3.0
+     */
+    public static <T> T[] toArray(Collection<T> collection, Class<T> arrayItemClass) {
+        return (T[]) collection.toArray((Object[]) Array.newInstance(arrayItemClass, collection.size()));
+    }
+
+    /**
+     * Converts a primitive array to the equivalent wrapper such as int[] to Integer[].
+     * @param primitiveArray The primitive array
+     * @return The primitive array wrapper.
+     * @since 3.0.0
+     */
+    public static Object[] toWrapperArray(final Object primitiveArray) {
+        Objects.requireNonNull(primitiveArray, "Primitive array cannot be null");
+        final Class<?> cls = primitiveArray.getClass();
+        Class<?> componentType = cls.getComponentType();
+        if (!cls.isArray() || !componentType.isPrimitive()) {
+            throw new IllegalArgumentException(
+                    "Only primitive arrays are supported");
+        }
+        final int length = Array.getLength(primitiveArray);
+        Object[] arr = (Object[]) Array.newInstance(ReflectionUtils.getWrapperType(componentType), length);
+        for (int i = 0; i < length; i++) {
+            arr[i] = Array.get(primitiveArray, i);
+        }
+        return arr;
+    }
+
+    /**
+     * Converts a primitive wrapper array to the equivalent primitive array such as Integer[] to int[].
+     * @param wrapperArray The wrapper array
+     * @return The primitive array.
+     * @since 3.0.0
+     */
+    public static Object toPrimitiveArray(final Object[] wrapperArray) {
+        Objects.requireNonNull(wrapperArray, "Wrapper array cannot be null");
+        final Class<?> cls = wrapperArray.getClass();
+        Class<?> ct = cls.getComponentType();
+        Class<?> componentType = ReflectionUtils.getPrimitiveType(ct);
+        if (componentType == ct) {
+            return wrapperArray;
+        } else {
+
+            if (!cls.isArray() || !componentType.isPrimitive()) {
+                throw new IllegalArgumentException(
+                        "Only primitive arrays are supported");
+            }
+            final int length = wrapperArray.length;
+            Object arr = Array.newInstance(componentType, length);
+            for (int i = 0; i < length; i++) {
+                Array.set(arr, i, wrapperArray[i]);
+            }
+            return arr;
+        }
     }
 
     /**

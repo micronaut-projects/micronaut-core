@@ -31,7 +31,7 @@ import java.util.stream.Stream;
 @Internal
 public final class AnyQualifier<T> implements Qualifier<T> {
     @SuppressWarnings("rawtypes")
-    static final AnyQualifier INSTANCE = new AnyQualifier();
+    public static final AnyQualifier INSTANCE = new AnyQualifier();
 
     private AnyQualifier() {
     }

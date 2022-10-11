@@ -25,13 +25,12 @@ import java.lang.annotation.*;
 /**
  * <p>An annotation that can be applied to method argument to indicate that the method argument is bound from an HTTP header
  *   This also can be used in conjunction with &#064;Headers to list headers on a client class that will always be applied.</p>
- * <p></p>
+ *
  * <p>The following example demonstrates usage at the type level to declare default values to pass in the request when using the {@code Client} annotation:</p>
- * <p></p>
  *
  * <pre class="code">
- * &#064;Header(name="X-Username",value='Freddy'),
- * &#064;Header(name="X-MyParam",value='${foo.bar}')
+ * &#064;Header(name = "X-Username", value = "Freddy"),
+ * &#064;Header(name = "X-MyParam", value = "${foo.bar}")
  * &#064;Client('/users')
  * interface UserClient {
  *
@@ -56,6 +55,7 @@ import java.lang.annotation.*;
 @Target({ElementType.FIELD, ElementType.PARAMETER, ElementType.TYPE, ElementType.METHOD, ElementType.ANNOTATION_TYPE}) // this can be either type or param
 @Repeatable(value = Headers.class)
 @Bindable
+@Inherited
 public @interface Header {
 
     /**

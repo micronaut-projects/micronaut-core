@@ -456,6 +456,21 @@ class ValidatorSpec extends Specification {
         violations.size() == 1
         violations.first().message == "must not be null"
     }
+
+    void "test helpful toString() message for constraintViolation"() {
+        given:
+        BookService bookService = applicationContext.getBean(BookService)
+        def constraintViolations = validator.forExecutables().validateParameters(
+                bookService,
+                BookService.getDeclaredMethod("saveBook", String, int.class),
+                ["", 50] as Object[]
+        ).toList().sort({ it.propertyPath.toString() })
+
+        expect:
+        constraintViolations.size() == 2
+        constraintViolations[0].toString() == 'DefaultConstraintViolation{rootBean=class io.micronaut.validation.validator.$BookService$Definition$Intercepted, invalidValue=50, path=saveBook.pages}'
+        constraintViolations[1].toString() == 'DefaultConstraintViolation{rootBean=class io.micronaut.validation.validator.$BookService$Definition$Intercepted, invalidValue=, path=saveBook.title}'
+    }
 }
 
 @Introspected

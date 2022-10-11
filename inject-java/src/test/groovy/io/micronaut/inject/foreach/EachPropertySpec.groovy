@@ -469,6 +469,26 @@ class EachPropertySpec extends Specification {
         props.inner.any { it.age == 30 }
     }
 
+    void "test constructor injection eachproperty inner class of config props"() {
+        given:
+        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        applicationContext.environment.addPropertySource(PropertySource.of('test', [
+                'outer-constructor.name': 'Outer',
+                'outer-constructor.inner.sally.age': 20,
+                'outer-constructor.inner.joe.age': 30
+        ]))
+        applicationContext.start()
+
+        when:
+        OuterConstructorProperties props = applicationContext.getBean(OuterConstructorProperties)
+
+        then:
+        props.name == 'Outer'
+        props.inner.size() == 2
+        props.inner.any { it.age == 20 }
+        props.inner.any { it.age == 30 }
+    }
+
     void "test eachproperty list inner class of config props"() {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")

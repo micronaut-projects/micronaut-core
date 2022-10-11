@@ -6,6 +6,7 @@ import io.micronaut.http.HttpResponse
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.server.netty.AbstractMicronautSpec
+import reactor.core.publisher.Flux
 
 import javax.annotation.Nullable
 
@@ -13,42 +14,42 @@ class RouteComplexitySpec extends AbstractMicronautSpec {
 
     void "test route complexity"() {
         when:
-        String body = rxClient.retrieve(HttpRequest.GET("/test-complexity/id/somefile.xls")).blockingFirst()
+        String body = rxClient.toBlocking().retrieve(HttpRequest.GET("/test-complexity/id/somefile.xls"))
 
         then:
         noExceptionThrown()
         body == "fallback"
 
         when:
-        body = rxClient.retrieve(HttpRequest.GET("/test-complexity/id/somefile.csv")).blockingFirst()
+        body = rxClient.toBlocking().retrieve(HttpRequest.GET("/test-complexity/id/somefile.csv"))
 
         then:
         noExceptionThrown()
         body == "csv"
 
         when:
-        body = rxClient.retrieve(HttpRequest.GET("/test-complexity/other/a/b/c/d")).blockingFirst()
+        body = rxClient.toBlocking().retrieve(HttpRequest.GET("/test-complexity/other/a/b/c/d"))
 
         then:
         noExceptionThrown()
         body == "ab/c"
 
         when:
-        body = rxClient.retrieve(HttpRequest.GET("/test-complexity/other2/a/b/c")).blockingFirst()
+        body = rxClient.toBlocking().retrieve(HttpRequest.GET("/test-complexity/other2/a/b/c"))
 
         then:
         noExceptionThrown()
         body == "ab/c"
 
         when:
-        body = rxClient.retrieve(HttpRequest.GET("/test-complexity/list")).blockingFirst()
+        body = rxClient.toBlocking().retrieve(HttpRequest.GET("/test-complexity/list"))
 
         then:
         noExceptionThrown()
         body == "list"
 
         when:
-        body = rxClient.retrieve(HttpRequest.GET("/test-complexity/length/abc")).blockingFirst()
+        body = rxClient.toBlocking().retrieve(HttpRequest.GET("/test-complexity/length/abc"))
 
         then:
         noExceptionThrown()

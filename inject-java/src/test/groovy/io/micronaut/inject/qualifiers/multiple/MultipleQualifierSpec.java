@@ -32,7 +32,6 @@ public class MultipleQualifierSpec {
 
 @Singleton
 class MyBean {
-    @Inject
     @PayBy(PaymentMethod.CREDIT_CARD)
     @Asynchronous
     Processor asyncCreditCartProcessor;

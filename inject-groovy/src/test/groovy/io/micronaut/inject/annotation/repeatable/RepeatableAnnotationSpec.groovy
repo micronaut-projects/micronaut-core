@@ -59,7 +59,7 @@ class Test {
 
 
     void "test repeatable annotations are combined"() {
-        AnnotationMetadata metadata = buildMethodAnnotationMetadata('test.Test', '''\
+        AnnotationMetadata metadata = buildBeanDefinition('test.Test', '''\
 package test
 
 import io.micronaut.inject.annotation.repeatable.*
@@ -73,10 +73,11 @@ class Test {
 
     @Property(name="prop2", value="value2")    
     @Property(name="prop3", value="value33")    
-    @Property(name="prop4", value="value4")    
+    @Property(name="prop4", value="value4")
+    @Executable    
     void someMethod() {}
 }
-''', 'someMethod')
+''').getRequiredMethod("someMethod").getAnnotationMetadata()
 
         when:
         List<AnnotationValue<Property>> properties = metadata.getAnnotationValuesByType(Property)

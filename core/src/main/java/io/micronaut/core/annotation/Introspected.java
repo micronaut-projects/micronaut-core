@@ -35,7 +35,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  * <p>If the classes you wish to introspect are already compiled then this annotation can be used on another class (doesn't matter which, but typically on a configuration class) to specify which existing compiled classes to produce {@link io.micronaut.core.beans.BeanIntrospection} instances for either through the {@link #classes()} method or the {@link #packages()} method. The latter uses compile time package scanning and for the moment is regarded as {@link Experimental}.</p>
  *
  * <pre class="code">
- * &#064;Introspected(classes=MyBean.class)
+ * &#064;Introspected(classes = MyBean.class)
  * public class MyConfiguration {
  *      ...
  * }</pre>
@@ -48,6 +48,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Documented
 @Retention(RUNTIME)
 @Target({ElementType.TYPE, ElementType.ANNOTATION_TYPE})
+@Inherited
 public @interface Introspected {
 
     /**
@@ -68,6 +69,14 @@ public @interface Introspected {
      * @since 3.0
      */
     AccessKind[] accessKind() default { AccessKind.METHOD };
+
+    /**
+     * Allows specifying the visibility policy to use to control which fields and methods are included.
+     *
+     * @return The visibility policies
+     * @since 3.2.0
+     */
+    Visibility[] visibility() default  { Visibility.DEFAULT };
 
     /**
      * <p>By default {@link Introspected} applies to the class it is applied on. However if packages are specified
@@ -120,11 +129,11 @@ public @interface Introspected {
     /**
      * The annotation types that should be indexed for lookup via {@link io.micronaut.core.beans.BeanIntrospection#getIndexedProperties(Class)} or {@link io.micronaut.core.beans.BeanIntrospection#getIndexedProperty(Class, String)} if {@link IndexedAnnotation#member()} is specified.
      *
-     * <p>Property lookup indexing allows building indexes at compilation time for performing reverse property lookups. Consider for example a property with an annotation such as {@code @Column(name="foo_bar"}. To lookup the property by "foo_bar" you can specify:</p>
+     * <p>Property lookup indexing allows building indexes at compilation time for performing reverse property lookups. Consider for example a property with an annotation such as {@code @Column(name = "foo_bar"}. To lookup the property by "foo_bar" you can specify:</p>
      *
      * <pre class="code">
      * &#064;Introspected(
-     *   indexed = &#064;IndexedAnnotation(annotation=Column.class, member="name")
+     *   indexed = &#064;IndexedAnnotation(annotation = Column.class, member = "name")
      * )
      * public class MyBean {
      *      ...
@@ -181,5 +190,24 @@ public @interface Introspected {
          * The default behaviour which is to favour public getters for bean properties.
          */
         METHOD
+    }
+
+    /**
+     * Visibility policy for bean properties and fields.
+     *
+     * @since 3.2.0
+     */
+    enum Visibility {
+
+        /**
+         * Only public methods and/or fields are included.
+         */
+        PUBLIC,
+
+        /**
+         * The default behaviour which in addition to public getters and setters will also include package protected fields if an {@link io.micronaut.core.annotation.Introspected.AccessKind} of {@link io.micronaut.core.annotation.Introspected.AccessKind#FIELD} is specified.
+         *
+         */
+        DEFAULT
     }
 }

@@ -169,7 +169,7 @@ public class JavaParser implements Closeable {
     }
 
     /**
-     * Parses {@code sources} into {@code CompilationUnitTree} units. This method
+     * Parses {@code sources} into {@code com.sun.source.tree.CompilationUnitTree} units. This method
      * <b>does not</b> compile the sources.
      *
      * @param sources The sources
@@ -219,7 +219,7 @@ public class JavaParser implements Closeable {
     }
 
     /**
-     * Parses {@code sources} into {@code CompilationUnitTree} units. This method
+     * Parses {@code sources} into {@code com.sun.source.tree.CompilationUnitTree} units. This method
      * <b>does not</b> compile the sources.
      *
      * @param className The class name
@@ -250,7 +250,7 @@ public class JavaParser implements Closeable {
     }
 
     /**
-     * Parses {@code sources} into {@code CompilationUnitTree} units. This method
+     * Parses {@code sources} into {@code com.sun.source.tree.CompilationUnitTree} units. This method
      * <b>does not</b> compile the sources.
      *
      * @param sources The sources
@@ -282,11 +282,12 @@ public class JavaParser implements Closeable {
 
     private Set<String> getCompilerOptions() {
         Set<String> options;
-        if (Jvm.getCurrent().isJava15Compatible()) {
+        final Jvm jvm = Jvm.getCurrent();
+        if (jvm.isJava15Compatible() && !jvm.isJava17Compatible()) {
             options = CollectionUtils.setOf(
                     "--enable-preview",
                     "-source",
-                    Jvm.getCurrent().getJavaSpecificationVersion()
+                    jvm.getJavaSpecificationVersion()
             );
         } else {
             options = Collections.emptySet();
@@ -304,7 +305,6 @@ public class JavaParser implements Closeable {
         processors.add(getAggregatingTypeElementVisitorProcessor());
         processors.add(new PackageConfigurationInjectProcessor());
         processors.add(getBeanDefinitionInjectProcessor());
-        processors.add(new ServiceDescriptionProcessor());
         return processors;
     }
 

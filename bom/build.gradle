@@ -1,126 +1,56 @@
 plugins {
-    id 'java-platform'
+    id 'io.micronaut.build.internal.bom'
 }
 
 group projectGroupId
 version projectVersion
 
+micronautBom {
+    extraExcludedProjects = [
+            "benchmarks",
+            "inject-test-utils"
+    ]
+    catalogToPropertyNameOverrides = [
+            'jakarta.annotation.api': 'jakarta.annotation-api',
+            'javax.annotation.api': 'javax.annotation-api',
+            'methvin.directory.watcher': 'methvin.directory-watcher',
+            'paho.v3': 'pahov3',
+            'paho.v5': 'pahov5',
+            'graal.sdk': 'graalSdk',
+            'neo4j.java.driver': 'neo4j.bolt',
+    ]
+    propertyName = 'core'
+    suppressions {
+        // https://github.com/micronaut-projects/micronaut-serialization/issues/167
+        dependencies.add("io.micronaut.serde:micronaut-serde-tck:1.0.0")
 
-apply plugin: 'maven-publish'
+        // https://github.com/micronaut-projects/micronaut-oracle-cloud/issues/359
+        dependencies.add("io.micronaut.oraclecloud:micronaut-oraclecloud-sdk-processor:2.1.1")
+        dependencies.add("io.micronaut.oraclecloud:micronaut-oraclecloud-atp-hikari-test:2.1.1")
+        dependencies.add("io.micronaut.oraclecloud:micronaut-example-http-function-java:2.1.1")
+        dependencies.add("io.micronaut.oraclecloud:micronaut-example-function-groovy:2.1.1")
+        dependencies.add("io.micronaut.oraclecloud:micronaut-example-http-function-kotlin:2.1.1")
+        dependencies.add("io.micronaut.oraclecloud:micronaut-example-groovy:2.1.1")
+        dependencies.add("io.micronaut.oraclecloud:micronaut-example-kotlin:2.1.1")
+        dependencies.add("io.micronaut.oraclecloud:micronaut-example-function-java:2.1.1")
+        dependencies.add("io.micronaut.oraclecloud:micronaut-example-java:2.1.1")
+        dependencies.add("io.micronaut.oraclecloud:micronaut-example-http-function-groovy:2.1.1")
+        dependencies.add("io.micronaut.oraclecloud:micronaut-example-function-kotlin:2.1.1")
+        dependencies.add("io.micronaut.oraclecloud:micronaut-oraclecloud-atp-ucp-test:2.1.1")
 
-boolean micronautSnapshot = rootProject.version.toString().endsWith("-SNAPSHOT")
+        // https://github.com/micronaut-projects/micronaut-data/issues/1403
+        dependencies.add("io.micronaut.data:micronaut-data-tck:3.3.0")
+        dependencies.add("io.micronaut.data:micronaut-data-document-tck:3.3.0")
 
-def excludedProjects = [
-        "benchmarks",
-        "inject-test-utils",
-        "test-suite",
-        "test-suite-groovy",
-        "test-suite-helper",
-        "test-suite-kotlin",
-        "test-utils"
-]
+        // https://github.com/micronaut-projects/micronaut-core/pull/7631#issuecomment-1174702395
+        bomAuthorizedGroupIds.put(
+                "io.opentelemetry.instrumentation:opentelemetry-instrumentation-bom-alpha",
+                ["io.opentelemetry.javaagent", "io.opentelemetry", "io.opentelemetry.instrumentation", "io.opentelemetry.javaagent.instrumentation"] as Set
+        )
+        dependencies.add("io.opentelemetry:opentelemetry-bom:1.15.0")
+        dependencies.add("io.opentelemetry:opentelemetry-bom-alpha:1.15.0-alpha")
 
-publishing {
-    afterEvaluate {
-        publications {
-            maven(MavenPublication) {
-                artifactId("micronaut-bom")
-                from components.javaPlatform
-
-                pom.withXml {
-                    def xml = asNode()
-
-                    xml.children().find {
-                        it.name().localPart == 'packaging'
-                    } + pomInfo
-
-                    for(dep in dependencyVersions) {
-                        setBomVersion(dep, xml)
-                    }
-                    for(dep in bomVersions) {
-                        setBomVersion(dep, xml)
-                    }
-                }
-            }
-        }
+        // The R2DBC bom that we include mentions dependencies which do not belong to io.r2dbc group
+        bomAuthorizedGroupIds.put("io.r2dbc:r2dbc-bom", ["com.google.cloud", "com.oracle.database.r2dbc", "org.mariadb", "dev.miku"] as Set)
     }
 }
-
-private void setBomVersion(Map.Entry<Object, Object> dep, xml) {
-    String property = "\${${dep.key}.version}"
-    def info = dep.value
-    def version = info.version
-    def group = info.group
-    if (group && version) {
-        def modules = []
-        if (info.name) {
-            modules << info.name
-        }
-        if (info.modules) {
-            modules.addAll(info.modules)
-        }
-        for (module in modules) {
-
-            def pomDep = xml.dependencyManagement.dependencies.dependency.find {
-                it.artifactId.text() == module &&
-                        it.groupId.text() == group
-            }
-            if (pomDep != null) {
-                pomDep.version.first().setValue(property)
-            }
-        }
-
-    }
-}
-
-ext.extraPomInfo = {
-    delegate.properties {
-        for(dep in dependencyVersions) {
-            "${dep.key}.version"(dep.value.version)
-        }
-        for(dep in bomVersions) {
-            "${dep.key}.version"(dep.value.version)
-        }
-    }
-}
-javaPlatform {
-    allowDependencies()
-}
-dependencies {
-    for (dep in bomVersions) {
-        def info = dep.value
-        def versionExpr = info.version
-        api platform("$info.group:$info.name:$versionExpr")
-    }
-
-    constraints {
-        for (Project p : rootProject.subprojects) {
-            if (!p.subprojects.empty) continue
-            if (p.name.contains("bom")) continue
-            if (excludedProjects.contains(p.name)) continue
-
-            api "$p.group:micronaut-$p.name:$p.version"
-        }
-
-        for (dep in dependencyVersions) {
-            def info = dep.value
-            // don't include snapshots
-            if (info.version.toString().endsWith("-SNAPSHOT") && !micronautSnapshot) {
-                continue
-            }
-
-            def versionExpr = dep.value.version
-
-            if (info.name) {
-                api "$info.group:$info.name:$versionExpr"
-            }
-            if (info.modules) {
-                for (m in info.modules) {
-                    api "$info.group:$m:$versionExpr"
-                }
-            }
-        }
-    }
-}
-
-apply plugin: "io.micronaut.build.internal.publishing"

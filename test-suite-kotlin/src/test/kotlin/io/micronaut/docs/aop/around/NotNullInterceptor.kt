@@ -27,7 +27,7 @@ import jakarta.inject.Singleton
 @Singleton
 @InterceptorBean(NotNull::class) // <1>
 class NotNullInterceptor : MethodInterceptor<Any, Any> { // <2>
-    override fun intercept(context: MethodInvocationContext<Any, Any>): Any {
+    override fun intercept(context: MethodInvocationContext<Any, Any>): Any? {
         val nullParam = context.parameters
                 .entries
                 .stream()

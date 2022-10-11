@@ -21,26 +21,26 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.session.Session
-import io.micronaut.websocket.RxWebSocketClient
+import io.micronaut.websocket.WebSocketClient
 import io.micronaut.websocket.WebSocketSession
 import io.micronaut.websocket.annotation.ClientWebSocket
 import io.micronaut.websocket.annotation.OnMessage
 import io.micronaut.websocket.annotation.ServerWebSocket
+import reactor.core.publisher.Flux
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
 class WebSocketSessionSpec extends Specification {
 
-
     void "test websocket can share HTTP session"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
 
-        RxWebSocketClient wsClient = embeddedServer.applicationContext.createBean(RxWebSocketClient, embeddedServer.getURL())
-        RxHttpClient httpClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+        WebSocketClient wsClient = embeddedServer.applicationContext.createBean(WebSocketClient, embeddedServer.getURL())
+        HttpClient httpClient = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         when:
         HttpResponse response = httpClient.toBlocking().exchange(HttpRequest.GET('/ws/session/simple'), String)
@@ -56,7 +56,7 @@ class WebSocketSessionSpec extends Specification {
         result == 'value in session'
 
         when:
-        SomeValueClient someValueClient= wsClient.connect(SomeValueClient, HttpRequest.GET('/ws/somesocket').header(HttpHeaders.AUTHORIZATION_INFO, sessionId)).blockingFirst()
+        SomeValueClient someValueClient= Flux.from(wsClient.connect(SomeValueClient, HttpRequest.GET('/ws/somesocket').header(HttpHeaders.AUTHORIZATION_INFO, sessionId))).blockFirst()
         someValueClient.send("hello")
         PollingConditions conditions = new PollingConditions(timeout: 3, delay: 0.5)
 
@@ -65,15 +65,11 @@ class WebSocketSessionSpec extends Specification {
             someValueClient.replies.contains("hello value is value in session")
         }
 
-
-
         cleanup:
         wsClient.close()
         httpClient.close()
         embeddedServer.close()
-
     }
-
 
     @Controller('/ws/session')
     static class SessionController {

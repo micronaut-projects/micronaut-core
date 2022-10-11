@@ -4,7 +4,7 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
-import io.micronaut.http.server.netty.AbstractMicronautSpec
+import reactor.core.publisher.Flux
 
 import java.security.cert.X509Certificate
 
@@ -12,9 +12,9 @@ class RequestCertificateSpec extends AbstractMicronautSpec {
 
     void "test certificate extraction"() {
         when:
-        def response = rxClient
-                .exchange('/ssl', String)
-                .blockingFirst()
+        def response = Flux.from(rxClient
+                .exchange('/ssl', String))
+                .blockFirst()
         then:
         response.code() == HttpStatus.OK.code
         response.body() == "O=Test CA,ST=Some-State,C=US"
@@ -23,9 +23,11 @@ class RequestCertificateSpec extends AbstractMicronautSpec {
     @Override
     Map<String, Object> getConfiguration() {
         super.getConfiguration() << [
-                'micronaut.ssl.enabled': true,
+                "micronaut.http.client.read-timeout": "15s",
+                'micronaut.server.ssl.enabled': true,
+                'micronaut.server.ssl.port': -1,
                 // Cannot be true!
-                'micronaut.ssl.buildSelfSigned': false,
+                'micronaut.server.ssl.buildSelfSigned': false,
                 'micronaut.ssl.clientAuthentication': "need",
                 'micronaut.ssl.key-store.path': 'classpath:KeyStore.pkcs12',
                 'micronaut.ssl.key-store.type': 'PKCS12',

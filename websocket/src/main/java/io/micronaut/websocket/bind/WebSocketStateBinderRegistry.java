@@ -27,7 +27,6 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.bind.binders.QueryValueArgumentBinder;
-import io.micronaut.websocket.RxWebSocketSession;
 import io.micronaut.websocket.WebSocketSession;
 
 import java.util.HashMap;
@@ -57,7 +56,6 @@ public class WebSocketStateBinderRegistry implements ArgumentBinderRegistry<WebS
         this.requestBinderRegistry = requestBinderRegistry;
         ArgumentBinder<Object, WebSocketState> sessionBinder = (context, source) -> () -> Optional.of(source.getSession());
         this.byType.put(WebSocketSession.class, sessionBinder);
-        this.byType.put(RxWebSocketSession.class, sessionBinder);
         this.queryValueArgumentBinder = new QueryValueArgumentBinder<>(ConversionService.SHARED);
     }
 

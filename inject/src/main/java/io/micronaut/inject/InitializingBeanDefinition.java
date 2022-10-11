@@ -21,17 +21,17 @@ import io.micronaut.context.DefaultBeanResolutionContext;
 
 /**
  * A bean definition that is provides initialization hooks normally in the form of methods annotated with
- * {@link javax.annotation.PostConstruct}.
+ * {@link jakarta.annotation.PostConstruct}.
  *
  * @param <T> The bean definition type
  * @author Graeme Rocher
- * @see javax.annotation.PostConstruct
+ * @see jakarta.annotation.PostConstruct
  * @since 1.0
  */
 public interface InitializingBeanDefinition<T> extends BeanDefinition<T> {
 
     /**
-     * Initializes the bean invoking all {@link javax.annotation.PostConstruct} hooks.
+     * Initializes the bean invoking all {@link jakarta.annotation.PostConstruct} hooks.
      *
      * @param context The bean context
      * @param bean    The bean
@@ -42,7 +42,7 @@ public interface InitializingBeanDefinition<T> extends BeanDefinition<T> {
     }
 
     /**
-     * Initializes the bean invoking all {@link javax.annotation.PostConstruct} hooks.
+     * Initializes the bean invoking all {@link jakarta.annotation.PostConstruct} hooks.
      *
      * @param resolutionContext The resolution context
      * @param context           The bean context

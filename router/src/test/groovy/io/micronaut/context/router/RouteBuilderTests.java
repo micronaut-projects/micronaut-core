@@ -21,15 +21,15 @@ import io.micronaut.context.annotation.Executable;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
-import org.junit.Test;
 import io.micronaut.web.router.*;
 
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
+import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
-import static org.junit.Assert.*;
 /**
  * @author Graeme Rocher
  * @since 1.0
@@ -45,7 +45,6 @@ public class RouteBuilderTests {
         routeBuilder.someRoutes(new BookController(), new AuthorController());
         List<UriRoute> builtRoutes = routeBuilder.getUriRoutes();
         Router router = new DefaultRouter(routeBuilder);
-
         // test invoking routes
         assertTrue(router.GET("/books/1").isPresent());
 

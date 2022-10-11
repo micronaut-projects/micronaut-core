@@ -16,8 +16,8 @@
 package io.micronaut.http.client;
 
 import io.micronaut.context.LifeCycle;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
@@ -26,6 +26,7 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.hateoas.JsonError;
 import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
 
 import java.io.Closeable;
 import java.net.URL;
@@ -52,10 +53,10 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
     /**
      * <p>Perform an HTTP request for the given request object emitting the full HTTP response from returned
      * {@link Publisher} and converting the response body to the specified type.</p>
-     * <p>
+     *
      * <p>This method will send a {@code Content-Length} header and except a content length header the response and is
      * designed for simple non-streaming exchanges of data</p>
-     * <p>
+     *
      * <p>By default the exchange {@code Content-Type} is application/json, unless otherwise specified in the passed
      * {@link HttpRequest}</p>
      *
@@ -67,15 +68,15 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
      * @param <E>      The error type
      * @return A {@link Publisher} that emits the full {@link HttpResponse} object
      */
-    <I, O, E> Publisher<HttpResponse<O>> exchange(HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType);
+    <I, O, E> Publisher<HttpResponse<O>> exchange(@NonNull HttpRequest<I> request, @NonNull Argument<O> bodyType, @NonNull Argument<E> errorType);
 
     /**
      * <p>Perform an HTTP request for the given request object emitting the full HTTP response from returned
      * {@link Publisher} and converting the response body to the specified type.</p>
-     * <p>
+     *
      * <p>This method will send a {@code Content-Length} header and except a content length header the response and is
      * designed for simple non-streaming exchanges of data</p>
-     * <p>
+     *
      * <p>By default the exchange {@code Content-Type} is application/json, unless otherwise specified in the passed
      * {@link HttpRequest}</p>
      *
@@ -85,7 +86,7 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
      * @param <O>      The response body type
      * @return A {@link Publisher} that emits the full {@link HttpResponse} object
      */
-    default <I, O> Publisher<HttpResponse<O>> exchange(HttpRequest<I> request, Argument<O> bodyType) {
+    default <I, O> Publisher<HttpResponse<O>> exchange(@NonNull HttpRequest<I> request, @NonNull Argument<O> bodyType) {
         return exchange(request, bodyType, DEFAULT_ERROR_TYPE);
     }
 
@@ -97,7 +98,7 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
      * @param <I>     The request body type
      * @return A {@link Publisher} that emits the full {@link HttpResponse} object
      */
-    default <I> Publisher<HttpResponse<ByteBuffer>> exchange(HttpRequest<I> request) {
+    default <I> Publisher<HttpResponse<ByteBuffer>> exchange(@NonNull HttpRequest<I> request) {
         return exchange(request, ByteBuffer.class);
     }
 
@@ -108,7 +109,7 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
      * @param uri The Uri
      * @return A {@link Publisher} that emits the full {@link HttpResponse} object
      */
-    default Publisher<HttpResponse<ByteBuffer>> exchange(String uri) {
+    default Publisher<HttpResponse<ByteBuffer>> exchange(@NonNull String uri) {
         return exchange(HttpRequest.GET(uri), ByteBuffer.class);
     }
 
@@ -121,7 +122,7 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
      * @param <O>      The response body type
      * @return A {@link Publisher} that emits the full {@link HttpResponse} object
      */
-    default <O> Publisher<HttpResponse<O>> exchange(String uri, Class<O> bodyType) {
+    default <O> Publisher<HttpResponse<O>> exchange(@NonNull String uri, @NonNull Class<O> bodyType) {
         return exchange(HttpRequest.GET(uri), Argument.of(bodyType));
     }
 
@@ -135,7 +136,7 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
      * @param <O>      The response body type
      * @return A {@link Publisher} that emits the full {@link HttpResponse} object
      */
-    default <I, O> Publisher<HttpResponse<O>> exchange(HttpRequest<I> request, Class<O> bodyType) {
+    default <I, O> Publisher<HttpResponse<O>> exchange(@NonNull HttpRequest<I> request, @NonNull Class<O> bodyType) {
         return exchange(request, Argument.of(bodyType));
     }
 
@@ -151,8 +152,9 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
      * @param <E>      The error type
      * @return A {@link Publisher} that emits a result of the given type
      */
-    default <I, O, E> Publisher<O> retrieve(HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType) {
-        return Publishers.map(exchange(request, bodyType, errorType), response -> {
+    default <I, O, E> Publisher<O> retrieve(@NonNull HttpRequest<I> request, @NonNull Argument<O> bodyType, @NonNull Argument<E> errorType) {
+        // note: this default impl isn't used by us anymore, it's overridden by DefaultHttpClient
+        return Flux.from(exchange(request, bodyType, errorType)).map(response -> {
             if (bodyType.getType() == HttpStatus.class) {
                 return (O) response.getStatus();
             } else {
@@ -182,7 +184,7 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
      * @param <O>      The response body type
      * @return A {@link Publisher} that emits a result of the given type
      */
-    default <I, O> Publisher<O> retrieve(HttpRequest<I> request, Argument<O> bodyType) {
+    default <I, O> Publisher<O> retrieve(@NonNull HttpRequest<I> request, @NonNull Argument<O> bodyType) {
         return retrieve(request, bodyType, DEFAULT_ERROR_TYPE);
     }
 
@@ -196,7 +198,7 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
      * @param <O>      The response body type
      * @return A {@link Publisher} that emits a result of the given type
      */
-    default <I, O> Publisher<O> retrieve(HttpRequest<I> request, Class<O> bodyType) {
+    default <I, O> Publisher<O> retrieve(@NonNull HttpRequest<I> request, @NonNull Class<O> bodyType) {
         return retrieve(request, Argument.of(bodyType));
     }
 
@@ -208,7 +210,7 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
      * @param <I>     The request body type
      * @return A {@link Publisher} that emits String result
      */
-    default <I> Publisher<String> retrieve(HttpRequest<I> request) {
+    default <I> Publisher<String> retrieve(@NonNull HttpRequest<I> request) {
         return retrieve(request, String.class);
     }
 
@@ -219,7 +221,7 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
      * @param uri The URI
      * @return A {@link Publisher} that emits String result
      */
-    default Publisher<String> retrieve(String uri) {
+    default Publisher<String> retrieve(@NonNull String uri) {
         return retrieve(HttpRequest.GET(uri), String.class);
     }
 
@@ -230,26 +232,29 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
     }
 
     /**
-     * Create a new {@link HttpClient}. Note that this method should only be used outside of the context of a
-     * Micronaut application. Within Micronaut use {@link javax.inject.Inject} to inject a client instead.
+     * Create a new {@link HttpClient}.
+     * Note that this method should only be used outside of the context of a Micronaut application.
+     * The returned {@link HttpClient} is not subject to dependency injection.
+     * The creator is responsible for closing the client to avoid leaking connections.
+     * Within a Micronaut application use {@link jakarta.inject.Inject} to inject a client instead.
      *
      * @param url The base URL
      * @return The client
      */
     static HttpClient create(@Nullable URL url) {
-        return HttpClientConfiguration.createClient(url);
+        return HttpClientFactoryResolver.getFactory().createClient(url);
     }
 
     /**
      * Create a new {@link HttpClient} with the specified configuration. Note that this method should only be used
-     * outside of the context of an application. Within Micronaut use {@link javax.inject.Inject} to inject a client instead
+     * outside of the context of an application. Within Micronaut use {@link jakarta.inject.Inject} to inject a client instead
      *
      * @param url The base URL
      * @param configuration the client configuration
      * @return The client
      * @since 2.2.0
      */
-    static HttpClient create(@Nullable URL url, HttpClientConfiguration configuration) {
-        return HttpClientConfiguration.createClient(url, configuration);
+    static HttpClient create(@Nullable URL url, @NonNull HttpClientConfiguration configuration) {
+        return HttpClientFactoryResolver.getFactory().createClient(url, configuration);
     }
 }

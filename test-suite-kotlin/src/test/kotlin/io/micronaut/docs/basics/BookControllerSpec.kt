@@ -1,13 +1,14 @@
 package io.micronaut.docs.basics
 
-import io.kotlintest.shouldBe
-import io.kotlintest.specs.StringSpec
+import io.kotest.matchers.shouldBe
+import io.kotest.core.spec.style.StringSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest.POST
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
+import reactor.core.publisher.Flux
 
 class BookControllerSpec: StringSpec() {
 
@@ -16,7 +17,7 @@ class BookControllerSpec: StringSpec() {
     )
 
     val client = autoClose(
-        embeddedServer.applicationContext.createBean(RxHttpClient::class.java, embeddedServer.url)
+        embeddedServer.applicationContext.createBean(HttpClient::class.java, embeddedServer.url)
     )
 
     init {
@@ -28,7 +29,7 @@ class BookControllerSpec: StringSpec() {
             )
             // end::posturitemplate[]
 
-            val response = call.blockingFirst()
+            val response = Flux.from(call).blockFirst()
             val message = response.getBody(Book::class.java) // <2>
             // check the status
             response.status shouldBe HttpStatus.CREATED // <3>
@@ -46,7 +47,7 @@ class BookControllerSpec: StringSpec() {
             )
             // end::postform[]
 
-            val response = call.blockingFirst()
+            val response = Flux.from(call).blockFirst()
             val message = response.getBody(Book::class.java) // <2>
             // check the status
             response.status shouldBe HttpStatus.CREATED // <3>

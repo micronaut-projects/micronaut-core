@@ -21,29 +21,30 @@ import com.fasterxml.jackson.databind.DeserializationContext
 import com.fasterxml.jackson.databind.JsonDeserializer
 import com.fasterxml.jackson.databind.JsonSerializer
 import com.fasterxml.jackson.databind.SerializerProvider
+import io.micronaut.context.annotation.Property
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.annotation.Client
-import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
-import spock.lang.AutoCleanup
 import spock.lang.Issue
 import spock.lang.Specification
 
 import java.math.RoundingMode
 
 @Issue("https://github.com/micronaut-projects/micronaut-core/issues/1089")
+@Property(name = 'spec.name', value = 'BigDecimalSerializationSpec')
 @MicronautTest
 class BigDecimalSerializationSpec extends Specification {
 
     @Inject
     @Client("/")
-    RxHttpClient client
+    HttpClient client
 
     void "test that big decimal precision is retained during JSON ser-de"() {
         given:
@@ -72,7 +73,7 @@ class BigDecimalSerializationSpec extends Specification {
         bigDecimal == actual
     }
 
-
+    @Requires(property = 'spec.name', value = 'BigDecimalSerializationSpec')
     @Controller("/big-decimal/test")
     static class TestController {
 
@@ -95,6 +96,7 @@ class BigDecimalSerializationSpec extends Specification {
         }
     }
 
+    @Requires(property = 'spec.name', value = 'BigDecimalSerializationSpec')
     @Singleton
     static class BigDecimalDeserializer extends JsonDeserializer<BigDecimal> {
 
@@ -104,6 +106,7 @@ class BigDecimalSerializationSpec extends Specification {
         }
     }
 
+    @Requires(property = 'spec.name', value = 'BigDecimalSerializationSpec')
     @Singleton
     static class BigDecimalSerializer extends JsonSerializer<BigDecimal> {
 

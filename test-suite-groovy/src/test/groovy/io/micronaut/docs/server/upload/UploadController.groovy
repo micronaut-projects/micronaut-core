@@ -15,13 +15,15 @@
  */
 package io.micronaut.docs.server.upload
 
+import io.micronaut.core.async.annotation.SingleResult
+
 // tag::class[]
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.multipart.StreamingFileUpload
-import io.reactivex.Single
 import org.reactivestreams.Publisher
+import reactor.core.publisher.Mono
 
 import static io.micronaut.http.HttpStatus.CONFLICT
 import static io.micronaut.http.MediaType.MULTIPART_FORM_DATA
@@ -29,14 +31,16 @@ import static io.micronaut.http.MediaType.TEXT_PLAIN
 
 @Controller("/upload")
 class UploadController {
+// end::class[]
 
+    // tag::file[]
     @Post(value = "/", consumes = MULTIPART_FORM_DATA, produces = TEXT_PLAIN) // <1>
-    Single<HttpResponse<String>> upload(StreamingFileUpload file) { // <2>
+    Mono<HttpResponse<String>> upload(StreamingFileUpload file) { // <2>
 
         File tempFile = File.createTempFile(file.filename, "temp")
         Publisher<Boolean> uploadPublisher = file.transferTo(tempFile) // <3>
 
-        Single.fromPublisher(uploadPublisher)  // <4>
+        Mono.from(uploadPublisher)  // <4>
             .map({ success ->
                 if (success) {
                     HttpResponse.ok("Uploaded")
@@ -46,5 +50,29 @@ class UploadController {
                 }
             })
     }
+    // end::file[]
+
+    // tag::outputStream[]
+    @Post(value = "/outputStream", consumes = MULTIPART_FORM_DATA, produces = TEXT_PLAIN) // <1>
+    @SingleResult
+    Mono<HttpResponse<String>> uploadOutputStream(StreamingFileUpload file) { // <2>
+
+        OutputStream outputStream = new ByteArrayOutputStream() // <3>
+
+        Publisher<Boolean> uploadPublisher = file.transferTo(outputStream) // <4>
+
+        Mono.from(uploadPublisher)  // <5>
+                .map({ success ->
+                    if (success) {
+                        HttpResponse.ok("Uploaded")
+                    } else {
+                        HttpResponse.<String>status(CONFLICT)
+                                .body("Upload Failed")
+                    }
+                })
+    }
+    // end::outputStream[]
+
+// tag::endclass[]
 }
-// end::class[]
+// end::endclass[]

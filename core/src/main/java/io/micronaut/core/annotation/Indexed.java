@@ -30,6 +30,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Retention(RUNTIME)
 @Target({ElementType.TYPE, ElementType.METHOD, ElementType.ANNOTATION_TYPE})
 @Repeatable(value = Indexes.class)
+@Inherited
 public @interface Indexed {
     /**
      * @return The indexed type

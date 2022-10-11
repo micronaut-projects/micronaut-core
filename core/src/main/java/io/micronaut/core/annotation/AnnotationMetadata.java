@@ -27,20 +27,28 @@ import io.micronaut.core.value.OptionalValues;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Repeatable;
 import java.lang.reflect.Array;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.OptionalDouble;
+import java.util.OptionalInt;
+import java.util.OptionalLong;
+import java.util.Set;
 
 /**
  * <p>An interface implemented at compile time by Micronaut that allows the inspection of annotation metadata and
  * stereotypes (meta-annotations)</p>.
- * <p>
+ *
  * <p>This interface exposes fast and efficient means to expose annotation data at runtime without requiring reflective
  * tricks to read the annotation metadata</p>
- * <p>
+ *
  * <p>Users of Micronaut should in general avoid the methods of the {@link java.lang.reflect.AnnotatedElement}
  * interface and use this interface instead to obtain maximum efficiency</p>
- * <p>
- * <p>Core framework types such as <tt>io.micronaut.inject.BeanDefinition</tt> and
- * <tt>io.micronaut.inject.ExecutableMethod</tt> implement this interface</p>
+ *
+ * <p>Core framework types such as {@code io.micronaut.inject.BeanDefinition} and
+ * {@code io.micronaut.inject.ExecutableMethod} implement this interface</p>
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -52,7 +60,7 @@ public interface AnnotationMetadata extends AnnotationSource {
     AnnotationMetadata EMPTY_METADATA = new EmptyAnnotationMetadata();
 
     /**
-     * The default <tt>value()</tt> member.
+     * The default {@code value()} member.
      */
     String VALUE_MEMBER = "value";
 
@@ -60,6 +68,15 @@ public interface AnnotationMetadata extends AnnotationSource {
      * The suffix used when saving compiled metadata to classes.
      */
     String CLASS_NAME_SUFFIX = "$$AnnotationMetadata";
+
+    /**
+     * Gets the declared metadata without inherited metdata.
+     * @return The declared metadata
+     * @since 3.0.0
+     */
+    default @NonNull AnnotationMetadata getDeclaredMetadata() {
+        return this;
+    }
 
     /**
      * Does the metadata contain any property expressions like {@code ${foo.bar}}. Note
@@ -85,11 +102,51 @@ public interface AnnotationMetadata extends AnnotationSource {
     }
 
     /**
+     * Resolve all of the annotation values that feature the given stereotype.
+     *
+     * @param stereotype The annotation names
+     * @param <T> The annotation type
+     * @return A set of annotation names
+     * @since 3.5.2
+     */
+    @NonNull
+    default <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByStereotype(@Nullable String stereotype) {
+        return Collections.emptyList();
+    }
+
+    /**
      * All the annotation names this metadata declares.
      *
      * @return All the annotation names this metadata declares
      */
     default @NonNull Set<String> getAnnotationNames() {
+        return Collections.emptySet();
+    }
+
+    /**
+     * Returns the names of the annotations which are stereotypes.
+     *
+     * <p>A stereotype is a meta-annotation (an annotation declared on another annotation).</p>
+     * @return The names of the stereotype annotations
+     * @since 3.4.1
+     * @see #getDeclaredStereotypeAnnotationNames()
+     */
+    default @NonNull Set<String> getStereotypeAnnotationNames() {
+        return Collections.emptySet();
+    }
+
+    /**
+     * Returns the names of the annotations which are declared stereotypes.
+     *
+     * <p>A stereotype is a meta-annotation (an annotation declared on another annotation).</p>
+     *
+     * <p>A stereotype is considered declared when it it is a meta-annotation that is present on an annotation directly declared on the element and not inherited from a super class.</p>
+     * @return The names of the stereotype annotations
+     * @since 3.4.1
+     * @see #getStereotypeAnnotationNames()
+     * @see #getDeclaredAnnotationNames()
+     */
+    default @NonNull Set<String> getDeclaredStereotypeAnnotationNames() {
         return Collections.emptySet();
     }
 
@@ -164,6 +221,18 @@ public interface AnnotationMetadata extends AnnotationSource {
     }
 
     /**
+     * Gets all the annotation values by the given repeatable type name.
+     *
+     * @param annotationType The annotation type
+     * @param <T> The annotation type
+     * @return A list of values
+     * @since 3.2.4
+     */
+    default @NonNull <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByName(@NonNull String annotationType) {
+        return Collections.emptyList();
+    }
+
+    /**
      * Gets only declared annotation values by the given repeatable type.
      *
      * @param annotationType The annotation type
@@ -171,6 +240,18 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @return A list of values
      */
     default @NonNull <T extends Annotation> List<AnnotationValue<T>> getDeclaredAnnotationValuesByType(@NonNull Class<T> annotationType) {
+        return Collections.emptyList();
+    }
+
+    /**
+     * Gets only declared annotation values by the given repeatable type name.
+     *
+     * @param annotationType The annotation type
+     * @param <T> The annotation type
+     * @return A list of values
+     * @since 3.2.4
+     */
+    default @NonNull <T extends Annotation> List<AnnotationValue<T>> getDeclaredAnnotationValuesByName(@NonNull String annotationType) {
         return Collections.emptyList();
     }
 
@@ -232,7 +313,7 @@ public interface AnnotationMetadata extends AnnotationSource {
 
     /**
      * <p>Checks whether this object has the given annotation stereotype on the object itself or inherited from a parent</p>.
-     * <p>
+     *
      * <p>An annotation stereotype is a meta annotation potentially applied to another annotation</p>
      *
      * @param annotation The annotation
@@ -244,7 +325,7 @@ public interface AnnotationMetadata extends AnnotationSource {
 
     /**
      * <p>Checks whether this object has the given annotation stereotype on the object itself and not inherited from a parent</p>.
-     * <p>
+     *
      * <p>An annotation stereotype is a meta annotation potentially applied to another annotation</p>
      *
      * @param annotation The annotation
@@ -408,8 +489,7 @@ public interface AnnotationMetadata extends AnnotationSource {
         ArgumentUtils.requireNonNull("member", member);
         ArgumentUtils.requireNonNull("requiredType", requiredType);
 
-        Repeatable repeatable = annotation.getAnnotation(Repeatable.class);
-        if (repeatable != null) {
+        if (isRepeatableAnnotation(annotation)) {
             List<? extends AnnotationValue<? extends Annotation>> values = getAnnotationValuesByType(annotation);
             if (!values.isEmpty()) {
                 return values.iterator().next().get(member, requiredType);
@@ -624,8 +704,7 @@ public interface AnnotationMetadata extends AnnotationSource {
     @Override
     default <T extends Annotation> Optional<AnnotationValue<T>> findAnnotation(@NonNull Class<T> annotationClass) {
         ArgumentUtils.requireNonNull("annotationClass", annotationClass);
-        Repeatable repeatable = annotationClass.getAnnotation(Repeatable.class);
-        if (repeatable != null) {
+        if (isRepeatableAnnotation(annotationClass)) {
             List<AnnotationValue<T>> values = getAnnotationValuesByType(annotationClass);
             if (values.isEmpty()) {
                 return Optional.empty();
@@ -643,8 +722,7 @@ public interface AnnotationMetadata extends AnnotationSource {
     @Override
     default <T extends Annotation> Optional<AnnotationValue<T>> findDeclaredAnnotation(@NonNull Class<T> annotationClass) {
         ArgumentUtils.requireNonNull("annotationClass", annotationClass);
-        Repeatable repeatable = annotationClass.getAnnotation(Repeatable.class);
-        if (repeatable != null) {
+        if (isRepeatableAnnotation(annotationClass)) {
             List<AnnotationValue<T>> values = getDeclaredAnnotationValuesByType(annotationClass);
             if (values.isEmpty()) {
                 return Optional.empty();
@@ -1357,19 +1435,16 @@ public interface AnnotationMetadata extends AnnotationSource {
      */
     default boolean hasAnnotation(@Nullable Class<? extends Annotation> annotation) {
         if (annotation != null) {
-            Repeatable repeatable = annotation.getAnnotation(Repeatable.class);
-            if (repeatable != null) {
-                return hasAnnotation(repeatable.value().getName());
-            } else {
-                return hasAnnotation(annotation.getName());
-            }
+            return findRepeatableAnnotation(annotation)
+                    .map(this::hasAnnotation)
+                    .orElseGet(() -> hasAnnotation(annotation.getName()));
         }
         return false;
     }
 
     /**
      * <p>Checks whether this object has the given annotation stereotype on the object itself or inherited from a parent</p>.
-     * <p>
+     *
      * <p>An annotation stereotype is a meta annotation potentially applied to another annotation</p>
      *
      * @param annotation The annotation
@@ -1377,12 +1452,9 @@ public interface AnnotationMetadata extends AnnotationSource {
      */
     default boolean hasStereotype(@Nullable Class<? extends Annotation> annotation) {
         if (annotation != null) {
-            Repeatable repeatable = annotation.getAnnotation(Repeatable.class);
-            if (repeatable != null) {
-                return hasStereotype(repeatable.value().getName());
-            } else {
-                return hasStereotype(annotation.getName());
-            }
+            return findRepeatableAnnotation(annotation)
+                    .map(this::hasStereotype)
+                    .orElseGet(() -> hasStereotype(annotation.getName()));
         }
         return false;
     }
@@ -1432,12 +1504,9 @@ public interface AnnotationMetadata extends AnnotationSource {
      */
     default boolean hasDeclaredAnnotation(@Nullable Class<? extends Annotation> annotation) {
         if (annotation != null) {
-            Repeatable repeatable = annotation.getAnnotation(Repeatable.class);
-            if (repeatable != null) {
-                return hasDeclaredAnnotation(repeatable.value().getName());
-            } else {
-                return hasDeclaredAnnotation(annotation.getName());
-            }
+            return findRepeatableAnnotation(annotation)
+                    .map(this::hasDeclaredAnnotation)
+                    .orElseGet(() -> hasDeclaredAnnotation(annotation.getName()));
         }
         return false;
     }
@@ -1450,12 +1519,9 @@ public interface AnnotationMetadata extends AnnotationSource {
      */
     default boolean hasDeclaredStereotype(@Nullable Class<? extends Annotation> stereotype) {
         if (stereotype != null) {
-            Repeatable repeatable = stereotype.getAnnotation(Repeatable.class);
-            if (repeatable != null) {
-                return hasDeclaredStereotype(repeatable.value().getName());
-            } else {
-                return hasDeclaredStereotype(stereotype.getName());
-            }
+            return findRepeatableAnnotation(stereotype)
+                    .map(this::hasDeclaredStereotype)
+                    .orElseGet(() -> hasDeclaredStereotype(stereotype.getName()));
         }
         return false;
     }
@@ -1477,6 +1543,47 @@ public interface AnnotationMetadata extends AnnotationSource {
             }
         }
         return false;
+    }
+
+    /**
+     * Is repeatable annotation?
+     * @param annotation The annotation
+     * @return true if repeatable
+     * @since 3.1
+     */
+    default boolean isRepeatableAnnotation(@NonNull Class<? extends Annotation> annotation) {
+        return annotation.getAnnotation(Repeatable.class) != null;
+    }
+
+    /**
+     * Is repeatable annotation?
+     * @param annotation The annotation
+     * @return true if repeatable
+     * @since 3.1
+     */
+    default boolean isRepeatableAnnotation(@NonNull String annotation) {
+        return false;
+    }
+
+    /**
+     * Find repeatable annotation container.
+     * @param annotation The annotation
+     * @return optional repeatable annotation container
+     * @since 3.1
+     */
+    default Optional<String> findRepeatableAnnotation(@NonNull Class<? extends Annotation> annotation) {
+        return Optional.ofNullable(annotation.getAnnotation(Repeatable.class))
+                .map(repeatable -> repeatable.value().getName());
+    }
+
+    /**
+     * Find repeatable annotation container.
+     * @param annotation The annotation
+     * @return optional repeatable annotation container
+     * @since 3.1
+     */
+    default Optional<String> findRepeatableAnnotation(@NonNull String annotation) {
+        return Optional.empty();
     }
 
     /**

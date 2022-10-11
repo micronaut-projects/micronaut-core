@@ -19,6 +19,7 @@ package io.micronaut.docs.aop.around
 import io.micronaut.aop.InterceptorBean
 import io.micronaut.aop.MethodInterceptor
 import io.micronaut.aop.MethodInvocationContext
+import io.micronaut.core.annotation.Nullable
 import io.micronaut.core.type.MutableArgumentValue
 
 import jakarta.inject.Singleton
@@ -28,6 +29,7 @@ import jakarta.inject.Singleton
 @Singleton
 @InterceptorBean(NotNull) // <1>
 class NotNullInterceptor implements MethodInterceptor<Object, Object> { // <2>
+    @Nullable
     @Override
     Object intercept(MethodInvocationContext<Object, Object> context) {
         Optional<Map.Entry<String, MutableArgumentValue<?>>> nullParam = context.parameters

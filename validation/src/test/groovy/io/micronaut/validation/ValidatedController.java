@@ -25,6 +25,7 @@ import javax.validation.Valid;
 import javax.validation.constraints.Digits;
 import javax.validation.constraints.Min;
 import javax.validation.constraints.NotNull;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -42,6 +43,11 @@ public class ValidatedController {
     @Post("/pojo")
     public Pojo pojo(@Body @Valid Pojo pojo) {
         return pojo;
+    }
+
+    @Post("/pojos")
+    public List<Pojo> pojos(@Body @Valid List<Pojo> pojos) {
+        return pojos;
     }
 
     @Post("/no-introspection")

@@ -1,18 +1,59 @@
 package io.micronaut.inject.requires
 
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.condition.OperatingSystem
 import io.micronaut.context.env.PropertySource
+import io.micronaut.context.exceptions.NoSuchBeanException
 import io.micronaut.core.annotation.AnnotationMetadata
-import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanDefinitionReference
 import spock.util.environment.RestoreSystemProperties
 
 class RequiresSpec extends AbstractTypeElementSpec{
+
+    void "test requires java sdk - success"() {
+        given:
+        ApplicationContext context = buildContext( '''
+package test;
+
+import io.micronaut.context.annotation.*;
+
+@Requires(sdk=Requires.Sdk.JAVA, value="8")
+@jakarta.inject.Singleton
+class MyBean {
+}
+''')
+        expect:"the bean exists"
+        getBean(context, 'test.MyBean')
+
+        cleanup:
+        context.close()
+    }
+
+    void "test requires java sdk - failure"() {
+        given:
+        ApplicationContext context = buildContext( '''
+package test;
+
+import io.micronaut.context.annotation.*;
+
+@Requires(sdk=Requires.Sdk.JAVA, version="800")
+@jakarta.inject.Singleton
+class MyBean {
+}
+''')
+        when:"the bean doesn't exist"
+        getBean(context, 'test.MyBean')
+
+        then:
+        thrown(NoSuchBeanException)
+
+        cleanup:
+        context.close()
+    }
 
     void "test requires property not equals"() {
         when:
@@ -29,7 +70,7 @@ class MyBean {
 
         ApplicationContext applicationContext = ApplicationContext.builder().build()
         applicationContext.environment.addPropertySource(PropertySource.of("foo":"test"))
-        applicationContext.environment.start()
+        applicationContext.start()
 
         then:
         beanDefinition.isEnabled(applicationContext)
@@ -38,7 +79,7 @@ class MyBean {
         applicationContext.close()
         applicationContext = ApplicationContext.builder().build()
         applicationContext.environment.addPropertySource(PropertySource.of("foo":"bar"))
-        applicationContext.environment.start()
+        applicationContext.start()
 
         then:
         !beanDefinition.isEnabled(applicationContext)
@@ -46,7 +87,7 @@ class MyBean {
         when:
         applicationContext.close()
         applicationContext = ApplicationContext.builder().build()
-        applicationContext.environment.start()
+        applicationContext.start()
 
         then:
         beanDefinition.isEnabled(applicationContext)
@@ -124,7 +165,7 @@ class MyBean {
         def context = ApplicationContext
                 .builder('foo.bar':"test")
                 .build()
-        context.environment.start()
+        context.start()
 
         context.registerSingleton(String.class, "foo")
 
@@ -167,6 +208,7 @@ class MyBean {
 
         def context = new DefaultBeanContext()
         context.registerSingleton(String.class, "foo")
+        context.start()
 
         then:
         !beanDefinition.isEnabled(context)
@@ -207,6 +249,7 @@ class MyBean {
 
         def context = new DefaultBeanContext()
         context.registerSingleton(String.class, "foo")
+        context.start()
 
         then:
         beanDefinition.isEnabled(context)
@@ -232,6 +275,7 @@ class MyBean {
 
         def context = new DefaultBeanContext()
         context.registerSingleton(new Outer.Inner())
+        context.start()
 
         then:
         beanDefinition.isEnabled(context)
@@ -254,6 +298,7 @@ class MyBean {
 ''')
 
         def context = ApplicationContext.builder("foo").build()
+        context.start()
 
         then:
         beanDefinition.isEnabled(context)
@@ -276,6 +321,7 @@ class MyBean {
 ''')
 
         def context = ApplicationContext.builder().build()
+        context.start()
 
         then:
         !beanDefinition.isEnabled(context)
@@ -298,6 +344,7 @@ class MyBean {
 ''')
 
         def context = ApplicationContext.builder("foo").build()
+        context.start()
 
         then:
         !beanDefinition.isEnabled(context)
@@ -320,6 +367,7 @@ class MyBean {
 ''')
 
         def context = ApplicationContext.builder("foo").build()
+        context.start()
 
         then:
         !beanDefinition.isEnabled(context)
@@ -342,6 +390,7 @@ class MyBean {
 ''')
 
         def context = ApplicationContext.builder().build()
+        context.start()
 
         then:
         beanDefinition.isEnabled(context)
@@ -364,6 +413,7 @@ class MyBean {
 ''')
 
         def context = ApplicationContext.builder().build()
+        context.start()
 
         then:
         beanDefinition.isEnabled(context)
@@ -389,8 +439,7 @@ class MyBean {
                 .builder('foo.bar':true)
                 .build()
 
-        context.environment.start()
-
+        context.start()
 
         then:
         beanDefinition.isEnabled(context)
@@ -419,8 +468,7 @@ class MyBean {
                 .builder()
                 .build()
 
-        context.environment.start()
-
+        context.start()
 
         then:
         !beanDefinition.isEnabled(context)
@@ -446,7 +494,7 @@ class MyBean {
                 .builder('foo.bar':"test")
                 .build()
 
-        context.environment.start()
+        context.start()
 
         then:
         beanDefinition.isEnabled(context)
@@ -472,7 +520,7 @@ class MyBean {
                 .builder()
                 .build()
 
-        context.environment.start()
+        context.start()
 
 
         then:
@@ -499,8 +547,7 @@ class MyBean {
                 .builder('foo.bar':"blah")
                 .build()
 
-        context.environment.start()
-
+        context.start()
 
         then:
         !beanDefinition.isEnabled(context)
@@ -528,7 +575,7 @@ class MyBean {
                 .builder('foo.bar':"10")
                 .build()
 
-        context.environment.start()
+        context.start()
 
         then:
         beanDefinition.isEnabled(context)
@@ -554,8 +601,7 @@ class MyBean {
                 .builder()
                 .build()
 
-        context.environment.start()
-
+        context.start()
 
         then:
         !beanDefinition.isEnabled(context)
@@ -581,8 +627,7 @@ class MyBean {
                 .builder('foo.bar':"blah")
                 .build()
 
-        context.environment.start()
-
+        context.start()
 
         then:
         !beanDefinition.isEnabled(context)
@@ -608,7 +653,7 @@ class MyBean {
                 .builder()
                 .build()
 
-        context.environment.start()
+        context.start()
 
         then:
         !beanDefinition.isEnabled(context)
@@ -620,7 +665,7 @@ class MyBean {
                 .builder()
                 .build()
 
-        context.environment.start()
+        context.start()
 
         then:
         beanDefinition.isEnabled(context)
@@ -647,7 +692,7 @@ class MyBean {
                 .builder()
                 .build()
 
-        context.environment.start()
+        context.start()
 
         then:
         !beanDefinition.isEnabled(context)
@@ -659,7 +704,7 @@ class MyBean {
                 .builder()
                 .build()
 
-        context.environment.start()
+        context.start()
 
         then:
         beanDefinition.isEnabled(context)

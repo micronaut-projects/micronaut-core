@@ -14,7 +14,9 @@ class ProductInterceptors {
     ProductInterceptors(ProductService productService) {
         this.productService = productService
     }
+// end::class[]
 
+    // tag::constructor-interceptor[]
     @InterceptorBean(ProductBean.class)
     ConstructorInterceptor<Product> aroundConstruct() { // <1>
         return  { context ->
@@ -30,7 +32,7 @@ class ProductInterceptors {
             return product
         }
     }
-// end::class[]
+    // end::constructor-interceptor[]
 
     // tag::method-interceptor[]
     @InterceptorBean(ProductBean.class) // <1>
@@ -50,6 +52,7 @@ class ProductInterceptors {
         }
     }
     // end::method-interceptor[]
+
 // tag::class[]
 }
 // end::class[]

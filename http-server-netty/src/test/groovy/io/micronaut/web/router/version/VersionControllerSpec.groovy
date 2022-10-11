@@ -18,7 +18,7 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.hateoas.JsonError
 import io.micronaut.http.hateoas.Link
 import io.micronaut.http.server.exceptions.ExceptionHandler
-import io.micronaut.http.server.netty.converters.DuplicateRouteHandler
+import io.micronaut.http.server.exceptions.DuplicateRouteHandler
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.web.router.UriRouteMatch
 import io.micronaut.web.router.exceptions.DuplicateRouteException

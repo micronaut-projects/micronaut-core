@@ -1,28 +1,48 @@
+plugins {
+    id "io.micronaut.build.internal.convention-library"
+    id 'io.micronaut.build.internal.functional-test'
+}
+
+micronautBuild {
+    core {
+        usesMicronautTest()
+    }
+}
+
 dependencies {
     api project(":inject")
     api project(':aop')
-    api dependencyModuleVersion("groovy", "groovy")
-
+    api libs.managed.groovy
 //    testImplementation 'javax.validation:validation-api:1.1.0.Final'
-    testImplementation group: 'javax.inject', name: 'javax.inject', version: '1'
-    testImplementation dependencyVersion("spotbugs")
-    testImplementation "org.hibernate:hibernate-core:5.4.29.Final"
-    testImplementation 'org.hibernate:hibernate-validator:6.1.6.Final'
-    testRuntimeOnly 'org.glassfish.web:el-impl:2.2.1-b05'
-    testRuntimeOnly 'org.glassfish:javax.el:3.0.1-b12'
+    testImplementation project(":context")
+    testImplementation libs.javax.inject
+    testImplementation libs.managed.spotbugs
+    testImplementation libs.hibernate
+    testImplementation libs.hibernate.validator
+    testRuntimeOnly libs.javax.el.impl
+    testRuntimeOnly libs.javax.el
     testImplementation project(":http-server-netty")
     testImplementation project(":http-client")
     testImplementation project(":inject-test-utils")
     testImplementation project(":inject-groovy-test")
     testImplementation project(":validation")
-    testImplementation 'org.neo4j.driver:neo4j-java-driver:1.4.5'
-    testImplementation dependencyModuleVersion("groovy", "groovy-json")
-    testImplementation "com.blazebit:blaze-persistence-core-impl:1.6.0-Alpha1"
+    testImplementation(libs.managed.neo4j.bolt) {
+        version {
+            require "1.4.5"
+        }
+    }
+    testImplementation libs.managed.groovy.json
+    testImplementation libs.blaze.persistence.core
+    testImplementation libs.managed.snakeyaml
+    testImplementation libs.managed.reactor
 
+    functionalTestImplementation(testFixtures(project(":test-suite")))
 }
 
-test {
+tasks.named("test") {
     exclude '**/*$_closure*'
+
+    systemProperty "groovy.attach.groovydoc", true
 }
 
 //compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']

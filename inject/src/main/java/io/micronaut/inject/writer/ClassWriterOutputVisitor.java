@@ -78,18 +78,28 @@ public interface ClassWriterOutputVisitor {
      *
      * @param type      the fully qualified service name
      * @param classname the fully qualified classname
-     * @throws IOException If the file couldn't be created
      */
     void visitServiceDescriptor(String type, String classname);
+
+    /**
+     * Allows adding a class that will be written to the {@code META-INF/services} file under the given type and class
+     * name.
+     *
+     * @param type      the fully qualified service name
+     * @param classname the fully qualified classname
+     * @param originatingElement The originating element
+     * @since 3.5.0
+     */
+    void visitServiceDescriptor(String type, String classname, Element originatingElement);
 
     /**
      * Visit a file within the META-INF directory of the classes directory.
      *
      * @param path The path to the file
      * @return An optional file it was possible to create it
-     * @throws IOException If the file couldn't be created
      * @deprecated Visiting a file should supply the originating elements. Use {@link #visitMetaInfFile(String, Element...)} instead
      */
+    // this is still needed
     @Deprecated
     default Optional<GeneratedFile> visitMetaInfFile(String path) {
         return visitMetaInfFile(path, Element.EMPTY_ELEMENT_ARRAY);
@@ -101,7 +111,6 @@ public interface ClassWriterOutputVisitor {
      * @param path The path to the file
      * @param originatingElements The originating elements
      * @return An optional file it was possible to create it
-     * @throws IOException If the file couldn't be created
      */
     Optional<GeneratedFile> visitMetaInfFile(String path, Element... originatingElements);
 
@@ -133,9 +142,25 @@ public interface ClassWriterOutputVisitor {
      *
      * @param type      The service type
      * @param classname the fully qualified classname
-     * @throws IOException If the file couldn't be created
+     * @deprecated Use {@link #visitServiceDescriptor(String, String, io.micronaut.inject.ast.Element)}
      */
-    default void visitServiceDescriptor(Class type, String classname) {
+    // this is still used
+    @Deprecated
+    @SuppressWarnings("java:S1133")
+    default void visitServiceDescriptor(Class<?> type, String classname) {
         visitServiceDescriptor(type.getName(), classname);
+    }
+
+    /**
+     * Allows adding a class that will be written to the {@code META-INF/services} file under the given type and class
+     * name.
+     *
+     * @param type      The service type
+     * @param classname the fully qualified classname
+     * @param originatingElement The originating element
+     * @since 3.5.0
+     */
+    default void visitServiceDescriptor(Class<?> type, String classname, Element originatingElement) {
+        visitServiceDescriptor(type.getName(), classname, originatingElement);
     }
 }

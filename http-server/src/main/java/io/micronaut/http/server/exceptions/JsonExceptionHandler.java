@@ -16,6 +16,7 @@
 package io.micronaut.http.server.exceptions;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
@@ -37,6 +38,7 @@ import java.util.Optional;
  */
 @Produces
 @Singleton
+@Requires(classes = JsonProcessingException.class)
 public class JsonExceptionHandler implements ExceptionHandler<JsonProcessingException, Object> {
 
     private final ErrorResponseProcessor<?> responseProcessor;

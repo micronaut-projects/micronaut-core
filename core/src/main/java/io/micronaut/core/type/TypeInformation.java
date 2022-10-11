@@ -24,6 +24,7 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletionStage;
 import java.util.stream.Collectors;
@@ -89,6 +90,14 @@ public interface TypeInformation<T> extends TypeVariableResolver, AnnotationMeta
      */
     default boolean isWrapperType() {
         return RuntimeTypeInformation.isWrapperType(getType());
+    }
+
+    /**
+     * Returns the wrapped type in the case where {@link #isWrapperType()} returns true.
+     * @return The wrapped type
+     */
+    default Argument<?> getWrappedType() {
+        return RuntimeTypeInformation.getWrappedType(this);
     }
 
     /**
@@ -194,6 +203,18 @@ public interface TypeInformation<T> extends TypeVariableResolver, AnnotationMeta
     }
 
     /**
+     * Represent this argument as a {@link Type}.
+     * @return The {@link Type}
+     * @since 3.5.2
+     */
+    default @NonNull Type asType() {
+        if (getTypeParameters().length == 0) {
+            return getType();
+        }
+        return asParameterizedType();
+    }
+
+    /**
      * Represent this argument as a {@link ParameterizedType}.
      * @return The {@link ParameterizedType}
      * @since 2.0.0
@@ -202,7 +223,7 @@ public interface TypeInformation<T> extends TypeVariableResolver, AnnotationMeta
         return new ParameterizedType() {
             @Override
             public Type[] getActualTypeArguments() {
-                return getTypeParameters();
+                return Arrays.stream(getTypeParameters()).map(TypeInformation::asType).toArray(Type[]::new);
             }
 
             @Override
@@ -212,7 +233,7 @@ public interface TypeInformation<T> extends TypeVariableResolver, AnnotationMeta
 
             @Override
             public Type getOwnerType() {
-                return TypeInformation.this;
+                return null;
             }
 
             @Override
@@ -223,6 +244,24 @@ public interface TypeInformation<T> extends TypeVariableResolver, AnnotationMeta
             @Override
             public String toString() {
                 return getTypeName();
+            }
+
+            public int hashCode() {
+                return Arrays.hashCode(getActualTypeArguments()) ^ Objects.hashCode(getOwnerType()) ^ Objects.hashCode(getRawType());
+            }
+
+            @Override
+            public boolean equals(Object o) {
+                if (o instanceof ParameterizedType) {
+                    ParameterizedType that = (ParameterizedType) o;
+                    if (this == that) {
+                        return true;
+                    }
+                    return Objects.equals(getOwnerType(), that.getOwnerType())
+                        && Objects.equals(getRawType(), that.getRawType()) &&
+                        Arrays.equals(getActualTypeArguments(), that.getActualTypeArguments());
+                }
+                return false;
             }
         };
     }
@@ -242,5 +281,14 @@ public interface TypeInformation<T> extends TypeVariableResolver, AnnotationMeta
      */
     default @NonNull String getSimpleName() {
         return getType().getSimpleName();
+    }
+
+    default boolean isProvider() {
+        for (String type: DefaultArgument.PROVIDER_TYPES) {
+            if (getType().getName().equals(type)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

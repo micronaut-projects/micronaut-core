@@ -34,6 +34,7 @@ import java.time.Instant;
  * @since 1.0
  */
 public class StreamedFile implements FileCustomizableResponseType {
+    private static final char[] HEX_DIGITS = "0123456789ABCDEF".toCharArray();
 
     private final MediaType mediaType;
     private final String name;
@@ -131,8 +132,85 @@ public class StreamedFile implements FileCustomizableResponseType {
     @Override
     public void process(MutableHttpResponse<?> response) {
         if (attachmentName != null) {
-            response.header(HttpHeaders.CONTENT_DISPOSITION, String.format(ATTACHMENT_HEADER, attachmentName));
+            response.header(HttpHeaders.CONTENT_DISPOSITION, buildAttachmentHeader(attachmentName));
         }
     }
 
+    static String buildAttachmentHeader(String attachmentName) {
+        // https://httpwg.org/specs/rfc6266.html#advice.generating
+        // 'filename' parameter is the fallback for legacy browsers, 'filename*' is the supported approach.
+        return "attachment; filename=\"" + sanitizeAscii(attachmentName) + "\"; filename*=utf-8''" + encodeRfc6987(attachmentName);
+    }
+
+    private static String sanitizeAscii(String s) {
+        StringBuilder builder = new StringBuilder(s.length());
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            // " ends the string
+            if (c >= 32 && c < 127 && c != '"') {
+                builder.append(c);
+            }
+        }
+        return builder.toString();
+    }
+
+    // this is mostly copied from netty QueryStringEncoder
+
+    @SuppressWarnings({"java:S3776", "java:S135", "java:S127"}) // stay close to netty impl
+    static String encodeRfc6987(String s) {
+        StringBuilder uriBuilder = new StringBuilder();
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c < 0x80) {
+                if (dontNeedEncoding(c)) {
+                    uriBuilder.append(c);
+                } else {
+                    appendEncoded(uriBuilder, c);
+                }
+            } else if (c < 0x800) {
+                appendEncoded(uriBuilder, 0xc0 | (c >> 6));
+                appendEncoded(uriBuilder, 0x80 | (c & 0x3f));
+            } else if (Character.isSurrogate(c)) {
+                if (!Character.isHighSurrogate(c)) {
+                    appendEncoded(uriBuilder, '?');
+                    continue;
+                }
+                // Surrogate Pair consumes 2 characters.
+                if (++i == s.length()) {
+                    appendEncoded(uriBuilder, '?');
+                    break;
+                }
+                // Extra method to allow inlining the rest of writeUtf8 which is the most likely code path.
+                writeUtf8Surrogate(uriBuilder, c, s.charAt(i));
+            } else {
+                appendEncoded(uriBuilder, 0xe0 | (c >> 12));
+                appendEncoded(uriBuilder, 0x80 | ((c >> 6) & 0x3f));
+                appendEncoded(uriBuilder, 0x80 | (c & 0x3f));
+            }
+        }
+        return uriBuilder.toString();
+    }
+
+    private static boolean dontNeedEncoding(char ch) {
+        return ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z' || ch >= '0' && ch <= '9'
+                || ch == '-' || ch == '_' || ch == '.' || ch == '*' || ch == '~';
+    }
+
+    private static void appendEncoded(StringBuilder uriBuilder, int b) {
+        uriBuilder.append('%').append(HEX_DIGITS[(b >> 4) & 0xf]).append(HEX_DIGITS[b & 0xf]);
+    }
+
+    private static void writeUtf8Surrogate(StringBuilder uriBuilder, char c, char c2) {
+        if (!Character.isLowSurrogate(c2)) {
+            appendEncoded(uriBuilder, '?');
+            appendEncoded(uriBuilder, Character.isHighSurrogate(c2) ? '?' : c2);
+            return;
+        }
+        int codePoint = Character.toCodePoint(c, c2);
+        // See https://www.unicode.org/versions/Unicode7.0.0/ch03.pdf#G2630.
+        appendEncoded(uriBuilder, 0xf0 | (codePoint >> 18));
+        appendEncoded(uriBuilder, 0x80 | ((codePoint >> 12) & 0x3f));
+        appendEncoded(uriBuilder, 0x80 | ((codePoint >> 6) & 0x3f));
+        appendEncoded(uriBuilder, 0x80 | (codePoint & 0x3f));
+    }
 }

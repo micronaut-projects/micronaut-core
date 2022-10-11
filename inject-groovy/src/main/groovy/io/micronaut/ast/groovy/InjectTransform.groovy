@@ -28,8 +28,7 @@ import io.micronaut.context.annotation.Configuration
 import io.micronaut.context.annotation.ConfigurationReader
 import io.micronaut.context.annotation.Context
 import io.micronaut.core.annotation.AnnotationMetadata
-import io.micronaut.core.annotation.Nullable
-import io.micronaut.inject.ast.Element
+
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder
 import io.micronaut.inject.writer.*
 import org.codehaus.groovy.ast.*
@@ -131,12 +130,11 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             AnnotatedNode beanClassNode = entry.key
             try {
                 BeanDefinitionReferenceWriter beanReferenceWriter = new BeanDefinitionReferenceWriter(
-                        beanTypeName,
                         beanDefWriter
                 )
 
                 beanReferenceWriter.setRequiresMethodProcessing(beanDefWriter.requiresMethodProcessing())
-                beanReferenceWriter.setContextScope(AstAnnotationUtils.hasStereotype(source, unit, beanClassNode, Context))
+                beanReferenceWriter.setContextScope(beanDefWriter.getAnnotationMetadata().hasDeclaredAnnotation(Context))
                 beanDefWriter.visitBeanDefinitionEnd()
                 if (classesDir != null) {
                     beanReferenceWriter.accept(outputVisitor)

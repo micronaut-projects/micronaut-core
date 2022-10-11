@@ -20,10 +20,9 @@ import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.http.client.LoadBalancer;
 import jakarta.inject.Singleton;
 
-import java.net.MalformedURLException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
-import java.util.Optional;
 
 /**
  * Converters from URL to {@link LoadBalancer} interface.
@@ -33,21 +32,15 @@ import java.util.Optional;
  */
 @Singleton
 public class LoadBalancerConverters implements TypeConverterRegistrar {
+    @SuppressWarnings("deprecation")
     @Override
     public void register(ConversionService<?> conversionService) {
-        conversionService.addConverter(URI.class, LoadBalancer.class, (object, targetType, context) -> {
-            try {
-                return Optional.of(LoadBalancer.fixed(object.toURL()));
-            } catch (MalformedURLException e) {
-                context.reject(e);
-                return Optional.empty();
-            }
-        });
+        conversionService.addConverter(URI.class, LoadBalancer.class, LoadBalancer::fixed);
         conversionService.addConverter(URL.class, LoadBalancer.class, LoadBalancer::fixed);
         conversionService.addConverter(String.class, LoadBalancer.class, url -> {
             try {
-                return LoadBalancer.fixed(new URL(url));
-            } catch (MalformedURLException e) {
+                return LoadBalancer.fixed(new URI(url));
+            } catch (URISyntaxException e) {
                 return null;
             }
         });

@@ -21,12 +21,15 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.ServerChannel;
 import io.netty.channel.epoll.Epoll;
 import io.netty.channel.epoll.EpollEventLoopGroup;
+import io.netty.channel.epoll.EpollServerDomainSocketChannel;
 import io.netty.channel.epoll.EpollServerSocketChannel;
 import io.netty.channel.epoll.EpollSocketChannel;
 import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.socket.SocketChannel;
+import io.netty.channel.unix.ServerDomainSocketChannel;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 
@@ -81,10 +84,28 @@ public class EpollEventLoopGroupFactory implements EventLoopGroupFactory {
         return EpollServerSocketChannel.class;
     }
 
+    @Override
+    public Class<? extends ServerDomainSocketChannel> domainServerSocketChannelClass() throws UnsupportedOperationException {
+        try {
+            return EpollServerDomainSocketChannel.class;
+        } catch (NoClassDefFoundError e) {
+            throw new UnsupportedOperationException(e);
+        }
+    }
+
     @NonNull
     @Override
     public EpollServerSocketChannel serverSocketChannelInstance(@Nullable EventLoopGroupConfiguration configuration) {
         return new EpollServerSocketChannel();
+    }
+
+    @Override
+    public ServerChannel domainServerSocketChannelInstance(@Nullable EventLoopGroupConfiguration configuration) {
+        try {
+            return new EpollServerDomainSocketChannel();
+        } catch (NoClassDefFoundError e) {
+            throw new UnsupportedOperationException(e);
+        }
     }
 
     @NonNull

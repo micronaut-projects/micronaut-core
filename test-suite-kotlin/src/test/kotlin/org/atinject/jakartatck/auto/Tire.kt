@@ -15,8 +15,8 @@
  */
 package org.atinject.jakartatck.auto
 
-import org.atinject.javaxtck.auto.accessories.RoundThing
-import org.atinject.javaxtck.auto.accessories.SpareTire
+import org.atinject.jakartatck.auto.accessories.RoundThing
+import org.atinject.jakartatck.auto.accessories.SpareTire
 
 import jakarta.inject.Inject
 import java.util.LinkedHashSet

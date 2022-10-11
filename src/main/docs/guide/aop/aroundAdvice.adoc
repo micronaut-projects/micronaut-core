@@ -15,7 +15,7 @@ The next step to defining Around advice is to implement a api:aop.MethodIntercep
 
 snippet::io.micronaut.docs.aop.around.NotNullInterceptor[tags="imports,interceptor", indent=0, title="MethodInterceptor Example"]
 
-<1> The ann:aop.InterceptorBean[] annotation is used to indicate what annotation the interceptor is associated with. Note that the `javax.inject.Singleton` annotation is optional, and a new interceptor would be created for each instance (prototype scope).
+<1> The ann:aop.InterceptorBean[] annotation is used to indicate what annotation the interceptor is associated with. Note that ann:aop.InterceptorBean[] is meta-annotated with a default scope of `@Singleton` therefore if you want a new interceptor created and associated with each intercepted bean you should annotate the interceptor with ann:context.annotation.Prototype[].
 <2> An interceptor implements the api:aop.MethodInterceptor[] interface.
 <3> The passed link:{api}/io/micronaut/aop/MethodInvocationContext.html[MethodInvocationContext] is used to find the first parameter that is `null`
 <4> If a `null` parameter is found an exception is thrown

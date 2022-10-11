@@ -15,9 +15,13 @@
  */
 package io.micronaut.http.client;
 
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import org.reactivestreams.Publisher;
+
+import java.net.URL;
 
 /**
  * Interface that allows proxying of HTTP requests in controllers and filters.
@@ -34,5 +38,49 @@ public interface ProxyHttpClient {
      * @param request The request
      * @return A publisher that emits the response.
      */
-    Publisher<MutableHttpResponse<?>> proxy(HttpRequest<?> request);
+    Publisher<MutableHttpResponse<?>> proxy(@NonNull HttpRequest<?> request);
+
+    /**
+     * Proxy the given request and emit the response. This method expects the full absolute URL to be included in the request.
+     * If a relative URL is specified then the method will try to resolve the URI for the current server otherwise an exception will be thrown.
+     *
+     * @param request The request
+     * @param options Further options for the proxy request
+     * @return A publisher that emits the response.
+     * @since 3.5.0
+     */
+    default Publisher<MutableHttpResponse<?>> proxy(@NonNull HttpRequest<?> request, @NonNull ProxyRequestOptions options) {
+        if (options.equals(ProxyRequestOptions.getDefault())) {
+            return proxy(request);
+        } else {
+            throw new UnsupportedOperationException("Not implemented");
+        }
+    }
+
+    /**
+     * Create a new {@link ProxyHttpClient}.
+     * Note that this method should only be used outside of the context of a Micronaut application.
+     * The returned {@link ProxyHttpClient} is not subject to dependency injection.
+     * The creator is responsible for closing the client to avoid leaking connections.
+     * Within a Micronaut application use {@link jakarta.inject.Inject} to inject a client instead.
+     *
+     * @param url The base URL
+     * @return The client
+     */
+    static ProxyHttpClient create(@Nullable URL url) {
+        return ProxyHttpClientFactoryResolver.getFactory().createProxyClient(url);
+    }
+
+    /**
+     * Create a new {@link ProxyHttpClient} with the specified configuration. Note that this method should only be used
+     * outside of the context of an application. Within Micronaut use {@link jakarta.inject.Inject} to inject a client instead
+     *
+     * @param url The base URL
+     * @param configuration the client configuration
+     * @return The client
+     * @since 2.2.0
+     */
+    static ProxyHttpClient create(@Nullable URL url, @NonNull HttpClientConfiguration configuration) {
+        return ProxyHttpClientFactoryResolver.getFactory().createProxyClient(url, configuration);
+    }
 }

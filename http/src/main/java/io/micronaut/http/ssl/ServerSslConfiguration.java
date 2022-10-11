@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2022 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -92,6 +92,29 @@ public class ServerSslConfiguration extends SslConfiguration {
         if (trustStore != null) {
             super.setTrustStore(trustStore);
         }
+    }
+
+    /**
+     * Sets the SSL port. Default value ({@value SslConfiguration#DEFAULT_PORT}).
+     *
+     * @param port The port
+     * @deprecated Please use {@code micronaut.server.ssl.port} instead ({@link ServerSslConfiguration#setPort(int)}).
+     */
+    @Override
+    @SuppressWarnings("deprecation")
+    public void setPort(int port) {
+        this.port = port;
+    }
+
+    /**
+     * Sets whether to build a self-signed certificate. Default value ({@value SslConfiguration#DEFAULT_BUILDSELFSIGNED}).
+     *
+     * @param buildSelfSigned True if a certificate should be built
+     */
+    @Override
+    @SuppressWarnings("deprecation")
+    public void setBuildSelfSigned(boolean buildSelfSigned) {
+        this.buildSelfSigned = buildSelfSigned;
     }
 
     /**

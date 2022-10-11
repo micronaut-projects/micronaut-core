@@ -48,6 +48,7 @@ import java.util.Optional;
  */
 public abstract class AbstractProviderDefinition<T> implements BeanDefinition<T>, BeanFactory<T>, BeanDefinitionReference<T> {
 
+    private static final Argument<Object> TYPE_VARIABLE = Argument.ofTypeVariable(Object.class, "T");
     private final AnnotationMetadata annotationMetadata;
 
     public AbstractProviderDefinition() {
@@ -59,7 +60,11 @@ public abstract class AbstractProviderDefinition<T> implements BeanDefinition<T>
                 Collections.emptyMap()
         );
         metadata.addDeclaredAnnotation(BootstrapContextCompatible.class.getName(), Collections.emptyMap());
-        metadata.addDeclaredAnnotation(Indexes.class.getName(), Collections.singletonMap(AnnotationMetadata.VALUE_MEMBER, getBeanType()));
+        try {
+            metadata.addDeclaredAnnotation(Indexes.class.getName(), Collections.singletonMap(AnnotationMetadata.VALUE_MEMBER, getBeanType()));
+        } catch (NoClassDefFoundError e) {
+            // ignore, might happen if javax.inject is not the classpath
+        }
         annotationMetadata = metadata;
     }
 
@@ -149,7 +154,7 @@ public abstract class AbstractProviderDefinition<T> implements BeanDefinition<T>
                         } else if (injectionPointArgument.isNullable()) {
                             throw new DisabledBeanException("Nullable bean doesn't exist");
                         } else {
-                            if (qualifier instanceof AnyQualifier) {
+                            if (qualifier instanceof AnyQualifier || isAllowEmptyProviders(context)) {
                                 return buildProvider(
                                         resolutionContext,
                                         context,
@@ -167,6 +172,15 @@ public abstract class AbstractProviderDefinition<T> implements BeanDefinition<T>
             }
         }
         throw new UnsupportedOperationException("Cannot inject provider for Object type");
+    }
+
+    /**
+     * Return whether missing providers are allowed for this implementation. If {@code false} a {@link io.micronaut.context.exceptions.NoSuchBeanException} is thrown.
+     * @param context The context
+     * @return Returns {@code true} if missing providers are allowed
+     */
+    protected boolean isAllowEmptyProviders(BeanContext context) {
+        return context.getContextConfiguration().isAllowEmptyProviders();
     }
 
     @Override
@@ -191,10 +205,8 @@ public abstract class AbstractProviderDefinition<T> implements BeanDefinition<T>
     @Override
     @NonNull
     public final List<Argument<?>> getTypeArguments() {
-        return Collections.singletonList(
-                Argument.OBJECT_ARGUMENT
-        );
-    }
+        return Collections.singletonList(TYPE_VARIABLE);
+    }    
 
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
@@ -205,4 +217,18 @@ public abstract class AbstractProviderDefinition<T> implements BeanDefinition<T>
     public Qualifier<T> getDeclaredQualifier() {
         return null;
     }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        return o != null && getClass() == o.getClass();
+    }
+
+    @Override
+    public int hashCode() {
+        return getClass().hashCode();
+    }
+
 }

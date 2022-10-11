@@ -15,6 +15,10 @@
  */
 package io.micronaut.core.reflect;
 
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.optim.StaticOptimizations;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
@@ -22,8 +26,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.helpers.NOPLogger;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.net.URI;
@@ -33,7 +35,18 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZonedDateTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.TimeZone;
+import java.util.UUID;
 
 /**
  * Utility methods for loading classes.
@@ -63,6 +76,9 @@ public class ClassUtils {
     public static final Logger REFLECTION_LOGGER;
 
     private static final boolean ENABLE_CLASS_LOADER_LOGGING = Boolean.getBoolean(PROPERTY_MICRONAUT_CLASSLOADER_LOGGING);
+    private static final Set<String> MISSING_TYPES = StaticOptimizations.get(Optimizations.class)
+            .map(Optimizations::getMissingTypes)
+            .orElse(Collections.emptySet());
 
     static {
         REFLECTION_LOGGER = getLogger(ClassUtils.class);
@@ -166,7 +182,7 @@ public class ClassUtils {
 
     /**
      * <p>Converts a URI to a class file reference to the class name</p>.
-     * <p>
+     *
      * <p>ie. ClassUtils.pathToClassName("foo/bar/MyClass.class") == "foo.bar.MyClass"</p>
      *
      * @param path The path name
@@ -192,7 +208,7 @@ public class ClassUtils {
     }
 
     /**
-     * Return whether the given class is a common type found in <tt>java.lang</tt> such as String or a primitive type.
+     * Return whether the given class is a common type found in {@code java.lang} such as String or a primitive type.
      *
      * @param type The type
      * @return True if it is
@@ -203,7 +219,7 @@ public class ClassUtils {
     }
 
     /**
-     * Return whether the given class is a common type found in <tt>java.lang</tt> such as String or a primitive type.
+     * Return whether the given class is a common type found in {@code java.lang} such as String or a primitive type.
      *
      * @param typeName The type name
      * @return True if it is
@@ -259,6 +275,9 @@ public class ClassUtils {
      */
     public static Optional<Class> forName(String name, @Nullable ClassLoader classLoader) {
         try {
+            if (MISSING_TYPES.contains(name)) {
+                return Optional.empty();
+            }
             if (classLoader == null) {
                 classLoader = Thread.currentThread().getContextClassLoader();
             }
@@ -334,4 +353,21 @@ public class ClassUtils {
             populateHierarchyInterfaces(aClass, hierarchy);
         }
     }
+
+    /**
+     * Optimizations for computing missing types.
+     */
+    @Internal
+    public static final class Optimizations {
+        private final Set<String> missingTypes;
+
+        public Optimizations(Set<String> missingTypes) {
+            this.missingTypes = missingTypes;
+        }
+
+        public Set<String> getMissingTypes() {
+            return missingTypes;
+        }
+    }
+
 }

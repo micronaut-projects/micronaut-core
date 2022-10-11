@@ -17,7 +17,7 @@ package io.micronaut.core.util;
 
 /**
  * Interface for components that can match source strings against a specified pattern string.
- * <p/>
+ * <p>
  * Different implementations can support different pattern types, for example, Ant style path expressions, or
  * regular expressions, or other types of text based patterns.
  *
@@ -25,9 +25,13 @@ package io.micronaut.core.util;
  */
 public interface PathMatcher {
     /**
-     * The default Ant style patch matcher.
+     * The default Ant style path matcher.
      */
     AntPathMatcher ANT = new AntPathMatcher();
+    /**
+     * The default regex style path matcher.
+     */
+    RegexPathMatcher REGEX = new RegexPathMatcher();
 
     /**
      * Returns <code>true</code> if the given <code>source</code> matches the specified <code>pattern</code>,

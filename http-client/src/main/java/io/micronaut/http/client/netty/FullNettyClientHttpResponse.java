@@ -85,8 +85,7 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
             FullHttpResponse fullHttpResponse,
             HttpStatus httpStatus,
             MediaTypeCodecRegistry mediaTypeCodecRegistry,
-            ByteBufferFactory<ByteBufAllocator,
-            ByteBuf> byteBufferFactory,
+            ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory,
             Argument<B> bodyType,
             boolean convertBody) {
 

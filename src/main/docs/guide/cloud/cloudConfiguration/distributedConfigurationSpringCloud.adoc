@@ -1,6 +1,6 @@
 Since 1.1, Micronaut features a native https://spring.io/projects/spring-cloud-config[Spring Cloud Configuration] for those who have not switched to a dedicated more complete solution like Consul.
 
-To enable support for Spring Cloud Configuration, add the following configuration to your `bootstrap.yml` file:
+To enable support for Spring Cloud Configuration, create a `src/main/resources/bootstrap.yml` configuration file and add the following configuration:
 
 .Integrating with Spring Cloud Configuration
 [source,yaml]

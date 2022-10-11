@@ -21,8 +21,10 @@ import org.atinject.javaxtck.auto.accessories.RoundThing;
 import org.atinject.javaxtck.auto.accessories.SpareTire;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.DefaultBeanContext;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 
 import javax.inject.Inject;
 import javax.inject.Named;
@@ -183,6 +185,7 @@ public class Convertible implements Car {
     public static ThreadLocal<Convertible> localConvertible = new ThreadLocal<Convertible>();
 
 
+    @TestInstance(TestInstance.Lifecycle.PER_CLASS)
     public static class Tests {
 
         private final BeanContext context = BeanContext.run();
@@ -253,12 +256,12 @@ public class Convertible implements Car {
 
         // injected values
 
-        @Test
+/*        @Test
         @Disabled
         public void testQualifiersNotInheritedFromOverriddenMethod() {
             assertTrue(engine.overriddenMethodInjected);
             assertFalse(engine.qualifiersInheritedFromOverriddenMethod);
-        }
+        }*/
 
         @Test
         public void testConstructorInjectionWithValues() {

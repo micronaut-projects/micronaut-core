@@ -1,0 +1,19 @@
+To log messages, use the Slf4j `LoggerFactory` to get a logger for your class.
+
+[source,java]
+----
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class LoggerExample {
+
+    private static Logger logger = LoggerFactory.getLogger(LoggerExample.class);
+
+    public static void main(String[] args) {
+        logger.debug("Debug message");
+        logger.info("Info message");
+        logger.error("Error message");
+    }
+}
+----
+

@@ -17,7 +17,6 @@ package io.micronaut.runtime.context.scope;
 
 import io.micronaut.context.scope.AbstractConcurrentCustomScope;
 import io.micronaut.context.scope.CreatedBean;
-import io.micronaut.context.scope.CustomScope;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.BeanIdentifier;
 import jakarta.inject.Singleton;
@@ -26,7 +25,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * A {@link CustomScope} that stores values in thread local storage.
+ * A {@link io.micronaut.context.scope.CustomScope} that stores values in thread local storage.
  *
  * @author Graeme Rocher
  * @since 1.0

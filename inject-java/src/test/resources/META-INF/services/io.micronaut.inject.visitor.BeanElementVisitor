@@ -1,0 +1,2 @@
+io.micronaut.inject.ast.beans.TestBeanElementVisitor
+io.micronaut.inject.ast.beans.SecondBeanElementVisitor

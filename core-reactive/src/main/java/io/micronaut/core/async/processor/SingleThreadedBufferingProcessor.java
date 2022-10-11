@@ -26,7 +26,7 @@ import java.util.concurrent.atomic.AtomicReference;
 /**
  * <p>A Reactive streams {@link org.reactivestreams.Processor} designed to be used within a single thread and manage
  * back pressure state.</p>
- * <p>
+ *
  * <p>This processor only supports a single {@link Subscriber}</p>
  *
  * @param <T> The argument type
@@ -87,6 +87,7 @@ public abstract class SingleThreadedBufferingProcessor<R, T> extends SingleThrea
             case BUFFERING:
             case FLOWING:
                 provideDownstreamSubscription(downstreamSubscriber);
+                break;
             default:
                 // no-op
         }

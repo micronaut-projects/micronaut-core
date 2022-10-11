@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty;
 
 import io.micronaut.context.annotation.DefaultImplementation;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.type.Argument;
 import io.micronaut.web.router.RouteMatch;
@@ -28,6 +29,7 @@ import io.micronaut.web.router.RouteMatch;
  * @since 1.3.0
  */
 @DefaultImplementation(DefaultHttpContentProcessorResolver.class)
+@Internal
 public interface HttpContentProcessorResolver {
 
     /**

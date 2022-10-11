@@ -7,8 +7,8 @@ class FactoryEnumSpec extends AbstractBeanDefinitionSpec {
 
     void "test a factory can return an enum"() {
         given:
-        ApplicationContext context = buildContext('test.TestFactory$TestEnum', '''\
-package test;
+        ApplicationContext context = buildContext('''
+package testenumf1;
 
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;

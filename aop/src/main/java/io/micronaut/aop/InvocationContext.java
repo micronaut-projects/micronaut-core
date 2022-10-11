@@ -32,7 +32,7 @@ import java.util.Map;
  * context and shared between multiple {@link Interceptor} implementations. The {@link #proceed()} method should be
  * called to proceed to the next {@link Interceptor} with the last interceptor in the chain being the original
  * decorated method implementation.</p>
- * <p>
+ *
  * <p>The parameters to pass to the next {@link Interceptor} can be mutated using {@link MutableArgumentValue}
  * interface returned by the {@link #getParameters()} method</p>
  *

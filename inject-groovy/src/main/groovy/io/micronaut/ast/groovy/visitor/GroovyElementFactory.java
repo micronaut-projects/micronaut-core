@@ -55,6 +55,10 @@ public class GroovyElementFactory implements ElementFactory<AnnotatedNode, Class
             return PrimitiveElement.valueOf(classNode.getName());
         } else if (classNode.isEnum()) {
             return new GroovyEnumElement(visitorContext, classNode, annotationMetadata);
+        } else if (classNode.isAnnotationDefinition()) {
+            return new GroovyAnnotationElement(visitorContext, classNode, annotationMetadata);
+        } else if (classNode.isGenericsPlaceHolder()) {
+            return new GroovyGenericPlaceholderElement(visitorContext, classNode, annotationMetadata, 0);
         } else {
             return new GroovyClassElement(visitorContext, classNode, annotationMetadata);
         }
@@ -80,6 +84,8 @@ public class GroovyElementFactory implements ElementFactory<AnnotatedNode, Class
                     return super.getTypeArguments();
                 }
             };
+        } else if (classNode.isAnnotationDefinition()) {
+            return new GroovyAnnotationElement(visitorContext, classNode, annotationMetadata);
         } else {
             return new GroovyClassElement(visitorContext, classNode, annotationMetadata) {
                 @NonNull
@@ -184,6 +190,20 @@ public class GroovyElementFactory implements ElementFactory<AnnotatedNode, Class
                 (GroovyClassElement) declaringClass,
                 visitorContext,
                 (ConstructorNode) constructor,
+                annotationMetadata
+        );
+    }
+
+    @Override
+    public EnumConstantElement newEnumConstantElement(ClassElement declaringClass, FieldNode enumConstant, AnnotationMetadata annotationMetadata) {
+        if (!(declaringClass instanceof GroovyClassElement)) {
+            throw new IllegalArgumentException("Declaring class must be a GroovyEnumElement");
+        }
+        return new GroovyEnumConstantElement(
+                (GroovyClassElement) declaringClass,
+                visitorContext,
+                enumConstant,
+                enumConstant,
                 annotationMetadata
         );
     }

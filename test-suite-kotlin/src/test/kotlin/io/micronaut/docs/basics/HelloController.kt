@@ -25,20 +25,23 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.annotation.Status
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
-import io.reactivex.Maybe
+import org.reactivestreams.Publisher
+import reactor.core.publisher.Flux
+import io.micronaut.core.async.annotation.SingleResult
 // end::imports[]
 
 @Requires(property = "spec.name", value = "HelloControllerSpec")
 @Controller("/")
-class HelloController(@param:Client("/endpoint") private val httpClient: RxHttpClient) {
+class HelloController(@param:Client("/endpoint") private val httpClient: HttpClient) {
 
     // tag::nonblocking[]
     @Get("/hello/{name}")
-    internal fun hello(name: String): Maybe<String> { // <1>
-        return httpClient.retrieve(GET<Any>("/hello/$name"))
-                         .firstElement() // <2>
+    @SingleResult
+    internal fun hello(name: String): Publisher<String> { // <1>
+        return Flux.from(httpClient.retrieve(GET<Any>("/hello/$name")))
+                         .next() // <2>
     }
     // end::nonblocking[]
 

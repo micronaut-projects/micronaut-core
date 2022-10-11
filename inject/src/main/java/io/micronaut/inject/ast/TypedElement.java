@@ -60,7 +60,7 @@ public interface TypedElement extends Element {
      * @return True if it is.
      */
     default boolean isArray() {
-        return false;
+        return getArrayDimensions() != 0;
     }
 
     /**

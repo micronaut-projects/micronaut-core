@@ -52,7 +52,8 @@ import org.reactivestreams.Publisher;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.Charset;
-import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -71,6 +72,7 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHttpReque
     private final MutableConvertibleValues<Object> attributes = new MutableConvertibleValuesMap<>();
     private final HttpMethod httpMethod;
     private final String httpMethodName;
+    private final Map<String, String> cookies = new LinkedHashMap<>(1);
     private URI uri;
     private Object body;
     private NettyHttpParameters httpParameters;
@@ -122,7 +124,14 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHttpReque
         if (cookie instanceof NettyCookie) {
             NettyCookie nettyCookie = (NettyCookie) cookie;
             String value = ClientCookieEncoder.LAX.encode(nettyCookie.getNettyCookie());
-            headers.add(HttpHeaderNames.COOKIE, value);
+            cookies.put(cookie.getName(), value);
+            String headerValue;
+            if (cookies.size() > 1) {
+                headerValue = String.join(";", cookies.values());
+            } else {
+                headerValue = value;
+            }
+            headers.set(HttpHeaderNames.COOKIE, headerValue);
         } else {
             throw new IllegalArgumentException("Argument is not a Netty compatible Cookie");
         }
@@ -132,17 +141,16 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHttpReque
     @Override
     public MutableHttpRequest<B> cookies(Set<Cookie> cookies) {
         if (cookies.size() > 1) {
-            Set<String> values = new HashSet<>(cookies.size());
             for (Cookie cookie: cookies) {
                 if (cookie instanceof NettyCookie) {
                     NettyCookie nettyCookie = (NettyCookie) cookie;
                     String value = ClientCookieEncoder.LAX.encode(nettyCookie.getNettyCookie());
-                    values.add(value);
+                    this.cookies.put(cookie.getName(), value);
                 } else {
                     throw new IllegalArgumentException("Argument is not a Netty compatible Cookie");
                 }
             }
-            headers.add(HttpHeaderNames.COOKIE, String.join(";", values));
+            headers.set(HttpHeaderNames.COOKIE, String.join(";", this.cookies.values()));
         } else if (!cookies.isEmpty()) {
             cookie(cookies.iterator().next());
         }

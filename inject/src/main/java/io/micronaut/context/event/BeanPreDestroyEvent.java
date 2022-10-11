@@ -19,8 +19,8 @@ import io.micronaut.context.BeanContext;
 import io.micronaut.inject.BeanDefinition;
 
 /**
- * <p>An event fired when a bean is about to be destroyed but before any {@link javax.annotation.PreDestroy} methods are invoked..</p>
- * <p>
+ * <p>An event fired when a bean is about to be destroyed but before any {@link jakarta.annotation.PreDestroy} methods are invoked..</p>
+ *
  *
  * @param <T> The event type
  * @author Graeme Rocher

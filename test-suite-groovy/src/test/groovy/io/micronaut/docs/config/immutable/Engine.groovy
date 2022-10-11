@@ -17,6 +17,7 @@ package io.micronaut.docs.config.immutable
 
 import jakarta.inject.Singleton
 
+// tag::class[]
 @Singleton
 class Engine {
     private final EngineConfig config
@@ -37,3 +38,4 @@ class Engine {
         return config
     }
 }
+// end::class[]

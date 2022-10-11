@@ -17,10 +17,11 @@ package io.micronaut.inject.failures
 
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.env.CachedEnvironment
 import io.micronaut.context.exceptions.BeanInstantiationException
 import spock.lang.Specification
 
-import javax.annotation.PostConstruct
+import jakarta.annotation.PostConstruct
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -39,12 +40,11 @@ class PostConstructExceptionSpec extends Specification {
 
         then:"The implementation is injected"
         def e = thrown(BeanInstantiationException)
-        e.message == '''Error instantiating bean of type  [io.micronaut.inject.failures.PostConstructExceptionSpec$B]
-
-Message: bad
-Path Taken: new B()'''
+        def ls = CachedEnvironment.getProperty("line.separator")
+        e.message == 'Error instantiating bean of type  [io.micronaut.inject.failures.PostConstructExceptionSpec$B]' + ls + ls +
+                'Message: bad' + ls +
+                'Path Taken: new B()'
     }
-
 
     @Singleton
     static class A {

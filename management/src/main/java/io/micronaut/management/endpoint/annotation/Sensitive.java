@@ -17,6 +17,7 @@ package io.micronaut.management.endpoint.annotation;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
+import java.lang.annotation.Inherited;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
@@ -26,19 +27,19 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  * Annotation that can be applied to endpoint methods to control sensitivity at the method level.
  *
  * For example:
- * <code>
- *     @Endpoint(id = "loggers", prefix = "myapp")
+ * {@code
+ *     {@literal @}Endpoint(id = "loggers", prefix = "myapp")
  *     public class LoggersEndpoint {
  *
- *         @Write
- *         @Sensitive(property = "write-sensitive", defaultValue = true)
+ *         {@literal @}Write
+ *         {@literal @}Sensitive(property = "write-sensitive", defaultValue = true)
  *         public void setLogLevel@Selector String name) {
  *
  *         }
  *     }
- * </code>
+ * }
  *
- * The configuration key <code>myapp.loggers.write-sensitive</code> will determine the sensitivity
+ * The configuration key {@code myapp.loggers.write-sensitive} will determine the sensitivity
  * of the method, defaulting to true if not present.
  *
  * @author James Kleeh
@@ -47,6 +48,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Documented
 @Retention(RUNTIME)
 @Target({ElementType.METHOD})
+@Inherited
 public @interface Sensitive {
 
     /**

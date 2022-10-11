@@ -33,7 +33,7 @@ import spock.lang.Retry
 import spock.lang.Shared
 import spock.lang.Specification
 
-import javax.annotation.PostConstruct
+import jakarta.annotation.PostConstruct
 import jakarta.inject.Inject
 import java.text.SimpleDateFormat
 

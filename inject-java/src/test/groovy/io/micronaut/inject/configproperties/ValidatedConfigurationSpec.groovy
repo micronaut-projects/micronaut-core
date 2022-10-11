@@ -36,9 +36,11 @@ class ValidatedConfigurationSpec extends AbstractTypeElementSpec {
         ValidatedConfig config = applicationContext.getBean(ValidatedConfig)
 
         then:
+        applicationContext.getBeanDefinition(ValidatedConfig) instanceof ValidatedBeanDefinition
         def e = thrown(BeanInstantiationException)
         e.message.contains('url - must not be null')
         e.message.contains('name - must not be blank')
+
 
         cleanup:
         applicationContext.close()

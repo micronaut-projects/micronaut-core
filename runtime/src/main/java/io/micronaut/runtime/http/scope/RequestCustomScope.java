@@ -19,7 +19,6 @@ import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.context.scope.AbstractConcurrentCustomScope;
 import io.micronaut.context.scope.BeanCreationContext;
 import io.micronaut.context.scope.CreatedBean;
-import io.micronaut.context.scope.CustomScope;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.util.ArgumentUtils;
@@ -28,13 +27,11 @@ import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.context.event.HttpRequestTerminatedEvent;
 import io.micronaut.inject.BeanIdentifier;
 import jakarta.inject.Singleton;
-
-import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * A {@link CustomScope} that creates a new bean for every HTTP request.
+ * A {@link io.micronaut.context.scope.CustomScope} that creates a new bean for every HTTP request.
  *
  * @author James Kleeh
  * @author Marcel Overdijk
@@ -78,7 +75,7 @@ class RequestCustomScope extends AbstractConcurrentCustomScope<RequestScope> imp
             //noinspection ConstantConditions
             return getRequestAttributeMap(request, forCreation);
         } else {
-            return Collections.emptyMap();
+            throw new IllegalStateException("No request present");
         }
     }
 

@@ -2,8 +2,7 @@ package io.micronaut.aop.compile
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.ExecutableMethod
-import io.reactivex.Flowable;
+import reactor.core.publisher.Flux
 
 class ExecutableFactoryMethodSpec extends AbstractTypeElementSpec {
 
@@ -57,7 +56,7 @@ class MyClass implements SomeInterface {
         BeanDefinition beanDefinition = buildBeanDefinition('test.MyFactory$MyClient0', """
 package test;
 
-import io.reactivex.Flowable;
+import reactor.core.publisher.Flux;
 import io.micronaut.context.annotation.*;
 import jakarta.inject.*;
 import org.reactivestreams.Publisher;
@@ -78,15 +77,15 @@ interface HttpClient {
 interface StreamingHttpClient extends HttpClient {
     Publisher<byte[]> stream();
 }
-interface RxHttpClient extends HttpClient {
+interface ReactorHttpClient extends HttpClient {
     @Override
-    Flowable retrieve();
+    Flux retrieve();
 }
-interface RxStreamingHttpClient extends StreamingHttpClient, RxHttpClient {
+interface ReactorStreamingHttpClient extends StreamingHttpClient, ReactorHttpClient {
     @Override
-    Flowable<byte[]> stream();
+    Flux<byte[]> stream();
 }
-interface MyClient extends RxStreamingHttpClient {
+interface MyClient extends ReactorStreamingHttpClient {
     byte[] blocking();
 }
 """)
@@ -97,8 +96,8 @@ interface MyClient extends RxStreamingHttpClient {
         def retrieveMethod = beanDefinition.getRequiredMethod("retrieve")
         def blockingMethod = beanDefinition.getRequiredMethod("blocking")
         def streamMethod = beanDefinition.getRequiredMethod("stream")
-        retrieveMethod.returnType.type == Flowable.class
-        streamMethod.returnType.type == Flowable.class
+        retrieveMethod.returnType.type == Flux.class
+        streamMethod.returnType.type == Flux.class
         retrieveMethod.returnType.typeParameters.length == 1
         retrieveMethod.returnType.typeParameters[0].type == Object.class
         streamMethod.returnType.typeParameters[0].type == byte[].class

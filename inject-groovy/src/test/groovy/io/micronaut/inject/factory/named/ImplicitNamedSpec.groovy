@@ -13,6 +13,7 @@ import javax.inject.*;
 
 @Factory
 class TestFactory {
+    static final String CONST = "constNamedFoo"
     
     @Singleton
     @Named
@@ -27,6 +28,17 @@ class TestFactory {
         return ()-> "primary";
     }
     
+    @Singleton
+    @Named("explicitlyNamedFoo")
+    Foo explicitNamed() {
+        return () -> "explicitlyNamed";
+    }
+    
+    @Singleton
+    @Named(TestFactory.CONST)
+    Foo constantNamed() {
+        return () -> "constNamedFoo";
+    }
 }
 
 class Test {
@@ -37,6 +49,25 @@ class Test {
     @Named("foo1")
     @Inject
     public Foo anotherFoo1;
+    
+    @Named("explicitlyNamedFoo")
+    @Inject
+    public Foo explicitlyNamedField;
+    
+    @Named("explicitlyNamedFoo")
+    @Inject
+    Foo explicitlyNamedProp
+    
+    @Named("explicitlyNamedFoo")
+    Foo explicitlyNamedProp2
+    
+    @Named(TestFactory.CONST)
+    @Inject
+    public Foo constNamedField;
+    
+    @Named(TestFactory.CONST)
+    @Inject
+    Foo constNamedProp;
     
     @Inject
     public Foo fooDefault;
@@ -72,6 +103,12 @@ interface Foo {
         bean.fooPrimary.name() == 'primary'
         bean.foo1Ctor.name() == 'one'
         bean.foo1Method.name() == 'one'
+        bean.explicitlyNamedField.name() == 'explicitlyNamed'
+        bean.explicitlyNamedProp.name() == 'explicitlyNamed'
+        bean.explicitlyNamedProp2.name() == 'explicitlyNamed'
+        bean.constNamedField.name() == 'constNamedFoo'
+        bean.constNamedProp.name() == 'constNamedFoo'
+
         cleanup:
         context.close()
     }

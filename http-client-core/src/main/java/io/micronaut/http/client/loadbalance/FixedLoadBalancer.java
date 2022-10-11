@@ -21,27 +21,42 @@ import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.http.client.LoadBalancer;
 import org.reactivestreams.Publisher;
 
+import java.io.UncheckedIOException;
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.Optional;
 
 /**
- * A {@link LoadBalancer} that resolves a fixed URL.
+ * A {@link LoadBalancer} that resolves a fixed URI.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public class FixedLoadBalancer implements LoadBalancer  {
     private final Publisher<ServiceInstance> publisher;
-    private final URL url;
+    private final URI uri;
 
     /**
      * Constructs a new FixedLoadBalancer.
      *
      * @param url The URL to fix to
+     * @deprecated Use {@link #FixedLoadBalancer(URI)} instead
      */
+    @Deprecated
     public FixedLoadBalancer(URL url) {
-        this.url = url;
-        this.publisher = Publishers.just(ServiceInstance.of(url.getHost(), url));
+        this(toUriUnchecked(url));
+    }
+
+    /**
+     * Constructs a new FixedLoadBalancer.
+     *
+     * @param uri The URI to fix to
+     */
+    public FixedLoadBalancer(URI uri) {
+        this.uri = uri;
+        this.publisher = Publishers.just(ServiceInstance.of(uri.getHost(), uri));
     }
 
     @Override
@@ -51,13 +66,34 @@ public class FixedLoadBalancer implements LoadBalancer  {
 
     /**
      * @return The URL of the {@link LoadBalancer}
+     * @deprecated Use {@link #getUri()} instead
      */
+    @Deprecated
     public URL getUrl() {
-        return url;
+        try {
+            return uri.toURL();
+        } catch (MalformedURLException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /**
+     * @return The URI of the {@link LoadBalancer}
+     */
+    public URI getUri() {
+        return uri;
     }
 
     @Override
     public Optional<String> getContextPath() {
-        return Optional.ofNullable(getUrl().getPath());
+        return Optional.ofNullable(getUri().getPath());
+    }
+
+    private static URI toUriUnchecked(URL url) {
+        try {
+            return url.toURI();
+        } catch (URISyntaxException e) {
+            throw new IllegalArgumentException("Illegal URI", e);
+        }
     }
 }

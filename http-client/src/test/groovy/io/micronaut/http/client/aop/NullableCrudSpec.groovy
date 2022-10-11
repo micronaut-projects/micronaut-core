@@ -16,6 +16,7 @@
 package io.micronaut.http.client.aop
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.annotation.Nullable
 import io.micronaut.http.annotation.*
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
@@ -23,7 +24,6 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
-import javax.annotation.Nullable
 import java.util.concurrent.atomic.AtomicLong
 
 class NullableCrudSpec extends Specification {
@@ -159,7 +159,7 @@ class NullableCrudSpec extends Specification {
         }
 
         @Override
-        NullableBook update(Long id, String title) {
+        NullableBook update(Long id, @Nullable String title) {
             NullableBook book = books[id]
             if (book != null) {
                 book.title = title

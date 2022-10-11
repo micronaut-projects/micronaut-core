@@ -15,6 +15,7 @@
  */
 package io.micronaut.runtime;
 
+import io.micronaut.context.banner.Banner;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.context.ApplicationContext;
@@ -25,6 +26,7 @@ import io.micronaut.context.banner.ResourceBanner;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.core.naming.Described;
+import io.micronaut.core.version.VersionUtils;
 import io.micronaut.runtime.exceptions.ApplicationStartupException;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.slf4j.Logger;
@@ -36,6 +38,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
 /**
@@ -45,6 +48,7 @@ import java.util.function.Function;
  * @since 1.0
  */
 public class Micronaut extends DefaultApplicationContextBuilder implements ApplicationContextBuilder  {
+    private static final String MICRONAUT = "  Micronaut";
     private static final String BANNER_NAME = "micronaut-banner.txt";
     private static final Logger LOG = LoggerFactory.getLogger(Micronaut.class);
     private static final String SHUTDOWN_MONITOR_THREAD = "micronaut-shutdown-monitor-thread";
@@ -62,7 +66,7 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
      */
     @Override
     public @NonNull ApplicationContext start() {
-        long start = System.currentTimeMillis();
+        long start = System.nanoTime();
         printBanner();
         ApplicationContext applicationContext = super.build();
 
@@ -79,8 +83,7 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
                     boolean keepAlive = false;
                     if (embeddedApplication instanceof Described) {
                         if (LOG.isInfoEnabled()) {
-                            long end = System.currentTimeMillis();
-                            long took = end - start;
+                            long took = elapsedMillis(start);
                             String desc = ((Described) embeddedApplication).getDescription();
                             LOG.info("Startup completed in {}ms. Server Running: {}", took, desc);
                         }
@@ -90,16 +93,14 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
 
                             final EmbeddedServer embeddedServer = (EmbeddedServer) embeddedApplication;
                             if (LOG.isInfoEnabled()) {
-                                long end = System.currentTimeMillis();
-                                long took = end - start;
+                                long took = elapsedMillis(start);
                                 URL url = embeddedServer.getURL();
                                 LOG.info("Startup completed in {}ms. Server Running: {}", took, url);
                             }
                             keepAlive = embeddedServer.isKeepAlive();
                         } else {
                             if (LOG.isInfoEnabled()) {
-                                long end = System.currentTimeMillis();
-                                long took = end - start;
+                                long took = elapsedMillis(start);
                                 LOG.info("Startup completed in {}ms.", took);
                             }
                             keepAlive = embeddedApplication.isServer();
@@ -134,10 +135,17 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
                             }
                         }, SHUTDOWN_MONITOR_THREAD).start();
 
-                        try {
-                            countDownLatch.await();
-                        } catch (InterruptedException e) {
-                            // ignore
+                        boolean interrupted = false;
+                        while (true) {
+                            try {
+                                countDownLatch.await();
+                                break;
+                            } catch (InterruptedException e) {
+                                interrupted = true;
+                            }
+                        }
+                        if (interrupted) {
+                            Thread.currentThread().interrupt();
                         }
                         if (LOG.isInfoEnabled()) {
                             LOG.info("Embedded Application shutting down");
@@ -161,6 +169,10 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
             handleStartupException(applicationContext.getEnvironment(), e);
             return null;
         }
+    }
+
+    private static long elapsedMillis(long startNanos) {
+        return TimeUnit.MILLISECONDS.convert(System.nanoTime() - startNanos, TimeUnit.NANOSECONDS);
     }
 
     @Override
@@ -335,13 +347,21 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
             return;
         }
         PrintStream out = System.out;
+        resolveBanner(out).print();
+        printMicronautVersion(out);
+    }
 
-        Optional<URL> resource = getResourceLoader().getResource(BANNER_NAME);
-        if (resource.isPresent()) {
-            new ResourceBanner(resource.get(), out).print();
-        } else {
-            new MicronautBanner(out).print();
-        }
+    private void printMicronautVersion(@NonNull PrintStream out) {
+        String version = VersionUtils.getMicronautVersion();
+        version = (version != null) ? " (v" + version + ")" : "";
+        out.println(MICRONAUT + version + "\n");
+    }
+
+    @NonNull
+    private Banner resolveBanner(@NonNull PrintStream out) {
+        return getResourceLoader().getResource(BANNER_NAME)
+            .map(resource -> (Banner) new ResourceBanner(resource, out))
+            .orElseGet(() -> new MicronautBanner(out));
     }
 
 }

@@ -18,6 +18,7 @@ package io.micronaut.http.uri;
 import io.micronaut.core.convert.value.MutableConvertibleMultiValues;
 import io.micronaut.core.convert.value.MutableConvertibleMultiValuesMap;
 import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.exceptions.UriSyntaxException;
 
@@ -235,7 +236,9 @@ class DefaultUriBuilder implements UriBuilder {
                     strings.add(value.toString());
                 }
             }
-            queryParams.put(name, strings);
+            if (CollectionUtils.isNotEmpty(strings)) {
+                queryParams.put(name, strings);
+            }
         }
         return this;
     }
@@ -250,7 +253,9 @@ class DefaultUriBuilder implements UriBuilder {
                     strings.add(value.toString());
                 }
             }
-            queryParams.put(name, strings);
+            if (CollectionUtils.isNotEmpty(strings)) {
+                queryParams.put(name, strings);
+            }
         }
         return this;
     }
@@ -359,12 +364,13 @@ class DefaultUriBuilder implements UriBuilder {
     private String buildQueryParams(Map<String, ? super Object> values) {
         if (!queryParams.isEmpty()) {
             StringBuilder builder = new StringBuilder();
-            final Iterator<String> nameIterator = queryParams.names().iterator();
+            final Iterator<Map.Entry<String, List<String>>> nameIterator = queryParams.iterator();
             while (nameIterator.hasNext()) {
-                String rawName = nameIterator.next();
+                Map.Entry<String, List<String>> entry = nameIterator.next();
+                String rawName = entry.getKey();
                 String name = expandOrEncode(rawName, values);
 
-                final Iterator<String> i = queryParams.getAll(rawName).iterator();
+                final Iterator<String> i = entry.getValue().iterator();
                 while (i.hasNext()) {
                     String v = expandOrEncode(i.next(), values);
                     builder.append(name).append('=').append(v);

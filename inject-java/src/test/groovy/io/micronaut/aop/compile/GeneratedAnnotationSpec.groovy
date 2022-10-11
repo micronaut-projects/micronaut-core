@@ -2,6 +2,7 @@ package io.micronaut.aop.compile
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.annotation.processing.test.Parser
+import io.micronaut.inject.writer.BeanDefinitionWriter
 import org.objectweb.asm.AnnotationVisitor
 import org.objectweb.asm.ClassReader
 import org.objectweb.asm.ClassVisitor
@@ -31,7 +32,7 @@ class FooController {
     }
 }
 ''')
-        JavaFileObject f = files.find { it -> it.name.contains('FooControllerDefinition$Intercepted.class') }
+        JavaFileObject f = files.find { it -> it.name.contains('FooController' + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionWriter.PROXY_SUFFIX + '.class') }
         def bytes = f.openInputStream().withCloseable {it.bytes }
         ClassReader reader = new ClassReader(bytes)
         int generatedAnnotations = 0

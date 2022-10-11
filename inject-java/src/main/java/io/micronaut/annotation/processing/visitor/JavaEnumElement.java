@@ -18,13 +18,17 @@ package io.micronaut.annotation.processing.visitor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.EnumConstantElement;
 import io.micronaut.inject.ast.EnumElement;
 
+import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.VariableElement;
+
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * Implements the {@link EnumElement} interface for Java.
@@ -34,6 +38,10 @@ import java.util.stream.Collectors;
  */
 @Internal
 class JavaEnumElement extends JavaClassElement implements EnumElement {
+
+    protected List<EnumConstantElement> enumConstants;
+    protected List<String> values;
+
     /**
      * @param classElement       The {@link TypeElement}
      * @param annotationMetadata The annotation metadata
@@ -50,18 +58,41 @@ class JavaEnumElement extends JavaClassElement implements EnumElement {
      * @param arrayDimensions    The number of array dimensions
      */
     JavaEnumElement(TypeElement classElement, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext, int arrayDimensions) {
-        super(classElement, annotationMetadata, visitorContext, Collections.emptyMap(), arrayDimensions);
+        super(classElement, annotationMetadata, visitorContext, Collections.emptyList(), Collections.emptyMap(), arrayDimensions, false);
     }
 
     @Override
     public List<String> values() {
-        TypeElement te = (TypeElement) getNativeType();
-        List<String> results = te.getEnclosedElements()
-                                    .stream()
-                                    .filter(e -> e.getKind() == ElementKind.ENUM_CONSTANT)
-                                    .map(e -> e.getSimpleName().toString())
-                                    .collect(Collectors.toList());
-        return Collections.unmodifiableList(results);
+        if (values != null) {
+            return values;
+        }
+        initEnum();
+        return values;
+    }
+
+    @Override
+    public List<EnumConstantElement> elements() {
+        if (enumConstants != null) {
+            return enumConstants;
+        }
+        initEnum();
+        return enumConstants;
+    }
+
+    private void initEnum() {
+        values = new ArrayList<>();
+        enumConstants = new ArrayList<>();
+        TypeElement nativeType = (TypeElement) getNativeType();
+        for (Element element : nativeType.getEnclosedElements()) {
+            if (element.getKind() == ElementKind.ENUM_CONSTANT) {
+                values.add(element.getSimpleName().toString());
+                enumConstants.add(new JavaEnumConstantElement(this, (VariableElement) element,
+                        visitorContext.getAnnotationUtils().newAnnotationBuilder().build(element),
+                        visitorContext));
+            }
+        }
+        values = Collections.unmodifiableList(values);
+        enumConstants = Collections.unmodifiableList(enumConstants);
     }
 
     @Override

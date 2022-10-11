@@ -103,7 +103,7 @@ class DefaultArgumentValue<V> implements ArgumentValue<V> {
     }
 
     @Override
-    public boolean equalsType(Argument<?> o) {
+    public boolean equalsType(@Nullable Argument<?> o) {
         return argument.equalsType(o);
     }
 

@@ -8,21 +8,23 @@ import io.micronaut.context.annotation.Factory
 // tag::class[]
 @Factory
 class ProductInterceptors(private val productService: ProductService) {
+// end::class[]
 
+    // tag::constructor-interceptor[]
     @InterceptorBean(ProductBean::class)
     fun aroundConstruct(): ConstructorInterceptor<Product> { // <1>
         return ConstructorInterceptor { context: ConstructorInvocationContext<Product> ->
             val parameterValues = context.parameterValues // <2>
             val parameterValue = parameterValues[0]
             require(!(parameterValue == null || parameterValues[0].toString().isEmpty())) { "Invalid product name" }
-            val productName = parameterValues[0].toString().toUpperCase()
+            val productName = parameterValues[0].toString().uppercase()
             parameterValues[0] = productName
             val product = context.proceed() // <3>
             productService.addProduct(product)
             product
         }
     }
-    // end::class[]
+    // end::constructor-interceptor[]
 
     // tag::method-interceptor[]
     @InterceptorBean(ProductBean::class)
@@ -43,6 +45,7 @@ class ProductInterceptors(private val productService: ProductService) {
         }
     }
     // end::method-interceptor[]
+
 // tag::class[]
 }
 // end::class[]

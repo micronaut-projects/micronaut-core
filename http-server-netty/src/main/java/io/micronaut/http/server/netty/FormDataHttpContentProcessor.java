@@ -23,9 +23,19 @@ import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration
 import io.netty.buffer.ByteBufHolder;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpRequest;
-import io.netty.handler.codec.http.multipart.*;
+import io.netty.handler.codec.http.multipart.Attribute;
+import io.netty.handler.codec.http.multipart.DefaultHttpDataFactory;
+import io.netty.handler.codec.http.multipart.FileUpload;
+import io.netty.handler.codec.http.multipart.HttpData;
+import io.netty.handler.codec.http.multipart.HttpDataFactory;
+import io.netty.handler.codec.http.multipart.HttpPostRequestDecoder;
+import io.netty.handler.codec.http.multipart.HttpPostStandardRequestDecoder;
+import io.netty.handler.codec.http.multipart.InterfaceHttpData;
+import io.netty.handler.codec.http.multipart.InterfaceHttpPostRequestDecoder;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
+import reactor.core.publisher.Operators;
+import reactor.util.context.Context;
 
 import java.io.IOException;
 import java.nio.charset.Charset;
@@ -46,8 +56,21 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
 
     private final InterfaceHttpPostRequestDecoder decoder;
     private final boolean enabled;
-    private AtomicLong extraMessages = new AtomicLong(0);
+    private final AtomicLong extraMessages = new AtomicLong(0);
     private final long partMaxSize;
+
+    /**
+     * Set to true to request a destroy by any thread.
+     */
+    private volatile boolean pleaseDestroy = false;
+    /**
+     * {@code true} during {@link #doOnNext}, can't destroy while that's running.
+     */
+    private volatile boolean inFlight = false;
+    /**
+     * {@code true} if the decoder has been destroyed or will be destroyed in the near future.
+     */
+    private boolean destroyed = false;
 
     /**
      * @param nettyHttpRequest The {@link NettyHttpRequest}
@@ -57,7 +80,7 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
         super(nettyHttpRequest, configuration);
         Charset characterEncoding = nettyHttpRequest.getCharacterEncoding();
         HttpServerConfiguration.MultipartConfiguration multipart = configuration.getMultipart();
-        DefaultHttpDataFactory factory;
+        HttpDataFactory factory;
         if (multipart.isDisk()) {
             factory = new DefaultHttpDataFactory(true, characterEncoding);
         } else if (multipart.isMixed()) {
@@ -102,84 +125,133 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
             @Override
             public void cancel() {
                 subscription.cancel();
+                pleaseDestroy = true;
+                destroyIfRequested();
             }
         });
     }
 
     @Override
     protected void onData(ByteBufHolder message) {
-        Subscriber<? super HttpData> subscriber = getSubscriber();
-
-        if (message instanceof HttpContent) {
-            HttpContent httpContent = (HttpContent) message;
-            List<InterfaceHttpData> messages = new ArrayList<>(1);
-
-            try {
-                InterfaceHttpPostRequestDecoder postRequestDecoder = this.decoder;
-                postRequestDecoder.offer(httpContent);
-
-                while (postRequestDecoder.hasNext()) {
-                    InterfaceHttpData data = postRequestDecoder.next();
-                    switch (data.getHttpDataType()) {
-                        case Attribute:
-                            Attribute attribute = (Attribute) data;
-                            messages.add(attribute);
-                            break;
-                        case FileUpload:
-                            FileUpload fileUpload = (FileUpload) data;
-                            if (fileUpload.isCompleted()) {
-                                messages.add(fileUpload);
-                            }
-                            break;
-                        default:
-                            // no-op
-                    }
-                }
-
-                InterfaceHttpData currentPartialHttpData = postRequestDecoder.currentPartialHttpData();
-                if (currentPartialHttpData instanceof HttpData) {
-                    messages.add(currentPartialHttpData);
-                }
-
-            } catch (HttpPostRequestDecoder.EndOfDataDecoderException e) {
-                // ok, ignore
-            } catch (HttpPostRequestDecoder.ErrorDataDecoderException e) {
-                Throwable cause = e.getCause();
-                if (cause instanceof IOException && cause.getMessage().equals("Size exceed allowed maximum capacity")) {
-                    String partName = decoder.currentPartialHttpData().getName();
-                    try {
-                        onError(new ContentLengthExceededException("The part named [" + partName + "] exceeds the maximum allowed content length [" + partMaxSize + "]"));
-                    } finally {
-                        parentSubscription.cancel();
-                    }
-                } else {
-                    onError(e);
-                }
-            } catch (Throwable e) {
-                onError(e);
-            } finally {
-                if (messages.isEmpty()) {
-                    subscription.request(1);
-                } else {
-                    extraMessages.updateAndGet(p -> p + messages.size() - 1);
-                    messages.stream().map(HttpData.class::cast).forEach(subscriber::onNext);
-                }
-
-                httpContent.release();
+        boolean skip;
+        synchronized (this) {
+            if (destroyed) {
+                skip = true;
+            } else {
+                skip = false;
+                inFlight = true;
             }
-        } else {
+        }
+        if (skip) {
             message.release();
+            return;
+        }
+        try {
+            Subscriber<? super HttpData> subscriber = getSubscriber();
+
+            if (message instanceof HttpContent) {
+                HttpContent httpContent = (HttpContent) message;
+                List<InterfaceHttpData> messages = new ArrayList<>(1);
+
+                try {
+                    InterfaceHttpPostRequestDecoder postRequestDecoder = this.decoder;
+                    postRequestDecoder.offer(httpContent);
+
+                    while (postRequestDecoder.hasNext()) {
+                        InterfaceHttpData data = postRequestDecoder.next();
+                        data.touch();
+                        switch (data.getHttpDataType()) {
+                            case Attribute:
+                                Attribute attribute = (Attribute) data;
+                                // bodyListHttpData keeps a copy and releases it later
+                                messages.add(attribute.retain());
+                                postRequestDecoder.removeHttpDataFromClean(attribute);
+                                break;
+                            case FileUpload:
+                                FileUpload fileUpload = (FileUpload) data;
+                                if (fileUpload.isCompleted()) {
+                                    // bodyListHttpData keeps a copy and releases it later
+                                    messages.add(fileUpload.retain());
+                                    postRequestDecoder.removeHttpDataFromClean(fileUpload);
+                                }
+                                break;
+                            default:
+                                // no-op
+                        }
+                    }
+
+                    InterfaceHttpData currentPartialHttpData = postRequestDecoder.currentPartialHttpData();
+                    if (currentPartialHttpData instanceof HttpData) {
+                        // can't give away ownership of this data yet, so retain it
+                        messages.add(currentPartialHttpData.retain());
+                    }
+
+                } catch (HttpPostRequestDecoder.EndOfDataDecoderException e) {
+                    // ok, ignore
+                } catch (HttpPostRequestDecoder.ErrorDataDecoderException e) {
+                    Throwable cause = e.getCause();
+                    if (cause instanceof IOException && cause.getMessage().equals("Size exceed allowed maximum capacity")) {
+                        String partName = decoder.currentPartialHttpData().getName();
+                        try {
+                            onError(new ContentLengthExceededException("The part named [" + partName + "] exceeds the maximum allowed content length [" + partMaxSize + "]"));
+                        } finally {
+                            parentSubscription.cancel();
+                        }
+                    } else {
+                        onError(e);
+                    }
+                } catch (Throwable e) {
+                    onError(e);
+                } finally {
+                    if (messages.isEmpty()) {
+                        subscription.request(1);
+                    } else {
+                        extraMessages.updateAndGet(p -> p + messages.size() - 1);
+                        messages.stream().map(HttpData.class::cast).forEach(data -> {
+                            try {
+                                subscriber.onNext(data);
+                            } catch (Throwable e) {
+                                subscriber.onError(Operators.onOperatorError(subscription, e, data, Context.empty()));
+                            }
+                        });
+                    }
+
+                    httpContent.release();
+                }
+            } else {
+                message.release();
+            }
+        } finally {
+            inFlight = false;
+            destroyIfRequested();
         }
     }
 
     @Override
     protected void doAfterOnError(Throwable throwable) {
-        decoder.destroy();
+        pleaseDestroy = true;
+        destroyIfRequested();
     }
 
     @Override
     protected void doAfterComplete() {
-        decoder.destroy();
+        pleaseDestroy = true;
+        destroyIfRequested();
+    }
+
+    private void destroyIfRequested() {
+        boolean destroy;
+        synchronized (this) {
+            if (pleaseDestroy && !destroyed && !inFlight) {
+                destroy = true;
+                destroyed = true;
+            } else {
+                destroy = false;
+            }
+        }
+        if (destroy) {
+            decoder.destroy();
+        }
     }
 
 }

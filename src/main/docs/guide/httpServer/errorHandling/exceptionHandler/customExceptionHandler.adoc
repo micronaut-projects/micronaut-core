@@ -12,4 +12,4 @@ To respond with 400 Bad Request as the response when the `OutOfStockException` i
 
 snippet::io.micronaut.docs.server.exception.OutOfStockExceptionHandler[tags="clazz", indent=0]
 
-<1> The default api:http.server.exceptions.format.JsonErrorResponseFactory[] is used to create the body of the response
+<1> The default api:http.server.exceptions.response.ErrorResponseProcessor[] is used to create the body of the response

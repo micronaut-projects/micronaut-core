@@ -39,23 +39,27 @@ final class DefaultFilterEntry<T extends HttpFilter> implements HttpFilterResolv
     private final String[] patterns;
     private final boolean hasMethods;
     private final boolean hasPatterns;
+    private final FilterPatternStyle patternStyle;
 
     /**
      * Default constructor.
      * @param filter The filter
      * @param annotationMetadata The annotation metadata
      * @param httpMethods The methods
+     * @param patternStyle the pattern style
      * @param patterns THe patterns
      */
     DefaultFilterEntry(
             T filter,
             AnnotationMetadata annotationMetadata,
             Set<HttpMethod> httpMethods,
+            FilterPatternStyle patternStyle,
             String[] patterns) {
         this.httpFilter = filter;
         this.annotationMetadata = annotationMetadata;
         this.filterMethods = httpMethods != null ? Collections.unmodifiableSet(httpMethods) : Collections.emptySet();
         this.patterns = patterns != null ? patterns : StringUtils.EMPTY_STRING_ARRAY;
+        this.patternStyle = patternStyle != null ? patternStyle : FilterPatternStyle.defaultStyle();
         this.hasMethods = CollectionUtils.isNotEmpty(filterMethods);
         this.hasPatterns = ArrayUtils.isNotEmpty(patterns);
     }
@@ -79,6 +83,11 @@ final class DefaultFilterEntry<T extends HttpFilter> implements HttpFilterResolv
     @Override
     public String[] getPatterns() {
         return patterns;
+    }
+
+    @Override
+    public FilterPatternStyle getPatternStyle() {
+        return patternStyle;
     }
 
     @Override

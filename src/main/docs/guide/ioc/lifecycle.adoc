@@ -1,6 +1,6 @@
-== When The Context Starts
+== When The Bean Is Constructed
 
-To invoke a method when a bean is constructed, use the `javax.annotation.PostConstruct` annotation:
+To invoke a method when the bean is constructed, use the `jakarta.annotation.PostConstruct` annotation:
 
 snippet::io.micronaut.docs.lifecycle.V8Engine[tags="imports, class", indent=0]
 
@@ -10,9 +10,9 @@ snippet::io.micronaut.docs.lifecycle.V8Engine[tags="imports, class", indent=0]
 
 To manage when a bean is constructed, see the section on <<scopes, bean scopes>>.
 
-== When The Context Closes
+== When The Bean Is Destroyed
 
-To invoke a method when the context is closed, use the `javax.annotation.PreDestroy` annotation:
+To invoke a method when the bean is destroyed, use the `jakarta.annotation.PreDestroy` annotation:
 
 snippet::io.micronaut.docs.lifecycle.PreDestroyBean[tags="class", indent=0]
 
@@ -31,3 +31,8 @@ snippet::io.micronaut.docs.lifecycle.Connection[tags="class", indent=0]
 <2> The annotation value matches the method name
 
 NOTE: Simply implementing the `Closeable` or `AutoCloseable` interface is not enough for a bean to be closed with the context. One of the above methods must be used.
+
+== Dependent Beans
+
+Dependent beans are the beans used in the construction of your bean.
+If the dependent bean's scope is `@Prototype` or unknown, it will be destroyed along with your instance.

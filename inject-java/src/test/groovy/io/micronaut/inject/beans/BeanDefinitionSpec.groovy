@@ -90,6 +90,121 @@ class Test {
         e.message.contains("Bean defines an exposed type [java.lang.Runnable] that is not implemented by the bean type")
     }
 
+    void "test exposed types on factory with AOP"() {
+        when:
+        buildBeanDefinition('limittypes.Test$Method0', '''
+package limittypes;
+
+import io.micronaut.aop.Logged;
+import io.micronaut.context.annotation.*;
+import jakarta.inject.Singleton;
+
+@Factory
+class Test {
+
+    @Singleton
+    @Bean(typed = {X.class})
+    @Logged
+    Y method() {
+        return new Y();
+    }
+}
+
+interface X {
+    
+}
+class Y implements X {
+    
+}
+
+''')
+
+        then:
+        noExceptionThrown()
+    }
+
+    void "test fail compilation on exposed subclass of bean type"() {
+        when:
+        buildBeanDefinition('limittypes.Test', '''
+package limittypes;
+
+import io.micronaut.context.annotation.*;
+import jakarta.inject.*;
+
+@Singleton
+@Bean(typed = X.class)
+class Test {
+
+}
+
+class X extends Test {}
+
+''')
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains("Bean defines an exposed type [limittypes.X] that is not implemented by the bean type")
+    }
+
+    void "test fail compilation on exposed subclass of bean type with factory"() {
+        when:
+        buildBeanDefinition('limittypes.Test$Method0', '''
+package limittypes;
+
+import io.micronaut.context.annotation.*;
+import jakarta.inject.Singleton;
+
+@Factory
+class Test {
+
+    @Singleton
+    @Bean(typed = {X.class, Y.class})
+    X method() {
+        return new Y();
+    }
+}
+
+interface X {
+    
+}
+class Y implements X {
+    
+}
+
+''')
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains("Bean defines an exposed type [limittypes.Y] that is not implemented by the bean type")
+    }
+
+    void "test exposed bean types with factory invalid type"() {
+        when:
+        buildBeanDefinition('limittypes.Test$Method0', '''
+package limittypes;
+
+import io.micronaut.context.annotation.*;
+import jakarta.inject.Singleton;
+
+@Factory
+class Test {
+
+    @Singleton
+    @Bean(typed = {Z.class})
+    X method() {
+        return new Y();
+    }
+}
+
+interface Z { }
+interface X { }
+class Y implements X { }
+''')
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains("Bean defines an exposed type [limittypes.Z] that is not implemented by the bean type")
+    }
+
     void 'test order annotation'() {
         given:
         def definition = buildBeanDefinition('test.TestOrder', '''
@@ -210,7 +325,7 @@ public class NumberThingManager extends AbstractThingManager<NumberThing<?>> {}
         then:
         noExceptionThrown()
         definition != null
-        definition.getTypeArguments("test.AbstractThingManager")[0].getTypeVariables().get("T").getType() == Object.class
+        definition.getTypeArguments("test.AbstractThingManager")[0].getTypeVariables().get("T").getType() == Number.class
     }
 
     void "test a bean definition in a package with uppercase letters"() {

@@ -78,6 +78,13 @@ public interface HttpFilterResolver<F extends HttpFilter, T extends AnnotationMe
         @NonNull String[] getPatterns();
 
         /**
+         * @return The filter patterns
+         */
+        default FilterPatternStyle getPatternStyle() {
+            return FilterPatternStyle.defaultStyle();
+        }
+
+        /**
          * @return Does the entry define any methods.
          */
         default boolean hasMethods() {
@@ -103,12 +110,38 @@ public interface HttpFilterResolver<F extends HttpFilter, T extends AnnotationMe
         static <FT extends HttpFilter> FilterEntry<FT> of(
                 @NonNull FT filter,
                 @Nullable AnnotationMetadata annotationMetadata,
-                @Nullable Set<HttpMethod> methods, String...patterns) {
+                @Nullable Set<HttpMethod> methods,
+                String...patterns) {
             return new DefaultFilterEntry<>(
                     Objects.requireNonNull(filter, "Filter cannot be null"),
                     annotationMetadata != null ? annotationMetadata : AnnotationMetadata.EMPTY_METADATA,
                     methods,
+                    null,
                     patterns
+            );
+        }
+
+        /**
+         * Creates a filter entry for the given arguments.
+         * @param filter The filter
+         * @param annotationMetadata The annotation metadata
+         * @param methods The methods
+         * @param patternStyle the pattern style
+         * @param patterns The patterns
+         * @return The filter entry
+         * @param <FT> the filter type
+         */
+        static <FT extends HttpFilter> FilterEntry<FT> of(
+            @NonNull FT filter,
+            @Nullable AnnotationMetadata annotationMetadata,
+            @Nullable Set<HttpMethod> methods,
+            @NonNull FilterPatternStyle patternStyle, String...patterns) {
+            return new DefaultFilterEntry<>(
+                Objects.requireNonNull(filter, "Filter cannot be null"),
+                annotationMetadata != null ? annotationMetadata : AnnotationMetadata.EMPTY_METADATA,
+                methods,
+                patternStyle,
+                patterns
             );
         }
     }

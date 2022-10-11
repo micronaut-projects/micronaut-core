@@ -1,24 +1,28 @@
-ext {
-    shadowJarEnabled = true
+import me.champeau.gradle.japicmp.JapicmpTask
+import io.micronaut.build.internal.japicmp.RemovedPackages
+
+plugins {
+    id "io.micronaut.build.internal.convention-core-library"
 }
 
-shadowJar {
+micronautBuild {
+    core {
+        documented = false
+    }
+}
+
+tasks.named("shadowJar") {
     exclude "module-info.class"
 }
 
 dependencies {
-    api dependencyVersion("slf4j")
-    compileOnly dependencyVersion('jsr305')
-    compileOnly "org.graalvm.nativeimage:svm:$graalVersion"
-    compileOnly "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion"
-    compileOnly "org.ow2.asm:asm-tree:$asmVersion"
-    shadowCompile "org.ow2.asm:asm:$asmVersion"
-    shadowCompile "org.ow2.asm:asm-commons:$asmVersion"
-    shadowCompile "org.ow2.asm:asm-tree:$asmVersion"
-    shadowCompile("com.github.ben-manes.caffeine:caffeine:$caffeineVersion") {
-        exclude group: "com.google.errorprone", module: "error_prone_annotations"
-        exclude group: "org.checkerframework", module: "checker-qual"
-    }
+    compileOnly libs.managed.jsr305
+    compileOnly libs.managed.graal
+    compileOnly libs.kotlin.stdlib
+    compileOnly libs.asm.tree
+
+    shadowCompile libs.bundles.asm
+    shadowCompile libs.asm.tree
 }
 
 spotless {
@@ -34,8 +38,17 @@ spotless {
     }
 }
 
-processResources.dependsOn('micronautVersionInfo')
-task micronautVersionInfo(type: WriteProperties) {
-    outputFile = "${buildDir}/resources/main/micronaut-version.properties"
+def versionInfo = tasks.register("micronautVersionInfo", WriteProperties) {
+    outputFile = "${buildDir}/resources/version/micronaut-version.properties"
     property 'micronaut.version', projectVersion
 }
+tasks.named("processResources") {
+    from(versionInfo)
+}
+
+tasks.withType(JapicmpTask).configureEach {
+   richReport {
+       addViolationTransformer(RemovedPackages, [prefixes: ['io.micronaut.caffeine'], exact: []])
+   }
+}
+

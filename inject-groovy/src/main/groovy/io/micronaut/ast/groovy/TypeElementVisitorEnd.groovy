@@ -26,6 +26,7 @@ import io.micronaut.ast.groovy.visitor.LoadedVisitor
 import io.micronaut.core.order.OrderUtil
 import io.micronaut.core.util.CollectionUtils
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
+import io.micronaut.inject.visitor.VisitorContext
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder
 import io.micronaut.inject.writer.BeanDefinitionReferenceWriter
 import io.micronaut.inject.writer.BeanDefinitionWriter
@@ -52,14 +53,22 @@ class TypeElementVisitorEnd implements ASTTransformation, CompilationUnitAware {
 
     @Override
     void visit(ASTNode[] nodes, SourceUnit source) {
-        Map<String, LoadedVisitor> loadedVisitors = TypeElementVisitorTransform.loadedVisitors
+        Map<String, LoadedVisitor> loadedVisitors = TypeElementVisitorTransform.loadedVisitors.get()
+
+        ClassWriterOutputVisitor classWriterOutputVisitor = null
+        if (source.classLoader instanceof InMemoryByteCodeGroovyClassLoader) {
+            classWriterOutputVisitor = new InMemoryClassWriterOutputVisitor(source.classLoader as InMemoryByteCodeGroovyClassLoader)
+        }
 
         if (loadedVisitors != null) {
             List<LoadedVisitor> values = new ArrayList<>(loadedVisitors.values())
             OrderUtil.reverseSort(values)
             for(loadedVisitor in values) {
                 try {
-                    loadedVisitor.finish(new GroovyVisitorContext(source, compilationUnit))
+                    GroovyVisitorContext visitorContext = classWriterOutputVisitor != null ?
+                            new GroovyVisitorContext(source, compilationUnit, classWriterOutputVisitor) :
+                            new GroovyVisitorContext(source, compilationUnit)
+                    loadedVisitor.finish(visitorContext)
                 } catch (Throwable e) {
                     AstMessageUtils.error(
                             source,
@@ -69,41 +78,32 @@ class TypeElementVisitorEnd implements ASTTransformation, CompilationUnitAware {
             }
         }
 
-        final List<AbstractBeanDefinitionBuilder> beanDefinitionBuilders = TypeElementVisitorTransform.beanDefinitionBuilders
+        final List<AbstractBeanDefinitionBuilder> beanDefinitionBuilders = TypeElementVisitorTransform.beanDefinitionBuilders.get()
         if (beanDefinitionBuilders) {
             File classesDir = compilationUnit.configuration.targetDirectory
-            ClassWriterOutputVisitor classWriterOutputVisitor
-            if (source.classLoader instanceof InMemoryByteCodeGroovyClassLoader) {
-                classWriterOutputVisitor = new InMemoryClassWriterOutputVisitor(source.classLoader as InMemoryByteCodeGroovyClassLoader)
-            } else {
+            if (classWriterOutputVisitor == null) {
                 classWriterOutputVisitor = new DirectoryClassWriterOutputVisitor(classesDir)
             }
-            for (AbstractBeanDefinitionBuilder beanDefinitionBuilder : beanDefinitionBuilders) {
-                final BeanDefinitionWriter beanDefinitionWriter = beanDefinitionBuilder.build()
-                if (beanDefinitionWriter != null) {
-                    try {
-                        beanDefinitionWriter.accept(classWriterOutputVisitor)
-                        String beanTypeName = beanDefinitionWriter.getBeanTypeName()
-                        BeanDefinitionReferenceWriter beanDefinitionReferenceWriter =
-                                new BeanDefinitionReferenceWriter(beanTypeName, beanDefinitionWriter)
-                        beanDefinitionReferenceWriter
-                                .setRequiresMethodProcessing(beanDefinitionWriter.requiresMethodProcessing())
-                        beanDefinitionReferenceWriter.accept(classWriterOutputVisitor)
-                    } catch (IOException e) {
-                        // raise a compile error
-                        AstMessageUtils.error(
-                                source,
-                                source.getAST(),
-                                "Error writing bean definitions: $e.message")
-
-                    }
-                }
+            try {
+                AbstractBeanDefinitionBuilder.writeBeanDefinitionBuilders(
+                        classWriterOutputVisitor,
+                        beanDefinitionBuilders
+                )
+            } catch (IOException e) {
+                // raise a compile error
+                AstMessageUtils.error(
+                        source,
+                        source.getAST(),
+                        "Error writing bean definitions: $e.message")
             }
+        }
+
+        if (classWriterOutputVisitor != null) {
             classWriterOutputVisitor.finish()
         }
 
-        TypeElementVisitorTransform.loadedVisitors = null
-        TypeElementVisitorTransform.beanDefinitionBuilders.clear()
+        TypeElementVisitorTransform.loadedVisitors.remove()
+        TypeElementVisitorTransform.beanDefinitionBuilders.remove()
         AstAnnotationUtils.invalidateCache()
         AbstractAnnotationMetadataBuilder.clearMutated()
     }

@@ -61,6 +61,16 @@ public interface ApplicationContextBuilder {
     }
 
     /**
+     * Specify whether the default set of property sources should be enabled (default is {@code true}).
+     * @param areEnabled Whether the default property sources are enabled
+     * @return This builder
+     * @since 3.7.0
+     */
+    default @NonNull ApplicationContextBuilder enableDefaultPropertySources(boolean areEnabled) {
+        return this;
+    }
+
+    /**
      * Specifies to eager init the given annotated types.
      *
      * @param annotations The annotation stereotypes
@@ -206,12 +216,32 @@ public interface ApplicationContextBuilder {
     @NonNull ApplicationContextBuilder banner(boolean isEnabled);
 
     /**
+     * Whether to error on an empty bean provider. Defaults to {@code false}.
+     *
+     * @param shouldAllow True if empty {@link jakarta.inject.Provider} instances are allowed
+     * @return This application
+     * @since 3.0.0
+     */
+    @NonNull ApplicationContextBuilder allowEmptyProviders(boolean shouldAllow);
+
+    /**
      * Set the command line arguments.
      *
      * @param args The arguments
      * @return This application
      */
-    default  @NonNull ApplicationContextBuilder args(@Nullable String... args) {
+    default @NonNull ApplicationContextBuilder args(@Nullable String... args) {
+        return this;
+    }
+
+    /**
+     * Sets whether the bootstrap environment should be initialized.
+     *
+     * @param bootstrapEnv True if it should be initialized. Default true
+     * @return This application
+     * @since 3.1.0
+     */
+    default @NonNull ApplicationContextBuilder bootstrapEnvironment(boolean bootstrapEnv) {
         return this;
     }
 

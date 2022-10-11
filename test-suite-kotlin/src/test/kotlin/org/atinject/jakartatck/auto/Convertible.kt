@@ -17,14 +17,16 @@ package org.atinject.jakartatck.auto
 
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
-import junit.framework.TestCase
-import org.atinject.javaxtck.auto.accessories.Cupholder
-import org.atinject.javaxtck.auto.accessories.RoundThing
-import org.atinject.javaxtck.auto.accessories.SpareTire
+import org.atinject.jakartatck.auto.accessories.Cupholder
+import org.atinject.jakartatck.auto.accessories.RoundThing
+import org.atinject.jakartatck.auto.accessories.SpareTire
+import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Test
 
 import jakarta.inject.Inject
 import jakarta.inject.Named
 import jakarta.inject.Provider
+import org.junit.jupiter.api.TestInstance
 
 open class Convertible : Car {
 
@@ -129,7 +131,8 @@ open class Convertible : Car {
         }
     }
 
-    class Tests : TestCase() {
+    @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+    class Tests {
 
         private val context = BeanContext.run()
         private val car = context.getBean(Convertible::class.java)
@@ -140,145 +143,140 @@ open class Convertible : Car {
 
         // smoke tests: if these fail all bets are off
 
+        @Test
         fun testFieldsInjected() {
-            TestCase.assertTrue(cupholder != null && spareTire != null)
+            assertTrue(cupholder != null && spareTire != null)
         }
 
+        @Test
         fun testProviderReturnedValues() {
-            TestCase.assertTrue(engine != null)
+            assertTrue(engine != null)
         }
 
         // injecting different kinds of members
 
+        @Test
         fun testMethodWithZeroParametersInjected() {
-            TestCase.assertTrue(car.methodWithZeroParamsInjected)
+            assertTrue(car.methodWithZeroParamsInjected)
         }
 
+        @Test
         fun testMethodWithMultipleParametersInjected() {
-            TestCase.assertTrue(car.methodWithMultipleParamsInjected)
+            assertTrue(car.methodWithMultipleParamsInjected)
         }
 
+        @Test
         fun testNonVoidMethodInjected() {
-            TestCase.assertTrue(car.methodWithNonVoidReturnInjected)
+            assertTrue(car.methodWithNonVoidReturnInjected)
         }
 
+        @Test
         fun testPublicNoArgsConstructorInjected() {
-            TestCase.assertTrue(engine!!.publicNoArgsConstructorInjected)
+            assertTrue(engine!!.publicNoArgsConstructorInjected)
         }
 
+        @Test
         fun testSubtypeFieldsInjected() {
-            TestCase.assertTrue(spareTire!!.hasSpareTireBeenFieldInjected())
+            assertTrue(spareTire!!.hasSpareTireBeenFieldInjected())
         }
 
+        @Test
         fun testSubtypeMethodsInjected() {
-            TestCase.assertTrue(spareTire!!.hasSpareTireBeenMethodInjected())
+            assertTrue(spareTire!!.hasSpareTireBeenMethodInjected())
         }
 
+        @Test
         fun testSupertypeFieldsInjected() {
-            TestCase.assertTrue(spareTire!!.hasTireBeenFieldInjected())
+            assertTrue(spareTire!!.hasTireBeenFieldInjected())
         }
 
+        @Test
         fun testSupertypeMethodsInjected() {
-            TestCase.assertTrue(spareTire!!.hasTireBeenMethodInjected())
+            assertTrue(spareTire!!.hasTireBeenMethodInjected())
         }
 
+        @Test
         fun testTwiceOverriddenMethodInjectedWhenMiddleLacksAnnotation() {
-            TestCase.assertTrue(engine!!.overriddenTwiceWithOmissionInMiddleInjected)
+            assertTrue(engine!!.overriddenTwiceWithOmissionInMiddleInjected)
         }
 
         // injected values
 
+/*        @Test
         fun testQualifiersNotInheritedFromOverriddenMethod() {
-            TestCase.assertTrue(engine!!.overriddenMethodInjected)
-            TestCase.assertFalse(engine!!.qualifiersInheritedFromOverriddenMethod)
-        }
+            assertTrue(engine!!.overriddenMethodInjected)
+            assertFalse(engine!!.qualifiersInheritedFromOverriddenMethod)
+        }*/
 
+        @Test
         fun testConstructorInjectionWithValues() {
-            TestCase.assertFalse("Expected unqualified value",
-                    car.constructorPlainSeat is DriversSeat)
-            TestCase.assertFalse("Expected unqualified value",
-                    car.constructorPlainTire is SpareTire)
-            TestCase.assertTrue("Expected qualified value",
-                    car.constructorDriversSeat is DriversSeat)
-            TestCase.assertTrue("Expected qualified value",
-                    car.constructorSpareTire is SpareTire)
+            assertFalse(car.constructorPlainSeat is DriversSeat,"Expected unqualified value")
+            assertFalse(car.constructorPlainTire is SpareTire,"Expected unqualified value")
+            assertTrue(car.constructorDriversSeat is DriversSeat,"Expected qualified value")
+            assertTrue(car.constructorSpareTire is SpareTire,"Expected qualified value")
         }
 
+        @Test
         fun testFieldInjectionWithValues() {
-            TestCase.assertFalse("Expected unqualified value",
-                    car.fieldPlainSeat is DriversSeat)
-            TestCase.assertFalse("Expected unqualified value",
-                    car.fieldPlainTire is SpareTire)
-            TestCase.assertTrue("Expected qualified value",
-                    car.fieldDriversSeat is DriversSeat)
-            TestCase.assertTrue("Expected qualified value",
-                    car.fieldSpareTire is SpareTire)
+            assertFalse(car.fieldPlainSeat is DriversSeat,"Expected unqualified value")
+            assertFalse(car.fieldPlainTire is SpareTire,"Expected unqualified value")
+            assertTrue(car.fieldDriversSeat is DriversSeat,"Expected qualified value")
+            assertTrue(car.fieldSpareTire is SpareTire,"Expected qualified value")
         }
 
+        @Test
         fun testMethodInjectionWithValues() {
-            TestCase.assertFalse("Expected unqualified value",
-                    car.methodPlainSeat is DriversSeat)
-            TestCase.assertFalse("Expected unqualified value",
-                    car.methodPlainTire is SpareTire)
-            TestCase.assertTrue("Expected qualified value",
-                    car.methodDriversSeat is DriversSeat)
-            TestCase.assertTrue("Expected qualified value",
-                    car.methodSpareTire is SpareTire)
+            assertFalse(car.methodPlainSeat is DriversSeat,"Expected unqualified value")
+            assertFalse(car.methodPlainTire is SpareTire,"Expected unqualified value")
+            assertTrue(car.methodDriversSeat is DriversSeat,"Expected qualified value")
+            assertTrue(car.methodSpareTire is SpareTire,"Expected qualified value")
         }
 
         // injected providers
 
+        @Test
         fun testConstructorInjectionWithProviders() {
-            TestCase.assertFalse("Expected unqualified value",
-                    car.constructorPlainSeatProvider.get() is DriversSeat)
-            TestCase.assertFalse("Expected unqualified value",
-                    car.constructorPlainTireProvider.get() is SpareTire)
-            TestCase.assertTrue("Expected qualified value",
-                    car.constructorDriversSeatProvider.get() is DriversSeat)
-            TestCase.assertTrue("Expected qualified value",
-                    car.constructorSpareTireProvider.get() is SpareTire)
+            assertFalse(car.constructorPlainSeatProvider.get() is DriversSeat,"Expected unqualified value")
+            assertFalse(car.constructorPlainTireProvider.get() is SpareTire,"Expected unqualified value")
+            assertTrue(car.constructorDriversSeatProvider.get() is DriversSeat,"Expected qualified value")
+            assertTrue(car.constructorSpareTireProvider.get() is SpareTire,"Expected qualified value")
         }
 
+        @Test
         fun testFieldInjectionWithProviders() {
-            TestCase.assertFalse("Expected unqualified value",
-                    car.fieldPlainSeatProvider.get() is DriversSeat)
-            TestCase.assertFalse("Expected unqualified value",
-                    car.fieldPlainTireProvider.get() is SpareTire)
-            TestCase.assertTrue("Expected qualified value",
-                    car.fieldDriversSeatProvider.get() is DriversSeat)
-            TestCase.assertTrue("Expected qualified value",
-                    car.fieldSpareTireProvider.get() is SpareTire)
+            assertFalse(car.fieldPlainSeatProvider.get() is DriversSeat,"Expected unqualified value")
+            assertFalse(car.fieldPlainTireProvider.get() is SpareTire,"Expected unqualified value")
+            assertTrue(car.fieldDriversSeatProvider.get() is DriversSeat,"Expected qualified value")
+            assertTrue(car.fieldSpareTireProvider.get() is SpareTire,"Expected qualified value")
         }
 
+        @Test
         fun testMethodInjectionWithProviders() {
-            TestCase.assertFalse("Expected unqualified value",
-                    car.methodPlainSeatProvider.get() is DriversSeat)
-            TestCase.assertFalse("Expected unqualified value",
-                    car.methodPlainTireProvider.get() is SpareTire)
-            TestCase.assertTrue("Expected qualified value",
-                    car.methodDriversSeatProvider.get() is DriversSeat)
-            TestCase.assertTrue("Expected qualified value",
-                    car.methodSpareTireProvider.get() is SpareTire)
+            assertFalse(car.methodPlainSeatProvider.get() is DriversSeat,"Expected unqualified value")
+            assertFalse(car.methodPlainTireProvider.get() is SpareTire,"Expected unqualified value")
+            assertTrue(car.methodDriversSeatProvider.get() is DriversSeat,"Expected qualified value")
+            assertTrue(car.methodSpareTireProvider.get() is SpareTire,"Expected qualified value")
         }
 
 
         // singletons
 
+        @Test
         fun testConstructorInjectedProviderYieldsSingleton() {
-            TestCase.assertSame("Expected same value",
-                    car.constructorPlainSeatProvider.get(), car.constructorPlainSeatProvider.get())
+            assertSame(car.constructorPlainSeatProvider.get(), car.constructorPlainSeatProvider.get(),"Expected same value")
         }
 
+        @Test
         fun testFieldInjectedProviderYieldsSingleton() {
-            TestCase.assertSame("Expected same value",
-                    car.fieldPlainSeatProvider.get(), car.fieldPlainSeatProvider.get())
+            assertSame(car.fieldPlainSeatProvider.get(), car.fieldPlainSeatProvider.get(),"Expected same value")
         }
 
+        @Test
         fun testMethodInjectedProviderYieldsSingleton() {
-            TestCase.assertSame("Expected same value",
-                    car.methodPlainSeatProvider.get(), car.methodPlainSeatProvider.get())
+            assertSame(car.methodPlainSeatProvider.get(), car.methodPlainSeatProvider.get(),"Expected same value")
         }
 
+        @Test
         fun testCircularlyDependentSingletons() {
             // uses provider.get() to get around circular deps
             assertSame(cupholder!!.seatProvider.get().cupholder, cupholder)
@@ -286,180 +284,199 @@ open class Convertible : Car {
 
 
         // non singletons
+        @Test
         fun testSingletonAnnotationNotInheritedFromSupertype() {
-            TestCase.assertNotSame(car.driversSeatA, car.driversSeatB)
+            assertNotSame(car.driversSeatA, car.driversSeatB)
         }
 
+        @Test
         fun testConstructorInjectedProviderYieldsDistinctValues() {
-            TestCase.assertNotSame("Expected distinct values",
-                    car.constructorDriversSeatProvider.get(), car.constructorDriversSeatProvider.get())
-            TestCase.assertNotSame("Expected distinct values",
-                    car.constructorPlainTireProvider.get(), car.constructorPlainTireProvider.get())
-            TestCase.assertNotSame("Expected distinct values",
-                    car.constructorSpareTireProvider.get(), car.constructorSpareTireProvider.get())
+            assertNotSame(car.constructorDriversSeatProvider.get(), car.constructorDriversSeatProvider.get(),"Expected distinct values")
+            assertNotSame(car.constructorPlainTireProvider.get(), car.constructorPlainTireProvider.get(),"Expected distinct values")
+            assertNotSame(car.constructorSpareTireProvider.get(), car.constructorSpareTireProvider.get(),"Expected distinct values")
         }
 
+        @Test
         fun testFieldInjectedProviderYieldsDistinctValues() {
-            TestCase.assertNotSame("Expected distinct values",
-                    car.fieldDriversSeatProvider.get(), car.fieldDriversSeatProvider.get())
-            TestCase.assertNotSame("Expected distinct values",
-                    car.fieldPlainTireProvider.get(), car.fieldPlainTireProvider.get())
-            TestCase.assertNotSame("Expected distinct values",
-                    car.fieldSpareTireProvider.get(), car.fieldSpareTireProvider.get())
+            assertNotSame(car.fieldDriversSeatProvider.get(), car.fieldDriversSeatProvider.get(),"Expected distinct values")
+            assertNotSame(car.fieldPlainTireProvider.get(), car.fieldPlainTireProvider.get(),"Expected distinct values")
+            assertNotSame(car.fieldSpareTireProvider.get(), car.fieldSpareTireProvider.get(),"Expected distinct values")
         }
 
+        @Test
         fun testMethodInjectedProviderYieldsDistinctValues() {
-            TestCase.assertNotSame("Expected distinct values",
-                    car.methodDriversSeatProvider.get(), car.methodDriversSeatProvider.get())
-            TestCase.assertNotSame("Expected distinct values",
-                    car.methodPlainTireProvider.get(), car.methodPlainTireProvider.get())
-            TestCase.assertNotSame("Expected distinct values",
-                    car.methodSpareTireProvider.get(), car.methodSpareTireProvider.get())
+            assertNotSame(car.methodDriversSeatProvider.get(), car.methodDriversSeatProvider.get(),"Expected distinct values")
+            assertNotSame(car.methodPlainTireProvider.get(), car.methodPlainTireProvider.get(),"Expected distinct values")
+            assertNotSame(car.methodSpareTireProvider.get(), car.methodSpareTireProvider.get(),"Expected distinct values")
         }
 
 
         // mix inheritance + visibility
 
+        @Test
         fun testPackagePrivateMethodInjectedDifferentPackages() {
-            TestCase.assertTrue(spareTire!!.subPackagePrivateMethodInjected)
+            assertTrue(spareTire!!.subPackagePrivateMethodInjected)
             //Not valid because in Kotlin it is an override
-            //TestCase.assertTrue(spareTire.superPackagePrivateMethodInjected)
+            //assertTrue(spareTire.superPackagePrivateMethodInjected)
         }
 
+        @Test
         fun testOverriddenProtectedMethodInjection() {
-            TestCase.assertTrue(spareTire!!.subProtectedMethodInjected)
-            TestCase.assertFalse(spareTire.superProtectedMethodInjected)
+            assertTrue(spareTire!!.subProtectedMethodInjected)
+            assertFalse(spareTire.superProtectedMethodInjected)
         }
 
+        @Test
         fun testOverriddenPublicMethodNotInjected() {
-            TestCase.assertTrue(spareTire!!.subPublicMethodInjected)
-            TestCase.assertFalse(spareTire.superPublicMethodInjected)
+            assertTrue(spareTire!!.subPublicMethodInjected)
+            assertFalse(spareTire.superPublicMethodInjected)
         }
 
 
         // inject in order
 
+        @Test
         fun testFieldsInjectedBeforeMethods() {
             //Added to assert that fields are injected before methods in Kotlin
-            TestCase.assertFalse(plainTire!!.methodInjectedBeforeFields)
+            assertFalse(plainTire!!.methodInjectedBeforeFields)
             //Ignored because fields override in Kotlin
-            //TestCase.assertFalse(spareTire!!.methodInjectedBeforeFields)
+            //assertFalse(spareTire!!.methodInjectedBeforeFields)
         }
 
+        @Test
         fun testSupertypeMethodsInjectedBeforeSubtypeFields() {
-            TestCase.assertFalse(spareTire!!.subtypeFieldInjectedBeforeSupertypeMethods)
+            assertFalse(spareTire!!.subtypeFieldInjectedBeforeSupertypeMethods)
         }
 
+        @Test
         fun testSupertypeMethodInjectedBeforeSubtypeMethods() {
-            TestCase.assertFalse(spareTire!!.subtypeMethodInjectedBeforeSupertypeMethods)
+            assertFalse(spareTire!!.subtypeMethodInjectedBeforeSupertypeMethods)
         }
 
 
         // necessary injections occur
 
+        @Test
         fun testPackagePrivateMethodInjectedEvenWhenSimilarMethodLacksAnnotation() {
             //Not valid because in Kotlin the method is overridden
-            //TestCase.assertTrue(spareTire!!.subPackagePrivateMethodForOverrideInjected)
+            //assertTrue(spareTire!!.subPackagePrivateMethodForOverrideInjected)
         }
 
 
         // override or similar method without @Inject
 
+        @Test
         fun testPrivateMethodNotInjectedWhenSupertypeHasAnnotatedSimilarMethod() {
-            TestCase.assertFalse(spareTire!!.superPrivateMethodForOverrideInjected)
+            assertFalse(spareTire!!.superPrivateMethodForOverrideInjected)
         }
 
+        @Test
         fun testPackagePrivateMethodNotInjectedWhenOverrideLacksAnnotation() {
-            TestCase.assertFalse(engine!!.subPackagePrivateMethodForOverrideInjected)
-            TestCase.assertFalse(engine.superPackagePrivateMethodForOverrideInjected)
+            assertFalse(engine!!.subPackagePrivateMethodForOverrideInjected)
+            assertFalse(engine.superPackagePrivateMethodForOverrideInjected)
         }
 
+        @Test
         fun testPackagePrivateMethodNotInjectedWhenSupertypeHasAnnotatedSimilarMethod() {
-            TestCase.assertFalse(spareTire!!.superPackagePrivateMethodForOverrideInjected)
+            assertFalse(spareTire!!.superPackagePrivateMethodForOverrideInjected)
         }
 
+        @Test
         fun testProtectedMethodNotInjectedWhenOverrideNotAnnotated() {
-            TestCase.assertFalse(spareTire!!.protectedMethodForOverrideInjected)
+            assertFalse(spareTire!!.protectedMethodForOverrideInjected)
         }
 
+        @Test
         fun testPublicMethodNotInjectedWhenOverrideNotAnnotated() {
-            TestCase.assertFalse(spareTire!!.publicMethodForOverrideInjected)
+            assertFalse(spareTire!!.publicMethodForOverrideInjected)
         }
 
+        @Test
         fun testTwiceOverriddenMethodNotInjectedWhenOverrideLacksAnnotation() {
-            TestCase.assertFalse(engine!!.overriddenTwiceWithOmissionInSubclassInjected)
+            assertFalse(engine!!.overriddenTwiceWithOmissionInSubclassInjected)
         }
 
+        @Test
         fun testOverridingMixedWithPackagePrivate2() {
-            TestCase.assertTrue(spareTire!!.spareTirePackagePrivateMethod2Injected)
+            assertTrue(spareTire!!.spareTirePackagePrivateMethod2Injected)
             //Not valid in Kotlin because the method is overridden
-            //TestCase.assertTrue((spareTire as Tire).tirePackagePrivateMethod2Injected)
-            TestCase.assertFalse((spareTire as RoundThing).roundThingPackagePrivateMethod2Injected)
+            //assertTrue((spareTire as Tire).tirePackagePrivateMethod2Injected)
+            assertFalse((spareTire as RoundThing).roundThingPackagePrivateMethod2Injected)
 
-            TestCase.assertTrue(plainTire!!.tirePackagePrivateMethod2Injected)
+            assertTrue(plainTire!!.tirePackagePrivateMethod2Injected)
             //Not valid in Kotlin because the method is overridden
-            //TestCase.assertTrue((plainTire as RoundThing).roundThingPackagePrivateMethod2Injected)
+            //assertTrue((plainTire as RoundThing).roundThingPackagePrivateMethod2Injected)
         }
 
+        @Test
         fun testOverridingMixedWithPackagePrivate3() {
-            TestCase.assertFalse(spareTire!!.spareTirePackagePrivateMethod3Injected)
+            assertFalse(spareTire!!.spareTirePackagePrivateMethod3Injected)
             //Not valid in Kotlin because the method is overridden
-            //TestCase.assertTrue((spareTire as Tire).tirePackagePrivateMethod3Injected)
-            TestCase.assertFalse((spareTire as RoundThing).roundThingPackagePrivateMethod3Injected)
+            //assertTrue((spareTire as Tire).tirePackagePrivateMethod3Injected)
+            assertFalse((spareTire as RoundThing).roundThingPackagePrivateMethod3Injected)
 
-            TestCase.assertTrue(plainTire!!.tirePackagePrivateMethod3Injected)
+            assertTrue(plainTire!!.tirePackagePrivateMethod3Injected)
             //Not valid in Kotlin because the method is overridden
-            //TestCase.assertTrue((plainTire as RoundThing).roundThingPackagePrivateMethod3Injected)
+            //assertTrue((plainTire as RoundThing).roundThingPackagePrivateMethod3Injected)
         }
 
+        @Test
         fun testOverridingMixedWithPackagePrivate4() {
-            TestCase.assertFalse(plainTire!!.tirePackagePrivateMethod4Injected)
+            assertFalse(plainTire!!.tirePackagePrivateMethod4Injected)
             //Not the same as Java because package private can be overridden by any subclass in the project
-            //TestCase.assertTrue((plainTire as RoundThing).roundThingPackagePrivateMethod4Injected)
+            //assertTrue((plainTire as RoundThing).roundThingPackagePrivateMethod4Injected)
         }
 
         // inject only once
 
+        @Test
         fun testOverriddenPackagePrivateMethodInjectedOnlyOnce() {
-            TestCase.assertFalse(engine!!.overriddenPackagePrivateMethodInjectedTwice)
+            assertFalse(engine!!.overriddenPackagePrivateMethodInjectedTwice)
         }
 
+        @Test
         fun testSimilarPackagePrivateMethodInjectedOnlyOnce() {
-            TestCase.assertFalse(spareTire!!.similarPackagePrivateMethodInjectedTwice)
+            assertFalse(spareTire!!.similarPackagePrivateMethodInjectedTwice)
         }
 
+        @Test
         fun testOverriddenProtectedMethodInjectedOnlyOnce() {
-            TestCase.assertFalse(spareTire!!.overriddenProtectedMethodInjectedTwice)
+            assertFalse(spareTire!!.overriddenProtectedMethodInjectedTwice)
         }
 
+        @Test
         fun testOverriddenPublicMethodInjectedOnlyOnce() {
-            TestCase.assertFalse(spareTire!!.overriddenPublicMethodInjectedTwice)
+            assertFalse(spareTire!!.overriddenPublicMethodInjectedTwice)
         }
 
     }
 
-    class PrivateTests : TestCase() {
+    class PrivateTests {
         private val context = DefaultBeanContext().start()
         private val car = context.getBean(Convertible::class.java)
         private val engine = car.engineProvider!!.get()
         private val spareTire = car.spareTire
 
+        @Test
         fun testSupertypePrivateMethodInjected() {
-            TestCase.assertTrue(spareTire!!.superPrivateMethodInjected)
-            TestCase.assertTrue(spareTire.subPrivateMethodInjected)
+            assertTrue(spareTire!!.superPrivateMethodInjected)
+            assertTrue(spareTire.subPrivateMethodInjected)
         }
 
+        @Test
         fun testPackagePrivateMethodInjectedSamePackage() {
-            TestCase.assertTrue(engine.subPackagePrivateMethodInjected)
-            TestCase.assertFalse(engine.superPackagePrivateMethodInjected)
+            assertTrue(engine.subPackagePrivateMethodInjected)
+            assertFalse(engine.superPackagePrivateMethodInjected)
         }
 
+        @Test
         fun testPrivateMethodInjectedEvenWhenSimilarMethodLacksAnnotation() {
-            TestCase.assertTrue(spareTire!!.subPrivateMethodForOverrideInjected)
+            assertTrue(spareTire!!.subPrivateMethodForOverrideInjected)
         }
 
+        @Test
         fun testSimilarPrivateMethodInjectedOnlyOnce() {
-            TestCase.assertFalse(spareTire!!.similarPrivateMethodInjectedTwice)
+            assertFalse(spareTire!!.similarPrivateMethodInjectedTwice)
         }
     }
 

@@ -24,8 +24,8 @@ import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.management.endpoint.info.InfoEndpoint;
 import io.micronaut.management.endpoint.info.InfoSource;
 import io.micronaut.runtime.context.scope.Refreshable;
-import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
 
 import java.util.Collections;
 import java.util.Map;
@@ -55,7 +55,7 @@ public class ConfigurationInfoSource implements InfoSource {
 
     @Override
     public Publisher<PropertySource> getSource() {
-        return Flowable.just(supplier.get());
+        return Flux.just(supplier.get());
     }
 
     private MapPropertySource retrieveConfigurationInfo() {
