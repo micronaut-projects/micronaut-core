@@ -2191,8 +2191,9 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             return hierarchy.createSibling(
                 declaredMetadata
             );
+        } else {
+            throw new IllegalStateException("Unrecognized annotation metadata: " + annotationMetadata);
         }
-        return annotationMetadata;
     }
 
     /**
@@ -2233,8 +2234,9 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             } else {
                 return declaredMetadata;
             }
+        } else {
+            throw new IllegalStateException("Unrecognized annotation metadata: " + annotationMetadata);
         }
-        return annotationMetadata;
     }
 
     /**
@@ -2275,8 +2277,9 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             } else {
                 return declaredMetadata;
             }
+        } else {
+            throw new IllegalStateException("Unrecognized annotation metadata: " + annotationMetadata);
         }
-        return annotationMetadata;
     }
 
     /**
@@ -2310,8 +2313,9 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             } else {
                 return declaredMetadata;
             }
+        } else {
+            throw new IllegalStateException("Unrecognized annotation metadata: " + annotationMetadata);
         }
-        return annotationMetadata;
     }
 
     /**

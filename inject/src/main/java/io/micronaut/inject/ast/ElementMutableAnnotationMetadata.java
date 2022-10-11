@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.ast;
 
+import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.NonNull;
@@ -32,7 +33,7 @@ import java.util.function.Predicate;
  * @author Denis Stepanov
  * @since 4.0.0
  */
-public interface MutableAnnotatedElement<Rtr> {
+public interface ElementMutableAnnotationMetadata<Rtr> extends AnnotationMetadataDelegate {
 
     /**
      * Annotate this element with the given annotation type. If the annotation is already present then
@@ -60,6 +61,7 @@ public interface MutableAnnotatedElement<Rtr> {
      * @param annotationType The annotation type
      * @return This element
      */
+    @NonNull
     default Rtr removeAnnotation(@NonNull String annotationType) {
         throw new UnsupportedOperationException("Element of type [" + getClass() + "] does not support removing annotations at compilation time");
     }
@@ -70,6 +72,7 @@ public interface MutableAnnotatedElement<Rtr> {
      * @param <T> The annotation generic type
      * @return This element
      */
+    @NonNull
     default <T extends Annotation> Rtr removeAnnotation(@NonNull Class<T> annotationType) {
         return removeAnnotation(Objects.requireNonNull(annotationType).getName());
     }
@@ -80,6 +83,7 @@ public interface MutableAnnotatedElement<Rtr> {
      * @param <T> The annotation generic type
      * @return This element
      */
+    @NonNull
     default <T extends Annotation> Rtr removeAnnotationIf(@NonNull Predicate<AnnotationValue<T>> predicate) {
         throw new UnsupportedOperationException("Element of type [" + getClass() + "] does not support removing annotations at compilation time");
     }
@@ -89,6 +93,7 @@ public interface MutableAnnotatedElement<Rtr> {
      * @param annotationType The annotation type
      * @return This element
      */
+    @NonNull
     default Rtr removeStereotype(@NonNull String annotationType) {
         throw new UnsupportedOperationException("Element of type [" + getClass() + "] does not support removing annotations at compilation time");
     }
@@ -99,6 +104,7 @@ public interface MutableAnnotatedElement<Rtr> {
      * @param <T> The annotation generic type
      * @return This element
      */
+    @NonNull
     default <T extends Annotation> Rtr removeStereotype(@NonNull Class<T> annotationType) {
         return removeStereotype(Objects.requireNonNull(annotationType).getName());
     }

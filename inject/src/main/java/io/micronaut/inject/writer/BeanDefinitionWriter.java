@@ -4033,6 +4033,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                                         boolean requiresReflection,
                                         boolean isPostConstructMethod,
                                         boolean isPreDestroyMethod) {
+        annotationMetadata = annotationMetadata.getTargetAnnotationMetadata();
         for (ParameterElement value : methodElement.getParameters()) {
             DefaultAnnotationMetadata.contributeDefaults(this.annotationMetadata, value.getAnnotationMetadata());
             DefaultAnnotationMetadata.contributeRepeatable(this.annotationMetadata, value.getGenericType());

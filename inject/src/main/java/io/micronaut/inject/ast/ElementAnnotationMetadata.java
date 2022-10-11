@@ -23,13 +23,5 @@ import io.micronaut.core.annotation.AnnotationMetadata;
  * @author Denis Stepanov
  * @since 4.0.0
  */
-public interface ElementAnnotationMetadata extends MutableAnnotatedElement<AnnotationMetadata> {
-
-    /**
-     * Gets the annotation metadata for the element.
-     *
-     * @return the annotation metadata
-     */
-    AnnotationMetadata get();
-
+public interface ElementAnnotationMetadata extends ElementMutableAnnotationMetadata<AnnotationMetadata> {
 }

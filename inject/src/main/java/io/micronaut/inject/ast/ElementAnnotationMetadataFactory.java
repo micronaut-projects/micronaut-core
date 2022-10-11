@@ -61,7 +61,7 @@ public interface ElementAnnotationMetadataFactory {
      * Creates a factory wrapper that would override the annotation metadata value for the provided native type.
      * @param nativeType The native type
      * @param fn The function to build the annotation metadata
-     * @return
+     * @return a new factory
      */
     @Experimental
     @NonNull

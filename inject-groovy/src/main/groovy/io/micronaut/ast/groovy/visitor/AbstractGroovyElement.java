@@ -15,12 +15,8 @@
  */
 package io.micronaut.ast.groovy.visitor;
 
-import groovy.transform.CompileStatic;
 import groovy.transform.PackageScope;
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.AnnotationMetadataDelegate;
-import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.ArrayUtils;
@@ -31,6 +27,8 @@ import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementAnnotationMetadata;
 import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.ElementModifier;
+import io.micronaut.inject.ast.ElementMutableAnnotationMetadata;
+import io.micronaut.inject.ast.ElementMutableAnnotationMetadataDelegate;
 import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.FieldNode;
@@ -39,7 +37,6 @@ import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.control.CompilationUnit;
 import org.codehaus.groovy.control.SourceUnit;
 
-import java.lang.annotation.Annotation;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -50,8 +47,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Consumer;
-import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
 /**
@@ -61,7 +56,7 @@ import java.util.regex.Pattern;
  * @since 1.1
  */
 
-public abstract class AbstractGroovyElement implements AnnotationMetadataDelegate, Element {
+public abstract class AbstractGroovyElement implements Element, ElementMutableAnnotationMetadataDelegate<Element> {
 
     private static final Pattern JAVADOC_PATTERN = Pattern.compile("(/\\s*\\*\\*)|\\s*\\*|(\\s*[*/])");
 
@@ -90,7 +85,13 @@ public abstract class AbstractGroovyElement implements AnnotationMetadataDelegat
         this.sourceUnit = visitorContext.getSourceUnit();
     }
 
-    private ElementAnnotationMetadata getElementAnnotationMetadata() {
+    @Override
+    public Element getReturnInstance() {
+        return this;
+    }
+
+    @Override
+    public ElementMutableAnnotationMetadata<?> getAnnotationMetadata() {
         if (elementAnnotationMetadata == null) {
             if (presetAnnotationMetadata == null) {
                 elementAnnotationMetadata = elementAnnotationMetadataFactory.build(this);
@@ -138,11 +139,6 @@ public abstract class AbstractGroovyElement implements AnnotationMetadataDelegat
     }
 
     @Override
-    public AnnotationMetadata getAnnotationMetadata() {
-        return getElementAnnotationMetadata().get();
-    }
-
-    @Override
     public AnnotatedNode getNativeType() {
         return annotatedNode;
     }
@@ -150,37 +146,6 @@ public abstract class AbstractGroovyElement implements AnnotationMetadataDelegat
     @Override
     public boolean isPackagePrivate() {
         return hasDeclaredAnnotation(PackageScope.class);
-    }
-
-    @CompileStatic
-    @Override
-    public <T extends Annotation> Element annotate(@NonNull String annotationType, @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
-        getElementAnnotationMetadata().annotate(annotationType, consumer);
-        return this;
-    }
-
-    @Override
-    public <T extends Annotation> Element annotate(AnnotationValue<T> annotationValue) {
-        getElementAnnotationMetadata().annotate(annotationValue);
-        return this;
-    }
-
-    @Override
-    public Element removeAnnotation(@NonNull String annotationType) {
-        getElementAnnotationMetadata().removeAnnotation(annotationType);
-        return this;
-    }
-
-    @Override
-    public <T extends Annotation> Element removeAnnotationIf(@NonNull Predicate<AnnotationValue<T>> predicate) {
-        getElementAnnotationMetadata().removeAnnotationIf(predicate);
-        return this;
-    }
-
-    @Override
-    public Element removeStereotype(@NonNull String annotationType) {
-        getElementAnnotationMetadata().removeStereotype(annotationType);
-        return this;
     }
 
     /**

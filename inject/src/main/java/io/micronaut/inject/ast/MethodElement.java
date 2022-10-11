@@ -258,8 +258,6 @@ public interface MethodElement extends MemberElement {
         ParameterElement... parameterElements) {
         return new MethodElement() {
 
-            private @NonNull AnnotationMetadata thisAnnotationMetadata = annotationMetadata;
-
             @Override
             public boolean isSynthetic() {
                 return true;
@@ -286,7 +284,7 @@ public interface MethodElement extends MemberElement {
             public MethodElement withParameters(ParameterElement... newParameters) {
                 return MethodElement.of(
                     declaredType,
-                    thisAnnotationMetadata,
+                    annotationMetadata,
                     returnType,
                     genericReturnType,
                     name,
@@ -297,7 +295,7 @@ public interface MethodElement extends MemberElement {
             @NonNull
             @Override
             public AnnotationMetadata getAnnotationMetadata() {
-                return thisAnnotationMetadata;
+                return annotationMetadata;
             }
 
             @Override
@@ -412,7 +410,7 @@ public interface MethodElement extends MemberElement {
             @Override
             public AnnotationMetadata getAnnotationMetadata() {
                 if (annotationMetadata == null) {
-                    annotationMetadata = annotationMetadataProvider.getAnnotationMetadata();
+                    annotationMetadata = annotationMetadataProvider.getAnnotationMetadata().copyAnnotationMetadata();
                 }
                 return annotationMetadata;
             }

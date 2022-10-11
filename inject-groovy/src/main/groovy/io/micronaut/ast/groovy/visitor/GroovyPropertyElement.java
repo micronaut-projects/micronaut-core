@@ -23,10 +23,12 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.ElementMutableAnnotationMetadata;
 import io.micronaut.inject.ast.PropertyElement;
 import org.codehaus.groovy.ast.AnnotatedNode;
 
@@ -58,8 +60,7 @@ final class GroovyPropertyElement extends AbstractGroovyElement implements Prope
     @Nullable
     private final FieldElement field;
     private final boolean excluded;
-    private final List<MemberElement> elements;
-    private final AnnotationMetadata annotationMetadata;
+    private final ElementMutableAnnotationMetadata<?> annotationMetadata;
 
     GroovyPropertyElement(GroovyVisitorContext visitorContext,
                           ClassElement owningElement,
@@ -82,7 +83,7 @@ final class GroovyPropertyElement extends AbstractGroovyElement implements Prope
         this.writeAccessKind = writeAccessKind;
         this.owningElement = owningElement;
         this.excluded = excluded;
-        elements = new ArrayList<>(3);
+        List<MemberElement> elements = new ArrayList<>(3);
         if (getter instanceof AbstractGroovyElement) {
             elements.add(getter);
         }
@@ -94,10 +95,11 @@ final class GroovyPropertyElement extends AbstractGroovyElement implements Prope
         }
         // The instance AnnotationMetadata of each element can change after a modification
         // Set annotation metadata as actual elements so the changes are reflected
+        AnnotationMetadata propertyAnnotationMetadata;
         if (elements.size() == 1) {
-            annotationMetadata = elements.iterator().next();
+            propertyAnnotationMetadata = elements.iterator().next();
         } else {
-            annotationMetadata = new AnnotationMetadataHierarchy(
+            propertyAnnotationMetadata = new AnnotationMetadataHierarchy(
                 true,
                 elements.stream().map(e -> {
                     if (e instanceof MethodElement) {
@@ -113,6 +115,70 @@ final class GroovyPropertyElement extends AbstractGroovyElement implements Prope
                 }).toArray(AnnotationMetadata[]::new)
             );
         }
+        annotationMetadata = new ElementMutableAnnotationMetadata<Element>() {
+
+            @Override
+            public <T extends Annotation> io.micronaut.inject.ast.Element annotate(AnnotationValue<T> annotationValue) {
+                for (MemberElement memberElement : elements) {
+                    memberElement.annotate(annotationValue);
+                }
+                return GroovyPropertyElement.this;
+            }
+
+            @Override
+            public <T extends Annotation> io.micronaut.inject.ast.Element annotate(String annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
+                for (MemberElement memberElement : elements) {
+                    memberElement.annotate(annotationType, consumer);
+                }
+                return GroovyPropertyElement.this;
+            }
+
+            @Override
+            public <T extends Annotation> io.micronaut.inject.ast.Element annotate(Class<T> annotationType) {
+                for (MemberElement memberElement : elements) {
+                    memberElement.annotate(annotationType);
+                }
+                return GroovyPropertyElement.this;
+            }
+
+            @Override
+            public io.micronaut.inject.ast.Element annotate(String annotationType) {
+                for (MemberElement memberElement : elements) {
+                    memberElement.annotate(annotationType);
+                }
+                return GroovyPropertyElement.this;
+            }
+
+            @Override
+            public <T extends Annotation> io.micronaut.inject.ast.Element annotate(Class<T> annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
+                for (MemberElement memberElement : elements) {
+                    memberElement.annotate(annotationType, consumer);
+                }
+                return GroovyPropertyElement.this;
+            }
+
+            @Override
+            public io.micronaut.inject.ast.Element removeAnnotation(String annotationType) {
+                for (MemberElement memberElement : elements) {
+                    memberElement.removeAnnotation(annotationType);
+                }
+                return GroovyPropertyElement.this;
+            }
+
+            @Override
+            public <T extends Annotation> io.micronaut.inject.ast.Element removeAnnotationIf(Predicate<AnnotationValue<T>> predicate) {
+                for (MemberElement memberElement : elements) {
+                    memberElement.removeAnnotationIf(predicate);
+                }
+                return GroovyPropertyElement.this;
+            }
+
+            @Override
+            public AnnotationMetadata getAnnotationMetadata() {
+                return propertyAnnotationMetadata;
+            }
+
+        };
     }
 
     @Override
@@ -147,7 +213,7 @@ final class GroovyPropertyElement extends AbstractGroovyElement implements Prope
     }
 
     @Override
-    public AnnotationMetadata getAnnotationMetadata() {
+    public ElementMutableAnnotationMetadata<?> getAnnotationMetadata() {
         return annotationMetadata;
     }
 
@@ -262,62 +328,6 @@ final class GroovyPropertyElement extends AbstractGroovyElement implements Prope
     @Override
     public ClassElement getOwningType() {
         return owningElement;
-    }
-
-    @Override
-    public <T extends Annotation> io.micronaut.inject.ast.Element annotate(AnnotationValue<T> annotationValue) {
-        for (MemberElement memberElement : elements) {
-            memberElement.annotate(annotationValue);
-        }
-        return this;
-    }
-
-    @Override
-    public <T extends Annotation> io.micronaut.inject.ast.Element annotate(String annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
-        for (MemberElement memberElement : elements) {
-            memberElement.annotate(annotationType, consumer);
-        }
-        return this;
-    }
-
-    @Override
-    public <T extends Annotation> io.micronaut.inject.ast.Element annotate(Class<T> annotationType) {
-        for (MemberElement memberElement : elements) {
-            memberElement.annotate(annotationType);
-        }
-        return this;
-    }
-
-    @Override
-    public io.micronaut.inject.ast.Element annotate(String annotationType) {
-        for (MemberElement memberElement : elements) {
-            memberElement.annotate(annotationType);
-        }
-        return this;
-    }
-
-    @Override
-    public <T extends Annotation> io.micronaut.inject.ast.Element annotate(Class<T> annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
-        for (MemberElement memberElement : elements) {
-            memberElement.annotate(annotationType, consumer);
-        }
-        return this;
-    }
-
-    @Override
-    public io.micronaut.inject.ast.Element removeAnnotation(String annotationType) {
-        for (MemberElement memberElement : elements) {
-            memberElement.removeAnnotation(annotationType);
-        }
-        return this;
-    }
-
-    @Override
-    public <T extends Annotation> io.micronaut.inject.ast.Element removeAnnotationIf(Predicate<AnnotationValue<T>> predicate) {
-        for (MemberElement memberElement : elements) {
-            memberElement.removeAnnotationIf(predicate);
-        }
-        return this;
     }
 
 }

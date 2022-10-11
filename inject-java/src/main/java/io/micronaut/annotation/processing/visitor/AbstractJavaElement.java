@@ -17,14 +17,14 @@ package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.annotation.processing.AnnotationUtils;
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementAnnotationMetadata;
 import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.ElementModifier;
+import io.micronaut.inject.ast.ElementMutableAnnotationMetadata;
+import io.micronaut.inject.ast.ElementMutableAnnotationMetadataDelegate;
 import io.micronaut.inject.ast.PrimitiveElement;
 
 import javax.lang.model.element.AnnotationMirror;
@@ -42,15 +42,12 @@ import javax.lang.model.type.TypeMirror;
 import javax.lang.model.type.TypeVariable;
 import javax.lang.model.type.UnionType;
 import javax.lang.model.type.WildcardType;
-import java.lang.annotation.Annotation;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Consumer;
-import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -65,7 +62,7 @@ import static javax.lang.model.element.Modifier.PUBLIC;
  * @author graemerocher
  * @since 1.0
  */
-public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Element {
+public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Element, ElementMutableAnnotationMetadataDelegate<io.micronaut.inject.ast.Element> {
 
     protected final JavaVisitorContext visitorContext;
     protected final ElementAnnotationMetadataFactory elementAnnotationMetadataFactory;
@@ -86,7 +83,13 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
         this.visitorContext = visitorContext;
     }
 
-    private ElementAnnotationMetadata getElementAnnotationMetadata() {
+    @Override
+    public io.micronaut.inject.ast.Element getReturnInstance() {
+        return this;
+    }
+
+    @Override
+    public ElementMutableAnnotationMetadata<?> getAnnotationMetadata() {
         if (elementAnnotationMetadata == null) {
             if (presetAnnotationMetadata == null) {
                 elementAnnotationMetadata = elementAnnotationMetadataFactory.build(this);
@@ -120,37 +123,6 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
         AbstractJavaElement abstractJavaElement = makeCopy();
         abstractJavaElement.presetAnnotationMetadata = annotationMetadata;
         return abstractJavaElement;
-    }
-
-    @NonNull
-    @Override
-    public <T extends Annotation> io.micronaut.inject.ast.Element annotate(@NonNull String annotationType, @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
-        getElementAnnotationMetadata().annotate(annotationType, consumer);
-        return this;
-    }
-
-    @Override
-    public <T extends Annotation> io.micronaut.inject.ast.Element annotate(AnnotationValue<T> annotationValue) {
-        getElementAnnotationMetadata().annotate(annotationValue);
-        return this;
-    }
-
-    @Override
-    public io.micronaut.inject.ast.Element removeAnnotation(@NonNull String annotationType) {
-        getElementAnnotationMetadata().removeAnnotation(annotationType);
-        return this;
-    }
-
-    @Override
-    public <T extends Annotation> io.micronaut.inject.ast.Element removeAnnotationIf(@NonNull Predicate<AnnotationValue<T>> predicate) {
-        getElementAnnotationMetadata().removeAnnotationIf(predicate);
-        return this;
-    }
-
-    @Override
-    public io.micronaut.inject.ast.Element removeStereotype(@NonNull String annotationType) {
-        getElementAnnotationMetadata().removeStereotype(annotationType);
-        return this;
     }
 
     @Override
@@ -213,11 +185,6 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
     @Override
     public Object getNativeType() {
         return element;
-    }
-
-    @Override
-    public AnnotationMetadata getAnnotationMetadata() {
-        return getElementAnnotationMetadata().get();
     }
 
     @Override

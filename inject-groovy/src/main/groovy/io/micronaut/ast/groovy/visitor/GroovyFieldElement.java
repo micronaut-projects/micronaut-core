@@ -66,6 +66,7 @@ public class GroovyFieldElement extends AbstractGroovyElement implements FieldEl
         return (FieldElement) super.withAnnotationMetadata(annotationMetadata);
     }
 
+    @Override
     public FieldNode getNativeType() {
         return fieldNode;
     }

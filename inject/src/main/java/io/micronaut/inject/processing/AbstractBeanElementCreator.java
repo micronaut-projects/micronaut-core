@@ -149,7 +149,7 @@ abstract class AbstractBeanElementCreator implements BeanDefinitionCreator {
     public static AnnotationMetadata getElementAnnotationMetadata(MemberElement methodElement) {
         // NOTE: if annotation processor modified the method's annotation
         // annotationUtils.getAnnotationMetadata(method) will return AnnotationMetadataHierarchy of both method+class metadata
-        AnnotationMetadata annotationMetadata = methodElement.getAnnotationMetadata();
+        AnnotationMetadata annotationMetadata = methodElement.getTargetAnnotationMetadata();
         if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
             return annotationMetadata.getDeclaredMetadata();
         }

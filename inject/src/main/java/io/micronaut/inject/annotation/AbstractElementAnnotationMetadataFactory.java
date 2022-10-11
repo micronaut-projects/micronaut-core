@@ -29,6 +29,7 @@ import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.EnumConstantElement;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.ElementMutableAnnotationMetadata;
 import io.micronaut.inject.ast.PackageElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PropertyElement;
@@ -272,6 +273,9 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
             if (preloadedAnnotationMetadata instanceof AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata) {
                 throw new IllegalStateException();
             }
+            if (preloadedAnnotationMetadata instanceof ElementAnnotationMetadata) {
+                throw new IllegalStateException();
+            }
         }
 
         protected abstract AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookup();
@@ -284,7 +288,7 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
         }
 
         @Override
-        public AnnotationMetadata get() {
+        public AnnotationMetadata getAnnotationMetadata() {
             if (preloadedAnnotationMetadata != null) {
                 if (classElement != null) {
                     if (preloadedAnnotationMetadata instanceof AnnotationMetadataHierarchy) {
@@ -314,6 +318,9 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
             if (annotationMetadata instanceof AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata) {
                 throw new IllegalStateException();
             }
+            if (annotationMetadata instanceof ElementMutableAnnotationMetadata) {
+                throw new IllegalStateException();
+            }
             if (annotationMetadata.isEmpty()) {
                 annotationMetadata = AnnotationMetadata.EMPTY_METADATA;
             }
@@ -326,7 +333,7 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
             } else {
                 preloadedAnnotationMetadata = annotationMetadata;
             }
-            return get();
+            return getAnnotationMetadata();
         }
 
         @Override
@@ -339,7 +346,7 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
                 AnnotationValue<T> av = builder.build();
                 return replaceAnnotationsInternal(metadataBuilder.annotate(getAnnotationMetadataToModify(), av));
             }
-            return get();
+            return getAnnotationMetadata();
         }
 
         @Override

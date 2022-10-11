@@ -17,7 +17,6 @@ package io.micronaut.inject.ast;
 
 import io.micronaut.core.annotation.AnnotatedElement;
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.naming.Described;
 
@@ -32,7 +31,7 @@ import java.util.Set;
  * @author graemerocher
  * @since 1.0
  */
-public interface Element extends MutableAnnotatedElement<Element>, AnnotatedElement, AnnotationMetadataDelegate, Described {
+public interface Element extends ElementMutableAnnotationMetadata<Element>, AnnotatedElement, Described {
 
     /**
      * An empty array of elements.

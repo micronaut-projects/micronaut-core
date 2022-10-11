@@ -84,7 +84,7 @@ public class ConfigurationMetadataProcessor extends AbstractInjectAnnotationProc
 
     }
 
-    protected void writeConfigurationMetadata(ConfigurationMetadataBuilder metadataBuilder, ConfigurationMetadataWriter writer) {
+    private void writeConfigurationMetadata(ConfigurationMetadataBuilder metadataBuilder, ConfigurationMetadataWriter writer) {
         try {
             writer.write(metadataBuilder, classWriterOutputVisitor);
         } catch (IOException e) {
