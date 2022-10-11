@@ -56,7 +56,7 @@ public final class GroovyEnumConstantElement extends AbstractGroovyElement imple
     }
 
     @Override
-    protected AbstractGroovyElement copyThis() {
+    protected AbstractGroovyElement copyConstructor() {
         return new GroovyEnumConstantElement(declaringEnum, visitorContext, variable, getNativeType(), elementAnnotationMetadataFactory);
     }
 

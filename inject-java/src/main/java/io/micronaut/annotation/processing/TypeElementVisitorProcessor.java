@@ -29,7 +29,7 @@ import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.version.VersionUtils;
-import io.micronaut.inject.ProcessingException;
+import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.EnumConstantElement;
 import io.micronaut.inject.ast.FieldElement;

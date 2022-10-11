@@ -16,6 +16,7 @@
 package io.micronaut.inject.visitor;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
@@ -59,9 +60,22 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     @NonNull
     ElementFactory<?, ?, ?, ?> getElementFactory();
 
+    /**
+     * Gets the element annotation metadata factory.
+     *
+     * @return The element annotation metadata factory
+     * @see 4.0.0
+     */
     @NonNull
     ElementAnnotationMetadataFactory getElementAnnotationMetadataFactory();
 
+    /**
+     * Gets the annotation metadata builder.
+     *
+     * @return The annotation metadata builder
+     * @see 4.0.0
+     */
+    @Internal
     @NonNull
     AbstractAnnotationMetadataBuilder<?, ?> getAnnotationMetadataBuilder();
 

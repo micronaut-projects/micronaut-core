@@ -25,7 +25,7 @@ import java.util.Collection;
  * @author Denis Stepanov
  * @since 4.0.0
  */
-public interface BeanDefinitionBuilder {
+public interface BeanDefinitionCreator {
 
     /**
      * @return produces Bean definitions

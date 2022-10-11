@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.processing;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.MethodElement;
@@ -31,11 +32,12 @@ import java.util.Set;
  * @author Denis Stepanov
  * @since 4.0.0
  */
-final class IntroductionInterfaceBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
+@Internal
+final class IntroductionInterfaceBeanElementCreator extends AbstractBeanElementCreator {
 
     private final String factoryBeanDefinitionName;
 
-    IntroductionInterfaceBeanDefinitionBuilder(ClassElement classElement, VisitorContext visitorContext, String factoryBeanDefinitionName) {
+    IntroductionInterfaceBeanElementCreator(ClassElement classElement, VisitorContext visitorContext, String factoryBeanDefinitionName) {
         super(classElement, visitorContext);
         this.factoryBeanDefinitionName = factoryBeanDefinitionName;
     }
@@ -47,12 +49,12 @@ final class IntroductionInterfaceBeanDefinitionBuilder extends AbstractBeanDefin
 
         // Because we add validated interceptor in some cases, this needs to run before the constructor visit
         if (classElement.hasAnnotation(ANN_REQUIRES_VALIDATION)) {
-            if (ConfigurationReaderBeanDefinitionBuilder.isConfigurationProperties(classElement)) {
+            if (ConfigurationReaderBeanElementCreator.isConfigurationProperties(classElement)) {
                 // Configuration beans are validated at the startup and don't require validation advice
                 aopProxyWriter.setValidated(true);
             } else {
                 for (MethodElement methodElement : classElement.getEnclosedElements(ElementQuery.ALL_METHODS.annotated(am -> am.hasAnnotation(ANN_REQUIRES_VALIDATION)))) {
-                    methodElement.annotate(AbstractBeanDefinitionBuilder.ANN_VALIDATED);
+                    methodElement.annotate(AbstractBeanElementCreator.ANN_VALIDATED);
                 }
             }
         }

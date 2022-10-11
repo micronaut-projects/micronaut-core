@@ -56,7 +56,7 @@ public class GroovyParameterElement extends AbstractGroovyElement implements Par
     }
 
     @Override
-    protected AbstractGroovyElement copyThis() {
+    protected AbstractGroovyElement copyConstructor() {
         return new GroovyParameterElement(methodElement, visitorContext, parameter, elementAnnotationMetadataFactory);
     }
 

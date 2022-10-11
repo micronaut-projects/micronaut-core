@@ -23,7 +23,7 @@ import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.ast.groovy.visitor.LoadedVisitor
 import io.micronaut.core.annotation.Generated
 import io.micronaut.core.order.OrderUtil
-import io.micronaut.inject.ProcessingException
+import io.micronaut.inject.processing.ProcessingException
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.ElementQuery
 import io.micronaut.inject.ast.MethodElement
@@ -147,9 +147,9 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
             }
             GroovyClassElement classElement = targetClassElement as GroovyClassElement
             // Pre cache methods because of their source flag
-            def methods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS, true)
+            def methods = classElement.getSourceEnclosedElements(ElementQuery.ALL_METHODS)
 
-            def properties = classElement.getNativeBeanProperties()
+            def properties = classElement.getSyntheticBeanProperties()
             for (PropertyElement pn : (properties)) {
                 visitNativeProperty(pn)
             }

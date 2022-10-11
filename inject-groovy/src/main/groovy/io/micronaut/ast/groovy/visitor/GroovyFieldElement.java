@@ -57,7 +57,7 @@ public class GroovyFieldElement extends AbstractGroovyElement implements FieldEl
     }
 
     @Override
-    protected AbstractGroovyElement copyThis() {
+    protected AbstractGroovyElement copyConstructor() {
         return new GroovyFieldElement(visitorContext, owningType, fieldNode, elementAnnotationMetadataFactory);
     }
 

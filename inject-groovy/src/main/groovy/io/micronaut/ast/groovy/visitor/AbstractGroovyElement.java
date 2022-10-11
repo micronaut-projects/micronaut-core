@@ -31,6 +31,7 @@ import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementAnnotationMetadata;
 import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.ElementModifier;
+import io.micronaut.inject.visitor.VisitorConfiguration;
 import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.FieldNode;
@@ -102,26 +103,37 @@ public abstract class AbstractGroovyElement implements AnnotationMetadataDelegat
     }
 
     /**
+     * Constructs this element by invoking the constructor.
+     *
      * @return the copy
      */
-    protected abstract AbstractGroovyElement copyThis();
+    @NonNull
+    protected abstract AbstractGroovyElement copyConstructor();
 
     /**
+     * Copies additional values after the element was constructed by {@link #copyConstructor()}.
+     *
      * @param element the values to be copied to
      */
-    protected void copyValues(AbstractGroovyElement element) {
+    protected void copyValues(@NonNull AbstractGroovyElement element) {
         element.presetAnnotationMetadata = presetAnnotationMetadata;
     }
 
-    protected final AbstractGroovyElement makeCopy() {
-        AbstractGroovyElement element = copyThis();
+    /**
+     * Makes a copy of this element.
+     *
+     * @return a copy
+     */
+    @NonNull
+    protected final AbstractGroovyElement copy() {
+        AbstractGroovyElement element = copyConstructor();
         copyValues(element);
         return element;
     }
 
     @Override
     public io.micronaut.inject.ast.Element withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
-        AbstractGroovyElement element = makeCopy();
+        AbstractGroovyElement element = copy();
         element.presetAnnotationMetadata = annotationMetadata;
         return element;
     }
@@ -325,9 +337,9 @@ public abstract class AbstractGroovyElement implements AnnotationMetadataDelegat
                 if (classNode.isGenericsPlaceHolder() && classNode != returnType) {
                     return resolveGenericType(typeGenericInfo, classNode);
                 } else {
-                    return this.visitorContext.getElementFactory().newClassElement(
-                        classNode, resolveElementAnnotationMetadataFactory(classNode)
-                    );
+                    return adjustTypeAnnotationMetadata(visitorContext.getElementFactory().newClassElement(
+                        classNode, elementAnnotationMetadataFactory
+                    ));
                 }
             }
         } else if (returnType.isArray()) {
@@ -340,9 +352,9 @@ public abstract class AbstractGroovyElement implements AnnotationMetadataDelegat
                         return resolveGenericType(typeGenericInfo, classNode);
                     } else {
                         ClassNode cn = classNode.makeArray();
-                        return this.visitorContext.getElementFactory().newClassElement(
-                            cn, resolveElementAnnotationMetadataFactory(cn)
-                        );
+                        return adjustTypeAnnotationMetadata(visitorContext.getElementFactory().newClassElement(
+                            cn, elementAnnotationMetadataFactory
+                        ));
                     }
                 }
             }
@@ -358,15 +370,19 @@ public abstract class AbstractGroovyElement implements AnnotationMetadataDelegat
         return Optional.of(JAVADOC_PATTERN.matcher(annotatedNode.getGroovydoc().getContent()).replaceAll(StringUtils.EMPTY_STRING).trim());
     }
 
-    protected final @NonNull ElementAnnotationMetadataFactory resolveElementAnnotationMetadataFactory(Object nativeType) {
+    /**
+     * The method will replace the annotation metadata with empty value if {@link VisitorConfiguration#includeTypeLevelAnnotationsInGenericArguments()}
+     * is false.
+     *
+     * @param classElement The class element to adjust annotation metadata
+     * @return the adjusted element or the same value
+     */
+    @NonNull
+    protected final ClassElement adjustTypeAnnotationMetadata(@NonNull ClassElement classElement) {
         if (visitorContext.getConfiguration().includeTypeLevelAnnotationsInGenericArguments()) {
-            return elementAnnotationMetadataFactory;
+            return classElement;
         }
-        return emptyAnnotationsForNativeType(nativeType);
-    }
-
-    protected final ElementAnnotationMetadataFactory emptyAnnotationsForNativeType(Object nativeType) {
-        return elementAnnotationMetadataFactory.overrideForNativeType(nativeType, element -> elementAnnotationMetadataFactory.build(element, AnnotationMetadata.EMPTY_METADATA));
+        return classElement.withAnnotationMetadata(AnnotationMetadata.EMPTY_METADATA);
     }
 
     @Override

@@ -25,7 +25,7 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ArrayableClassElement;
-import io.micronaut.inject.ast.BeanPropertiesConfiguration;
+import io.micronaut.inject.ast.BeanPropertiesQuery;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
@@ -312,15 +312,15 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     @Override
     public List<PropertyElement> getBeanProperties() {
         if (beanProperties == null) {
-            beanProperties = getBeanProperties(BeanPropertiesConfiguration.of(this));
+            beanProperties = getBeanProperties(BeanPropertiesQuery.of(this));
         }
         return Collections.unmodifiableList(beanProperties);
     }
 
     @Override
-    public List<PropertyElement> getBeanProperties(BeanPropertiesConfiguration configuration) {
+    public List<PropertyElement> getBeanProperties(BeanPropertiesQuery beanPropertiesQuery) {
         if (isRecord()) {
-            return AstBeanPropertiesUtils.resolveBeanProperties(configuration,
+            return AstBeanPropertiesUtils.resolveBeanProperties(beanPropertiesQuery,
                 this,
                 this::getRecordMethods,
                 this::getRecordFields,
@@ -357,7 +357,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                 };
             }
         }
-        return AstBeanPropertiesUtils.resolveBeanProperties(configuration,
+        return AstBeanPropertiesUtils.resolveBeanProperties(beanPropertiesQuery,
             this,
             () -> getEnclosedElements(ElementQuery.ALL_METHODS),
             () -> getEnclosedElements(ElementQuery.ALL_FIELDS),
@@ -849,7 +849,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                 // only static inner classes can be constructed
                 return Optional.empty();
             }
-            List<ConstructorElement> constructors = findConstructors();
+            List<ConstructorElement> constructors = getAccessibleConstructors();
             Optional<ConstructorElement> annotatedConstructor = constructors.stream()
                 .filter(c -> c.hasStereotype(AnnotationUtil.INJECT) || c.hasStereotype(Creator.class))
                 .findFirst();
@@ -863,8 +863,8 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     }
 
     @Override
-    public List<MethodElement> findStaticCreators() {
-        List<MethodElement> staticCreators = new ArrayList<>(ArrayableClassElement.super.findStaticCreators());
+    public List<MethodElement> getAccessibleStaticCreators() {
+        List<MethodElement> staticCreators = new ArrayList<>(ArrayableClassElement.super.getAccessibleStaticCreators());
         if (!staticCreators.isEmpty()) {
             return staticCreators;
         }

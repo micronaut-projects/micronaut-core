@@ -498,8 +498,8 @@ public abstract class AbstractEnvironmentAnnotationMetadata implements Annotatio
     }
 
     @Override
-    public AnnotationMetadata unwrapAnnotationMetadata() {
-        return environmentAnnotationMetadata.unwrapAnnotationMetadata();
+    public AnnotationMetadata getTargetAnnotationMetadata() {
+        return environmentAnnotationMetadata.getTargetAnnotationMetadata();
     }
 
     /**

@@ -1627,19 +1627,27 @@ public interface AnnotationMetadata extends AnnotationSource {
     }
 
     /**
-     * Makes a copy of the annotation.
+     * Makes a copy of the annotation or returns this.
+     *
      * @return the copy
      * @since 4.0.0
      */
-    AnnotationMetadata copyAnnotationMetadata();
+    @NonNull
+    default AnnotationMetadata copyAnnotationMetadata() {
+        return this;
+    }
 
     /**
-     * Unwraps possible delegate or provider.
+     * Unwraps possible a possible delegate or a provider, returns this otherwise.
+     *
      * @return unwrapped
+     * @see AnnotationMetadataDelegate
+     * @see AnnotationMetadataProvider
      * @since 4.0.0
      */
     @Override
-    default AnnotationMetadata unwrapAnnotationMetadata() {
+    @NonNull
+    default AnnotationMetadata getTargetAnnotationMetadata() {
         return this;
     }
 

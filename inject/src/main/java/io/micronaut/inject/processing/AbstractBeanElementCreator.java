@@ -20,11 +20,11 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NextMajorVersion;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.reflect.ClassUtils;
-import io.micronaut.inject.ProcessingException;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.RequiresValidation;
 import io.micronaut.inject.ast.ClassElement;
@@ -45,7 +45,8 @@ import java.util.function.Predicate;
  * @author Denis Stepanov
  * @since 4.0.0
  */
-abstract class AbstractBeanDefinitionBuilder implements BeanDefinitionBuilder {
+@Internal
+abstract class AbstractBeanElementCreator implements BeanDefinitionCreator {
 
     public static final String ANN_VALIDATED = "io.micronaut.validation.Validated";
     protected static final String ANN_REQUIRES_VALIDATION = RequiresValidation.class.getName();
@@ -56,14 +57,15 @@ abstract class AbstractBeanDefinitionBuilder implements BeanDefinitionBuilder {
 
     protected final AopHelper aopHelper;
 
-    protected AbstractBeanDefinitionBuilder(ClassElement classElement, VisitorContext visitorContext) {
+    protected AbstractBeanElementCreator(ClassElement classElement, VisitorContext visitorContext) {
         this.classElement = classElement;
         this.visitorContext = visitorContext;
         checkPackage(classElement);
+        String helperName = "io.micronaut.aop.writer.AopHelperImpl";
         try {
-            aopHelper = (AopHelper) ClassUtils.forName("io.micronaut.aop.writer.AopHelperImpl", getClass().getClassLoader()).get().newInstance();
+            aopHelper = (AopHelper) ClassUtils.forName(helperName, getClass().getClassLoader()).get().newInstance();
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            throw new RuntimeException("Cannot create AOP helper class: " + helperName, e);
         }
     }
 
@@ -73,7 +75,10 @@ abstract class AbstractBeanDefinitionBuilder implements BeanDefinitionBuilder {
         return beanDefinitionWriters;
     }
 
-    public abstract void buildInternal();
+    /**
+     * Build visitors.
+     */
+    protected abstract void buildInternal();
 
     private void checkPackage(ClassElement classElement) {
         io.micronaut.inject.ast.PackageElement packageElement = classElement.getPackage();

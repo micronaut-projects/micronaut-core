@@ -19,8 +19,9 @@ import io.micronaut.context.annotation.BeanProperties;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
-import io.micronaut.inject.ast.BeanPropertiesConfiguration;
+import io.micronaut.inject.ast.BeanPropertiesQuery;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
@@ -44,6 +45,7 @@ import java.util.function.Supplier;
  * @author Denis Stepanov
  * @since 4.0.0
  */
+@Internal
 public final class AstBeanPropertiesUtils {
 
     private AstBeanPropertiesUtils() {
@@ -63,7 +65,7 @@ public final class AstBeanPropertiesUtils {
      * @param propertyCreator                  The property creator
      * @return the list of properties
      */
-    public static List<PropertyElement> resolveBeanProperties(BeanPropertiesConfiguration configuration,
+    public static List<PropertyElement> resolveBeanProperties(BeanPropertiesQuery configuration,
                                                               ClassElement classElement,
                                                               Supplier<List<MethodElement>> methodsSupplier,
                                                               Supplier<List<FieldElement>> fieldSupplier,
@@ -166,7 +168,7 @@ public final class AstBeanPropertiesUtils {
         return value.readAccessKind == null && value.writeAccessKind == null;
     }
 
-    private static boolean isExcludedByAnnotations(BeanPropertiesConfiguration conf, BeanPropertyData value) {
+    private static boolean isExcludedByAnnotations(BeanPropertiesQuery conf, BeanPropertyData value) {
         if (conf.getExcludedAnnotations().isEmpty()) {
             return false;
         }
@@ -366,7 +368,7 @@ public final class AstBeanPropertiesUtils {
      * Internal holder class for getters and setters.
      */
     @SuppressWarnings("VisibilityModifier")
-    public static class BeanPropertyData {
+    public final static class BeanPropertyData {
         public ClassElement type;
         public MethodElement getter;
         public MethodElement setter;

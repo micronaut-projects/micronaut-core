@@ -79,7 +79,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     private static final Map<String, List<AnnotationMapper<?>>> ANNOTATION_MAPPERS = new HashMap<>(10);
     private static final Map<String, List<AnnotationTransformer<Annotation>>> ANNOTATION_TRANSFORMERS = new HashMap<>(5);
     private static final Map<String, List<AnnotationRemapper>> ANNOTATION_REMAPPERS = new HashMap<>(5);
-    private static final Map<MetadataKey<?>, CacheEntry> MUTATED_ANNOTATION_METADATA = new HashMap<>(100);
+    private static final Map<MetadataKey<?>, CachedAnnotationMetadata> MUTATED_ANNOTATION_METADATA = new HashMap<>(100);
     private static final Map<String, Set<String>> NON_BINDING_CACHE = new HashMap<>(50);
     private static final List<String> DEFAULT_ANNOTATE_EXCLUDES = Arrays.asList(Internal.class.getName(),
         Experimental.class.getName());
@@ -214,7 +214,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @param parameterElement The parameter element
      * @return The {@link AnnotationMetadata}
      */
-    public CacheEntry lookupOrBuildForParameter(T owningType, T methodElement, T parameterElement) {
+    public CachedAnnotationMetadata lookupOrBuildForParameter(T owningType, T methodElement, T parameterElement) {
         return lookupOrBuild(true, owningType, methodElement, parameterElement);
     }
 
@@ -224,7 +224,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @param typeElement The element
      * @return The {@link AnnotationMetadata}
      */
-    public CacheEntry lookupOrBuildForType(T typeElement) {
+    public CachedAnnotationMetadata lookupOrBuildForType(T typeElement) {
         return lookupOrBuild(true, typeElement);
     }
 
@@ -233,9 +233,9 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      *
      * @param owningType The owningType
      * @param element    The element
-     * @return The {@link CacheEntry}
+     * @return The {@link CachedAnnotationMetadata}
      */
-    public CacheEntry lookupOrBuildForMethod(T owningType, T element) {
+    public CachedAnnotationMetadata lookupOrBuildForMethod(T owningType, T element) {
         return lookupOrBuild(false, owningType, element);
     }
 
@@ -244,13 +244,13 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      *
      * @param owningType The owningType
      * @param element    The element
-     * @return The {@link CacheEntry}
+     * @return The {@link CachedAnnotationMetadata}
      */
-    public CacheEntry lookupOrBuildForField(T owningType, T element) {
+    public CachedAnnotationMetadata lookupOrBuildForField(T owningType, T element) {
         return lookupOrBuild(false, owningType, element);
     }
 
-    private CacheEntry lookupOrBuild(boolean inheritTypeAnnotations, T... elements) {
+    private CachedAnnotationMetadata lookupOrBuild(boolean inheritTypeAnnotations, T... elements) {
         return lookupExisting(elements, () -> {
             T element = elements[elements.length - 1];
             return buildInternal(inheritTypeAnnotations, false, element);
@@ -938,8 +938,8 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     }
 
     @NonNull
-    private CacheEntry lookupExisting(T[] elements, Supplier<AnnotationMetadata> annotationMetadataSupplier) {
-        return MUTATED_ANNOTATION_METADATA.computeIfAbsent(new MetadataKey<>(elements), metadataKey -> new DefaultCacheEntry(annotationMetadataSupplier.get()));
+    private CachedAnnotationMetadata lookupExisting(T[] elements, Supplier<AnnotationMetadata> annotationMetadataSupplier) {
+        return MUTATED_ANNOTATION_METADATA.computeIfAbsent(new MetadataKey<>(elements), metadataKey -> new DefaultCachedAnnotationMetadata(annotationMetadataSupplier.get()));
     }
 
     private void processAnnotationAlias(
@@ -2062,7 +2062,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     @Internal
     public boolean isMetadataMutated(T owningType, T element) {
         if (element != null) {
-            CacheEntry entry = MUTATED_ANNOTATION_METADATA.get(new MetadataKey(owningType, element));
+            CachedAnnotationMetadata entry = MUTATED_ANNOTATION_METADATA.get(new MetadataKey(owningType, element));
             return entry != null && entry.isMutated();
         }
         return false;
@@ -2320,7 +2320,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @author Denis Stepanov
      * @since 4.0.0
      */
-    public interface CacheEntry extends AnnotationMetadataDelegate {
+    public interface CachedAnnotationMetadata extends AnnotationMetadataDelegate {
 
         /**
          * @return annotation metadata in the cache or empty
@@ -2379,13 +2379,13 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         void accept(T t, U u, V v);
     }
 
-    private static final class DefaultCacheEntry implements CacheEntry {
+    private static final class DefaultCachedAnnotationMetadata implements CachedAnnotationMetadata {
         @Nullable
         private AnnotationMetadata annotationMetadata;
         private boolean isMutated;
 
-        public DefaultCacheEntry(AnnotationMetadata annotationMetadata) {
-            if (annotationMetadata instanceof CacheEntry) {
+        public DefaultCachedAnnotationMetadata(AnnotationMetadata annotationMetadata) {
+            if (annotationMetadata instanceof AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata) {
                 throw new IllegalStateException();
             }
             this.annotationMetadata = annotationMetadata;
@@ -2406,7 +2406,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
 
         @Override
         public void update(AnnotationMetadata annotationMetadata) {
-            if (annotationMetadata instanceof CacheEntry) {
+            if (annotationMetadata instanceof AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata) {
                 throw new IllegalStateException();
             }
             this.annotationMetadata = annotationMetadata;

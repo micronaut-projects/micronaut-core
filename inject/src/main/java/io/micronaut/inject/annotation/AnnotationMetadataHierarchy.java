@@ -1038,7 +1038,7 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     public MutableAnnotationMetadata merge() {
         MutableAnnotationMetadata newAnnotationMetadata = new MutableAnnotationMetadata();
         for (AnnotationMetadata annotationMetadata : hierarchy) {
-            annotationMetadata = annotationMetadata.unwrapAnnotationMetadata();
+            annotationMetadata = annotationMetadata.getTargetAnnotationMetadata();
             if (annotationMetadata.isEmpty()) {
                 continue;
             }

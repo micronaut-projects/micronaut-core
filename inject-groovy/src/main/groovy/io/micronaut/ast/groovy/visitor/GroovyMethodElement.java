@@ -69,7 +69,7 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
     }
 
     @Override
-    protected AbstractGroovyElement copyThis() {
+    protected AbstractGroovyElement copyConstructor() {
         return new GroovyMethodElement(owningType, visitorContext, methodNode, elementAnnotationMetadataFactory);
     }
 
@@ -85,7 +85,7 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
 
     @Override
     public MethodElement withParameters(ParameterElement... newParameters) {
-        GroovyMethodElement methodElement = (GroovyMethodElement) makeCopy();
+        GroovyMethodElement methodElement = (GroovyMethodElement) copy();
         methodElement.parameters = newParameters;
         return methodElement;
     }

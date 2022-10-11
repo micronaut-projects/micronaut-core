@@ -20,10 +20,10 @@ import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NextMajorVersion;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.inject.ProcessingException;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
@@ -47,13 +47,14 @@ import java.util.concurrent.atomic.AtomicInteger;
  * @author Denis Stepanov
  * @since 4.0.0
  */
-public class DeclaredBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
+@Internal
+class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
 
     protected BeanDefinitionVisitor aopProxyVisitor;
     protected final boolean isAopProxy;
     private final AtomicInteger adaptedMethodIndex = new AtomicInteger(0);
 
-    protected DeclaredBeanDefinitionBuilder(ClassElement classElement, VisitorContext visitorContext, boolean isAopProxy) {
+    protected DeclaredBeanElementCreator(ClassElement classElement, VisitorContext visitorContext, boolean isAopProxy) {
         super(classElement, visitorContext);
         this.isAopProxy = isAopProxy;
     }
@@ -136,7 +137,7 @@ public class DeclaredBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder
     private void build(BeanDefinitionVisitor visitor) {
         Set<FieldElement> processedFields = new HashSet<>();
         if (!processAsProperties()) {
-            for (PropertyElement propertyElement : classElement.getNativeBeanProperties()) {
+            for (PropertyElement propertyElement : classElement.getSyntheticBeanProperties()) {
                 propertyElement.getField().ifPresent(processedFields::add);
                 visitPropertyInternal(visitor, propertyElement);
             }
@@ -440,7 +441,7 @@ public class DeclaredBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder
         }
         AnnotationMetadata fieldAnnotationMetadata = fieldElement.getAnnotationMetadata();
         if (fieldAnnotationMetadata.hasStereotype(Value.class) || fieldAnnotationMetadata.hasStereotype(Property.class)) {
-            visitor.visitFieldValue(fieldElement.getDeclaringType(), fieldElement, false, fieldElement.isReflectionRequired(classElement));
+            visitor.visitFieldValue(fieldElement.getDeclaringType(), fieldElement, fieldElement.isReflectionRequired(classElement), false);
             return true;
         }
         if (fieldAnnotationMetadata.hasStereotype(AnnotationUtil.INJECT)

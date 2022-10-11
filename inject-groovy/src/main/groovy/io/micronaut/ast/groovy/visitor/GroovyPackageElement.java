@@ -46,7 +46,7 @@ public class GroovyPackageElement extends AbstractGroovyElement implements Packa
     }
 
     @Override
-    protected AbstractGroovyElement copyThis() {
+    protected AbstractGroovyElement copyConstructor() {
         return new GroovyPackageElement(visitorContext, packageNode, elementAnnotationMetadataFactory);
     }
 

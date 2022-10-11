@@ -76,7 +76,7 @@ public @interface ConfigurationBuilder {
      *
      * @return True if zero arg setters should be processed
      */
-    @AliasFor(annotation = BeanProperties.class, member = BeanProperties.ALLOW_WRITE_WITH_ZERO_ARGS)
+    @AliasFor(annotation = BeanProperties.class, member = BeanProperties.MEMBER_ALLOW_WRITE_WITH_ZERO_ARGS)
     boolean allowZeroArgs() default false;
 
     /**
@@ -94,12 +94,12 @@ public @interface ConfigurationBuilder {
     /**
      * @return The names of the properties to include
      */
-    @AliasFor(annotation = BeanProperties.class, member = BeanProperties.INCLUDES)
+    @AliasFor(annotation = BeanProperties.class, member = BeanProperties.MEMBER_INCLUDES)
     String[] includes() default {};
 
     /**
      * @return The names of the properties to exclude
      */
-    @AliasFor(annotation = BeanProperties.class, member = BeanProperties.EXCLUDES)
+    @AliasFor(annotation = BeanProperties.class, member = BeanProperties.MEMBER_EXCLUDES)
     String[] excludes() default {};
 }

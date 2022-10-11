@@ -116,7 +116,7 @@ final class GroovyPropertyElement extends AbstractGroovyElement implements Prope
     }
 
     @Override
-    protected AbstractGroovyElement copyThis() {
+    protected AbstractGroovyElement copyConstructor() {
         return new GroovyPropertyElement(visitorContext, owningElement, type, getter, setter, field,
             elementAnnotationMetadataFactory, name, readAccessKind, writeAccessKind, excluded);
     }

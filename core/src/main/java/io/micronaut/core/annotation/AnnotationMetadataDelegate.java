@@ -672,7 +672,7 @@ public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, 
     }
 
     @Override
-    default AnnotationMetadata unwrapAnnotationMetadata() {
-        return getAnnotationMetadata().unwrapAnnotationMetadata();
+    default AnnotationMetadata getTargetAnnotationMetadata() {
+        return getAnnotationMetadata().getTargetAnnotationMetadata();
     }
 }

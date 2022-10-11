@@ -2235,7 +2235,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      */
     @Internal
     public static void contributeDefaults(AnnotationMetadata target, AnnotationMetadata source) {
-        source = source.unwrapAnnotationMetadata();
+        source = source.getTargetAnnotationMetadata();
         if (source instanceof AnnotationMetadataHierarchy) {
             source = ((AnnotationMetadataHierarchy) source).merge();
         }
@@ -2270,7 +2270,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      */
     @Internal
     public static void contributeRepeatable(AnnotationMetadata target, AnnotationMetadata source) {
-        source = source.unwrapAnnotationMetadata();
+        source = source.getTargetAnnotationMetadata();
         if (source instanceof AnnotationMetadataHierarchy) {
             source = ((AnnotationMetadataHierarchy) source).merge();
         }

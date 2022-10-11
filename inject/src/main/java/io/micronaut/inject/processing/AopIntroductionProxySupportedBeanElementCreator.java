@@ -16,7 +16,7 @@
 package io.micronaut.inject.processing;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.inject.ProcessingException;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.PropertyElement;
@@ -29,9 +29,10 @@ import io.micronaut.inject.writer.BeanDefinitionVisitor;
  * @author Denis Stepanov
  * @since 4.0.0
  */
-final class AopIntroductionProxySupportedBeanDefinitionBuilder extends DeclaredBeanDefinitionBuilder {
+@Internal
+final class AopIntroductionProxySupportedBeanElementCreator extends DeclaredBeanElementCreator {
 
-    AopIntroductionProxySupportedBeanDefinitionBuilder(ClassElement classElement, VisitorContext visitorContext, boolean isAopProxy) {
+    AopIntroductionProxySupportedBeanElementCreator(ClassElement classElement, VisitorContext visitorContext, boolean isAopProxy) {
         super(classElement, visitorContext, isAopProxy);
     }
 

@@ -32,7 +32,7 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ArrayableClassElement;
-import io.micronaut.inject.ast.BeanPropertiesConfiguration;
+import io.micronaut.inject.ast.BeanPropertiesQuery;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.Element;
@@ -178,7 +178,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     }
 
     @Override
-    protected GroovyClassElement copyThis() {
+    protected GroovyClassElement copyConstructor() {
         return new GroovyClassElement(visitorContext, classNode, elementAnnotationMetadataFactory, genericInfo, arrayDimensions, isTypeVar);
     }
 
@@ -210,7 +210,20 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
         return getEnclosedElements(query, false);
     }
 
-    public final <T extends Element> List<T> getEnclosedElements(@NonNull ElementQuery<T> query, boolean isSource) {
+    /**
+     * This method will produce th elements just like {@link #getEnclosedElements(ElementQuery)}
+     * but the elements are constructed as the source ones.
+     * {@link io.micronaut.inject.ast.ElementFactory#newSourceMethodElement(ClassElement, Object, ElementAnnotationMetadataFactory)}.
+     *
+     * @param query The query
+     * @param <T> The element type
+     * @return The list of elements
+     */
+    public final <T extends Element> List<T> getSourceEnclosedElements(@NonNull ElementQuery<T> query) {
+        return getEnclosedElements(query, true);
+    }
+
+    private <T extends Element> List<T> getEnclosedElements(@NonNull ElementQuery<T> query, boolean isSource) {
         Objects.requireNonNull(query, "Query cannot be null");
         ElementQuery.Result<T> result = query.result();
         boolean onlyDeclared = result.isOnlyDeclared();
@@ -644,8 +657,8 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
             Map<String, ClassElement> typeArgs = new LinkedHashMap<>(forType.size());
             for (Map.Entry<String, ClassNode> entry : forType.entrySet()) {
                 ClassNode classNode = entry.getValue();
-
-                ClassElement rawElement = new GroovyClassElement(visitorContext, classNode, resolveElementAnnotationMetadataFactory(classNode));
+                ClassElement rawElement = visitorContext.getElementFactory().newClassElement(classNode, elementAnnotationMetadataFactory);
+                rawElement = adjustTypeAnnotationMetadata(rawElement);
                 if (thisSpec != null) {
                     rawElement = getGenericElement(sourceUnit, classNode, rawElement, thisSpec);
                 }
@@ -665,7 +678,11 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
 
         genericInfo.forEach((name, generics) -> {
             Map<String, ClassElement> resolved = new LinkedHashMap<>(generics.size());
-            generics.forEach((variable, type) -> resolved.put(variable, new GroovyClassElement(visitorContext, type, resolveElementAnnotationMetadataFactory(classNode))));
+            generics.forEach((variable, type) -> {
+                ClassElement classElement = visitorContext.getElementFactory().newClassElement(type, elementAnnotationMetadataFactory);
+                classElement = adjustTypeAnnotationMetadata(classElement);
+                resolved.put(variable, classElement);
+            });
             results.put(name, resolved);
         });
         results.put(getName(), getTypeArguments());
@@ -697,14 +714,14 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                         ClassNode cn = resolveTypeArgument(info, redirectType.getName());
                         if (cn != null) {
                             Map<String, ClassNode> newInfo = alignNewGenericsInfo(genericsTypes, redirectTypes, info);
-                            typeArgumentMap.put(redirectType.getName(), new GroovyClassElement(
+                            typeArgumentMap.put(redirectType.getName(), adjustTypeAnnotationMetadata(new GroovyClassElement(
                                 visitorContext,
                                 cn,
-                                resolveElementAnnotationMetadataFactory(cn),
+                                elementAnnotationMetadataFactory,
                                 Collections.singletonMap(cn.getName(), newInfo),
                                 cn.isArray() ? computeDimensions(cn) : 0,
                                 true
-                            ));
+                            )));
                         }
                     } else {
                         ClassNode type;
@@ -715,13 +732,13 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                         } else {
                             type = gt.getType();
                         }
-                        typeArgumentMap.put(redirectType.getName(), new GroovyClassElement(
+                        typeArgumentMap.put(redirectType.getName(), adjustTypeAnnotationMetadata(new GroovyClassElement(
                             visitorContext,
                             type,
-                            resolveElementAnnotationMetadataFactory(type),
+                            elementAnnotationMetadataFactory,
                             Collections.emptyMap(),
                             type.isArray() ? computeDimensions(type) : 0
-                        ));
+                        )));
                     }
                 }
             } else if (redirectTypes != null) {
@@ -733,13 +750,13 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                         if (genericsTypes != null) {
                             newInfo = alignNewGenericsInfo(genericsTypes, redirectTypes, info);
                         }
-                        typeArgumentMap.put(gt.getName(), new GroovyClassElement(
+                        typeArgumentMap.put(gt.getName(), adjustTypeAnnotationMetadata(new GroovyClassElement(
                             visitorContext,
                             cn,
-                            resolveElementAnnotationMetadataFactory(cn),
+                            elementAnnotationMetadataFactory,
                             Collections.singletonMap(cn.getName(), newInfo),
                             cn.isArray() ? computeDimensions(cn) : 0
-                        ));
+                        )));
                     }
                 }
             }
@@ -752,7 +769,9 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
             Map<String, ClassElement> map = new LinkedHashMap<>(spec.size());
             for (Map.Entry<String, ClassNode> entry : spec.entrySet()) {
                 ClassNode cn = entry.getValue();
-                map.put(entry.getKey(), visitorContext.getElementFactory().newClassElement(cn, resolveElementAnnotationMetadataFactory(cn)));
+                ClassElement classElement = visitorContext.getElementFactory().newClassElement(cn, elementAnnotationMetadataFactory);
+                classElement = adjustTypeAnnotationMetadata(classElement);
+                map.put(entry.getKey(), classElement);
             }
             return Collections.unmodifiableMap(map);
         }
@@ -784,10 +803,10 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     }
 
     @Override
-    public List<PropertyElement> getNativeBeanProperties() {
+    public List<PropertyElement> getSyntheticBeanProperties() {
         // Native properties should be composed of field + synthetic getter/setter
         if (nativeProperties == null) {
-            BeanPropertiesConfiguration configuration = new BeanPropertiesConfiguration();
+            BeanPropertiesQuery configuration = new BeanPropertiesQuery();
             configuration.setAllowStaticProperties(true);
             Set<String> nativeProps = getPropertyNodes().stream().map(PropertyNode::getName).collect(Collectors.toCollection(LinkedHashSet::new));
             nativeProperties = AstBeanPropertiesUtils.resolveBeanProperties(configuration,
@@ -804,9 +823,9 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     }
 
     @Override
-    public List<PropertyElement> getBeanProperties(BeanPropertiesConfiguration configuration) {
+    public List<PropertyElement> getBeanProperties(BeanPropertiesQuery beanPropertiesQuery) {
         Set<String> nativeProps = getPropertyNodes().stream().map(PropertyNode::getName).collect(Collectors.toCollection(LinkedHashSet::new));
-        return AstBeanPropertiesUtils.resolveBeanProperties(configuration,
+        return AstBeanPropertiesUtils.resolveBeanProperties(beanPropertiesQuery,
             this,
             () -> AstBeanPropertiesUtils.getSubtypeFirstMethods(this),
             () -> AstBeanPropertiesUtils.getSubtypeFirstFields(this),
@@ -814,20 +833,20 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
             nativeProps,
             methodElement -> Optional.empty(),
             methodElement -> Optional.empty(),
-            value -> mapPropertyElement(nativeProps, value, configuration, false));
+            value -> mapPropertyElement(nativeProps, value, beanPropertiesQuery, false));
     }
 
     @Override
     public List<PropertyElement> getBeanProperties() {
         if (properties == null) {
-            properties = getBeanProperties(BeanPropertiesConfiguration.of(this));
+            properties = getBeanProperties(BeanPropertiesQuery.of(this));
         }
         return properties;
     }
 
     private GroovyPropertyElement mapPropertyElement(Set<String> nativeProps,
                                                      AstBeanPropertiesUtils.BeanPropertyData value,
-                                                     BeanPropertiesConfiguration conf,
+                                                     BeanPropertiesQuery conf,
                                                      boolean nativePropertiesOnly) {
         if (value.type == null) {
             // withSomething() builder setter
@@ -1055,7 +1074,8 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     }
 
     protected final ClassElement toClassElement(ClassNode classNode) {
-        return visitorContext.getElementFactory().newClassElement(classNode, emptyAnnotationsForNativeType(classNode));
+        return visitorContext.getElementFactory().newClassElement(classNode, elementAnnotationMetadataFactory)
+            .withAnnotationMetadata(AnnotationMetadata.EMPTY_METADATA);
     }
 
     @NonNull

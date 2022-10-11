@@ -18,6 +18,7 @@ package io.micronaut.inject.mappers;
 import io.micronaut.context.annotation.BeanProperties;
 import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.annotation.TypedAnnotationMapper;
 import io.micronaut.inject.visitor.VisitorContext;
 
@@ -30,6 +31,7 @@ import java.util.List;
  * @author Denis Stepanov
  * @since 4.0.0
  */
+@Internal
 public final class ConfigurationBuilderToBeanPropertiesMapper implements TypedAnnotationMapper<ConfigurationBuilder> {
 
     @Override
@@ -37,12 +39,12 @@ public final class ConfigurationBuilderToBeanPropertiesMapper implements TypedAn
         return Collections.singletonList(
             AnnotationValue.builder(BeanProperties.class)
                 // Configuration properties also includes fields
-                .member(BeanProperties.ACCESS_KIND, new BeanProperties.AccessKind[]{BeanProperties.AccessKind.METHOD})
-                .member(BeanProperties.VISIBILITY, BeanProperties.Visibility.DEFAULT)
-                .member(BeanProperties.INCLUDES, annotation.stringValues(BeanProperties.INCLUDES))
-                .member(BeanProperties.EXCLUDES, annotation.stringValues(BeanProperties.EXCLUDES))
-                .member(BeanProperties.ALLOW_WRITE_WITH_ZERO_ARGS, annotation.booleanValue("allowZeroArgs").orElse(false))
-                .member(BeanProperties.ALLOW_WRITE_WITH_MULTIPLE_ARGS, true)
+                .member(BeanProperties.MEMBER_ACCESS_KIND, new BeanProperties.AccessKind[]{BeanProperties.AccessKind.METHOD})
+                .member(BeanProperties.MEMBER_VISIBILITY, BeanProperties.Visibility.DEFAULT)
+                .member(BeanProperties.MEMBER_INCLUDES, annotation.stringValues(BeanProperties.MEMBER_INCLUDES))
+                .member(BeanProperties.MEMBER_EXCLUDES, annotation.stringValues(BeanProperties.MEMBER_EXCLUDES))
+                .member(BeanProperties.MEMBER_ALLOW_WRITE_WITH_ZERO_ARGS, annotation.booleanValue("allowZeroArgs").orElse(false))
+                .member(BeanProperties.MEMBER_ALLOW_WRITE_WITH_MULTIPLE_ARGS, true)
                 .build()
         );
     }

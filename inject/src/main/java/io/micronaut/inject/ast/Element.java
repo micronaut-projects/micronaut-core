@@ -55,6 +55,8 @@ public interface Element extends MutableAnnotatedElement<Element>, AnnotatedElem
     }
 
     /**
+     * Checks if the current element is synthetic - not user defined but created by the compiler.
+     *
      * @return True if the element is synthetic.
      * @since 4.0.0
      */

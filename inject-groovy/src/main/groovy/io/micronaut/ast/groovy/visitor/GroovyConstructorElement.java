@@ -41,7 +41,7 @@ public class GroovyConstructorElement extends GroovyMethodElement implements Con
     }
 
     @Override
-    protected AbstractGroovyElement copyThis() {
+    protected AbstractGroovyElement copyConstructor() {
         return new GroovyConstructorElement(getOwningType(), visitorContext, (ConstructorNode) getNativeType(), elementAnnotationMetadataFactory);
     }
 

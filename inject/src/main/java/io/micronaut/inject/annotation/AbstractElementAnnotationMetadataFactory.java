@@ -102,7 +102,7 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
         return new AbstractElementAnnotationMetadata(defaultAnnotationMetadata) {
 
             @Override
-            protected AbstractAnnotationMetadataBuilder.CacheEntry lookup() {
+            protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookup() {
                 throw new IllegalStateException("Properties should combine annotations for it's elements!");
             }
 
@@ -119,7 +119,7 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
         return new AbstractElementAnnotationMetadata(defaultAnnotationMetadata) {
 
             @Override
-            protected AbstractAnnotationMetadataBuilder.CacheEntry lookup() {
+            protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookup() {
                 return metadataBuilder.lookupOrBuildForField(
                     (K) enumConstantElement.getOwningType().getNativeType(),
                     (K) enumConstantElement.getNativeType()
@@ -138,7 +138,7 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
         return new AbstractElementAnnotationMetadata(defaultAnnotationMetadata) {
 
             @Override
-            protected AbstractAnnotationMetadataBuilder.CacheEntry lookup() {
+            protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookup() {
                 return metadataBuilder.lookupOrBuildForType((K) packageElement.getNativeType());
             }
 
@@ -154,7 +154,7 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
         return new AbstractElementAnnotationMetadata(defaultAnnotationMetadata) {
 
             @Override
-            protected AbstractAnnotationMetadataBuilder.CacheEntry lookup() {
+            protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookup() {
                 return metadataBuilder.lookupOrBuildForParameter(
                     (K) parameterElement.getMethodElement().getOwningType().getNativeType(),
                     (K) parameterElement.getMethodElement().getNativeType(),
@@ -175,7 +175,7 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
         return new AbstractElementAnnotationMetadata(defaultAnnotationMetadata) {
 
             @Override
-            protected AbstractAnnotationMetadataBuilder.CacheEntry lookup() {
+            protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookup() {
                 return metadataBuilder.lookupOrBuildForField(
                     (K) fieldElement.getOwningType().getNativeType(),
                     (K) fieldElement.getNativeType()
@@ -195,7 +195,7 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
         return new AbstractElementAnnotationMetadata(isReadOnly, methodElement.getOwningType(), defaultAnnotationMetadata) {
 
             @Override
-            protected AbstractAnnotationMetadataBuilder.CacheEntry lookup() {
+            protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookup() {
                 return metadataBuilder.lookupOrBuildForMethod((K) methodElement.getOwningType().getNativeType(), (K) methodElement.getNativeType());
             }
 
@@ -212,7 +212,7 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
         return new AbstractElementAnnotationMetadata(defaultAnnotationMetadata) {
 
             @Override
-            protected AbstractAnnotationMetadataBuilder.CacheEntry lookup() {
+            protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookup() {
                 return metadataBuilder.lookupOrBuildForMethod(
                     (K) constructorElement.getOwningType().getNativeType(),
                     (K) constructorElement.getNativeType()
@@ -231,7 +231,7 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
         return new AbstractElementAnnotationMetadata(defaultAnnotationMetadata) {
 
             @Override
-            protected AbstractAnnotationMetadataBuilder.CacheEntry lookup() {
+            protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookup() {
                 return metadataBuilder.lookupOrBuildForType((K) classElement.getNativeType());
             }
 
@@ -252,7 +252,7 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
 
         protected AnnotationMetadata preloadedAnnotationMetadata;
         private final boolean readOnly;
-        private AbstractAnnotationMetadataBuilder.CacheEntry cacheEntry;
+        private AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata cachedAnnotationMetadata;
         private final ClassElement classElement;
 
         protected AbstractElementAnnotationMetadata(@Nullable AnnotationMetadata annotationMetadata) {
@@ -269,18 +269,18 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
             this.readOnly = readOnly;
             this.classElement = classElement;
             this.preloadedAnnotationMetadata = annotationMetadata;
-            if (preloadedAnnotationMetadata instanceof AbstractAnnotationMetadataBuilder.CacheEntry) {
+            if (preloadedAnnotationMetadata instanceof AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata) {
                 throw new IllegalStateException();
             }
         }
 
-        protected abstract AbstractAnnotationMetadataBuilder.CacheEntry lookup();
+        protected abstract AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookup();
 
-        private AbstractAnnotationMetadataBuilder.CacheEntry getCacheEntry() {
-            if (cacheEntry == null) {
-                cacheEntry = lookup();
+        private AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata getCacheEntry() {
+            if (cachedAnnotationMetadata == null) {
+                cachedAnnotationMetadata = lookup();
             }
-            return cacheEntry;
+            return cachedAnnotationMetadata;
         }
 
         @Override
@@ -311,7 +311,7 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
         }
 
         private AnnotationMetadata replaceAnnotationsInternal(AnnotationMetadata annotationMetadata) {
-            if (annotationMetadata instanceof AbstractAnnotationMetadataBuilder.CacheEntry) {
+            if (annotationMetadata instanceof AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata) {
                 throw new IllegalStateException();
             }
             if (annotationMetadata.isEmpty()) {

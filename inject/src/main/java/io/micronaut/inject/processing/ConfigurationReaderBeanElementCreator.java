@@ -25,11 +25,11 @@ import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.bind.annotation.Bindable;
-import io.micronaut.inject.ProcessingException;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
-import io.micronaut.inject.ast.BeanPropertiesConfiguration;
+import io.micronaut.inject.ast.BeanPropertiesQuery;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
@@ -53,14 +53,15 @@ import java.util.concurrent.TimeUnit;
  * @author Denis Stepanov
  * @since 4.0.0
  */
-final class ConfigurationReaderBeanDefinitionBuilder extends DeclaredBeanDefinitionBuilder {
+@Internal
+final class ConfigurationReaderBeanElementCreator extends DeclaredBeanElementCreator {
 
     private static final List<String> CONSTRUCTOR_PARAMETERS_INJECTION_ANN =
         Arrays.asList(Property.class.getName(), Value.class.getName(), Parameter.class.getName(), AnnotationUtil.QUALIFIER, AnnotationUtil.INJECT);
 
     private final ConfigurationMetadataBuilder metadataBuilder = ConfigurationMetadataBuilder.INSTANCE;
 
-    ConfigurationReaderBeanDefinitionBuilder(ClassElement classElement, VisitorContext visitorContext) {
+    ConfigurationReaderBeanElementCreator(ClassElement classElement, VisitorContext visitorContext) {
         super(classElement, visitorContext, false);
     }
 
@@ -193,7 +194,7 @@ final class ConfigurationReaderBeanDefinitionBuilder extends DeclaredBeanDefinit
                 FieldElement fieldElement = field.get();
                 AnnotationMetadata annotationMetadata = MutableAnnotationMetadata.of(propertyElement.getAnnotationMetadata());
                 annotationMetadata = calculatePath(propertyElement, fieldElement, annotationMetadata);
-                visitor.visitFieldValue(fieldElement.getDeclaringType(), fieldElement.withAnnotationMetadata(annotationMetadata), true, fieldElement.isReflectionRequired(classElement));
+                visitor.visitFieldValue(fieldElement.getDeclaringType(), fieldElement.withAnnotationMetadata(annotationMetadata), fieldElement.isReflectionRequired(classElement), true);
                 claimed = true;
             }
             if (readMethod.isPresent()) {
@@ -237,7 +238,7 @@ final class ConfigurationReaderBeanDefinitionBuilder extends DeclaredBeanDefinit
                                            ClassElement builderType) {
         try {
             String configurationPrefix = builderElement.stringValue(ConfigurationBuilder.class).map(v -> v + ".").orElse("");
-            builderType.getBeanProperties(BeanPropertiesConfiguration.of(builderElement))
+            builderType.getBeanProperties(BeanPropertiesQuery.of(builderElement))
                 .stream()
                 .filter(propertyElement -> {
                     if (propertyElement.isExcluded()) {

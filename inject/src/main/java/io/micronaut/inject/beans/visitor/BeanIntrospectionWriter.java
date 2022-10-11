@@ -967,7 +967,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     }
 
     private void pushAnnotationMetadata(ClassWriter classWriter, GeneratorAdapter staticInit, AnnotationMetadata annotationMetadata) {
-        annotationMetadata = annotationMetadata.unwrapAnnotationMetadata();
+        annotationMetadata = annotationMetadata.getTargetAnnotationMetadata();
         if (annotationMetadata.isEmpty()) {
             staticInit.push((String) null);
         } else if (annotationMetadata instanceof AnnotationMetadataReference) {

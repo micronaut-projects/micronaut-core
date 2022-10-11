@@ -16,6 +16,7 @@
 package io.micronaut.inject.processing;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NextMajorVersion;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
@@ -29,6 +30,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * AOP helper to connect Inject module with AOP.
  */
 @NextMajorVersion("Correct dependency graph")
+@Internal
 public interface AopHelper {
 
     BeanDefinitionVisitor visitAdaptedMethod(ClassElement classElement,

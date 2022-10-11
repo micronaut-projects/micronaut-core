@@ -51,7 +51,14 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Inherited
 public @interface Introspected {
 
+    /**
+     * The default values for the access kind attribute.
+     */
      Introspected.AccessKind[] DEFAULT_ACCESS_KIND = {Introspected.AccessKind.METHOD};
+
+    /**
+     * The default values for the visibility attribute.
+     */
      Introspected.Visibility[] DEFAULT_VISIBILITY = {Introspected.Visibility.DEFAULT};
 
     /**

@@ -69,7 +69,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
         if (annotationMetadata.isEmpty()) {
             return new MutableAnnotationMetadata();
         }
-        annotationMetadata = annotationMetadata.unwrapAnnotationMetadata();
+        annotationMetadata = annotationMetadata.getTargetAnnotationMetadata();
         if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
             return  ((AnnotationMetadataHierarchy) annotationMetadata).merge();
         } else if (annotationMetadata instanceof MutableAnnotationMetadata) {

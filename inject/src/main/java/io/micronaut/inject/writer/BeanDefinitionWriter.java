@@ -655,7 +655,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             throw new IllegalArgumentException("Unsupported element type: " + beanProducingElement.getClass().getName());
         }
         this.isPrimitiveBean = beanTypeElement.isPrimitive() && !beanTypeElement.isArray();
-        this.annotationMetadata = beanProducingElement.unwrapAnnotationMetadata();
+        this.annotationMetadata = beanProducingElement.getTargetAnnotationMetadata();
         this.beanDefinitionType = getTypeReferenceForName(this.beanDefinitionName);
         this.beanType = getTypeReference(beanTypeElement);
         this.beanDefinitionInternalName = getInternalName(this.beanDefinitionName);
@@ -1793,7 +1793,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     @Override
     public void visitFieldValue(TypedElement declaringType,
                                 FieldElement fieldElement,
-                                boolean isOptional, boolean requiresReflection) {
+                                boolean requiresReflection, boolean isOptional) {
         AnnotationMetadata annotationMetadata = fieldElement.getAnnotationMetadata();
         Label falseCondition = isOptional ? pushPropertyContainsCheck(injectMethodVisitor, fieldElement.getType(), fieldElement.getName(), annotationMetadata) : null;
 
@@ -4115,7 +4115,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     private void pushAnnotationMetadata(GeneratorAdapter staticInit, AnnotationMetadata annotationMetadata) {
-        annotationMetadata = annotationMetadata.unwrapAnnotationMetadata();
+        annotationMetadata = annotationMetadata.getTargetAnnotationMetadata();
         if (annotationMetadata == AnnotationMetadata.EMPTY_METADATA || annotationMetadata.isEmpty()) {
             staticInit.push((String) null);
         } else if (annotationMetadata instanceof AnnotationMetadataHierarchy) {

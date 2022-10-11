@@ -22,8 +22,8 @@ import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.inject.ProcessingException;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
@@ -48,11 +48,12 @@ import java.util.concurrent.atomic.AtomicInteger;
  * @author Denis Stepanov
  * @since 4.0.0
  */
-final class FactoryBeanDefinitionBuilder extends DeclaredBeanDefinitionBuilder {
+@Internal
+final class FactoryBeanElementCreator extends DeclaredBeanElementCreator {
 
     private final AtomicInteger factoryMethodIndex = new AtomicInteger();
 
-    FactoryBeanDefinitionBuilder(ClassElement classElement, VisitorContext visitorContext, boolean isAopProxy) {
+    FactoryBeanElementCreator(ClassElement classElement, VisitorContext visitorContext, boolean isAopProxy) {
         super(classElement, visitorContext, isAopProxy);
     }
 

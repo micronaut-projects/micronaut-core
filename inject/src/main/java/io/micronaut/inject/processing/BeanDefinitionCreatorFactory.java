@@ -26,7 +26,6 @@ import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.inject.ProcessingException;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.visitor.VisitorContext;
@@ -43,40 +42,40 @@ import java.util.function.Predicate;
  * @author Denis Stepanov
  * @since 4.0.0
  */
-public abstract class BeanDefinitionBuilderFactory {
+public abstract class BeanDefinitionCreatorFactory {
 
     @NonNull
-    public static BeanDefinitionBuilder produce(ClassElement classElement, VisitorContext visitorContext) {
+    public static BeanDefinitionCreator produce(ClassElement classElement, VisitorContext visitorContext) {
         boolean isAbstract = classElement.isAbstract();
         boolean isIntroduction = classElement.hasStereotype(AnnotationUtil.ANN_INTRODUCTION);
-        if (ConfigurationReaderBeanDefinitionBuilder.isConfigurationProperties(classElement)) {
+        if (ConfigurationReaderBeanElementCreator.isConfigurationProperties(classElement)) {
             if (classElement.isInterface()) {
-                return new IntroductionInterfaceBeanDefinitionBuilder(classElement, visitorContext, null);
+                return new IntroductionInterfaceBeanElementCreator(classElement, visitorContext, null);
             }
-            return new ConfigurationReaderBeanDefinitionBuilder(classElement, visitorContext);
+            return new ConfigurationReaderBeanElementCreator(classElement, visitorContext);
         }
         boolean aopProxyType = !isAbstract && isAopProxyType(classElement);
         if (!isAbstract && classElement.hasStereotype(Factory.class)) {
-            return new FactoryBeanDefinitionBuilder(classElement, visitorContext, aopProxyType);
+            return new FactoryBeanElementCreator(classElement, visitorContext, aopProxyType);
         }
         if (aopProxyType) {
             if (isIntroduction) {
-                return new AopIntroductionProxySupportedBeanDefinitionBuilder(classElement, visitorContext, true);
+                return new AopIntroductionProxySupportedBeanElementCreator(classElement, visitorContext, true);
             }
-            return new DeclaredBeanDefinitionBuilder(classElement, visitorContext, true);
+            return new DeclaredBeanElementCreator(classElement, visitorContext, true);
         }
         if (isIntroduction) {
             if (classElement.isInterface()) {
-                return new IntroductionInterfaceBeanDefinitionBuilder(classElement, visitorContext, null);
+                return new IntroductionInterfaceBeanElementCreator(classElement, visitorContext, null);
             }
-            return new AopIntroductionProxySupportedBeanDefinitionBuilder(classElement, visitorContext, false);
+            return new AopIntroductionProxySupportedBeanElementCreator(classElement, visitorContext, false);
         }
         // NOTE: In Micronaut 3 abstract classes are allowed to be beans, but are not pickup to be beans just by having methods or fields with @Inject
         if (isDeclaredBean(classElement) || (!isAbstract && (containsInjectMethod(classElement) || containsInjectField(classElement)))) {
             if (classElement.hasStereotype("groovy.lang.Singleton")) {
                 throw new ProcessingException(classElement, "Class annotated with groovy.lang.Singleton instead of jakarta.inject.Singleton. Import jakarta.inject.Singleton to use Micronaut Dependency Injection.");
             }
-            return new DeclaredBeanDefinitionBuilder(classElement, visitorContext, false);
+            return new DeclaredBeanElementCreator(classElement, visitorContext, false);
         }
         return Collections::emptyList;
     }
@@ -105,7 +104,7 @@ public abstract class BeanDefinitionBuilderFactory {
         return classElement.getEnclosedElement(
             ElementQuery.ALL_FIELDS
                 .onlyDeclared()
-                .annotated(BeanDefinitionBuilderFactory::containsInjectPoint)
+                .annotated(BeanDefinitionCreatorFactory::containsInjectPoint)
         ).isPresent();
     }
 

@@ -24,9 +24,9 @@ import io.micronaut.ast.groovy.visitor.GroovyPackageElement
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.context.annotation.Configuration
 import io.micronaut.context.annotation.Context
-import io.micronaut.inject.ProcessingException
-import io.micronaut.inject.processing.BeanDefinitionBuilder
-import io.micronaut.inject.processing.BeanDefinitionBuilderFactory
+import io.micronaut.inject.processing.ProcessingException
+import io.micronaut.inject.processing.BeanDefinitionCreator
+import io.micronaut.inject.processing.BeanDefinitionCreatorFactory
 import io.micronaut.inject.visitor.VisitorConfiguration
 import io.micronaut.inject.writer.BeanConfigurationWriter
 import io.micronaut.inject.writer.BeanDefinitionReferenceWriter
@@ -117,7 +117,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             }
             try {
                 def classElement = groovyVisitorContext.getElementFactory().newClassElement(classNode, elementAnnotationMetadataFactory)
-                BeanDefinitionBuilder beanProcessor = BeanDefinitionBuilderFactory.produce(classElement, groovyVisitorContext);
+                BeanDefinitionCreator beanProcessor = BeanDefinitionCreatorFactory.produce(classElement, groovyVisitorContext);
                 beanProcessor.build().forEach(writer -> {
                     if (writer.getBeanTypeName() == classNode.getName()) {
                         beanDefinitionWriters.put(classNode, writer)

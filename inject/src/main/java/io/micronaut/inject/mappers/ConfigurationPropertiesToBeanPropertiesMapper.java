@@ -18,6 +18,7 @@ package io.micronaut.inject.mappers;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.context.annotation.BeanProperties;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.annotation.TypedAnnotationMapper;
 import io.micronaut.inject.visitor.VisitorContext;
 
@@ -30,6 +31,7 @@ import java.util.List;
  * @author Denis Stepanov
  * @since 4.0.0
  */
+@Internal
 public final class ConfigurationPropertiesToBeanPropertiesMapper implements TypedAnnotationMapper<ConfigurationReader> {
 
     @Override
@@ -37,8 +39,8 @@ public final class ConfigurationPropertiesToBeanPropertiesMapper implements Type
         return Collections.singletonList(
             AnnotationValue.builder(BeanProperties.class)
                 // Configuration properties also includes fields
-                .member(BeanProperties.ACCESS_KIND, new BeanProperties.AccessKind[]{BeanProperties.AccessKind.FIELD, BeanProperties.AccessKind.METHOD})
-                .member(BeanProperties.VISIBILITY, BeanProperties.Visibility.DEFAULT)
+                .member(BeanProperties.MEMBER_ACCESS_KIND, new BeanProperties.AccessKind[]{BeanProperties.AccessKind.FIELD, BeanProperties.AccessKind.METHOD})
+                .member(BeanProperties.MEMBER_VISIBILITY, BeanProperties.Visibility.DEFAULT)
                 .build()
         );
     }

@@ -303,12 +303,12 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
      *
      * @param declaringType      The declaring type. Either a Class or a string representing the name of the type
      * @param fieldElement       The field element
-     * @param isOptional         Is the value optional
      * @param requiresReflection Whether accessing the field requires reflection
+     * @param isOptional         Is the value optional
      */
     void visitFieldValue(TypedElement declaringType,
                          FieldElement fieldElement,
-                         boolean isOptional, boolean requiresReflection);
+                         boolean requiresReflection, boolean isOptional);
 
     /**
      * @return The package name of the bean

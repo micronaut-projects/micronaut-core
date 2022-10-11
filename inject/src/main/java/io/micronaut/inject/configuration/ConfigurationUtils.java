@@ -18,6 +18,7 @@ package io.micronaut.inject.configuration;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
 
@@ -30,6 +31,7 @@ import java.util.Optional;
  * @author Denis Stepanov
  * @since 4.0.0
  */
+@Internal
 public final class ConfigurationUtils {
 
     private static final String PREFIX_CALCULATED = "prefixCalculated";

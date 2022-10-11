@@ -28,7 +28,7 @@ import io.micronaut.core.annotation.NextMajorVersion;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
-import io.micronaut.inject.ProcessingException;
+import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
@@ -52,10 +52,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * AOP helper to connect Inject module with AOP.
+ *
+ * @author Denis Stepanov
+ * @since 4.0.0
  */
 @Internal
 @NextMajorVersion("Correct project dependency so this hack is not needed")
-public class AopHelperImpl implements AopHelper {
+public final class AopHelperImpl implements AopHelper {
 
     @Override
     public BeanDefinitionVisitor visitAdaptedMethod(ClassElement classElement,

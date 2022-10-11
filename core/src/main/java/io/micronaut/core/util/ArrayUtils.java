@@ -286,7 +286,7 @@ public class ArrayUtils {
     }
 
     /**
-     * Reverse the order of items in array.
+     * Mutates the passed array by reversing the order of the items in it.
      *
      * @param input The array
      * @param <T>   The array type

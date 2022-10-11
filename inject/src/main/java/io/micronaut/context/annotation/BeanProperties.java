@@ -39,13 +39,13 @@ import static java.lang.annotation.RetentionPolicy.SOURCE;
 @Inherited
 public @interface BeanProperties {
 
-    String ACCESS_KIND = "accessKind";
-    String VISIBILITY = "visibility";
-    String INCLUDES = "includes";
-    String EXCLUDES = "excludes";
-    String ALLOW_WRITE_WITH_ZERO_ARGS = "allowWriteWithZeroArgs";
-    String ALLOW_WRITE_WITH_MULTIPLE_ARGS = "allowWriteWithMultipleArgs";
-    String EXCLUDED_ANNOTATIONS = "excludedAnnotations";
+    String MEMBER_ACCESS_KIND = "accessKind";
+    String MEMBER_VISIBILITY = "visibility";
+    String MEMBER_INCLUDES = "includes";
+    String MEMBER_EXCLUDES = "excludes";
+    String MEMBER_ALLOW_WRITE_WITH_ZERO_ARGS = "allowWriteWithZeroArgs";
+    String MEMBER_ALLOW_WRITE_WITH_MULTIPLE_ARGS = "allowWriteWithMultipleArgs";
+    String MEMBER_EXCLUDED_ANNOTATIONS = "excludedAnnotations";
 
     /**
      * <p>The default access type is {@link AccessKind#METHOD} which treats only public JavaBean getters or Java record components as properties. By specifying {@link AccessKind#FIELD}, public or package-protected fields will be used instead. </p>

@@ -35,7 +35,7 @@ import java.util.Set;
  * @author Denis Stepanov
  * @since 4.0.0
  */
-public final class BeanPropertiesConfiguration {
+public final class BeanPropertiesQuery {
 
     private BeanProperties.Visibility visibility = BeanProperties.Visibility.DEFAULT;
     private Set<BeanProperties.AccessKind> accessKinds = EnumSet.of(BeanProperties.AccessKind.METHOD);
@@ -48,37 +48,37 @@ public final class BeanPropertiesConfiguration {
     private boolean allowStaticProperties;
     private Set<String> excludedAnnotations = Collections.emptySet();
 
-    public static BeanPropertiesConfiguration of(AnnotationMetadata annotationMetadata) {
-        BeanPropertiesConfiguration conf = new BeanPropertiesConfiguration();
+    public static BeanPropertiesQuery of(AnnotationMetadata annotationMetadata) {
+        BeanPropertiesQuery conf = new BeanPropertiesQuery();
         Set<String> includes = new HashSet<>();
         Set<String> excludes = new HashSet<>();
 
         AnnotationValue<BeanProperties> annotation = annotationMetadata.getAnnotation(BeanProperties.class);
         if (annotation != null) {
-            annotation.enumValue(BeanProperties.VISIBILITY, BeanProperties.Visibility.class)
+            annotation.enumValue(BeanProperties.MEMBER_VISIBILITY, BeanProperties.Visibility.class)
                 .ifPresent(conf::setVisibility);
-            if (annotation.isPresent(BeanProperties.ACCESS_KIND)) {
+            if (annotation.isPresent(BeanProperties.MEMBER_ACCESS_KIND)) {
                 conf.setAccessKinds(
-                    annotation.enumValuesSet(BeanProperties.ACCESS_KIND, BeanProperties.AccessKind.class)
+                    annotation.enumValuesSet(BeanProperties.MEMBER_ACCESS_KIND, BeanProperties.AccessKind.class)
                 );
             }
-            annotation.booleanValue(BeanProperties.ALLOW_WRITE_WITH_ZERO_ARGS)
+            annotation.booleanValue(BeanProperties.MEMBER_ALLOW_WRITE_WITH_ZERO_ARGS)
                 .ifPresent(conf::setAllowSetterWithZeroArgs);
-            annotation.booleanValue(BeanProperties.ALLOW_WRITE_WITH_MULTIPLE_ARGS)
+            annotation.booleanValue(BeanProperties.MEMBER_ALLOW_WRITE_WITH_MULTIPLE_ARGS)
                 .ifPresent(conf::setAllowSetterWithMultipleArgs);
 
-            includes.addAll(Arrays.asList(annotation.stringValues(BeanProperties.INCLUDES)));
-            excludes.addAll(Arrays.asList(annotation.stringValues(BeanProperties.EXCLUDES)));
+            includes.addAll(Arrays.asList(annotation.stringValues(BeanProperties.MEMBER_INCLUDES)));
+            excludes.addAll(Arrays.asList(annotation.stringValues(BeanProperties.MEMBER_EXCLUDES)));
 
-            conf.setExcludedAnnotations(CollectionUtils.setOf(annotation.stringValues(BeanProperties.EXCLUDED_ANNOTATIONS)));
+            conf.setExcludedAnnotations(CollectionUtils.setOf(annotation.stringValues(BeanProperties.MEMBER_EXCLUDED_ANNOTATIONS)));
         }
 
         // TODO: investigate why aliases aren't propagated
-        includes.addAll(Arrays.asList(annotationMetadata.stringValues(ConfigurationProperties.class, BeanProperties.INCLUDES)));
-        excludes.addAll(Arrays.asList(annotationMetadata.stringValues(ConfigurationProperties.class, BeanProperties.EXCLUDES)));
+        includes.addAll(Arrays.asList(annotationMetadata.stringValues(ConfigurationProperties.class, BeanProperties.MEMBER_INCLUDES)));
+        excludes.addAll(Arrays.asList(annotationMetadata.stringValues(ConfigurationProperties.class, BeanProperties.MEMBER_EXCLUDES)));
 
-        includes.addAll(Arrays.asList(annotationMetadata.stringValues(ConfigurationBuilder.class, BeanProperties.INCLUDES)));
-        excludes.addAll(Arrays.asList(annotationMetadata.stringValues(ConfigurationBuilder.class, BeanProperties.EXCLUDES)));
+        includes.addAll(Arrays.asList(annotationMetadata.stringValues(ConfigurationBuilder.class, BeanProperties.MEMBER_INCLUDES)));
+        excludes.addAll(Arrays.asList(annotationMetadata.stringValues(ConfigurationBuilder.class, BeanProperties.MEMBER_EXCLUDES)));
 
         conf.setIncludes(includes);
         conf.setExcludes(excludes);

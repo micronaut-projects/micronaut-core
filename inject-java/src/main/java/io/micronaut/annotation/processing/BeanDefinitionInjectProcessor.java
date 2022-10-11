@@ -25,11 +25,11 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.inject.ProcessingException;
+import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
-import io.micronaut.inject.processing.BeanDefinitionBuilder;
-import io.micronaut.inject.processing.BeanDefinitionBuilderFactory;
+import io.micronaut.inject.processing.BeanDefinitionCreator;
+import io.micronaut.inject.processing.BeanDefinitionCreatorFactory;
 import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.visitor.BeanElementVisitor;
 import io.micronaut.inject.visitor.VisitorConfiguration;
@@ -174,7 +174,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         }
                         if (element.getKind() == ENUM) {
                             final AnnotationMetadata am = annotationMetadataBuilder.lookupOrBuildForType(element);
-                            if (BeanDefinitionBuilderFactory.isDeclaredBeanInMetadata(am)) {
+                            if (BeanDefinitionCreatorFactory.isDeclaredBeanInMetadata(am)) {
                                 error(element, "Enum types cannot be defined as beans");
                             }
                             return;
@@ -219,8 +219,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             }
                             JavaClassElement classElement = javaVisitorContext.getElementFactory()
                                 .newClassElement(typeElement, annotationMetadataFactory);
-                            BeanDefinitionBuilder beanDefinitionBuilder = BeanDefinitionBuilderFactory.produce(classElement, javaVisitorContext);
-                            for (BeanDefinitionVisitor writer : beanDefinitionBuilder.build()) {
+                            BeanDefinitionCreator beanDefinitionCreator = BeanDefinitionCreatorFactory.produce(classElement, javaVisitorContext);
+                            for (BeanDefinitionVisitor writer : beanDefinitionCreator.build()) {
                                 if (processed.add(writer.getBeanDefinitionName())) {
                                     processBeanDefinitions(writer);
                                 } else {

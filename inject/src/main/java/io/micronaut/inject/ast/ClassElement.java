@@ -39,7 +39,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -183,7 +182,7 @@ public interface ClassElement extends TypedElement {
             // only static inner classes can be constructed
             return Optional.empty();
         }
-        List<ConstructorElement> constructors = findConstructors();
+        List<ConstructorElement> constructors = getAccessibleConstructors();
         if (constructors.isEmpty()) {
             return Optional.empty();
         }
@@ -217,7 +216,7 @@ public interface ClassElement extends TypedElement {
             // only static inner classes can be constructed
             return Optional.empty();
         }
-        List<ConstructorElement> constructors = findConstructors()
+        List<ConstructorElement> constructors = getAccessibleConstructors()
             .stream()
             .filter(ctor -> ctor.getParameters().length == 0)
             .collect(Collectors.toList());
@@ -235,13 +234,13 @@ public interface ClassElement extends TypedElement {
     }
 
     /**
-     * Find static creator.
+     * Find and return a single primary static creator. If more than creator candidate exists, then return empty unless a static
+     * creator is found that is annotated with {@link io.micronaut.core.annotation.Creator}.
      *
-     * @return a static creator
-     * @since 4.0.0
+     * @return The primary creator if one is present
      */
     default Optional<MethodElement> findStaticCreator() {
-        List<MethodElement> staticCreators = findStaticCreators();
+        List<MethodElement> staticCreators = getAccessibleStaticCreators();
         if (staticCreators.isEmpty()) {
             return Optional.empty();
         }
@@ -249,7 +248,7 @@ public interface ClassElement extends TypedElement {
             return Optional.of(staticCreators.get(0));
         }
         //Can be multiple static @Creator methods. Prefer one with args here. The no arg method (if present) will
-        //be picked up by staticDefaultCreatorFor
+        //be picked up by findDefaultStaticCreator
         List<MethodElement> withArgs = staticCreators.stream().filter(method -> method.getParameters().length > 0).collect(Collectors.toList());
         if (withArgs.size() == 1) {
             return Optional.of(withArgs.get(0));
@@ -260,13 +259,14 @@ public interface ClassElement extends TypedElement {
     }
 
     /**
-     * Find default static creator.
-     *
+     * Find and return a single default static creator. A default static creator is one
+     * without arguments that is accessible.
+     * *
      * @return a static creator
      * @since 4.0.0
      */
     default Optional<MethodElement> findDefaultStaticCreator() {
-        List<MethodElement> staticCreators = findStaticCreators()
+        List<MethodElement> staticCreators = getAccessibleStaticCreators()
             .stream()
             .filter(c -> c.getParameters().length == 0)
             .collect(Collectors.toList());
@@ -285,7 +285,8 @@ public interface ClassElement extends TypedElement {
      * @return accessible constructors
      * @since 4.0.0
      */
-    default List<ConstructorElement> findConstructors() {
+    @NonNull
+    default List<ConstructorElement> getAccessibleConstructors() {
         return getEnclosedElements(ElementQuery.CONSTRUCTORS)
             .stream()
             .filter(ctor -> !ctor.isPrivate())
@@ -293,12 +294,15 @@ public interface ClassElement extends TypedElement {
     }
 
     /**
-     * Find static creators.
+     * Get accessible static creators.
+     * A static creator is a static method annotated with {@link Creator} that can be used to create the class.
+     * For enums "valueOf" is picked as a static creator.
      *
      * @return static creators
      * @since 4.0.0
      */
-    default List<MethodElement> findStaticCreators() {
+    @NonNull
+    default List<MethodElement> getAccessibleStaticCreators() {
         List<MethodElement> creators = getEnclosedElements(ElementQuery.ALL_METHODS
             .onlyDeclared()
             .onlyStatic()
@@ -377,28 +381,32 @@ public interface ClassElement extends TypedElement {
      *
      * @return The bean properties for this class element
      */
+    @NonNull
     default List<PropertyElement> getBeanProperties() {
         return Collections.emptyList();
     }
 
     /**
-     * Returns the native bean properties (synthetic getters and setters) for this class element..
+     * Returns the synthetic bean properties. The properties where one of the methods (getter or setter)
+     * is synthetic - not user defined but created by the compiler.
      *
      * @return The bean properties for this class element
      * @since 4.0.0
      */
-    default List<PropertyElement> getNativeBeanProperties() {
+    @NonNull
+    default List<PropertyElement> getSyntheticBeanProperties() {
         return Collections.emptyList();
     }
 
     /**
      * Returns the bean properties (getters and setters) for this class element based on custom configuration.
      *
-     * @param configuration The configuration
+     * @param beanPropertiesQuery The configuration
      * @return The bean properties for this class element
      * @since 4.0.0
      */
-    default List<PropertyElement> getBeanProperties(BeanPropertiesConfiguration configuration) {
+    @NonNull
+    default List<PropertyElement> getBeanProperties(BeanPropertiesQuery beanPropertiesQuery) {
         return Collections.emptyList();
     }
 
@@ -407,6 +415,7 @@ public interface ClassElement extends TypedElement {
      *
      * @return The fields
      */
+    @NonNull
     default List<FieldElement> getFields() {
         return getEnclosedElements(ElementQuery.ALL_FIELDS);
     }
@@ -419,6 +428,7 @@ public interface ClassElement extends TypedElement {
      * @return The fields
      * @since 2.3.0
      */
+    @NonNull
     default <T extends Element> List<T> getEnclosedElements(@NonNull ElementQuery<T> query) {
         return Collections.emptyList();
     }
