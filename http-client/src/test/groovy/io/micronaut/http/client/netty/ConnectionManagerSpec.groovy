@@ -719,6 +719,57 @@ class ConnectionManagerSpec extends Specification {
         ctx.close()
     }
 
+    def 'max pending acquires'() {
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.pool.max-pending-acquires': 5,
+                'micronaut.http.client.pool.max-pending-connections': 1,
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn = new EmbeddedTestConnectionHttp1()
+        conn.setupHttp1()
+
+        ChannelPromise delayPromise
+        def normalInit = conn.clientInitializer
+        // hack: delay the channelActive call until we complete delayPromise
+        conn.clientInitializer = new ChannelInitializer<EmbeddedChannel>() {
+            @Override
+            protected void initChannel(EmbeddedChannel ch) throws Exception {
+                ch.pipeline().addLast(new ChannelInboundHandlerAdapter() {
+                    @Override
+                    void channelActive(ChannelHandlerContext chtx) throws Exception {
+                        delayPromise = chtx.newPromise()
+                        delayPromise.addListener(new GenericFutureListener<io.netty.util.concurrent.Future<? super Void>>() {
+                            @Override
+                            void operationComplete(io.netty.util.concurrent.Future<? super Void> future) throws Exception {
+                                chtx.fireChannelActive()
+                            }
+                        })
+                    }
+                })
+                ch.pipeline().addLast(normalInit)
+            }
+        }
+
+        patch(client, conn)
+
+        List<CompletableFuture<?>> futures = new ArrayList<>()
+        for (int i = 0; i < 6; i++) {
+            futures.add(Mono.from(client.exchange(conn.scheme + '://example.com/foo')).toFuture())
+        }
+        conn.advance()
+
+        for (int i = 0; i < 5; i++) {
+            assert !futures.get(i).isDone()
+        }
+        assert futures.get(5).isDone()
+        assert futures.get(5).completedExceptionally
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
     def 'multipart request'() {
         def ctx = ApplicationContext.run()
         def client = ctx.getBean(DefaultHttpClient)
