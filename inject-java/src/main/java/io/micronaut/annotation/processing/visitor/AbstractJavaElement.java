@@ -17,7 +17,6 @@ package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.annotation.processing.AnnotationUtils;
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.NonNull;
