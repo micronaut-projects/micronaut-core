@@ -18,7 +18,6 @@ configurations {
 
 tasks.named("shadowJar") {
     configurations = [project.configurations.shadowCompile]
-    relocate "com.github.benmanes.caffeine", "io.micronaut.caffeine"
     relocate "org.objectweb.asm", "io.micronaut.asm"
 }
 
