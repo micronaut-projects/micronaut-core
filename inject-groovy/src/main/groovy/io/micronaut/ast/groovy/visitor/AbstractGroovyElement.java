@@ -31,7 +31,6 @@ import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementAnnotationMetadata;
 import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.ElementModifier;
-import io.micronaut.inject.visitor.VisitorConfiguration;
 import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.FieldNode;
@@ -371,7 +370,7 @@ public abstract class AbstractGroovyElement implements AnnotationMetadataDelegat
     }
 
     /**
-     * The method will replace the annotation metadata with empty value if {@link VisitorConfiguration#includeTypeLevelAnnotationsInGenericArguments()}
+     * The method will replace the annotation metadata with empty value if {@link io.micronaut.inject.visitor.VisitorConfiguration#includeTypeLevelAnnotationsInGenericArguments()}
      * is false.
      *
      * @param classElement The class element to adjust annotation metadata
@@ -379,7 +378,7 @@ public abstract class AbstractGroovyElement implements AnnotationMetadataDelegat
      */
     @NonNull
     protected final ClassElement adjustTypeAnnotationMetadata(@NonNull ClassElement classElement) {
-        if (visitorContext.getConfiguration().includeTypeLevelAnnotationsInGenericArguments()) {
+        if (classElement.isPrimitive() || visitorContext.getConfiguration().includeTypeLevelAnnotationsInGenericArguments()) {
             return classElement;
         }
         return classElement.withAnnotationMetadata(AnnotationMetadata.EMPTY_METADATA);

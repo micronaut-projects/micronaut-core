@@ -368,7 +368,7 @@ public final class AstBeanPropertiesUtils {
      * Internal holder class for getters and setters.
      */
     @SuppressWarnings("VisibilityModifier")
-    public final static class BeanPropertyData {
+    public static final class BeanPropertyData {
         public ClassElement type;
         public MethodElement getter;
         public MethodElement setter;
