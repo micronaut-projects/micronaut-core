@@ -26,6 +26,14 @@ The `javax.annotation` library is no longer a directory dependency. Any referenc
 
 Kotlin has been updated to 1.7.20, which may cause issues when compiling or linking to Kotlin libraries.
 
+==== Bean Introspection changes
+
+Before, when both METHOD and FIELD were set as the access kind, the bean introspection would choose the same access type to get and set the property value. In Micronaut 4, the accessors can be of different kinds: a field to get and a method to set, and vice versa.
+
+==== Annotations with retention CLASS are excluded at runtime
+
+Annotations with the retention CLASS are not available in the annotation metadata at the runtime.
+
 == 3.3.0
 
 - The <<environmentEndpoint, environmental endpoint>> is now disabled by default. To enable it, you must update your endpoint config:

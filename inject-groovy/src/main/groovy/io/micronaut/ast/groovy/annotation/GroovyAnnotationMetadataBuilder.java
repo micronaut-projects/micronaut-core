@@ -233,6 +233,10 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
 
     @Override
     protected Optional<AnnotatedNode> getAnnotationMirror(String annotationName) {
+        Optional<AnnotatedNode> classNode = compilationUnit == null ? Optional.empty() : Optional.ofNullable(compilationUnit.getClassNode(annotationName));
+        if (classNode.isPresent()) {
+            return classNode;
+        }
         ClassNode cn = ClassUtils.forName(annotationName, GroovyAnnotationMetadataBuilder.class.getClassLoader())
             .map(ClassHelper::make)
             .orElseGet(() -> ClassHelper.make(annotationName));

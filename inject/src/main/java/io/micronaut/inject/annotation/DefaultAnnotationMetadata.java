@@ -1944,7 +1944,8 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         }
         putValues(annotation, values, allAnnotations);
 
-        if (retentionPolicy == RetentionPolicy.SOURCE) {
+        // Annotations with retention CLASS need not be retained at run time
+        if (retentionPolicy == RetentionPolicy.SOURCE || retentionPolicy == RetentionPolicy.CLASS) {
             addSourceRetentionAnnotation(annotation);
         }
     }

@@ -487,7 +487,14 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
         // 4th argument: all annotations
         pushCreateAnnotationData(owningType, declaringClassWriter, generatorAdapter, annotationMetadata.allAnnotations, defaultsStorage, loadTypeMethods, annotationMetadata.getSourceRetentionAnnotations());
         // 5th argument: annotations by stereotype
-        pushStringMapOf(generatorAdapter, annotationMetadata.annotationsByStereotype, false, Collections.emptyList(), list -> pushListOfString(generatorAdapter, list));
+        Map<String, List<String>> annotationsByStereotype = annotationMetadata.annotationsByStereotype;
+        if (annotationMetadata.getSourceRetentionAnnotations() != null && annotationsByStereotype != null) {
+            annotationsByStereotype = new LinkedHashMap<>(annotationsByStereotype);
+            for (String sourceRetentionAnnotation : annotationMetadata.getSourceRetentionAnnotations()) {
+                annotationsByStereotype.remove(sourceRetentionAnnotation);
+            }
+        }
+        pushStringMapOf(generatorAdapter, annotationsByStereotype, false, Collections.emptyList(), list -> pushListOfString(generatorAdapter, list));
         // 6th argument: has property expressions
         generatorAdapter.push(annotationMetadata.hasPropertyExpressions());
         // 7th argument: use repeatable annotations

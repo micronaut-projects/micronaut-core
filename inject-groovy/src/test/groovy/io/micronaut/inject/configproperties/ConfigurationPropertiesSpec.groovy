@@ -17,6 +17,7 @@ package io.micronaut.inject.configproperties
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
+import io.micronaut.context.annotation.BeanProperties
 import io.micronaut.context.env.PropertySource
 import spock.lang.Specification
 /**
@@ -61,6 +62,7 @@ class ConfigurationPropertiesSpec extends Specification {
         config.defaultValue == 9999
         config.primitiveDefaultValue == 9999
         config.inner.enabled
+        !applicationContext.getBeanDefinition(MyConfig).getAnnotation(BeanProperties.class)
     }
 
 }

@@ -32,6 +32,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Documented
 @Retention(RUNTIME)
 @Target(ElementType.ANNOTATION_TYPE)
+@BeanProperties(accessKind = {BeanProperties.AccessKind.METHOD, BeanProperties.AccessKind.FIELD}, visibility = BeanProperties.Visibility.DEFAULT)
 public @interface ConfigurationReader {
 
     /**

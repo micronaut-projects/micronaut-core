@@ -16,9 +16,9 @@
 package io.micronaut.inject.mappers;
 
 import io.micronaut.context.annotation.BeanProperties;
-import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.annotation.TypedAnnotationMapper;
 import io.micronaut.inject.visitor.VisitorContext;
 
@@ -26,31 +26,36 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Map values of {@link ConfigurationBuilder} to {@link BeanProperties}.
+ * Map values of {@link Introspected} to {@link BeanProperties}.
  *
  * @author Denis Stepanov
  * @since 4.0.0
  */
-@Internal
-public final class ConfigurationBuilderToBeanPropertiesMapper implements TypedAnnotationMapper<ConfigurationBuilder> {
+public final class IntrospectedToBeanPropertiesMapper implements TypedAnnotationMapper<Introspected> {
 
     @Override
-    public List<AnnotationValue<?>> map(AnnotationValue<ConfigurationBuilder> annotation, VisitorContext visitorContext) {
+    public List<AnnotationValue<?>> map(AnnotationValue<Introspected> annotation, VisitorContext visitorContext) {
+        Introspected.AccessKind[] accessKinds = annotation.enumValues(BeanProperties.MEMBER_ACCESS_KIND, Introspected.AccessKind.class);
+        Introspected.Visibility[] visibilities = annotation.enumValues(BeanProperties.MEMBER_VISIBILITY, Introspected.Visibility.class);
+        if (ArrayUtils.isEmpty(accessKinds)) {
+            accessKinds = Introspected.DEFAULT_ACCESS_KIND;
+        }
+        if (ArrayUtils.isEmpty(visibilities)) {
+            visibilities = Introspected.DEFAULT_VISIBILITY;
+        }
         return Collections.singletonList(
             AnnotationValue.builder(BeanProperties.class)
-                // Configuration properties also includes fields
-                .member(BeanProperties.MEMBER_ACCESS_KIND, new BeanProperties.AccessKind[]{BeanProperties.AccessKind.METHOD})
-                .member(BeanProperties.MEMBER_VISIBILITY, BeanProperties.Visibility.DEFAULT)
+                .member(BeanProperties.MEMBER_ACCESS_KIND, accessKinds)
+                .member(BeanProperties.MEMBER_VISIBILITY, visibilities)
                 .member(BeanProperties.MEMBER_INCLUDES, annotation.stringValues(BeanProperties.MEMBER_INCLUDES))
                 .member(BeanProperties.MEMBER_EXCLUDES, annotation.stringValues(BeanProperties.MEMBER_EXCLUDES))
-                .member(BeanProperties.MEMBER_ALLOW_WRITE_WITH_ZERO_ARGS, annotation.booleanValue("allowZeroArgs").orElse(false))
-                .member(BeanProperties.MEMBER_ALLOW_WRITE_WITH_MULTIPLE_ARGS, true)
+                .member(BeanProperties.MEMBER_EXCLUDED_ANNOTATIONS, annotation.stringValues(BeanProperties.MEMBER_EXCLUDED_ANNOTATIONS))
                 .build()
         );
     }
 
     @Override
-    public Class<ConfigurationBuilder> annotationType() {
-        return ConfigurationBuilder.class;
+    public Class<Introspected> annotationType() {
+        return Introspected.class;
     }
 }
