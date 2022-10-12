@@ -20,13 +20,10 @@ import io.micronaut.context.DefaultBeanContext
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanFactory
 import io.micronaut.inject.writer.BeanDefinitionVisitor
-import spock.lang.Ignore
-
 /**
  * @author graemerocher
  * @since 1.0
  */
-@Ignore // for some reason fails when run with Gradle.. probably due to order of compilation
 class AbstractClassIntroductionSpec extends AbstractBeanDefinitionSpec {
 
     void "test that a non-abstract method defined in class is not overridden by the introduction advise"() {
@@ -40,8 +37,8 @@ import io.micronaut.context.annotation.*;
 @Stub
 @jakarta.inject.Singleton
 abstract class AbstractBean {
-    public abstract String isAbstract(); 
-    
+    public abstract String isAbstract();
+
     public String nonAbstract() {
         return "good";
     }
@@ -78,8 +75,8 @@ interface Foo {
 @Stub
 @jakarta.inject.Singleton
 abstract class AbstractBean implements Foo {
-    public abstract String isAbstract(); 
-    
+    public abstract String isAbstract();
+
     @Override
     public String nonAbstract() {
         return "good";
@@ -118,8 +115,8 @@ interface Foo {
 @Stub
 @jakarta.inject.Singleton
 abstract class AbstractBean implements Foo {
-    public abstract String isAbstract(); 
-    
+    public abstract String isAbstract();
+
     @Override
     public String nonAbstract() {
         return "good";
@@ -154,7 +151,7 @@ import io.micronaut.context.annotation.*;
 interface Bar {
     @Stub
     String nonAbstract();
-    
+
     String another();
 }
 
@@ -165,13 +162,13 @@ interface Foo extends Bar {
 @Stub
 @jakarta.inject.Singleton
 abstract class AbstractBean implements Foo {
-    public abstract String isAbstract(); 
-    
+    public abstract String isAbstract();
+
     @Override
     public String nonAbstract() {
         return "good";
     }
-    
+
     @Override
     public String another() {
         return "good";
@@ -211,8 +208,8 @@ interface Foo {
 @Stub
 @jakarta.inject.Singleton
 abstract class AbstractBean implements Foo {
-    public abstract String isAbstract(); 
-    
+    public abstract String isAbstract();
+
     @Override
     public String nonAbstract() {
         return "good";

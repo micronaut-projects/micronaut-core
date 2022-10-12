@@ -426,7 +426,7 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
      * @return The qualifier or null if this isn't one
      */
     default @Nullable Qualifier<T> getDeclaredQualifier() {
-        AnnotationMetadata annotationMetadata = getAnnotationMetadata();
+        AnnotationMetadata annotationMetadata = getTargetAnnotationMetadata();
         if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
             // Beans created by a factory will have AnnotationMetadataHierarchy = producing element + factory class
             // All qualifiers are removed from the factory class anyway, so we can skip the hierarchy

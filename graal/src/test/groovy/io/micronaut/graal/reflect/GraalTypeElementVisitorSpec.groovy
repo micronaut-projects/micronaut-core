@@ -17,7 +17,7 @@ import io.micronaut.core.annotation.Introspected;
 
 @Introspected
 class Test {
-    
+
 }
 
 ''')
@@ -36,7 +36,7 @@ import io.micronaut.core.annotation.*;
 
 @TypeHint(Bar.class)
 class Test {
-    
+
 }
 
 class Bar {}
@@ -68,7 +68,7 @@ import io.micronaut.core.annotation.*;
     )
 )
 class Test {
-    
+
 }
 
 class Bar {}
@@ -96,7 +96,7 @@ import io.micronaut.core.annotation.*;
 
 @TypeHint(value = Bar.class, typeNames = "java.lang.String")
 class Test {
-    
+
 }
 
 class Bar {}
@@ -136,7 +136,7 @@ import io.micronaut.core.annotation.*;
 
 @TypeHint(value = {Bar.class, String[].class})
 class Test {
-    
+
 }
 
 class Bar {}
@@ -177,7 +177,7 @@ import io.micronaut.core.annotation.*;
 
 @TypeHint(value=Bar.class, accessType = TypeHint.AccessType.ALL_PUBLIC_METHODS)
 class Test {
-    
+
 }
 
 class Bar {}
@@ -202,10 +202,10 @@ package test;
 import io.micronaut.core.annotation.*;
 
 class Test {
-    
+
     @ReflectiveAccess
     private String name;
-    
+
     @ReflectiveAccess
     public String getFoo() {
         return name;
@@ -238,10 +238,10 @@ import io.micronaut.core.annotation.*;
 
 @jakarta.inject.Singleton
 class Test {
-    
+
     @jakarta.inject.Inject
     private String name;
-    
+
     @jakarta.inject.Inject
     private void setFoo(Other other) {
     }
@@ -282,9 +282,9 @@ class HTTPCheck extends NewCheck {
     }
 }
 abstract class NewCheck {
-    
+
     private String status;
-     
+
     @ReflectiveAccess
     protected void setStatus(String status) {
         this.status = status;
@@ -295,15 +295,22 @@ abstract class NewCheck {
 ''')
 
         when:
-        AnnotationValue<ReflectionConfig> config = configurer.getAnnotationMetadata().getAnnotationValuesByType(ReflectionConfig).first()
+        // New check is returned first because the methods from the subtype are processed first
+        AnnotationValue<ReflectionConfig> httpCheck = configurer.getAnnotationMetadata().getAnnotationValuesByType(ReflectionConfig).get(1)
+        AnnotationValue<ReflectionConfig> newCheck = configurer.getAnnotationMetadata().getAnnotationValuesByType(ReflectionConfig).get(0)
 
         then:
-        config
-        config.stringValue("type").get() == 'test.HTTPCheck'
-        config.enumValues("accessType", TypeHint.AccessType) == [] as TypeHint.AccessType[]
-        config.getAnnotations("methods").size() == 1
-        config.getAnnotations("methods").first().stringValue("name").get() == 'setInterval'
-        config.getAnnotations("methods").first().classValues("parameterTypes") == [String] as Class[]
+        httpCheck
+        httpCheck.stringValue("type").get() == 'test.HTTPCheck'
+        httpCheck.enumValues("accessType", TypeHint.AccessType) == [] as TypeHint.AccessType[]
+        httpCheck.getAnnotations("methods").size() == 1
+        httpCheck.getAnnotations("methods").first().stringValue("name").get() == 'setInterval'
+        httpCheck.getAnnotations("methods").first().classValues("parameterTypes") == [String] as Class[]
+        newCheck.stringValue("type").get() == 'test.NewCheck'
+        newCheck.enumValues("accessType", TypeHint.AccessType) == [] as TypeHint.AccessType[]
+        newCheck.getAnnotations("methods").size() == 1
+        newCheck.getAnnotations("methods").first().stringValue("name").get() == 'setStatus'
+        newCheck.getAnnotations("methods").first().classValues("parameterTypes") == [String] as Class[]
     }
 
     void "test write reflect.json for @ReflectiveAccess with classes"() {
@@ -399,7 +406,7 @@ enum Test {
         config
         config.stringValue("type").get() == 'test.Test'
         config.enumValues("accessType", TypeHint.AccessType) == [TypeHint.AccessType.ALL_PUBLIC_METHODS, TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS, TypeHint.AccessType.ALL_DECLARED_FIELDS] as TypeHint.AccessType[]
-        config.getAnnotations("methods").size() == 0
+        config.getAnnotations("methods").size() == 2 // Two methods from Enum
 
     }
 }

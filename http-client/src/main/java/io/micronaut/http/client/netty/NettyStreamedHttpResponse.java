@@ -22,7 +22,6 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
-import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.cookie.Cookie;
@@ -34,9 +33,9 @@ import io.micronaut.http.netty.cookies.NettyCookies;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.cookie.ServerCookieEncoder;
 
-import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -50,7 +49,6 @@ import java.util.Optional;
 class NettyStreamedHttpResponse<B> implements MutableHttpResponse<B>, NettyHttpResponseBuilder {
 
     private final StreamedHttpResponse nettyResponse;
-    private HttpStatus status;
     private final NettyHttpHeaders headers;
     @GuardedBy("this")
     private NettyCookies nettyCookies; // initialized lazily
@@ -59,11 +57,9 @@ class NettyStreamedHttpResponse<B> implements MutableHttpResponse<B>, NettyHttpR
 
     /**
      * @param response The streamed Http response
-     * @param httpStatus The Http status
      */
-    NettyStreamedHttpResponse(StreamedHttpResponse response, HttpStatus httpStatus) {
+    NettyStreamedHttpResponse(StreamedHttpResponse response) {
         this.nettyResponse = response;
-        this.status = httpStatus;
         this.headers = new NettyHttpHeaders(response.headers(), ConversionService.SHARED);
     }
 
@@ -75,13 +71,13 @@ class NettyStreamedHttpResponse<B> implements MutableHttpResponse<B>, NettyHttpR
     }
 
     @Override
-    public String reason() {
-        return nettyResponse.status().reasonPhrase();
+    public int code() {
+        return nettyResponse.status().code();
     }
 
     @Override
-    public HttpStatus getStatus() {
-        return status;
+    public String reason() {
+        return nettyResponse.status().reasonPhrase();
     }
 
     @Override
@@ -175,8 +171,12 @@ class NettyStreamedHttpResponse<B> implements MutableHttpResponse<B>, NettyHttpR
     }
 
     @Override
-    public MutableHttpResponse<B> status(HttpStatus status, CharSequence message) {
-        this.status = Objects.requireNonNull(status, "Status is required");
+    public MutableHttpResponse<B> status(int status, CharSequence message) {
+        if (message == null) {
+            nettyResponse.setStatus(HttpResponseStatus.valueOf(status));
+        } else {
+            nettyResponse.setStatus(HttpResponseStatus.valueOf(status, message.toString()));
+        }
         return this;
     }
 }

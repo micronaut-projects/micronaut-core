@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.ast;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.NonNull;
 
 /**
@@ -40,5 +41,10 @@ public interface FieldElement extends TypedElement, MemberElement {
         } else {
             return getType().getName() + " " + getName();
         }
+    }
+
+    @Override
+    default FieldElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
+        return (FieldElement) MemberElement.super.withAnnotationMetadata(annotationMetadata);
     }
 }

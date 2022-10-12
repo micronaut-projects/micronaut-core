@@ -1195,7 +1195,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     }
 
     private void writeFinalNettyResponse(MutableHttpResponse<?> message, HttpRequest<?> request, ChannelHandlerContext context) {
-        HttpStatus httpStatus = message.status();
+        int httpStatus = message.code();
 
         final io.micronaut.http.HttpVersion httpVersion = request.getHttpVersion();
         final boolean isHttp2 = httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0;
@@ -1233,7 +1233,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             // default Connection header if not set explicitly
             if (!isHttp2) {
                 if (!message.getHeaders().contains(HttpHeaders.CONNECTION)) {
-                    if (!decodeError && (httpStatus.getCode() < 500 || serverConfiguration.isKeepAliveOnServerError())) {
+                    if (!decodeError && (httpStatus < 500 || serverConfiguration.isKeepAliveOnServerError())) {
                         message.getHeaders().set(HttpHeaders.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
                     } else {
                         message.getHeaders().set(HttpHeaders.CONNECTION, HttpHeaderValues.CLOSE);
@@ -1251,7 +1251,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             if (!isHttp2) {
                 if (!nettyHeaders.contains(HttpHeaderNames.CONNECTION)) {
                     boolean expectKeepAlive = nettyResponse.protocolVersion().isKeepAliveDefault() || request.getHeaders().isKeepAlive();
-                    if (!decodeError && expectKeepAlive && (httpStatus.getCode() < 500 || serverConfiguration.isKeepAliveOnServerError())) {
+                    if (!decodeError && expectKeepAlive && (httpStatus < 500 || serverConfiguration.isKeepAliveOnServerError())) {
                         nettyHeaders.set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
                     } else {
                         nettyHeaders.set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
@@ -1342,13 +1342,12 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
     @NonNull
     private NettyMutableHttpResponse<?> createNettyResponse(HttpResponse<?> message) {
-        HttpStatus httpStatus = message.status();
         Object body = message.body();
         io.netty.handler.codec.http.HttpHeaders nettyHeaders = new DefaultHttpHeaders(serverConfiguration.isValidateHeaders());
         message.getHeaders().forEach((BiConsumer<String, List<String>>) nettyHeaders::set);
         return new NettyMutableHttpResponse<>(
                 HttpVersion.HTTP_1_1,
-                HttpResponseStatus.valueOf(httpStatus.getCode(), httpStatus.getReason()),
+                HttpResponseStatus.valueOf(message.code(), message.reason()),
                 body instanceof ByteBuf ? body : null,
                 ConversionService.SHARED
         );

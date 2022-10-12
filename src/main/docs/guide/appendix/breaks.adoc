@@ -22,9 +22,9 @@ SnakeYAML is no longer a direct dependency, if you need YAML configuration you s
 
 The `javax.annotation` library is no longer a directory dependency. Any references to types in the `javax.anotation` package should be changed to `jakarta.annotation`
 
-==== Kotlin base version updated to 1.7.10
+==== Kotlin base version updated to 1.7.20
 
-Kotlin has been updated to 1.7.10, which may cause issues when compiling or linking to Kotlin libraries.
+Kotlin has been updated to 1.7.20, which may cause issues when compiling or linking to Kotlin libraries.
 
 == 3.3.0
 

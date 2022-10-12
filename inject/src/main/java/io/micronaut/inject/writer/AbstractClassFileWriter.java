@@ -29,6 +29,7 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.annotation.AnnotationMetadataWriter;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
+import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
@@ -268,7 +269,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
                 ClassElement classElement = entry.getValue();
                 Type classReference = JavaModelUtils.getTypeReference(classElement);
                 Map<String, ClassElement> typeArguments = classElement.getTypeArguments();
-                if (CollectionUtils.isNotEmpty(typeArguments) || classElement.getAnnotationMetadata() != AnnotationMetadata.EMPTY_METADATA) {
+                if (CollectionUtils.isNotEmpty(typeArguments) || !classElement.getAnnotationMetadata().isEmpty()) {
                     buildArgumentWithGenerics(
                             owningType,
                             declaringClassWriter,
@@ -386,8 +387,8 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         // 2nd argument: the name
         generatorAdapter.push(argumentName);
 
-        AnnotationMetadata annotationMetadata = classElement.getAnnotationMetadata();
-        boolean hasAnnotationMetadata = annotationMetadata != AnnotationMetadata.EMPTY_METADATA;
+        AnnotationMetadata annotationMetadata = MutableAnnotationMetadata.of(classElement.getAnnotationMetadata());
+        boolean hasAnnotationMetadata = !annotationMetadata.isEmpty();
 
         if (!hasAnnotationMetadata && typeArguments.isEmpty()) {
             invokeInterfaceStaticMethod(
@@ -591,6 +592,8 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
             Map<String, ClassElement> typeArguments,
             Map<String, Integer> defaults,
             Map<String, GeneratorAdapter> loadTypeMethods) {
+        annotationMetadata = MutableAnnotationMetadata.of(annotationMetadata);
+
         Type argumentType = JavaModelUtils.getTypeReference(typedElement);
 
         // 1st argument: The type
@@ -599,7 +602,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         // 2nd argument: The argument name
         generatorAdapter.push(argumentName);
 
-        boolean hasAnnotations = !annotationMetadata.isEmpty() && annotationMetadata instanceof DefaultAnnotationMetadata;
+        boolean hasAnnotations = !annotationMetadata.isEmpty();
         boolean hasTypeArguments = typeArguments != null && !typeArguments.isEmpty();
         boolean isGenericPlaceholder = typedElement instanceof GenericPlaceholderElement;
         boolean isTypeVariable = isGenericPlaceholder || ((typedElement instanceof ClassElement) && ((ClassElement) typedElement).isTypeVariable());

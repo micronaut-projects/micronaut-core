@@ -862,10 +862,7 @@ public class DefaultHttpClient implements
                             traceBody("Response", byteBuf);
                         }
                         ByteBuffer<?> byteBuffer = byteBufferFactory.wrap(byteBuf);
-                        NettyStreamedHttpResponse<ByteBuffer<?>> thisResponse = new NettyStreamedHttpResponse<>(
-                                streamedHttpResponse,
-                                response.status()
-                        );
+                        NettyStreamedHttpResponse<ByteBuffer<?>> thisResponse = new NettyStreamedHttpResponse<>(streamedHttpResponse);
                         thisResponse.setBody(byteBuffer);
                         return (HttpResponse<ByteBuffer<?>>) new HttpResponseWrapper<>(thisResponse);
                     });
@@ -1417,7 +1414,7 @@ public class DefaultHttpClient implements
                                 public void onComplete() {
                                     try {
                                         FullHttpResponse fullHttpResponse = new DefaultFullHttpResponse(nettyResponse.protocolVersion(), nettyResponse.status(), buffer, nettyResponse.headers(), new DefaultHttpHeaders(true));
-                                        final FullNettyClientHttpResponse<Object> fullNettyClientHttpResponse = new FullNettyClientHttpResponse<>(fullHttpResponse, response.status(), mediaTypeCodecRegistry, byteBufferFactory, (Argument<Object>) errorType, true);
+                                        final FullNettyClientHttpResponse<Object> fullNettyClientHttpResponse = new FullNettyClientHttpResponse<>(fullHttpResponse, mediaTypeCodecRegistry, byteBufferFactory, (Argument<Object>) errorType, true);
                                         fullNettyClientHttpResponse.onComplete();
                                         emitter.error(customizeException(new HttpClientResponseException(
                                             fullHttpResponse.status().reasonPhrase(),
@@ -1540,7 +1537,7 @@ public class DefaultHttpClient implements
     ) {
         boolean errorStatus = response.code() >= 400;
         if (errorStatus && failOnError) {
-            return Flux.error(customizeException(new HttpClientResponseException(response.getStatus().getReason(), response)));
+            return Flux.error(customizeException(new HttpClientResponseException(response.reason(), response)));
         } else {
             return Flux.just(response);
         }
@@ -2082,22 +2079,12 @@ public class DefaultHttpClient implements
                 return;
             }
 
-            HttpResponseStatus status = msg.status();
-            int statusCode = status.code();
-            HttpStatus httpStatus;
-            try {
-                httpStatus = HttpStatus.valueOf(statusCode);
-            } catch (IllegalArgumentException e) {
-                responsePromise.tryFailure(e);
-                return;
-            }
-
             HttpHeaders headers = msg.headers();
             if (log.isTraceEnabled()) {
                 log.trace("HTTP Client Response Received ({}) for Request: {} {}", msg.status(), finalRequest.getMethodName(), finalRequest.getUri());
                 traceHeaders(headers);
             }
-            buildResponse(responsePromise, msg, httpStatus);
+            buildResponse(responsePromise, msg);
             removeHandler(ctx);
         }
 
@@ -2122,7 +2109,7 @@ public class DefaultHttpClient implements
 
         protected abstract Function<URI, Publisher<? extends O>> makeRedirectHandler(io.micronaut.http.HttpRequest<?> parentRequest, MutableHttpRequest<Object> redirectRequest);
 
-        protected abstract void buildResponse(Promise<? super O> promise, R msg, HttpStatus httpStatus);
+        protected abstract void buildResponse(Promise<? super O> promise, R msg);
     }
 
     private class FullHttpResponseHandler<O> extends BaseHttpResponseHandler<FullHttpResponse, HttpResponse<O>> {
@@ -2186,21 +2173,21 @@ public class DefaultHttpClient implements
         }
 
         @Override
-        protected void buildResponse(Promise<? super HttpResponse<O>> promise, FullHttpResponse msg, HttpStatus httpStatus) {
+        protected void buildResponse(Promise<? super HttpResponse<O>> promise, FullHttpResponse msg) {
             try {
                 if (log.isTraceEnabled()) {
                     traceBody("Response", msg.content());
                 }
 
-                if (httpStatus == HttpStatus.NO_CONTENT) {
+                if (msg.status().equals(HttpResponseStatus.NO_CONTENT)) {
                     // normalize the NO_CONTENT header, since http content aggregator adds it even if not present in the response
                     msg.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
                 }
 
-                boolean convertBodyWithBodyType = httpStatus.getCode() < 400 ||
+                boolean convertBodyWithBodyType = msg.status().code() < 400 ||
                         (!DefaultHttpClient.this.configuration.isExceptionOnErrorStatus() && bodyType.equalsType(errorType));
                 FullNettyClientHttpResponse<O> response
-                        = new FullNettyClientHttpResponse<>(msg, httpStatus, mediaTypeCodecRegistry, byteBufferFactory, bodyType, convertBodyWithBodyType);
+                        = new FullNettyClientHttpResponse<>(msg, mediaTypeCodecRegistry, byteBufferFactory, bodyType, convertBodyWithBodyType);
 
                 if (convertBodyWithBodyType) {
                     promise.trySuccess(response);
@@ -2214,13 +2201,13 @@ public class DefaultHttpClient implements
                         response.onComplete();
                     } catch (Exception t) {
                         response.onComplete();
-                        promise.tryFailure(makeErrorBodyParseError(msg, httpStatus, t));
+                        promise.tryFailure(makeErrorBodyParseError(msg, t));
                     }
                 }
             } catch (HttpClientResponseException t) {
                 promise.tryFailure(t);
             } catch (Exception t) {
-                makeNormalBodyParseError(msg, httpStatus, t, cause -> {
+                makeNormalBodyParseError(msg, t, cause -> {
                     if (!promise.tryFailure(cause) && log.isWarnEnabled()) {
                         log.warn("Exception fired after handler completed: " + t.getMessage(), t);
                     }
@@ -2252,10 +2239,9 @@ public class DefaultHttpClient implements
         /**
          * Create a {@link HttpClientResponseException} if parsing of the HTTP error body failed.
          */
-        private HttpClientResponseException makeErrorBodyParseError(FullHttpResponse fullResponse, HttpStatus httpStatus, Throwable t) {
+        private HttpClientResponseException makeErrorBodyParseError(FullHttpResponse fullResponse, Throwable t) {
             FullNettyClientHttpResponse<Object> errorResponse = new FullNettyClientHttpResponse<>(
                     fullResponse,
-                    httpStatus,
                     mediaTypeCodecRegistry,
                     byteBufferFactory,
                     null,
@@ -2271,10 +2257,9 @@ public class DefaultHttpClient implements
             ));
         }
 
-        private void makeNormalBodyParseError(FullHttpResponse fullResponse, HttpStatus httpStatus, Throwable t, Consumer<HttpClientResponseException> forward) {
+        private void makeNormalBodyParseError(FullHttpResponse fullResponse, Throwable t, Consumer<HttpClientResponseException> forward) {
             FullNettyClientHttpResponse<Object> response = new FullNettyClientHttpResponse<>(
                     fullResponse,
-                    httpStatus,
                     mediaTypeCodecRegistry,
                     byteBufferFactory,
                     null,
@@ -2338,7 +2323,7 @@ public class DefaultHttpClient implements
         }
 
         @Override
-        protected void buildResponse(Promise<? super MutableHttpResponse<?>> promise, FullHttpResponse msg, HttpStatus httpStatus) {
+        protected void buildResponse(Promise<? super MutableHttpResponse<?>> promise, FullHttpResponse msg) {
             Publisher<HttpContent> bodyPublisher;
             if (msg.content() instanceof EmptyByteBuf) {
                 bodyPublisher = Publishers.empty();
@@ -2351,7 +2336,7 @@ public class DefaultHttpClient implements
                     msg.headers(),
                     bodyPublisher
             );
-            promise.trySuccess(new NettyStreamedHttpResponse<>(nettyResponse, httpStatus));
+            promise.trySuccess(new NettyStreamedHttpResponse<>(nettyResponse));
         }
 
         @Override
@@ -2381,8 +2366,8 @@ public class DefaultHttpClient implements
         }
 
         @Override
-        protected void buildResponse(Promise<? super MutableHttpResponse<?>> promise, StreamedHttpResponse msg, HttpStatus httpStatus) {
-            promise.trySuccess(new NettyStreamedHttpResponse<>(msg, httpStatus));
+        protected void buildResponse(Promise<? super MutableHttpResponse<?>> promise, StreamedHttpResponse msg) {
+            promise.trySuccess(new NettyStreamedHttpResponse<>(msg));
         }
 
         @Override

@@ -48,7 +48,7 @@ public interface BeanElement extends Element {
     Element getOriginatingElement();
 
     /**
-     * Returns the declaring {@link io.micronaut.inject.ast.ClassElement} which may differ
+     * Returns the declaring {@link ClassElement} which may differ
      * from the {@link #getBeanTypes()} in the case of factory beans.
      *
      * @return The declaring class of the bean.
@@ -57,7 +57,7 @@ public interface BeanElement extends Element {
     ClassElement getDeclaringClass();
 
     /**
-     * The element that produces the bean, this could be a {@link io.micronaut.inject.ast.ClassElement} for regular beans,
+     * The element that produces the bean, this could be a {@link ClassElement} for regular beans,
      * or either a {@link io.micronaut.inject.ast.MethodElement} or {@link io.micronaut.inject.ast.FieldElement} for factory beans.
      *
      * @return The producing element

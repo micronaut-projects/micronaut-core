@@ -40,6 +40,11 @@ public class SimpleHttpResponseFactory implements HttpResponseFactory {
     }
 
     @Override
+    public <T> MutableHttpResponse<T> status(int status, String reason) {
+        return new SimpleHttpResponse<T>().status(status, reason);
+    }
+
+    @Override
     public <T> MutableHttpResponse<T> status(HttpStatus status, T body) {
         return new SimpleHttpResponse<T>().status(status).body(body);
     }

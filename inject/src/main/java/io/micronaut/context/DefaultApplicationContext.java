@@ -422,7 +422,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                                                          BeanDefinition<T> candidate,
                                                          List<BeanDefinition<T>> transformedCandidates) {
         boolean isList = candidate.booleanValue(EachProperty.class, "list").orElse(false);
-        String property = candidate.stringValue(ConfigurationReader.class, "prefix")
+        String property = candidate.stringValue(ConfigurationReader.class, ConfigurationReader.PREFIX)
                 .map(prefix ->
                         //strip the .* or [*]
                         prefix.substring(0, prefix.length() - (isList ? 3 : 2)))

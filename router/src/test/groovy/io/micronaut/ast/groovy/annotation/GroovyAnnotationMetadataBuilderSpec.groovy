@@ -21,6 +21,7 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Consumes
 import io.micronaut.http.annotation.Error
+import io.micronaut.inject.BeanDefinition
 
 /**
  * @author Graeme Rocher
@@ -61,7 +62,7 @@ class FormController {
 
     void "test controller action annotation metadata"() {
         given:
-        AnnotationMetadata metadata = buildMethodAnnotationMetadata("test.FormController", '''\
+        BeanDefinition beanDefinition = buildBeanDefinition("test.FormController", '''\
 package test;
 
 import io.micronaut.web.router.annotation.*
@@ -75,11 +76,11 @@ class FormController {
         "name: $name, age: $age"
     }
 }
-''', 'simple')
+''')
 
         expect:
-        metadata != null
-        metadata.hasStereotype(Consumes)
-        metadata.getValue(Consumes,MediaType[].class).isPresent()
+        beanDefinition.getExecutableMethods().size() == 1 != null
+        beanDefinition.getExecutableMethods().iterator().next().hasStereotype(Consumes)
+        beanDefinition.getExecutableMethods().iterator().next().getValue(Consumes,MediaType[].class).isPresent()
     }
 }

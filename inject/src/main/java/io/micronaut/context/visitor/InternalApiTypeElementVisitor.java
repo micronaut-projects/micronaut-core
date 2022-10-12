@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.validation.internal;
+package io.micronaut.context.visitor;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
@@ -34,6 +34,7 @@ import io.micronaut.inject.visitor.VisitorContext;
  * @author James Kleeh
  * @since 1.1.0
  */
+@Internal
 public class InternalApiTypeElementVisitor implements TypeElementVisitor<Object, Object> {
 
     private static final String IO_MICRONAUT = "io.micronaut";
@@ -69,7 +70,7 @@ public class InternalApiTypeElementVisitor implements TypeElementVisitor<Object,
     }
 
     private void warnMember(MemberElement element, VisitorContext context) {
-        if (!element.getDeclaringType().getName().startsWith(IO_MICRONAUT)) {
+        if (!element.getOwningType().getName().startsWith(IO_MICRONAUT)) {
             warn(element, context);
         }
     }

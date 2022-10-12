@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.ast;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.AnnotationMetadata;
 
@@ -115,6 +116,21 @@ public interface ElementQuery<T extends Element> {
      * @return The query
      */
     ElementQuery<T> onlyInstance();
+
+    /**
+     * Indicates to return only static methods/fields.
+     * @return The query
+     * @since 4.0.0
+     */
+    ElementQuery<T> onlyStatic();
+
+    /**
+     * Indicates to exclude any property elements (read write methods and a field).
+     * @return The query
+     * @since 4.0.0
+     */
+    @Experimental
+    ElementQuery<T> excludePropertyElements();
 
     /**
      * Indicates to include enum constants, only applicable for fields query.
@@ -249,6 +265,12 @@ public interface ElementQuery<T extends Element> {
         boolean isOnlyInstance();
 
         /**
+         * @return Whether to return only static methods / fields
+         * @since 4.0.0
+         */
+        boolean isOnlyStatic();
+
+        /**
          * @return Whether to include enum constants
          * @since 3.4.0
          */
@@ -265,6 +287,12 @@ public interface ElementQuery<T extends Element> {
          * @since 3.4.0
          */
         boolean isIncludeHiddenElements();
+
+        /**
+         * @return Whether to exclude property elements
+         * @since 4.0.0
+         */
+        boolean isExcludePropertyElements();
 
         /**
          * @return The name predicates

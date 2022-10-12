@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2022 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package io.micronaut.inject.ast;
+
+import io.micronaut.core.annotation.AnnotationMetadata;
+
 /**
- * Package to organize classes responsible for validating executable methods at compile time.
+ * Element's annotation metadata.
+ *
+ * @author Denis Stepanov
+ * @since 4.0.0
  */
-package io.micronaut.validation.executable;
+public interface ElementAnnotationMetadata extends ElementMutableAnnotationMetadata<AnnotationMetadata> {
+}

@@ -288,11 +288,11 @@ import jakarta.inject.Singleton;
 @ConfigurationProperties("outer")
 class ParentConfig {
     private String simpleConfigProperty;
-    
+
     public String getSimpleConfigProperty() {
         return simpleConfigProperty;
     }
-    
+
     public void setSimpleConfigProperty(String simpleConfigProperty) {
         this.simpleConfigProperty = simpleConfigProperty;
     }
@@ -301,11 +301,11 @@ class ParentConfig {
 @ConfigurationProperties("inherited")
 class InheritedConfig extends ParentConfig {
     private String inheritedProperty;
-    
+
     public String getInheritedProperty() {
         return inheritedProperty;
     }
-    
+
     public void setInheritedProperty(String inheritedProperty) {
         this.inheritedProperty = inheritedProperty;
     }
@@ -626,7 +626,7 @@ class AccessorStyleFirstConfig {
 
     private String firstAccessorStyleProperty;
     private String secondAccessorStyleProperty;
-    
+
     public String readFirstAccessorStyleProperty() {
         return firstAccessorStyleProperty;
     }
@@ -717,7 +717,7 @@ class PrimitiveConfig
     public int getIntProperty() {
         return intProperty;
     }
-    
+
     public void setIntProperty(int intProperty) {
         this.intProperty = intProperty;
     }
@@ -725,11 +725,11 @@ class PrimitiveConfig
     public int getAnotherIntProperty() {
         return anotherIntProperty;
     }
-    
+
     public void setAnotherIntProperty(int anotherIntProperty) {
         this.anotherIntProperty = anotherIntProperty;
     }
-    
+
     public boolean isBoolProperty() {
         return boolProperty;
     }
@@ -779,11 +779,11 @@ class NotConfigurationProperties
     public int getIntProperty() {
         return intProperty;
     }
-    
+
     public void setIntProperty(int intProperty) {
         this.intProperty = intProperty;
     }
-    
+
     public boolean isBoolProperty() {
         return boolProperty;
     }
@@ -791,11 +791,11 @@ class NotConfigurationProperties
     public void setBoolProperty(boolean boolProperty) {
         this.boolProperty = boolProperty;
     }
-    
+
     public String getStringProperty() {
         return stringProperty;
     }
-    
+
     public void setStringProperty(String stringProperty) {
         this.stringProperty = stringProperty;
     }
@@ -854,7 +854,7 @@ class RequiredBean
     public void setStringProperty(String stringProperty) {
         this.stringProperty = stringProperty;
     }
-    
+
     @ConfigurationProperties("inner")
     public static class InnerConfig {
         private String innerProperty = "default value";
@@ -862,7 +862,7 @@ class RequiredBean
         public String getInnerProperty() {
             return innerProperty;
         }
-        
+
         public void setInnerProperty(String innerProperty) {
             this.innerProperty = innerProperty;
         }
@@ -916,8 +916,8 @@ interface Configuration extends Toggleable {}
 class ConfigurationImpl implements Configuration
 {
     private boolean enabled = false;
-    
-    @Override 
+
+    @Override
     public boolean isEnabled() {
         return this.enabled;
     }

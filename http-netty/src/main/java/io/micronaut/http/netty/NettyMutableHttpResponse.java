@@ -181,8 +181,7 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, Nett
 
     @Override
     public String toString() {
-        HttpStatus status = getStatus();
-        return status.getCode() + " " + status.getReason();
+        return code() + " " + reason();
     }
 
     @Override
@@ -203,11 +202,6 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, Nett
             }
         }
         return attributes;
-    }
-
-    @Override
-    public HttpStatus getStatus() {
-        return HttpStatus.valueOf(httpResponseStatus.code());
     }
 
     @Override
@@ -260,9 +254,11 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, Nett
     }
 
     @Override
-    public MutableHttpResponse<B> status(HttpStatus status, CharSequence message) {
-        message = message == null ? status.getReason() : message;
-        httpResponseStatus = new HttpResponseStatus(status.getCode(), message.toString());
+    public MutableHttpResponse<B> status(int status, CharSequence message) {
+        if (message == null) {
+            message = HttpStatus.getDefaultReason(status);
+        }
+        httpResponseStatus = new HttpResponseStatus(status, message.toString());
         return this;
     }
 

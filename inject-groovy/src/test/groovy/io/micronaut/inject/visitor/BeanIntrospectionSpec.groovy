@@ -40,7 +40,7 @@ class Test {
     public String getOne() {
         invoked = true
         one
-    } 
+    }
 }
 ''');
         when:
@@ -121,7 +121,7 @@ class Test {
     public String getOne() {
         invoked = true
         one
-    } 
+    }
 }
 ''');
         when:
@@ -168,7 +168,7 @@ class Test {
     @groovy.transform.PackageScope String three // package protected
     protected String four // not included since protected
     private String five // not included since private
-    
+
     Test(int two) {
         this.two = two
     }
@@ -217,28 +217,28 @@ import java.net.URL
 @io.micronaut.core.annotation.Introspected
 class CopyMe {
 
-    //@groovy.transform.PackageScope 
+    //@groovy.transform.PackageScope
     URL url
-    //@groovy.transform.PackageScope 
+    //@groovy.transform.PackageScope
     boolean enabled = false
     private final String name
     private final String another
-    
+
     CopyMe(String name, String another) {
         this.name = name;
         this.another = another;
     }
-    
+
     //@groovy.transform.PackageScope
     String getName() {
         return name
     }
-    
+
     //@groovy.transform.PackageScope
     String getAnother() {
         return another
     }
-    
+
     CopyMe withAnother(String a) {
         return this.another.is(a) ? this : new CopyMe(this.name, a.toUpperCase())
     }
@@ -398,12 +398,12 @@ public class MethodTest extends SuperType implements SomeInt {
     public boolean nonAnnotated() {
         return true;
     }
-    
+
     @Executable
     public String invokeMe(String str) {
         return str;
     }
-    
+
     @Executable
     int invokePrim(int i) {
         return i;
@@ -415,7 +415,7 @@ class SuperType {
     String superMethod(String str) {
         return str;
     }
-    
+
     @Executable
     public String invokeMe(String str) {
         return str;
@@ -427,7 +427,7 @@ interface SomeInt {
     default boolean ok() {
         return true;
     }
-    
+
     default String getName() {
         return "ok";
     }
@@ -438,18 +438,20 @@ interface SomeInt {
 
         then:
         // bizarrely Groovy doesn't support resolving default interface methods
-        beanMethods*.name as Set == ['invokeMe', 'invokePrim', 'superMethod'] as Set
+        beanMethods*.name as Set == ['invokeMe', 'invokePrim', 'superMethod', 'ok'] as Set
         beanMethods.every({it.annotationMetadata.hasAnnotation(Executable)})
         beanMethods.every { it.declaringBean == introspection}
 
         when:
         def invokeMe = beanMethods.find { it.name == 'invokeMe' }
         def invokePrim = beanMethods.find { it.name == 'invokePrim' }
+        def itfeMethod = beanMethods.find { it.name == 'ok' }
         def bean = introspection.instantiate()
 
         then:
         invokeMe.invoke(bean, "test") == 'test'
         invokePrim.invoke(bean, 10) == 10
+        itfeMethod.invoke(bean) == true
     }
 
     void "test generate bean introspection for interface"() {
@@ -544,23 +546,23 @@ import com.fasterxml.jackson.annotation.*;
 class Test {
     private String name;
     private int age;
-    
+
     @JsonCreator
     Test(@JsonProperty("name") String name) {
         this.name = name;
     }
-    
+
     Test(int age) {
         this.age = age;
     }
-    
+
     public int getAge() {
         return age;
     }
     public void setAge(int age) {
         this.age = age;
     }
-    
+
     public String getName() {
         return this.name;
     }
@@ -789,11 +791,11 @@ import java.util.*;
 @Introspected
 class Test {
     private Status status;
-    
+
     public void setStatus(Status status) {
         this.status = status;
     }
-    
+
     public Status getStatus() {
         return this.status;
     }
@@ -891,7 +893,7 @@ class Test {
     @Size(max=100)
     private int age;
     private int[] primitiveArray;
-    
+
     public Test(String name, int age, int[] primitiveArray) {
         this.name = name;
         this.age = age;
@@ -908,19 +910,19 @@ class Test {
     public void setAge(int age) {
         this.age = age;
     }
-    
+
     public void setId(Long id) {
         this.id = id;
     }
-    
+
     public Long getId() {
         return this.id;
     }
-    
+
     public void setVersion(Long version) {
         this.version = version;
     }
-    
+
     public Long getVersion() {
         return this.version;
     }
@@ -969,28 +971,28 @@ class Test extends ParentBean {
     private String name;
     @Size(max=100)
     private int age;
-    
+
     private List<Number> list;
     private String[] stringArray;
     private int[] primitiveArray;
     private boolean flag;
     private TypeConverter<String, Collection> genericsTest;
-    
+
     public TypeConverter<String, Collection> getGenericsTest() {
         return genericsTest;
     }
-        
+
     public String getReadOnly() {
         return readOnly;
     }
     public boolean isFlag() {
         return flag;
     }
-    
+
     public void setFlag(boolean flag) {
         this.flag = flag;
     }
-    
+
     public String getName() {
         return this.name;
     }
@@ -1003,11 +1005,11 @@ class Test extends ParentBean {
     public void setAge(int age) {
         this.age = age;
     }
-    
+
     public List<Number> getList() {
         return this.list;
     }
-    
+
     public void setList(List<Number> l) {
         this.list = l;
     }
@@ -1031,11 +1033,11 @@ class Test extends ParentBean {
 
 class ParentBean {
     private List<byte[]> listOfBytes;
-    
+
     public List<byte[]> getListOfBytes() {
         return this.listOfBytes;
     }
-    
+
     public void setListOfBytes(List<byte[]> list) {
         this.listOfBytes = list;
     }
@@ -1290,7 +1292,7 @@ import io.micronaut.core.annotation.*;
 
 @Introspected
 class Test {
-    
+
     final String name
 }
 
@@ -1321,16 +1323,16 @@ import io.micronaut.core.annotation.*
 @Introspected
 class Test {
     private String name
-    
+
     private Test(String name) {
         this.name = name
     }
-    
+
     @Creator
     static Test forName(String name) {
         new Test(name)
     }
-    
+
     String getName() {
         name
     }
@@ -1368,16 +1370,16 @@ import io.micronaut.core.annotation.*
 @Introspected
 class Test {
     private String name
-    
+
     private Test(String name) {
         this.name = name
     }
-    
+
     @Creator
     static Test forName() {
         new Test("default")
     }
-    
+
     String getName() {
         name
     }
@@ -1416,21 +1418,21 @@ import io.micronaut.core.annotation.*
 class Test {
 
     private String name
-    
+
     private Test(String name) {
         this.name = name
     }
-    
+
     @Creator
     static Test forName() {
         new Test("default")
     }
-    
+
     @Creator
     static Test forName(String name) {
         new Test(name)
     }
-    
+
     String getName() {
         name
     }
@@ -1529,7 +1531,7 @@ enum Test {
     Test(int number) {
         this.number = number
     }
-    
+
     int getNumber() {
         number
     }
@@ -1726,11 +1728,11 @@ class ValidatedConfig {
 
     @NotNull
     URL url
-    
+
     static class Inner {
-    
+
     }
-    
+
 }
 ''')
         expect:
@@ -1774,17 +1776,17 @@ class MyConfig {
 
     private String host
     private int serverPort
-    
+
     @ConfigurationInject
     MyConfig(@javax.validation.constraints.NotBlank String host, int serverPort) {
         this.host = host
         this.serverPort = serverPort
     }
-    
+
     String getHost() {
         host
     }
-    
+
     int getServerPort() {
         serverPort
     }
@@ -1849,13 +1851,13 @@ class ValidatedConfig {
 
     @NotNull
     URL url
-    
+
     public static class Inner {
     }
-    
+
     @ConfigurationProperties("another")
     static class Another {
-    
+
         @NotNull
         URL url
     }
@@ -2096,7 +2098,7 @@ import io.micronaut.core.annotation.Introspected
 abstract class Test {
     String name
     String author
-    
+
     int getAge() {
         0
     }

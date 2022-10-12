@@ -94,9 +94,12 @@ public final class AnnotationMetadataSupport {
                 ANNOTATION_TYPES.put(ann.getName(), ann)
         );
 
+
         for (Map.Entry<Class<? extends Annotation>, Class<? extends Annotation>> e : getCoreRepeatableAnnotations()) {
             REPEATABLE_ANNOTATIONS.put(e.getKey().getName(), e.getValue().getName());
         }
+
+        REPEATABLE_ANNOTATIONS.put("io.micronaut.aop.InterceptorBinding", "io.micronaut.aop.InterceptorBindingDefinitions");
     }
 
     /**

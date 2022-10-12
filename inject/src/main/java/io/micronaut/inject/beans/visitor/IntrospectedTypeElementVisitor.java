@@ -15,7 +15,6 @@
  */
 package io.micronaut.inject.beans.visitor;
 
-import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.core.annotation.AccessorsStyle;
 import io.micronaut.core.annotation.AnnotationClassValue;
@@ -23,20 +22,34 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
-import io.micronaut.inject.ast.*;
+import io.micronaut.inject.annotation.MutableAnnotationMetadata;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ElementModifier;
+import io.micronaut.inject.ast.ElementQuery;
+import io.micronaut.inject.ast.FieldElement;
+import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.ClassGenerationException;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
-
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -70,7 +83,6 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
     private Map<String, BeanIntrospectionWriter> writers = new LinkedHashMap<>(10);
     private List<AbstractIntrospection> abstractIntrospections = new ArrayList<>();
     private AbstractIntrospection currentAbstractIntrospection;
-    private ClassElement currentClassElement;
 
     @Override
     public int getOrder() {
@@ -81,23 +93,12 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
     @Override
     public void visitClass(ClassElement element, VisitorContext context) {
         // reset
-        currentClassElement = null;
         currentAbstractIntrospection = null;
         if (!element.isPrivate() && element.hasStereotype(Introspected.class)) {
             final AnnotationValue<Introspected> introspected = element.getAnnotation(Introspected.class);
             if (introspected != null && !writers.containsKey(element.getName())) {
-                currentClassElement = element;
                 processIntrospected(element, context, introspected);
             }
-        }
-    }
-
-    @Override
-    public void visitConstructor(ConstructorElement element, VisitorContext context) {
-        final ClassElement declaringType = element.getDeclaringType();
-        if (element.getDeclaringType().hasStereotype(ConfigurationReader.class)) {
-            final ParameterElement[] parameters = element.getParameters();
-            introspectIfValidated(context, declaringType, parameters);
         }
     }
 
@@ -114,13 +115,6 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                 .orElse(new String[]{AccessorsStyle.DEFAULT_READ_PREFIX});
         final String[] writePrefixes = declaringType.getValue(AccessorsStyle.class, "writePrefixes", String[].class)
                 .orElse(new String[]{AccessorsStyle.DEFAULT_WRITE_PREFIX});
-
-        if (declaringType.hasStereotype(ConfigurationReader.class) && NameUtils.isReaderName(methodName, readPrefixes) && !writers.containsKey(declaringType.getName())) {
-            final boolean hasConstraints = element.hasStereotype(JAVAX_VALIDATION_CONSTRAINT) || element.hasStereotype(JAVAX_VALIDATION_VALID);
-            if (hasConstraints) {
-                processIntrospected(declaringType, context, AnnotationValue.builder(Introspected.class).build());
-            }
-        }
 
         if (currentAbstractIntrospection != null) {
             if (NameUtils.isReaderName(methodName, readPrefixes) && element.getParameters().length == 0) {
@@ -139,28 +133,6 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                         propertyName
                 ));
                 propertyElement.writeMethod = element;
-            }
-        }
-    }
-
-    @Override
-    public void visitField(FieldElement element, VisitorContext context) {
-        final ClassElement declaringType = element.getDeclaringType();
-        if (declaringType.hasStereotype(ConfigurationReader.class) && !writers.containsKey(declaringType.getName())) {
-            final boolean hasConstraints = element.hasStereotype(JAVAX_VALIDATION_CONSTRAINT) || element.hasStereotype(JAVAX_VALIDATION_VALID);
-            if (hasConstraints) {
-                processIntrospected(declaringType, context, AnnotationValue.builder(Introspected.class).build());
-            }
-        }
-    }
-
-    private void introspectIfValidated(VisitorContext context, ClassElement declaringType, ParameterElement[] parameters) {
-        if (!writers.containsKey(declaringType.getName())) {
-            final boolean hasConstraints = Arrays.stream(parameters).anyMatch(e ->
-                    e.hasStereotype(JAVAX_VALIDATION_CONSTRAINT) || e.hasStereotype(JAVAX_VALIDATION_VALID)
-            );
-            if (hasConstraints) {
-                processIntrospected(declaringType, context, AnnotationValue.builder(Introspected.class).build());
             }
         }
     }
@@ -276,7 +248,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
 
             final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(
                     element,
-                    metadata ? element.getAnnotationMetadata() : null
+                    metadata ? MutableAnnotationMetadata.of(element.getAnnotationMetadata()) : null
             );
 
             processElement(
@@ -301,7 +273,6 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
 
     @Override
     public void finish(VisitorContext visitorContext) {
-
         try {
             for (AbstractIntrospection abstractIntrospection : abstractIntrospections) {
                 final Collection<? extends PropertyElement> properties = abstractIntrospection.properties.values();
@@ -484,6 +455,12 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                 continue;
             }
 
+            AnnotationMetadata annotationMetadata;
+            if (metadata) {
+                annotationMetadata = MutableAnnotationMetadata.of(beanProperty.getAnnotationMetadata());
+            } else {
+                annotationMetadata = null;
+            }
             writer.visitProperty(
                     type,
                     genericType,
@@ -491,7 +468,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                     beanProperty.getReadMethod().orElse(null),
                     beanProperty.getWriteMethod().orElse(null),
                     beanProperty.isReadOnly(),
-                    metadata ? beanProperty.getAnnotationMetadata() : null,
+                    annotationMetadata,
                     genericType.getTypeArguments()
             );
 

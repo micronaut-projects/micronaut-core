@@ -17,19 +17,14 @@ package io.micronaut.ast.groovy
 
 import groovy.transform.CompilationUnitAware
 import groovy.transform.CompileStatic
-import io.micronaut.ast.groovy.utils.AstAnnotationUtils
 import io.micronaut.ast.groovy.utils.AstMessageUtils
 import io.micronaut.ast.groovy.utils.InMemoryByteCodeGroovyClassLoader
 import io.micronaut.ast.groovy.utils.InMemoryClassWriterOutputVisitor
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.ast.groovy.visitor.LoadedVisitor
 import io.micronaut.core.order.OrderUtil
-import io.micronaut.core.util.CollectionUtils
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
-import io.micronaut.inject.visitor.VisitorContext
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder
-import io.micronaut.inject.writer.BeanDefinitionReferenceWriter
-import io.micronaut.inject.writer.BeanDefinitionWriter
 import io.micronaut.inject.writer.ClassWriterOutputVisitor
 import io.micronaut.inject.writer.DirectoryClassWriterOutputVisitor
 import org.codehaus.groovy.ast.ASTNode
@@ -38,7 +33,6 @@ import org.codehaus.groovy.control.CompilePhase
 import org.codehaus.groovy.control.SourceUnit
 import org.codehaus.groovy.transform.ASTTransformation
 import org.codehaus.groovy.transform.GroovyASTTransformation
-
 /**
  * Finishes the type element visitors.
  *
@@ -104,7 +98,6 @@ class TypeElementVisitorEnd implements ASTTransformation, CompilationUnitAware {
 
         TypeElementVisitorTransform.loadedVisitors.remove()
         TypeElementVisitorTransform.beanDefinitionBuilders.remove()
-        AstAnnotationUtils.invalidateCache()
         AbstractAnnotationMetadataBuilder.clearMutated()
     }
 

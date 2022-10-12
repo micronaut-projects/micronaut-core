@@ -15,11 +15,11 @@
  */
 package io.micronaut.annotation.processing.visitor;
 
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
 
 import javax.lang.model.element.TypeParameterElement;
@@ -41,18 +41,18 @@ final class JavaGenericPlaceholderElement extends JavaClassElement implements Ge
     final TypeVariable realTypeVariable;
     private final List<JavaClassElement> bounds;
 
-    JavaGenericPlaceholderElement(
-            @NonNull TypeVariable realTypeVariable,
-            @NonNull List<JavaClassElement> bounds,
-            int arrayDimensions) {
+    JavaGenericPlaceholderElement(@NonNull TypeVariable realTypeVariable,
+                                  @NonNull List<JavaClassElement> bounds,
+                                  @NonNull ElementAnnotationMetadataFactory annotationMetadataFactory,
+                                  int arrayDimensions) {
         super(
-                bounds.get(0).classElement,
-                bounds.get(0).getAnnotationMetadata(),
-                bounds.get(0).visitorContext,
-                bounds.get(0).typeArguments,
-                bounds.get(0).getGenericTypeInfo(),
-                arrayDimensions,
-                true
+            bounds.get(0).classElement,
+            annotationMetadataFactory,
+            bounds.get(0).visitorContext,
+            bounds.get(0).typeArguments,
+            bounds.get(0).getGenericTypeInfo(),
+            arrayDimensions,
+            true
         );
         this.realTypeVariable = realTypeVariable;
         this.bounds = bounds;
@@ -60,7 +60,8 @@ final class JavaGenericPlaceholderElement extends JavaClassElement implements Ge
 
     @Override
     public Object getNativeType() {
-        return realTypeVariable;
+        // Native types should be always Element
+        return getParameterElement();
     }
 
     @NonNull
@@ -86,7 +87,7 @@ final class JavaGenericPlaceholderElement extends JavaClassElement implements Ge
 
     @Override
     public ClassElement withArrayDimensions(int arrayDimensions) {
-        return new JavaGenericPlaceholderElement(realTypeVariable, bounds, arrayDimensions);
+        return new JavaGenericPlaceholderElement(realTypeVariable, bounds, elementAnnotationMetadataFactory, arrayDimensions);
     }
 
     @Override
@@ -95,8 +96,4 @@ final class JavaGenericPlaceholderElement extends JavaClassElement implements Ge
         return fold.apply(this);
     }
 
-    @Override
-    public AnnotationMetadata getAnnotationMetadata() {
-        return super.getAnnotationMetadata();
-    }
 }

@@ -11,6 +11,7 @@ import spock.lang.Ignore
 import spock.lang.Shared
 import spock.lang.Specification
 
+import javax.validation.ConstraintViolationException
 import javax.validation.ElementKind
 import javax.validation.Valid
 import javax.validation.ValidatorFactory
@@ -335,11 +336,21 @@ class ValidatorSpec extends Specification {
 
         when:
         arrayTest = applicationContext.createBean(ArrayTest)
-        arrayTest.integers = [30,10,60] as int[]
+        arrayTest.integers = [30, 10, 60] as int[] // Groovy property method access and validation
+
+        then:
+        def e = thrown(ConstraintViolationException)
+        e.message.contains "setIntegers.integers[0]: must be less than or equal to 20"
+        e.message.contains "setIntegers.integers[2]: must be less than or equal to 20"
+
+        when:
+        arrayTest = new ArrayTest()
+        arrayTest.integers = [30, 10, 60] as int[] // No interceptor
+
         def violations = validator.forExecutables().validateParameters(
-                new ArrayTest(),
-                ArrayTest.getDeclaredMethod("saveChild", ArrayTest.class),
-                [arrayTest] as Object[]
+            new ArrayTest(),
+            ArrayTest.getDeclaredMethod("saveChild", ArrayTest.class),
+            [arrayTest] as Object[]
         ).toList().sort({ it -> it.propertyPath.toString() })
 
         then:
