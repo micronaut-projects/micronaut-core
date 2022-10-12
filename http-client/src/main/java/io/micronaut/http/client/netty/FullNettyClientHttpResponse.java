@@ -61,7 +61,6 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultHttpClient.class);
 
-    private final HttpStatus status;
     private final NettyHttpHeaders headers;
     private final NettyCookies nettyCookies;
     private final MutableConvertibleValues<Object> attributes;
@@ -75,7 +74,6 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
 
     /**
      * @param fullHttpResponse       The full Http response
-     * @param httpStatus             The Http status
      * @param mediaTypeCodecRegistry The media type codec registry
      * @param byteBufferFactory      The byte buffer factory
      * @param bodyType               The body type
@@ -83,13 +81,11 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
      */
     FullNettyClientHttpResponse(
             FullHttpResponse fullHttpResponse,
-            HttpStatus httpStatus,
             MediaTypeCodecRegistry mediaTypeCodecRegistry,
             ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory,
             Argument<B> bodyType,
             boolean convertBody) {
 
-        this.status = httpStatus;
         this.headers = new NettyHttpHeaders(fullHttpResponse.headers(), ConversionService.SHARED);
         this.attributes = new MutableConvertibleValuesMap<>();
         this.nettyHttpResponse = fullHttpResponse;
@@ -120,8 +116,8 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
     }
 
     @Override
-    public HttpStatus getStatus() {
-        return status;
+    public int code() {
+        return this.nettyHttpResponse.status().code();
     }
 
     @Override
@@ -217,7 +213,7 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
                     converted = convertByteBuf(content, finalArgument);
                 }
             } catch (RuntimeException e) {
-                if (status.getCode() < 400) {
+                if (code() < 400) {
                     throw e;
                 } else {
                     if (LOG.isDebugEnabled()) {

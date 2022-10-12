@@ -57,7 +57,19 @@ public class NettyHttpResponseFactory implements HttpResponseFactory {
         if (reason == null) {
             nettyStatus = HttpResponseStatus.valueOf(status.getCode());
         } else {
-            nettyStatus = new HttpResponseStatus(status.getCode(), reason);
+            nettyStatus = HttpResponseStatus.valueOf(status.getCode(), reason);
+        }
+
+        return new NettyMutableHttpResponse(HttpVersion.HTTP_1_1, nettyStatus, ConversionService.SHARED);
+    }
+
+    @Override
+    public <T> MutableHttpResponse<T> status(int status, String reason) {
+        HttpResponseStatus nettyStatus;
+        if (reason == null) {
+            nettyStatus = HttpResponseStatus.valueOf(status);
+        } else {
+            nettyStatus = HttpResponseStatus.valueOf(status, reason);
         }
 
         return new NettyMutableHttpResponse(HttpVersion.HTTP_1_1, nettyStatus, ConversionService.SHARED);

@@ -51,6 +51,16 @@ public interface HttpResponseFactory {
      * Return a response for the given status.
      *
      * @param status The status
+     * @param reason An alternatively reason message
+     * @param <T>    The response type
+     * @return The response
+     */
+    <T> MutableHttpResponse<T> status(int status, String reason);
+
+    /**
+     * Return a response for the given status.
+     *
+     * @param status The status
      * @param body   The body
      * @param <T>    The body type
      * @return The response

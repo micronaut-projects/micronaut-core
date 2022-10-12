@@ -121,7 +121,7 @@ public class HttpResponseEncoder extends MessageToMessageEncoder<MutableHttpResp
             ByteBuf body = b instanceof  ByteBuf ? (ByteBuf) b : Unpooled.buffer(0);
             FullHttpResponse nettyResponse = new DefaultFullHttpResponse(
                     HttpVersion.HTTP_1_1,
-                    HttpResponseStatus.valueOf(response.status().getCode(), response.status().getReason()),
+                    HttpResponseStatus.valueOf(response.code(), response.reason()),
                     body,
                     nettyHeaders,
                     EmptyHttpHeaders.INSTANCE
