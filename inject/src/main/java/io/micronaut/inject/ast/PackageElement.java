@@ -46,7 +46,7 @@ public interface PackageElement extends Element {
      * Is unnamed package?
      *
      * @return true if unnamed
-     * @since 3.7.0
+     * @since 4.0.0
      */
     default boolean isUnnamed() {
         return StringUtils.isEmpty(getName());
