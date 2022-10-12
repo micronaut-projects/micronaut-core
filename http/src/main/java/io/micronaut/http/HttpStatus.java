@@ -15,6 +15,9 @@
  */
 package io.micronaut.http;
 
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+
 import java.util.Objects;
 
 /**
@@ -264,6 +267,24 @@ public enum HttpStatus implements CharSequence {
             default:
                 throw new IllegalArgumentException("Invalid HTTP status code: " + code);
         }
+    }
+
+    /**
+     * Get the default reason phrase for the given status code, if it is a known status code.
+     *
+     * @param code The status code
+     * @return The default reason phrase, or {@code "CUSTOM"} if the code is unknown.
+     */
+    @Internal
+    @NonNull
+    public static String getDefaultReason(int code) {
+        HttpStatus httpStatus;
+        try {
+            httpStatus = valueOf(code);
+        } catch (IllegalArgumentException e) {
+            return "CUSTOM";
+        }
+        return httpStatus.getReason();
     }
 
     @Override

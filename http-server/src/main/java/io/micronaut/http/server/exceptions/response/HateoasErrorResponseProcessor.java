@@ -64,13 +64,13 @@ public class HateoasErrorResponseProcessor implements ErrorResponseProcessor<Jso
         }
         JsonError error;
         if (!errorContext.hasErrors()) {
-            error = new JsonError(response.getStatus().getReason());
+            error = new JsonError(response.reason());
         } else if (errorContext.getErrors().size() == 1 && !alwaysSerializeErrorsAsList) {
             Error jsonError = errorContext.getErrors().get(0);
             error = new JsonError(jsonError.getMessage());
             jsonError.getPath().ifPresent(error::path);
         } else {
-            error = new JsonError(response.getStatus().getReason());
+            error = new JsonError(response.reason());
             List<Resource> errors = new ArrayList<>();
             for (Error jsonError : errorContext.getErrors()) {
                 errors.add(new JsonError(jsonError.getMessage()).path(jsonError.getPath().orElse(null)));

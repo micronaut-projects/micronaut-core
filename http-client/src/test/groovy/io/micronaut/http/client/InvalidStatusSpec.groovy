@@ -1,11 +1,12 @@
 package io.micronaut.http.client
 
-import com.github.tomakehurst.wiremock.WireMockServer
-import com.github.tomakehurst.wiremock.client.WireMock
-import com.github.tomakehurst.wiremock.core.WireMockConfiguration
+
 import io.micronaut.context.ApplicationContext
-import io.micronaut.http.HttpRequest
-import reactor.core.publisher.Flux
+import io.micronaut.context.annotation.Requires
+import io.micronaut.http.HttpResponse
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
+import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -14,32 +15,39 @@ class InvalidStatusSpec extends Specification {
 
     @Shared
     @AutoCleanup
-    ApplicationContext context = ApplicationContext.run()
+    ApplicationContext context = ApplicationContext.run([
+            'spec.name': 'InvalidStatusSpec'
+    ])
 
     void "test receiving an invalid status code"() {
         given:
-        WireMockServer wireMockServer = new WireMockServer(WireMockConfiguration.options().dynamicPort())
-        wireMockServer.start()
-        wireMockServer.stubFor(WireMock.get("/status-only")
-                .willReturn(WireMock.status(519)))
-        StreamingHttpClient client = context.createBean(StreamingHttpClient, new URL("http://localhost:${wireMockServer.port()}"))
+        EmbeddedServer server = context.getBean(EmbeddedServer)
+        server.start()
+        StreamingHttpClient client = context.createBean(StreamingHttpClient, server.URL)
 
         when:
-        client.toBlocking().exchange("/status-only", String)
+        def response = client.toBlocking().exchange("/invalid-status", String)
 
+        then:
+        response.code() == 290
+
+        when:
+        response.status()
         then:
         def ex = thrown(IllegalArgumentException)
-        ex.message == "Invalid HTTP status code: 519"
-
-        when:
-        Flux.from(client.dataStream(HttpRequest.GET("/status-only"))).blockFirst()
-
-        then:
-        ex = thrown(IllegalArgumentException)
-        ex.message == "Invalid HTTP status code: 519"
+        ex.message == "Invalid HTTP status code: 290"
 
         cleanup:
         client.close()
-        wireMockServer.stop()
+        server.stop()
+    }
+
+    @Controller('/invalid-status')
+    @Requires(property = 'spec.name', value = 'InvalidStatusSpec')
+    static class InvalidStatusController {
+        @Get
+        HttpResponse<?> status() {
+            return HttpResponse.ok().status(290)
+        }
     }
 }
