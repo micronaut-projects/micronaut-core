@@ -34,5 +34,5 @@ public interface ConfigurationMetadataWriter {
      * @param classWriterOutputVisitor The class output visitor
      * @throws IOException If an error occurred writing output
      */
-    void write(ConfigurationMetadataBuilder<?> metadataBuilder, ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException;
+    void write(ConfigurationMetadataBuilder metadataBuilder, ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException;
 }

@@ -31,7 +31,6 @@ import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.Qualifier;
-import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
@@ -39,14 +38,12 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
-import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.Toggleable;
 import io.micronaut.core.value.OptionalValues;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.ProxyBeanDefinition;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
-import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementQuery;
@@ -54,7 +51,6 @@ import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.TypedElement;
-import io.micronaut.inject.configuration.ConfigurationMetadata;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.visitor.VisitorContext;
@@ -117,12 +113,6 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             DefaultBeanContext.class,
             "getProxyTargetBean",
             BeanResolutionContext.class,
-            Argument.class,
-            Qualifier.class
-    ));
-    public static final Method METHOD_GET_PROXY_TARGET_BEAN = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(
-            BeanLocator.class,
-            "getProxyTargetBean",
             Argument.class,
             Qualifier.class
     ));
@@ -212,13 +202,11 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
      * <p>Additional {@link Interceptor} types can be added downstream with {@link #visitInterceptorBinding(AnnotationValue[])} .</p>
      *  @param parent             The parent {@link BeanDefinitionWriter}
      * @param settings           optional setting
-     * @param metadataBuilder    The configuration metadata builder
      * @param visitorContext     The visitor context
      * @param interceptorBinding The interceptor binding of the {@link Interceptor} instances to be injected
      */
     public AopProxyWriter(BeanDefinitionWriter parent,
                           OptionalValues<Boolean> settings,
-                          ConfigurationMetadataBuilder<?> metadataBuilder,
                           VisitorContext visitorContext,
                           AnnotationValue<?>... interceptorBinding) {
         super(parent.getOriginatingElements());
@@ -244,7 +232,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         this.proxyBeanDefinitionWriter = new BeanDefinitionWriter(
                 aopElement,
                 parent,
-                metadataBuilder, visitorContext
+                visitorContext
         );
         startClass(classWriter, getInternalName(proxyFullName), getTypeReferenceForName(targetClassFullName));
         proxyBeanDefinitionWriter.setInterceptedType(targetClassFullName);
@@ -259,8 +247,6 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
      * @param annotationMetadata The annotation metadata
      * @param interfaceTypes     The additional interfaces to implement
      * @param visitorContext     The visitor context
-     * @param metadataBuilder    The configuration metadata builder
-     * @param configurationMetadata The configuration metadata for the class
      * @param interceptorBinding The interceptor types
      */
     public AopProxyWriter(String packageName,
@@ -270,10 +256,8 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                           AnnotationMetadata annotationMetadata,
                           ClassElement[] interfaceTypes,
                           VisitorContext visitorContext,
-                          ConfigurationMetadataBuilder<?> metadataBuilder,
-                          ConfigurationMetadata configurationMetadata,
                           AnnotationValue<?>... interceptorBinding) {
-        this(packageName, className, isInterface, true, originatingElement, annotationMetadata, interfaceTypes, visitorContext, metadataBuilder, configurationMetadata, interceptorBinding);
+        this(packageName, className, isInterface, true, originatingElement, annotationMetadata, interfaceTypes, visitorContext, interceptorBinding);
     }
 
     /**
@@ -286,8 +270,6 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
      * @param annotationMetadata The annotation metadata
      * @param interfaceTypes     The additional interfaces to implement
      * @param visitorContext     The visitor context
-     * @param metadataBuilder    The configuration metadata builder
-     * @param configurationMetadata The configuration metadata for the class
      * @param interceptorBinding The interceptor binding
      */
     public AopProxyWriter(String packageName,
@@ -298,8 +280,6 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                           AnnotationMetadata annotationMetadata,
                           ClassElement[] interfaceTypes,
                           VisitorContext visitorContext,
-                          ConfigurationMetadataBuilder<?> metadataBuilder,
-                          ConfigurationMetadata configurationMetadata,
                           AnnotationValue<?>... interceptorBinding) {
         super(OriginatingElements.of(originatingElement));
         this.isIntroduction = true;
@@ -323,21 +303,6 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         this.interceptorBinding = toInterceptorBindingMap(interceptorBinding);
         this.interfaceTypes = interfaceTypes != null ? new LinkedHashSet<>(Arrays.asList(interfaceTypes)) : Collections.emptySet();
         this.classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
-        if (configurationMetadata != null) {
-            // unfortunate we have to do this
-            String existingPrefix = annotationMetadata.stringValue(
-                    ConfigurationReader.class,
-                    "prefix")
-                    .orElse("");
-
-            String computedPrefix = StringUtils.isNotEmpty(existingPrefix) ? existingPrefix + "." + configurationMetadata.getName() : configurationMetadata.getName();
-            annotationMetadata = DefaultAnnotationMetadata.mutateMember(
-                    annotationMetadata,
-                    ConfigurationReader.class.getName(),
-                    "prefix",
-                    computedPrefix
-            );
-        }
         ClassElement aopElement = ClassElement.of(
                 proxyFullName,
                 isInterface,
@@ -346,7 +311,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         this.proxyBeanDefinitionWriter = new BeanDefinitionWriter(
                 aopElement,
                 this,
-                metadataBuilder, visitorContext
+                visitorContext
         );
         if (isInterface) {
             if (implementInterface) {
@@ -1199,12 +1164,14 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     public void visitSetterValue(
             TypedElement declaringType,
             MethodElement methodElement,
+            AnnotationMetadata annotationMetadata,
             boolean requiresReflection,
             boolean isOptional) {
         deferredInjectionPoints.add(() ->
                 proxyBeanDefinitionWriter.visitSetterValue(
                         declaringType,
                         methodElement,
+                        annotationMetadata,
                         requiresReflection,
                         isOptional
                 )
@@ -1298,16 +1265,13 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
     @Override
     public void visitFieldValue(
-            TypedElement declaringType,
-            FieldElement fieldType,
-            boolean requiresReflection,
-            boolean isOptional) {
+        TypedElement declaringType,
+        FieldElement fieldType,
+        boolean requiresReflection, boolean isOptional) {
         deferredInjectionPoints.add(() ->
                 proxyBeanDefinitionWriter.visitFieldValue(
                         declaringType,
-                        fieldType,
-                        requiresReflection,
-                        isOptional
+                        fieldType, requiresReflection, isOptional
                 )
         );
     }
@@ -1338,13 +1302,13 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     }
 
     @Override
-    public void visitConfigBuilderMethod(String prefix, ClassElement returnType, String methodName, ClassElement paramType, Map<String, ClassElement> generics, String propertyPath) {
-        proxyBeanDefinitionWriter.visitConfigBuilderMethod(prefix, returnType, methodName, paramType, generics, propertyPath);
+    public void visitConfigBuilderMethod(String propertyName, ClassElement returnType, String methodName, ClassElement paramType, Map<String, ClassElement> generics, String propertyPath) {
+        proxyBeanDefinitionWriter.visitConfigBuilderMethod(propertyName, returnType, methodName, paramType, generics, propertyPath);
     }
 
     @Override
-    public void visitConfigBuilderDurationMethod(String prefix, ClassElement returnType, String methodName, String propertyPath) {
-        proxyBeanDefinitionWriter.visitConfigBuilderDurationMethod(prefix, returnType, methodName, propertyPath);
+    public void visitConfigBuilderDurationMethod(String propertyName, ClassElement returnType, String methodName, String propertyPath) {
+        proxyBeanDefinitionWriter.visitConfigBuilderDurationMethod(propertyName, returnType, methodName, propertyPath);
     }
 
     @Override

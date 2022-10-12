@@ -460,8 +460,9 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
                     validatorCache.put(key, local.get());
                     return (Optional) local;
                 } else if (beanContext != null) {
-                    final ConstraintValidator cv = beanContext
-                            .findBean(ConstraintValidator.class, qualifier).orElse(ConstraintValidator.VALID);
+                    Optional<ConstraintValidator> bean = beanContext
+                        .findBean(ConstraintValidator.class, qualifier);
+                    final ConstraintValidator cv = bean.orElse(ConstraintValidator.VALID);
                     validatorCache.put(key, cv);
                     if (cv != ConstraintValidator.VALID) {
                         return Optional.of(cv);

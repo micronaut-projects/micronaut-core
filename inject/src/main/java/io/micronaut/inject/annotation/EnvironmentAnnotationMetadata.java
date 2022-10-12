@@ -51,7 +51,7 @@ interface EnvironmentAnnotationMetadata extends AnnotationMetadata {
      * @return The enum value
      */
     @Internal
-    <E extends Enum> Optional<E> enumValue(@NonNull Class<? extends Annotation> annotation, @NonNull String member, Class<E> enumType, @Nullable Function<Object, Object> valueMapper);
+    <E extends Enum<E>> Optional<E> enumValue(@NonNull Class<? extends Annotation> annotation, @NonNull String member, Class<E> enumType, @Nullable Function<Object, Object> valueMapper);
 
     /**
      * Retrieve the enum value and optionally map its value.
@@ -63,7 +63,7 @@ interface EnvironmentAnnotationMetadata extends AnnotationMetadata {
      * @return The enum value
      */
     @Internal
-    <E extends Enum> Optional<E> enumValue(@NonNull String annotation, @NonNull String member, Class<E> enumType, @Nullable Function<Object, Object> valueMapper);
+    <E extends Enum<E>> Optional<E> enumValue(@NonNull String annotation, @NonNull String member, Class<E> enumType, @Nullable Function<Object, Object> valueMapper);
 
     /**
      * Retrieve the enum values and optionally map its value.
@@ -75,7 +75,7 @@ interface EnvironmentAnnotationMetadata extends AnnotationMetadata {
      * @return The enum value
      */
     @Internal
-    <E extends Enum> E[] enumValues(@NonNull Class<? extends Annotation> annotation, @NonNull String member, Class<E> enumType, @Nullable Function<Object, Object> valueMapper);
+    <E extends Enum<E>> E[] enumValues(@NonNull Class<? extends Annotation> annotation, @NonNull String member, Class<E> enumType, @Nullable Function<Object, Object> valueMapper);
 
     /**
      * Retrieve the enum values and optionally map its value.
@@ -87,7 +87,7 @@ interface EnvironmentAnnotationMetadata extends AnnotationMetadata {
      * @return The enum value
      */
     @Internal
-    <E extends Enum> E[] enumValues(@NonNull String annotation, @NonNull String member, Class<E> enumType, @Nullable Function<Object, Object> valueMapper);
+    <E extends Enum<E>> E[] enumValues(@NonNull String annotation, @NonNull String member, Class<E> enumType, @Nullable Function<Object, Object> valueMapper);
 
     /**
      * Retrieve the class value and optionally map its value.

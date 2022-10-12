@@ -16,7 +16,11 @@
 package io.micronaut.inject.writer;
 
 import io.micronaut.context.AbstractInitializableBeanDefinitionReference;
-import io.micronaut.context.annotation.*;
+import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.ConfigurationReader;
+import io.micronaut.context.annotation.DefaultScope;
+import io.micronaut.context.annotation.Primary;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
