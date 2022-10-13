@@ -336,16 +336,6 @@ public class JavaParser implements Closeable {
 
     @Override
     public void close() {
-        if (compiler != null) {
-            try {
-                // avoid illegal access
-                if (!Jvm.getCurrent().isJava15Compatible()) {
-                    ((com.sun.tools.javac.main.JavaCompiler) compiler).close();
-                }
-            } catch (Exception e) {
-                // ignore
-            }
-        }
         if (fileManager != null) {
             try {
                 fileManager.close();
