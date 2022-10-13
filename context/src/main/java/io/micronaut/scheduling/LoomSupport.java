@@ -1,11 +1,11 @@
 /*
- * Copyright 2003-2021 the original author or authors.
+ * Copyright 2017-2021 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     https://www.apache.org/licenses/LICENSE-2.0
+ * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,7 +19,15 @@ import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 
-public class LoomSupport {
+/**
+ * Adds support for Loom virtual threads.
+ */
+public final class LoomSupport {
+    /**
+     * returns an executor service using virtual threads.
+     * @param threadFactory the thread factory
+     * @return a non-empty optional if virtual threads are supported
+     */
     public Optional<ExecutorService> newVirtualThreadExecutorService(ThreadFactory threadFactory) {
         return Optional.empty();
     }
