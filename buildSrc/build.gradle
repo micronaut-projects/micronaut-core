@@ -12,4 +12,5 @@ dependencies {
     implementation "io.micronaut.build.internal:micronaut-gradle-plugins:5.3.14"
     implementation "org.tomlj:tomlj:1.0.0"
     implementation "me.champeau.gradle:japicmp-gradle-plugin:0.4.1"
+    implementation "me.champeau.gradle.mrjar:plugin:0.1.1"
 }

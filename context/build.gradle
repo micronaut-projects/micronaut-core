@@ -20,3 +20,21 @@ spotless {
         targetExclude '**/io/micronaut/scheduling/cron/CronExpression.java'
     }
 }
+
+multiRelease {
+    targetVersions 17, 19
+}
+
+tasks.named("compileJava19Java", JavaCompile) {
+    options.compilerArgs.addAll([
+            "--enable-preview",
+            "--add-modules", "jdk.incubator.concurrent"
+    ])
+}
+
+tasks.withType(JavaExec).configureEach {
+    jvmArgs = [
+            "--enable-preview",
+            "--add-modules", "jdk.incubator.concurrent"
+    ]
+}
