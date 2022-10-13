@@ -17,6 +17,7 @@ package io.micronaut.scheduling.executor;
 
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.scheduling.LoomSupport;
 import io.micronaut.scheduling.TaskExecutors;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
@@ -37,6 +38,8 @@ public class IOExecutorServiceConfig {
     @Singleton
     @Named(TaskExecutors.IO)
     ExecutorConfiguration configuration() {
-        return UserExecutorConfiguration.of(TaskExecutors.IO, ExecutorType.CACHED);
+        UserExecutorConfiguration cfg = UserExecutorConfiguration.of(TaskExecutors.IO, LoomSupport.isSupported() ? ExecutorType.THREAD_PER_TASK : ExecutorType.CACHED);
+        cfg.setVirtual(LoomSupport.isSupported());
+        return cfg;
     }
 }

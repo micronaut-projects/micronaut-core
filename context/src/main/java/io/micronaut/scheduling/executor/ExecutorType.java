@@ -42,5 +42,10 @@ public enum ExecutorType {
     /**
      * @see java.util.concurrent.Executors#newWorkStealingPool()
      */
-    WORK_STEALING
+    WORK_STEALING,
+
+    /**
+     * @see java.util.concurrent.Executors#newVirtualThreadPerTaskExecutor()
+     */
+    THREAD_PER_TASK
 }

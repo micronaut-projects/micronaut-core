@@ -21,9 +21,12 @@ import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.inject.qualifiers.Qualifiers;
+import io.micronaut.scheduling.LoomSupport;
 import jakarta.inject.Inject;
 
-import java.util.concurrent.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 
 /**
  * Constructs {@link ExecutorService} instances based on {@link UserExecutorConfiguration} instances.
@@ -57,7 +60,13 @@ public class ExecutorFactory {
      */
     @EachBean(ExecutorConfiguration.class)
     protected ThreadFactory eventLoopGroupThreadFactory(ExecutorConfiguration configuration) {
-        return configuration.getName() == null ? threadFactory : new NamedThreadFactory(configuration.getName() + "-executor");
+        if (configuration.isVirtual()) {
+            return LoomSupport.newVirtualThreadFactory(configuration.getName() + "-executor");
+        }
+        if (configuration.getName() != null) {
+            return new NamedThreadFactory(configuration.getName() + "-executor");
+        }
+        return threadFactory;
     }
 
     /**
@@ -79,6 +88,8 @@ public class ExecutorFactory {
                 return Executors.newScheduledThreadPool(executorConfiguration.getCorePoolSize(), getThreadFactory(executorConfiguration));
             case WORK_STEALING:
                 return Executors.newWorkStealingPool(executorConfiguration.getParallelism());
+            case THREAD_PER_TASK:
+                return LoomSupport.newThreadPerTaskExecutor(getThreadFactory(executorConfiguration));
 
             default:
                 throw new IllegalStateException("Could not create Executor service for enum value: " + executorType);

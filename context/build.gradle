@@ -28,13 +28,17 @@ multiRelease {
 tasks.named("compileJava19Java", JavaCompile) {
     options.compilerArgs.addAll([
             "--enable-preview",
-            "--add-modules", "jdk.incubator.concurrent"
+    ])
+}
+
+tasks.named("compileJava19TestJava", JavaCompile) {
+    options.compilerArgs.addAll([
+            "--enable-preview",
     ])
 }
 
 tasks.withType(JavaExec).configureEach {
     jvmArgs = [
             "--enable-preview",
-            "--add-modules", "jdk.incubator.concurrent"
     ]
 }
