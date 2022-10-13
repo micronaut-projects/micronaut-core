@@ -7,7 +7,7 @@ caffeine = "2.9.3"
 compile-testing = "0.19"
 
 geb = "3.4.1"
-geb-groovy = "3.0.12"
+geb-groovy = "3.0.13"
 geb-spock = "2.2-groovy-3.0"
 
 hibernate = "5.5.9.Final"
