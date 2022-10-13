@@ -42,11 +42,12 @@ dependencies {
         testImplementation libs.bcpkix
     }
 
-    testImplementation(libs.managed.micronaut.xml) {
-        exclude module:'micronaut-inject'
-        exclude module:'micronaut-http'
-        exclude module:'micronaut-bom'
-    }
+// Add Micronaut Jackson XML after v4 Migration
+//    testImplementation(libs.managed.micronaut.xml) {
+//        exclude module:'micronaut-inject'
+//        exclude module:'micronaut-http'
+//        exclude module:'micronaut-bom'
+//    }
     testImplementation libs.managed.jackson.databind
 
     // http impls for tests

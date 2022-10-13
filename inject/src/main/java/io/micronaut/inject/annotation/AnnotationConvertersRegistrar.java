@@ -16,7 +16,7 @@
 package io.micronaut.inject.annotation;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.reflect.ClassUtils;
 
@@ -36,7 +36,7 @@ import java.util.Optional;
 public final class AnnotationConvertersRegistrar implements TypeConverterRegistrar {
 
     @Override
-    public void register(ConversionService<?> conversionService) {
+    public void register(MutableConversionService conversionService) {
         conversionService.addConverter(io.micronaut.core.annotation.AnnotationValue.class, Annotation.class, (object, targetType, context) -> {
             Optional<Class> annotationClass = ClassUtils.forName(object.getAnnotationName(), targetType.getClassLoader());
             return annotationClass.map(aClass -> AnnotationMetadataSupport.buildAnnotation(aClass, object));

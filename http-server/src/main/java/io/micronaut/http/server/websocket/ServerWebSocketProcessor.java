@@ -50,7 +50,7 @@ public class ServerWebSocketProcessor extends DefaultRouteBuilder implements Exe
      * @param uriNamingStrategy The {@link io.micronaut.web.router.RouteBuilder.UriNamingStrategy}
      * @param conversionService The {@link ConversionService}
      */
-    ServerWebSocketProcessor(ExecutionHandleLocator executionHandleLocator, UriNamingStrategy uriNamingStrategy, ConversionService<?> conversionService) {
+    ServerWebSocketProcessor(ExecutionHandleLocator executionHandleLocator, UriNamingStrategy uriNamingStrategy, ConversionService conversionService) {
         super(executionHandleLocator, uriNamingStrategy, conversionService);
     }
 

@@ -16,6 +16,7 @@
 package io.micronaut.docs.config.converters
 
 // tag::imports[]
+import io.micronaut.context.annotation.Prototype
 import io.micronaut.core.convert.ConversionContext
 import io.micronaut.core.convert.ConversionService
 import io.micronaut.core.convert.TypeConverter
@@ -26,7 +27,7 @@ import jakarta.inject.Singleton
 // end::imports[]
 
 // tag::class[]
-@Singleton
+@Prototype
 class MapToLocalDateConverter : TypeConverter<Map<*, *>, LocalDate> { // <1>
     override fun convert(propertyMap: Map<*, *>, targetType: Class<LocalDate>, context: ConversionContext): Optional<LocalDate> {
         val day = ConversionService.SHARED.convert(propertyMap["day"], Int::class.java)

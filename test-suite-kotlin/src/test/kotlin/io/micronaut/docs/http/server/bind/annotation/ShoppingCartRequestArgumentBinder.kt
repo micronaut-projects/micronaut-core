@@ -13,7 +13,7 @@ import jakarta.inject.Singleton
 
 @Singleton
 class ShoppingCartRequestArgumentBinder(
-        private val conversionService: ConversionService<*>,
+        private val conversionService: ConversionService,
         private val objectSerializer: JacksonObjectSerializer
 ) : AnnotatedRequestArgumentBinder<ShoppingCart, Any> { //<1>
 

@@ -44,7 +44,7 @@ public interface PropertyExpressionResolver {
      */
     @NonNull
     <T> Optional<T> resolve(@NonNull PropertyResolver propertyResolver,
-                            @NonNull ConversionService<?> conversionService,
+                            @NonNull ConversionService conversionService,
                             @NonNull String expression,
                             @NonNull Class<T> requiredType);
 

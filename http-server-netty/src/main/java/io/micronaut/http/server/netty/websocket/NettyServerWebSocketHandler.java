@@ -111,7 +111,8 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
                 routeMatch.getVariableValues(),
                 handshaker.version(),
                 handshaker.selectedSubprotocol(),
-                webSocketSessionRepository);
+                webSocketSessionRepository,
+                nettyEmbeddedServices.getApplicationContext().getConversionService());
 
         this.nettyEmbeddedServices = nettyEmbeddedServices;
         this.coroutineHelper = coroutineHelper;

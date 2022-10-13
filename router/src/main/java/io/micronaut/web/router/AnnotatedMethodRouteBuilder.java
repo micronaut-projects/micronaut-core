@@ -54,7 +54,7 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
      * @param uriNamingStrategy The URI naming strategy
      * @param conversionService The conversion service
      */
-    public AnnotatedMethodRouteBuilder(ExecutionHandleLocator executionHandleLocator, UriNamingStrategy uriNamingStrategy, ConversionService<?> conversionService) {
+    public AnnotatedMethodRouteBuilder(ExecutionHandleLocator executionHandleLocator, UriNamingStrategy uriNamingStrategy, ConversionService conversionService) {
         super(executionHandleLocator, uriNamingStrategy, conversionService);
         httpMethodsHandlers.put(Get.class, (RouteDefinition definition) -> {
             final BeanDefinition bean = definition.beanDefinition;

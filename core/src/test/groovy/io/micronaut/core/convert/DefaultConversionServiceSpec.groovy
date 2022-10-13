@@ -31,7 +31,7 @@ class DefaultConversionServiceSpec extends Specification {
     @Unroll
     void "test default conversion service converts a #sourceObject.class.name to a #targetType.name"() {
         given:
-        ConversionService conversionService = new DefaultConversionService()
+        ConversionService conversionService = new DefaultMutableConversionService()
 
         expect:
         conversionService.convert(sourceObject, targetType).get() == result
@@ -70,7 +70,7 @@ class DefaultConversionServiceSpec extends Specification {
 
     void "test empty string conversion"() {
         given:
-        ConversionService conversionService = new DefaultConversionService()
+        ConversionService conversionService = new DefaultMutableConversionService()
 
         expect:
         !conversionService.convert("", targetType).isPresent()
@@ -81,7 +81,7 @@ class DefaultConversionServiceSpec extends Specification {
 
     void "test convert required"() {
         given:
-        ConversionService conversionService = new DefaultConversionService()
+        ConversionService conversionService = new DefaultMutableConversionService()
 
         when:
         conversionService.convertRequired("junk", Integer)
@@ -94,7 +94,7 @@ class DefaultConversionServiceSpec extends Specification {
 
     void "test conversion service with type arguments"() {
         given:
-        ConversionService conversionService = new DefaultConversionService()
+        ConversionService conversionService = new DefaultMutableConversionService()
 
         expect:
         conversionService.convert(sourceObject, targetType, ConversionContext.of(typeArguments)).get() == result

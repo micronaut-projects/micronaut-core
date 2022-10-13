@@ -69,7 +69,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     static final Object NO_VALUE = new Object();
     protected final ExecutionHandleLocator executionHandleLocator;
     protected final UriNamingStrategy uriNamingStrategy;
-    protected final ConversionService<?> conversionService;
+    protected final ConversionService conversionService;
     protected final Charset defaultCharset;
 
     private DefaultUriRoute currentParentRoute = null;
@@ -99,7 +99,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
      * @param uriNamingStrategy The URI naming strategy
      * @param conversionService The conversion service
      */
-    public DefaultRouteBuilder(ExecutionHandleLocator executionHandleLocator, UriNamingStrategy uriNamingStrategy, ConversionService<?> conversionService) {
+    public DefaultRouteBuilder(ExecutionHandleLocator executionHandleLocator, UriNamingStrategy uriNamingStrategy, ConversionService conversionService) {
         this.executionHandleLocator = executionHandleLocator;
         this.uriNamingStrategy = uriNamingStrategy;
         this.conversionService = conversionService;
@@ -383,10 +383,10 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     private UriRoute buildRoute(String httpMethodName, HttpMethod httpMethod, String uri, MethodExecutionHandle<?, Object> executableHandle) {
         UriRoute route;
         if (currentParentRoute != null) {
-            route = new DefaultUriRoute(httpMethod, currentParentRoute.uriMatchTemplate.nest(uri), executableHandle, httpMethodName);
+            route = new DefaultUriRoute(httpMethod, currentParentRoute.uriMatchTemplate.nest(uri), executableHandle, httpMethodName, conversionService);
             currentParentRoute.nestedRoutes.add((DefaultUriRoute) route);
         } else {
-            route = new DefaultUriRoute(httpMethod, uri, executableHandle, httpMethodName);
+            route = new DefaultUriRoute(httpMethod, uri, executableHandle, httpMethodName, conversionService);
         }
 
         this.uriRoutes.add(route);
@@ -418,7 +418,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     abstract class AbstractRoute implements MethodBasedRoute, RouteInfo<Object> {
         protected final List<Predicate<HttpRequest<?>>> conditions = new ArrayList<>();
         protected final MethodExecutionHandle<?, ?> targetMethod;
-        protected final ConversionService<?> conversionService;
+        protected final ConversionService conversionService;
         protected List<MediaType> consumesMediaTypes;
         protected List<MediaType> producesMediaTypes;
         protected String bodyArgumentName;
@@ -442,7 +442,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
          * @param conversionService The conversion service
          * @param mediaTypes The media types
          */
-        AbstractRoute(MethodExecutionHandle targetMethod, ConversionService<?> conversionService, List<MediaType> mediaTypes) {
+        AbstractRoute(MethodExecutionHandle targetMethod, ConversionService conversionService, List<MediaType> mediaTypes) {
             this.targetMethod = targetMethod;
             this.conversionService = conversionService;
             this.consumesMediaTypes = mediaTypes;
@@ -651,7 +651,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
          * @param targetMethod The target method execution handle
          * @param conversionService The conversion service
          */
-        public DefaultErrorRoute(Class<? extends Throwable> error, MethodExecutionHandle targetMethod, ConversionService<?> conversionService) {
+        public DefaultErrorRoute(Class<? extends Throwable> error, MethodExecutionHandle targetMethod, ConversionService conversionService) {
             this(null, error, targetMethod, conversionService);
         }
 
@@ -664,7 +664,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         public DefaultErrorRoute(
                 Class originatingClass, Class<? extends Throwable> error,
                 MethodExecutionHandle targetMethod,
-                ConversionService<?> conversionService) {
+                ConversionService conversionService) {
             super(targetMethod, conversionService, Collections.emptyList());
             this.originatingClass = originatingClass;
             this.error = error;
@@ -772,7 +772,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
          * @param targetMethod The target method execution handle
          * @param conversionService The conversion service
          */
-        public DefaultStatusRoute(HttpStatus status, MethodExecutionHandle targetMethod, ConversionService<?> conversionService) {
+        public DefaultStatusRoute(HttpStatus status, MethodExecutionHandle targetMethod, ConversionService conversionService) {
             this(null, status, targetMethod, conversionService);
         }
 
@@ -782,7 +782,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
          * @param targetMethod The target method execution handle
          * @param conversionService The conversion service
          */
-        public DefaultStatusRoute(Class originatingClass, HttpStatus status, MethodExecutionHandle targetMethod, ConversionService<?> conversionService) {
+        public DefaultStatusRoute(Class originatingClass, HttpStatus status, MethodExecutionHandle targetMethod, ConversionService conversionService) {
             super(targetMethod, conversionService, Collections.emptyList());
             this.originatingClass = originatingClass;
             this.status = status;
@@ -880,9 +880,13 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
          * @param httpMethod The HTTP method
          * @param uriTemplate The URI Template as a {@link CharSequence}
          * @param targetMethod The target method execution handle
+         * @param conversionService The conversion service
          */
-        DefaultUriRoute(HttpMethod httpMethod, CharSequence uriTemplate, MethodExecutionHandle targetMethod) {
-            this(httpMethod, uriTemplate, targetMethod, httpMethod.name());
+        DefaultUriRoute(HttpMethod httpMethod,
+                        CharSequence uriTemplate,
+                        MethodExecutionHandle targetMethod,
+                        ConversionService conversionService) {
+            this(httpMethod, uriTemplate, targetMethod, httpMethod.name(), conversionService);
         }
 
         /**
@@ -890,9 +894,14 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
          * @param uriTemplate The URI Template as a {@link CharSequence}
          * @param targetMethod The target method execution handle
          * @param httpMethodName The actual name of the method - may differ from {@link HttpMethod#name()} for non-standard http methods
+         * @param conversionService The conversion service
          */
-        DefaultUriRoute(HttpMethod httpMethod, CharSequence uriTemplate, MethodExecutionHandle targetMethod, String httpMethodName) {
-            this(httpMethod, uriTemplate, MediaType.APPLICATION_JSON_TYPE, targetMethod, httpMethodName);
+        DefaultUriRoute(HttpMethod httpMethod,
+                        CharSequence uriTemplate,
+                        MethodExecutionHandle targetMethod,
+                        String httpMethodName,
+                        ConversionService conversionService) {
+            this(httpMethod, uriTemplate, MediaType.APPLICATION_JSON_TYPE, targetMethod, httpMethodName, conversionService);
         }
 
         /**
@@ -900,9 +909,14 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
          * @param uriTemplate The URI Template as a {@link CharSequence}
          * @param mediaType The Media type
          * @param targetMethod The target method execution handle
+         * @param conversionService The conversion service
          */
-        DefaultUriRoute(HttpMethod httpMethod, CharSequence uriTemplate, MediaType mediaType, MethodExecutionHandle targetMethod) {
-            this(httpMethod, uriTemplate, mediaType, targetMethod, httpMethod.name());
+        DefaultUriRoute(HttpMethod httpMethod,
+                        CharSequence uriTemplate,
+                        MediaType mediaType,
+                        MethodExecutionHandle targetMethod,
+                        ConversionService conversionService) {
+            this(httpMethod, uriTemplate, mediaType, targetMethod, httpMethod.name(), conversionService);
         }
 
         /**
@@ -911,18 +925,28 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
          * @param mediaType The Media type
          * @param targetMethod The target method execution handle
          * @param httpMethodName The actual name of the method - may differ from {@link HttpMethod#name()} for non-standard http methods
+         * @param conversionService The conversion service
          */
-        DefaultUriRoute(HttpMethod httpMethod, CharSequence uriTemplate, MediaType mediaType, MethodExecutionHandle targetMethod, String httpMethodName) {
-            this(httpMethod, new UriMatchTemplate(uriTemplate), Collections.singletonList(mediaType), targetMethod, httpMethodName);
+        DefaultUriRoute(HttpMethod httpMethod,
+                        CharSequence uriTemplate,
+                        MediaType mediaType,
+                        MethodExecutionHandle targetMethod,
+                        String httpMethodName,
+                        ConversionService conversionService) {
+            this(httpMethod, new UriMatchTemplate(uriTemplate), Collections.singletonList(mediaType), targetMethod, httpMethodName, conversionService);
         }
 
         /**
          * @param httpMethod The HTTP method
          * @param uriTemplate The URI Template as a {@link UriMatchTemplate}
          * @param targetMethod The target method execution handle
+         * @param conversionService The conversion service
          */
-        DefaultUriRoute(HttpMethod httpMethod, UriMatchTemplate uriTemplate, MethodExecutionHandle targetMethod) {
-            this(httpMethod, uriTemplate, targetMethod, httpMethod.name());
+        DefaultUriRoute(HttpMethod httpMethod,
+                        UriMatchTemplate uriTemplate,
+                        MethodExecutionHandle targetMethod,
+                        ConversionService conversionService) {
+            this(httpMethod, uriTemplate, targetMethod, httpMethod.name(), conversionService);
         }
 
         /**
@@ -930,9 +954,14 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
          * @param uriTemplate The URI Template as a {@link UriMatchTemplate}
          * @param targetMethod The target method execution handle
          * @param httpMethodName The actual name of the method - may differ from {@link HttpMethod#name()} for non-standard http methods
+         * @param conversionService The conversion service
          */
-        DefaultUriRoute(HttpMethod httpMethod, UriMatchTemplate uriTemplate, MethodExecutionHandle targetMethod, String httpMethodName) {
-            this(httpMethod, uriTemplate, Collections.singletonList(MediaType.APPLICATION_JSON_TYPE), targetMethod, httpMethodName);
+        DefaultUriRoute(HttpMethod httpMethod,
+                        UriMatchTemplate uriTemplate,
+                        MethodExecutionHandle targetMethod,
+                        String httpMethodName,
+                        ConversionService conversionService) {
+            this(httpMethod, uriTemplate, Collections.singletonList(MediaType.APPLICATION_JSON_TYPE), targetMethod, httpMethodName, conversionService);
         }
 
         /**
@@ -940,9 +969,14 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
          * @param uriTemplate The URI Template as a {@link UriMatchTemplate}
          * @param mediaTypes The media types
          * @param targetMethod The target method execution handle
+         * @param conversionService The conversion service
          */
-        DefaultUriRoute(HttpMethod httpMethod, UriMatchTemplate uriTemplate, List<MediaType> mediaTypes, MethodExecutionHandle targetMethod) {
-            this(httpMethod, uriTemplate, mediaTypes, targetMethod, httpMethod.name());
+        DefaultUriRoute(HttpMethod httpMethod,
+                        UriMatchTemplate uriTemplate,
+                        List<MediaType> mediaTypes,
+                        MethodExecutionHandle targetMethod,
+                        ConversionService conversionService) {
+            this(httpMethod, uriTemplate, mediaTypes, targetMethod, httpMethod.name(), conversionService);
         }
 
         /**
@@ -951,9 +985,14 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
          * @param mediaTypes The media types
          * @param targetMethod The target method execution handle
          * @param httpMethodName The actual name of the method - may differ from {@link HttpMethod#name()} for non-standard http methods
+         * @param conversionService The conversion service
          */
-        DefaultUriRoute(HttpMethod httpMethod, UriMatchTemplate uriTemplate, List<MediaType> mediaTypes, MethodExecutionHandle targetMethod, String httpMethodName) {
-            super(targetMethod, ConversionService.SHARED, mediaTypes);
+        DefaultUriRoute(HttpMethod httpMethod, UriMatchTemplate uriTemplate,
+                        List<MediaType> mediaTypes,
+                        MethodExecutionHandle targetMethod,
+                        String httpMethodName,
+                        ConversionService conversionService) {
+            super(targetMethod, conversionService, mediaTypes);
             this.httpMethod = httpMethod;
             this.uriMatchTemplate = uriTemplate;
             this.httpMethodName = httpMethodName;

@@ -34,6 +34,11 @@ Before, when both METHOD and FIELD were set as the access kind, the bean introsp
 
 Annotations with the retention CLASS are not available in the annotation metadata at the runtime.
 
+==== `ConversionService` and `ConversionService.SHARED` is no longer mutable
+
+New type converters can be added to api:core.convert.MutableConversionService[] retrieved from the bean context or by declaring a bean of type api:core.convert.TypeConverter[].
+To register a type converter into `ConversionService.SHARED`, the registration needs to be done via the service loader.
+
 == 3.3.0
 
 - The <<environmentEndpoint, environmental endpoint>> is now disabled by default. To enable it, you must update your endpoint config:

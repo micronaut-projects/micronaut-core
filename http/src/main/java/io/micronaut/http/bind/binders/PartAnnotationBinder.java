@@ -30,7 +30,7 @@ import io.micronaut.http.annotation.Part;
  */
 public class PartAnnotationBinder<T> extends AbstractAnnotatedArgumentBinder<Part, T, HttpRequest<?>> implements AnnotatedRequestArgumentBinder<Part, T> {
 
-    public PartAnnotationBinder(ConversionService<?> conversionService) {
+    public PartAnnotationBinder(ConversionService conversionService) {
         super(conversionService);
     }
 

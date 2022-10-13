@@ -1,6 +1,6 @@
 package io.micronaut.http.client.netty
 
-
+import io.micronaut.core.convert.ConversionService
 import io.micronaut.http.cookie.Cookie
 import io.micronaut.http.cookie.Cookies
 import io.netty.handler.codec.http.DefaultFullHttpResponse
@@ -22,7 +22,7 @@ class FullNettyClientHttpResponseSpec extends Specification {
           fullHttpResponse.headers().set(httpHeaders)
 
         when:
-          FullNettyClientHttpResponse response = new FullNettyClientHttpResponse(fullHttpResponse, null, null, null, false)
+          FullNettyClientHttpResponse response = new FullNettyClientHttpResponse(fullHttpResponse, null, null, null, false, ConversionService.SHARED)
 
         then:
             Cookies cookies = response.getCookies()
@@ -45,7 +45,7 @@ class FullNettyClientHttpResponseSpec extends Specification {
         fullHttpResponse.headers().set(httpHeaders)
 
         when:
-        FullNettyClientHttpResponse response = new FullNettyClientHttpResponse(fullHttpResponse, null, null, null, false)
+        FullNettyClientHttpResponse response = new FullNettyClientHttpResponse(fullHttpResponse, null, null, null, false, ConversionService.SHARED)
 
         then:
         Cookies cookies = response.getCookies()

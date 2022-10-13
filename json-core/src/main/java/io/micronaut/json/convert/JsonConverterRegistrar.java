@@ -23,6 +23,7 @@ import io.micronaut.core.bind.BeanPropertyBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.convert.value.ConvertibleValues;
@@ -54,13 +55,13 @@ import java.util.Optional;
 @Singleton
 public final class JsonConverterRegistrar implements TypeConverterRegistrar {
     private final BeanProvider<JsonMapper> objectCodec;
-    private final ConversionService<?> conversionService;
+    private final ConversionService conversionService;
     private final BeanProvider<BeanPropertyBinder> beanPropertyBinder;
 
     @Inject
     public JsonConverterRegistrar(
             BeanProvider<JsonMapper> objectCodec,
-            ConversionService<?> conversionService,
+            ConversionService conversionService,
             BeanProvider<BeanPropertyBinder> beanPropertyBinder
     ) {
         this.objectCodec = objectCodec;
@@ -69,7 +70,7 @@ public final class JsonConverterRegistrar implements TypeConverterRegistrar {
     }
 
     @Override
-    public void register(ConversionService<?> conversionService) {
+    public void register(MutableConversionService conversionService) {
         conversionService.addConverter(
                 JsonArray.class,
                 Object[].class,

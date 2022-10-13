@@ -17,6 +17,7 @@ package io.micronaut.http.server.netty.encoders;
 
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.Writable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.http.HttpHeaders;
@@ -64,16 +65,19 @@ public class HttpResponseEncoder extends MessageToMessageEncoder<MutableHttpResp
 
     private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
     private final HttpServerConfiguration serverConfiguration;
+    private final ConversionService conversionService;
 
     /**
      * Default constructor.
      *
      * @param mediaTypeCodecRegistry The media type registry
-     * @param serverConfiguration The server config
+     * @param serverConfiguration    The server config
+     * @param conversionService      The conversion service
      */
-    public HttpResponseEncoder(MediaTypeCodecRegistry mediaTypeCodecRegistry, HttpServerConfiguration serverConfiguration) {
+    public HttpResponseEncoder(MediaTypeCodecRegistry mediaTypeCodecRegistry, HttpServerConfiguration serverConfiguration, ConversionService conversionService) {
         this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
         this.serverConfiguration = serverConfiguration;
+        this.conversionService = conversionService;
     }
 
     @Override
@@ -105,7 +109,7 @@ public class HttpResponseEncoder extends MessageToMessageEncoder<MutableHttpResp
                 response = encodeBodyWithCodec(response, body, codec, responseMediaType, context);
             }
 
-            MediaTypeCodec defaultCodec = new TextPlainCodec(serverConfiguration.getDefaultCharset());
+            MediaTypeCodec defaultCodec = new TextPlainCodec(serverConfiguration.getDefaultCharset(), conversionService);
 
             response = encodeBodyWithCodec(response, body, defaultCodec, responseMediaType, context);
         }

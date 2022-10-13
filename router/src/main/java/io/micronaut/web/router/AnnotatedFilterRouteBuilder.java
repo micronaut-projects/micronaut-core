@@ -57,7 +57,7 @@ public class AnnotatedFilterRouteBuilder extends DefaultRouteBuilder implements 
             BeanContext beanContext,
             ExecutionHandleLocator executionHandleLocator,
             UriNamingStrategy uriNamingStrategy,
-            ConversionService<?> conversionService,
+            ConversionService conversionService,
             @Nullable ServerContextPathProvider contextPathProvider) {
         super(executionHandleLocator, uriNamingStrategy, conversionService);
         this.contextPathProvider = contextPathProvider;

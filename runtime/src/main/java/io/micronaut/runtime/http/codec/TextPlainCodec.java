@@ -59,15 +59,19 @@ public class TextPlainCodec implements MediaTypeCodec {
 
     private final Charset defaultCharset;
     private final List<MediaType> additionalTypes;
+    private final ConversionService conversionService;
 
     /**
-     * @param defaultCharset      The default charset used for serialization and deserialization
-     * @param codecConfiguration  The configuration for the codec
+     * @param defaultCharset     The default charset used for serialization and deserialization
+     * @param codecConfiguration The configuration for the codec
+     * @param conversionService  The conversion service
      */
     @Inject
     public TextPlainCodec(@Value("${" + ApplicationConfiguration.DEFAULT_CHARSET + "}") Optional<Charset> defaultCharset,
-                          @Named(CONFIGURATION_QUALIFIER) @Nullable CodecConfiguration codecConfiguration) {
+                          @Named(CONFIGURATION_QUALIFIER) @Nullable CodecConfiguration codecConfiguration,
+                          ConversionService conversionService) {
         this.defaultCharset = defaultCharset.orElse(StandardCharsets.UTF_8);
+        this.conversionService = conversionService;
         if (codecConfiguration != null) {
             this.additionalTypes = codecConfiguration.getAdditionalTypes();
         } else {
@@ -76,10 +80,12 @@ public class TextPlainCodec implements MediaTypeCodec {
     }
 
     /**
-     * @param defaultCharset The default charset used for serialization and deserialization
+     * @param defaultCharset    The default charset used for serialization and deserialization
+     * @param conversionService The conversion service
      */
-    public TextPlainCodec(Charset defaultCharset) {
+    public TextPlainCodec(Charset defaultCharset, ConversionService conversionService) {
         this.defaultCharset = defaultCharset != null ? defaultCharset : StandardCharsets.UTF_8;
+        this.conversionService = conversionService;
         this.additionalTypes = Collections.emptyList();
     }
 
@@ -97,7 +103,7 @@ public class TextPlainCodec implements MediaTypeCodec {
         if (CharSequence.class.isAssignableFrom(type.getType())) {
             return (T) text;
         }
-        return ConversionService.SHARED
+        return conversionService
             .convert(text, type)
             .orElseThrow(() -> new CodecException("Cannot decode byte buffer with value [" + text + "] to type: " + type));
     }
@@ -108,7 +114,7 @@ public class TextPlainCodec implements MediaTypeCodec {
         if (CharSequence.class.isAssignableFrom(type.getType())) {
             return (T) text;
         }
-        return ConversionService.SHARED
+        return conversionService
             .convert(text, type)
             .orElseThrow(() -> new CodecException("Cannot decode bytes with value [" + text + "] to type: " + type));
     }
