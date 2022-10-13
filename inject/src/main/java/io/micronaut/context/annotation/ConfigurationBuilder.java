@@ -34,6 +34,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Documented
 @Retention(RUNTIME)
 @Target({ElementType.FIELD, ElementType.METHOD})
+@BeanProperties(accessKind = BeanProperties.AccessKind.METHOD, visibility = BeanProperties.Visibility.DEFAULT, allowWriteWithMultipleArgs = true, allowWriteWithZeroArgs = true)
 public @interface ConfigurationBuilder {
 
     /**

@@ -289,7 +289,7 @@ final class GroovyPropertyElement extends AbstractGroovyElement implements Prope
 
     @Override
     public boolean isReadOnly() {
-        switch (readAccessKind) {
+        switch (writeAccessKind) {
             case METHOD:
                 return setter == null;
             case FIELD:
@@ -301,7 +301,7 @@ final class GroovyPropertyElement extends AbstractGroovyElement implements Prope
 
     @Override
     public boolean isWriteOnly() {
-        switch (writeAccessKind) {
+        switch (readAccessKind) {
             case METHOD:
                 return getter == null;
             case FIELD:
