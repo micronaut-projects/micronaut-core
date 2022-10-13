@@ -75,6 +75,8 @@ public interface ExecutorConfiguration {
      */
     @Min(1L) Integer getCorePoolSize();
 
+    boolean isVirtual();
+
     /**
      * @return The class to use as the {@link ThreadFactory}
      */

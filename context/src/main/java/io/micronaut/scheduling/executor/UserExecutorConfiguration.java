@@ -16,12 +16,11 @@
 package io.micronaut.scheduling.executor;
 
 import io.micronaut.context.annotation.ConfigurationInject;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
-import io.micronaut.core.util.ArgumentUtils;
-
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.util.ArgumentUtils;
 
 import javax.validation.constraints.Min;
 import java.util.Optional;
@@ -48,6 +47,7 @@ public class UserExecutorConfiguration implements ExecutorConfiguration {
     private ExecutorType type;
     private Integer parallelism;
     private Integer corePoolSize;
+    private boolean virtual = false;
     private Class<? extends ThreadFactory> threadFactoryClass;
 
     /**
@@ -56,7 +56,7 @@ public class UserExecutorConfiguration implements ExecutorConfiguration {
      * @param name The name
      */
     private UserExecutorConfiguration(@Parameter String name) {
-        this(name, null, null, null, null, null);
+        this(name, null, null, null, null, false, null);
     }
 
     /**
@@ -75,12 +75,14 @@ public class UserExecutorConfiguration implements ExecutorConfiguration {
                                         @Nullable ExecutorType type,
                                         @Nullable Integer parallelism,
                                         @Nullable Integer corePoolSize,
+                                        boolean virtual,
                                         @Nullable Class<? extends ThreadFactory> threadFactoryClass) {
         this.name = name;
         this.nThreads = nThreads == null ? AVAILABLE_PROCESSORS * 2 : nThreads;
         this.type = type == null ? ExecutorType.SCHEDULED : type;
         this.parallelism = parallelism == null ? AVAILABLE_PROCESSORS : parallelism;
         this.corePoolSize = corePoolSize == null ? AVAILABLE_PROCESSORS * 2 : corePoolSize;
+        this.virtual = virtual;
         this.threadFactoryClass = threadFactoryClass;
     }
 
@@ -111,6 +113,15 @@ public class UserExecutorConfiguration implements ExecutorConfiguration {
     @Min(1L)
     public Integer getCorePoolSize() {
         return corePoolSize;
+    }
+
+    @Override
+    public boolean isVirtual() {
+        return virtual;
+    }
+
+    public void setVirtual(boolean virtual) {
+        this.virtual = virtual;
     }
 
     @Override
