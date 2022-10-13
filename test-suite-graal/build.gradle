@@ -19,7 +19,6 @@ dependencies {
     testImplementation project(":http-client")
     testImplementation project(":validation")
     testImplementation project(":inject-java")
-    testImplementation project(":session")
     testImplementation libs.managed.micronaut.test.junit5
 }
 
