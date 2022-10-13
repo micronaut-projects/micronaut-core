@@ -703,16 +703,6 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 }
             }
         }
-        mapAnnotations(originatingElement, originatingElementIsSameParent, metadata, isDeclared, annotationName, annotationValues);
-        return annotationValues;
-    }
-
-    private void mapAnnotations(T originatingElement,
-                                boolean originatingElementIsSameParent,
-                                DefaultAnnotationMetadata metadata,
-                                boolean isDeclared, String annotationName,
-                                Map<CharSequence, Object> annotationValues) {
-        RetentionPolicy retentionPolicy;
         List<AnnotationMapper<?>> mappers = getAnnotationMappers(annotationName);
         if (mappers != null) {
             AnnotationValue<?> annotationValue = new AnnotationValue(annotationName, annotationValues);
@@ -800,6 +790,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 }
             }
         }
+        return annotationValues;
     }
 
     private void handleAnnotationAlias(T originatingElement,
