@@ -19,10 +19,10 @@ import io.micronaut.context.annotation.BeanProperties;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.util.ArrayUtils;
-import io.micronaut.inject.annotation.TypedAnnotationMapper;
+import io.micronaut.inject.annotation.TypedAnnotationTransformer;
 import io.micronaut.inject.visitor.VisitorContext;
 
-import java.util.Collections;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -31,10 +31,12 @@ import java.util.List;
  * @author Denis Stepanov
  * @since 4.0.0
  */
-public final class IntrospectedToBeanPropertiesMapper implements TypedAnnotationMapper<Introspected> {
+public final class IntrospectedToBeanPropertiesTransformer implements TypedAnnotationTransformer<Introspected> {
 
     @Override
-    public List<AnnotationValue<?>> map(AnnotationValue<Introspected> annotation, VisitorContext visitorContext) {
+    public List<AnnotationValue<?>> transform(AnnotationValue<Introspected> annotation, VisitorContext visitorContext) {
+        // We need to use AnnotationTransformer instead of AnnotationMapper
+        // Somehow it doesn't work when the annotation is added
         Introspected.AccessKind[] accessKinds = annotation.enumValues(BeanProperties.MEMBER_ACCESS_KIND, Introspected.AccessKind.class);
         Introspected.Visibility[] visibilities = annotation.enumValues(BeanProperties.MEMBER_VISIBILITY, Introspected.Visibility.class);
         if (ArrayUtils.isEmpty(accessKinds)) {
@@ -43,7 +45,8 @@ public final class IntrospectedToBeanPropertiesMapper implements TypedAnnotation
         if (ArrayUtils.isEmpty(visibilities)) {
             visibilities = Introspected.DEFAULT_VISIBILITY;
         }
-        return Collections.singletonList(
+        return Arrays.asList(
+            annotation,
             AnnotationValue.builder(BeanProperties.class)
                 .member(BeanProperties.MEMBER_ACCESS_KIND, accessKinds)
                 .member(BeanProperties.MEMBER_VISIBILITY, visibilities)
