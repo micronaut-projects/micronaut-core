@@ -16,6 +16,7 @@
 package io.micronaut.inject.annotation
 
 import io.micrometer.core.annotation.Timed
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.aop.Around
 import io.micronaut.aop.introduction.StubIntroducer
 import io.micronaut.context.annotation.Primary
@@ -23,24 +24,17 @@ import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requirements
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.annotation.Type
-import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationClassValue
+import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.AnnotationValue
-import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.annotation.TypeHint
-import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.retry.annotation.Recoverable
-
-import jakarta.inject.Qualifier
-import jakarta.inject.Scope
-import jakarta.inject.Singleton
 import spock.lang.Unroll
 
 import java.lang.annotation.Documented
 import java.lang.annotation.Retention
-
 /**
  * @author Graeme Rocher
  * @since 1.0
@@ -58,7 +52,7 @@ import io.micronaut.inject.annotation.Outer;
 
 @Outer.Inner
 class Test {
-    
+
 }
 """)
 
@@ -124,7 +118,7 @@ class Test {
         expect:
         metadata != null
         metadata.declaredAnnotationNames.size() == 1
-        metadata.declaredStereotypes == null
+        metadata.declaredStereotypeAnnotationNames.size() == 0
         metadata.annotationNames.size() == 1
     }
 
@@ -570,9 +564,9 @@ import io.micronaut.context.annotation.*;
 @jakarta.inject.Singleton
 class Test {
 
-    @Property(name="prop2", value="value2")    
-    @Property(name="prop3", value="value33")    
-    @Property(name="prop4", value="value4")    
+    @Property(name="prop2", value="value2")
+    @Property(name="prop3", value="value33")
+    @Property(name="prop4", value="value4")
     @io.micronaut.context.annotation.Executable
     void someMethod() {}
 }
@@ -608,9 +602,9 @@ import io.micronaut.context.annotation.*;
 @jakarta.inject.Singleton
 class Test {
 
-    @Property(name="prop2", value="value2")    
-    @Property(name="prop3", value="value33")    
-    @Property(name="prop4", value="value4")    
+    @Property(name="prop2", value="value2")
+    @Property(name="prop3", value="value33")
+    @Property(name="prop4", value="value4")
     @io.micronaut.context.annotation.Executable
     void someMethod() {}
 }
@@ -646,9 +640,9 @@ import io.micronaut.context.annotation.*;
 @jakarta.inject.Singleton
 class Test {
 
-    @Property(name="prop2", value="value2")    
-    @Property(name="prop3", value="value33")    
-    @Property(name="prop4", value="value4")    
+    @Property(name="prop2", value="value2")
+    @Property(name="prop3", value="value33")
+    @Property(name="prop4", value="value4")
     @io.micronaut.context.annotation.Executable
     void someMethod() {}
 }

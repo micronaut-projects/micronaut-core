@@ -15,10 +15,9 @@
  */
 package io.micronaut.annotation.processing.visitor;
 
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.ast.ConstructorElement;
+import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 
@@ -34,21 +33,24 @@ import javax.lang.model.element.ExecutableElement;
 class JavaConstructorElement extends JavaMethodElement implements ConstructorElement {
 
     /**
-     * @param declaringClass     The declaring class
-     * @param executableElement  The {@link ExecutableElement}
-     * @param annotationMetadata The annotation metadata
-     * @param visitorContext     The visitor context
+     * @param declaringClass            The declaring class
+     * @param executableElement         The {@link ExecutableElement}
+     * @param annotationMetadataFactory The annotation metadata factory
+     * @param visitorContext            The visitor context
      */
-    JavaConstructorElement(JavaClassElement declaringClass, ExecutableElement executableElement, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext) {
-        super(declaringClass, executableElement, annotationMetadata, visitorContext);
+    JavaConstructorElement(JavaClassElement declaringClass,
+                           ExecutableElement executableElement,
+                           ElementAnnotationMetadataFactory annotationMetadataFactory,
+                           JavaVisitorContext visitorContext) {
+        super(declaringClass, executableElement, annotationMetadataFactory, visitorContext);
     }
 
     @Override
-    public MethodElement withNewParameters(ParameterElement... newParameters) {
-        return new JavaConstructorElement(declaringClass, executableElement, getAnnotationMetadata(), visitorContext) {
+    public MethodElement withParameters(ParameterElement... newParameters) {
+        return new JavaConstructorElement(owningType, executableElement, elementAnnotationMetadataFactory, visitorContext) {
             @Override
             public ParameterElement[] getParameters() {
-                return ArrayUtils.concat(super.getParameters(), newParameters);
+                return newParameters;
             }
         };
     }

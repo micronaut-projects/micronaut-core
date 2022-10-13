@@ -412,6 +412,10 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
             pushBoxPrimitiveIfNecessary(propertyType, writer);
         }
 
+        @NotNull
+        public FieldElement getField() {
+            return beanField;
+        }
     }
 
     /**
@@ -457,6 +461,11 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
 
             // push null return type
             writer.push((String) null);
+        }
+
+        @NotNull
+        public FieldElement getField() {
+            return beanField;
         }
     }
 

@@ -46,6 +46,15 @@ tasks.withType(Jar).configureEach {
     preserveFileTimestamps = false
 }
 
+configurations.all {
+    resolutionStrategy.eachDependency { DependencyResolveDetails details ->
+        if (details.requested.group == 'org.codehaus.groovy') {
+            details.useTarget("org.apache.groovy:${details.requested.name}:${details.requested.version}")
+            details.because "Plugin 'io.micronaut.build.internal.common' isn't Groovy 4 yet and it's pulling in old versions"
+        }
+    }
+}
+
 dependencies {
     annotationProcessor libs.bundles.asm
     annotationProcessor(libs.micronaut.docs.map {

@@ -29,7 +29,7 @@ import java.util.Map;
  * @author Graeme Rocher
  * @since 1.0
  */
-@Singleton
+@Singleton // Groovy @Singleton!!!
 @Validated
 public class Foo {
 

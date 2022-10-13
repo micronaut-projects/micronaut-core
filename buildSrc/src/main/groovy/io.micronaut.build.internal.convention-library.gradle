@@ -18,7 +18,13 @@ configurations {
 
 tasks.named("shadowJar") {
     configurations = [project.configurations.shadowCompile]
-    relocate "com.github.benmanes.caffeine", "io.micronaut.caffeine"
     relocate "org.objectweb.asm", "io.micronaut.asm"
+}
+
+micronautBuild {
+    binaryCompatibility {
+        // Enable before Micronaut 4 release
+        enabled.set(false)
+    }
 }
 

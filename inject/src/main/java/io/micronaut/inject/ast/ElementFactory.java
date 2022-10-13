@@ -16,7 +16,6 @@
 package io.micronaut.inject.ast;
 
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.AnnotationMetadata;
 
 import java.util.Map;
 
@@ -31,135 +30,115 @@ import java.util.Map;
  * @since 2.3.0
  */
 public interface ElementFactory<E, C extends E, M extends E, F extends E> {
-    /**
-     * Builds a new class element for the given type.
-     *
-     * @param type               The type
-     * @param annotationMetadata The resolved annotation metadata
-     * @return The class element
-     */
-    @NonNull
-    ClassElement newClassElement(
-            @NonNull C type,
-            @NonNull AnnotationMetadata annotationMetadata);
 
     /**
      * Builds a new class element for the given type.
      *
-     * @param type               The type
-     * @param annotationMetadata The resolved annotation metadata
-     * @param resolvedGenerics The resolved generics
+     * @param type                      The type
+     * @param annotationMetadataFactory The element annotation metadata factory
      * @return The class element
-     * @since 3.0.0
+     * @since 4.0.0
      */
     @NonNull
-    ClassElement newClassElement(
-            @NonNull C type,
-            @NonNull AnnotationMetadata annotationMetadata,
-            @NonNull Map<String, ClassElement> resolvedGenerics);
+    ClassElement newClassElement(@NonNull C type, ElementAnnotationMetadataFactory annotationMetadataFactory);
+
+    /**
+     * Builds a new class element for the given type.
+     *
+     * @param type                      The type
+     * @param annotationMetadataFactory The element annotation metadata factory
+     * @param resolvedGenerics          The resolved generics
+     * @return The class element
+     * @since 4.0.0
+     */
+    @NonNull
+    ClassElement newClassElement(@NonNull C type,
+                                 @NonNull ElementAnnotationMetadataFactory annotationMetadataFactory,
+                                 @NonNull Map<String, ClassElement> resolvedGenerics);
 
     /**
      * Builds a new source class element for the given type. This method
-     * differs from {@link #newClassElement(Object, AnnotationMetadata)} in that
+     * differs from {@link #newClassElement(Object, ElementAnnotationMetadataFactory)} in that
      * it should only be called from elements that are known to originate from source code.
      *
-     * @param type               The type
-     * @param annotationMetadata The resolved annotation metadata
+     * @param type                             The type
+     * @param elementAnnotationMetadataFactory The element annotation metadata factory
      * @return The class element
-     * @since 3.0.0
+     * @since 4.0.0
      */
     @NonNull
-    ClassElement newSourceClassElement(
-            @NonNull C type,
-            @NonNull AnnotationMetadata annotationMetadata);
+    ClassElement newSourceClassElement(@NonNull C type, @NonNull ElementAnnotationMetadataFactory elementAnnotationMetadataFactory);
 
     /**
      * Builds a new source method element for the given method. This method
-     * differs from {@link #newMethodElement(ClassElement, Object, AnnotationMetadata)} in that
+     * differs from {@link #newMethodElement(ClassElement, Object, ElementAnnotationMetadataFactory)} in that
      * it should only be called from elements that are known to originate from source code.
      *
-     * @param declaringClass     The declaring class
-     * @param method             The method
-     * @param annotationMetadata The resolved annotation metadata
+     * @param owningClass                      The owning class
+     * @param method                           The method
+     * @param elementAnnotationMetadataFactory The element annotation metadata factory
      * @return The class element
-     * @since 3.0.0
+     * @since 4.0.0
      */
     @NonNull
-    MethodElement newSourceMethodElement(
-            ClassElement declaringClass,
-            @NonNull M method,
-            @NonNull AnnotationMetadata annotationMetadata);
+    MethodElement newSourceMethodElement(@NonNull ClassElement owningClass,
+                                         @NonNull M method,
+                                         @NonNull ElementAnnotationMetadataFactory elementAnnotationMetadataFactory);
 
     /**
      * Builds a new method element for the given type.
      *
-     * @param declaringClass     The declaring class
-     * @param method             The method
-     * @param annotationMetadata The resolved annotation metadata
+     * @param owningClass                      The owning class
+     * @param method                           The method
+     * @param elementAnnotationMetadataFactory The element annotation metadata factory
      * @return The method element
+     * @since 4.0.0
      */
     @NonNull
-    MethodElement newMethodElement(
-            ClassElement declaringClass,
-            @NonNull M method,
-            @NonNull AnnotationMetadata annotationMetadata);
-
+    MethodElement newMethodElement(@NonNull ClassElement owningClass,
+                                   @NonNull M method,
+                                   @NonNull ElementAnnotationMetadataFactory elementAnnotationMetadataFactory);
 
     /**
      * Builds a new constructor element for the given type.
      *
-     * @param declaringClass     The declaring class
-     * @param constructor        The constructor
-     * @param annotationMetadata The resolved annotation metadata
+     * @param owningClass                      The owning class
+     * @param constructor                      The constructor
+     * @param elementAnnotationMetadataFactory The element annotation metadata factory
      * @return The constructor element
+     * @since 4.0.0
      */
     @NonNull
-    ConstructorElement newConstructorElement(
-            ClassElement declaringClass,
-            @NonNull M constructor,
-            @NonNull AnnotationMetadata annotationMetadata);
+    ConstructorElement newConstructorElement(@NonNull ClassElement owningClass,
+                                             @NonNull M constructor,
+                                             @NonNull ElementAnnotationMetadataFactory elementAnnotationMetadataFactory);
 
     /**
      * Builds a new enum constant element for the given type.
      *
-     * @param declaringClass     The declaring class
-     * @param enumConstant        The enum constant
-     * @param annotationMetadata The resolved annotation metadata
-     *
+     * @param owningClass                      The owning class
+     * @param enumConstant                     The enum constant
+     * @param elementAnnotationMetadataFactory The element annotation metadata factory
      * @return The enum constant element
-     *
-     * @since 3.6.0
+     * @since 4.0.0
      */
     @NonNull
-    EnumConstantElement newEnumConstantElement(
-            ClassElement declaringClass,
-            @NonNull F enumConstant,
-            @NonNull AnnotationMetadata annotationMetadata);
+    EnumConstantElement newEnumConstantElement(@NonNull ClassElement owningClass,
+                                               @NonNull F enumConstant,
+                                               @NonNull ElementAnnotationMetadataFactory elementAnnotationMetadataFactory);
 
     /**
      * Builds a new field element for the given type.
      *
-     * @param declaringClass     The declaring class
-     * @param field              The field
-     * @param annotationMetadata The resolved annotation metadata
+     * @param owningClass                      The owning class
+     * @param field                            The field
+     * @param elementAnnotationMetadataFactory The element annotation metadata factory
      * @return The field element
+     * @since 4.0.0
      */
     @NonNull
-    FieldElement newFieldElement(
-            ClassElement declaringClass,
-            @NonNull F field,
-            @NonNull AnnotationMetadata annotationMetadata);
-
-    /**
-     * Builds a new field element for the given field.
-     *
-     * @param field              The field
-     * @param annotationMetadata The resolved annotation metadata
-     * @return The field element
-     */
-    @NonNull
-    FieldElement newFieldElement(
-            @NonNull F field,
-            @NonNull AnnotationMetadata annotationMetadata);
+    FieldElement newFieldElement(@NonNull ClassElement owningClass,
+                                 @NonNull F field,
+                                 @NonNull ElementAnnotationMetadataFactory elementAnnotationMetadataFactory);
 
 }

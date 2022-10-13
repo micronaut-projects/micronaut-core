@@ -31,7 +31,7 @@ import io.micronaut.context.annotation.Bean;
 @Bean
 class Test {
 
-}    
+}
 ''')
         expect:
         definition

@@ -516,11 +516,10 @@ public final class RouteExecutor {
 
     private Publisher<MutableHttpResponse<?>> handleStatusException(HttpRequest<?> request,
                                                                     MutableHttpResponse<?> response) {
-        HttpStatus status = response.status();
         RouteInfo<?> routeInfo = response.getAttribute(HttpAttributes.ROUTE_INFO, RouteInfo.class).orElse(null);
 
-        if (status.getCode() >= 400 && routeInfo != null && !routeInfo.isErrorRoute()) {
-            RouteMatch<Object> statusRoute = findStatusRoute(request, status, routeInfo);
+        if (response.code() >= 400 && routeInfo != null && !routeInfo.isErrorRoute()) {
+            RouteMatch<Object> statusRoute = findStatusRoute(request, response.status(), routeInfo);
 
             if (statusRoute != null) {
                 return executeRoute(
@@ -579,8 +578,7 @@ public final class RouteExecutor {
         if (message instanceof MutableHttpResponse) {
             mutableHttpResponse = (MutableHttpResponse<?>) message;
         } else {
-            HttpStatus httpStatus = message.status();
-            mutableHttpResponse = HttpResponse.status(httpStatus, httpStatus.getReason());
+            mutableHttpResponse = HttpResponse.status(message.code(), message.reason());
             mutableHttpResponse.body(message.body());
             message.getHeaders().forEach((name, value) -> {
                 for (String val : value) {

@@ -17,6 +17,7 @@ dependencies {
     if (!JavaVersion.current().isJava9Compatible()) {
         api files(org.gradle.internal.jvm.Jvm.current().toolsJar)
     }
+    api libs.jetbrains.annotations
 
     testAnnotationProcessor project(":inject-java")
     testCompileOnly project(":inject-groovy")
