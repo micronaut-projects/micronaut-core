@@ -78,3 +78,15 @@ dependencies {
 multiRelease {
     targetVersions 17, 19
 }
+
+tasks.withType(JavaExec).configureEach {
+    jvmArgs = [
+            "--enable-preview",
+    ]
+}
+
+tasks.named("compileJava19TestJava", JavaCompile) {
+    options.compilerArgs.addAll([
+            "--enable-preview",
+    ])
+}

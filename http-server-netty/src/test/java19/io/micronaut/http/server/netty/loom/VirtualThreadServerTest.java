@@ -5,6 +5,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.QueryValue;
+import io.micronaut.scheduling.LoomSupport;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
 
@@ -16,8 +17,9 @@ import java.nio.file.Paths;
 import java.util.Base64;
 import java.util.Map;
 
-public class VirtualThreadTest {
+public class VirtualThreadServerTest {
     public static void main(String[] args) {
+        System.out.println("Loom support: " + LoomSupport.isSupported());
         ApplicationContext.run(Map.of("spec.name", "VirtualThreadTest"), args);
     }
 
