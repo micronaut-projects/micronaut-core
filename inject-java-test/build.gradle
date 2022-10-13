@@ -29,6 +29,14 @@ dependencies {
     testImplementation libs.smallrye
 }
 
+tasks.withType(JavaCompile).configureEach {
+    options.compilerArgs += [
+            '--add-exports', 'jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED'
+    ]
+    // https://github.com/gradle/gradle/issues/18824
+    sourceCompatibility = 17
+}
+
 tasks.named("sourcesJar") {
     from "$projectDir/src/main/groovy"
 }
