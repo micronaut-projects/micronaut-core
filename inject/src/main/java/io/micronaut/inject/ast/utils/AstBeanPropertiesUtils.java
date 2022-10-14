@@ -27,6 +27,7 @@ import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.PropertyElement;
 
@@ -139,6 +140,18 @@ public final class AstBeanPropertiesUtils {
             for (Map.Entry<String, BeanPropertyData> entry : props.entrySet()) {
                 String propertyName = entry.getKey();
                 BeanPropertyData value = entry.getValue();
+                // Define the property type based on its writer element
+                if (value.writeAccessKind == BeanProperties.AccessKind.FIELD && !value.field.getType().equals(value.type)) {
+                    value.type = value.field.getGenericType();
+                } else if (value.writeAccessKind == BeanProperties.AccessKind.METHOD
+                    && value.setter != null
+                    && value.setter.getParameters().length > 0) {
+                    ParameterElement parameter = value.setter.getParameters()[0];
+                    if (!parameter.getType().equals(value.type)) {
+                        value.type = parameter.getGenericType();
+                    }
+                }
+
                 if (value.readAccessKind != null || value.writeAccessKind != null) {
                     value.isExcluded = shouldExclude(includes, excludes, propertyName)
                         || isExcludedByAnnotations(configuration, value)
