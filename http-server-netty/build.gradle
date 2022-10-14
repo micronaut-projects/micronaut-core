@@ -75,11 +75,18 @@ dependencies {
     testImplementation libs.junit.jupiter.api
 }
 
-//tasks.withType(Test).configureEach {
-//    testLogging {
-//        showStandardStreams = true
-//        exceptionFormat = 'full'
-//    }
-//}
+multiRelease {
+    targetVersions 17, 19
+}
 
-//compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']
+tasks.withType(JavaExec).configureEach {
+    jvmArgs = [
+            "--enable-preview",
+    ]
+}
+
+tasks.named("compileJava19TestJava", JavaCompile) {
+    options.compilerArgs.addAll([
+            "--enable-preview",
+    ])
+}
