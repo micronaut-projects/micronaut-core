@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        java: ['11', '17']
+        java: ['17']
         graalvm: ['latest', 'dev']
     steps:
        # https://github.com/actions/virtual-environments/issues/709

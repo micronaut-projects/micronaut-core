@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        java: ['8', '11']
+        java: ['17']
     container: amazoncorretto:${{ matrix.java }}
     steps:
     - name: Display Java and Linux version
