@@ -29,6 +29,7 @@ import io.micronaut.inject.ast.FieldElement
 import io.micronaut.inject.ast.MemberElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.PackageElement
+import io.micronaut.inject.ast.PrimitiveElement
 import jakarta.inject.Singleton
 import spock.lang.IgnoreIf
 import spock.lang.Issue
@@ -40,6 +41,27 @@ import java.sql.SQLException
 import java.util.function.Supplier
 
 class ClassElementSpec extends AbstractTypeElementSpec {
+
+    void "test equals with primitive"() {
+        given:
+            def element = buildClassElement("""
+package test;
+
+class Test {
+    boolean test1;
+}
+""")
+
+        expect:
+            element != PrimitiveElement.BOOLEAN
+            element != PrimitiveElement.VOID
+            element != PrimitiveElement.BOOLEAN.withArrayDimensions(4)
+            PrimitiveElement.VOID != element
+            PrimitiveElement.INT != element
+            PrimitiveElement.INT.withArrayDimensions(2) != element
+            element.getFields().get(0).getType() == PrimitiveElement.BOOLEAN
+            PrimitiveElement.BOOLEAN == element.getFields().get(0).getType()
+    }
 
     void "test resolve receiver type on method"() {
         given:

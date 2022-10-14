@@ -26,6 +26,7 @@ import io.micronaut.inject.ast.ElementModifier;
 import io.micronaut.inject.ast.ElementMutableAnnotationMetadata;
 import io.micronaut.inject.ast.ElementMutableAnnotationMetadataDelegate;
 import io.micronaut.inject.ast.PrimitiveElement;
+import io.micronaut.inject.ast.TypedElement;
 
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.Element;
@@ -430,6 +431,9 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
             return false;
         }
         io.micronaut.inject.ast.Element that = (io.micronaut.inject.ast.Element) o;
+        if (that instanceof TypedElement && ((TypedElement) that).isPrimitive()) {
+            return false;
+        }
         return element.equals(that.getNativeType());
     }
 
