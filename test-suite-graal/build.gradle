@@ -27,7 +27,9 @@ tasks.withType(Test).configureEach {
 }
 
 configurations {
-    // Exclude Groovy from the nativeTestCompilation classpath
+    all {
+        exclude group: 'org.codehaus.groovy'
+    }
     nativeImageTestClasspath {
         exclude module: 'groovy-test'
     }
