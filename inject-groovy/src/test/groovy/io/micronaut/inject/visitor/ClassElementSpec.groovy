@@ -26,6 +26,7 @@ import io.micronaut.inject.ast.FieldElement
 import io.micronaut.inject.ast.MemberElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.PackageElement
+import io.micronaut.inject.ast.PrimitiveElement
 import io.micronaut.inject.ast.PropertyElement
 import io.micronaut.inject.ast.TypedElement
 import spock.lang.Issue
@@ -45,6 +46,29 @@ class ClassElementSpec extends AbstractBeanDefinitionSpec {
 
     def cleanup() {
         AllElementsVisitor.clearVisited()
+    }
+
+    void "test equals with primitive"() {
+        given:
+            def element = buildClassElement("""
+package test
+
+class Test {
+
+boolean test1
+
+}
+""")
+
+        expect:
+            element != PrimitiveElement.BOOLEAN
+            element != PrimitiveElement.VOID
+            element != PrimitiveElement.BOOLEAN.withArrayDimensions(4)
+            PrimitiveElement.VOID != element
+            PrimitiveElement.INT != element
+            PrimitiveElement.INT.withArrayDimensions(2) != element
+            element.getFields().get(0).getType() == PrimitiveElement.BOOLEAN
+            PrimitiveElement.BOOLEAN == element.getFields().get(0).getType()
     }
 
     @Issue("https://github.com/micronaut-projects/micronaut-openapi/issues/670")
