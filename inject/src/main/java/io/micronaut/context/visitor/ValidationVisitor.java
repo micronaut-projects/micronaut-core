@@ -18,12 +18,13 @@ package io.micronaut.context.visitor;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NextMajorVersion;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.inject.validation.RequiresValidation;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.processing.ProcessingException;
+import io.micronaut.inject.validation.RequiresValidation;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 
@@ -72,7 +73,7 @@ public class ValidationVisitor implements TypeElementVisitor<Object, Object> {
         if (classElement == null) {
             return;
         }
-        if (requiresValidation(element) || parametersRequireValidation(element)) {
+        if (requiresValidation(element, true) || parametersRequireValidation(element, true)) {
             element.annotate(RequiresValidation.class);
             classElement.annotate(RequiresValidation.class);
         }
@@ -83,7 +84,13 @@ public class ValidationVisitor implements TypeElementVisitor<Object, Object> {
         if (classElement == null) {
             return;
         }
-        if (requiresValidation(element) || parametersRequireValidation(element)) {
+        boolean isPrivate = element.isPrivate();
+        boolean isAbstract = element.getOwningType().isInterface() || element.getOwningType().isAbstract();
+        boolean requireOnConstraint = isAbstract || !isPrivate;
+        if (requiresValidation(element, requireOnConstraint) || parametersRequireValidation(element, requireOnConstraint)) {
+            if (isPrivate) {
+                throw new ProcessingException(element, "Method annotated for validation but is declared private. Change the method to be non-private in order for AOP advice to be applied.");
+            }
             element.annotate(RequiresValidation.class);
             classElement.annotate(RequiresValidation.class);
         }
@@ -94,17 +101,20 @@ public class ValidationVisitor implements TypeElementVisitor<Object, Object> {
         if (classElement == null) {
             return;
         }
-        if (requiresValidation(element)) {
+        if (requiresValidation(element, true)) {
             element.annotate(RequiresValidation.class);
             classElement.annotate(RequiresValidation.class);
         }
     }
 
-    private boolean parametersRequireValidation(MethodElement element) {
-        return Arrays.stream(element.getParameters()).anyMatch(this::requiresValidation);
+    private boolean parametersRequireValidation(MethodElement element, boolean requireOnConstraint) {
+        return Arrays.stream(element.getParameters()).anyMatch(e -> requiresValidation(e, requireOnConstraint));
     }
 
-    private boolean requiresValidation(Element e) {
-        return e.hasStereotype(ANN_VALID) || e.hasStereotype(ANN_CONSTRAINT);
+    private boolean requiresValidation(Element e, boolean requireOnConstraint) {
+        if (requireOnConstraint && e.hasStereotype(ANN_CONSTRAINT)) {
+            return true;
+        }
+        return e.hasStereotype(ANN_VALID);
     }
 }
