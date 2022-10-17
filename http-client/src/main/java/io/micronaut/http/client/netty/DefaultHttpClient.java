@@ -1014,9 +1014,8 @@ public class DefaultHttpClient implements
                         if (ignoreOneLast) {
                             ignoreOneLast = false;
                         } else {
-                            ctx.pipeline()
-                                .remove(this)
-                                .remove(ChannelPipelineCustomizer.HANDLER_HTTP_STREAM);
+                            ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_HTTP_STREAM);
+                            ctx.pipeline().remove(this);
                         }
                     }
                 }
