@@ -36,8 +36,9 @@ final class NoneQualifier<T> implements Qualifier<T> {
 
     private NoneQualifier() {
     }
+
     @Override
-    public <BT extends BeanType<T>> Stream<BT> reduce(Class<T> beanType, Stream<BT> candidates) {
+    public <B extends BeanType<T>> Stream<B> reduce(Class<T> beanType, Stream<B> candidates) {
         return candidates.filter(candidate -> {
             if (candidate instanceof BeanDefinition) {
                 return ((BeanDefinition<?>) candidate).getDeclaredQualifier() == null;
