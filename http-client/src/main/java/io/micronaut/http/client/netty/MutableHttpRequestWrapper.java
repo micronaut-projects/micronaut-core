@@ -1,0 +1,116 @@
+package io.micronaut.http.client.netty;
+
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.convert.ConversionContext;
+import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.type.Argument;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpRequestWrapper;
+import io.micronaut.http.MutableHttpHeaders;
+import io.micronaut.http.MutableHttpParameters;
+import io.micronaut.http.MutableHttpRequest;
+import io.micronaut.http.cookie.Cookie;
+
+import java.net.URI;
+import java.util.Optional;
+
+/**
+ * Wrapper around an immutable {@link HttpRequest} that allows mutation.
+ *
+ * @param <B> Body type
+ * @since 4.0.0
+ */
+@Internal
+final class MutableHttpRequestWrapper<B> extends HttpRequestWrapper<B> implements MutableHttpRequest<B> {
+    private final ConversionService<?> conversionService;
+
+    @Nullable
+    private B body;
+    @Nullable
+    private URI uri;
+
+    MutableHttpRequestWrapper(ConversionService<?> conversionService, HttpRequest<B> delegate) {
+        super(delegate);
+        this.conversionService = conversionService;
+    }
+
+    static MutableHttpRequest<?> wrapIfNecessary(ConversionService<?> conversionService, HttpRequest<?> request) {
+        if (request instanceof MutableHttpRequest<?>) {
+            return (MutableHttpRequest<?>) request;
+        } else {
+            return new MutableHttpRequestWrapper<>(conversionService, request);
+        }
+    }
+
+    @NonNull
+    @Override
+    public Optional<B> getBody() {
+        if (body == null) {
+            return getDelegate().getBody();
+        } else {
+            return Optional.of(body);
+        }
+    }
+
+    @NonNull
+    @Override
+    public <T> Optional<T> getBody(@NonNull Class<T> type) {
+        if (body == null) {
+            return getDelegate().getBody(type);
+        } else {
+            return conversionService.convert(body, ConversionContext.of(type));
+        }
+    }
+
+    @NonNull
+    @Override
+    public <T> Optional<T> getBody(@NonNull Argument<T> type) {
+        if (body == null) {
+            return getDelegate().getBody(type);
+        } else {
+            return conversionService.convert(body, ConversionContext.of(type));
+        }
+    }
+
+    @Override
+    public MutableHttpRequest<B> cookie(Cookie cookie) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public MutableHttpRequest<B> uri(URI uri) {
+        this.uri = uri;
+        return this;
+    }
+
+    @Override
+    @NonNull
+    public URI getUri() {
+        if (uri == null) {
+            return getDelegate().getUri();
+        } else {
+            return uri;
+        }
+    }
+
+    @NonNull
+    @Override
+    public MutableHttpParameters getParameters() {
+        return (MutableHttpParameters) super.getParameters();
+    }
+
+    @NonNull
+    @Override
+    public MutableHttpHeaders getHeaders() {
+        return (MutableHttpHeaders) super.getHeaders();
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public <T> MutableHttpRequest<T> body(T body) {
+        this.body = (B) body;
+        return (MutableHttpRequest<T>) this;
+    }
+}

@@ -399,6 +399,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
             AnnotationMetadata annotationMetadata) {
 
         EventLoopGroup eventLoopGroup = resolveEventLoopGroup(configuration, beanContext);
+        ConversionService conversionService = beanContext.getBean(ConversionService.class);
         return new DefaultHttpClient(
                 loadBalancer,
                 httpVersion,
@@ -414,13 +415,14 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
                 codecRegistry,
                 WebSocketBeanRegistry.forClient(beanContext),
                 beanContext.findBean(RequestBinderRegistry.class).orElseGet(() ->
-                        new DefaultRequestBinderRegistry(ConversionService.SHARED)
+                        new DefaultRequestBinderRegistry(conversionService)
                 ),
                 eventLoopGroup,
                 resolveSocketChannelFactory(configuration, beanContext),
                 clientCustomizer,
                 invocationInstrumenterFactories,
-                clientId
+                clientId,
+                conversionService
         );
     }
 
