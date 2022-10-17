@@ -1218,9 +1218,19 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         if (values.isEmpty()) {
             return "@" + annotationName;
         } else {
-            return "@" + annotationName + "(" + values.entrySet().stream().map(entry -> entry.getKey() + "=" + entry.getValue()).collect(
+            return "@" + annotationName + "(" + values.entrySet().stream().map(entry -> entry.getKey() + "=" + toStringValue(entry.getValue())).collect(
                     Collectors.joining(", ")) + ")";
         }
+    }
+
+    private String toStringValue(Object object) {
+        if (object == null) {
+            return "null";
+        }
+        if (object instanceof Object[]) {
+            return Arrays.deepToString((Object[]) object);
+        }
+        return object.toString();
     }
 
     @Override
