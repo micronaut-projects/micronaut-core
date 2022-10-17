@@ -81,6 +81,8 @@ public interface NettyClientCustomizer {
         CONNECTION,
         /**
          * The channel is a HTTP2 stream channel.
+         *
+         * @since 4.0.0
          */
         HTTP2_STREAM,
     }

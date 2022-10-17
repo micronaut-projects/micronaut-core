@@ -233,7 +233,9 @@ class ConnectionManager {
      * For testing.
      *
      * @return Connected channels in all pools
+     * @since 4.0.0
      */
+    @NonNull
     @SuppressWarnings("unused")
     List<Channel> getChannels() {
         List<Channel> channels = new ArrayList<>();
@@ -247,6 +249,7 @@ class ConnectionManager {
      * For testing.
      *
      * @return Number of running requests
+     * @since 4.0.0
      */
     @SuppressWarnings("unused")
     int liveRequestCount() {
@@ -572,7 +575,7 @@ class ConnectionManager {
      * Initializer for TLS channels. After ALPN we will proceed either with
      * {@link #initHttp1(Channel)} or {@link #initHttp2(Pool, Channel, NettyClientCustomizer)}.
      */
-    private class AdaptiveAlpnChannelInitializer extends ChannelInitializer<Channel> {
+    private final class AdaptiveAlpnChannelInitializer extends ChannelInitializer<Channel> {
         private final Pool pool;
 
         private final SslContext sslContext;
@@ -652,7 +655,7 @@ class ConnectionManager {
      * Initializer for H2C connections. Will proceed with
      * {@link #initHttp2(Pool, Channel, NettyClientCustomizer)} when the upgrade is done.
      */
-    private class Http2UpgradeInitializer extends ChannelInitializer<Channel> {
+    private final class Http2UpgradeInitializer extends ChannelInitializer<Channel> {
         private final Pool pool;
 
         Http2UpgradeInitializer(Pool pool) {
@@ -834,7 +837,7 @@ class ConnectionManager {
                             protected void initChannel(@NonNull Channel ch) throws Exception {
                                 configureProxy(ch.pipeline(), false, requestKey.getHost(), requestKey.getPort());
                                 initHttp1(ch);
-                                ch.pipeline().addLast("activity-listener", new ChannelInboundHandlerAdapter() {
+                                ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_ACTIVITY_LISTENER, new ChannelInboundHandlerAdapter() {
                                     @Override
                                     public void channelActive(@NonNull ChannelHandlerContext ctx) throws Exception {
                                         super.channelActive(ctx);

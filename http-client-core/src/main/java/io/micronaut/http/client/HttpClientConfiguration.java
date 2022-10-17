@@ -665,6 +665,7 @@ public abstract class HttpClientConfiguration {
      * @return The plaintext connection mode.
      * @since 4.0.0
      */
+    @NonNull
     public HttpVersionSelection.PlaintextMode getPlaintextMode() {
         return plaintextMode;
     }
@@ -677,7 +678,7 @@ public abstract class HttpClientConfiguration {
      * @param plaintextMode The plaintext connection mode.
      * @since 4.0.0
      */
-    public void setPlaintextMode(HttpVersionSelection.PlaintextMode plaintextMode) {
+    public void setPlaintextMode(@NonNull HttpVersionSelection.PlaintextMode plaintextMode) {
         this.plaintextMode = Objects.requireNonNull(plaintextMode, "plaintextMode");
     }
 
@@ -690,6 +691,7 @@ public abstract class HttpClientConfiguration {
      * @return The supported ALPN protocols.
      * @since 4.0.0
      */
+    @NonNull
     public List<String> getAlpnModes() {
         return alpnModes;
     }
@@ -703,7 +705,7 @@ public abstract class HttpClientConfiguration {
      * @param alpnModes The supported ALPN protocols.
      * @since 4.0.0
      */
-    public void setAlpnModes(List<String> alpnModes) {
+    public void setAlpnModes(@NonNull List<String> alpnModes) {
         this.alpnModes = Objects.requireNonNull(alpnModes, "alpnModes");
     }
 
@@ -794,6 +796,7 @@ public abstract class HttpClientConfiguration {
          * pool.
          *
          * @return The maximum number of pending connections
+         * @since 4.0.0
          */
         public int getMaxPendingConnections() {
             return maxPendingConnections;
@@ -804,6 +807,7 @@ public abstract class HttpClientConfiguration {
          * pool.
          *
          * @param maxPendingConnections The maximum number of pending connections
+         * @since 4.0.0
          */
         public void setMaxPendingConnections(int maxPendingConnections) {
             this.maxPendingConnections = maxPendingConnections;
@@ -814,6 +818,7 @@ public abstract class HttpClientConfiguration {
          * connection.
          *
          * @return The maximum concurrent request count
+         * @since 4.0.0
          */
         public int getMaxConcurrentRequestsPerHttp2Connection() {
             return maxConcurrentRequestsPerHttp2Connection;
@@ -824,6 +829,7 @@ public abstract class HttpClientConfiguration {
          * connection.
          *
          * @param maxConcurrentRequestsPerHttp2Connection The maximum concurrent request count
+         * @since 4.0.0
          */
         public void setMaxConcurrentRequestsPerHttp2Connection(int maxConcurrentRequestsPerHttp2Connection) {
             this.maxConcurrentRequestsPerHttp2Connection = maxConcurrentRequestsPerHttp2Connection;
@@ -833,6 +839,7 @@ public abstract class HttpClientConfiguration {
          * The maximum number of concurrent HTTP1 connections in the pool.
          *
          * @return The maximum concurrent connection count
+         * @since 4.0.0
          */
         public int getMaxConcurrentHttp1Connections() {
             return maxConcurrentHttp1Connections;
@@ -842,6 +849,7 @@ public abstract class HttpClientConfiguration {
          * The maximum number of concurrent HTTP1 connections in the pool.
          *
          * @param maxConcurrentHttp1Connections The maximum concurrent connection count
+         * @since 4.0.0
          */
         public void setMaxConcurrentHttp1Connections(int maxConcurrentHttp1Connections) {
             this.maxConcurrentHttp1Connections = maxConcurrentHttp1Connections;
@@ -851,6 +859,7 @@ public abstract class HttpClientConfiguration {
          * The maximum number of concurrent HTTP2 connections in the pool.
          *
          * @return The maximum concurrent connection count
+         * @since 4.0.0
          */
         public int getMaxConcurrentHttp2Connections() {
             return maxConcurrentHttp2Connections;
@@ -860,6 +869,7 @@ public abstract class HttpClientConfiguration {
          * The maximum number of concurrent HTTP2 connections in the pool.
          *
          * @param maxConcurrentHttp2Connections The maximum concurrent connection count
+         * @since 4.0.0
          */
         public void setMaxConcurrentHttp2Connections(int maxConcurrentHttp2Connections) {
             this.maxConcurrentHttp2Connections = maxConcurrentHttp2Connections;

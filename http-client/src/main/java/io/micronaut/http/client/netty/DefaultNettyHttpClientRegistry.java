@@ -157,7 +157,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
 
     @NonNull
     @Override
-    public HttpClient getClient(HttpVersionSelection httpVersion, @NonNull String clientId, @Nullable String path) {
+    public HttpClient getClient(@NonNull HttpVersionSelection httpVersion, @NonNull String clientId, @Nullable String path) {
         final ClientKey key = new ClientKey(
                 httpVersion,
                 clientId,

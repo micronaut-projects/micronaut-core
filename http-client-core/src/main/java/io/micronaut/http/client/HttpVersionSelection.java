@@ -17,6 +17,7 @@ package io.micronaut.http.client;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.client.annotation.Client;
@@ -59,7 +60,7 @@ public final class HttpVersionSelection {
     private final String[] alpnSupportedProtocols;
     private final boolean http2CipherSuites;
 
-    private HttpVersionSelection(PlaintextMode plaintextMode, boolean alpn, String[] alpnSupportedProtocols, boolean http2CipherSuites) {
+    private HttpVersionSelection(@NonNull PlaintextMode plaintextMode, boolean alpn, @NonNull String[] alpnSupportedProtocols, boolean http2CipherSuites) {
         this.plaintextMode = plaintextMode;
         this.alpn = alpn;
         this.alpnSupportedProtocols = alpnSupportedProtocols;
@@ -73,7 +74,8 @@ public final class HttpVersionSelection {
      * @param httpVersion The HTTP version as configured for Micronaut HTTP client 3.x
      * @return The version selection
      */
-    public static HttpVersionSelection forLegacyVersion(HttpVersion httpVersion) {
+    @NonNull
+    public static HttpVersionSelection forLegacyVersion(@NonNull HttpVersion httpVersion) {
         switch (httpVersion) {
             case HTTP_1_0:
             case HTTP_1_1:

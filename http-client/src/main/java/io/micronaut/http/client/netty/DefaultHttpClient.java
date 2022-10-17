@@ -1017,9 +1017,13 @@ public class DefaultHttpClient implements
                             ctx.pipeline()
                                 .remove(this)
                                 .remove(ChannelPipelineCustomizer.HANDLER_HTTP_STREAM);
-                            poolHandle.release();
                         }
                     }
+                }
+
+                @Override
+                public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
+                    poolHandle.release();
                 }
             });
             if (sse) {
@@ -1955,7 +1959,7 @@ public class DefaultHttpClient implements
          */
         protected void write(ConnectionManager.PoolHandle poolHandle, boolean isSecure, FluxSink<?> emitter) {
             if (poolHandle.http2) {
-                // todo: move to CM
+                // todo: move to ConnectionManager, DefaultHttpClient shouldn't care about the scheme
                 if (isSecure) {
                     nettyRequest.headers().add(AbstractNettyHttpRequest.HTTP2_SCHEME, HttpScheme.HTTPS);
                 } else {

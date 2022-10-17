@@ -62,9 +62,10 @@ public interface HttpClientRegistry<T extends HttpClient> {
      * @param clientId    The client ID
      * @param path        The path (Optional)
      * @return The client
+     * @since 4.0.0
      */
     @NonNull
-    T getClient(HttpVersionSelection httpVersion, @NonNull String clientId, @Nullable String path);
+    T getClient(@NonNull HttpVersionSelection httpVersion, @NonNull String clientId, @Nullable String path);
 
     /**
      * Resolves a {@link HttpClient} for the given injection point.

@@ -33,6 +33,8 @@ import io.netty.handler.codec.http.LastHttpContent;
  * Variant of {@link LineBasedFrameDecoder} that accepts
  * {@link io.netty.handler.codec.http.HttpContent} data. Note: this handler removes itself when the
  * response has been consumed.
+ *
+ * @since 4.0.0
  */
 @Internal
 final class HttpLineBasedFrameDecoder extends LineBasedFrameDecoder {
@@ -40,7 +42,7 @@ final class HttpLineBasedFrameDecoder extends LineBasedFrameDecoder {
 
     private boolean ignoreOneLast = false;
 
-    public HttpLineBasedFrameDecoder(int maxLength, boolean stripDelimiter, boolean failFast) {
+    HttpLineBasedFrameDecoder(int maxLength, boolean stripDelimiter, boolean failFast) {
         super(maxLength, stripDelimiter, failFast);
     }
 
