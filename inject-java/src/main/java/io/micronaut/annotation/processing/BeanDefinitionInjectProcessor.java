@@ -961,7 +961,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         writer.setValidated(validatedMethod);
                     }
                 }
-            } else if (validatedMethod) {
+            } else if (validatedMethod && isDeclaredBean) {
                 if (isPrivate) {
                     error(method, "Method annotated with constraints but is declared private. Change the method to be non-private in order for AOP advice to be applied.");
                     return null;
