@@ -137,6 +137,7 @@ class ConnectionManager {
         this.group = from.group;
         this.shutdownGroup = from.shutdownGroup;
         this.threadFactory = from.threadFactory;
+        this.socketChannelFactory = from.socketChannelFactory;
         this.bootstrap = from.bootstrap;
         this.configuration = from.configuration;
         this.sslContext = from.sslContext;
