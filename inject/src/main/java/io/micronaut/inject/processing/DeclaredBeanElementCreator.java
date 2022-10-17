@@ -189,7 +189,7 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
     }
 
     private void visitMethodInternal(BeanDefinitionVisitor visitor, MethodElement methodElement) {
-        if (methodElement.hasAnnotation(ANN_REQUIRES_VALIDATION)) {
+        if (methodElement.hasDeclaredAnnotation(ANN_REQUIRES_VALIDATION)) {
             methodElement.annotate(ANN_VALIDATED);
         }
         boolean claimed = visitMethod(visitor, methodElement);
