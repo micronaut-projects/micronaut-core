@@ -151,35 +151,40 @@ public class DefaultInterceptorRegistry implements InterceptorRegistry {
                 }
                 // loop through the bindings on the interceptor and make sure that
                 // the intercept point has the same once
-                interceptorValuesLoop:
                 for (AnnotationValue<?> interceptorAnnotationValue : interceptorValues) {
-                    final AnnotationValue<Annotation> memberBinding = interceptorAnnotationValue
-                        .getAnnotation(META_MEMBER_MEMBERS).orElse(null);
-                    final String annotationName = interceptorAnnotationValue.stringValue().orElse(null);
-                    if (annotationName == null) {
-                        // This shouldn't happen
+                    if (!matches(interceptorAnnotationValue, interceptPointBindings)) {
                         return false;
                     }
-                    for (AnnotationValue<?> applicableValue : interceptPointBindings) {
-                        String interceptPointAnnotation = applicableValue.stringValue().orElse(null);
-                        if (!annotationName.equals(interceptPointAnnotation)) {
-                            continue;
-                        }
-                        if (memberBinding == null) {
-                            continue interceptorValuesLoop; // Match
-                        }
-                        AnnotationValue<Annotation> otherMembers =
-                            applicableValue.getAnnotation(META_MEMBER_MEMBERS).orElse(null);
-                        if (!memberBinding.equals(otherMembers)) {
-                            continue;
-                        }
-                        continue interceptorValuesLoop; // Match
-                    }
-                    return false;
                 }
                 return true;
             }).sorted(OrderUtil.COMPARATOR)
             .map(BeanRegistration::getBean);
+    }
+
+    private boolean matches(AnnotationValue<?> interceptorAnnotationValue, Collection<AnnotationValue<?>> interceptPointBindings) {
+        final AnnotationValue<Annotation> memberBinding = interceptorAnnotationValue
+            .getAnnotation(META_MEMBER_MEMBERS).orElse(null);
+        final String annotationName = interceptorAnnotationValue.stringValue().orElse(null);
+        if (annotationName == null) {
+            // This shouldn't happen
+            return false;
+        }
+        for (AnnotationValue<?> applicableValue : interceptPointBindings) {
+            String interceptPointAnnotation = applicableValue.stringValue().orElse(null);
+            if (!annotationName.equals(interceptPointAnnotation)) {
+                continue;
+            }
+            if (memberBinding == null) {
+                return true;
+            }
+            AnnotationValue<Annotation> otherMembers =
+                applicableValue.getAnnotation(META_MEMBER_MEMBERS).orElse(null);
+            if (!memberBinding.equals(otherMembers)) {
+                continue;
+            }
+            return true;
+        }
+        return false;
     }
 
     private <T, R> boolean isApplicableByType(BeanRegistration<Interceptor<T, R>> beanRegistration,

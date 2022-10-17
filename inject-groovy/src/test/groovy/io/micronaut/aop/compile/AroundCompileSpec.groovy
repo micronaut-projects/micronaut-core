@@ -769,7 +769,7 @@ class MyBean {
 }
 
 
-@InterceptorBean({ TestAnn.class, TestAnn2.class })
+@InterceptorBean([TestAnn.class, TestAnn2.class])
 class TestInterceptor implements Interceptor {
     long count = 0;
     @Override
