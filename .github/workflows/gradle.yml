@@ -60,7 +60,7 @@ jobs:
            PREDICTIVE_TEST_SELECTION: "${{ github.event_name == 'pull_request' && 'true' || 'false' }}"
       - name: Publish Test Report
         if: always()
-        uses: mikepenz/action-junit-report@v3.5.1
+        uses: mikepenz/action-junit-report@v3.5.2
         with:
           check_name: Java CI / Test Report (${{ matrix.java }})
           report_paths: '**/build/test-results/test/TEST-*.xml'
