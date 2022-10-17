@@ -17,6 +17,7 @@ package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.naming.Named;
+import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.context.event.HttpRequestReceivedEvent;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.stream.HttpStreamsServerHandler;
@@ -74,7 +75,7 @@ import java.nio.channels.ClosedChannelException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 
 /**
  * Helper class that manages the {@link ChannelPipeline} of incoming HTTP connections.
@@ -86,6 +87,8 @@ import java.util.concurrent.atomic.AtomicReference;
  * @author ywkat
  */
 final class HttpPipelineBuilder {
+    static final Supplier<AttributeKey<StreamPipeline>> STREAM_PIPELINE_ATTRIBUTE =
+        SupplierUtil.memoized(() -> AttributeKey.newInstance("stream-pipeline"));
 
     private static final Logger LOG = LoggerFactory.getLogger(HttpPipelineBuilder.class);
 
@@ -464,7 +467,7 @@ final class HttpPipelineBuilder {
          * and netty requests, and routing.
          */
         private void insertMicronautHandlers() {
-            channel.attr(StreamPipelineAttributeKeyHolder.getInstance()).set(this);
+            channel.attr(STREAM_PIPELINE_ATTRIBUTE.get()).set(this);
 
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_COMPRESSOR, new SmartHttpContentCompressor(embeddedServices.getHttpCompressionStrategy()));
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECOMPRESSOR, new HttpContentDecompressor());
@@ -516,25 +519,6 @@ final class HttpPipelineBuilder {
                 }
                 pipeline.addLast(name, outboundHandlerAdapter);
             }
-        }
-    }
-
-    // We need the AttributeKey to be static, as it's used in NettyHttpRequest, but we can't eagerly initialize it
-    // as it would fail in Graal
-    static final class StreamPipelineAttributeKeyHolder {
-
-        private static final AtomicReference<AttributeKey<StreamPipeline>> INSTANCE = new AtomicReference<>();
-
-        private StreamPipelineAttributeKeyHolder() {
-        }
-
-        static AttributeKey<StreamPipeline> getInstance() {
-            return INSTANCE.updateAndGet(key -> {
-                if (key == null) {
-                    return AttributeKey.newInstance("micronaut-stream-pipeline");
-                }
-                return key;
-            });
         }
     }
 }

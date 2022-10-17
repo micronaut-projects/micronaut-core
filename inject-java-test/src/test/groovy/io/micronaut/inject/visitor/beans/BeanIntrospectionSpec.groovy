@@ -77,6 +77,84 @@ class Test<T extends CharSequence> {
         introspection.beanMethods.first().returnType.type == CharSequence[].class
     }
 
+    void "test property type is defined by its setter"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.core.annotation.Nullable;
+import java.util.Optional;
+
+@Introspected
+class Test {
+    @Nullable
+    private String foo;
+
+    public Optional<String> getFoo() {
+        return Optional.ofNullable(foo);
+    }
+
+    public void setFoo(@Nullable String foo) {
+        this.foo = foo;
+    }
+}
+''')
+        expect:
+        introspection.getProperty("foo").get().type == String.class
+    }
+
+    void "test property type is defined by its writer field"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.core.annotation.Nullable;
+import java.util.Optional;
+
+@Introspected(accessKind = {Introspected.AccessKind.METHOD, Introspected.AccessKind.FIELD})
+class Test {
+    @Nullable
+    String foo;
+
+    public Optional<String> getFoo() {
+        return Optional.ofNullable(foo);
+    }
+
+}
+''')
+        expect:
+        introspection.getProperty("foo").get().type == String.class
+    }
+
+    void "test property type is not defined by its not accessible field"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.core.annotation.Nullable;
+import java.util.Optional;
+
+@Introspected(accessKind = {Introspected.AccessKind.METHOD, Introspected.AccessKind.FIELD})
+class Test {
+    @Nullable
+    private String foo;
+
+    public Optional<String> getFoo() {
+        return Optional.ofNullable(foo);
+    }
+
+}
+''')
+        expect:
+        introspection.getProperty("foo").get().type == Optional.class
+    }
+
     void 'test favor method access'() {
         given:
         BeanIntrospection introspection = buildBeanIntrospection('fieldaccess.Test','''\
@@ -145,7 +223,7 @@ class Test {
         instance.invoked
     }
 
-    void 'test favor field access'() {
+    void 'test use getter to read and field to write'() {
         given:
         BeanIntrospection introspection = buildBeanIntrospection('fieldaccess.Test','''\
 package fieldaccess;
@@ -176,10 +254,10 @@ class Test {
 
         then:'the new value is reflected'
         one.get(instance) == 'test'
-        !instance.invoked
+        instance.invoked // The property was accessed with getter
     }
 
-    void 'test favor field access with custom getter'() {
+    void 'test use filed to read and setter to write'() {
         given:
         BeanIntrospection introspection = buildBeanIntrospection('fieldaccess.Test','''\
 package fieldaccess;
@@ -211,7 +289,7 @@ class Test {
 
         then:'the new value is reflected'
         one.get(instance) == 'test'
-        !instance.invoked
+        instance.invoked // Setter invoked
     }
 
     void 'test field access only'() {
@@ -227,7 +305,7 @@ class Test {
     public String one; // read/write
     public final int two; // read-only
     String three; // package protected
-    protected String four; // not included since protected
+    protected String four; // protected can be accessed from the same package
     private String five; // not included since private
 
     Test(int two) {
@@ -239,7 +317,7 @@ class Test {
         def properties = introspection.getBeanProperties()
 
         then:
-        properties.size() == 3
+        properties.size() == 4
 
         def one = introspection.getRequiredProperty("one", String)
         one.isReadWrite()
@@ -249,6 +327,9 @@ class Test {
 
         def three = introspection.getRequiredProperty("three", String)
         three.isReadWrite()
+
+        def four = introspection.getRequiredProperty("four", String)
+        four.isReadWrite()
 
         when:'a field is set'
         def instance = introspection.instantiate(10)
@@ -262,6 +343,18 @@ class Test {
 
         then:'the new value is reflected'
         two.get(instance) == 20
+
+        when:
+        four.set(instance, "test")
+
+        then:
+        four.get(instance) == "test"
+
+        when:
+        instance = four.withValue(instance, "test2")
+
+        then:
+        four.get(instance) == "test2"
     }
 
     void 'test field access only - public only'() {
@@ -985,7 +1078,7 @@ interface GenBase<T> {
 
         then:
         def e = thrown(UnsupportedOperationException)
-        e.message =='Cannot mutate property [name] that is not mutable via a setter method or constructor argument for type: test.Foo'
+        e.message =='Cannot mutate property [name] that is not mutable via a setter method, field or constructor argument for type: test.Foo'
     }
 
     void "test bean introspection with property of generic superclass"() {

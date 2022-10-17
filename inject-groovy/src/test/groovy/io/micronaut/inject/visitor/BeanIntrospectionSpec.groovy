@@ -107,7 +107,7 @@ class Test {
         instance.invoked
     }
 
-    void 'test favor field access'() {
+    void 'test use getter to read and field to write'() {
         given:
         BeanIntrospection introspection = buildBeanIntrospection('fieldaccess.Test','''\
 package fieldaccess
@@ -138,48 +138,26 @@ class Test {
 
         then:'the new value is reflected'
         one.get(instance) == 'test'
-        !instance.invoked
+        instance.invoked
 
         and:'unsafe access is working'
         (one as UnsafeBeanProperty).getUnsafe(instance) == 'test'
-        !instance.invoked
 
         when:
         (one as UnsafeBeanProperty).setUnsafe(instance, "test2")
         then:
         (one as UnsafeBeanProperty).getUnsafe(instance) == 'test2'
-        !instance.invoked
     }
 
-    // @PackageScope is commented out because type element visitors are run before it
-    // is processed because they visitors and the package scope transformation run in
-    // the same phase and there is no way to set the order
     void 'test field access only'() {
         given:
-        BeanIntrospection introspection = buildBeanIntrospection('fieldaccess.Test','''\
-package fieldaccess
-
-import io.micronaut.core.annotation.*
-
-@Introspected(accessKind=Introspected.AccessKind.FIELD)
-class Test {
-    public String one // read/write
-    public final int two // read-only
-    @groovy.transform.PackageScope String three // package protected
-    protected String four // not included since protected
-    private String five // not included since private
-
-    Test(int two) {
-        this.two = two
-    }
-}
-''');
+        // Using a real class to prevent classloader permissions issue
+        def introspection = BeanIntrospection.getIntrospection(TestFieldAccess)
         when:
         def properties = introspection.getBeanProperties()
 
         then:
-//        properties.size() == 3
-        properties.size() == 2
+        properties.size() == 4
 
         def one = introspection.getRequiredProperty("one", String)
         one.isReadWrite()
@@ -187,8 +165,11 @@ class Test {
         def two = introspection.getRequiredProperty("two", int.class)
         two.isReadOnly()
 
-//        def three = introspection.getRequiredProperty("three", String)
-//        three.isReadWrite()
+        def three = introspection.getRequiredProperty("three", String)
+        three.isReadWrite()
+
+        def four = introspection.getRequiredProperty("four", String)
+        four.isReadWrite()
 
         when:'a field is set'
         def instance = introspection.instantiate(10)
@@ -202,6 +183,18 @@ class Test {
 
         then:'the new value is reflected'
         two.get(instance) == 20
+
+        when:
+        four.set(instance, "test")
+
+        then:
+        four.get(instance) == "test"
+
+        when:
+        instance = four.withValue(instance, "test2")
+
+        then:
+        four.get(instance) == "test2"
     }
 
     // @PackageScope is commented out because type element visitors are run before it

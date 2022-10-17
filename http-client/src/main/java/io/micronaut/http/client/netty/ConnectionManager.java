@@ -118,7 +118,8 @@ class ConnectionManager {
     private EventLoopGroup group;
     private final boolean shutdownGroup;
     private final ThreadFactory threadFactory;
-    private final Bootstrap bootstrap;
+    private final ChannelFactory<? extends Channel> socketChannelFactory;
+    private Bootstrap bootstrap;
     private final HttpClientConfiguration configuration;
     private final SslContext sslContext;
     private final NettyClientCustomizer clientCustomizer;
@@ -162,6 +163,7 @@ class ConnectionManager {
         this.log = log;
         this.httpVersion = httpVersion;
         this.threadFactory = threadFactory;
+        this.socketChannelFactory = socketChannelFactory;
         this.configuration = configuration;
         this.instrumenter = instrumenter;
         this.clientCustomizer = clientCustomizer;
@@ -177,10 +179,7 @@ class ConnectionManager {
             shutdownGroup = true;
         }
 
-        this.bootstrap = new Bootstrap();
-        this.bootstrap.group(group)
-            .channelFactory(socketChannelFactory)
-            .option(ChannelOption.SO_KEEPALIVE, true);
+        initBootstrap();
 
         Optional<Duration> connectTimeout = configuration.getConnectTimeout();
         connectTimeout.ifPresent(duration -> bootstrap.option(
@@ -272,8 +271,18 @@ class ConnectionManager {
      * @see DefaultHttpClient#start()
      */
     public void start() {
-        group = createEventLoopGroup(configuration, threadFactory);
-        bootstrap.group(group);
+        // only need to start new group if it's managed by us
+        if (shutdownGroup) {
+            group = createEventLoopGroup(configuration, threadFactory);
+            initBootstrap(); // rebuild bootstrap with new group
+        }
+    }
+
+    private void initBootstrap() {
+        this.bootstrap = new Bootstrap();
+        this.bootstrap.group(group)
+            .channelFactory(socketChannelFactory)
+            .option(ChannelOption.SO_KEEPALIVE, true);
     }
 
     /**

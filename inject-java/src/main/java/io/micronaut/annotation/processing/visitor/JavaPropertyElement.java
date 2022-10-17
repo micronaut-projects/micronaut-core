@@ -276,7 +276,7 @@ final class JavaPropertyElement extends AbstractJavaElement implements PropertyE
 
     @Override
     public boolean isReadOnly() {
-        switch (readAccessKind) {
+        switch (writeAccessKind) {
             case METHOD:
                 return setter == null;
             case FIELD:
@@ -288,7 +288,7 @@ final class JavaPropertyElement extends AbstractJavaElement implements PropertyE
 
     @Override
     public boolean isWriteOnly() {
-        switch (writeAccessKind) {
+        switch (readAccessKind) {
             case METHOD:
                 return getter == null;
             case FIELD:

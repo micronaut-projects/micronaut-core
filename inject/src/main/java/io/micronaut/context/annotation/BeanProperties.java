@@ -19,10 +19,12 @@ import io.micronaut.core.annotation.Experimental;
 
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
 import java.lang.annotation.Inherited;
 import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
 
-import static java.lang.annotation.RetentionPolicy.SOURCE;
+import static java.lang.annotation.RetentionPolicy.CLASS;
 
 /**
  * Bean properties configuration annotation.
@@ -35,7 +37,8 @@ import static java.lang.annotation.RetentionPolicy.SOURCE;
  */
 @Experimental
 @Documented
-@Retention(SOURCE)
+@Target({ElementType.ANNOTATION_TYPE, ElementType.TYPE})
+@Retention(CLASS)
 @Inherited
 public @interface BeanProperties {
 
