@@ -75,6 +75,9 @@ public interface ExecutorConfiguration {
      */
     @Min(1L) Integer getCorePoolSize();
 
+    /**
+     * @return Whether the pool should use virtual threads.
+     */
     boolean isVirtual();
 
     /**
