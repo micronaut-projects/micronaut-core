@@ -41,7 +41,7 @@ class AstMessageUtils {
      * @param message The message
      */
     static void warning(SourceUnit sourceUnit, @Nullable ASTNode node, String message) {
-        final String sample = node ? null : sourceUnit.getSample(node.getLineNumber(), node.getColumnNumber(), new Janitor())
+        final String sample = node ? sourceUnit.getSample(node.getLineNumber(), node.getColumnNumber(), new Janitor()) : null
         if (sample) {
             System.err.println("""WARNING: $message
 
