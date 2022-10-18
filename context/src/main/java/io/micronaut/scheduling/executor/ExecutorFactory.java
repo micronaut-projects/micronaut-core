@@ -60,11 +60,15 @@ public class ExecutorFactory {
      */
     @EachBean(ExecutorConfiguration.class)
     protected ThreadFactory eventLoopGroupThreadFactory(ExecutorConfiguration configuration) {
+        String name = configuration.getName();
         if (configuration.isVirtual()) {
-            return LoomSupport.newVirtualThreadFactory(configuration.getName() + "-executor");
+            if (name == null) {
+                name = "virtual";
+            }
+            return LoomSupport.newVirtualThreadFactory(name + "-executor");
         }
-        if (configuration.getName() != null) {
-            return new NamedThreadFactory(configuration.getName() + "-executor");
+        if (name != null) {
+            return new NamedThreadFactory(name + "-executor");
         }
         return threadFactory;
     }
