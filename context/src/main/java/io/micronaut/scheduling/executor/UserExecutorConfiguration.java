@@ -67,6 +67,7 @@ public class UserExecutorConfiguration implements ExecutorConfiguration {
      * @param type the type
      * @param parallelism the parallelism
      * @param corePoolSize the core pool size
+     * @param virtual whether to use virtual threads
      * @param threadFactoryClass the thread factory class
      */
     @ConfigurationInject
