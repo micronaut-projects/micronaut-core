@@ -23,7 +23,6 @@ import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.http.hateoas.Link;
 import io.micronaut.http.hateoas.Resource;
-import io.micronaut.jackson.JacksonConfiguration;
 import io.micronaut.json.JsonConfiguration;
 import jakarta.inject.Singleton;
 
@@ -44,16 +43,6 @@ public class HateoasErrorResponseProcessor implements ErrorResponseProcessor<Jso
 
     public HateoasErrorResponseProcessor(JsonConfiguration jacksonConfiguration) {
         this.alwaysSerializeErrorsAsList = jacksonConfiguration.isAlwaysSerializeErrorsAsList();
-    }
-
-    /**
-     * Constructor for binary compatibility. Equivalent to
-     * {@link HateoasErrorResponseProcessor#HateoasErrorResponseProcessor(JsonConfiguration)}
-     *
-     * @param jacksonConfiguration the configuration to use for processing.
-     */
-    public HateoasErrorResponseProcessor(JacksonConfiguration jacksonConfiguration) {
-        this((JsonConfiguration) jacksonConfiguration);
     }
 
     @Override
