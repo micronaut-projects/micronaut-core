@@ -15,8 +15,6 @@
  */
 package io.micronaut.scheduling;
 
-import java.util.concurrent.Executors;
-
 /**
  * The names of common task schedulers.
  *
@@ -27,7 +25,7 @@ public interface TaskExecutors {
 
     /**
      * The name of the {@link java.util.concurrent.ExecutorService} used to schedule I/O tasks. By
-     * default, this is a {@link Executors#newCachedThreadPool() cached thread pool}.
+     * default, this is a {@link java.util.concurrent.Executors#newCachedThreadPool() cached thread pool}.
      */
     String IO = "io";
 

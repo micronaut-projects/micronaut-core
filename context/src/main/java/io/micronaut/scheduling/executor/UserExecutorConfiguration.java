@@ -120,6 +120,9 @@ public class UserExecutorConfiguration implements ExecutorConfiguration {
         return virtual;
     }
 
+    /**
+     * @param virtual Whether the pool should use virtual threads
+     */
     public void setVirtual(boolean virtual) {
         this.virtual = virtual;
     }

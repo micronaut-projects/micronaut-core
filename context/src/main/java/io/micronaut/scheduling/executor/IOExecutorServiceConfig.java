@@ -32,7 +32,7 @@ import java.util.concurrent.ExecutorService;
  * @since 1.0
  */
 @Factory
-public class IOExecutorServiceConfig {
+public final class IOExecutorServiceConfig {
 
     /**
      * @return The default IO pool configuration
@@ -60,6 +60,13 @@ public class IOExecutorServiceConfig {
         return cfg;
     }
 
+    /**
+     * The blocking executor.
+     *
+     * @param io IO executor (fallback)
+     * @param virtual Virtual thread executor (used if available)
+     * @return The blocking executor
+     */
     @Singleton
     @Named(TaskExecutors.BLOCKING)
     @Requires(missingProperty = ExecutorConfiguration.PREFIX + "." + TaskExecutors.BLOCKING)

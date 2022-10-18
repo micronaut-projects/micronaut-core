@@ -53,6 +53,7 @@ public class DefaultExecutorSelector implements ExecutorSelector {
      * Default constructor.
      * @param beanLocator The bean locator
      * @param ioExecutor The IO executor
+     * @param blockingExecutor The blocking executor
      */
     @Inject
     protected DefaultExecutorSelector(

@@ -26,15 +26,18 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 
+/**
+ * @since 4.0.0
+ */
 @Internal
 public final class LoomSupport {
-    private static final boolean supported;
+    private static final boolean SUPPORTED;
     private static Throwable failure;
 
-    private static final MethodHandle MH_newThreadPerTaskExecutor;
-    private static final MethodHandle MH_ofVirtual;
-    private static final MethodHandle MH_name;
-    private static final MethodHandle MH_factory;
+    private static final MethodHandle MH_NEW_THREAD_PER_TASK_EXECUTOR;
+    private static final MethodHandle MH_OF_VIRTUAL;
+    private static final MethodHandle MH_NAME;
+    private static final MethodHandle MH_FACTORY;
 
     static {
         boolean sup;
@@ -67,17 +70,18 @@ public final class LoomSupport {
             failure = e;
         }
 
-        supported = sup;
-        MH_newThreadPerTaskExecutor = newThreadPerTaskExecutor;
-        MH_ofVirtual = ofVirtual;
-        MH_name = name;
-        MH_factory = factory;
+        SUPPORTED = sup;
+        MH_NEW_THREAD_PER_TASK_EXECUTOR = newThreadPerTaskExecutor;
+        MH_OF_VIRTUAL = ofVirtual;
+        MH_NAME = name;
+        MH_FACTORY = factory;
     }
 
-    private LoomSupport() {}
+    private LoomSupport() {
+    }
 
     public static boolean isSupported() {
-        return supported;
+        return SUPPORTED;
     }
 
     public static void checkSupported() {
@@ -89,7 +93,7 @@ public final class LoomSupport {
     public static ExecutorService newThreadPerTaskExecutor(ThreadFactory threadFactory) {
         checkSupported();
         try {
-            return (ExecutorService) MH_newThreadPerTaskExecutor.invokeExact(threadFactory);
+            return (ExecutorService) MH_NEW_THREAD_PER_TASK_EXECUTOR.invokeExact(threadFactory);
         } catch (Throwable e) {
             throw new RuntimeException(e);
         }
@@ -98,9 +102,9 @@ public final class LoomSupport {
     public static ThreadFactory newVirtualThreadFactory(String namePrefix) {
         checkSupported();
         try {
-            Object builder = MH_ofVirtual.invoke();
-            builder = MH_name.invoke(builder, namePrefix, 1L);
-            return (ThreadFactory) MH_factory.invoke(builder);
+            Object builder = MH_OF_VIRTUAL.invoke();
+            builder = MH_NAME.invoke(builder, namePrefix, 1L);
+            return (ThreadFactory) MH_FACTORY.invoke(builder);
         } catch (Throwable e) {
             throw new RuntimeException(e);
         }
