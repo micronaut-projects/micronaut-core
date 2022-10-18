@@ -47,7 +47,7 @@ public class UserExecutorConfiguration implements ExecutorConfiguration {
     private ExecutorType type;
     private Integer parallelism;
     private Integer corePoolSize;
-    private boolean virtual = false;
+    private boolean virtual;
     private Class<? extends ThreadFactory> threadFactoryClass;
 
     /**
@@ -75,14 +75,14 @@ public class UserExecutorConfiguration implements ExecutorConfiguration {
                                         @Nullable ExecutorType type,
                                         @Nullable Integer parallelism,
                                         @Nullable Integer corePoolSize,
-                                        boolean virtual,
+                                        @Nullable Boolean virtual,
                                         @Nullable Class<? extends ThreadFactory> threadFactoryClass) {
         this.name = name;
         this.nThreads = nThreads == null ? AVAILABLE_PROCESSORS * 2 : nThreads;
         this.type = type == null ? ExecutorType.SCHEDULED : type;
         this.parallelism = parallelism == null ? AVAILABLE_PROCESSORS : parallelism;
         this.corePoolSize = corePoolSize == null ? AVAILABLE_PROCESSORS * 2 : corePoolSize;
-        this.virtual = virtual;
+        this.virtual = virtual == null ? false : virtual;
         this.threadFactoryClass = threadFactoryClass;
     }
 

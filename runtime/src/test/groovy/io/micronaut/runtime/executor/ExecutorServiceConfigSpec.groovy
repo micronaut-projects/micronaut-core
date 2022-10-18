@@ -17,6 +17,7 @@ package io.micronaut.runtime.executor
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.inject.qualifiers.Qualifiers
+import io.micronaut.scheduling.LoomSupport
 import io.micronaut.scheduling.TaskExecutors
 import io.micronaut.scheduling.executor.ExecutorConfiguration
 import io.micronaut.scheduling.executor.UserExecutorConfiguration
@@ -33,6 +34,7 @@ import java.util.concurrent.ThreadPoolExecutor
  * @since 1.0
  */
 class ExecutorServiceConfigSpec extends Specification {
+    static final int expectedExecutorCount = LoomSupport.isSupported() ? 6 : 5
 
     @Unroll
     void "test configure custom executor with invalidate cache: #invalidateCache"() {
@@ -53,7 +55,7 @@ class ExecutorServiceConfigSpec extends Specification {
         Collection<ExecutorService> executorServices = ctx.getBeansOfType(ExecutorService.class)
 
         then:
-        executorServices.size() == 4
+        executorServices.size() == expectedExecutorCount
 
         when:
         ThreadPoolExecutor poolExecutor = ctx.getBean(ThreadPoolExecutor, Qualifiers.byName("one"))
@@ -61,7 +63,7 @@ class ExecutorServiceConfigSpec extends Specification {
 
         then:
         forkJoinPool instanceof ForkJoinPool
-        executorServices.size() == 4
+        executorServices.size() == expectedExecutorCount
         poolExecutor.corePoolSize == 5
         ctx.getBean(ExecutorService.class, Qualifiers.byName(TaskExecutors.IO)) // the default IO executor
         ctx.getBean(ExecutorService.class, Qualifiers.byName(TaskExecutors.SCHEDULED)) // the default IO executor
@@ -113,7 +115,7 @@ class ExecutorServiceConfigSpec extends Specification {
         ExecutorService forkJoinPool = ctx.getBean(ExecutorService, Qualifiers.byName("two"))
 
         then:
-        executorServices.size() == 4
+        executorServices.size() == expectedExecutorCount
         poolExecutor.corePoolSize == 5
         ctx.getBean(ExecutorService.class, Qualifiers.byName(TaskExecutors.IO)) instanceof ThreadPoolExecutor
         ctx.getBean(ExecutorService.class, Qualifiers.byName(TaskExecutors.SCHEDULED)) instanceof ScheduledExecutorService
@@ -129,7 +131,7 @@ class ExecutorServiceConfigSpec extends Specification {
         executorServices = ctx.getBeansOfType(ExecutorService)
 
         then:
-        executorServices.size() == 4
+        executorServices.size() == expectedExecutorCount
         moreConfigs.size() == 4
         configs.size() == 2
 
@@ -168,7 +170,7 @@ class ExecutorServiceConfigSpec extends Specification {
         Collection<ExecutorService> executorServices = ctx.getBeansOfType(ExecutorService.class)
 
         then:
-        executorServices.size() == 3
+        executorServices.size() == expectedExecutorCount - 1
         ctx.getBean(ExecutorService.class, Qualifiers.byName(TaskExecutors.IO)) instanceof ThreadPoolExecutor
 
         when:
@@ -180,7 +182,7 @@ class ExecutorServiceConfigSpec extends Specification {
         executorServices = ctx.getBeansOfType(ExecutorService)
 
         then:
-        executorServices.size() == 3
+        executorServices.size() == expectedExecutorCount - 1
         moreConfigs.size() == 3
         configs.size() == 2
 
