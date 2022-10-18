@@ -51,7 +51,9 @@ public class HateoasErrorResponseProcessor implements ErrorResponseProcessor<Jso
      * {@link HateoasErrorResponseProcessor#HateoasErrorResponseProcessor(JsonConfiguration)}
      *
      * @param jacksonConfiguration the configuration to use for processing.
+     * @deprecated Use {@link HateoasErrorResponseProcessor(JsonConfiguration)}
      */
+    @Deprecated
     public HateoasErrorResponseProcessor(JacksonConfiguration jacksonConfiguration) {
         this((JsonConfiguration) jacksonConfiguration);
     }
