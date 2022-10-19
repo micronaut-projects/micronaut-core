@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2022 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,24 +13,33 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.inject;
+package io.micronaut.core.flow;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 
+import java.util.concurrent.CompletableFuture;
+
 /**
- * Represents an execution handle that invokes a method.
+ * The completable future flow.
  *
- * @param <T> The target type
- * @param <R> The result type
- * @author Graeme Rocher
- * @since 1.0
+ * @param <T> The value type
+ * @author Denis Stepnov
+ * @since 4.0.0
  */
-public interface MethodExecutionHandle<T, R> extends ExecutionHandle<T, R>, MethodReference<T, R> {
+@Internal
+public interface CompletableFutureFlow<T> extends Flow<T> {
+
     /**
-     * The underlying {@link ExecutableMethod} reference.
+     * Create a completable future flow representing a value.
      *
-     * @return The underlying method reference.
+     * @param value The value
+     * @param <K>   The value type
+     * @return a new flow
      */
     @NonNull
-    ExecutableMethod<?, R> getExecutableMethod();
+    static <K> Flow<K> just(@NonNull CompletableFuture<K> value) {
+        return (Flow<K>) new CompletableFutureFlowImpl((CompletableFuture<Object>) value);
+    }
+
 }
