@@ -413,6 +413,7 @@ log4j = { module = "org.apache.logging.log4j:log4j-core", version.ref = "log4j" 
 logbook-netty = { module = "org.zalando:logbook-netty", version.ref = "logbook-netty" }
 
 micronaut-docs = { module = "io.micronaut.docs:micronaut-docs-asciidoc-config-props", version.ref = "micronaut-docs" }
+micronaut-runtime-groovy = { module = "io.micronaut.groovy:micronaut-runtime-groovy", version.ref = "managed-micronaut-groovy" }
 
 mysql-driver = { module = "mysql:mysql-connector-java" }
 
