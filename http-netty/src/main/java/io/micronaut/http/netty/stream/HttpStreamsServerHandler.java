@@ -23,7 +23,16 @@ import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.ChannelPromise;
-import io.netty.handler.codec.http.*;
+import io.netty.handler.codec.http.DefaultFullHttpResponse;
+import io.netty.handler.codec.http.FullHttpRequest;
+import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.HttpContent;
+import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.HttpResponse;
+import io.netty.handler.codec.http.HttpResponseStatus;
+import io.netty.handler.codec.http.HttpUtil;
+import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketServerHandshaker;
 import io.netty.handler.codec.http.websocketx.WebSocketVersion;
@@ -210,6 +219,15 @@ public class HttpStreamsServerHandler extends HttpStreamsHandler<HttpRequest, Ht
             handleWebSocketResponse(ctx, webSocketResponse, webSocketResponseChannelPromise);
             webSocketResponse = null;
             webSocketResponseChannelPromise = null;
+        }
+        if (inFlight == 0) {
+            // normally, after writing the response, the routing handler triggers a read() for the
+            // next request. However, if at this point the request is not fully read yet (e.g.
+            // still missing a LastHttpContent), then that read() call will simply read the
+            // remaining content, and the HandlerPublisher also won't trigger more read()s since
+            // it's complete. To prevent the connection from being stuck in that case, we trigger a
+            // read here.
+            ctx.read();
         }
     }
 

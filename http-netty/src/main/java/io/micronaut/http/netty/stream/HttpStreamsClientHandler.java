@@ -88,7 +88,6 @@ public class HttpStreamsClientHandler extends HttpStreamsHandler<HttpResponse, H
             return true;
         }
 
-
         if (HttpUtil.isContentLengthSet(response)) {
             return HttpUtil.getContentLength(response) > 0;
         }
@@ -183,7 +182,7 @@ public class HttpStreamsClientHandler extends HttpStreamsHandler<HttpResponse, H
 
     @Override
     public void write(final ChannelHandlerContext ctx, Object msg, final ChannelPromise promise) throws Exception {
-        if (ctx.channel().attr(AttributeKey.valueOf(ChannelPipelineCustomizer.HANDLER_HTTP_CHUNK)).get() == Boolean.TRUE) {
+        if (Boolean.TRUE.equals(ctx.channel().attr(AttributeKey.valueOf(ChannelPipelineCustomizer.HANDLER_HTTP_CHUNK)).get())) {
             ctx.write(msg, promise);
         } else {
             super.write(ctx, msg, promise);

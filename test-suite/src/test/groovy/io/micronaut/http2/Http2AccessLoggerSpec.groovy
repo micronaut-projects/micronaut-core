@@ -1,22 +1,21 @@
 package io.micronaut.http2
 
+import ch.qos.logback.classic.Logger
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.AppenderBase
-import ch.qos.logback.classic.Logger
-import io.micronaut.http.client.HttpClient
-import io.micronaut.http.client.StreamingHttpClient
-import org.reactivestreams.Publisher
-import org.slf4j.LoggerFactory
-
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.type.Argument
 import io.micronaut.docs.server.json.Person
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.client.HttpClient
+import io.micronaut.http.client.StreamingHttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.sse.Event
 import io.micronaut.runtime.server.EmbeddedServer
+import org.reactivestreams.Publisher
+import org.slf4j.LoggerFactory
 import reactor.core.publisher.Flux
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -144,6 +143,7 @@ class Http2AccessLoggerSpec extends Specification {
                 'micronaut.server.ssl.buildSelfSigned': true,
                 'micronaut.server.ssl.port': -1,
                 "micronaut.http.client.log-level" : "TRACE",
+                "micronaut.http.client.http-version" : "1.1",
                 "micronaut.server.netty.log-level" : "TRACE",
                 'micronaut.server.netty.access-logger.enabled': true,
                 'micronaut.http.client.ssl.insecure-trust-all-certificates': true

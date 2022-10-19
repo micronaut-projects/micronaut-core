@@ -98,7 +98,7 @@ public class ServiceHttpClientFactory {
                     Collection<URI> loadBalancedURIs = instanceList.getLoadBalancedURIs();
                     final HttpClient httpClient = clientFactory.get()
                             .getClient(
-                                    configuration.getHttpVersion(),
+                                    HttpVersionSelection.forClientConfiguration(configuration),
                                     configuration.getServiceId(),
                                     configuration.getPath().orElse(null));
                     final Duration initialDelay = configuration.getHealthCheckInterval();

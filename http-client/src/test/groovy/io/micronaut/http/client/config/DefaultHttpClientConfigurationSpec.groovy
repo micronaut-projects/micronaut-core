@@ -75,7 +75,6 @@ class DefaultHttpClientConfigurationSpec extends Specification {
         where:
         key               | property         | value   | expected
         'enabled'         | 'enabled'        | 'false' | false
-        'max-connections' | 'maxConnections' | '10'    | 10
     }
 
     void "test overriding logger for the client"() {

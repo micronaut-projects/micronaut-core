@@ -146,7 +146,14 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
 
     @Override
     public void channelActive(final ChannelHandlerContext ctx) {
-        handshaker.handshake(ctx.channel());
+        handshaker.handshake(ctx.channel()).addListener(future -> {
+            if (future.isSuccess()) {
+                ctx.channel().config().setAutoRead(true);
+                ctx.read();
+            } else {
+                handshakeFuture.tryFailure(future.cause());
+            }
+        });
     }
 
     @Override

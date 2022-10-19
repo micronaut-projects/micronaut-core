@@ -1,12 +1,13 @@
 package io.micronaut.docs.netty
 
-import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.annotation.Requires
+import io.micronaut.context.event.BeanCreatedEvent;
 
 // tag::imports[]
 
-import io.micronaut.context.event.BeanCreatedEvent
 import io.micronaut.context.event.BeanCreatedEventListener
 import io.micronaut.http.client.netty.NettyClientCustomizer
+import io.micronaut.http.netty.channel.ChannelPipelineCustomizer
 import io.netty.channel.Channel
 import jakarta.inject.Singleton
 import org.zalando.logbook.Logbook
@@ -47,8 +48,9 @@ class LogbookNettyClientCustomizer
         }
 
         @Override
-        void onStreamPipelineBuilt() {
-            channel.pipeline().addLast( // <5>
+        void onRequestPipelineBuilt() {
+            channel.pipeline().addBefore( // <5>
+                    ChannelPipelineCustomizer.HANDLER_HTTP_STREAM,
                     "logbook",
                     new LogbookClientHandler(logbook)
             )
