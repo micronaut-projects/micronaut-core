@@ -338,5 +338,10 @@
     "type": "io.micronaut.core.io.service.StreamSoftServiceLoader",
     "member": "Constructor io.micronaut.core.io.service.StreamSoftServiceLoader()",
     "reason": "Deprecated and removed for Micronaut 4. Use io.micronaut.core.io.service.SoftServiceLoader#collectAll(java.util.Collection)."
+  },
+  {
+    "type": "io.micronaut.http.server.exceptions.response.HateoasErrorResponseProcessor",
+    "member": "Constructor io.micronaut.http.server.exceptions.response.HateoasErrorResponseProcessor(io.micronaut.jackson.JacksonConfiguration)",
+    "reason": "Removed as was deprecated in 3.8.x"
   }
 ]
