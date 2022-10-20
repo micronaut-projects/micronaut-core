@@ -43,7 +43,7 @@ class Test extends SuperClass {
 
         expect:
         classElement.getDocumentation().get() == 'This is class level docs'
-        classElement.getFields().get(0).getDocumentation().get() == 'This is property level docs'
+        classElement.getFields().find {it.name == "tenant" }.getDocumentation().get() == 'This is property level docs'
         classElement.getEnclosedElements(ElementQuery.of(MethodElement.class).named("getTenant")).get(0).getDocumentation().get() == 'This is method level docs'
         classElement.getEnclosedElements(ElementQuery.of(MethodElement.class).named("setTenant")).get(0).getDocumentation().get() == 'This is method level docs'
     }

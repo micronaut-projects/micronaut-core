@@ -29,7 +29,6 @@ import io.micronaut.inject.ast.BeanPropertiesQuery;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
-import io.micronaut.inject.ast.ElementModifier;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
@@ -39,6 +38,7 @@ import io.micronaut.inject.ast.PackageElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.WildcardElement;
 import io.micronaut.inject.ast.utils.AstBeanPropertiesUtils;
+import io.micronaut.inject.ast.utils.EnclosedElementsQuery;
 import io.micronaut.inject.processing.JavaModelUtils;
 
 import javax.lang.model.element.Element;
@@ -51,24 +51,19 @@ import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.type.TypeVariable;
-import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.BiPredicate;
 import java.util.function.Function;
-import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 /**
@@ -76,6 +71,7 @@ import java.util.stream.Collectors;
  *
  * @author James Kleeh
  * @author graemerocher
+ * @author Denis Stepanov
  * @since 1.0
  */
 @Internal
@@ -88,12 +84,11 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     private final boolean isTypeVariable;
     private List<PropertyElement> beanProperties;
     private Map<String, Map<String, TypeMirror>> genericTypeInfo;
-    private List<? extends Element> enclosedElements;
     private String simpleName;
     private String name;
     private String packageName;
-    private final Map<Element, io.micronaut.inject.ast.Element> elementsCache = new HashMap<>();
     private Map<String, ClassElement> resolvedTypeArguments;
+    private final JavaEnclosedElementsQuery enclosedElementsQuery = new JavaEnclosedElementsQuery();
 
     /**
      * @param classElement              The {@link TypeElement}
@@ -274,8 +269,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         if (superclass != null) {
             final Element element = visitorContext.getTypes().asElement(superclass);
 
-            if (element instanceof TypeElement) {
-                TypeElement superElement = (TypeElement) element;
+            if (element instanceof TypeElement superElement) {
                 if (!Object.class.getName().equals(superElement.getQualifiedName().toString())) {
                     // if super type has type arguments, then build a parameterized ClassElement
                     if (superclass instanceof DeclaredType && !((DeclaredType) superclass).getTypeArguments().isEmpty()) {
@@ -470,277 +464,10 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
 
     @Override
     public <T extends io.micronaut.inject.ast.Element> List<T> getEnclosedElements(@NonNull ElementQuery<T> query) {
-        Objects.requireNonNull(query, "Query cannot be null");
-        ElementQuery.Result<T> result = query.result();
-        Set<Element> excludeElements;
-        if (result.isExcludePropertyElements()) {
-            excludeElements = new HashSet<>();
-            for (PropertyElement excludePropertyElement : getBeanProperties()) {
-                excludePropertyElement.getReadMethod().ifPresent(methodElement -> excludeElements.add((Element) methodElement.getNativeType()));
-                excludePropertyElement.getWriteMethod().ifPresent(methodElement -> excludeElements.add((Element) methodElement.getNativeType()));
-                excludePropertyElement.getField().ifPresent(fieldElement -> excludeElements.add((Element) fieldElement.getNativeType()));
-            }
-        } else {
-            excludeElements = Collections.emptySet();
+        if (getNativeType() instanceof TypeElement) {
+            return enclosedElementsQuery.getEnclosedElements(this, query);
         }
-        Elements elements = visitorContext.getElements();
-        ElementKind kind = getElementKind(result.getElementType());
-        Predicate<Element> predicate = element -> {
-            Element enclosingElement = element.getEnclosingElement();
-            if (enclosingElement instanceof TypeElement
-                && ((TypeElement) enclosingElement).getQualifiedName().toString().equals(Enum.class.getName())
-                && element.getKind() == ElementKind.FIELD) {
-                // Skip any fields on Enum but allow to query methods
-                return false;
-            }
-            ElementKind enclosedElementKind = element.getKind();
-            return enclosedElementKind == kind
-                || result.isIncludeEnumConstants() && kind == ElementKind.FIELD && enclosedElementKind == ElementKind.ENUM_CONSTANT
-                || (enclosedElementKind == ElementKind.ENUM && kind == ElementKind.CLASS);
-        };
-
-        Predicate<io.micronaut.inject.ast.Element> filter = element -> {
-            if (excludeElements.contains(element.getNativeType())) {
-                return false;
-            }
-            List<Predicate<T>> elementPredicates = result.getElementPredicates();
-            if (!elementPredicates.isEmpty()) {
-                for (Predicate<T> elementPredicate : elementPredicates) {
-                    if (!elementPredicate.test((T) element)) {
-                        return false;
-                    }
-                }
-            }
-            if (element instanceof MethodElement) {
-                MethodElement methodElement = (MethodElement) element;
-                if (result.isOnlyAbstract()) {
-                    if (methodElement.getDeclaringType().isInterface() && methodElement.isDefault()) {
-                        return false;
-                    } else if (!element.isAbstract()) {
-                        return false;
-                    }
-                } else if (result.isOnlyConcrete()) {
-                    if (methodElement.getDeclaringType().isInterface() && !methodElement.isDefault()) {
-                        return false;
-                    } else if (element.isAbstract()) {
-                        return false;
-                    }
-                }
-            }
-            if (result.isOnlyInstance() && element.isStatic()) {
-                return false;
-            } else if (result.isOnlyStatic() && !element.isStatic()) {
-                return false;
-            }
-            if (result.isOnlyAccessible()) {
-                // exclude private members
-                // exclude synthetic members or bridge methods that start with $
-                if (element.isPrivate() || element.getName().startsWith("$")) {
-                    return false;
-                }
-                if (element instanceof MemberElement && !((MemberElement) element).isAccessible()) {
-                    return false;
-                }
-            }
-            if (!result.getModifierPredicates().isEmpty()) {
-                Set<ElementModifier> modifiers = element.getModifiers();
-                for (Predicate<Set<ElementModifier>> modifierPredicate : result.getModifierPredicates()) {
-                    if (!modifierPredicate.test(modifiers)) {
-                        return false;
-                    }
-                }
-            }
-            if (!result.getNamePredicates().isEmpty()) {
-                for (Predicate<String> namePredicate : result.getNamePredicates()) {
-                    if (!namePredicate.test(element.getName())) {
-                        return false;
-                    }
-                }
-            }
-            if (!result.getAnnotationPredicates().isEmpty()) {
-                for (Predicate<AnnotationMetadata> annotationPredicate : result.getAnnotationPredicates()) {
-                    if (!annotationPredicate.test(element)) {
-                        return false;
-                    }
-                }
-            }
-            if (!result.getTypePredicates().isEmpty()) {
-                for (Predicate<ClassElement> typePredicate : result.getTypePredicates()) {
-                    ClassElement classElement;
-                    if (element instanceof ConstructorElement) {
-                        classElement = JavaClassElement.this;
-                    } else if (element instanceof MethodElement) {
-                        classElement = ((MethodElement) element).getGenericReturnType();
-                    } else if (element instanceof ClassElement) {
-                        classElement = (ClassElement) element;
-                    } else {
-                        classElement = ((FieldElement) element).getGenericField();
-                    }
-                    if (!typePredicate.test(classElement)) {
-                        return false;
-                    }
-                }
-            }
-// TODO: FIX only injected
-//                if (result.isOnlyInjected() && !element.hasDeclaredAnnotation(AnnotationUtil.INJECT)) {
-//                    return false;
-//                }
-            return true;
-        };
-
-        BiPredicate<io.micronaut.inject.ast.Element, io.micronaut.inject.ast.Element> reduce;
-        if (result.isIncludeHiddenElements() && result.isIncludeOverriddenMethods()) {
-            reduce = (t1, t2) -> false;
-        } else {
-            reduce = (newElement, existingElement) -> {
-                if (!result.isIncludeHiddenElements() && hidden(elements, newElement, existingElement)) {
-                    return true;
-                }
-                if (!result.isIncludeOverriddenMethods()) {
-                    if (kind == ElementKind.METHOD) {
-                        if (newElement instanceof MethodElement && existingElement instanceof MethodElement) {
-                            return ((MethodElement) newElement).overrides((MethodElement) existingElement);
-                        }
-                    }
-                }
-                return false;
-            };
-        }
-        return (List<T>) Collections.unmodifiableList(
-            getAllElements(classElement, result.isOnlyDeclared(), predicate, reduce)
-                .stream()
-                .filter(filter)
-                .collect(Collectors.toList())
-        );
-    }
-
-    private static boolean hidden(Elements elements, io.micronaut.inject.ast.Element newElement, io.micronaut.inject.ast.Element existingElement) {
-        if (newElement instanceof MemberElement) {
-            if (newElement.isStatic() && ((MemberElement) newElement).getDeclaringType().isInterface()) {
-                return false;
-            }
-        }
-        return elements.hides((Element) newElement.getNativeType(), (Element) existingElement.getNativeType());
-    }
-
-    private Collection<io.micronaut.inject.ast.Element> getAllElements(TypeElement classNode,
-                                                                       boolean onlyDeclared,
-                                                                       Predicate<Element> predicate,
-                                                                       BiPredicate<io.micronaut.inject.ast.Element, io.micronaut.inject.ast.Element> reduce) {
-        Set<io.micronaut.inject.ast.Element> elements = new LinkedHashSet<>();
-        List<List<Element>> hierarchy = new ArrayList<>();
-        collectHierarchy(classNode, onlyDeclared, predicate, hierarchy);
-        for (List<Element> classElements : hierarchy) {
-            Set<io.micronaut.inject.ast.Element> addedFromClassElements = new LinkedHashSet<>();
-            classElements:
-            for (Element element : classElements) {
-                io.micronaut.inject.ast.Element newElement = elementsCache.computeIfAbsent(element, this::toAstElement);
-                for (Iterator<io.micronaut.inject.ast.Element> iterator = elements.iterator(); iterator.hasNext(); ) {
-                    io.micronaut.inject.ast.Element existingElement = iterator.next();
-                    if (newElement.equals(existingElement)) {
-                        continue;
-                    }
-                    if (reduce.test(newElement, existingElement)) {
-                        iterator.remove();
-                        addedFromClassElements.add(newElement);
-                    } else if (reduce.test(existingElement, newElement)) {
-                        continue classElements;
-                    }
-                }
-                addedFromClassElements.add(newElement);
-            }
-            elements.addAll(addedFromClassElements);
-        }
-        return elements;
-    }
-
-    private void collectHierarchy(TypeElement classNode,
-                                  boolean onlyDeclared,
-                                  Predicate<Element> predicate,
-                                  List<List<Element>> hierarchy) {
-        if (classNode.getQualifiedName().toString().equals(Object.class.getName())
-            || classNode.getQualifiedName().toString().equals(Enum.class.getName())) {
-            return;
-        }
-        if (!onlyDeclared) {
-            TypeMirror superclass = classNode.getSuperclass();
-            if (superclass instanceof DeclaredType) {
-                DeclaredType dt = (DeclaredType) superclass;
-                TypeElement element = (TypeElement) dt.asElement();
-                collectHierarchy(element, false, predicate, hierarchy);
-            }
-            for (TypeMirror ifaceMirror : classNode.getInterfaces()) {
-                final Element ifaceEl = visitorContext.getTypes().asElement(ifaceMirror);
-                if (ifaceEl instanceof TypeElement) {
-                    TypeElement iface = (TypeElement) ifaceEl;
-                    List<List<Element>> interfaceElements = new ArrayList<>();
-                    collectHierarchy(iface, false, predicate, interfaceElements);
-                    hierarchy.addAll(interfaceElements);
-                }
-            }
-        }
-        List<? extends Element> enclosedElements;
-        if (classNode == classElement) {
-            if (this.enclosedElements == null) {
-                this.enclosedElements = classElement.getEnclosedElements();
-            }
-            enclosedElements = this.enclosedElements;
-        } else {
-            enclosedElements = classNode.getEnclosedElements();
-        }
-        hierarchy.add(enclosedElements.stream().filter(predicate).collect(Collectors.toList()));
-    }
-
-    private io.micronaut.inject.ast.Element toAstElement(Element enclosedElement) {
-        final JavaElementFactory elementFactory = visitorContext.getElementFactory();
-        switch (enclosedElement.getKind()) {
-            case METHOD:
-                return elementFactory.newMethodElement(
-                    JavaClassElement.this,
-                    (ExecutableElement) enclosedElement,
-                    elementAnnotationMetadataFactory,
-                    genericTypeInfo
-                );
-            case FIELD:
-                return elementFactory.newFieldElement(
-                    JavaClassElement.this,
-                    (VariableElement) enclosedElement,
-                    elementAnnotationMetadataFactory
-                );
-            case ENUM_CONSTANT:
-                return elementFactory.newEnumConstantElement(
-                    JavaClassElement.this,
-                    (VariableElement) enclosedElement,
-                    elementAnnotationMetadataFactory
-                );
-            case CONSTRUCTOR:
-                return elementFactory.newConstructorElement(
-                    JavaClassElement.this,
-                    (ExecutableElement) enclosedElement,
-                    elementAnnotationMetadataFactory
-                );
-            case CLASS:
-            case ENUM:
-                return elementFactory.newClassElement(
-                    (TypeElement) enclosedElement,
-                    elementAnnotationMetadataFactory
-                );
-            default:
-                return null;
-        }
-    }
-
-    private <T extends io.micronaut.inject.ast.Element> ElementKind getElementKind(Class<T> elementType) {
-        if (elementType == MethodElement.class) {
-            return ElementKind.METHOD;
-        } else if (elementType == FieldElement.class) {
-            return ElementKind.FIELD;
-        } else if (elementType == ConstructorElement.class) {
-            return ElementKind.CONSTRUCTOR;
-        } else if (elementType == ClassElement.class) {
-            return ElementKind.CLASS;
-        }
-        throw new IllegalArgumentException("Unsupported element type for query: " + elementType);
+        return Collections.emptyList();
     }
 
     @Override
@@ -791,8 +518,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         while (enclosingElement != null && enclosingElement.getKind() != ElementKind.PACKAGE) {
             enclosingElement = enclosingElement.getEnclosingElement();
         }
-        if (enclosingElement instanceof javax.lang.model.element.PackageElement) {
-            javax.lang.model.element.PackageElement packageElement = (javax.lang.model.element.PackageElement) enclosingElement;
+        if (enclosingElement instanceof javax.lang.model.element.PackageElement packageElement) {
             return new JavaPackageElement(
                 packageElement,
                 elementAnnotationMetadataFactory,
@@ -876,8 +602,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     public Optional<ClassElement> getEnclosingType() {
         if (isInner()) {
             Element enclosingElement = this.classElement.getEnclosingElement();
-            if (enclosingElement instanceof TypeElement) {
-                TypeElement typeElement = (TypeElement) enclosingElement;
+            if (enclosingElement instanceof TypeElement typeElement) {
                 return Optional.of(visitorContext.getElementFactory().newClassElement(
                     typeElement,
                     elementAnnotationMetadataFactory
@@ -1064,6 +789,128 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             genericTypeInfo = visitorContext.getGenericUtils().buildGenericTypeArgumentElementInfo(classElement, null, getBoundTypeMirrors());
         }
         return genericTypeInfo;
+    }
+
+    private final class JavaEnclosedElementsQuery extends EnclosedElementsQuery<TypeElement, Element> {
+
+        private List<? extends Element> enclosedElements;
+
+        @Override
+        protected Set<Element> getExcludedNativeElements(ElementQuery.Result<?> result) {
+            if (result.isExcludePropertyElements()) {
+                Set<Element> excludeElements = new HashSet<>();
+                for (PropertyElement excludePropertyElement : getBeanProperties()) {
+                    excludePropertyElement.getReadMethod().ifPresent(methodElement -> excludeElements.add((Element) methodElement.getNativeType()));
+                    excludePropertyElement.getWriteMethod().ifPresent(methodElement -> excludeElements.add((Element) methodElement.getNativeType()));
+                    excludePropertyElement.getField().ifPresent(fieldElement -> excludeElements.add((Element) fieldElement.getNativeType()));
+                }
+                return excludeElements;
+            }
+            return Collections.emptySet();
+        }
+
+        @Override
+        protected TypeElement getSuperClass(TypeElement classNode) {
+            TypeMirror superclass = classNode.getSuperclass();
+            if (superclass instanceof DeclaredType dt) {
+                Element element = dt.asElement();
+                if (element instanceof TypeElement) {
+                    return (TypeElement) element;
+                }
+            }
+            return null;
+        }
+
+        @Override
+        protected Collection<TypeElement> getInterfaces(TypeElement classNode) {
+            List<? extends TypeMirror> interfaces = classNode.getInterfaces();
+            Collection<TypeElement> result = new ArrayList<>(interfaces.size());
+            for (TypeMirror ifaceMirror : interfaces) {
+                final Element ifaceEl = visitorContext.getTypes().asElement(ifaceMirror);
+                if (ifaceEl instanceof TypeElement) {
+                    result.add((TypeElement) ifaceEl);
+                }
+            }
+            return result;
+        }
+
+        @Override
+        protected List<Element> getEnclosedElements(TypeElement classNode, ElementQuery.Result<?> result) {
+            List<? extends Element> ee;
+            if (classNode == classElement) {
+                ee = getEnclosedElements();
+            } else {
+                ee = classNode.getEnclosedElements();
+            }
+            EnumSet<ElementKind> elementKinds = getElementKind(result);
+            return ee.stream().filter(element -> elementKinds.contains(element.getKind())).collect(Collectors.toList());
+        }
+
+        @Override
+        protected boolean excludeClass(TypeElement classNode) {
+            return classNode.getQualifiedName().toString().equals(Object.class.getName())
+                || classNode.getQualifiedName().toString().equals(Enum.class.getName());
+        }
+
+        @Override
+        protected io.micronaut.inject.ast.Element toAstElement(Element enclosedElement) {
+            final JavaElementFactory elementFactory = visitorContext.getElementFactory();
+            return switch (enclosedElement.getKind()) {
+                case METHOD -> elementFactory.newMethodElement(
+                    JavaClassElement.this,
+                    (ExecutableElement) enclosedElement,
+                    elementAnnotationMetadataFactory,
+                    genericTypeInfo
+                );
+                case FIELD -> elementFactory.newFieldElement(
+                    JavaClassElement.this,
+                    (VariableElement) enclosedElement,
+                    elementAnnotationMetadataFactory
+                );
+                case ENUM_CONSTANT -> elementFactory.newEnumConstantElement(
+                    JavaClassElement.this,
+                    (VariableElement) enclosedElement,
+                    elementAnnotationMetadataFactory
+                );
+                case CONSTRUCTOR -> elementFactory.newConstructorElement(
+                    JavaClassElement.this,
+                    (ExecutableElement) enclosedElement,
+                    elementAnnotationMetadataFactory
+                );
+                case CLASS, ENUM -> elementFactory.newClassElement(
+                    (TypeElement) enclosedElement,
+                    elementAnnotationMetadataFactory
+                );
+                default -> throw new IllegalStateException("Unknown element: " + enclosedElement);
+            };
+        }
+
+        private List<? extends Element> getEnclosedElements() {
+            if (enclosedElements == null) {
+                enclosedElements = classElement.getEnclosedElements();
+            }
+            return enclosedElements;
+        }
+
+        private EnumSet<ElementKind> getElementKind(ElementQuery.Result<?> result) {
+            Class<?> elementType = result.getElementType();
+            if (elementType == MemberElement.class) {
+                return EnumSet.of(ElementKind.FIELD, ElementKind.METHOD);
+            } else if (elementType == MethodElement.class) {
+                return EnumSet.of(ElementKind.METHOD);
+            } else if (elementType == FieldElement.class) {
+                if (result.isIncludeEnumConstants()) {
+                    return EnumSet.of(ElementKind.FIELD, ElementKind.ENUM_CONSTANT);
+                }
+                return EnumSet.of(ElementKind.FIELD);
+            } else if (elementType == ConstructorElement.class) {
+                return EnumSet.of(ElementKind.CONSTRUCTOR);
+            } else if (elementType == ClassElement.class) {
+                return EnumSet.of(ElementKind.CLASS, ElementKind.ENUM);
+            }
+            throw new IllegalArgumentException("Unsupported element type for query: " + elementType);
+        }
+
     }
 
 }

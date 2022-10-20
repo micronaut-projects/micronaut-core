@@ -22,7 +22,7 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.ElementModifier;
 import io.micronaut.inject.ast.EnumConstantElement;
-import io.micronaut.inject.ast.MemberElement;
+import io.micronaut.inject.ast.FieldElement;
 import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.FieldNode;
 
@@ -61,8 +61,8 @@ public final class GroovyEnumConstantElement extends AbstractGroovyElement imple
     }
 
     @Override
-    public MemberElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
-        return (MemberElement) super.withAnnotationMetadata(annotationMetadata);
+    public FieldElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
+        return (FieldElement) super.withAnnotationMetadata(annotationMetadata);
     }
 
     @Override

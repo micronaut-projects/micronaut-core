@@ -142,42 +142,25 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
                 visitPropertyInternal(visitor, propertyElement);
             }
         }
-        ElementQuery<FieldElement> fieldsQuery = ElementQuery.ALL_FIELDS.includeHiddenElements();
-        ElementQuery<MethodElement> membersQuery = ElementQuery.ALL_METHODS;
+        ElementQuery<MemberElement> memberQuery = ElementQuery.ALL_METHODS_AND_FIELDS.includeHiddenElements();
         boolean processAsProperties = processAsProperties();
         if (processAsProperties) {
-            fieldsQuery = fieldsQuery.excludePropertyElements();
-            membersQuery = membersQuery.excludePropertyElements();
+            memberQuery = memberQuery.excludePropertyElements();
             for (PropertyElement propertyElement : classElement.getBeanProperties()) {
                 visitPropertyInternal(visitor, propertyElement);
             }
         }
-        List<FieldElement> fields = new ArrayList<>(classElement.getEnclosedElements(fieldsQuery));
-        fields.removeIf(processedFields::contains);
-        List<FieldElement> declaredFields = new ArrayList<>(fields.size());
+        List<MemberElement> memberElements = new ArrayList<>(classElement.getEnclosedElements(memberQuery));
+        memberElements.removeIf(processedFields::contains);
         // Process subtype fields first
-        for (FieldElement fieldElement : fields) {
-            if (fieldElement.getDeclaringType().equals(classElement)) {
-                declaredFields.add(fieldElement);
-            } else {
+        for (MemberElement memberElement : memberElements) {
+            if (memberElement instanceof FieldElement fieldElement) {
                 visitFieldInternal(visitor, fieldElement);
-            }
-        }
-        List<MethodElement> methods = classElement.getEnclosedElements(membersQuery);
-        List<MethodElement> declaredMethods = new ArrayList<>(methods.size());
-        // Process subtype methods first
-        for (MethodElement methodElement : methods) {
-            if (methodElement.getDeclaringType().equals(classElement)) {
-                declaredMethods.add(methodElement);
-            } else {
+            } else if (memberElement instanceof MethodElement methodElement) {
                 visitMethodInternal(visitor, methodElement);
+            } else {
+                throw new IllegalStateException("Unknown element");
             }
-        }
-        for (FieldElement fieldElement : declaredFields) {
-            visitFieldInternal(visitor, fieldElement);
-        }
-        for (MethodElement methodElement : declaredMethods) {
-            visitMethodInternal(visitor, methodElement);
         }
     }
 

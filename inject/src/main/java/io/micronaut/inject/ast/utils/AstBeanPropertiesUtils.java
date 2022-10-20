@@ -23,7 +23,6 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.inject.ast.BeanPropertiesQuery;
 import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
@@ -336,39 +335,6 @@ public final class AstBeanPropertiesUtils {
             default:
                 return false;
         }
-    }
-
-    public static List<MethodElement> getSubtypeFirstMethods(ClassElement classElement) {
-        List<MethodElement> methods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS.onlyInstance());
-        List<MethodElement> result = new ArrayList<>(methods.size());
-        List<MethodElement> other = new ArrayList<>(methods.size());
-        // Process subtype methods first
-        for (MethodElement methodElement : methods) {
-            if (methodElement.getDeclaringType().equals(classElement)) {
-                other.add(methodElement);
-            } else {
-                result.add(methodElement);
-            }
-        }
-        result.addAll(other);
-        return result;
-
-    }
-
-    public static List<FieldElement> getSubtypeFirstFields(ClassElement classElement) {
-        List<FieldElement> fields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS);
-        List<FieldElement> result = new ArrayList<>(fields.size());
-        List<FieldElement> other = new ArrayList<>(fields.size());
-        // Process subtype fields first
-        for (FieldElement fieldElement : fields) {
-            if (fieldElement.getDeclaringType().equals(classElement)) {
-                other.add(fieldElement);
-            } else {
-                result.add(fieldElement);
-            }
-        }
-        result.addAll(other);
-        return result;
     }
 
     private static boolean shouldExclude(Set<String> includes, Set<String> excludes, String propertyName) {

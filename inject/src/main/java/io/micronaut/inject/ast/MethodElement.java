@@ -238,6 +238,38 @@ public interface MethodElement extends MemberElement {
         return true;
     }
 
+    @Override
+    default boolean hides(@NonNull MemberElement memberElement) {
+        if (memberElement instanceof MethodElement hidden) {
+            if (equals(hidden) || isStatic() || hidden.isStatic() || hidden.isPrivate()) {
+                return false;
+            }
+            MethodElement newMethod = this;
+            if (!newMethod.getName().equals(hidden.getName()) || hidden.getParameters().length != newMethod.getParameters().length) {
+                return false;
+            }
+            for (int i = 0; i < hidden.getParameters().length; i++) {
+                ParameterElement existingParameter = hidden.getParameters()[i];
+                ParameterElement newParameter = newMethod.getParameters()[i];
+                ClassElement existingType = existingParameter.getGenericType();
+                ClassElement newType = newParameter.getGenericType();
+                if (!newType.isAssignable(existingType)) {
+                    return false;
+                }
+            }
+            ClassElement existingReturnType = hidden.getReturnType().getGenericType();
+            ClassElement newTypeReturn = newMethod.getReturnType().getGenericType();
+            if (!newTypeReturn.isAssignable(existingReturnType)) {
+                return false;
+            }
+            if (hidden.isPackagePrivate()) {
+                return newMethod.getDeclaringType().getPackageName().equals(hidden.getDeclaringType().getPackageName());
+            }
+            return true;
+        }
+        return false;
+    }
+
     /**
      * Creates a {@link MethodElement} for the given parameters.
      *

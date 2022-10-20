@@ -18,6 +18,7 @@ package io.micronaut.annotation.processing.visitor;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
+import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 
@@ -53,5 +54,15 @@ class JavaConstructorElement extends JavaMethodElement implements ConstructorEle
                 return newParameters;
             }
         };
+    }
+
+    @Override
+    public boolean overrides(MethodElement overridden) {
+        return false;
+    }
+
+    @Override
+    public boolean hides(MemberElement hidden) {
+        return false;
     }
 }

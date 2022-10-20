@@ -25,8 +25,10 @@ import io.micronaut.core.annotation.NonNull;
  * @since 1.0
  */
 public interface FieldElement extends TypedElement, MemberElement {
+
     /**
      * Obtain the generic type with the associated annotation metadata for the field.
+     *
      * @return The generic field
      */
     default ClassElement getGenericField() {
@@ -46,5 +48,22 @@ public interface FieldElement extends TypedElement, MemberElement {
     @Override
     default FieldElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
         return (FieldElement) MemberElement.super.withAnnotationMetadata(annotationMetadata);
+    }
+
+    @Override
+    default boolean hides(@NonNull MemberElement memberElement) {
+        if (memberElement instanceof FieldElement hidden) {
+            if (equals(hidden) || isStatic() && getDeclaringType().isInterface() || hidden.isPrivate()) {
+                return false;
+            }
+            if (!getName().equals(hidden.getName()) || !getDeclaringType().isAssignable(hidden.getDeclaringType())) {
+                return false;
+            }
+            if (hidden.isPackagePrivate()) {
+                return getDeclaringType().getPackageName().equals(hidden.getDeclaringType().getPackageName());
+            }
+            return true;
+        }
+        return false;
     }
 }

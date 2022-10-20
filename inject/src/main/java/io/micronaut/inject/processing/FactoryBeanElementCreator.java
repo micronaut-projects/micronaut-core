@@ -39,6 +39,7 @@ import io.micronaut.inject.writer.BeanDefinitionVisitor;
 import io.micronaut.inject.writer.BeanDefinitionWriter;
 import io.micronaut.inject.writer.OriginatingElements;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -221,9 +222,10 @@ final class FactoryBeanElementCreator extends DeclaredBeanElementCreator {
             aopProxyWriter.visitTypeArguments(producedType.getAllTypeArguments());
             beanDefinitionWriters.add(aopProxyWriter);
 
-            producedType.getEnclosedElements(ElementQuery.ALL_METHODS)
+            List<MethodElement> methodElements = producedType.getEnclosedElements(ElementQuery.ALL_METHODS)
                 .stream()
-                .filter(m -> m.isPublic() && !m.isFinal() && !m.isStatic())
+                .filter(m -> m.isPublic() && !m.isFinal() && !m.isStatic()).toList();
+            methodElements
                 .forEach(methodElement -> aopHelper.visitAroundMethod(aopProxyWriter, methodElement.getDeclaringType(), methodElement));
 
         } else if (producedAnnotationMetadata.hasStereotype(Executable.class)) {
