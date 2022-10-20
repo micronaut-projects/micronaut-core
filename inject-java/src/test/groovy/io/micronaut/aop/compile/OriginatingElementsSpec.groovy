@@ -6,9 +6,6 @@ import io.micronaut.inject.writer.BeanDefinitionVisitor
 import io.micronaut.inject.writer.StaticOriginatingElements
 import spock.util.environment.RestoreSystemProperties
 
-import javax.validation.constraints.Min
-import javax.validation.constraints.NotBlank
-
 class OriginatingElementsSpec extends AbstractTypeElementSpec {
 
     def cleanup() {
@@ -175,9 +172,9 @@ class MyBean extends MyBase {
 }
 
 abstract class MyBase {
-    
+
     private ConversionService conversionService;
-    
+
     @Inject
     void setConversionService(ConversionService conversionService) {
         this.conversionService = conversionService;
@@ -230,7 +227,7 @@ interface MyBean extends MyInterface {
         StaticOriginatingElements.INSTANCE.originatingElements.size() == 2
         StaticOriginatingElements.INSTANCE.originatingElements[0].name == 'test.MyBean'
         StaticOriginatingElements.INSTANCE.originatingElements[1].name == 'test.MyInterface'
-
+        beanDefinition.getExecutableMethods().size() == 2
     }
 
     @RestoreSystemProperties

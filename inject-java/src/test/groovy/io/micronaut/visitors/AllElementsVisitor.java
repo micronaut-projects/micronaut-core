@@ -15,6 +15,7 @@
  */
 package io.micronaut.visitors;
 
+import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
@@ -41,18 +42,25 @@ public class AllElementsVisitor implements TypeElementVisitor<Controller, Object
     @Override
     public void visitClass(ClassElement element, VisitorContext context) {
         visit(element);
+        // Java 9+ doesn't allow resolving elements was the compiler
+        // is finished being used so this test cannot be made to work beyond Java 8 the way it is currently written
+        element.getBeanProperties(); // Preload properties for tests otherwise it fails because the compiler is done
+        element.getAnnotationMetadata();
         VISITED_CLASS_ELEMENTS.add(element);
     }
 
     @Override
     public void visitMethod(MethodElement element, VisitorContext context) {
         VISITED_METHOD_ELEMENTS.add(element);
+        element.getReturnType().getBeanProperties().forEach(AnnotationMetadataProvider::getAnnotationMetadata); // Preload
+        element.getAnnotationMetadata();
         visit(element);
     }
 
     @Override
     public void visitField(FieldElement element, VisitorContext context) {
         visit(element);
+        element.getAnnotationMetadata();
     }
 
     private void visit(Element element) {

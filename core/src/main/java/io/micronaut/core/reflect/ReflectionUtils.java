@@ -434,6 +434,7 @@ public class ReflectionUtils {
      * @param clazz The class
      * @param fieldName The fieldName
      * @param instance The instance
+     * @return the field value
      * @since 3.7.0
      */
     @UsedByGeneratedCode

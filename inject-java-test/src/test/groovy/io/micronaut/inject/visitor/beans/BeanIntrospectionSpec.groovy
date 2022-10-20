@@ -11,6 +11,8 @@ import io.micronaut.annotation.processing.test.JavaParser
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Executable
 import io.micronaut.context.annotation.Replaces
+import io.micronaut.context.visitor.ConfigurationReaderVisitor
+import io.micronaut.context.visitor.ValidationVisitor
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.beans.BeanIntrospectionReference
@@ -62,7 +64,7 @@ class Test<T extends CharSequence> {
     public void setArray(T[] array) {
         this.array = array;
     }
-    
+
     @Executable
     T[] myMethod() {
         return array;
@@ -73,6 +75,84 @@ class Test<T extends CharSequence> {
         introspection.getRequiredProperty("array", CharSequence[].class)
             .type == CharSequence[].class
         introspection.beanMethods.first().returnType.type == CharSequence[].class
+    }
+
+    void "test property type is defined by its setter"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.core.annotation.Nullable;
+import java.util.Optional;
+
+@Introspected
+class Test {
+    @Nullable
+    private String foo;
+
+    public Optional<String> getFoo() {
+        return Optional.ofNullable(foo);
+    }
+
+    public void setFoo(@Nullable String foo) {
+        this.foo = foo;
+    }
+}
+''')
+        expect:
+        introspection.getProperty("foo").get().type == String.class
+    }
+
+    void "test property type is defined by its writer field"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.core.annotation.Nullable;
+import java.util.Optional;
+
+@Introspected(accessKind = {Introspected.AccessKind.METHOD, Introspected.AccessKind.FIELD})
+class Test {
+    @Nullable
+    String foo;
+
+    public Optional<String> getFoo() {
+        return Optional.ofNullable(foo);
+    }
+
+}
+''')
+        expect:
+        introspection.getProperty("foo").get().type == String.class
+    }
+
+    void "test property type is not defined by its not accessible field"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.core.annotation.Nullable;
+import java.util.Optional;
+
+@Introspected(accessKind = {Introspected.AccessKind.METHOD, Introspected.AccessKind.FIELD})
+class Test {
+    @Nullable
+    private String foo;
+
+    public Optional<String> getFoo() {
+        return Optional.ofNullable(foo);
+    }
+
+}
+''')
+        expect:
+        introspection.getProperty("foo").get().type == Optional.class
     }
 
     void 'test favor method access'() {
@@ -90,7 +170,7 @@ class Test {
     public String getOne() {
         this.invoked = true;
         return one;
-    } 
+    }
 }
 ''');
 
@@ -143,7 +223,7 @@ class Test {
         instance.invoked
     }
 
-    void 'test favor field access'() {
+    void 'test use getter to read and field to write'() {
         given:
         BeanIntrospection introspection = buildBeanIntrospection('fieldaccess.Test','''\
 package fieldaccess;
@@ -158,7 +238,7 @@ class Test {
     public String getOne() {
         this.invoked = true;
         return one;
-    } 
+    }
 }
 ''');
 
@@ -174,10 +254,10 @@ class Test {
 
         then:'the new value is reflected'
         one.get(instance) == 'test'
-        !instance.invoked
+        instance.invoked // The property was accessed with getter
     }
 
-    void 'test favor field access with custom getter'() {
+    void 'test use filed to read and setter to write'() {
         given:
         BeanIntrospection introspection = buildBeanIntrospection('fieldaccess.Test','''\
 package fieldaccess;
@@ -209,7 +289,7 @@ class Test {
 
         then:'the new value is reflected'
         one.get(instance) == 'test'
-        !instance.invoked
+        instance.invoked // Setter invoked
     }
 
     void 'test field access only'() {
@@ -225,9 +305,9 @@ class Test {
     public String one; // read/write
     public final int two; // read-only
     String three; // package protected
-    protected String four; // not included since protected
+    protected String four; // protected can be accessed from the same package
     private String five; // not included since private
-    
+
     Test(int two) {
         this.two = two;
     }
@@ -237,7 +317,7 @@ class Test {
         def properties = introspection.getBeanProperties()
 
         then:
-        properties.size() == 3
+        properties.size() == 4
 
         def one = introspection.getRequiredProperty("one", String)
         one.isReadWrite()
@@ -247,6 +327,9 @@ class Test {
 
         def three = introspection.getRequiredProperty("three", String)
         three.isReadWrite()
+
+        def four = introspection.getRequiredProperty("four", String)
+        four.isReadWrite()
 
         when:'a field is set'
         def instance = introspection.instantiate(10)
@@ -260,6 +343,18 @@ class Test {
 
         then:'the new value is reflected'
         two.get(instance) == 20
+
+        when:
+        four.set(instance, "test")
+
+        then:
+        four.get(instance) == "test"
+
+        when:
+        instance = four.withValue(instance, "test2")
+
+        then:
+        four.get(instance) == "test2"
     }
 
     void 'test field access only - public only'() {
@@ -280,7 +375,7 @@ class Test {
     String three; // package protected
     protected String four; // not included since protected
     private String five; // not included since private
-    
+
     Test(int two) {
         this.two = two;
     }
@@ -309,7 +404,7 @@ package beanctor;
 public class Test {
 
     private final String another;
-    
+
     @com.fasterxml.jackson.annotation.JsonCreator
     Test(String another) {
         this.another = another;
@@ -356,7 +451,7 @@ public class MethodTest extends SuperType implements SomeInt {
     public String invokeMe(String str) {
         return str;
     }
-    
+
     @Executable
     int invokePrim(int i) {
         return i;
@@ -368,7 +463,7 @@ class SuperType {
     String superMethod(String str) {
         return str;
     }
-    
+
     @Executable
     public String invokeMe(String str) {
         return str;
@@ -380,7 +475,7 @@ interface SomeInt {
     default boolean ok() {
         return true;
     }
-    
+
     default String getName() {
         return "ok";
     }
@@ -494,7 +589,7 @@ import java.net.URL;
 public class CopyMe {
 
     private final String another;
-    
+
     CopyMe(String another) {
         this.another = another;
     }
@@ -502,7 +597,7 @@ public class CopyMe {
     public String getAnother() {
         return another;
     }
-    
+
     public CopyMe alterAnother(String a) {
         return this.another == a ? this : new CopyMe(a.toUpperCase());
     }
@@ -538,7 +633,7 @@ public class CopyMe {
     private URL url;
     private final String name;
     private final String another;
-    
+
     CopyMe(String name, String another) {
         this.name = name;
         this.another = another;
@@ -551,15 +646,15 @@ public class CopyMe {
     public void setUrl(URL url) {
         this.url = url;
     }
-    
+
     public String getName() {
         return name;
     }
-    
+
     public String getAnother() {
         return another;
     }
-    
+
     public CopyMe withAnother(String a) {
         return this.another == a ? this : new CopyMe(this.name, a.toUpperCase());
     }
@@ -729,7 +824,7 @@ public class Foo {
     public List<Long> getValue() {
         return value;
     }
-    
+
     public void setValue(List<Long> value) {
         this.value = value;
     }
@@ -850,7 +945,7 @@ public interface MyInterface {
     @Executable
     default String name() {
         return getName();
-    }    
+    }
 }
 
 class MyImpl implements MyInterface {
@@ -884,7 +979,7 @@ class Test {}
 
 public interface MyInterface {
     @Executable
-    String name();    
+    String name();
 }
 
 class MyImpl implements MyInterface {
@@ -983,7 +1078,7 @@ interface GenBase<T> {
 
         then:
         def e = thrown(UnsupportedOperationException)
-        e.message =='Cannot mutate property [name] that is not mutable via a setter method or constructor argument for type: test.Foo'
+        e.message =='Cannot mutate property [name] that is not mutable via a setter method, field or constructor argument for type: test.Foo'
     }
 
     void "test bean introspection with property of generic superclass"() {
@@ -1000,7 +1095,7 @@ class Foo extends GenBase<String> {
 
 abstract class GenBase<T> {
     abstract T getName();
-    
+
     public T getOther() {
         return (T) "other";
     }
@@ -1032,7 +1127,7 @@ class Foo implements GenBase<Long> {
     public Long getValue() {
         return value;
     }
-    
+
     public void setValue(Long value) {
         this.value = value;
     }
@@ -1040,7 +1135,7 @@ class Foo implements GenBase<Long> {
 
 interface GenBase<T> {
     T getValue();
-    
+
     void setValue(T t);
 }
 ''')
@@ -1070,7 +1165,7 @@ import io.micronaut.core.annotation.Creator;
 @io.micronaut.core.annotation.Introspected
 interface Foo {
     String getName();
-    
+
     @Creator
     static Foo create(String name) {
         return () -> name;
@@ -1097,7 +1192,7 @@ import io.micronaut.core.annotation.Creator;
 @io.micronaut.core.annotation.Introspected
 interface Foo<T> {
     String getName();
-    
+
     @Creator
     static <T1> Foo<T1> create(String name) {
         return () -> name;
@@ -1388,11 +1483,11 @@ public class ValidatedConfig {
     public void setUrl(URL url) {
         this.url = url;
     }
-    
+
     public static class Inner {
-    
+
     }
-    
+
 }
 ''')
         expect:
@@ -1455,21 +1550,21 @@ class ValidatedConfig {
     public void setUrl(URL url) {
         this.url = url;
     }
-    
+
     public static class Inner {
-    
+
     }
-    
+
     @ConfigurationProperties("another")
     static class Another {
-    
+
         private URL url;
 
         @NotNull
         public URL getUrl() {
             return url;
         }
-    
+
         public void setUrl(URL url) {
             this.url = url;
         }
@@ -1633,17 +1728,17 @@ import java.time.Duration;
 class MyConfig {
     private String host;
     private int serverPort;
-    
+
     @ConfigurationInject
     MyConfig(@javax.validation.constraints.NotBlank String host, int serverPort) {
         this.host = host;
         this.serverPort = serverPort;
     }
-    
+
     public String getHost() {
         return host;
     }
-    
+
     public int getServerPort() {
         return serverPort;
     }
@@ -1705,7 +1800,7 @@ public class Test {
     public <T extends Enum<T>> Test(int num, String str, Class<T> enumClass) {
         this(num, str + enumClass.getName());
     }
-    
+
     @Creator
     public <T extends Enum<T>> Test(int num, String str) {
         this.num = num;
@@ -1740,7 +1835,7 @@ class Test {
     }
     public String getTest() {
         return test;
-    } 
+    }
 }
 
 
@@ -1760,7 +1855,7 @@ class Test<T extends B> {
     private T child;
     public T getChild() {
         return child;
-    } 
+    }
 }
 class B<T extends Test> {}
 
@@ -1800,7 +1895,7 @@ class Address {
     @NotBlank(groups = GroupThree.class, message = "different message")
     @Size(min = 5, max = 20, groups = GroupTwo.class)
     private String street;
-    
+
     public String getStreet() {
         return this.street;
     }
@@ -1834,7 +1929,7 @@ class Book {
         this.title = title;
         this.author = author;
     }
-    
+
     @io.micronaut.core.annotation.Creator
     public Book(String title) {
         this.title = title;
@@ -1843,7 +1938,7 @@ class Book {
     public String getTitle() {
         return title;
     }
-    
+
     void setTitle(String title) {
         this.title = title;
     }
@@ -1869,7 +1964,7 @@ class Book {
         then:
         introspection != null
         introspection.hasAnnotation(Introspected)
-        introspection.propertyNames.length == 1
+        introspection.propertyNames.length == 2 // Author also passes the rules to be a property, but only write only
 
         when:
         introspection.instantiate()
@@ -1908,12 +2003,12 @@ class Book {
     private String title;
 
     public Book() {
-    }   
+    }
 
     public String getTitle() {
         return title;
     }
-    
+
     public void setTitle(String title) {
         this.title = title;
     }
@@ -1967,23 +2062,23 @@ import com.fasterxml.jackson.annotation.*;
 class Test {
     private String name;
     private int age;
-    
+
     @JsonCreator
     Test(@JsonProperty("name") String name) {
         this.name = name;
     }
-    
+
     Test(int age) {
         this.age = age;
     }
-    
+
     public int getAge() {
         return age;
     }
     public void setAge(int age) {
         this.age = age;
     }
-    
+
     public String getName() {
         return this.name;
     }
@@ -2140,11 +2235,11 @@ import java.util.*;
 @Introspected
 class Test {
     private Status status;
-    
+
     public void setStatus(Status status) {
         this.status = status;
     }
-    
+
     public Status getStatus() {
         return this.status;
     }
@@ -2200,9 +2295,9 @@ class Test {
     @Size(max=100)
     private int age;
     private int[] primitiveArray;
-    
+
     private long v;
-    
+
     public Test(String name, @Size(max=100) int age, int[] primitiveArray) {
         this.name = name;
         this.age = age;
@@ -2219,28 +2314,28 @@ class Test {
     public void setAge(int age) {
         this.age = age;
     }
-    
+
     public void setId(Long id) {
         this.id = id;
     }
-    
+
     public Long getId() {
         return this.id;
     }
-    
+
     public void setVersion(Long version) {
         this.version = version;
     }
-    
+
     public Long getVersion() {
         return this.version;
     }
-    
+
     @Version
     public long getAnotherVersion() {
         return v;
     }
-    
+
     public void setAnotherVersion(long v) {
         this.v = v;
     }
@@ -2314,8 +2409,8 @@ class Test {
     private String name;
     @Size(max=100)
     private int age;
-    
-    
+
+
     public String getName() {
         return this.name;
     }
@@ -2328,19 +2423,19 @@ class Test {
     public void setAge(int age) {
         this.age = age;
     }
-    
+
     public void setId(Long id) {
         this.id = id;
     }
-    
+
     public Long getId() {
         return this.id;
     }
-    
+
     public void setVersion(Long version) {
         this.version = version;
     }
-    
+
     public Long getVersion() {
         return this.version;
     }
@@ -2491,33 +2586,33 @@ class Test extends ParentBean {
     private String name;
     @Size(max=100)
     private int age;
-    
+
     private List<Number> list;
     private String[] stringArray;
     private int[] primitiveArray;
     private boolean flag;
     private TypeConverter<String, Collection> genericsTest;
     private TypeConverter<String, Object[]> genericsArrayTest;
-    
+
     public TypeConverter<String, Collection> getGenericsTest() {
         return genericsTest;
     }
-    
+
     public TypeConverter<String, Object[]> getGenericsArrayTest() {
         return genericsArrayTest;
     }
-    
+
     public String getReadOnly() {
         return readOnly;
     }
     public boolean isFlag() {
         return flag;
     }
-    
+
     public void setFlag(boolean flag) {
         this.flag = flag;
     }
-    
+
     public String getName() {
         return this.name;
     }
@@ -2530,11 +2625,11 @@ class Test extends ParentBean {
     public void setAge(int age) {
         this.age = age;
     }
-    
+
     public List<Number> getList() {
         return this.list;
     }
-    
+
     public void setList(List<Number> l) {
         this.list = l;
     }
@@ -2558,11 +2653,11 @@ class Test extends ParentBean {
 
 class ParentBean {
     private List<byte[]> listOfBytes;
-    
+
     public List<byte[]> getListOfBytes() {
         return this.listOfBytes;
     }
-    
+
     public void setListOfBytes(List<byte[]> list) {
         this.listOfBytes = list;
     }
@@ -2867,12 +2962,12 @@ import com.fasterxml.jackson.annotation.*;
 @Introspected
 class Test {
     private Map<String, String> properties;
-    
+
     @Creator
     Test(Map<String, String> properties) {
         this.properties = properties;
     }
-    
+
     public Map<String, String> getProperties() {
         return properties;
     }
@@ -2895,16 +2990,16 @@ import io.micronaut.core.annotation.*;
 @Introspected
 class Test {
     private String name;
-    
+
     private Test(String name) {
         this.name = name;
     }
-    
+
     @Creator
     public static Test forName(String name) {
         return new Test(name);
     }
-    
+
     public String getName() {
         return name;
     }
@@ -2990,16 +3085,16 @@ import io.micronaut.core.annotation.*;
 @Introspected
 class Test {
     private String name;
-    
+
     private Test(String name) {
         this.name = name;
     }
-    
+
     @Creator
     public static Test forName() {
         return new Test("default");
     }
-    
+
     public String getName() {
         return name;
     }
@@ -3037,21 +3132,21 @@ import io.micronaut.core.annotation.*;
 @Introspected
 class Test {
     private String name;
-    
+
     private Test(String name) {
         this.name = name;
     }
-    
+
     @Creator
     public static Test forName() {
         return new Test("default");
     }
-    
+
     @Creator
     public static Test forName(String name) {
         return new Test(name);
     }
-    
+
     public String getName() {
         return name;
     }
@@ -3091,22 +3186,22 @@ class Test {
 
     private final String name;
     public static final Companion Companion = new Companion();
-    
+
     public final String getName() {
         return name;
     }
-    
+
     private Test(String name) {
         this.name = name;
     }
-    
+
     public static final class Companion {
-        
+
         @Creator
         public final Test forName(String name) {
             return new Test(name);
         }
-        
+
         private Companion() {
         }
     }
@@ -3165,7 +3260,7 @@ public enum Test {
     Test(int number) {
         this.number = number;
     }
-    
+
     public int getNumber() {
         return number;
     }
@@ -3286,7 +3381,7 @@ import java.util.Map;
 class Test {
 
     public Test(Map<String, List<Action>> map) {
-    
+
     }
 }
 
@@ -3320,7 +3415,7 @@ class Test {
 
     public Test() {
     }
-    
+
     public int[] getOneDimension() {
         return oneDimension;
     }
@@ -3336,7 +3431,7 @@ class Test {
     public void setTwoDimensions(int[][] twoDimensions) {
         this.twoDimensions = twoDimensions;
     }
-    
+
     public int[][][] getThreeDimensions() {
         return threeDimensions;
     }
@@ -3394,13 +3489,13 @@ class Test {
 
     public Test() {
     }
-    
+
     public String[] getOneDimension() {
         return oneDimension;
     }
 
     public void setOneDimension(String[] oneDimension) {
-        this.oneDimension = oneDimension;     
+        this.oneDimension = oneDimension;
     }
 
     public String[][] getTwoDimensions() {
@@ -3410,7 +3505,7 @@ class Test {
     public void setTwoDimensions(String[][] twoDimensions) {
         this.twoDimensions = twoDimensions;
     }
-    
+
     public String[][][] getThreeDimensions() {
         return threeDimensions;
     }
@@ -3469,13 +3564,13 @@ class Test {
 
     public Test() {
     }
-    
+
     public SomeEnum[] getOneDimension() {
         return oneDimension;
     }
 
     public void setOneDimension(SomeEnum[] oneDimension) {
-        this.oneDimension = oneDimension;     
+        this.oneDimension = oneDimension;
     }
 
     public SomeEnum[][] getTwoDimensions() {
@@ -3485,7 +3580,7 @@ class Test {
     public void setTwoDimensions(SomeEnum[][] twoDimensions) {
         this.twoDimensions = twoDimensions;
     }
-    
+
     public SomeEnum[][][] getThreeDimensions() {
         return threeDimensions;
     }
@@ -3600,11 +3695,11 @@ import io.micronaut.core.annotation.Introspected;
 class Test {
 
     private final String xForwardedFor;
-    
+
     Test(String xForwardedFor) {
         this.xForwardedFor = xForwardedFor;
     }
-    
+
     public String getXForwardedFor() {
         return xForwardedFor;
     }
@@ -3665,19 +3760,19 @@ import io.micronaut.core.annotation.Introspected;
 abstract class Test {
     private String name;
     private String author;
-    
+
     public String getName() {
         return name;
     }
-    
+
     public void setName(String name) {
         this.name = name;
     }
-    
+
     public String getAuthor() {
         return author;
     }
-    
+
     public void setAuthor(String author) {
         this.author = author;
     }
@@ -3771,23 +3866,23 @@ import io.micronaut.core.annotation.Introspected;
 abstract class Test {
     private String name;
     private String author;
-    
+
     public String getName() {
         return name;
     }
-    
+
     public void setName(String name) {
         this.name = name;
     }
-    
+
     public String getAuthor() {
         return author;
     }
-    
+
     public void setAuthor(String author) {
         this.author = author;
     }
-    
+
     public int getAge() {
         return 0;
     }
@@ -3851,7 +3946,7 @@ import java.util.Set;
 public class Test {
 
     private Set<Author> authors;
-    
+
     public Set<Author> getAuthors() {
         return authors;
     }
@@ -3893,7 +3988,7 @@ public class Test {
     public String getFoo() {
         return "bar";
     }
-    
+
     @JsonProperty
     public void setFoo(String s) {
     }
@@ -3947,11 +4042,11 @@ import io.micronaut.core.annotation.Introspected;
 public class Test {
     @JsonProperty
     String foo;
-    
+
     public String getFoo() {
         return foo;
     }
-    
+
     public void setFoo(String s) {
         this.foo = s;
     }
@@ -4008,12 +4103,12 @@ import io.micronaut.core.annotation.Introspected;
 public class Test {
     @JsonProperty("field")
     String foo;
-    
+
     @JsonProperty("getter")
     public String getFoo() {
         return foo;
     }
-    
+
     @JsonProperty("setter")
     public void setFoo(String s) {
         this.foo = s;
@@ -4073,11 +4168,11 @@ import io.micronaut.core.annotation.Introspected;
 public class Test {
     @JsonProperty("field")
     String foo;
-    
+
     public String getFoo() {
         return foo;
     }
-    
+
     @JsonProperty("setter")
     public void setFoo(String s) {
         this.foo = s;
@@ -4102,15 +4197,15 @@ import io.micronaut.core.annotation.Introspected;
 @Introspected
 public class Test {
     private final java.util.ArrayList<String> foo;
-    
+
     public Test(java.util.List<String> foo) {
         this.foo = null;
     }
-    
+
     public java.util.List<String> getFoo() {
         return null;
     }
-    
+
 }
 ''')
 
@@ -4238,7 +4333,7 @@ public record Foo(String name, String isSurname, boolean contains, Boolean purge
     static class MyTypeElementVisitorProcessor extends TypeElementVisitorProcessor {
         @Override
         protected Collection<TypeElementVisitor> findTypeElementVisitors() {
-            return [new IntrospectedTypeElementVisitor()]
+            return [new ValidationVisitor(), new ConfigurationReaderVisitor(), new IntrospectedTypeElementVisitor()]
         }
     }
 

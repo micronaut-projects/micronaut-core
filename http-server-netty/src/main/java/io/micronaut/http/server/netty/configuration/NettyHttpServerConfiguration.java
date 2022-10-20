@@ -111,7 +111,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      * The default configuration for boolean flag indicating whether to add connection header `keep-alive` to responses with HttpStatus > 499.
      */
     @SuppressWarnings("WeakerAccess")
-    public static final boolean DEFAULT_KEEP_ALIVE_ON_SERVER_ERROR = false;
+    public static final boolean DEFAULT_KEEP_ALIVE_ON_SERVER_ERROR = true;
 
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServerConfiguration.class);
 

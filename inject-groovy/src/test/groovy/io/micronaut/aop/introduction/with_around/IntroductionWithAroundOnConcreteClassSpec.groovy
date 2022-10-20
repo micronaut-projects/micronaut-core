@@ -78,8 +78,8 @@ class Test {}
         def proxyTargetBeanDefinition = applicationContext.getProxyTargetBeanDefinition(clazz, null)
         def beanDefinition = applicationContext.getBeanDefinition(clazz, null)
         then:
-        proxyTargetBeanDefinition.getExecutableMethods().size() == 1
-        beanDefinition.getExecutableMethods().size() == 1
+        proxyTargetBeanDefinition.getExecutableMethods().size() == 5
+        beanDefinition.getExecutableMethods().size() == 5
     }
 
     void "test executable methods count for around with executable"() {

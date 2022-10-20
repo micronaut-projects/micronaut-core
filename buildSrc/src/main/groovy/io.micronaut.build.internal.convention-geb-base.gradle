@@ -1,0 +1,100 @@
+import io.micronaut.build.internal.ext.MicronautCoreExtension
+import io.micronaut.build.internal.ext.DefaultMicronautCoreExtension
+
+plugins {
+    id "io.micronaut.build.internal.base"
+    id "groovy"
+    id "java-library"
+}
+
+micronautBuild {
+    enableBom = false
+    enableProcessing = false
+}
+
+group = projectGroupId
+
+def micronautBuild = (ExtensionAware) project.extensions.getByName("micronautBuild")
+def micronautCore = micronautBuild.extensions.create(MicronautCoreExtension, "core", DefaultMicronautCoreExtension, extensions.findByType(VersionCatalogsExtension))
+micronautCore.documented.convention(true)
+
+if (System.getProperty('geb.env')) {
+    apply plugin:"com.energizedwork.webdriver-binaries"
+
+    webdriverBinaries {
+        chromedriver "${chromedriverVersion}"
+        geckodriver "${geckodriverVersion}"
+    }
+}
+
+tasks.withType(Test).configureEach {
+    useJUnitPlatform()
+    jvmArgs '-Xmx2048m'
+    systemProperty "micronaut.cloud.platform", "OTHER"
+    if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_15)) {
+        jvmArgs "--enable-preview"
+    }
+}
+
+tasks.named("test") {
+    systemProperty "geb.env", System.getProperty('geb.env')
+    systemProperty "webdriver.chrome.driver", System.getProperty('webdriver.chrome.driver')
+    systemProperty "webdriver.gecko.driver", System.getProperty('webdriver.gecko.driver')
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.fork = true
+    options.compilerArgs.add("-Amicronaut.processing.group=$project.group")
+    options.compilerArgs.add("-Amicronaut.processing.module=micronaut-$project.name")
+    options.compilerArgs.add("-Amicronaut.processing.omit.confprop.injectpoints=true")
+    options.forkOptions.memoryMaximumSize = "2g"
+}
+
+tasks.withType(GroovyCompile).configureEach {
+    options.fork = true
+    options.compilerArgs.add("-Amicronaut.processing.group=$project.group")
+    options.compilerArgs.add("-Amicronaut.processing.module=micronaut-$project.name")
+    groovyOptions.forkOptions.memoryMaximumSize = "2g"
+}
+
+// This is for reproducible builds
+tasks.withType(Jar).configureEach {
+    reproducibleFileOrder = true
+    preserveFileTimestamps = false
+}
+
+dependencies {
+    annotationProcessor libs.bundles.asm
+    annotationProcessor(libs.micronaut.docs.map {
+        if (micronautCore.documented.get()) {
+            it
+        } else {
+            null
+        }
+    }) {
+        transitive = false
+    }
+
+    api libs.managed.slf4j
+    compileOnly libs.caffeine
+    compileOnly libs.bundles.asm
+
+    testAnnotationProcessor project(":http-validation")
+    testAnnotationProcessor libs.bundles.asm
+
+    testImplementation libs.caffeine
+    testImplementation libs.bundles.asm
+
+    // Geb currently requires Groovy 3, and Spock for Groovy 3
+    testImplementation libs.geb.spock
+    testImplementation libs.spock.for.geb
+    testImplementation libs.geb.groovy.test
+    testImplementation libs.selenium.driver.htmlunit
+    testImplementation libs.selenium.remote.driver
+    testImplementation libs.selenium.api
+    testImplementation libs.selenium.support
+
+    testRuntimeOnly libs.htmlunit
+    testRuntimeOnly libs.selenium.driver.chrome
+    testRuntimeOnly libs.selenium.driver.firefox
+}

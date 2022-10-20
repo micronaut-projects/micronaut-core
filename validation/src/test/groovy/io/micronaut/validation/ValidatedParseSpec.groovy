@@ -5,6 +5,7 @@ import io.micronaut.aop.Around
 import io.micronaut.inject.ProxyBeanDefinition
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 import io.micronaut.inject.writer.BeanDefinitionWriter
+import spock.lang.PendingFeature
 
 import java.time.LocalDate
 
@@ -19,12 +20,12 @@ class Test {
 
     @io.micronaut.context.annotation.Executable
     public void setName(@javax.validation.constraints.NotBlank String name) {
-    
+
     }
-    
+
     @io.micronaut.context.annotation.Executable
     public void setName2(@javax.validation.Valid String name) {
-    
+
     }
 }
 ''')
@@ -56,5 +57,63 @@ interface ExchangeRates {
 
         expect:
         definition.findMethod("rate", LocalDate).get().hasStereotype(Validated)
+    }
+
+
+    void "test a default method constraints on a declarative client makes it @Validated"() {
+        given:
+            def definition = buildBeanDefinition('validateparse3.ExchangeRates' + BeanDefinitionVisitor.PROXY_SUFFIX,'''
+package validateparse3;
+
+import io.micronaut.http.annotation.Get;
+import io.micronaut.http.client.annotation.Client;
+
+import javax.validation.constraints.PastOrPresent;
+import java.time.LocalDate;
+
+@Client("https://exchangeratesapi.io")
+interface ExchangeRates {
+
+    @Get("{date}")
+    String rate(@PastOrPresent LocalDate date);
+
+    default String rate2(@PastOrPresent LocalDate date) {
+        return null;
+    }
+}
+''')
+
+        expect:
+            definition.findMethod("rate", LocalDate).get().hasStereotype(Validated)
+            definition.findMethod("rate2", LocalDate).get().hasStereotype(Validated)
+    }
+
+    @PendingFeature
+    void "test a default method only constraints on a declarative client makes it @Validated"() {
+        given:
+            def definition = buildBeanDefinition('validateparse3.ExchangeRates' + BeanDefinitionVisitor.PROXY_SUFFIX,'''
+package validateparse3;
+
+import io.micronaut.http.annotation.Get;
+import io.micronaut.http.client.annotation.Client;
+
+import javax.validation.constraints.PastOrPresent;
+import java.time.LocalDate;
+
+@Client("https://exchangeratesapi.io")
+interface ExchangeRates {
+
+    @Get("{date}")
+    String rate(LocalDate date);
+
+    default String rate2(@PastOrPresent LocalDate date) {
+        return rate(date);
+    }
+}
+''')
+
+        expect:
+            !definition.findMethod("rate", LocalDate).get().hasStereotype(Validated)
+            definition.findMethod("rate2", LocalDate).get().hasStereotype(Validated)
     }
 }

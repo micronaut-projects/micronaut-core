@@ -28,7 +28,6 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.core.util.StringUtils;
 import jakarta.inject.Named;
 
 import java.lang.annotation.Annotation;
@@ -307,21 +306,6 @@ public class Qualifiers {
     public static @NonNull
     <T> Qualifier<T> byInterceptorBinding(@NonNull AnnotationMetadata annotationMetadata) {
         return new InterceptorBindingQualifier<>(annotationMetadata);
-    }
-
-    /**
-     * Reduces bean definitions by the given interceptor binding.
-     *
-     * @param bindingAnnotationNames The binding annotation names
-     * @param <T>                    The bean type
-     * @return The qualifier
-     * @since 3.0.0
-     * @deprecated Use {@link #byInterceptorBindingValues(java.util.Collection)}
-     */
-    @Deprecated
-    public static @NonNull
-    <T> Qualifier<T> byInterceptorBinding(@NonNull Collection<String> bindingAnnotationNames) {
-        return new InterceptorBindingQualifier<>(bindingAnnotationNames.toArray(StringUtils.EMPTY_STRING_ARRAY));
     }
 
     /**

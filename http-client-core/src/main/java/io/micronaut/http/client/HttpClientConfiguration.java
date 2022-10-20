@@ -36,8 +36,11 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.ThreadFactory;
@@ -145,7 +148,16 @@ public abstract class HttpClientConfiguration {
 
     private String eventLoopGroup = "default";
 
-    private HttpVersion httpVersion = HttpVersion.HTTP_1_1;
+    @Deprecated
+    @Nullable
+    private HttpVersion httpVersion = null;
+
+    private HttpVersionSelection.PlaintextMode plaintextMode = HttpVersionSelection.PlaintextMode.HTTP_1;
+
+    private List<String> alpnModes = Arrays.asList(
+        HttpVersionSelection.ALPN_HTTP_2,
+        HttpVersionSelection.ALPN_HTTP_1
+    );
 
     private LogLevel logLevel;
 
@@ -201,7 +213,11 @@ public abstract class HttpClientConfiguration {
     /**
      * The HTTP version to use. Defaults to {@link HttpVersion#HTTP_1_1}.
      * @return The http version
+     * @deprecated There are now separate settings for HTTP and HTTPS connections. To configure
+     * HTTP connections (e.g. for h2c), use {@link #plaintextMode}. To configure ALPN, set
+     * {@link #alpnModes}.
      */
+    @Deprecated
     public HttpVersion getHttpVersion() {
         return httpVersion;
     }
@@ -209,7 +225,11 @@ public abstract class HttpClientConfiguration {
     /**
      * Sets the HTTP version to use. Defaults to {@link HttpVersion#HTTP_1_1}.
      * @param httpVersion The http version
+     * @deprecated There are now separate settings for HTTP and HTTPS connections. To configure
+     * HTTP connections (e.g. for h2c), use {@link #plaintextMode}. To configure ALPN, set
+     * {@link #alpnModes}.
      */
+    @Deprecated
     public void setHttpVersion(HttpVersion httpVersion) {
         if (httpVersion != null) {
             this.httpVersion = httpVersion;
@@ -638,6 +658,58 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
+     * The connection mode to use for <i>plaintext</i> (http as opposed to https) connections.
+     * <br>
+     * <b>Note: If {@link #httpVersion} is set, this setting is ignored!</b>
+     *
+     * @return The plaintext connection mode.
+     * @since 4.0.0
+     */
+    @NonNull
+    public HttpVersionSelection.PlaintextMode getPlaintextMode() {
+        return plaintextMode;
+    }
+
+    /**
+     * The connection mode to use for <i>plaintext</i> (http as opposed to https) connections.
+     * <br>
+     * <b>Note: If {@link #httpVersion} is set, this setting is ignored!</b>
+     *
+     * @param plaintextMode The plaintext connection mode.
+     * @since 4.0.0
+     */
+    public void setPlaintextMode(@NonNull HttpVersionSelection.PlaintextMode plaintextMode) {
+        this.plaintextMode = Objects.requireNonNull(plaintextMode, "plaintextMode");
+    }
+
+    /**
+     * The protocols to support for TLS ALPN. If HTTP 2 is included, this will also restrict the
+     * TLS cipher suites to those supported by the HTTP 2 standard.
+     * <br>
+     * <b>Note: If {@link #httpVersion} is set, this setting is ignored!</b>
+     *
+     * @return The supported ALPN protocols.
+     * @since 4.0.0
+     */
+    @NonNull
+    public List<String> getAlpnModes() {
+        return alpnModes;
+    }
+
+    /**
+     * The protocols to support for TLS ALPN. If HTTP 2 is included, this will also restrict the
+     * TLS cipher suites to those supported by the HTTP 2 standard.
+     * <br>
+     * <b>Note: If {@link #httpVersion} is set, this setting is ignored!</b>
+     *
+     * @param alpnModes The supported ALPN protocols.
+     * @since 4.0.0
+     */
+    public void setAlpnModes(@NonNull List<String> alpnModes) {
+        this.alpnModes = Objects.requireNonNull(alpnModes, "alpnModes");
+    }
+
+    /**
      * Configuration for the HTTP client connnection pool.
      */
     public static class ConnectionPoolConfiguration implements Toggleable {
@@ -650,15 +722,13 @@ public abstract class HttpClientConfiguration {
          * The default enable value.
          */
         @SuppressWarnings("WeakerAccess")
-        public static final boolean DEFAULT_ENABLED = false;
+        public static final boolean DEFAULT_ENABLED = true;
 
-        /**
-         * The default max connections value.
-         */
-        @SuppressWarnings("WeakerAccess")
-        public static final int DEFAULT_MAXCONNECTIONS = -1;
+        private int maxPendingConnections = 4;
 
-        private int maxConnections = DEFAULT_MAXCONNECTIONS;
+        private int maxConcurrentRequestsPerHttp2Connection = Integer.MAX_VALUE;
+        private int maxConcurrentHttp1Connections = Integer.MAX_VALUE;
+        private int maxConcurrentHttp2Connections = 1;
 
         private int maxPendingAcquires = Integer.MAX_VALUE;
 
@@ -683,24 +753,6 @@ public abstract class HttpClientConfiguration {
          */
         public void setEnabled(boolean enabled) {
             this.enabled = enabled;
-        }
-
-        /**
-         * The maximum number of connections. Defaults to ({@value io.micronaut.http.client.HttpClientConfiguration.ConnectionPoolConfiguration#DEFAULT_MAXCONNECTIONS}); no maximum.
-         *
-         * @return The max connections
-         */
-        public int getMaxConnections() {
-            return maxConnections;
-        }
-
-        /**
-         * Sets the maximum number of connections. Defaults to no maximum.
-         *
-         * @param maxConnections The count
-         */
-        public void setMaxConnections(int maxConnections) {
-            this.maxConnections = maxConnections;
         }
 
         /**
@@ -738,5 +790,90 @@ public abstract class HttpClientConfiguration {
         public void setAcquireTimeout(@Nullable Duration acquireTimeout) {
             this.acquireTimeout = acquireTimeout;
         }
+
+        /**
+         * The maximum number of <i>pending</i> (new) connections before they are assigned to a
+         * pool.
+         *
+         * @return The maximum number of pending connections
+         * @since 4.0.0
+         */
+        public int getMaxPendingConnections() {
+            return maxPendingConnections;
+        }
+
+        /**
+         * The maximum number of <i>pending</i> (new) connections before they are assigned to a
+         * pool.
+         *
+         * @param maxPendingConnections The maximum number of pending connections
+         * @since 4.0.0
+         */
+        public void setMaxPendingConnections(int maxPendingConnections) {
+            this.maxPendingConnections = maxPendingConnections;
+        }
+
+        /**
+         * The maximum number of requests (streams) that can run concurrently on one HTTP2
+         * connection.
+         *
+         * @return The maximum concurrent request count
+         * @since 4.0.0
+         */
+        public int getMaxConcurrentRequestsPerHttp2Connection() {
+            return maxConcurrentRequestsPerHttp2Connection;
+        }
+
+        /**
+         * The maximum number of requests (streams) that can run concurrently on one HTTP2
+         * connection.
+         *
+         * @param maxConcurrentRequestsPerHttp2Connection The maximum concurrent request count
+         * @since 4.0.0
+         */
+        public void setMaxConcurrentRequestsPerHttp2Connection(int maxConcurrentRequestsPerHttp2Connection) {
+            this.maxConcurrentRequestsPerHttp2Connection = maxConcurrentRequestsPerHttp2Connection;
+        }
+
+        /**
+         * The maximum number of concurrent HTTP1 connections in the pool.
+         *
+         * @return The maximum concurrent connection count
+         * @since 4.0.0
+         */
+        public int getMaxConcurrentHttp1Connections() {
+            return maxConcurrentHttp1Connections;
+        }
+
+        /**
+         * The maximum number of concurrent HTTP1 connections in the pool.
+         *
+         * @param maxConcurrentHttp1Connections The maximum concurrent connection count
+         * @since 4.0.0
+         */
+        public void setMaxConcurrentHttp1Connections(int maxConcurrentHttp1Connections) {
+            this.maxConcurrentHttp1Connections = maxConcurrentHttp1Connections;
+        }
+
+        /**
+         * The maximum number of concurrent HTTP2 connections in the pool.
+         *
+         * @return The maximum concurrent connection count
+         * @since 4.0.0
+         */
+        public int getMaxConcurrentHttp2Connections() {
+            return maxConcurrentHttp2Connections;
+        }
+
+        /**
+         * The maximum number of concurrent HTTP2 connections in the pool.
+         *
+         * @param maxConcurrentHttp2Connections The maximum concurrent connection count
+         * @since 4.0.0
+         */
+        public void setMaxConcurrentHttp2Connections(int maxConcurrentHttp2Connections) {
+            this.maxConcurrentHttp2Connections = maxConcurrentHttp2Connections;
+        }
     }
+
 }

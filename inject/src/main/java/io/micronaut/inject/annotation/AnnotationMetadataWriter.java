@@ -17,6 +17,7 @@ package io.micronaut.inject.annotation;
 
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
@@ -182,6 +183,9 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             boolean writeAnnotationDefaults) {
         super(originatingElement);
         this.className = className + AnnotationMetadata.CLASS_NAME_SUFFIX;
+        if (annotationMetadata instanceof AnnotationMetadataDelegate) {
+            annotationMetadata = ((AnnotationMetadataDelegate) annotationMetadata).getAnnotationMetadata();
+        }
         if (annotationMetadata instanceof DefaultAnnotationMetadata) {
             this.annotationMetadata = annotationMetadata;
         } else if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
@@ -333,7 +337,10 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             Map<String, Integer> defaultsStorage,
             Map<String, GeneratorAdapter> loadTypeMethods,
             AnnotationMetadata annotationMetadata) {
-        if (annotationMetadata instanceof DefaultAnnotationMetadata) {
+        annotationMetadata = annotationMetadata.getTargetAnnotationMetadata();
+        if (annotationMetadata.isEmpty()) {
+            generatorAdapter.getStatic(Type.getType(AnnotationMetadata.class), "EMPTY_METADATA", Type.getType(AnnotationMetadata.class));
+        } else if (annotationMetadata instanceof DefaultAnnotationMetadata) {
             instantiateNewMetadata(
                     owningType,
                     classWriter,
@@ -345,7 +352,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
         } else if (annotationMetadata instanceof AnnotationMetadataReference) {
             pushAnnotationMetadataReference(generatorAdapter, (AnnotationMetadataReference) annotationMetadata);
         } else {
-            generatorAdapter.getStatic(Type.getType(AnnotationMetadata.class), "EMPTY_METADATA", Type.getType(AnnotationMetadata.class));
+            throw new IllegalStateException("Unknown annotation metadata: " + annotationMetadata);
         }
     }
 
@@ -480,7 +487,14 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
         // 4th argument: all annotations
         pushCreateAnnotationData(owningType, declaringClassWriter, generatorAdapter, annotationMetadata.allAnnotations, defaultsStorage, loadTypeMethods, annotationMetadata.getSourceRetentionAnnotations());
         // 5th argument: annotations by stereotype
-        pushStringMapOf(generatorAdapter, annotationMetadata.annotationsByStereotype, false, Collections.emptyList(), list -> pushListOfString(generatorAdapter, list));
+        Map<String, List<String>> annotationsByStereotype = annotationMetadata.annotationsByStereotype;
+        if (annotationMetadata.getSourceRetentionAnnotations() != null && annotationsByStereotype != null) {
+            annotationsByStereotype = new LinkedHashMap<>(annotationsByStereotype);
+            for (String sourceRetentionAnnotation : annotationMetadata.getSourceRetentionAnnotations()) {
+                annotationsByStereotype.remove(sourceRetentionAnnotation);
+            }
+        }
+        pushStringMapOf(generatorAdapter, annotationsByStereotype, false, Collections.emptyList(), list -> pushListOfString(generatorAdapter, list));
         // 6th argument: has property expressions
         generatorAdapter.push(annotationMetadata.hasPropertyExpressions());
         // 7th argument: use repeatable annotations

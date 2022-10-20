@@ -16,14 +16,13 @@
 package io.micronaut.aop.introduction
 
 import io.micronaut.context.annotation.Executable
-import io.micronaut.context.annotation.Type;
-import io.micronaut.aop.Introduction;
-import io.micronaut.context.annotation.Type;
+import io.micronaut.aop.Introduction
+import io.micronaut.context.annotation.Type
 
-import java.lang.annotation.Documented;
-import java.lang.annotation.Retention;
+import java.lang.annotation.Documented
+import java.lang.annotation.Retention
 
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import static java.lang.annotation.RetentionPolicy.RUNTIME
 
 /**
  * @author Graeme Rocher
@@ -34,5 +33,5 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Documented
 @Retention(RUNTIME)
 @Executable
-public @interface Stub {
+@interface Stub {
 }

@@ -26,6 +26,7 @@ import io.micronaut.inject.ast.FieldElement
 import io.micronaut.inject.ast.MemberElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.PackageElement
+import io.micronaut.inject.ast.PrimitiveElement
 import io.micronaut.inject.ast.PropertyElement
 import io.micronaut.inject.ast.TypedElement
 import spock.lang.Issue
@@ -45,6 +46,29 @@ class ClassElementSpec extends AbstractBeanDefinitionSpec {
 
     def cleanup() {
         AllElementsVisitor.clearVisited()
+    }
+
+    void "test equals with primitive"() {
+        given:
+            def element = buildClassElement("""
+package test
+
+class Test {
+
+boolean test1
+
+}
+""")
+
+        expect:
+            element != PrimitiveElement.BOOLEAN
+            element != PrimitiveElement.VOID
+            element != PrimitiveElement.BOOLEAN.withArrayDimensions(4)
+            PrimitiveElement.VOID != element
+            PrimitiveElement.INT != element
+            PrimitiveElement.INT.withArrayDimensions(2) != element
+            element.getFields().get(0).getType() == PrimitiveElement.BOOLEAN
+            PrimitiveElement.BOOLEAN == element.getFields().get(0).getType()
     }
 
     @Issue("https://github.com/micronaut-projects/micronaut-openapi/issues/670")
@@ -321,8 +345,7 @@ interface AnotherInterface {
         def allMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS)
 
         then:"All methods, including non-accessible are returned but not overridden"
-        // slightly different result to java since groovy hides private methods
-        allMethods.size() == 9
+        allMethods.size() == 10
 
         when:"only abstract methods are requested"
         def abstractMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS.onlyAbstract())
@@ -396,7 +419,7 @@ interface AnotherInterface {
         def allMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS)
 
         then:"All methods, including non-accessible are returned but not overridden"
-        allMethods.size() == 6 // slightly different result to java since groovy hides private methods
+        allMethods.size() == 7
         allMethods.find { it.name == 'publicMethod'}.declaringType.simpleName == 'Test'
         allMethods.find { it.name == 'otherSuper'}.declaringType.simpleName == 'SuperType'
 
@@ -753,5 +776,92 @@ enum Test {
             assert expected.contains(name)
         }
         allFields.size() == expected.size()
+    }
+
+    void "test unrecognized default method"() {
+        given:
+            ClassElement classElement = buildClassElement('elementquery.MyBean', '''
+package elementquery;
+
+class Generic {
+}
+class Specific extends Generic {
+}
+interface GenericInterface {
+    Generic getObject()
+}
+interface SpecificInterface {
+    Specific getObject()
+}
+
+interface MyBean extends GenericInterface, SpecificInterface {
+
+    default Specific getObject() {
+        return null
+    }
+
+}
+
+''')
+        when:
+            def allMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS)
+        then:
+            allMethods.size() == 1
+        when:
+            def declaredMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared())
+        then:
+            declaredMethods.size() == 1
+            declaredMethods.get(0).isAbstract() == true
+            declaredMethods.get(0).isDefault() == false
+    }
+
+    // Groovy bug?
+    void "test unrecognized default method 2"() {
+        given:
+            ClassElement classElement = buildClassElement('elementquery.MyBean', '''
+package elementquery;
+
+interface MyBean {
+
+    default String getObject() {
+        return null
+    }
+
+}
+
+''')
+        when:
+            def allMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS)
+        then:
+            allMethods.size() == 1
+            allMethods.get(0).isAbstract() == true
+            allMethods.get(0).isDefault() == false
+    }
+
+    // Groovy bug?
+    void "test default method"() {
+        given:
+            ClassElement classElement = buildClassElement('elementquery.MyBean', '''
+package elementquery;
+
+interface MyInt {
+
+    default String getObject() {
+        return null
+    }
+
+}
+
+class MyBean implements MyInt {
+}
+
+''')
+        when:
+            def allMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS)
+        then:
+            // In this case the default method is not abstract but still not default
+            allMethods.size() == 1
+            allMethods.get(0).isAbstract() == false
+            allMethods.get(0).isDefault() == false
     }
 }

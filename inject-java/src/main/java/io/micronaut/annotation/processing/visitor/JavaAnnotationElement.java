@@ -15,10 +15,10 @@
  */
 package io.micronaut.annotation.processing.visitor;
 
-import javax.lang.model.element.TypeElement;
-
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.ast.AnnotationElement;
+import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
+
+import javax.lang.model.element.TypeElement;
 
 /**
  * Represents an annotation in the AST for Java.
@@ -28,11 +28,11 @@ import io.micronaut.inject.ast.AnnotationElement;
  */
 final class JavaAnnotationElement extends JavaClassElement implements AnnotationElement {
     /**
-     * @param classElement       The {@link javax.lang.model.element.TypeElement}
-     * @param annotationMetadata The annotation metadata
-     * @param visitorContext The visitor context
+     * @param classElement              The {@link javax.lang.model.element.TypeElement}
+     * @param annotationMetadataFactory The annotation metadata factory
+     * @param visitorContext            The visitor context
      */
-    JavaAnnotationElement(TypeElement classElement, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext) {
-        super(classElement, annotationMetadata, visitorContext);
+    JavaAnnotationElement(TypeElement classElement, ElementAnnotationMetadataFactory annotationMetadataFactory, JavaVisitorContext visitorContext) {
+        super(classElement, annotationMetadataFactory, visitorContext);
     }
 }

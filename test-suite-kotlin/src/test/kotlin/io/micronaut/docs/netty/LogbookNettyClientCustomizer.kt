@@ -6,6 +6,7 @@ import io.micronaut.context.event.BeanCreatedEvent
 import io.micronaut.context.event.BeanCreatedEventListener
 import io.micronaut.http.client.netty.NettyClientCustomizer
 import io.micronaut.http.client.netty.NettyClientCustomizer.ChannelRole
+import io.micronaut.http.netty.channel.ChannelPipelineCustomizer
 import io.netty.channel.Channel
 import jakarta.inject.Singleton
 import org.zalando.logbook.Logbook
@@ -29,8 +30,9 @@ class LogbookNettyClientCustomizer(private val logbook: Logbook) :
 
         override fun specializeForChannel(channel: Channel, role: ChannelRole) = Customizer(channel) // <4>
 
-        override fun onStreamPipelineBuilt() {
-            channel!!.pipeline().addLast( // <5>
+        override fun onRequestPipelineBuilt() {
+            channel!!.pipeline().addBefore( // <5>
+                ChannelPipelineCustomizer.HANDLER_HTTP_STREAM,
                 "logbook",
                 LogbookClientHandler(logbook)
             )

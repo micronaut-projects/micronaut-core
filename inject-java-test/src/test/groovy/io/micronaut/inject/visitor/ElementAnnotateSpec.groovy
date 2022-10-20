@@ -60,12 +60,12 @@ class TestListener {
     @Executable
     void receive(String v) {
     }
-    
+
     @Executable
     int[] receiveArray(int[] v) {
         return v;
     }
-    
+
     @Executable
     int receiveInt(int v) {
         return v;
@@ -96,11 +96,11 @@ import io.micronaut.core.annotation.Introspected;
 @Introspected
 class Test {
     private String name;
-    
-    public String getName() { 
+
+    public String getName() {
         return name;
     }
-    
+
     public void setName(String name) {
         this.name = name;
     }
@@ -123,11 +123,11 @@ class Outer {
     @Introspected
     static class Test {
         private String name;
-        
-        public String getName() { 
+
+        public String getName() {
             return name;
         }
-        
+
         public void setName(String name) {
             this.name = name;
         }

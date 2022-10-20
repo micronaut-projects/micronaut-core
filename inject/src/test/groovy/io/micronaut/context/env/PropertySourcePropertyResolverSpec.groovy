@@ -530,7 +530,8 @@ class PropertySourcePropertyResolverSpec extends Specification {
                 'my.property.one'  : 'one',
                 'my.property.two'  : '${foo.bar}',
                 'my.property.three': 'three',
-                'test-key.convention-test': 'key'
+                'test-key.convention-test': 'key',
+                'FranKen_Ste-in.property' : 'Victor'
         ]
         PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
                 PropertySource.of("test", values))
@@ -542,6 +543,12 @@ class PropertySourcePropertyResolverSpec extends Specification {
         resolver.getAllProperties(StringConvention.RAW, MapFormat.MapTransformation.NESTED).get('my').get('property').get('two') == 'two'
         resolver.getAllProperties(StringConvention.CAMEL_CASE, MapFormat.MapTransformation.FLAT).get('testKey.conventionTest') == 'key'
         resolver.getAllProperties(StringConvention.CAMEL_CASE, MapFormat.MapTransformation.NESTED).get('testKey').get('conventionTest') == 'key'
+        resolver.getAllProperties(StringConvention.CAMEL_CASE_CAPITALIZED, MapFormat.MapTransformation.FLAT).get('FranKenSteIn.property') == 'Victor'
+        resolver.getAllProperties(StringConvention.CAMEL_CASE, MapFormat.MapTransformation.FLAT).get('franKenSteIn.property') == 'Victor'
+        resolver.getAllProperties(StringConvention.HYPHENATED, MapFormat.MapTransformation.FLAT).get('fran-ken-ste-in.property') == 'Victor'
+        resolver.getAllProperties(StringConvention.RAW, MapFormat.MapTransformation.FLAT).get('FranKen_Ste-in.property') == 'Victor'
+        resolver.getAllProperties(StringConvention.UNDER_SCORE_SEPARATED, MapFormat.MapTransformation.FLAT).get('FRAN_KEN_STE_IN_PROPERTY') == 'Victor'
+        resolver.getAllProperties(StringConvention.UNDER_SCORE_SEPARATED_LOWER_CASE, MapFormat.MapTransformation.FLAT).get('fran_ken_ste_in.property') == 'Victor'
     }
 
     void "test inner properties"() {

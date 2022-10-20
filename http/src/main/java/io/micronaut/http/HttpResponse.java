@@ -15,11 +15,11 @@
  */
 package io.micronaut.http;
 
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
 import io.micronaut.http.exceptions.UriSyntaxException;
 
-import io.micronaut.core.annotation.Nullable;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Optional;
@@ -37,7 +37,9 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     /**
      * @return The current status
      */
-    HttpStatus getStatus();
+    default HttpStatus getStatus() {
+        return HttpStatus.valueOf(code());
+    }
 
     @Override
     default HttpResponse<B> setAttribute(CharSequence name, Object value) {
@@ -74,16 +76,12 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     /**
      * @return The response status code
      */
-    default int code() {
-        return getStatus().getCode();
-    }
+    int code();
 
     /**
      * @return The HTTP status reason phrase
      */
-    default String reason() {
-        return getStatus().getReason();
-    }
+    String reason();
 
     /**
      * Return an {@link io.micronaut.http.HttpStatus#OK} response with an empty body.
@@ -385,6 +383,18 @@ public interface HttpResponse<B> extends HttpMessage<B> {
      * @return The response
      */
     static <T> MutableHttpResponse<T> status(HttpStatus status, String reason) {
+        return HttpResponseFactory.INSTANCE.status(status, reason);
+    }
+
+    /**
+     * Return a response for the given status.
+     *
+     * @param status The status
+     * @param reason An alternatively reason message
+     * @param <T>    The response type
+     * @return The response
+     */
+    static <T> MutableHttpResponse<T> status(int status, String reason) {
         return HttpResponseFactory.INSTANCE.status(status, reason);
     }
 

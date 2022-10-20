@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.ast;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.ReflectiveAccess;
 
@@ -116,6 +117,10 @@ public interface MemberElement extends Element {
      */
     default boolean isAccessible(@NonNull ClassElement callingType) {
         return !isReflectionRequired(callingType) || hasAnnotation(ReflectiveAccess.class);
+    }
 
+    @Override
+    default MemberElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
+        return (MemberElement) Element.super.withAnnotationMetadata(annotationMetadata);
     }
 }

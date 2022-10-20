@@ -1,7 +1,6 @@
 package io.micronaut.ast.groovy.visitor
 
 import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
-import io.micronaut.inject.ast.ClassElement
 
 import javax.validation.constraints.NotBlank
 
@@ -19,7 +18,7 @@ class Test extends SuperClass {
     @NotBlank
     @NotNull
     private String tenant
-    
+
     String getTenant() {
         return tenant
     }

@@ -17,6 +17,7 @@ package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.naming.Named;
+import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.context.event.HttpRequestReceivedEvent;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.stream.HttpStreamsServerHandler;
@@ -74,6 +75,7 @@ import java.nio.channels.ClosedChannelException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.Supplier;
 
 /**
  * Helper class that manages the {@link ChannelPipeline} of incoming HTTP connections.
@@ -85,7 +87,8 @@ import java.util.concurrent.ThreadLocalRandom;
  * @author ywkat
  */
 final class HttpPipelineBuilder {
-    static final AttributeKey<StreamPipeline> STREAM_PIPELINE_ATTRIBUTE = AttributeKey.newInstance("stream-pipeline");
+    static final Supplier<AttributeKey<StreamPipeline>> STREAM_PIPELINE_ATTRIBUTE =
+        SupplierUtil.memoized(() -> AttributeKey.newInstance("stream-pipeline"));
 
     private static final Logger LOG = LoggerFactory.getLogger(HttpPipelineBuilder.class);
 
@@ -464,7 +467,7 @@ final class HttpPipelineBuilder {
          * and netty requests, and routing.
          */
         private void insertMicronautHandlers() {
-            channel.attr(STREAM_PIPELINE_ATTRIBUTE).set(this);
+            channel.attr(STREAM_PIPELINE_ATTRIBUTE.get()).set(this);
 
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_COMPRESSOR, new SmartHttpContentCompressor(embeddedServices.getHttpCompressionStrategy()));
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECOMPRESSOR, new HttpContentDecompressor());

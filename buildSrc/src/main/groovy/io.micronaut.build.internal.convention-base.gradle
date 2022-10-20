@@ -46,6 +46,12 @@ tasks.withType(Jar).configureEach {
     preserveFileTimestamps = false
 }
 
+configurations.all {
+    resolutionStrategy.dependencySubstitution {
+        substitute module("io.micronaut:micronaut-inject-groovy") using project(":inject-groovy") because "we want to test with what we're building"
+    }
+}
+
 dependencies {
     annotationProcessor libs.bundles.asm
     annotationProcessor(libs.micronaut.docs.map {
