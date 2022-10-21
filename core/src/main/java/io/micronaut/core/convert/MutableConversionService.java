@@ -15,6 +15,8 @@
  */
 package io.micronaut.core.convert;
 
+import io.micronaut.core.annotation.NonNull;
+
 import java.util.function.Function;
 
 /**
@@ -31,6 +33,7 @@ public interface MutableConversionService extends ConversionService {
      *
      * @return A new mutable conversion service.
      */
+    @NonNull
     static MutableConversionService create() {
         return new DefaultMutableConversionService();
     }
@@ -44,7 +47,7 @@ public interface MutableConversionService extends ConversionService {
      * @param <S>           The source generic type
      * @param <T>           The target generic type
      */
-    <S, T> void addConverter(Class<S> sourceType, Class<T> targetType, Function<S, T> typeConverter);
+    <S, T> void addConverter(@NonNull Class<S> sourceType, @NonNull Class<T> targetType, @NonNull Function<S, T> typeConverter);
 
     /**
      * Adds a type converter.
@@ -55,6 +58,6 @@ public interface MutableConversionService extends ConversionService {
      * @param <S>           The source generic type
      * @param <T>           The target generic type
      */
-    <S, T> void addConverter(Class<S> sourceType, Class<T> targetType, TypeConverter<S, T> typeConverter);
+    <S, T> void addConverter(@NonNull Class<S> sourceType, @NonNull Class<T> targetType, @NonNull TypeConverter<S, T> typeConverter);
 
 }
