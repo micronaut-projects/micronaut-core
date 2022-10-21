@@ -2399,7 +2399,7 @@ public class DefaultHttpClient implements
         }
 
         @Override
-        protected void buildResponse(Promise<? super HttpResponse<?>> promise, StreamedHttpResponse msg) {
+        protected void buildResponse(Promise<? super MutableHttpResponse<?>> promise, StreamedHttpResponse msg) {
             promise.trySuccess(new NettyStreamedHttpResponse<>(msg, conversionService));
         }
 
