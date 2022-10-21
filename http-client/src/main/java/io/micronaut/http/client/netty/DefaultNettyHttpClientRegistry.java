@@ -421,7 +421,6 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
                 resolveSocketChannelFactory(configuration, beanContext),
                 clientCustomizer,
                 invocationInstrumenterFactories,
-                clientId
                 clientId,
                 conversionService
         );
