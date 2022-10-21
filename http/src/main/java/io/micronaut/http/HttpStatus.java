@@ -69,6 +69,10 @@ public enum HttpStatus implements CharSequence {
     UNPROCESSABLE_ENTITY(422, "Unprocessable Entity"),
     LOCKED(423, "Locked"),
     FAILED_DEPENDENCY(424, "Failed Dependency"),
+    /**
+     * @deprecated Will be replaced by {@code TOO_EARLY} in 4.0
+     */
+    @Deprecated
     UNORDERED_COLLECTION(425, "Unordered Collection"),
     UPGRADE_REQUIRED(426, "Upgrade Required"),
     PRECONDITION_REQUIRED(428, "Precondition Required"),
