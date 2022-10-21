@@ -30,6 +30,7 @@ public enum HttpStatus implements CharSequence {
     CONTINUE(100, "Continue"),
     SWITCHING_PROTOCOLS(101, "Switching Protocols"),
     PROCESSING(102, "Processing"),
+    EARLY_HINTS(103, "Early Hints"),
     OK(200, "Ok"),
     CREATED(201, "Created"),
     ACCEPTED(202, "Accepted"),
@@ -69,10 +70,11 @@ public enum HttpStatus implements CharSequence {
     EXPECTATION_FAILED(417, "Expectation Failed"),
     I_AM_A_TEAPOT(418, "I am a teapot"),
     ENHANCE_YOUR_CALM(420, "Enhance your calm"),
+    MISDIRECTED_REQUEST(421, "Misdirected Request"),
     UNPROCESSABLE_ENTITY(422, "Unprocessable Entity"),
     LOCKED(423, "Locked"),
     FAILED_DEPENDENCY(424, "Failed Dependency"),
-    UNORDERED_COLLECTION(425, "Unordered Collection"),
+    TOO_EARLY(425, "Too Early"),
     UPGRADE_REQUIRED(426, "Upgrade Required"),
     PRECONDITION_REQUIRED(428, "Precondition Required"),
     TOO_MANY_REQUESTS(429, "Too Many Requests"),
@@ -136,6 +138,8 @@ public enum HttpStatus implements CharSequence {
                 return SWITCHING_PROTOCOLS;
             case 102:
                 return PROCESSING;
+            case 103:
+                return EARLY_HINTS;
             case 200:
                 return OK;
             case 201:
@@ -214,6 +218,8 @@ public enum HttpStatus implements CharSequence {
                 return I_AM_A_TEAPOT;
             case 420:
                 return ENHANCE_YOUR_CALM;
+            case 421:
+                return MISDIRECTED_REQUEST;
             case 422:
                 return UNPROCESSABLE_ENTITY;
             case 423:
@@ -221,7 +227,7 @@ public enum HttpStatus implements CharSequence {
             case 424:
                 return FAILED_DEPENDENCY;
             case 425:
-                return UNORDERED_COLLECTION;
+                return TOO_EARLY;
             case 426:
                 return UPGRADE_REQUIRED;
             case 428:
