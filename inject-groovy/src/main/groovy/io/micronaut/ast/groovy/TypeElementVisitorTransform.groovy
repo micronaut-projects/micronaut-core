@@ -17,7 +17,6 @@ package io.micronaut.ast.groovy
 
 import groovy.transform.CompilationUnitAware
 import groovy.transform.CompileStatic
-import groovy.transform.PackageScope
 import io.micronaut.ast.groovy.visitor.GroovyClassElement
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.ast.groovy.visitor.LoadedVisitor
@@ -27,12 +26,12 @@ import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.ElementQuery
 import io.micronaut.inject.ast.EnumConstantElement
 import io.micronaut.inject.ast.FieldElement
+import io.micronaut.inject.ast.MemberElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.PropertyElement
 import io.micronaut.inject.processing.ProcessingException
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder
 import org.codehaus.groovy.ast.ASTNode
-import org.codehaus.groovy.ast.AnnotatedNode
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.ConstructorNode
 import org.codehaus.groovy.ast.InnerClassNode
@@ -44,8 +43,6 @@ import org.codehaus.groovy.transform.ASTTransformation
 import org.codehaus.groovy.transform.GroovyASTTransformation
 
 import java.lang.reflect.Modifier
-
-import static org.codehaus.groovy.ast.ClassHelper.makeCached
 /**
  * Executes type element visitors.
  *
@@ -133,10 +130,6 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
             this.visitorContext = visitorContext
         }
 
-        protected boolean isPackagePrivate(AnnotatedNode annotatedNode, int modifiers) {
-            return ((!Modifier.isProtected(modifiers) && !Modifier.isPublic(modifiers) && !Modifier.isPrivate(modifiers)) || !annotatedNode.getAnnotations(makeCached(PackageScope)).isEmpty())
-        }
-
         void visitClass(ClassNode node) {
             if (targetClassElement.getNativeType() != node) {
                 targetClassElement = visitorContext.getElementFactory().newSourceClassElement(node, visitorContext.getElementAnnotationMetadataFactory())
@@ -147,21 +140,21 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
                 }
             }
             GroovyClassElement classElement = targetClassElement as GroovyClassElement
-            // Pre cache methods because of their source flag
-            def methods = classElement.getSourceEnclosedElements(ElementQuery.ALL_METHODS)
-
             def properties = classElement.getSyntheticBeanProperties()
             for (PropertyElement pn : (properties)) {
                 visitNativeProperty(pn)
             }
-            for (FieldElement fieldElement : classElement.getFields()) {
-                visitField(fieldElement)
-            }
             for (ConstructorNode cn : node.getDeclaredConstructors()) {
                 visitConstructor(cn)
             }
-            for (MethodElement methodElement : methods) {
-                visitMethod(methodElement)
+            for (MemberElement memberElement : classElement.getSourceEnclosedElements(ElementQuery.ALL_FIELD_AND_METHODS)) {
+                if (memberElement instanceof FieldElement) {
+                    visitField(memberElement)
+                } else if (memberElement instanceof MethodElement) {
+                    visitMethod(memberElement)
+                } else {
+                    throw new IllegalStateException("Unknown element: " + memberElement)
+                }
             }
         }
 

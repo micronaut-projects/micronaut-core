@@ -149,10 +149,6 @@ public abstract class EnclosedElementsQuery<C, N> {
                     }
                 }
             }
-// TODO: FIX only injected
-//                if (result.isOnlyInjected() && !element.hasDeclaredAnnotation(AnnotationUtil.INJECT)) {
-//                    return false;
-//                }
             return true;
         };
         return (List<T>) getAllElements((C) classElement.getNativeType(), result.isOnlyDeclared(), (t1, t2) -> reduceElements(t1, t2, result), result)

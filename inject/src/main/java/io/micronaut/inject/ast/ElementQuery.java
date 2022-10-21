@@ -56,7 +56,7 @@ public interface ElementQuery<T extends Element> {
      *
      * @since 4.0.0
      */
-    ElementQuery<MemberElement> ALL_METHODS_AND_FIELDS = ElementQuery.of(MemberElement.class);
+    ElementQuery<MemberElement> ALL_FIELD_AND_METHODS = ElementQuery.of(MemberElement.class);
 
     /**
      * Constant to retrieve instance constructors, not including those of the parent class.
@@ -70,12 +70,6 @@ public interface ElementQuery<T extends Element> {
      * @return This query
      */
     @NonNull ElementQuery<T> onlyDeclared();
-
-    /**
-     * Search for methods that are injection points.
-     * @return This query
-     */
-    ElementQuery<T> onlyInjected();
 
     /**
      * Indicates that only concrete members should be returned.
@@ -235,11 +229,6 @@ public interface ElementQuery<T extends Element> {
          * @return Whether to return only abstract methods
          */
         boolean isOnlyAbstract();
-
-        /**
-         * @return Whether to return only injection points
-         */
-        boolean isOnlyInjected();
 
         /**
          * @return Whether to return only concrete methods
