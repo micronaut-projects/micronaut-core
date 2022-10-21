@@ -23,7 +23,7 @@ jobs:
           java-version: '17'
       - name: Set the current release version
         id: release_version
-        run: echo ::set-output name=release_version::${GITHUB_REF:11}
+        run: echo ::set-output name=release_version::${GITHUB_REF:17}
       - name: Run pre-release
         uses: micronaut-projects/github-actions/pre-release@master
         env:
