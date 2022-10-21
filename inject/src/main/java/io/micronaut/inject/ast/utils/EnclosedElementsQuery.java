@@ -77,8 +77,7 @@ public abstract class EnclosedElementsQuery<C, N> {
                     }
                 }
             }
-            if (element instanceof MethodElement) {
-                MethodElement methodElement = (MethodElement) element;
+            if (element instanceof MethodElement methodElement) {
                 if (result.isOnlyAbstract()) {
                     if (methodElement.getDeclaringType().isInterface() && methodElement.isDefault()) {
                         return false;

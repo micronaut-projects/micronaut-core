@@ -72,6 +72,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.Spliterator;
@@ -490,7 +491,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
             nativeProperties = AstBeanPropertiesUtils.resolveBeanProperties(configuration,
                 this,
                 () -> getEnclosedElements(ElementQuery.ALL_METHODS.onlyInstance()),
-                () -> getEnclosedElements(ElementQuery.ALL_FIELDS),
+                () -> getPropertyNodes().stream().map(propertyNode -> visitorContext.getElementFactory().newFieldElement(this, propertyNode.getField(), elementAnnotationMetadataFactory)).collect(Collectors.toList()),
                 true,
                 nativeProps,
                 methodElement -> Optional.empty(),
@@ -867,10 +868,16 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
 
         @Override
         protected boolean excludeClass(ClassNode classNode) {
-            return Object.class.getName().equals(classNode.getName())
-                || Enum.class.getName().equals(classNode.getName())
-                || GroovyObjectSupport.class.getName().equals(classNode.getName())
-                || Script.class.getName().equals(classNode.getName());
+            String packageName = Objects.requireNonNullElse(classNode.getPackageName(), "");
+            if (packageName.startsWith("org.spockframework.lang") || packageName.startsWith("spock.mock") || packageName.startsWith("spock.lang")) {
+                // Performance optimization to exclude Spock;s deep hierarchy
+                return true;
+            }
+            String className = classNode.getName();
+            return Object.class.getName().equals(className)
+                || Enum.class.getName().equals(className)
+                || GroovyObjectSupport.class.getName().equals(className)
+                || Script.class.getName().equals(className);
         }
 
         @Override

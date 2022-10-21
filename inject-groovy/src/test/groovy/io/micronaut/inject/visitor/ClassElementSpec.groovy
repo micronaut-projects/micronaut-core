@@ -865,32 +865,67 @@ class MyBean implements MyInt {
             allMethods.get(0).isDefault() == false
     }
 
-    void "test fields"() {
+    void "test synthetic properties aren't removed"() {
         given:
-            ClassElement classElement = buildClassElement('elementquery.MyBean', '''
-package elementquery;
+            ClassElement classElement = buildClassElement('elementquery.SuccessfulTest', '''
+package elementquery
 
-class AbstractExample {
+import io.micronaut.context.ApplicationContext;
+import spock.lang.Shared
+import spock.lang.Specification
 
-    String s1
+import jakarta.inject.Inject
 
-    String s2
+class AbstractExample extends Specification {
+
+    @Inject
+    @Shared
+    ApplicationContext sharedCtx
+
+    @Inject
+    ApplicationContext ctx
 
 }
 
-class MyBean extends AbstractExample {
+class FailingTest extends AbstractExample {
 
-    String s3
+    def 'injection is not null'() {
+        expect:
+        ctx != null
+    }
 
+    def 'shared injection is not null'() {
+        expect:
+        sharedCtx != null
+    }
 }
+
+class SuccessfulTest extends AbstractExample {
+
+    @Shared
+    @Inject
+    ApplicationContext dummy
+
+    def 'injection is not null'() {
+        expect:
+        ctx != null
+    }
+
+    def 'shared injection is not null'() {
+        expect:
+        sharedCtx != null
+    }
+}
+
 
 ''')
         when:
+            def props = classElement.getSyntheticBeanProperties()
             def allFields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS)
         then:
-            allFields.size() == 3
-            allFields.get(0).name == "s1"
-            allFields.get(1).name == "s2"
-            allFields.get(2).name == "s3"
+            props.size() == 3
+            props[0].name == "ctx"
+            props[1].name.contains "dummy"
+            props[2].name.contains "sharedCtx"
     }
 }

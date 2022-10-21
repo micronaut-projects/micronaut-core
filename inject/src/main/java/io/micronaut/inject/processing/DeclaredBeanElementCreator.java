@@ -136,17 +136,15 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
 
     private void build(BeanDefinitionVisitor visitor) {
         Set<FieldElement> processedFields = new HashSet<>();
-        if (!processAsProperties()) {
-            for (PropertyElement propertyElement : classElement.getSyntheticBeanProperties()) {
-                propertyElement.getField().ifPresent(processedFields::add);
-                visitPropertyInternal(visitor, propertyElement);
-            }
-        }
         ElementQuery<MemberElement> memberQuery = ElementQuery.ALL_FIELD_AND_METHODS.includeHiddenElements();
-        boolean processAsProperties = processAsProperties();
-        if (processAsProperties) {
+        if (processAsProperties()) {
             memberQuery = memberQuery.excludePropertyElements();
             for (PropertyElement propertyElement : classElement.getBeanProperties()) {
+                visitPropertyInternal(visitor, propertyElement);
+            }
+        } else {
+            for (PropertyElement propertyElement : classElement.getSyntheticBeanProperties()) {
+                propertyElement.getField().ifPresent(processedFields::add);
                 visitPropertyInternal(visitor, propertyElement);
             }
         }
