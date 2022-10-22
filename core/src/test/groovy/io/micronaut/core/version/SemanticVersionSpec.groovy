@@ -22,6 +22,8 @@ class SemanticVersionSpec extends Specification {
     void "it compare two different major versions: #semver"(String semver) {
         expect:
         SemanticVersion.isAtLeastMajorMinor(semver, 3, 3)
+        SemanticVersion.isAtLeastMajorMinor(semver, 3, 0)
+        !SemanticVersion.isAtLeastMajorMinor(semver, 5, 3)
         !SemanticVersion.isAtLeastMajorMinor(semver, 5, 0)
 
         where:
