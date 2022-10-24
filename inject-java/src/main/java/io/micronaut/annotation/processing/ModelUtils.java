@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Creator;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
+import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.processing.JavaModelUtils;
 
@@ -31,6 +32,7 @@ import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.ElementFilter;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
+import java.lang.reflect.Method;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -45,6 +47,7 @@ import static javax.lang.model.type.TypeKind.NONE;
  */
 @Internal
 public class ModelUtils {
+    private static final Method RECORD_COMPONENTS_METHODS = ReflectionUtils.findMethod(TypeElement.class, "getRecordComponents").orElse(null);
 
     private final Elements elementUtils;
     private final Types typeUtils;
@@ -197,6 +200,7 @@ public class ModelUtils {
      * @return The constructor
      */
     @Nullable
+    @SuppressWarnings("java:S1119")
     public ExecutableElement concreteConstructorFor(TypeElement classElement, AnnotationUtils annotationUtils) {
         if (JavaModelUtils.isRecord(classElement)) {
             final List<ExecutableElement> constructors = ElementFilter
@@ -205,7 +209,33 @@ public class ModelUtils {
             if (element.isPresent()) {
                  return element.get();
             } else {
+                if (RECORD_COMPONENTS_METHODS != null) {
+                    List<Element> recordComponents = ReflectionUtils.invokeMethod(classElement, RECORD_COMPONENTS_METHODS);
+                    if (recordComponents != null) {
 
+                        // pick the constructor with the same number of arguments
+                        // and where the types match the record components
+                        constructorSearch: for (ExecutableElement constructor : constructors) {
+                            List<? extends VariableElement> parameters = constructor.getParameters();
+                            if (parameters.size() == recordComponents.size()) {
+                                for (int i = 0; i < parameters.size(); i++) {
+                                    VariableElement vt = parameters.get(i);
+                                    Element rct = recordComponents.get(i);
+                                    TypeMirror leftType = typeUtils.erasure(vt.asType());
+                                    TypeMirror rightType = typeUtils.erasure(rct.asType());
+                                    if (!leftType.equals(rightType)) {
+                                        // types don't match, continue searching constructors
+                                        continue constructorSearch;
+                                    }
+                                }
+                            } else {
+                                continue;
+                            }
+                            return constructor;
+                        }
+                    }
+
+                }
                 // with records the record constructor is always the last constructor
                 return constructors.get(constructors.size() - 1);
             }
