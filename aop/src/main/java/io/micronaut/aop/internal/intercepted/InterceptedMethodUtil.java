@@ -52,8 +52,10 @@ public final class InterceptedMethodUtil {
      * @param context           The {@link MethodInvocationContext}
      * @param conversionService The {@link ConversionService}
      * @return The {@link InterceptedMethod}
+     * @since 4.0.0
      */
-    public static InterceptedMethod of(MethodInvocationContext<?, ?> context, ConversionService conversionService) {
+    @NonNull
+    public static InterceptedMethod of(@NonNull MethodInvocationContext<?, ?> context, @NonNull ConversionService conversionService) {
         if (context.isSuspend()) {
             KotlinInterceptedMethod kotlinInterceptedMethod = KotlinInterceptedMethod.of(context);
             if (kotlinInterceptedMethod != null) {

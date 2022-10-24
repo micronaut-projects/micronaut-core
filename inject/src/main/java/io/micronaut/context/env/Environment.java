@@ -53,7 +53,7 @@ import java.util.stream.Stream;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface Environment extends PropertyResolver, LifeCycle<Environment>, MutableConversionService, ResourceLoader {
+public interface Environment extends PropertyResolver, LifeCycle<Environment>, MutableConversionService<Environment>, ResourceLoader {
 
     /**
      * Constant for the name micronaut.
