@@ -85,7 +85,7 @@ import java.util.function.Function;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class DefaultMutableConversionService implements MutableConversionService<DefaultMutableConversionService> {
+public class DefaultMutableConversionService implements MutableConversionService {
 
     private static final int CACHE_MAX = 150;
     private static final TypeConverter UNCONVERTIBLE = (object, targetType, context) -> Optional.empty();
@@ -179,20 +179,18 @@ public class DefaultMutableConversionService implements MutableConversionService
     }
 
     @Override
-    public <S, T> DefaultMutableConversionService addConverter(Class<S> sourceType, Class<T> targetType, TypeConverter<S, T> typeConverter) {
+    public <S, T> void addConverter(Class<S> sourceType, Class<T> targetType, TypeConverter<S, T> typeConverter) {
         ConvertiblePair pair = newPair(sourceType, targetType, typeConverter);
         typeConverters.put(pair, typeConverter);
         converterCache.put(pair, typeConverter);
-        return this;
     }
 
     @Override
-    public <S, T> DefaultMutableConversionService addConverter(Class<S> sourceType, Class<T> targetType, Function<S, T> function) {
+    public <S, T> void addConverter(Class<S> sourceType, Class<T> targetType, Function<S, T> function) {
         ConvertiblePair pair = new ConvertiblePair(sourceType, targetType);
         TypeConverter<S, T> typeConverter = TypeConverter.of(sourceType, targetType, function);
         typeConverters.put(pair, typeConverter);
         converterCache.put(pair, typeConverter);
-        return this;
     }
 
     /**
