@@ -314,15 +314,13 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     }
 
     @Override
-    public <S, T> Environment addConverter(Class<S> sourceType, Class<T> targetType, TypeConverter<S, T> typeConverter) {
+    public <S, T> void addConverter(Class<S> sourceType, Class<T> targetType, TypeConverter<S, T> typeConverter) {
         mutableConversionService.addConverter(sourceType, targetType, typeConverter);
-        return this;
     }
 
     @Override
-    public <S, T> Environment addConverter(Class<S> sourceType, Class<T> targetType, Function<S, T> typeConverter) {
+    public <S, T> void addConverter(Class<S> sourceType, Class<T> targetType, Function<S, T> typeConverter) {
         mutableConversionService.addConverter(sourceType, targetType, typeConverter);
-        return this;
     }
 
     @Override
