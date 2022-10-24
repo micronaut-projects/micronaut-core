@@ -23,9 +23,9 @@ import java.util.Set;
  *
  * @since 3.6.0
  */
-public interface EnumConstantElement extends TypedElement, MemberElement {
+public interface EnumConstantElement extends FieldElement {
 
-    Set<ElementModifier> ENUM_CONSTANT_MODIFIERS = new HashSet<ElementModifier>() {{
+    Set<ElementModifier> ENUM_CONSTANT_MODIFIERS = new HashSet<>() {{
         add(ElementModifier.PUBLIC);
         add(ElementModifier.STATIC);
         add(ElementModifier.FINAL);

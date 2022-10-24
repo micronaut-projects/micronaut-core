@@ -15,8 +15,8 @@
  */
 package io.micronaut.inject.visitor
 
-import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.ast.groovy.TypeElementVisitorStart
+import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.context.exceptions.BeanContextException
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.ElementModifier
@@ -363,7 +363,9 @@ interface AnotherInterface {
     void "test find matching methods using ElementQuery"() {
         given:
         ClassElement classElement = buildClassElement('''
-package elementquery;
+package elementquery
+
+import groovy.transform.PackageScope;
 
 class Test extends SuperType implements AnotherInterface, SomeInt {
 
@@ -388,7 +390,8 @@ class Test extends SuperType implements AnotherInterface, SomeInt {
 }
 
 class SuperType {
-    protected boolean s1;
+    @PackageScope
+    boolean s1;
     private boolean s2;
     private boolean privateMethod() {
         return true;
@@ -415,15 +418,15 @@ interface AnotherInterface {
     boolean publicMethod();
 }
 ''')
-        when:"all methods are retrieved"
+        when: "all methods are retrieved"
         def allMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS)
 
-        then:"All methods, including non-accessible are returned but not overridden"
+        then: "All methods, including non-accessible are returned but not overridden"
         allMethods.size() == 7
-        allMethods.find { it.name == 'publicMethod'}.declaringType.simpleName == 'Test'
-        allMethods.find { it.name == 'otherSuper'}.declaringType.simpleName == 'SuperType'
+        allMethods.find { it.name == 'publicMethod' }.declaringType.simpleName == 'Test'
+        allMethods.find { it.name == 'otherSuper' }.declaringType.simpleName == 'SuperType'
 
-        when:"obtaining only the declared methods"
+        when: "obtaining only the declared methods"
         def declared = classElement.getEnclosedElements(ElementQuery.of(MethodElement).onlyDeclared())
 
         then:"The declared are correct"
@@ -431,31 +434,32 @@ interface AnotherInterface {
         // part of the methods declared by classNode.getMethods() and there is no way to distinguish them
         declared*.name as Set == ['privateMethod', 'packagePrivateMethod', 'publicMethod', 'staticMethod', 'itfeMethod'] as Set
 
-        when:"Accessible methods are retrieved"
+        when: "Accessible methods are retrieved"
         def accessible = classElement.getEnclosedElements(ElementQuery.of(MethodElement).onlyAccessible())
 
-        then:"Only accessible methods, excluding those that require reflection"
+        then: "Only accessible methods, excluding those that require reflection"
+        accessible.size() == 5
         accessible*.name as Set == ['otherSuper', 'itfeMethod', 'publicMethod', 'packagePrivateMethod', 'staticMethod'] as Set
 
-        when:"static methods are resolved"
+        when: "static methods are resolved"
         def staticMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS.modifiers({
             it.contains(ElementModifier.STATIC)
         }))
 
-        then:"We only get statics"
+        then: "We only get statics"
         staticMethods.size() == 1
         staticMethods.first().name == 'staticMethod'
 
-        when:"All fields are retrieved"
+        when: "All fields are retrieved"
         def allFields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS)
 
-        then:"we get everything"
+        then: "we get everything"
         allFields.size() == 4
 
-        when:"Accessible fields are retrieved"
+        when: "Accessible fields are retrieved"
         def accessibleFields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS.onlyAccessible())
 
-        then:"we get everything"
+        then: "we get everything"
         accessibleFields.size() == 2
         accessibleFields*.name as Set == ['s1', 't1'] as Set
     }
@@ -737,9 +741,6 @@ enum Test {
         when:
         List<FieldElement> allFields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS)
         List<String> expected = [
-                'A',
-                'B',
-                'C',
                 'publicStaticFinalField',
                 'publicStaticField',
                 'publicFinalField',
@@ -756,10 +757,8 @@ enum Test {
                 'privateStaticField',
                 'privateFinalField',
                 'privateField',
-                'MIN_VALUE',
-                'MAX_VALUE',
-                'name',
-                'ordinal',
+                'MIN_VALUE', // Extra field in Groovy
+                'MAX_VALUE' // Extra field in Groovy
         ]
 
         then:
@@ -770,6 +769,7 @@ enum Test {
 
         when:
         allFields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS.includeEnumConstants())
+        expected = ['A', 'B', 'C'] + expected
 
         then:
         for (String name : allFields*.name) {
@@ -863,5 +863,69 @@ class MyBean implements MyInt {
             allMethods.size() == 1
             allMethods.get(0).isAbstract() == false
             allMethods.get(0).isDefault() == false
+    }
+
+    void "test synthetic properties aren't removed"() {
+        given:
+            ClassElement classElement = buildClassElement('elementquery.SuccessfulTest', '''
+package elementquery
+
+import io.micronaut.context.ApplicationContext;
+import spock.lang.Shared
+import spock.lang.Specification
+
+import jakarta.inject.Inject
+
+class AbstractExample extends Specification {
+
+    @Inject
+    @Shared
+    ApplicationContext sharedCtx
+
+    @Inject
+    ApplicationContext ctx
+
+}
+
+class FailingTest extends AbstractExample {
+
+    def 'injection is not null'() {
+        expect:
+        ctx != null
+    }
+
+    def 'shared injection is not null'() {
+        expect:
+        sharedCtx != null
+    }
+}
+
+class SuccessfulTest extends AbstractExample {
+
+    @Shared
+    @Inject
+    ApplicationContext dummy
+
+    def 'injection is not null'() {
+        expect:
+        ctx != null
+    }
+
+    def 'shared injection is not null'() {
+        expect:
+        sharedCtx != null
+    }
+}
+
+
+''')
+        when:
+            def props = classElement.getSyntheticBeanProperties()
+            def allFields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS)
+        then:
+            props.size() == 3
+            props[0].name == "ctx"
+            props[1].name.contains "dummy"
+            props[2].name.contains "sharedCtx"
     }
 }

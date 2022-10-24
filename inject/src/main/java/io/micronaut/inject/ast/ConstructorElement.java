@@ -35,4 +35,14 @@ public interface ConstructorElement extends MethodElement {
     default ClassElement getReturnType() {
         return getDeclaringType();
     }
+
+    @Override
+    default boolean hides(MemberElement memberElement) {
+        return false;
+    }
+
+    @Override
+    default boolean overrides(MethodElement overridden) {
+        return false;
+    }
 }

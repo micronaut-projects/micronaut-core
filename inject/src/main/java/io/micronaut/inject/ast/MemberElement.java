@@ -123,4 +123,15 @@ public interface MemberElement extends Element {
     default MemberElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
         return (MemberElement) Element.super.withAnnotationMetadata(annotationMetadata);
     }
+
+    /**
+     * Checks if this member element hides another.
+     *
+     * @param hidden The possibly hidden element
+     * @return true if this member element hides passed field element
+     * @since 4.0.0
+     */
+    default boolean hides(@NonNull MemberElement hidden) {
+        return false;
+    }
 }
