@@ -152,22 +152,22 @@ class MaxRequestSizeSpec extends Specification {
         ])
         HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
-//        when:
-//        MultipartBody body = MultipartBody.builder()
-//                .addPart("a", "a.pdf", new byte[1024])
-//                .addPart("b", "b.pdf", new byte[1024])
-//                .addPart("c", "c.pdf", new byte[1024])
-//                .addPart("d", "d.pdf", new byte[1024])
-//                .addPart("e", "e.pdf", new byte[1024])
-//                .build()
-//
-//        String result = client.toBlocking().retrieve(HttpRequest.POST("/test-max-size/multipart", body).contentType(MediaType.MULTIPART_FORM_DATA_TYPE))
-//
-//        then:
-//        result == "OK"
+        when:
+        MultipartBody body = MultipartBody.builder()
+                .addPart("a", "a.pdf", new byte[1024])
+                .addPart("b", "b.pdf", new byte[1024])
+                .addPart("c", "c.pdf", new byte[1024])
+                .addPart("d", "d.pdf", new byte[1024])
+                .addPart("e", "e.pdf", new byte[1024])
+                .build()
+
+        String result = client.toBlocking().retrieve(HttpRequest.POST("/test-max-size/multipart", body).contentType(MediaType.MULTIPART_FORM_DATA_TYPE))
+
+        then:
+        result == "OK"
 
         when:
-            MultipartBody body = MultipartBody.builder()
+        body = MultipartBody.builder()
                 .addPart("a", "a.pdf", new byte[1024])
                 .addPart("b", "b.pdf", new byte[1024])
                 .addPart("c", "c.pdf", new byte[1024])
