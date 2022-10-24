@@ -59,21 +59,21 @@ import io.micronaut.http.annotation.Get;
 
 @Controller("/test")
 public class TestController {
-    
+
     private int age;
     @javax.annotation.Nullable
     private String name;
     @javax.annotation.Nullable
     private String description;
-    
+
     /**
      * The age
      */
     @Get("/getMethod")
     public int getAge() {
         return age;
-    }    
-        
+    }
+
     /**
      * The age
      */
@@ -85,7 +85,7 @@ public class TestController {
     public String getName() {
         return name;
     }
-    
+
     @javax.validation.constraints.NotBlank
     public void setName(@javax.validation.constraints.NotBlank String n) {
         name = n;
@@ -130,10 +130,10 @@ import jakarta.inject.Inject;
 
 @Controller("/test")
 public class TestController<T extends CharSequence> {
-    
+
     private int age;
     private T name;
-    
+
     public int getAge() {
         return age;
     }
@@ -141,7 +141,7 @@ public class TestController<T extends CharSequence> {
     public T getName() {
         return name;
     }
-    
+
     public void setName(T n) {
         name = n;
     }
@@ -168,9 +168,9 @@ import jakarta.inject.Inject;
 
 @Controller("/test")
 public class TestController {
-    
+
     private Response<Integer> age;
-    
+
     public Response<Integer> getAge() {
         return age;
     }
@@ -201,5 +201,82 @@ class Response<T> {
         AllElementsVisitor.VISITED_METHOD_ELEMENTS[1].returnType.typeArguments.values().first().name == 'java.lang.Integer'
         AllElementsVisitor.VISITED_METHOD_ELEMENTS[1].returnType.beanProperties.size() == 1
         AllElementsVisitor.VISITED_METHOD_ELEMENTS[1].returnType.beanProperties[0].type.name == 'java.lang.Integer'
+    }
+
+    void "test get annotations from type after bean properties "() {
+        buildBeanDefinition('test.TestController', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.http.annotation.Body;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Post;
+
+@Controller
+class TestController {
+
+    @Post("/path")
+    public void processSync(@Body MyDto dto) {
+    }
+}
+
+class MyDto {
+
+    private Parameters parameters;
+
+    public Parameters getParameters() {
+        return parameters;
+    }
+
+    public void setParameters(Parameters parameters) {
+        this.parameters = parameters;
+    }
+}
+
+@Introspected
+class Parameters {
+
+    private Integer stampWidth;
+    private Integer stampHeight;
+    private int pageNumber;
+
+    public Integer getStampWidth() {
+        return stampWidth;
+    }
+
+    public void setStampWidth(Integer stampWidth) {
+        this.stampWidth = stampWidth;
+    }
+
+    public Integer getStampHeight() {
+        return stampHeight;
+    }
+
+    public void setStampHeight(Integer stampHeight) {
+        this.stampHeight = stampHeight;
+    }
+
+    public int getPageNumber() {
+        return pageNumber;
+    }
+
+    public void setPageNumber(int pageNumber) {
+        this.pageNumber = pageNumber;
+    }
+}
+''')
+        expect:
+        AllElementsVisitor.VISITED_CLASS_ELEMENTS.size() == 1
+
+        def method = AllElementsVisitor.VISITED_METHOD_ELEMENTS[0]
+        def parameter = method.parameters[0]
+
+        def fieldTypeAnnotations = parameter.type.beanProperties.get(0).type.annotationNames
+
+        System.out.println(parameter.type.beanProperties.get(0).type.annotationNames)
+
+        fieldTypeAnnotations
+        fieldTypeAnnotations.size() == 1
+        fieldTypeAnnotations.iterator().next() == 'io.micronaut.core.annotation.Introspected'
     }
 }
