@@ -34,6 +34,10 @@ Before, when both METHOD and FIELD were set as the access kind, the bean introsp
 
 Annotations with the retention CLASS are not available in the annotation metadata at the runtime.
 
+==== Interceptors with multiple interceptor bindings annotations
+
+Interceptors with multiple interceptor bindings annotations now require the same set of annotations to be present at the intercepted point. In the Micronaut 3 an interceptor with multiple binding annotations would need at least one of the binding annotations to be present at the intercepted point.
+
 == 3.3.0
 
 - The <<environmentEndpoint, environmental endpoint>> is now disabled by default. To enable it, you must update your endpoint config:
