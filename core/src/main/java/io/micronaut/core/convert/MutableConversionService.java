@@ -25,7 +25,7 @@ import java.util.function.Function;
  * @author Denis Stepanov
  * @since 4.0.0
  */
-public interface MutableConversionService extends ConversionService {
+public interface MutableConversionService<Impl extends ConversionService> extends ConversionService {
 
     /**
      * Creates a new mutable conversion service that extends the shared conversion service.
@@ -34,7 +34,7 @@ public interface MutableConversionService extends ConversionService {
      * @return A new mutable conversion service.
      */
     @NonNull
-    static MutableConversionService create() {
+    static MutableConversionService<?> create() {
         return new DefaultMutableConversionService();
     }
 
@@ -47,7 +47,7 @@ public interface MutableConversionService extends ConversionService {
      * @param <S>           The source generic type
      * @param <T>           The target generic type
      */
-    <S, T> void addConverter(@NonNull Class<S> sourceType, @NonNull Class<T> targetType, @NonNull Function<S, T> typeConverter);
+    <S, T> Impl addConverter(@NonNull Class<S> sourceType, @NonNull Class<T> targetType, @NonNull Function<S, T> typeConverter);
 
     /**
      * Adds a type converter.
@@ -58,6 +58,6 @@ public interface MutableConversionService extends ConversionService {
      * @param <S>           The source generic type
      * @param <T>           The target generic type
      */
-    <S, T> void addConverter(@NonNull Class<S> sourceType, @NonNull Class<T> targetType, @NonNull TypeConverter<S, T> typeConverter);
+    <S, T> Impl addConverter(@NonNull Class<S> sourceType, @NonNull Class<T> targetType, @NonNull TypeConverter<S, T> typeConverter);
 
 }
