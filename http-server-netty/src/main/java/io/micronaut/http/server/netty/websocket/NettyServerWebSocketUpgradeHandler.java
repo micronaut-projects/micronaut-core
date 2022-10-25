@@ -101,9 +101,8 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
      * @param embeddedServices The embedded server services
      * @param webSocketSessionRepository The websocket session repository
      */
-    public NettyServerWebSocketUpgradeHandler(
-            NettyEmbeddedServices embeddedServices,
-            WebSocketSessionRepository webSocketSessionRepository) {
+    public NettyServerWebSocketUpgradeHandler(NettyEmbeddedServices embeddedServices,
+                                              WebSocketSessionRepository webSocketSessionRepository) {
         this.router = embeddedServices.getRouter();
         this.binderRegistry = embeddedServices.getRequestArgumentSatisfier().getBinderRegistry();
         this.webSocketBeanRegistry = embeddedServices.getWebSocketBeanRegistry();
@@ -131,24 +130,27 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
         ServerRequestContext.set(msg);
 
         Optional<UriRouteMatch<Object, Object>> optionalRoute = router.find(HttpMethod.GET, msg.getUri().toString(), msg)
-                .filter(rm -> rm.isAnnotationPresent(OnMessage.class) || rm.isAnnotationPresent(OnOpen.class))
-                .findFirst();
+            .filter(rm -> rm.isAnnotationPresent(OnMessage.class) || rm.isAnnotationPresent(OnOpen.class))
+            .findFirst();
 
         MutableHttpResponse<?> proceed = HttpResponse.ok();
         AtomicReference<HttpRequest<?>> requestReference = new AtomicReference<>(msg);
 
-        ExecutionFlow<MutableHttpResponse<?>> responseFlow = routeExecutor.filterPublisher(requestReference, () -> {
+        ExecutionFlow<MutableHttpResponse<?>> responseFlow = ExecutionFlow.async(ctx.channel().eventLoop(), () -> routeExecutor.filterPublisher(requestReference, () -> {
+            ExecutionFlow<MutableHttpResponse<?>> response;
             if (optionalRoute.isPresent()) {
                 UriRouteMatch<Object, Object> rm = optionalRoute.get();
                 msg.setAttribute(HttpAttributes.ROUTE_MATCH, rm);
                 msg.setAttribute(HttpAttributes.ROUTE_INFO, rm);
                 proceed.setAttribute(HttpAttributes.ROUTE_MATCH, rm);
                 proceed.setAttribute(HttpAttributes.ROUTE_INFO, rm);
-                return ExecutionFlow.just(proceed);
+                response = ExecutionFlow.just(proceed);
+            } else {
+                response = routeExecutor.onError(new HttpStatusException(HttpStatus.NOT_FOUND, "WebSocket Not Found"), msg);
             }
-            return routeExecutor.onError(new HttpStatusException(HttpStatus.NOT_FOUND, "WebSocket Not Found"), msg);
-        });
-        responseFlow.putInContext(ServerRequestContext.KEY, requestReference.get());
+            response.putInContext(ServerRequestContext.KEY, requestReference.get());
+            return response;
+        }));
         responseFlow.onComplete((response, throwable) -> {
             if (response != null) {
                 writeResponse(ctx, msg, proceed, response);
