@@ -135,9 +135,8 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
                 });
             }
             return m;
-        } else {
-            throw new IllegalStateException();
         }
+        throw new IllegalStateException();
     }
 
     @Override

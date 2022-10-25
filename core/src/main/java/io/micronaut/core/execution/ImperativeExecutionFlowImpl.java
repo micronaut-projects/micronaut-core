@@ -132,6 +132,7 @@ final class ImperativeExecutionFlowImpl implements ImperativeExecutionFlow<Objec
         fn.accept(value, error);
     }
 
+    @Override
     public CompletableFuture<Object> toCompletableFuture() {
         if (error != null) {
             return CompletableFuture.failedFuture(error);

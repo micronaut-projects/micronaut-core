@@ -251,7 +251,7 @@ public final class RouteExecutor {
             List<UriRouteMatch<Object, Object>> anyUriRoutes = router.findAny(httpRequest.getUri().toString(), httpRequest).toList();
             if (!anyUriRoutes.isEmpty()) {
                 setRouteAttributes(httpRequest, anyUriRoutes.get(0));
-                httpRequest.setAttribute(AVAILABLE_HTTP_METHODS, anyUriRoutes.stream().map(UriRouteMatch::getHttpMethod).collect(Collectors.toList()));
+                httpRequest.setAttribute(AVAILABLE_HTTP_METHODS, anyUriRoutes.stream().map(UriRouteMatch::getHttpMethod).toList());
             }
         }
         return routeMatch;
@@ -370,7 +370,7 @@ public final class RouteExecutor {
     public ExecutionFlow<MutableHttpResponse<?>> onError(Throwable t, HttpRequest<?> httpRequest) {
         // find the origination of the route
         Optional<RouteInfo> previousRequestRouteInfo = httpRequest.getAttribute(HttpAttributes.ROUTE_INFO, RouteInfo.class);
-        Class declaringType = previousRequestRouteInfo.map(RouteInfo::getDeclaringType).orElse(null);
+        Class<?> declaringType = previousRequestRouteInfo.map(RouteInfo::getDeclaringType).orElse(null);
 
         final Throwable cause;
         // top level exceptions returned by CompletableFutures. These always wrap the real exception thrown.
@@ -860,8 +860,8 @@ public final class RouteExecutor {
                 outgoingResponse = ReactiveExecutionFlow.fromPublisher(
                     fromReactiveExecute(request, body, routeInfo, defaultHttpStatus)
                 );
-            } else if (body instanceof HttpStatus) { // now we have the raw result, transform it as necessary
-                outgoingResponse = ExecutionFlow.just(HttpResponse.status((HttpStatus) body));
+            } else if (body instanceof HttpStatus httpStatus) { // now we have the raw result, transform it as necessary
+                outgoingResponse = ExecutionFlow.just(HttpResponse.status(httpStatus));
             } else {
                 if (routeInfo.isSuspended()) {
                     outgoingResponse = fromKotlinCoroutineExecute(request, body, routeInfo, defaultHttpStatus);
@@ -874,8 +874,8 @@ public final class RouteExecutor {
             // for head request we never emit the body
             if (request != null && request.getMethod().equals(HttpMethod.HEAD)) {
                 final Object o = response.getBody().orElse(null);
-                if (o instanceof ReferenceCounted) {
-                    ((ReferenceCounted) o).release();
+                if (o instanceof ReferenceCounted referenceCounted) {
+                    referenceCounted.release();
                 }
                 response.body(null);
             }
@@ -1046,9 +1046,9 @@ public final class RouteExecutor {
          * Reads the HTTP request body.
          * TODO: This needs to be refactored for Micronaut 4 to eliminate the need for the route match.
          *
-         * @param routeMatch
-         * @param httpRequest
-         * @return
+         * @param routeMatch The route match
+         * @param httpRequest The http request
+         * @return The execution flow carrying the route match
          */
         @NonNull
         ExecutionFlow<RouteMatch<?>> read(@NonNull RouteMatch<?> routeMatch, @NonNull HttpRequest<?> httpRequest);

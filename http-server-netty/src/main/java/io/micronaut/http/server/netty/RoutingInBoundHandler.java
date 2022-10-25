@@ -20,7 +20,6 @@ import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.reactive.reactor.execution.ReactiveExecutionFlow;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.convert.ConversionService;
@@ -53,7 +52,6 @@ import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.RouteExecutor;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.http.server.exceptions.InternalServerException;
-import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.multipart.NettyCompletedFileUpload;
 import io.micronaut.http.server.netty.multipart.NettyPartData;
@@ -63,6 +61,7 @@ import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandler
 import io.micronaut.http.server.netty.types.files.NettyStreamedFileCustomizableResponseType;
 import io.micronaut.http.server.netty.types.files.NettySystemFileCustomizableResponseType;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
+import io.micronaut.reactive.reactor.execution.ReactiveExecutionFlow;
 import io.micronaut.runtime.http.codec.TextPlainCodec;
 import io.micronaut.web.router.RouteInfo;
 import io.micronaut.web.router.RouteMatch;
@@ -151,7 +150,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     private final StaticResourceResolver staticResourceResolver;
     private final NettyHttpServerConfiguration serverConfiguration;
     private final HttpContentProcessorResolver httpContentProcessorResolver;
-    private final ErrorResponseProcessor<?> errorResponseProcessor;
     private final RequestArgumentSatisfier requestArgumentSatisfier;
     private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
     private final NettyCustomizableResponseTypeHandlerRegistry customizableResponseTypeHandlerRegistry;
@@ -184,7 +182,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         this.requestArgumentSatisfier = embeddedServerContext.getRequestArgumentSatisfier();
         this.serverConfiguration = serverConfiguration;
         this.httpContentProcessorResolver = httpContentProcessorResolver;
-        this.errorResponseProcessor = embeddedServerContext.getRouteExecutor().getErrorResponseProcessor();
         this.terminateEventPublisher = terminateEventPublisher;
         Optional<Boolean> multipartEnabled = serverConfiguration.getMultipart().getEnabled();
         this.multipartEnabled = !multipartEnabled.isPresent() || multipartEnabled.get();
@@ -287,34 +284,31 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
         io.netty.handler.codec.http.HttpRequest nativeRequest = nettyHttpRequest.getNativeRequest();
 
-        RouteExecutor.RequestBodyReader requestBodyReader = new RouteExecutor.RequestBodyReader() {
-            @Override
-            public ExecutionFlow<RouteMatch<?>> read(RouteMatch<?> routeMatch, HttpRequest<?> hr) {
-                // handle decoding failure
-                DecoderResult decoderResult = nativeRequest.decoderResult();
-                if (decoderResult.isFailure()) {
-                    return ExecutionFlow.error(decoderResult.cause());
-                }
-                // try to fulfill the argument requirements of the route
-                RouteMatch<?> route = requestArgumentSatisfier.fulfillArgumentRequirements(routeMatch, httpRequest, false);
-
-                Optional<Argument<?>> bodyArgument = route.getBodyArgument()
-                    .filter(argument -> argument.getAnnotationMetadata().hasAnnotation(Body.class));
-
-                // The request body is required, so at this point we must have a StreamedHttpRequest
-                io.netty.handler.codec.http.HttpRequest nativeRequest = nettyHttpRequest.getNativeRequest();
-                if (!route.isExecutable() &&
-                    HttpMethod.permitsRequestBody(nettyHttpRequest.getMethod()) &&
-                    nativeRequest instanceof StreamedHttpRequest &&
-                    (bodyArgument.isEmpty() || !route.isSatisfied(bodyArgument.get().getName()))) {
-                    return ReactiveExecutionFlow.fromPublisher(
-                        Mono.create(emitter -> httpContentProcessorResolver.resolve(nettyHttpRequest, route)
-                            .subscribe(buildSubscriber(nettyHttpRequest, route, emitter))
-                        ));
-                }
-                ctx.read();
-                return ExecutionFlow.just(route);
+        RouteExecutor.RequestBodyReader requestBodyReader = (routeMatch, hr) -> {
+            // handle decoding failure
+            DecoderResult decoderResult = nativeRequest.decoderResult();
+            if (decoderResult.isFailure()) {
+                return ExecutionFlow.error(decoderResult.cause());
             }
+            // try to fulfill the argument requirements of the route
+            RouteMatch<?> route = requestArgumentSatisfier.fulfillArgumentRequirements(routeMatch, httpRequest, false);
+
+            Optional<Argument<?>> bodyArgument = route.getBodyArgument()
+                .filter(argument -> argument.getAnnotationMetadata().hasAnnotation(Body.class));
+
+            // The request body is required, so at this point we must have a StreamedHttpRequest
+            io.netty.handler.codec.http.HttpRequest nativeRequest1 = nettyHttpRequest.getNativeRequest();
+            if (!route.isExecutable() &&
+                HttpMethod.permitsRequestBody(nettyHttpRequest.getMethod()) &&
+                nativeRequest1 instanceof StreamedHttpRequest &&
+                (bodyArgument.isEmpty() || !route.isSatisfied(bodyArgument.get().getName()))) {
+                return ReactiveExecutionFlow.fromPublisher(
+                    Mono.create(emitter -> httpContentProcessorResolver.resolve(nettyHttpRequest, route)
+                        .subscribe(buildSubscriber(nettyHttpRequest, route, emitter))
+                    ));
+            }
+            ctx.read();
+            return ExecutionFlow.just(route);
         };
 
         ExecutionFlow<MutableHttpResponse<?>> responseFlow;
