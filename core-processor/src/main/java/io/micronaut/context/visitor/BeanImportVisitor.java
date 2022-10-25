@@ -15,6 +15,18 @@
  */
 package io.micronaut.context.visitor;
 
+import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.Import;
+import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.order.OrderUtil;
+import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.beans.BeanElementBuilder;
+import io.micronaut.inject.visitor.TypeElementVisitor;
+import io.micronaut.inject.visitor.VisitorContext;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -22,19 +34,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.ServiceLoader;
 import java.util.Set;
-
-import io.micronaut.context.annotation.Bean;
-import io.micronaut.context.annotation.Import;
-import io.micronaut.core.annotation.AnnotationUtil;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.order.OrderUtil;
-import io.micronaut.core.order.Ordered;
-import io.micronaut.core.util.ArrayUtils;
-import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.beans.BeanElementBuilder;
-import io.micronaut.inject.visitor.TypeElementVisitor;
-import io.micronaut.inject.visitor.VisitorContext;
 
 /**
  * Implementation of {@link io.micronaut.context.annotation.Import}.
