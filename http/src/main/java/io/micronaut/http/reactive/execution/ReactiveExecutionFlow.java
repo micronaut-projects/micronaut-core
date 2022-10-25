@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.reactive.reactor.execution;
+package io.micronaut.http.reactive.execution;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
@@ -61,7 +61,7 @@ public interface ReactiveExecutionFlow<T> extends ExecutionFlow<T> {
     static <K> ReactiveExecutionFlow<K> async(@NonNull Executor executor, @NonNull Supplier<ExecutionFlow<K>> supplier) {
         Scheduler scheduler = Schedulers.fromExecutor(executor);
         return (ReactiveExecutionFlow<K>) new ReactorExecutionFlowImpl(
-            Mono.fromSupplier(supplier).flatMap(ReactorExecutionFlowImpl::toMono).subscribeOn(scheduler).subscribeOn(scheduler)
+            Mono.fromSupplier(supplier).flatMap(ReactorExecutionFlowImpl::toMono).publishOn(scheduler)
         );
     }
 
