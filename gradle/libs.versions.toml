@@ -38,7 +38,7 @@ wiremock = "2.33.2"
 # that they will appear in the Micronaut BOM as <properties>
 #
 managed-dekorate = "1.0.3"
-managed-elasticsearch = "7.16.3"
+managed-elasticsearch = "7.17.7"
 managed-ignite = "2.13.0"
 managed-junit5 = "5.9.1"
 managed-kotlin = "1.7.20"
