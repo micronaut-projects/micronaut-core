@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.core.flow;
+package io.micronaut.core.execution;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
@@ -26,7 +26,7 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
- * The flow class represents a data flow which state can be represented as a simple imperative flow or an async/reactive.
+ * The execution flow class represents a data flow which state can be represented as a simple imperative flow or an async/reactive.
  * The state can be resolved or lazy - based on the implementation.
  * NOTE: The instance of the flow is not supposed to be used after a mapping operator is used.
  *
@@ -35,7 +35,7 @@ import java.util.function.Supplier;
  * @since 4.0.0
  */
 @Internal
-public interface Flow<T> {
+public interface ExecutionFlow<T> {
 
     /**
      * Create a simple flow representing a value.
@@ -45,8 +45,8 @@ public interface Flow<T> {
      * @return a new flow
      */
     @NonNull
-    static <K> Flow<K> just(@Nullable K value) {
-        return (Flow<K>) new ImperativeFlowImpl(value, null);
+    static <K> ExecutionFlow<K> just(@Nullable K value) {
+        return (ExecutionFlow<K>) new ImperativeExecutionFlowImpl(value, null);
     }
 
     /**
@@ -57,8 +57,8 @@ public interface Flow<T> {
      * @return a new flow
      */
     @NonNull
-    static <K> Flow<K> error(@NonNull Throwable e) {
-        return (Flow<K>) new ImperativeFlowImpl(null, e);
+    static <K> ExecutionFlow<K> error(@NonNull Throwable e) {
+        return (ExecutionFlow<K>) new ImperativeExecutionFlowImpl(null, e);
     }
 
     /**
@@ -68,8 +68,8 @@ public interface Flow<T> {
      * @return a new flow
      */
     @NonNull
-    static <T> Flow<T> empty() {
-        return (Flow<T>) new ImperativeFlowImpl(null, null);
+    static <T> ExecutionFlow<T> empty() {
+        return (ExecutionFlow<T>) new ImperativeExecutionFlowImpl(null, null);
     }
 
     /**
@@ -81,7 +81,7 @@ public interface Flow<T> {
      * @return a new flow
      */
     @NonNull
-    static <T> Flow<T> async(@NonNull Executor executor, @NonNull Supplier<? extends Flow<T>> supplier) {
+    static <T> ExecutionFlow<T> async(@NonNull Executor executor, @NonNull Supplier<? extends ExecutionFlow<T>> supplier) {
         CompletableFuture<T> completableFuture = new CompletableFuture<>();
         executor.execute(() -> supplier.get().onComplete((t, throwable) -> {
             if (throwable != null) {
@@ -90,7 +90,7 @@ public interface Flow<T> {
                 completableFuture.complete(t);
             }
         }));
-        return CompletableFutureFlow.just(completableFuture);
+        return CompletableFutureExecutionFlow.just(completableFuture);
     }
 
     /**
@@ -101,7 +101,7 @@ public interface Flow<T> {
      * @return a new flow
      */
     @NonNull
-    <R> Flow<R> map(@NonNull Function<? super T, ? extends R> transformer);
+    <R> ExecutionFlow<R> map(@NonNull Function<? super T, ? extends R> transformer);
 
     /**
      * Map a not-empty value to a new flow.
@@ -111,7 +111,7 @@ public interface Flow<T> {
      * @return a new flow
      */
     @NonNull
-    <R> Flow<R> flatMap(@NonNull Function<? super T, ? extends Flow<? extends R>> transformer);
+    <R> ExecutionFlow<R> flatMap(@NonNull Function<? super T, ? extends ExecutionFlow<? extends R>> transformer);
 
     /**
      * Supply a new flow after the existing flow value is resolved.
@@ -121,7 +121,7 @@ public interface Flow<T> {
      * @return a new flow
      */
     @NonNull
-    <R> Flow<R> then(@NonNull Supplier<? extends Flow<? extends R>> supplier);
+    <R> ExecutionFlow<R> then(@NonNull Supplier<? extends ExecutionFlow<? extends R>> supplier);
 
     /**
      * Supply a new flow if the existing flow is erroneous.
@@ -130,7 +130,7 @@ public interface Flow<T> {
      * @return a new flow
      */
     @NonNull
-    Flow<T> onErrorResume(@NonNull Function<? super Throwable, ? extends Flow<? extends T>> fallback);
+    ExecutionFlow<T> onErrorResume(@NonNull Function<? super Throwable, ? extends ExecutionFlow<? extends T>> fallback);
 
     /**
      * Store a contextual value.
@@ -140,7 +140,7 @@ public interface Flow<T> {
      * @return a new flow
      */
     @NonNull
-    Flow<T> putInContext(@NonNull String key, @NonNull Object value);
+    ExecutionFlow<T> putInContext(@NonNull String key, @NonNull Object value);
 
     /**
      * Invokes a provided function when the flow is resolved.

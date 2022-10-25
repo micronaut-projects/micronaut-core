@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.core.flow;
+package io.micronaut.core.execution;
 
 import io.micronaut.core.annotation.Internal;
 
@@ -24,51 +24,51 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
- * The completable future flow implementation.
+ * The completable future execution flow implementation.
  *
  * @author Denis Stepanov
  * @since 4.0.0
  */
 @Internal
-final class CompletableFutureFlowImpl implements CompletableFutureFlow<Object> {
+final class CompletableFutureExecutionFlowImpl implements CompletableFutureExecutionFlow<Object> {
 
     private CompletableFuture<Object> stage;
 
-    public CompletableFutureFlowImpl(CompletableFuture<Object> stage) {
+    public CompletableFutureExecutionFlowImpl(CompletableFuture<Object> stage) {
         this.stage = stage;
     }
 
     @Override
-    public <R> Flow<R> flatMap(Function<? super Object, ? extends Flow<? extends R>> transformer) {
+    public <R> ExecutionFlow<R> flatMap(Function<? super Object, ? extends ExecutionFlow<? extends R>> transformer) {
         stage = stage.thenCompose(value -> {
             if (value != null) {
                 return (CompletionStage<Object>) transformer.apply(value).toCompletableFuture();
             }
             return CompletableFuture.completedFuture(null);
         });
-        return (Flow<R>) this;
+        return (ExecutionFlow<R>) this;
     }
 
     @Override
-    public <R> Flow<R> then(Supplier<? extends Flow<? extends R>> supplier) {
+    public <R> ExecutionFlow<R> then(Supplier<? extends ExecutionFlow<? extends R>> supplier) {
         stage = stage.thenCompose(value -> (CompletionStage<Object>) supplier.get().toCompletableFuture());
-        return (Flow<R>) this;
+        return (ExecutionFlow<R>) this;
     }
 
     @Override
-    public <R> Flow<R> map(Function<? super Object, ? extends R> function) {
+    public <R> ExecutionFlow<R> map(Function<? super Object, ? extends R> function) {
         stage = stage.thenApply(function::apply);
-        return (Flow<R>) this;
+        return (ExecutionFlow<R>) this;
     }
 
     @Override
-    public Flow<Object> onErrorResume(Function<? super Throwable, ? extends Flow<?>> fallback) {
+    public ExecutionFlow<Object> onErrorResume(Function<? super Throwable, ? extends ExecutionFlow<?>> fallback) {
         stage = stage.exceptionallyCompose(throwable -> (CompletionStage<Object>) fallback.apply(throwable).toCompletableFuture());
         return this;
     }
 
     @Override
-    public Flow<Object> putInContext(String key, Object value) {
+    public ExecutionFlow<Object> putInContext(String key, Object value) {
         return this;
     }
 

@@ -20,11 +20,11 @@ import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.core.async.flow.ReactiveFlow;
+import io.micronaut.reactive.reactor.execution.ReactiveExecutionFlow;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.flow.Flow;
+import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.Writable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ReferenceCounted;
@@ -289,11 +289,11 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
         RouteExecutor.RequestBodyReader requestBodyReader = new RouteExecutor.RequestBodyReader() {
             @Override
-            public Flow<RouteMatch<?>> read(RouteMatch<?> routeMatch, HttpRequest<?> hr) {
+            public ExecutionFlow<RouteMatch<?>> read(RouteMatch<?> routeMatch, HttpRequest<?> hr) {
                 // handle decoding failure
                 DecoderResult decoderResult = nativeRequest.decoderResult();
                 if (decoderResult.isFailure()) {
-                    return Flow.error(decoderResult.cause());
+                    return ExecutionFlow.error(decoderResult.cause());
                 }
                 // try to fulfill the argument requirements of the route
                 RouteMatch<?> route = requestArgumentSatisfier.fulfillArgumentRequirements(routeMatch, httpRequest, false);
@@ -307,17 +307,17 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     HttpMethod.permitsRequestBody(nettyHttpRequest.getMethod()) &&
                     nativeRequest instanceof StreamedHttpRequest &&
                     (bodyArgument.isEmpty() || !route.isSatisfied(bodyArgument.get().getName()))) {
-                    return ReactiveFlow.fromPublisher(
+                    return ReactiveExecutionFlow.fromPublisher(
                         Mono.create(emitter -> httpContentProcessorResolver.resolve(nettyHttpRequest, route)
                             .subscribe(buildSubscriber(nettyHttpRequest, route, emitter))
                         ));
                 }
                 ctx.read();
-                return Flow.just(route);
+                return ExecutionFlow.just(route);
             }
         };
 
-        Flow<MutableHttpResponse<?>> responseFlow;
+        ExecutionFlow<MutableHttpResponse<?>> responseFlow;
 
         // handle decoding failure
         DecoderResult decoderResult = nativeRequest.decoderResult();

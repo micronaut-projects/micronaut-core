@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.core.flow;
+package io.micronaut.core.execution;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
@@ -21,14 +21,14 @@ import io.micronaut.core.annotation.NonNull;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * The completable future flow.
+ * The completable future execution flow.
  *
  * @param <T> The value type
  * @author Denis Stepnov
  * @since 4.0.0
  */
 @Internal
-public interface CompletableFutureFlow<T> extends Flow<T> {
+public interface CompletableFutureExecutionFlow<T> extends ExecutionFlow<T> {
 
     /**
      * Create a completable future flow representing a value.
@@ -38,8 +38,8 @@ public interface CompletableFutureFlow<T> extends Flow<T> {
      * @return a new flow
      */
     @NonNull
-    static <K> Flow<K> just(@NonNull CompletableFuture<K> value) {
-        return (Flow<K>) new CompletableFutureFlowImpl((CompletableFuture<Object>) value);
+    static <K> ExecutionFlow<K> just(@NonNull CompletableFuture<K> value) {
+        return (ExecutionFlow<K>) new CompletableFutureExecutionFlowImpl((CompletableFuture<Object>) value);
     }
 
 }

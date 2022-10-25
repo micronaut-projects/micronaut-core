@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.core.async.flow;
+package io.micronaut.reactive.reactor.execution;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.flow.Flow;
+import io.micronaut.core.execution.ExecutionFlow;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Scheduler;
@@ -27,7 +27,7 @@ import java.util.concurrent.Executor;
 import java.util.function.Supplier;
 
 /**
- * The reactive flow.
+ * The reactive execution flow.
  * NOTE: The flow is expected to produce only one result.
  *
  * @param <T> The value type
@@ -35,7 +35,7 @@ import java.util.function.Supplier;
  * @since 4.0.0
  */
 @Internal
-public interface ReactiveFlow<T> extends Flow<T> {
+public interface ReactiveExecutionFlow<T> extends ExecutionFlow<T> {
 
     /**
      * Creates a new reactive flow from a publisher.
@@ -45,8 +45,8 @@ public interface ReactiveFlow<T> extends Flow<T> {
      * @return a new flow
      */
     @NonNull
-    static <K> ReactiveFlow<K> fromPublisher(@NonNull Publisher<K> publisher) {
-        return (ReactiveFlow<K>) new ReactiveFlowImpl(publisher);
+    static <K> ReactiveExecutionFlow<K> fromPublisher(@NonNull Publisher<K> publisher) {
+        return (ReactiveExecutionFlow<K>) new ReactorExecutionFlowImpl(publisher);
     }
 
     /**
@@ -58,10 +58,10 @@ public interface ReactiveFlow<T> extends Flow<T> {
      * @return a new flow
      */
     @NonNull
-    static <K> ReactiveFlow<K> async(@NonNull Executor executor, @NonNull Supplier<Flow<K>> supplier) {
+    static <K> ReactiveExecutionFlow<K> async(@NonNull Executor executor, @NonNull Supplier<ExecutionFlow<K>> supplier) {
         Scheduler scheduler = Schedulers.fromExecutor(executor);
-        return (ReactiveFlow<K>) new ReactiveFlowImpl(
-            Mono.fromSupplier(supplier).flatMap(flow -> ReactiveFlowImpl.toMono(flow)).subscribeOn(scheduler).subscribeOn(scheduler)
+        return (ReactiveExecutionFlow<K>) new ReactorExecutionFlowImpl(
+            Mono.fromSupplier(supplier).flatMap(flow -> ReactorExecutionFlowImpl.toMono(flow)).subscribeOn(scheduler).subscribeOn(scheduler)
         );
     }
 
@@ -73,11 +73,11 @@ public interface ReactiveFlow<T> extends Flow<T> {
      * @return a new flow
      */
     @NonNull
-    static <K> ReactiveFlow<K> fromFlow(@NonNull Flow<K> flow) {
-        if (flow instanceof ReactiveFlow<K>) {
-            return (ReactiveFlow<K>) flow;
+    static <K> ReactiveExecutionFlow<K> fromFlow(@NonNull ExecutionFlow<K> flow) {
+        if (flow instanceof ReactiveExecutionFlow<K>) {
+            return (ReactiveExecutionFlow<K>) flow;
         }
-        return (ReactiveFlow<K>) new ReactiveFlowImpl(ReactiveFlowImpl.toMono(flow));
+        return (ReactiveExecutionFlow<K>) new ReactorExecutionFlowImpl(ReactorExecutionFlowImpl.toMono(flow));
     }
 
     /**

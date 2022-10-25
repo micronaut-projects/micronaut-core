@@ -13,12 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.core.async.flow;
+package io.micronaut.reactive.reactor.execution;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.flow.CompletableFutureFlow;
-import io.micronaut.core.flow.Flow;
-import io.micronaut.core.flow.ImperativeFlow;
+import io.micronaut.core.execution.CompletableFutureExecutionFlow;
+import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.core.execution.ImperativeExecutionFlow;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -38,44 +38,44 @@ import java.util.function.Supplier;
  * @since 4.0.0
  */
 @Internal
-final class ReactiveFlowImpl implements ReactiveFlow<Object> {
+final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
 
     private Mono<Object> value;
 
-    public <K> ReactiveFlowImpl(Publisher<K> value) {
+    public <K> ReactorExecutionFlowImpl(Publisher<K> value) {
         this(Mono.from(value));
     }
 
-    public <K>  ReactiveFlowImpl(Mono<K> value) {
+    public <K> ReactorExecutionFlowImpl(Mono<K> value) {
         this.value = (Mono<Object>) value;
     }
 
     @Override
-    public <R> Flow<R> flatMap(Function<? super Object, ? extends Flow<? extends R>> transformer) {
+    public <R> ExecutionFlow<R> flatMap(Function<? super Object, ? extends ExecutionFlow<? extends R>> transformer) {
         value = value.flatMap(value -> toMono(transformer.apply(value)));
-        return (Flow<R>) this;
+        return (ExecutionFlow<R>) this;
     }
 
     @Override
-    public <R> Flow<R> then(Supplier<? extends Flow<? extends R>> supplier) {
-        value = value.then(Mono.fromSupplier(supplier).flatMap(ReactiveFlowImpl::toMono));
-        return (Flow<R>) this;
+    public <R> ExecutionFlow<R> then(Supplier<? extends ExecutionFlow<? extends R>> supplier) {
+        value = value.then(Mono.fromSupplier(supplier).flatMap(ReactorExecutionFlowImpl::toMono));
+        return (ExecutionFlow<R>) this;
     }
 
     @Override
-    public <R> Flow<R> map(Function<? super Object, ? extends R> function) {
+    public <R> ExecutionFlow<R> map(Function<? super Object, ? extends R> function) {
         value = value.map(function);
-        return (Flow<R>) this;
+        return (ExecutionFlow<R>) this;
     }
 
     @Override
-    public Flow<Object> onErrorResume(Function<? super Throwable, ? extends Flow<?>> fallback) {
+    public ExecutionFlow<Object> onErrorResume(Function<? super Throwable, ? extends ExecutionFlow<?>> fallback) {
         value = value.onErrorResume(throwable -> toMono(fallback.apply(throwable)));
         return this;
     }
 
     @Override
-    public Flow<Object> putInContext(String key, Object value) {
+    public ExecutionFlow<Object> putInContext(String key, Object value) {
         this.value = this.value.contextWrite(context -> context.put(key, value));
         return this;
     }
@@ -111,12 +111,12 @@ final class ReactiveFlowImpl implements ReactiveFlow<Object> {
         });
     }
 
-    static <R> Mono<Object> toMono(Flow<R> next) {
-        if (next instanceof ReactiveFlowImpl reactiveFlowImpl) {
+    static <R> Mono<Object> toMono(ExecutionFlow<R> next) {
+        if (next instanceof ReactorExecutionFlowImpl reactiveFlowImpl) {
             return reactiveFlowImpl.value;
-        } else if (next instanceof CompletableFutureFlow<?> completableFutureFlow) {
+        } else if (next instanceof CompletableFutureExecutionFlow<?> completableFutureFlow) {
             return Mono.fromCompletionStage(completableFutureFlow.toCompletableFuture());
-        } else if (next instanceof ImperativeFlow<?> imperativeFlow) {
+        } else if (next instanceof ImperativeExecutionFlow<?> imperativeFlow) {
             Mono<Object> m;
             if (imperativeFlow.getError() != null) {
                 m = Mono.error(imperativeFlow.getError());

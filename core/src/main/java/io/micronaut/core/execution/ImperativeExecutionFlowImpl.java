@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.core.flow;
+package io.micronaut.core.execution;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
@@ -26,13 +26,13 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
- * The imperative flow implementation.
+ * The imperative execution flow implementation.
  *
  * @author Denis Stepanov
  * @since 4.0.0
  */
 @Internal
-final class ImperativeFlowImpl implements ImperativeFlow<Object> {
+final class ImperativeExecutionFlowImpl implements ImperativeExecutionFlow<Object> {
 
     @Nullable
     private Object value;
@@ -41,7 +41,7 @@ final class ImperativeFlowImpl implements ImperativeFlow<Object> {
     @Nullable
     private Map<String, Object> context;
 
-    public <T> ImperativeFlowImpl(T value, Throwable error) {
+    public <T> ImperativeExecutionFlowImpl(T value, Throwable error) {
         this.value = value;
         this.error = error;
     }
@@ -65,35 +65,35 @@ final class ImperativeFlowImpl implements ImperativeFlow<Object> {
     }
 
     @Override
-    public <R> Flow<R> flatMap(Function<? super Object, ? extends Flow<? extends R>> transformer) {
+    public <R> ExecutionFlow<R> flatMap(Function<? super Object, ? extends ExecutionFlow<? extends R>> transformer) {
         if (error == null) {
             try {
                 if (value != null) {
-                    return (Flow<R>) transformer.apply(value);
+                    return (ExecutionFlow<R>) transformer.apply(value);
                 }
             } catch (Throwable e) {
                 error = e;
                 value = null;
             }
         }
-        return (Flow<R>) this;
+        return (ExecutionFlow<R>) this;
     }
 
     @Override
-    public <R> Flow<R> then(Supplier<? extends Flow<? extends R>> supplier) {
+    public <R> ExecutionFlow<R> then(Supplier<? extends ExecutionFlow<? extends R>> supplier) {
         if (error == null) {
             try {
-                return (Flow<R>) supplier.get();
+                return (ExecutionFlow<R>) supplier.get();
             } catch (Throwable e) {
                 error = e;
                 value = null;
             }
         }
-        return (Flow<R>) this;
+        return (ExecutionFlow<R>) this;
     }
 
     @Override
-    public <R> Flow<R> map(Function<? super Object, ? extends R> transformer) {
+    public <R> ExecutionFlow<R> map(Function<? super Object, ? extends R> transformer) {
         if (error == null) {
             try {
                 value = transformer.apply(value);
@@ -102,14 +102,14 @@ final class ImperativeFlowImpl implements ImperativeFlow<Object> {
                 value = null;
             }
         }
-        return (Flow<R>) this;
+        return (ExecutionFlow<R>) this;
     }
 
     @Override
-    public Flow<Object> onErrorResume(Function<? super Throwable, ? extends Flow<? extends Object>> fallback) {
+    public ExecutionFlow<Object> onErrorResume(Function<? super Throwable, ? extends ExecutionFlow<? extends Object>> fallback) {
         if (error != null) {
             try {
-                return (Flow<Object>) fallback.apply(error);
+                return (ExecutionFlow<Object>) fallback.apply(error);
             } catch (Throwable e) {
                 error = e;
                 value = null;
@@ -119,7 +119,7 @@ final class ImperativeFlowImpl implements ImperativeFlow<Object> {
     }
 
     @Override
-    public Flow<Object> putInContext(String key, Object value) {
+    public ExecutionFlow<Object> putInContext(String key, Object value) {
         if (context == null) {
             context = new LinkedHashMap<>();
         }

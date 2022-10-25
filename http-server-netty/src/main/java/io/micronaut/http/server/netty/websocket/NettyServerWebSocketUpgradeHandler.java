@@ -17,7 +17,7 @@ package io.micronaut.http.server.netty.websocket;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.flow.Flow;
+import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpMethod;
@@ -137,14 +137,14 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
         MutableHttpResponse<?> proceed = HttpResponse.ok();
         AtomicReference<HttpRequest<?>> requestReference = new AtomicReference<>(msg);
 
-        Flow<MutableHttpResponse<?>> responseFlow = routeExecutor.filterPublisher(requestReference, () -> {
+        ExecutionFlow<MutableHttpResponse<?>> responseFlow = routeExecutor.filterPublisher(requestReference, () -> {
             if (optionalRoute.isPresent()) {
                 UriRouteMatch<Object, Object> rm = optionalRoute.get();
                 msg.setAttribute(HttpAttributes.ROUTE_MATCH, rm);
                 msg.setAttribute(HttpAttributes.ROUTE_INFO, rm);
                 proceed.setAttribute(HttpAttributes.ROUTE_MATCH, rm);
                 proceed.setAttribute(HttpAttributes.ROUTE_INFO, rm);
-                return Flow.just(proceed);
+                return ExecutionFlow.just(proceed);
             }
             return routeExecutor.onError(new HttpStatusException(HttpStatus.NOT_FOUND, "WebSocket Not Found"), msg);
         });

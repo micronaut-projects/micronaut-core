@@ -5,5 +5,4 @@ plugins {
 dependencies {
     api project(":core")
     api libs.managed.reactive.streams
-    implementation libs.managed.reactor
 }

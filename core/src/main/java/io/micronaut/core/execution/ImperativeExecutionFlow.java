@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.core.flow;
+package io.micronaut.core.execution;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
@@ -21,14 +21,14 @@ import io.micronaut.core.annotation.Nullable;
 import java.util.Map;
 
 /**
- * The imperative flow.
+ * The imperative execution flow.
  *
  * @param <T> The value type
  * @author Denis Stepnov
  * @since 4.0.0
  */
 @Internal
-public interface ImperativeFlow<T> extends Flow<T> {
+public interface ImperativeExecutionFlow<T> extends ExecutionFlow<T> {
 
     /**
      * @return The value if present
