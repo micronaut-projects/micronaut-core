@@ -1,0 +1,8 @@
+plugins {
+    id "io.micronaut.build.internal.convention-library"
+}
+
+dependencies {
+    api project(":core")
+    api libs.jakarta.inject.api
+}

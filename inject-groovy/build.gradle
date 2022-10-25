@@ -10,8 +10,7 @@ micronautBuild {
 }
 
 dependencies {
-    api project(":inject")
-    api project(':aop')
+    api project(":core-processor")
     api libs.managed.groovy
 //    testImplementation 'javax.validation:validation-api:1.1.0.Final'
     testImplementation project(":context")

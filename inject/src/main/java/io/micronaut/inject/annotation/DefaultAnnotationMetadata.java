@@ -31,7 +31,6 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
-import io.micronaut.inject.ast.ClassElement;
 
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Repeatable;
@@ -2285,30 +2284,6 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                     damTarget.repeated.putAll(damSource.repeated);
                 }
             }
-        }
-    }
-
-    /**
-     * Contributes repeatable annotation metadata to the given class element.
-     *
-     * <p>WARNING: for internal use only be the framework</p>
-     *
-     * @param target        The target
-     * @param classElement  The source
-     */
-    @Internal
-    public static void contributeRepeatable(AnnotationMetadata target, ClassElement classElement) {
-       contributeRepeatable(target, classElement, new HashSet<>());
-    }
-
-    private static void contributeRepeatable(AnnotationMetadata target, ClassElement classElement, Set<ClassElement> alreadySeen) {
-        alreadySeen.add(classElement);
-        contributeRepeatable(target, classElement.getAnnotationMetadata());
-        for (ClassElement element : classElement.getTypeArguments().values()) {
-            if (alreadySeen.contains(classElement)) {
-                continue;
-            }
-            contributeRepeatable(target, element);
         }
     }
 

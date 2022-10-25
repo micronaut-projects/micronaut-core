@@ -24,7 +24,7 @@ micronautBuild {
 
 dependencies {
     annotationProcessor project(":inject-java")
-    api project(":inject")
+    api project(":core-processor")
 
     testImplementation project(":context")
     testImplementation libs.managed.netty.codec.http

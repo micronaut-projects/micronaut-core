@@ -80,7 +80,7 @@ import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
 import static io.micronaut.core.util.KotlinUtils.isKotlinCoroutineSuspended;
-import static io.micronaut.inject.util.KotlinExecutableMethodUtils.isKotlinFunctionReturnTypeUnit;
+import static io.micronaut.inject.beans.KotlinExecutableMethodUtils.isKotlinFunctionReturnTypeUnit;
 
 /**
  * A class responsible for executing routes.

@@ -1,5 +1,6 @@
 package io.micronaut.inject.util
 
+import io.micronaut.inject.visitor.util.VisitorContextUtils
 import spock.lang.Specification
 import spock.lang.Stepwise
 import spock.util.environment.RestoreSystemProperties
