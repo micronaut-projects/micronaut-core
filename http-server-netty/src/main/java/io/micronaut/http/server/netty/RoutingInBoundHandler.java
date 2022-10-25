@@ -370,7 +370,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
     @Override
     public FileCustomizableResponseType find(HttpRequest<?> httpRequest) {
-        Optional<URL> optionalUrl = staticResourceResolver.resolve(httpRequest.getPath());
+        Optional<URL> optionalUrl = staticResourceResolver.resolve(httpRequest.getUri().getPath());
         if (optionalUrl.isPresent()) {
             try {
                 URL url = optionalUrl.get();
@@ -380,7 +380,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         return new NettySystemFileCustomizableResponseType(file);
                     }
                 }
-
                 return new NettyStreamedFileCustomizableResponseType(url);
             } catch (URISyntaxException e) {
                 //no-op
