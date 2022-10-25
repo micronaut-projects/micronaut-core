@@ -89,7 +89,7 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
                     variableElement.asType(),
                     visitorContext,
                     owningType.getGenericTypeInfo(),
-                    false
+                    true
                 );
             }
         }
