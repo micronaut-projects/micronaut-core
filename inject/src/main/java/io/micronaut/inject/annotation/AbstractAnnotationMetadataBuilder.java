@@ -82,8 +82,10 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     private static final Map<MetadataKey<?>, CachedAnnotationMetadata> MUTATED_ANNOTATION_METADATA = new HashMap<>(100);
     private static final Map<String, Set<String>> NON_BINDING_CACHE = new HashMap<>(50);
     private static final List<String> DEFAULT_ANNOTATE_EXCLUDES = Arrays.asList(Internal.class.getName(),
-        Experimental.class.getName());
+        Experimental.class.getName(), "jdk.internal.ValueBased");
     private static final Map<String, Map<String, Object>> ANNOTATION_DEFAULTS = new HashMap<>(20);
+
+    protected static final List<String> EXCLUDES = Arrays.asList(AnnotationUtil.KOTLIN_METADATA, "jdk.internal.ValueBased");
 
     static {
         for (AnnotationMapper mapper : SoftServiceLoader.load(AnnotationMapper.class, AbstractAnnotationMetadataBuilder.class.getClassLoader())

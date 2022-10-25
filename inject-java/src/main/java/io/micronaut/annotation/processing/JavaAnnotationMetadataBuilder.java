@@ -242,7 +242,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     @Override
     protected List<? extends AnnotationMirror> getAnnotationsForType(Element element) {
         List<? extends AnnotationMirror> annotationMirrors = new ArrayList<>(element.getAnnotationMirrors());
-        annotationMirrors.removeIf(mirror -> getAnnotationTypeName(mirror).equals(AnnotationUtil.KOTLIN_METADATA));
+        annotationMirrors.removeIf(mirror -> EXCLUDES.contains(getAnnotationTypeName(mirror)));
         List<AnnotationMirror> expanded = new ArrayList<>(annotationMirrors.size());
         for (AnnotationMirror annotation : annotationMirrors) {
             boolean repeatable = false;
