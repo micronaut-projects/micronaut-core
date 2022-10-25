@@ -146,7 +146,14 @@ public final class AstBeanPropertiesUtils {
                     && value.setter.getParameters().length > 0) {
                     value.type = value.setter.getParameters()[0].getGenericType();
                 }
-
+                // In a case when the field's type is the same as the selected property type,
+                // and it has more type arguments annotations - use it as the property type
+                if (value.field != null
+                    && value.field.getType().equals(value.type)
+                    && hasGenericTypeAnnotations(value.field.getType())
+                    && !hasGenericTypeAnnotations(value.type.getType())) {
+                    value.type = value.field.getGenericType();
+                }
                 if (value.readAccessKind != null || value.writeAccessKind != null) {
                     value.isExcluded = shouldExclude(includes, excludes, propertyName)
                         || isExcludedByAnnotations(configuration, value)
@@ -160,6 +167,10 @@ public final class AstBeanPropertiesUtils {
             return beanProperties;
         }
         return Collections.emptyList();
+    }
+
+    private static boolean hasGenericTypeAnnotations(ClassElement cl) {
+        return cl.getTypeArguments().values().stream().anyMatch(t -> !t.getAnnotationMetadata().isEmpty());
     }
 
     private static boolean isExcludedBecauseOfMissingAccess(BeanPropertyData value) {
