@@ -18,6 +18,7 @@ package io.micronaut.core.execution;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -41,7 +42,7 @@ final class ImperativeExecutionFlowImpl implements ImperativeExecutionFlow<Objec
     @Nullable
     private Map<String, Object> context;
 
-    public <T> ImperativeExecutionFlowImpl(T value, Throwable error) {
+    <T> ImperativeExecutionFlowImpl(T value, Throwable error) {
         this.value = value;
         this.error = error;
     }
@@ -58,10 +59,9 @@ final class ImperativeExecutionFlowImpl implements ImperativeExecutionFlow<Objec
         return error;
     }
 
-    @Nullable
     @Override
     public Map<String, Object> getContext() {
-        return context;
+        return context == null ? Collections.emptyMap() : context;
     }
 
     @Override

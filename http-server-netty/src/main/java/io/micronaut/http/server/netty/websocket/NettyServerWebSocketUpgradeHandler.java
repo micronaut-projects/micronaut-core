@@ -165,7 +165,8 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
         }
 
         if (actualResponse == proceed) {
-            UriRouteMatch routeMatch = actualResponse.getAttribute(HttpAttributes.ROUTE_MATCH, UriRouteMatch.class).get();
+            UriRouteMatch<Object, Object> routeMatch = actualResponse.getAttribute(HttpAttributes.ROUTE_MATCH, UriRouteMatch.class)
+                .orElseThrow(() -> new IllegalStateException("Route match is required!"));
             //Adding new handler to the existing pipeline to handle WebSocket Messages
             WebSocketBean<?> webSocketBean = webSocketBeanRegistry.getWebSocket(routeMatch.getTarget().getClass());
 

@@ -16,6 +16,7 @@
 package io.micronaut.core.execution;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 
 import java.util.Map;
@@ -45,7 +46,7 @@ public interface ImperativeExecutionFlow<T> extends ExecutionFlow<T> {
     /**
      * @return The context if present
      */
-    @Nullable
+    @NonNull
     Map<String, Object> getContext();
 
 }

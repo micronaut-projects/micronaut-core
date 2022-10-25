@@ -42,11 +42,11 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
 
     private Mono<Object> value;
 
-    public <K> ReactorExecutionFlowImpl(Publisher<K> value) {
+    <K> ReactorExecutionFlowImpl(Publisher<K> value) {
         this(Mono.from(value));
     }
 
-    public <K> ReactorExecutionFlowImpl(Mono<K> value) {
+    <K> ReactorExecutionFlowImpl(Mono<K> value) {
         this.value = (Mono<Object>) value;
     }
 
@@ -125,12 +125,13 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
             } else {
                 m = Mono.empty();
             }
-            if (imperativeFlow.getContext() != null) {
-                m = m.contextWrite(context -> {
-                    for (Map.Entry<String, Object> e : imperativeFlow.getContext().entrySet()) {
-                        context = context.put(e.getKey(), e.getValue());
+            Map<String, Object> context = imperativeFlow.getContext();
+            if (!context.isEmpty()) {
+                m = m.contextWrite(ctx -> {
+                    for (Map.Entry<String, Object> e : context.entrySet()) {
+                        ctx = ctx.put(e.getKey(), e.getValue());
                     }
-                    return context;
+                    return ctx;
                 });
             }
             return m;

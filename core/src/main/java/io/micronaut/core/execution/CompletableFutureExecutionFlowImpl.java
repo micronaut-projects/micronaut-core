@@ -34,7 +34,7 @@ final class CompletableFutureExecutionFlowImpl implements CompletableFutureExecu
 
     private CompletableFuture<Object> stage;
 
-    public CompletableFutureExecutionFlowImpl(CompletableFuture<Object> stage) {
+    CompletableFutureExecutionFlowImpl(CompletableFuture<Object> stage) {
         this.stage = stage;
     }
 
