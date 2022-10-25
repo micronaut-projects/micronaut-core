@@ -26,7 +26,6 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
-import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.PropertyElement;
 
@@ -145,10 +144,7 @@ public final class AstBeanPropertiesUtils {
                 } else if (value.writeAccessKind == BeanProperties.AccessKind.METHOD
                     && value.setter != null
                     && value.setter.getParameters().length > 0) {
-                    ParameterElement parameter = value.setter.getParameters()[0];
-                    if (!parameter.getType().equals(value.type)) {
-                        value.type = parameter.getGenericType();
-                    }
+                    value.type = value.setter.getParameters()[0].getGenericType();
                 }
 
                 if (value.readAccessKind != null || value.writeAccessKind != null) {
@@ -327,14 +323,11 @@ public final class AstBeanPropertiesUtils {
     }
 
     private static boolean isAccessible(MemberElement memberElement, BeanProperties.Visibility visibility) {
-        switch (visibility) {
-            case DEFAULT:
-                return !memberElement.isPrivate() && (memberElement.isAccessible() || memberElement.getDeclaringType().hasDeclaredStereotype(BeanProperties.class));
-            case PUBLIC:
-                return memberElement.isPublic();
-            default:
-                return false;
-        }
+        return switch (visibility) {
+            case DEFAULT ->
+                !memberElement.isPrivate() && (memberElement.isAccessible() || memberElement.getDeclaringType().hasDeclaredStereotype(BeanProperties.class));
+            case PUBLIC -> memberElement.isPublic();
+        };
     }
 
     private static boolean shouldExclude(Set<String> includes, Set<String> excludes, String propertyName) {

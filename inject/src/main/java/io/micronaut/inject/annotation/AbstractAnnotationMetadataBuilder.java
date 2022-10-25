@@ -215,7 +215,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @return The {@link AnnotationMetadata}
      */
     public CachedAnnotationMetadata lookupOrBuildForParameter(T owningType, T methodElement, T parameterElement) {
-        return lookupOrBuild(true, owningType, methodElement, parameterElement);
+        return lookupOrBuild(false, owningType, methodElement, parameterElement);
     }
 
     /**
