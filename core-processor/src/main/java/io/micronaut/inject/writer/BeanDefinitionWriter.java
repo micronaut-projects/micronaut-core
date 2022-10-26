@@ -1265,7 +1265,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                     ReflectionUtils.getRequiredMethod(Arrays.class, "asList", Object[].class)
             ));
             writer.invokeConstructor(Type.getType(HashSet.class), org.objectweb.asm.commons.Method.getMethod(
-                    ReflectionUtils.findConstructor(HashSet.class, Collection.class).get()
+                    ReflectionUtils.getRequiredInternalConstructor(HashSet.class, Collection.class)
             ));
         } else {
             pushClass(writer, classes[0]);
@@ -2114,7 +2114,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     private Label pushPropertyContainsCheck(GeneratorAdapter injectMethodVisitor, ClassElement propertyType, String propertyName, AnnotationMetadata annotationMetadata) {
-        Optional<String> propertyValue = annotationMetadata.stringValue(Property.class, "name");
+        String propertyValue = annotationMetadata.stringValue(Property.class, "name").orElse(propertyName);
 
         Label trueCondition = new Label();
         Label falseCondition = new Label();
@@ -2124,7 +2124,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         // 2nd argument load BeanContext
         injectMethodVisitor.loadArg(1);
         // 3rd argument push property name
-        injectMethodVisitor.push(propertyValue.get());
+        injectMethodVisitor.push(propertyValue);
         if (isMultiValueProperty(propertyType)) {
             injectMethodVisitor.invokeVirtual(beanDefinitionType, CONTAINS_PROPERTIES_VALUE_METHOD);
         } else {
@@ -3777,18 +3777,18 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     private void resolveInnerTypeArgumentIfNeeded(GeneratorAdapter visitor, ClassElement type) {
-        if (isInternalGenericTypeContainer(type.getFirstTypeArgument().get())) {
+        if (isInternalGenericTypeContainer(type.getFirstTypeArgument().orElse(null))) {
             resolveFirstTypeArgument(visitor);
         }
     }
 
-    private boolean isInternalGenericTypeContainer(ClassElement type) {
-        return type.isAssignable(BeanRegistration.class);
+    private boolean isInternalGenericTypeContainer(@Nullable ClassElement type) {
+        return type != null && type.isAssignable(BeanRegistration.class);
     }
 
     private void resolveFirstTypeArgument(GeneratorAdapter visitor) {
         visitor.invokeInterface(Type.getType(TypeVariableResolver.class),
-                org.objectweb.asm.commons.Method.getMethod(ReflectionUtils.findMethod(TypeVariableResolver.class, "getTypeParameters").get()));
+                org.objectweb.asm.commons.Method.getMethod(ReflectionUtils.getRequiredInternalMethod(TypeVariableResolver.class, "getTypeParameters")));
         visitor.push(0);
         visitor.arrayLoad(Type.getType(Argument.class));
     }

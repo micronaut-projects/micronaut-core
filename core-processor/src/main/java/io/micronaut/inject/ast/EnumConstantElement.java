@@ -15,7 +15,6 @@
  */
 package io.micronaut.inject.ast;
 
-import java.util.HashSet;
 import java.util.Set;
 
 /**
@@ -25,9 +24,9 @@ import java.util.Set;
  */
 public interface EnumConstantElement extends FieldElement {
 
-    Set<ElementModifier> ENUM_CONSTANT_MODIFIERS = new HashSet<>() {{
-        add(ElementModifier.PUBLIC);
-        add(ElementModifier.STATIC);
-        add(ElementModifier.FINAL);
-    }};
+    Set<ElementModifier> ENUM_CONSTANT_MODIFIERS = Set.of(
+        ElementModifier.PUBLIC,
+        ElementModifier.STATIC,
+        ElementModifier.FINAL
+    );
 }
