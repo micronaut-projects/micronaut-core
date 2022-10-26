@@ -40,6 +40,11 @@ public final class LogbackLoggingSystem implements LoggingSystem {
         getLoggerContext().getLogger(name).setLevel(toLevel(level));
     }
 
+    @Override
+    public void refresh() {
+        getLoggerContext().reset();
+    }
+
     /**
      * @return The logback {@link LoggerContext}
      */
