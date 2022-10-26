@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2022 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,24 +13,40 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.inject;
+package io.micronaut.core.execution;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
+
+import java.util.Map;
 
 /**
- * Represents an execution handle that invokes a method.
+ * The imperative execution flow.
  *
- * @param <T> The target type
- * @param <R> The result type
- * @author Graeme Rocher
- * @since 1.0
+ * @param <T> The value type
+ * @author Denis Stepnov
+ * @since 4.0.0
  */
-public interface MethodExecutionHandle<T, R> extends ExecutionHandle<T, R>, MethodReference<T, R> {
+@Internal
+public interface ImperativeExecutionFlow<T> extends ExecutionFlow<T> {
+
     /**
-     * The underlying {@link ExecutableMethod} reference.
-     *
-     * @return The underlying method reference.
+     * @return The value if present
+     */
+    @Nullable
+    T getValue();
+
+    /**
+     * @return The exception if present
+     */
+    @Nullable
+    Throwable getError();
+
+    /**
+     * @return The context if present
      */
     @NonNull
-    ExecutableMethod<?, R> getExecutableMethod();
+    Map<String, Object> getContext();
+
 }

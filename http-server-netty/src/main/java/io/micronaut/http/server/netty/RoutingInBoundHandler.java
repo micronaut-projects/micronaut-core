@@ -23,12 +23,12 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.Writable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
-import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
@@ -52,8 +52,6 @@ import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.RouteExecutor;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.http.server.exceptions.InternalServerException;
-import io.micronaut.http.server.exceptions.response.ErrorContext;
-import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.multipart.NettyCompletedFileUpload;
 import io.micronaut.http.server.netty.multipart.NettyPartData;
@@ -63,13 +61,11 @@ import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandler
 import io.micronaut.http.server.netty.types.files.NettyStreamedFileCustomizableResponseType;
 import io.micronaut.http.server.netty.types.files.NettySystemFileCustomizableResponseType;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
+import io.micronaut.reactive.reactor.execution.ReactiveExecutionFlow;
 import io.micronaut.runtime.http.codec.TextPlainCodec;
-import io.micronaut.web.router.MethodBasedRouteMatch;
 import io.micronaut.web.router.RouteInfo;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.Router;
-import io.micronaut.web.router.UriRouteMatch;
-import io.micronaut.web.router.exceptions.DuplicateRouteException;
 import io.micronaut.web.router.resource.StaticResourceResolver;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;
@@ -120,10 +116,8 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -133,9 +127,6 @@ import java.util.function.BiConsumer;
 import java.util.function.LongConsumer;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
-
-import static io.micronaut.http.HttpAttributes.AVAILABLE_HTTP_METHODS;
 
 /**
  * Internal implementation of the {@link io.netty.channel.ChannelInboundHandler} for Micronaut.
@@ -146,20 +137,19 @@ import static io.micronaut.http.HttpAttributes.AVAILABLE_HTTP_METHODS;
 @Internal
 @Sharable
 @SuppressWarnings("FileLength")
-class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.http.HttpRequest<?>> {
+class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.http.HttpRequest<?>> implements RouteExecutor.StaticResourceResponseFinder {
 
     private static final Logger LOG = LoggerFactory.getLogger(RoutingInBoundHandler.class);
     /*
      * Also present in {@link RouteExecutor}.
      */
     private static final Pattern IGNORABLE_ERROR_MESSAGE = Pattern.compile(
-            "^.*(?:connection (?:reset|closed|abort|broken)|broken pipe).*$", Pattern.CASE_INSENSITIVE);
+        "^.*(?:connection (?:reset|closed|abort|broken)|broken pipe).*$", Pattern.CASE_INSENSITIVE);
     private static final Argument ARGUMENT_PART_DATA = Argument.of(PartData.class);
     private final Router router;
     private final StaticResourceResolver staticResourceResolver;
     private final NettyHttpServerConfiguration serverConfiguration;
     private final HttpContentProcessorResolver httpContentProcessorResolver;
-    private final ErrorResponseProcessor<?> errorResponseProcessor;
     private final RequestArgumentSatisfier requestArgumentSatisfier;
     private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
     private final NettyCustomizableResponseTypeHandlerRegistry customizableResponseTypeHandlerRegistry;
@@ -178,12 +168,12 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
      * @param terminateEventPublisher                 The terminate event publisher
      */
     RoutingInBoundHandler(
-            NettyHttpServerConfiguration serverConfiguration,
-            NettyCustomizableResponseTypeHandlerRegistry customizableResponseTypeHandlerRegistry,
-            NettyEmbeddedServices embeddedServerContext,
-            Supplier<ExecutorService> ioExecutor,
-            HttpContentProcessorResolver httpContentProcessorResolver,
-            ApplicationEventPublisher<HttpRequestTerminatedEvent> terminateEventPublisher) {
+        NettyHttpServerConfiguration serverConfiguration,
+        NettyCustomizableResponseTypeHandlerRegistry customizableResponseTypeHandlerRegistry,
+        NettyEmbeddedServices embeddedServerContext,
+        Supplier<ExecutorService> ioExecutor,
+        HttpContentProcessorResolver httpContentProcessorResolver,
+        ApplicationEventPublisher<HttpRequestTerminatedEvent> terminateEventPublisher) {
         this.mediaTypeCodecRegistry = embeddedServerContext.getMediaTypeCodecRegistry();
         this.customizableResponseTypeHandlerRegistry = customizableResponseTypeHandlerRegistry;
         this.staticResourceResolver = embeddedServerContext.getStaticResourceResolver();
@@ -192,7 +182,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         this.requestArgumentSatisfier = embeddedServerContext.getRequestArgumentSatisfier();
         this.serverConfiguration = serverConfiguration;
         this.httpContentProcessorResolver = httpContentProcessorResolver;
-        this.errorResponseProcessor = embeddedServerContext.getRouteExecutor().getErrorResponseProcessor();
         this.terminateEventPublisher = terminateEventPublisher;
         Optional<Boolean> multipartEnabled = serverConfiguration.getMultipart().getEnabled();
         this.multipartEnabled = !multipartEnabled.isPresent() || multipartEnabled.get();
@@ -277,362 +266,120 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             ctx.writeAndFlush(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR));
             return;
         }
-        ServerRequestContext.set(nettyHttpRequest);
-        filterAndEncodeResponse(
-                ctx,
-                nettyHttpRequest,
-                routeExecutor.onError(cause, nettyHttpRequest));
+        routeExecutor.filterPublisher(new AtomicReference<>(nettyHttpRequest), () -> routeExecutor.onError(cause, nettyHttpRequest))
+            .onComplete((response, throwable) -> writeResponse(ctx, nettyHttpRequest, response, throwable));
     }
 
     @Override
-    protected void channelRead0(ChannelHandlerContext ctx, io.micronaut.http.HttpRequest<?> request) {
+    protected void channelRead0(ChannelHandlerContext ctx, io.micronaut.http.HttpRequest<?> httpRequest) {
+        NettyHttpRequest<?> nettyHttpRequest = (NettyHttpRequest<?>) httpRequest;
+
         ctx.channel().config().setAutoRead(false);
-        io.micronaut.http.HttpMethod httpMethod = request.getMethod();
-        String requestPath = request.getUri().getPath();
-        ServerRequestContext.set(request);
 
         if (LOG.isDebugEnabled()) {
-            LOG.debug("Request {} {}", httpMethod, request.getUri());
+            HttpMethod httpMethod = httpRequest.getMethod();
+            ServerRequestContext.set(httpRequest);
+            LOG.debug("Request {} {}", httpMethod, httpRequest.getUri());
         }
 
-        NettyHttpRequest nettyHttpRequest = (NettyHttpRequest) request;
         io.netty.handler.codec.http.HttpRequest nativeRequest = nettyHttpRequest.getNativeRequest();
+
+        RouteExecutor.RequestBodyReader requestBodyReader = (routeMatch, hr) -> {
+            // handle decoding failure
+            DecoderResult decoderResult = nativeRequest.decoderResult();
+            if (decoderResult.isFailure()) {
+                return ExecutionFlow.error(decoderResult.cause());
+            }
+            // try to fulfill the argument requirements of the route
+            RouteMatch<?> route = requestArgumentSatisfier.fulfillArgumentRequirements(routeMatch, httpRequest, false);
+
+            Optional<Argument<?>> bodyArgument = route.getBodyArgument()
+                .filter(argument -> argument.getAnnotationMetadata().hasAnnotation(Body.class));
+
+            // The request body is required, so at this point we must have a StreamedHttpRequest
+            io.netty.handler.codec.http.HttpRequest nativeRequest1 = nettyHttpRequest.getNativeRequest();
+            if (!route.isExecutable() &&
+                HttpMethod.permitsRequestBody(nettyHttpRequest.getMethod()) &&
+                nativeRequest1 instanceof StreamedHttpRequest &&
+                (bodyArgument.isEmpty() || !route.isSatisfied(bodyArgument.get().getName()))) {
+                return ReactiveExecutionFlow.fromPublisher(
+                    Mono.create(emitter -> httpContentProcessorResolver.resolve(nettyHttpRequest, route)
+                        .subscribe(buildSubscriber(nettyHttpRequest, route, emitter))
+                    ));
+            }
+            ctx.read();
+            return ExecutionFlow.just(route);
+        };
+
+        ExecutionFlow<MutableHttpResponse<?>> responseFlow;
+
         // handle decoding failure
         DecoderResult decoderResult = nativeRequest.decoderResult();
         if (decoderResult.isFailure()) {
             Throwable cause = decoderResult.cause();
             HttpStatus status = cause instanceof TooLongFrameException ? HttpStatus.REQUEST_ENTITY_TOO_LARGE : HttpStatus.BAD_REQUEST;
-            handleStatusError(
-                    ctx,
-                    nettyHttpRequest,
-                    HttpResponse.status(status),
-                    status.getReason()
+            responseFlow = routeExecutor.onStatusError(
+                requestBodyReader,
+                httpRequest,
+                HttpResponse.status(status),
+                status.getReason()
             );
-            return;
+        } else {
+            responseFlow = routeExecutor.executeRoute(requestBodyReader, httpRequest, multipartEnabled, this);
         }
+        responseFlow
+            .onComplete((response, throwable) -> writeResponse(ctx, nettyHttpRequest, response, throwable));
+    }
 
-        MediaType contentType = request.getContentType().orElse(null);
-        final String requestMethodName = request.getMethodName();
-
-        if (!multipartEnabled &&
-                contentType != null &&
-                contentType.equals(MediaType.MULTIPART_FORM_DATA_TYPE)) {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Multipart uploads have been disabled via configuration. Rejected request for URI {}, method {}, and content type {}", request.getUri(),
-                        requestMethodName, contentType);
-            }
-
-            handleStatusError(
+    private void writeResponse(ChannelHandlerContext ctx,
+                               NettyHttpRequest<?> nettyHttpRequest,
+                               MutableHttpResponse<?> response,
+                               Throwable throwable) {
+        if (throwable != null) {
+            response = routeExecutor.createDefaultErrorResponse(nettyHttpRequest, throwable);
+        }
+        if (response == null) {
+            ctx.read();
+        } else {
+            try {
+                encodeHttpResponse(
                     ctx,
                     nettyHttpRequest,
-                    HttpResponse.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE),
-                    "Content Type [" + contentType + "] not allowed");
-            return;
-        }
-
-        UriRouteMatch<Object, Object> routeMatch = null;
-
-        List<UriRouteMatch<Object, Object>> uriRoutes = router.findAllClosest(request);
-
-        if (uriRoutes.size() > 1) {
-            throw new DuplicateRouteException(requestPath, uriRoutes);
-        } else if (uriRoutes.size() == 1) {
-            routeMatch = uriRoutes.get(0);
-            setRouteAttributes(request, routeMatch);
-        }
-
-        if (routeMatch == null && request.getMethod().equals(HttpMethod.OPTIONS)) {
-            List<UriRouteMatch<Object, Object>> anyUriRoutes = router.findAny(request.getUri().toString(), request)
-                    .collect(Collectors.toList());
-            if (!anyUriRoutes.isEmpty()) {
-                setRouteAttributes(request, anyUriRoutes.get(0));
-                request.setAttribute(AVAILABLE_HTTP_METHODS, anyUriRoutes.stream().map(UriRouteMatch::getHttpMethod).collect(Collectors.toList()));
-            }
-        }
-
-        RouteMatch<?> route;
-
-        if (routeMatch == null) {
-
-            //Check if there is a file for the route before returning route not found
-            Optional<? extends FileCustomizableResponseType> optionalFile = matchFile(requestPath);
-
-            if (optionalFile.isPresent()) {
-                filterAndEncodeResponse(ctx, nettyHttpRequest, Flux.just(HttpResponse.ok(optionalFile.get())));
-                return;
-            }
-
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("No matching route: {} {}", httpMethod, request.getUri());
-            }
-
-            // if there is no route present try to locate a route that matches a different HTTP method
-            final List<UriRouteMatch<?, ?>> anyMatchingRoutes = router
-                    .findAny(request.getUri().toString(), request)
-                    .collect(Collectors.toList());
-            final Collection<MediaType> acceptedTypes = request.accept();
-            final boolean hasAcceptHeader = CollectionUtils.isNotEmpty(acceptedTypes);
-
-            Set<MediaType> acceptableContentTypes = contentType != null ? new HashSet<>(5) : null;
-            Set<String> allowedMethods = new HashSet<>(5);
-            Set<MediaType> produceableContentTypes = hasAcceptHeader ? new HashSet<>(5) : null;
-            for (UriRouteMatch<?, ?> anyRoute : anyMatchingRoutes) {
-                final String routeMethod = anyRoute.getRoute().getHttpMethodName();
-                if (!requestMethodName.equals(routeMethod)) {
-                    allowedMethods.add(routeMethod);
-                }
-                if (contentType != null && !anyRoute.doesConsume(contentType)) {
-                    acceptableContentTypes.addAll(anyRoute.getRoute().getConsumes());
-                }
-                if (hasAcceptHeader && !anyRoute.doesProduce(acceptedTypes)) {
-                    produceableContentTypes.addAll(anyRoute.getRoute().getProduces());
-                }
-            }
-
-            if (CollectionUtils.isNotEmpty(acceptableContentTypes)) {
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Content type not allowed for URI {}, method {}, and content type {}", request.getUri(),
-                            requestMethodName, contentType);
-                }
-
-                handleStatusError(
-                        ctx,
-                        nettyHttpRequest,
-                        HttpResponse.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE),
-                        "Content Type [" + contentType + "] not allowed. Allowed types: " + acceptableContentTypes);
-                return;
-            }
-
-            if (CollectionUtils.isNotEmpty(produceableContentTypes)) {
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Content type not allowed for URI {}, method {}, and content type {}", request.getUri(),
-                            requestMethodName, contentType);
-                }
-
-                handleStatusError(
-                        ctx,
-                        nettyHttpRequest,
-                        HttpResponse.status(HttpStatus.NOT_ACCEPTABLE),
-                        "Specified Accept Types " + acceptedTypes + " not supported. Supported types: " + produceableContentTypes);
-                return;
-            }
-
-            if (!allowedMethods.isEmpty()) {
-
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Method not allowed for URI {} and method {}", request.getUri(), requestMethodName);
-                }
-
-                handleStatusError(
-                        ctx,
-                        nettyHttpRequest,
-                        HttpResponse.notAllowedGeneric(allowedMethods),
-                        "Method [" + requestMethodName + "] not allowed for URI [" + request.getUri() + "]. Allowed methods: " + allowedMethods);
-                return;
-            } else {
-                handleStatusError(ctx, nettyHttpRequest, HttpResponse.status(HttpStatus.NOT_FOUND), "Page Not Found");
-            }
-            return;
-
-        } else {
-            route = routeMatch;
-        }
-
-        if (LOG.isTraceEnabled()) {
-            if (route instanceof MethodBasedRouteMatch) {
-                LOG.trace("Matched route {} - {} to controller {}", requestMethodName, requestPath, route.getDeclaringType());
-            } else {
-                LOG.trace("Matched route {} - {}", requestMethodName, requestPath);
-            }
-        }
-        // all ok proceed to try and execute the route
-        if (route.isWebSocketRoute()) {
-            handleStatusError(
+                    response,
+                    null,
+                    response.body()
+                );
+            } catch (Throwable e) {
+                response = routeExecutor.createDefaultErrorResponse(nettyHttpRequest, e);
+                encodeHttpResponse(
                     ctx,
                     nettyHttpRequest,
-                    HttpResponse.status(HttpStatus.BAD_REQUEST),
-                    "Not a WebSocket request");
-        } else {
-            handleRouteMatch(route, nettyHttpRequest, ctx);
-        }
-    }
-
-    private void setRouteAttributes(HttpRequest<?> request, UriRouteMatch<Object, Object> route) {
-        request.setAttribute(HttpAttributes.ROUTE, route.getRoute());
-        request.setAttribute(HttpAttributes.ROUTE_MATCH, route);
-        request.setAttribute(HttpAttributes.ROUTE_INFO, route);
-        request.setAttribute(HttpAttributes.URI_TEMPLATE, route.getRoute().getUriMatchTemplate().toString());
-    }
-
-    private void handleStatusError(
-            ChannelHandlerContext ctx,
-            NettyHttpRequest<?> nettyHttpRequest,
-            MutableHttpResponse<?> defaultResponse,
-            String message) {
-        Optional<RouteMatch<Object>> statusRoute = router.findStatusRoute(defaultResponse.status(), nettyHttpRequest);
-        if (statusRoute.isPresent()) {
-            RouteMatch<Object> routeMatch = statusRoute.get();
-            handleRouteMatch(routeMatch, nettyHttpRequest, ctx);
-        } else {
-            if (nettyHttpRequest.getMethod() != HttpMethod.HEAD) {
-                defaultResponse = errorResponseProcessor.processResponse(ErrorContext.builder(nettyHttpRequest)
-                        .errorMessage(message)
-                        .build(), defaultResponse);
-                if (!defaultResponse.getContentType().isPresent()) {
-                    defaultResponse = defaultResponse.contentType(MediaType.APPLICATION_JSON_TYPE);
-                }
+                    response,
+                    null,
+                    response.body()
+                );
             }
-            filterAndEncodeResponse(
-                    ctx,
-                    nettyHttpRequest,
-                    Publishers.just(defaultResponse)
-            );
         }
     }
 
-    private void filterAndEncodeResponse(
-            ChannelHandlerContext channelContext,
-            NettyHttpRequest<?> request,
-            Publisher<MutableHttpResponse<?>> responsePublisher) {
-        AtomicReference<HttpRequest<?>> requestReference = new AtomicReference<>(request);
-
-        Flux.from(routeExecutor.filterPublisher(requestReference, responsePublisher))
-                .contextWrite(ctx -> ctx.put(ServerRequestContext.KEY, request))
-                .subscribe(new Subscriber<MutableHttpResponse<?>>() {
-                    Subscription subscription;
-                    AtomicBoolean empty = new AtomicBoolean();
-                    @Override
-                    public void onSubscribe(Subscription s) {
-                        this.subscription = s;
-                        s.request(1);
-                    }
-
-                    @Override
-                    public void onNext(MutableHttpResponse<?> response) {
-                        empty.set(false);
-                        encodeHttpResponse(
-                                channelContext,
-                                request,
-                                response,
-                                null,
-                                response.body()
-                        );
-                        subscription.request(1);
-                    }
-
-                    @Override
-                    public void onError(Throwable t) {
-                        empty.set(false);
-                        final MutableHttpResponse<?> response = routeExecutor.createDefaultErrorResponse(request, t);
-                        encodeHttpResponse(
-                                channelContext,
-                                request,
-                                response,
-                                null,
-                                response.body()
-                        );
-                    }
-
-                    @Override
-                    public void onComplete() {
-                        if (empty.get()) {
-                            channelContext.read();
-                        }
-                    }
-                });
-    }
-
-    private Optional<? extends FileCustomizableResponseType> matchFile(String path) {
-        Optional<URL> optionalUrl = staticResourceResolver.resolve(path);
-
+    @Override
+    public FileCustomizableResponseType find(HttpRequest<?> httpRequest) {
+        Optional<URL> optionalUrl = staticResourceResolver.resolve(httpRequest.getUri().getPath());
         if (optionalUrl.isPresent()) {
             try {
                 URL url = optionalUrl.get();
                 if (url.getProtocol().equals("file")) {
                     File file = Paths.get(url.toURI()).toFile();
                     if (file.exists() && !file.isDirectory() && file.canRead()) {
-                        return Optional.of(new NettySystemFileCustomizableResponseType(file));
+                        return new NettySystemFileCustomizableResponseType(file);
                     }
                 }
-
-                return Optional.of(new NettyStreamedFileCustomizableResponseType(url));
+                return new NettyStreamedFileCustomizableResponseType(url);
             } catch (URISyntaxException e) {
                 //no-op
             }
         }
-
-        return Optional.empty();
-    }
-
-    private void handleRouteMatch(
-            RouteMatch<?> originalRoute,
-            NettyHttpRequest<?> request,
-            ChannelHandlerContext context) {
-
-        // try to fulfill the argument requirements of the route
-        RouteMatch<?> route = requestArgumentSatisfier.fulfillArgumentRequirements(originalRoute, request, false);
-
-        Optional<Argument<?>> bodyArgument = route.getBodyArgument()
-            .filter(argument -> argument.getAnnotationMetadata().hasAnnotation(Body.class));
-
-        // The request body is required, so at this point we must have a StreamedHttpRequest
-        io.netty.handler.codec.http.HttpRequest nativeRequest = request.getNativeRequest();
-        Flux<RouteMatch<?>> routeMatchPublisher;
-        if (!route.isExecutable() &&
-                io.micronaut.http.HttpMethod.permitsRequestBody(request.getMethod()) &&
-                nativeRequest instanceof StreamedHttpRequest &&
-                (!bodyArgument.isPresent() || !route.isSatisfied(bodyArgument.get().getName()))) {
-            routeMatchPublisher = Mono.<RouteMatch<?>>create(emitter -> httpContentProcessorResolver.resolve(request, route)
-                    .subscribe(buildSubscriber(request, route, emitter))
-            ).flux();
-        } else {
-            context.read();
-            routeMatchPublisher = Flux.just(route);
-        }
-
-        final Flux<MutableHttpResponse<?>> routeResponse = routeExecutor.executeRoute(
-                request,
-                true,
-                routeMatchPublisher
-        );
-        routeResponse
-                .contextWrite(ctx -> ctx.put(ServerRequestContext.KEY, request))
-                .subscribe(new CompletionAwareSubscriber<HttpResponse<?>>() {
-            @Override
-            protected void doOnSubscribe(Subscription subscription) {
-                subscription.request(1);
-            }
-
-            @Override
-            protected void doOnNext(HttpResponse<?> message) {
-                encodeHttpResponse(
-                        context,
-                        request,
-                        toMutableResponse(message),
-                        (Argument<Object>) route.getBodyType(),
-                        message.body()
-                );
-                subscription.request(1);
-            }
-
-            @Override
-            protected void doOnError(Throwable throwable) {
-                final MutableHttpResponse<?> defaultErrorResponse = routeExecutor
-                        .createDefaultErrorResponse(request, throwable);
-                encodeHttpResponse(
-                        context,
-                        request,
-                        defaultErrorResponse,
-                        (Argument<Object>) route.getBodyType(),
-                        defaultErrorResponse.body()
-                );
-            }
-
-            @Override
-            protected void doOnComplete() {
-                // assume exactly one message has been sent (onNext)
-            }
-        });
+        return null;
     }
 
     private Subscriber<Object> buildSubscriber(NettyHttpRequest<?> request,
@@ -666,11 +413,11 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         flux = flux.doOnRequest(onRequest);
                     }
                     return flux
-                            .doAfterTerminate(() -> {
-                                if (controlsFlow) {
-                                    dataReference.destroy();
-                                }
-                            });
+                        .doAfterTerminate(() -> {
+                            if (controlsFlow) {
+                                dataReference.destroy();
+                            }
+                        });
                 }
 
                 @Override
@@ -706,8 +453,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
                     boolean executed = this.executed.get();
                     if (message instanceof ByteBufHolder) {
-                        if (message instanceof HttpData) {
-                            HttpData data = (HttpData) message;
+                        if (message instanceof HttpData data) {
 
                             if (LOG.isTraceEnabled()) {
                                 LOG.trace("Received HTTP Data for request [{}]: {}", request, message);
@@ -736,8 +482,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                     Sinks.Many<Object> namedSubject = subjectsByDataName.computeIfAbsent(name, key -> makeDownstreamUnicastProcessor());
 
                                     chunkedProcessing = PartData.class.equals(typeVariableType) ||
-                                            Publishers.isConvertibleToPublisher(typeVariableType) ||
-                                            ClassUtils.isJavaLangType(typeVariableType);
+                                        Publishers.isConvertibleToPublisher(typeVariableType) ||
+                                        ClassUtils.isJavaLangType(typeVariableType);
 
                                     if (Publishers.isConvertibleToPublisher(typeVariableType)) {
                                         boolean streamingFileUpload = StreamingFileUpload.class.isAssignableFrom(typeVariableType);
@@ -752,10 +498,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                                 Flux flowable = processFlowable(childSubject, dataReference, true);
                                                 if (streamingFileUpload && data instanceof FileUpload) {
                                                     namedSubject.tryEmitNext(new NettyStreamingFileUpload(
-                                                            (FileUpload) data,
-                                                            serverConfiguration.getMultipart(),
-                                                            getIoExecutor(),
-                                                            (Flux<PartData>) flowable));
+                                                        (FileUpload) data,
+                                                        serverConfiguration.getMultipart(),
+                                                        getIoExecutor(),
+                                                        (Flux<PartData>) flowable));
                                                 } else {
                                                     namedSubject.tryEmitNext(flowable);
                                                 }
@@ -794,14 +540,14 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                     }
 
                                     if (data instanceof FileUpload &&
-                                            StreamingFileUpload.class.isAssignableFrom(argument.getType())) {
+                                        StreamingFileUpload.class.isAssignableFrom(argument.getType())) {
                                         dataReference.upload.getAndUpdate(upload -> {
                                             if (upload == null) {
                                                 return new NettyStreamingFileUpload(
-                                                        (FileUpload) data,
-                                                        serverConfiguration.getMultipart(),
-                                                        getIoExecutor(),
-                                                        (Flux<PartData>) processFlowable(subject, dataReference, true));
+                                                    (FileUpload) data,
+                                                    serverConfiguration.getMultipart(),
+                                                    getIoExecutor(),
+                                                    (Flux<PartData>) processFlowable(subject, dataReference, true));
                                             }
                                             return upload;
                                         });
@@ -931,7 +677,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         } else {
             return new CompletionAwareSubscriber<Object>() {
                 private Subscription s;
-                private RouteMatch<?> routeMatch = finalRoute;
                 private AtomicBoolean executed = new AtomicBoolean(false);
 
                 @Override
@@ -961,7 +706,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 @Override
                 protected void doOnComplete() {
                     if (executed.compareAndSet(false, true)) {
-                        emitter.success(routeMatch);
+                        emitter.success(finalRoute);
                     }
                 }
             };
@@ -984,11 +729,11 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     }
 
     private void encodeHttpResponse(
-            ChannelHandlerContext context,
-            NettyHttpRequest<?> nettyRequest,
-            MutableHttpResponse<?> response,
-            @Nullable Argument<Object> bodyType,
-            Object body) {
+        ChannelHandlerContext context,
+        NettyHttpRequest<?> nettyRequest,
+        MutableHttpResponse<?> response,
+        @Nullable Argument<Object> bodyType,
+        Object body) {
         boolean isNotHead = nettyRequest.getMethod() != HttpMethod.HEAD;
 
         if (isNotHead) {
@@ -1002,51 +747,51 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         response.body(byteBuf);
                         if (!response.getContentType().isPresent()) {
                             response.getAttribute(HttpAttributes.ROUTE_INFO, RouteInfo.class).ifPresent((routeInfo) ->
-                                    response.contentType(routeExecutor.resolveDefaultResponseContentType(nettyRequest, routeInfo)));
+                                response.contentType(routeExecutor.resolveDefaultResponseContentType(nettyRequest, routeInfo)));
                         }
                         writeFinalNettyResponse(
-                                response,
-                                nettyRequest,
-                                context
+                            response,
+                            nettyRequest,
+                            context
                         );
                     } catch (IOException e) {
                         final MutableHttpResponse<?> errorResponse = routeExecutor.createDefaultErrorResponse(nettyRequest, e);
                         writeFinalNettyResponse(
-                                errorResponse,
-                                nettyRequest,
-                                context
+                            errorResponse,
+                            nettyRequest,
+                            context
                         );
                     }
                 });
             } else if (body instanceof Publisher) {
                 response.body(null);
                 DelegateStreamedHttpResponse streamedResponse = new DelegateStreamedHttpResponse(
-                        toNettyResponse(response),
-                        mapToHttpContent(nettyRequest, response, body, context)
+                    toNettyResponse(response),
+                    mapToHttpContent(nettyRequest, response, body, context)
                 );
                 context.writeAndFlush(streamedResponse);
                 context.read();
             } else {
                 encodeResponseBody(
-                        context,
-                        nettyRequest,
-                        response,
-                        bodyType,
-                        body
+                    context,
+                    nettyRequest,
+                    response,
+                    bodyType,
+                    body
                 );
 
                 writeFinalNettyResponse(
-                        response,
-                        nettyRequest,
-                        context
+                    response,
+                    nettyRequest,
+                    context
                 );
             }
         } else {
             response.body(null);
             writeFinalNettyResponse(
-                    response,
-                    nettyRequest,
-                    context
+                response,
+                nettyRequest,
+                context
             );
         }
     }
@@ -1062,7 +807,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             mediaType = routeExecutor.resolveDefaultResponseContentType(request, routeInfo);
         }
         boolean isJson = mediaType != null && mediaType.getExtension().equals(MediaType.EXTENSION_JSON) &&
-                isJsonFormattable(hasRouteInfo ? routeInfo.getBodyType() : null);
+            isJsonFormattable(hasRouteInfo ? routeInfo.getBodyType() : null);
         NettyByteBufferFactory byteBufferFactory = new NettyByteBufferFactory(context.alloc());
 
         Flux<Object> bodyPublisher = Flux.from(Publishers.convertPublisher(body, Publisher.class));
@@ -1087,7 +832,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             } else {
 
                 MediaTypeCodec codec = mediaTypeCodecRegistry.findCodec(finalMediaType, message.getClass()).orElse(
-                        new TextPlainCodec(serverConfiguration.getDefaultCharset()));
+                    new TextPlainCodec(serverConfiguration.getDefaultCharset()));
 
                 if (LOG.isTraceEnabled()) {
                     LOG.trace("Encoding emitted response object [{}] using codec: {}", message, codec);
@@ -1117,11 +862,11 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         }
 
         httpContentPublisher = httpContentPublisher
-                .contextWrite(reactorContext -> reactorContext.put(ServerRequestContext.KEY, request))
-                .doOnNext(httpContent ->
-                        // once an http content is written, read the next item if it is available
-                        context.read())
-                .doAfterTerminate(() -> cleanupRequest(context, request));
+            .contextWrite(reactorContext -> reactorContext.put(ServerRequestContext.KEY, request))
+            .doOnNext(httpContent ->
+                // once an http content is written, read the next item if it is available
+                context.read())
+            .doAfterTerminate(() -> cleanupRequest(context, request));
 
         return httpContentPublisher;
     }
@@ -1135,22 +880,22 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             javaType = argument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT).getType();
         }
         return !(javaType == byte[].class
-                || ByteBuffer.class.isAssignableFrom(javaType)
-                || ByteBuf.class.isAssignableFrom(javaType));
+            || ByteBuffer.class.isAssignableFrom(javaType)
+            || ByteBuf.class.isAssignableFrom(javaType));
     }
 
     private void encodeResponseBody(
-            ChannelHandlerContext context,
-            HttpRequest<?> request,
-            MutableHttpResponse<?> message,
-            @Nullable Argument<Object> bodyType,
-            Object body) {
+        ChannelHandlerContext context,
+        HttpRequest<?> request,
+        MutableHttpResponse<?> message,
+        @Nullable Argument<Object> bodyType,
+        Object body) {
         if (body == null) {
             return;
         }
 
         Optional<NettyCustomizableResponseTypeHandler> typeHandler = customizableResponseTypeHandlerRegistry
-                .findTypeHandler(body.getClass());
+            .findTypeHandler(body.getClass());
         if (typeHandler.isPresent()) {
             NettyCustomizableResponseTypeHandler th = typeHandler.get();
             setBodyContent(message, new NettyCustomizableResponseTypeHandlerInvoker(th, body));
@@ -1158,9 +903,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             MediaType mediaType = message.getContentType().orElse(null);
             if (mediaType == null) {
                 mediaType = message.getAttribute(HttpAttributes.ROUTE_INFO, RouteInfo.class)
-                        .map(routeInfo -> routeExecutor.resolveDefaultResponseContentType(request, routeInfo))
-                        // RouteExecutor will pick json by default, so we do too
-                        .orElse(MediaType.APPLICATION_JSON_TYPE);
+                    .map(routeInfo -> routeExecutor.resolveDefaultResponseContentType(request, routeInfo))
+                    // RouteExecutor will pick json by default, so we do too
+                    .orElse(MediaType.APPLICATION_JSON_TYPE);
                 message.contentType(mediaType);
             }
             if (body instanceof CharSequence) {
@@ -1201,7 +946,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         final boolean isHttp2 = httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0;
 
         boolean decodeError = request instanceof NettyHttpRequest &&
-                ((NettyHttpRequest<?>) request).getNativeRequest().decoderResult().isFailure();
+            ((NettyHttpRequest<?>) request).getNativeRequest().decoderResult().isFailure();
 
         GenericFutureListener<Future<? super Void>> requestCompletor = future -> {
             try {
@@ -1307,18 +1052,18 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     }
 
     private void syncWriteAndFlushNettyResponse(
-            ChannelHandlerContext context,
-            HttpRequest<?> request,
-            io.netty.handler.codec.http.HttpResponse nettyResponse,
-            GenericFutureListener<Future<? super Void>> requestCompletor
+        ChannelHandlerContext context,
+        HttpRequest<?> request,
+        io.netty.handler.codec.http.HttpResponse nettyResponse,
+        GenericFutureListener<Future<? super Void>> requestCompletor
     ) {
         context.writeAndFlush(nettyResponse).addListener(requestCompletor);
 
         if (LOG.isDebugEnabled()) {
             LOG.debug("Response {} - {} {}",
-                    nettyResponse.status().code(),
-                    request.getMethodName(),
-                    request.getUri());
+                nettyResponse.status().code(),
+                request.getMethodName(),
+                request.getUri());
         }
     }
 
@@ -1346,10 +1091,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         io.netty.handler.codec.http.HttpHeaders nettyHeaders = new DefaultHttpHeaders(serverConfiguration.isValidateHeaders());
         message.getHeaders().forEach((BiConsumer<String, List<String>>) nettyHeaders::set);
         return new NettyMutableHttpResponse<>(
-                HttpVersion.HTTP_1_1,
-                HttpResponseStatus.valueOf(message.code(), message.reason()),
-                body instanceof ByteBuf ? body : null,
-                ConversionService.SHARED
+            HttpVersion.HTTP_1_1,
+            HttpResponseStatus.valueOf(message.code(), message.reason()),
+            body instanceof ByteBuf ? body : null,
+            ConversionService.SHARED
         );
     }
 
@@ -1385,11 +1130,11 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     }
 
     private ByteBuf encodeBodyAsByteBuf(
-            @Nullable Argument<Object> bodyType,
-            Object body,
-            MediaTypeCodec codec,
-            ChannelHandlerContext context,
-            HttpRequest<?> request) {
+        @Nullable Argument<Object> bodyType,
+        Object body,
+        MediaTypeCodec codec,
+        ChannelHandlerContext context,
+        HttpRequest<?> request) {
         ByteBuf byteBuf;
         if (body instanceof ByteBuf) {
             byteBuf = (ByteBuf) body;
@@ -1437,6 +1182,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
     /**
      * Is the exception ignorable by Micronaut.
+     *
      * @param cause The cause
      * @return True if it can be ignored.
      */
