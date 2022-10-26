@@ -16,6 +16,7 @@ dependencies {
 
     testCompileOnly project(":inject-groovy")
     testAnnotationProcessor project(":inject-java")
+    testImplementation project(":jackson-databind")
     testImplementation project(":inject")
     testImplementation project(":runtime")
 }

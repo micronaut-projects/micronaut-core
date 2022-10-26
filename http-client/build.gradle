@@ -26,6 +26,8 @@ dependencies {
 
     implementation libs.managed.reactor
 
+    testImplementation project(":retry")
+    testImplementation project(":jackson-databind")
     testImplementation project(":http-server-netty")
     testImplementation libs.wiremock
     testImplementation libs.managed.logback
