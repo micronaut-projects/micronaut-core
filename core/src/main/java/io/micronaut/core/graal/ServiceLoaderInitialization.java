@@ -56,7 +56,6 @@ final class ServiceLoaderFeature implements Feature {
 
     @Override
     public void beforeAnalysis(BeforeAnalysisAccess access) {
-        Class<?> t = access.findClassByName("ch.qos.logback.core.ConsoleAppender");
         configureForReflection(access);
 
         StaticServiceDefinitions staticServiceDefinitions = buildStaticServiceDefinitions(access);
@@ -66,6 +65,7 @@ final class ServiceLoaderFeature implements Feature {
                 try {
                     final Class<?> c = access.findClassByName(typeName);
                     if (c != null) {
+
                         RuntimeReflection.registerForReflectiveInstantiation(c);
                         RuntimeReflection.register(c);
                     }
