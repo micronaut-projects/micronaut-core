@@ -22,7 +22,7 @@ import io.micronaut.discovery.event.ServiceReadyEvent;
 import io.micronaut.discovery.event.ServiceStoppedEvent;
 import io.micronaut.discovery.exceptions.DiscoveryException;
 import io.micronaut.health.HealthStatus;
-import io.micronaut.health.HeartbeatEvent;
+import io.micronaut.discovery.heartbeat.HeartbeatEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

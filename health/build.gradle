@@ -1,0 +1,10 @@
+plugins {
+    id "io.micronaut.build.internal.convention-library"
+}
+
+dependencies {
+    annotationProcessor project(":inject-java")
+
+    api project(':context')
+    compileOnly libs.managed.jackson.annotations
+}

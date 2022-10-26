@@ -6,7 +6,7 @@ plugins {
 dependencies {
     annotationProcessor project(":inject-java")
     annotationProcessor project(":graal")
-    api project(":inject")
+    api project(":context")
     api project(":core-reactive")
     implementation libs.managed.reactor
     compileOnly libs.kotlinx.coroutines.core

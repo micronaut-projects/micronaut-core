@@ -7,7 +7,9 @@ dependencies {
 
     implementation libs.managed.reactor
 
-    api project(":runtime")
+    api project(":http")
+    api project(":json-core")
+    api project(":discovery")
 
     compileOnly libs.kotlin.stdlib
 }

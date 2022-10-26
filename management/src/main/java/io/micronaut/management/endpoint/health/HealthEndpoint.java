@@ -197,7 +197,7 @@ public class HealthEndpoint {
     }
 
     /**
-     * Configuration related to handling of the {@link io.micronaut.health.HealthStatus}.
+     * Configuration related to handling of the {@link HealthStatus}.
      *
      * @author graemerocher
      * @since 1.0
@@ -216,14 +216,14 @@ public class HealthEndpoint {
         }
 
         /**
-         * @return How {@link io.micronaut.health.HealthStatus} map to {@link io.micronaut.http.HttpStatus} codes.
+         * @return How {@link HealthStatus} map to {@link io.micronaut.http.HttpStatus} codes.
          */
         public Map<String, HttpStatus> getHttpMapping() {
             return httpMapping;
         }
 
         /**
-         * Set how {@link io.micronaut.health.HealthStatus} map to {@link io.micronaut.http.HttpStatus} codes.
+         * Set how {@link HealthStatus} map to {@link io.micronaut.http.HttpStatus} codes.
          *
          * @param httpMapping The http mappings
          */

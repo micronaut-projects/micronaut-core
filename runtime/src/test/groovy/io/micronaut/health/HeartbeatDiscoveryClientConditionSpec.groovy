@@ -5,6 +5,8 @@ import io.micronaut.context.condition.ConditionContext
 import io.micronaut.core.convert.ArgumentConversionContext
 import io.micronaut.discovery.DefaultCompositeDiscoveryClient
 import io.micronaut.discovery.DiscoveryClient
+import io.micronaut.discovery.heartbeat.HeartbeatConfiguration
+import io.micronaut.discovery.heartbeat.HeartbeatDiscoveryClientCondition
 import io.micronaut.inject.BeanDefinition
 import spock.lang.IgnoreIf
 import spock.lang.Specification

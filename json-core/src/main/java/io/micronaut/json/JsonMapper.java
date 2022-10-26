@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.type.Argument;
 import io.micronaut.json.tree.JsonNode;
 import org.reactivestreams.Processor;
@@ -27,8 +28,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.Comparator;
 import java.util.Optional;
+import java.util.ServiceLoader;
 import java.util.function.Consumer;
+import java.util.stream.Stream;
 
 /**
  * Common abstraction for mapping json to data structures.
@@ -222,4 +226,25 @@ public interface JsonMapper {
      */
     @NonNull
     JsonStreamConfig getStreamConfig();
+
+    /**
+     * Resolves the default {@link JsonMapper}
+     * @return The default {@link JsonMapper}
+     * @throws IllegalStateException If no {@link JsonMapper} implementation exists on the classpath.
+     * @since 4.0.0
+     */
+    static @NonNull JsonMapper createDefault() {
+        return ServiceLoader.load(JsonMapperSupplier.class).stream()
+            .flatMap(p -> {
+                try {
+                    JsonMapperSupplier supplier = p.get();
+                    return Stream.ofNullable(supplier);
+                } catch (Exception e) {
+                    return Stream.empty();
+                }
+            })
+            .min(OrderUtil.COMPARATOR)
+            .orElseThrow(() -> new IllegalStateException("No JsonMapper implementation found"))
+            .get();
+    }
 }

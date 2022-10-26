@@ -21,7 +21,6 @@ import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.BeanContext;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.discovery.exceptions.NoAvailableServiceException;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
@@ -201,16 +200,8 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
      * @return Returns the fallback value or throws the original exception
      */
     protected Object resolveFallback(MethodInvocationContext<Object, Object> context, RuntimeException exception) {
-        if (exception instanceof NoAvailableServiceException) {
-            NoAvailableServiceException nase = (NoAvailableServiceException) exception;
-            if (LOG.isErrorEnabled()) {
-                LOG.debug(nase.getMessage(), nase);
-                LOG.error("Type [{}] attempting to resolve fallback for unavailable service [{}]", context.getTarget().getClass().getName(), nase.getServiceID());
-            }
-        } else {
-            if (LOG.isErrorEnabled()) {
-                LOG.error("Type [" + context.getTarget().getClass().getName() + "] executed with error: " + exception.getMessage(), exception);
-            }
+        if (LOG.isErrorEnabled()) {
+            LOG.error("Type [" + context.getTarget().getClass().getName() + "] executed with error: " + exception.getMessage(), exception);
         }
 
         Optional<? extends MethodExecutionHandle<?, Object>> fallback = findFallbackMethod(context);

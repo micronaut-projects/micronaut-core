@@ -1,0 +1,13 @@
+plugins {
+    id "io.micronaut.build.internal.convention-library"
+}
+
+dependencies {
+    annotationProcessor project(":inject-java")
+
+    api project(':context')
+    api project(':health')
+    implementation libs.managed.reactor
+    implementation project(":jackson-databind")
+//    api project(":http")
+}

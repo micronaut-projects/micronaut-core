@@ -5,12 +5,15 @@ plugins {
 dependencies {
     annotationProcessor project(":inject-java")
     annotationProcessor project(":graal")
-    api project(":http")
-    api project(':inject')
     api project(':aop')
+    api project(':discovery')
+    api project(':health')
     api project(':context')
     api project(":core-reactive")
-    api project(":jackson-databind")
+    api project(":http")
+    api project(':inject')
+    api project(':retry')
+
     api libs.managed.validation
 
     implementation libs.managed.reactor
@@ -18,12 +21,10 @@ dependencies {
     compileOnly libs.managed.graal
     compileOnly libs.managed.jcache
 
-    compileOnly libs.log4j
     compileOnly libs.javax.el
     compileOnly libs.caffeine
     compileOnly libs.kotlinx.coroutines.core
     compileOnly libs.kotlinx.coroutines.reactive
-    compileOnly libs.managed.logback
     testImplementation libs.managed.logback
     testImplementation libs.managed.snakeyaml
     testAnnotationProcessor project(":inject-java")

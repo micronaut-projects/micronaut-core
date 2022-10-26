@@ -25,9 +25,8 @@ dependencies {
     api project(":core")
     api project(":http-netty")
     api libs.managed.netty.codec.http
-
     implementation libs.managed.reactor
-
+    compileOnly project(":jackson-databind")
     compileOnly libs.kotlin.stdlib
     compileOnly libs.managed.netty.transport.native.unix.common
 

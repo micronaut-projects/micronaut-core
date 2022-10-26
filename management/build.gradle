@@ -7,7 +7,8 @@ dependencies {
     annotationProcessor project(":graal")
 
     api project(":router")
-    api project(":runtime")
+    api project(":discovery")
+    compileOnly project(":jackson-databind")
     compileOnly(libs.managed.micronaut.sql.jdbc) {
         exclude module:'micronaut-inject'
         exclude module:'micronaut-bom'

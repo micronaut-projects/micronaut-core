@@ -11,7 +11,7 @@ micronautBuild {
 
 dependencies {
     annotationProcessor project(":inject-java")
-    api project(":runtime")
+    api project(":context")
     api project(":http-client-core")
     api project(":websocket")
     api project(":http-netty")
