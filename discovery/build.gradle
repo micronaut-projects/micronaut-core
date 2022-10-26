@@ -8,6 +8,7 @@ dependencies {
     api project(':context')
     api project(':health')
     implementation libs.managed.reactor
-    implementation project(":jackson-databind")
+    compileOnly project(":jackson-databind")
+    testImplementation project(":jackson-databind")
 //    api project(":http")
 }
