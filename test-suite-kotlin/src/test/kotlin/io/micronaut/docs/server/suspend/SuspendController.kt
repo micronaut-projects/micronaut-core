@@ -178,13 +178,12 @@ class SuspendController(
         "$before,$after"
     }
 
-// TODO: HttpCoroutineTracingDispatcherFactory#create should eliminate nulls
-//    @Get("/keepTracingContextUsingCoroutineTracingDispatcherExplicitly")
-//    fun keepTracingContextUsingCoroutineTracingDispatcherExplicitly() = runBlocking {
-//        val before = currentTraceId()
-//        val after = withContext(Dispatchers.Default + coroutineTracingDispatcherFactory.create()) { currentTraceId() }
-//        "$before,$after"
-//    }
+    @Get("/keepTracingContextUsingCoroutineTracingDispatcherExplicitly")
+    fun keepTracingContextUsingCoroutineTracingDispatcherExplicitly() = runBlocking {
+        val before = currentTraceId()
+        val after = withContext(Dispatchers.Default + coroutineTracingDispatcherFactory.create()) { currentTraceId() }
+        "$before,$after"
+    }
 
     private fun currentTraceId(): String? = MDC.get("traceId")
 }
