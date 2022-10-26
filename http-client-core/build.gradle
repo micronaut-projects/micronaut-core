@@ -12,6 +12,8 @@ dependencies {
     api project(":discovery")
 
     compileOnly libs.kotlin.stdlib
+
+    testImplementation project(":jackson-databind")
 }
 
 //tasks.withType(Test).configureEach {

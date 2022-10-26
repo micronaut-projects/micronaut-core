@@ -8,4 +8,6 @@ dependencies {
     api project(':context')
     api project(':core-reactive')
     implementation libs.managed.reactor
+    testImplementation project(":jackson-databind")
+    testImplementation project(":discovery")
 }

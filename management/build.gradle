@@ -19,6 +19,7 @@ dependencies {
     testImplementation project(":http-client")
     testImplementation project(":inject-groovy")
     testImplementation project(":http-server-netty")
+    testImplementation project(":jackson-databind")
     testImplementation(libs.managed.micronaut.sql.jdbc.tomcat) {
         exclude module:'micronaut-inject'
         exclude module:'micronaut-bom'
