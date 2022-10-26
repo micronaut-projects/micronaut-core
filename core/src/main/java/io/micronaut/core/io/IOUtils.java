@@ -194,15 +194,12 @@ public class IOUtils {
                     reader.close();
                 }
             } catch (IOException e) {
-                if (IOLogging.LOG.isWarnEnabled()) {
-                    IOLogging.LOG.warn("Failed to close reader: " + e.getMessage(), e);
+                Logger logger = LoggerFactory.getLogger(Logger.class);
+                if (logger.isWarnEnabled()) {
+                    logger.warn("Failed to close reader: " + e.getMessage(), e);
                 }
             }
         }
         return answer.toString();
-    }
-
-    private static final class IOLogging {
-        private static final Logger LOG = LoggerFactory.getLogger(IOLogging.class);
     }
 }
