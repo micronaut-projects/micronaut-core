@@ -79,7 +79,7 @@ public class ConfigurationMetadataProcessor extends AbstractInjectAnnotationProc
                 }
             }
         } finally {
-            ConfigurationMetadataBuilder.INSTANCE = new ConfigurationMetadataBuilder();
+            ConfigurationMetadataBuilder.reset();
         }
 
     }

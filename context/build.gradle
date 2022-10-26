@@ -9,6 +9,7 @@ dependencies {
     api project(':aop')
     api libs.managed.validation
     compileOnly project(':core-reactive')
+    compileOnly project(':core-processor')
     testCompileOnly project(":inject-groovy")
     testAnnotationProcessor project(":inject-java")
     testImplementation project(":core-reactive")

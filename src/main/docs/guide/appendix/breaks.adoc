@@ -4,6 +4,18 @@ This section documents breaking changes between Micronaut versions
 
 === Core Changes
 
+==== Compilation Time API Split into new module
+
+In order to keep the runtime small all types and interfaces that are used at compilation time only (like the `io.micronaut.inject.ast` API) have been moved into a separate module:
+
+dependency::micronaut-core-processor[]
+
+If you are using types and interfaces from this module you should take care to split the compilation time and runtime logic of your module into separate modules.
+
+==== ASM No Longer Shaded
+
+https://asm.ow2.io/[ASM] is no longer shaded into the `io.micronaut.asm` package. If you depend on this library you should directly depend on the latest version of ASM.
+
 ==== Caffeine No Longer Shaded
 
 https://github.com/ben-manes/caffeine[Caffeine] is no longer shaded into the `io.micronaut.caffeine` package. If you depend on this library you should directly depend on the latest version of Caffeine.

@@ -3,7 +3,7 @@ plugins {
 }
 dependencies {
     annotationProcessor project(":inject-java")
-    api project(":inject")
+    api project(":core-processor")
     implementation libs.managed.jackson.databind
 
     testImplementation project(":inject")

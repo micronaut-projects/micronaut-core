@@ -22,20 +22,20 @@ import jakarta.inject.Singleton;
 @Named("blah")
 class Test implements Runnable {
     @Inject ConversionService<?> conversionService;
-    
+
     @Inject
     void setEnvironment(Environment environment) {
-        
+
     }
-    
+
     @Override public void run() {
-    
+
     }
 }
 
 @Prototype
 class Excluded {
-    
+
 }
 ''')
 
@@ -65,14 +65,14 @@ import jakarta.inject.Singleton;
 @Named("blah")
 class Test implements Runnable {
     @Inject ConversionService<?> conversionService;
-    
+
     @Inject
     void setEnvironment(Environment environment) {
-        
+
     }
-    
+
     @Override public void run() {
-    
+
     }
 }
 ''')
@@ -110,19 +110,19 @@ import jakarta.inject.Singleton;
 @Factory
 class TestFactory implements Runnable {
     @Inject ConversionService<?> conversionService;
-    
+
     @Inject
     void setEnvironment(Environment environment) {
-        
+
     }
-    
+
     @Bean
     Test test() {
         return new Test();
     }
-    
+
     @Override public void run() {
-    
+
     }
 }
 

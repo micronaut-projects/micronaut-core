@@ -27,7 +27,7 @@ import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.annotation.Status;
 import io.micronaut.http.sse.Event;
-import io.micronaut.inject.util.KotlinExecutableMethodUtils;
+import io.micronaut.inject.beans.KotlinExecutableMethodUtils;
 
 import java.util.Arrays;
 import java.util.Collections;
