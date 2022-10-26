@@ -8,7 +8,7 @@ class ConfigurationPropertiesInjectSpec extends AbstractTypeElementSpec {
     void "test @ConfigurationInject constructor with beans and other configs"() {
         given:
         when:
-        def context = ApplicationContext.run(['foo.bar.host': 'test', 'foo.bar.server-port': '123', 'xyz.name': "33"])
+        def context = ApplicationContext.run(['spec': getClass().getSimpleName(), 'foo.bar.host': 'test', 'foo.bar.server-port': '123', 'xyz.name': "33"])
         def config = context.getBean(MyConfigWithConstructorConfigurationInject)
 
         then:
@@ -29,7 +29,7 @@ class ConfigurationPropertiesInjectSpec extends AbstractTypeElementSpec {
     void "test @ConfigurationInject method with beans and other configs"() {
         given:
         when:
-        def context = ApplicationContext.run(['foo.bar.host': 'test', 'foo.bar.server-port': '123', 'xyz.name': "33"])
+        def context = ApplicationContext.run(['spec': getClass().getSimpleName(), 'foo.bar.host': 'test', 'foo.bar.server-port': '123', 'xyz.name': "33"])
         def config = context.getBean(MyConfigWithMethodConfigurationInject)
 
         then:

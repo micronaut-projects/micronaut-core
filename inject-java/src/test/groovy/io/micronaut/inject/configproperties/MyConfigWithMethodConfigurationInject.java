@@ -4,11 +4,13 @@ import io.micronaut.context.BeanProvider;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.ConfigurationInject;
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.context.annotation.Requires;
 import jakarta.inject.Provider;
 import jakarta.inject.Singleton;
 
 import java.util.Optional;
 
+@Requires(property = "spec", value = "ConfigurationPropertiesInjectSpec")
 @ConfigurationProperties("foo.bar")
 class MyConfigWithMethodConfigurationInject {
     private String host;
