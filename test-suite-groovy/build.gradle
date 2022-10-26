@@ -28,6 +28,7 @@ dependencies {
     testImplementation project(":function-web")
     testRuntimeOnly(platform(libs.boms.micronaut.aws))
     testRuntimeOnly libs.aws.java.sdk.lambda
+    testRuntimeOnly(libs.micronaut.runtime.groovy)
 
     testImplementation libs.managed.reactor
 }

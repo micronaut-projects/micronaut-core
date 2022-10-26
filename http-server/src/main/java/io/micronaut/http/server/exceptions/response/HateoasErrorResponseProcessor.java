@@ -50,6 +50,7 @@ public class HateoasErrorResponseProcessor implements ErrorResponseProcessor<Jso
      * Constructor for binary compatibility. Equivalent to
      * {@link HateoasErrorResponseProcessor#HateoasErrorResponseProcessor(JsonConfiguration)}
      *
+     * @deprecated Use {@link HateoasErrorResponseProcessor#HateoasErrorResponseProcessor(JsonConfiguration)} instead.
      * @param jacksonConfiguration the configuration to use for processing.
      * @deprecated Use {@link HateoasErrorResponseProcessor(JsonConfiguration)}
      */
@@ -61,6 +62,11 @@ public class HateoasErrorResponseProcessor implements ErrorResponseProcessor<Jso
     @Override
     @NonNull
     public MutableHttpResponse<JsonError> processResponse(@NonNull ErrorContext errorContext, @NonNull MutableHttpResponse<?> response) {
+        return getJsonErrorMutableHttpResponse(alwaysSerializeErrorsAsList, errorContext, response);
+    }
+
+    @NonNull
+    static MutableHttpResponse<JsonError> getJsonErrorMutableHttpResponse(boolean alwaysSerializeErrorsAsList, ErrorContext errorContext, MutableHttpResponse<?> response) {
         if (errorContext.getRequest().getMethod() == HttpMethod.HEAD) {
             return (MutableHttpResponse<JsonError>) response;
         }
