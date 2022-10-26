@@ -20,6 +20,7 @@ import io.micronaut.context.annotation.Requires
 import io.micronaut.http.annotation.*
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.retry.annotation.Fallback
+import io.micronaut.retry.annotation.Recoverable
 import io.micronaut.runtime.server.EmbeddedServer
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
@@ -97,6 +98,7 @@ class ReactorJavaFallbackSpec extends Specification{
 
     @Requires(property = 'spec.name', value = 'ReactorJavaFallbackSpec')
     @Client('/rxjava/fallback/books')
+    @Recoverable
     static interface BookClient extends BookApi {
     }
 
