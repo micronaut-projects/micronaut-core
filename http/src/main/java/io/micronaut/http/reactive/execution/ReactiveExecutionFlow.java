@@ -61,7 +61,7 @@ public interface ReactiveExecutionFlow<T> extends ExecutionFlow<T> {
     static <K> ReactiveExecutionFlow<K> async(@NonNull Executor executor, @NonNull Supplier<ExecutionFlow<K>> supplier) {
         Scheduler scheduler = Schedulers.fromExecutor(executor);
         return (ReactiveExecutionFlow<K>) new ReactorExecutionFlowImpl(
-            Mono.fromSupplier(supplier).flatMap(ReactorExecutionFlowImpl::toMono).publishOn(scheduler)
+            Mono.fromSupplier(supplier).flatMap(ReactorExecutionFlowImpl::toMono).subscribeOn(scheduler)
         );
     }
 
