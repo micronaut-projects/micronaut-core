@@ -15,6 +15,8 @@
  */
 package io.micronaut.inject.processing;
 
+import io.micronaut.context.BeanProvider;
+import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationInject;
 import io.micronaut.context.annotation.ConfigurationReader;
@@ -40,6 +42,7 @@ import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.configuration.PropertyMetadata;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.BeanDefinitionVisitor;
+import jakarta.inject.Provider;
 
 import java.time.Duration;
 import java.util.Arrays;
@@ -90,11 +93,11 @@ final class ConfigurationReaderBeanElementCreator extends DeclaredBeanElementCre
                 return;
             }
         }
-        processConfigurationInjectionConstructor(visitor, constructor);
+        processConfigurationInjectionPoint(visitor, constructor);
     }
 
-    private void processConfigurationInjectionConstructor(BeanDefinitionVisitor visitor,
-                                                          MethodElement constructor) {
+    private void processConfigurationInjectionPoint(BeanDefinitionVisitor visitor,
+                                                    MethodElement constructor) {
         for (ParameterElement parameter : constructor.getParameters()) {
             if (CONSTRUCTOR_PARAMETERS_INJECTION_ANN.stream().noneMatch(parameter::hasStereotype)) {
                 processConfigurationConstructorParameter(parameter);
@@ -106,7 +109,7 @@ final class ConfigurationReaderBeanElementCreator extends DeclaredBeanElementCre
     }
 
     private void processConfigurationConstructorParameter(ParameterElement parameter) {
-        if (!parameter.hasStereotype(AnnotationUtil.SCOPE)) {
+        if (isPropertyParameter(parameter)) {
             final PropertyMetadata pm = metadataBuilder.visitProperty(
                 parameter.getMethodElement().getOwningType(),
                 parameter.getMethodElement().getDeclaringType(),
@@ -116,6 +119,16 @@ final class ConfigurationReaderBeanElementCreator extends DeclaredBeanElementCre
             );
             parameter.annotate(Property.class, (builder) -> builder.member("name", pm.getPath()));
         }
+    }
+
+    private boolean isPropertyParameter(ParameterElement parameter) {
+        ClassElement parameterType = parameter.getGenericType();
+        if (parameterType.isOptional() || parameterType.isAssignable(BeanProvider.class) || parameterType.isAssignable(Provider.class)) {
+            parameterType = parameterType.getFirstTypeArgument().orElse(parameterType);
+            // Get the class with type annotations
+            parameterType = visitorContext.getClassElement(parameterType.getCanonicalName()).orElse(parameterType);
+        }
+        return !parameterType.hasStereotype(AnnotationUtil.SCOPE) && !parameterType.hasStereotype(Bean.class);
     }
 
     public static boolean isConfigurationProperties(ClassElement classElement) {
