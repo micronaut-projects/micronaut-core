@@ -64,6 +64,7 @@ final class PropertiesLoggingLevelsConfigurer implements ApplicationEventListene
     public PropertiesLoggingLevelsConfigurer(Environment environment, List<LoggingSystem> loggingSystems) {
         this.environment = environment;
         this.loggingSystems = loggingSystems;
+        initLogging();
         configureLogLevels();
     }
 
@@ -74,9 +75,12 @@ final class PropertiesLoggingLevelsConfigurer implements ApplicationEventListene
      */
     @Override
     public void onApplicationEvent(RefreshEvent event) {
-        if (event.getSource().keySet().stream().anyMatch(key -> key.startsWith(LOGGER_LEVELS_PROPERTY_PREFIX))) {
-            configureLogLevels();
-        }
+        initLogging();
+        configureLogLevels();
+    }
+
+    private void initLogging() {
+        this.loggingSystems.forEach(LoggingSystem::refresh);
     }
 
     private void configureLogLevels() {

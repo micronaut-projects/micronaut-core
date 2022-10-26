@@ -142,4 +142,25 @@ logger:
             'foo.bar3'    | Level.INFO
     }
 
+    void 'logging refresh is properly called on application start'() {
+        given:
+        ApplicationContext context = ApplicationContext.builder()
+                .build()
+
+        def loggingSystem = context.getBean(LoggingSystem.class)
+        def spy = Spy(loggingSystem)
+
+        when:
+        SystemLambda.withEnvironmentVariable("LOGGER_LEVELS_FOO_BAR3", "INFO")
+                .execute(() -> {
+                    context.start()
+                })
+
+        then:
+        1 * spy.refresh()
+
+        cleanup:
+        context.close()
+    }
+
 }
