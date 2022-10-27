@@ -5,6 +5,7 @@ plugins {
 }
 
 configurations {
+    shadowCompile
     all {
         resolutionStrategy.eachDependency { DependencyResolveDetails details ->
             String group = details.requested.group
