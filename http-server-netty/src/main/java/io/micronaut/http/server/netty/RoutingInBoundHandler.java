@@ -65,7 +65,6 @@ import io.micronaut.http.server.types.files.FileCustomizableResponseType;
 import io.micronaut.runtime.http.codec.TextPlainCodec;
 import io.micronaut.web.router.RouteInfo;
 import io.micronaut.web.router.RouteMatch;
-import io.micronaut.web.router.Router;
 import io.micronaut.web.router.resource.StaticResourceResolver;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;
@@ -1174,7 +1173,7 @@ final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.microna
      * @param cause The cause
      * @return True if it can be ignored.
      */
-    final boolean isIgnorable(Throwable cause) {
+    boolean isIgnorable(Throwable cause) {
         if (cause instanceof ClosedChannelException || cause.getCause() instanceof ClosedChannelException) {
             return true;
         }

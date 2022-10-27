@@ -38,8 +38,6 @@ import io.micronaut.core.annotation.NonNull;
 @Internal
 abstract class AbstractBeanContextConditional implements BeanContextConditional, AnnotationMetadataProvider {
 
-    static final Logger LOG = LoggerFactory.getLogger(Condition.class);
-
     @Override
     public boolean isEnabled(@NonNull BeanContext context, @Nullable BeanResolutionContext resolutionContext) {
         AnnotationMetadata annotationMetadata = getAnnotationMetadata();
@@ -48,17 +46,25 @@ abstract class AbstractBeanContextConditional implements BeanContextConditional,
                 (DefaultBeanContext) context,
                 this, resolutionContext);
         boolean enabled = condition == null || condition.matches(conditionContext);
-        if (LOG.isDebugEnabled() && !enabled) {
+        if (ConditionLog.LOG.isDebugEnabled() && !enabled) {
             if (this instanceof BeanConfiguration) {
-                LOG.debug(this + " will not be loaded due to failing conditions:");
+                ConditionLog.LOG.debug("{} will not be loaded due to failing conditions:", this);
             } else {
-                LOG.debug("Bean [" + this + "] will not be loaded due to failing conditions:");
+                ConditionLog.LOG.debug("Bean [{}] will not be loaded due to failing conditions:", this);
             }
             for (Failure failure : conditionContext.getFailures()) {
-                LOG.debug("* {}", failure.getMessage());
+                ConditionLog.LOG.debug("* {}", failure.getMessage());
             }
         }
 
         return enabled;
+    }
+
+    @SuppressWarnings("java:S3416")
+    static final class ConditionLog {
+        private ConditionLog() {
+        }
+
+        static final Logger LOG = LoggerFactory.getLogger(Condition.class);
     }
 }

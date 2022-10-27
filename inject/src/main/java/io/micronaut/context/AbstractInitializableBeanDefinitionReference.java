@@ -21,8 +21,6 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.Collections;
 import java.util.Set;
@@ -37,7 +35,6 @@ import java.util.Set;
 @Internal
 public abstract class AbstractInitializableBeanDefinitionReference<T> extends AbstractBeanContextConditional implements BeanDefinitionReference<T> {
 
-    private static final Logger LOG = LoggerFactory.getLogger(AbstractInitializableBeanDefinitionReference.class);
     private final String beanTypeName;
     private final String beanDefinitionTypeName;
     private final AnnotationMetadata annotationMetadata;
@@ -158,8 +155,8 @@ public abstract class AbstractInitializableBeanDefinitionReference<T> extends Ab
                 present = true;
             } catch (Throwable e) {
                 if (e instanceof TypeNotPresentException || e instanceof ClassNotFoundException || e instanceof NoClassDefFoundError) {
-                    if (LOG.isTraceEnabled()) {
-                        LOG.trace("Bean definition for type [" + beanTypeName + "] not loaded since it is not on the classpath", e);
+                    if (ConditionLog.LOG.isTraceEnabled()) {
+                        ConditionLog.LOG.trace("Bean definition for type [" + beanTypeName + "] not loaded since it is not on the classpath", e);
                     }
                 } else {
                     throw new BeanContextException("Unexpected error loading bean definition [" + beanDefinitionTypeName + "]: " + e.getMessage(), e);

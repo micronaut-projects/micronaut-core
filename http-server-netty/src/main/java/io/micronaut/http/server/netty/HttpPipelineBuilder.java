@@ -483,9 +483,10 @@ final class HttpPipelineBuilder {
                 pipeline.addLast("request-certificate-handler", requestCertificateHandler);
             }
             pipeline.addLast(HttpResponseEncoder.ID, responseEncoder);
-            pipeline.addLast(NettyServerWebSocketUpgradeHandler.ID, new NettyServerWebSocketUpgradeHandler(
-                    embeddedServices,
-                    server.getWebSocketSessionRepository()));
+            embeddedServices.getWebSocketUpgradeHandler(server).ifPresent(websocketHandler ->
+                pipeline.addLast(ChannelPipelineCustomizer.HANDLER_WEBSOCKET_UPGRADE, websocketHandler)
+            );
+
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_INBOUND, routingInBoundHandler);
         }
 

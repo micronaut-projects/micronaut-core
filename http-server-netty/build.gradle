@@ -27,6 +27,7 @@ dependencies {
     api libs.managed.netty.codec.http
     implementation libs.managed.reactor
     compileOnly project(":jackson-databind")
+    compileOnly project(":websocket")
     compileOnly libs.kotlin.stdlib
     compileOnly libs.managed.netty.transport.native.unix.common
 
@@ -73,6 +74,7 @@ dependencies {
 
     // Adding these for now since micronaut-test isnt resolving correctly ... probably need to upgrade gradle there too
     testImplementation libs.junit.jupiter.api
+    testImplementation project(":websocket")
 }
 
 //tasks.withType(Test).configureEach {

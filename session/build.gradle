@@ -9,7 +9,7 @@ dependencies {
 
     compileOnly project(":http-server")
     compileOnly project(":http-server-netty")
-
+    compileOnly project(":websocket")
     implementation libs.managed.reactor
     implementation libs.caffeine
 
@@ -21,8 +21,8 @@ dependencies {
     testImplementation project(":http-server-netty")
     testImplementation project(":http-client")
     testImplementation project(":jackson-databind")
+    testImplementation project(":websocket")
     testImplementation libs.managed.netty.codec.http
-
 }
 
 

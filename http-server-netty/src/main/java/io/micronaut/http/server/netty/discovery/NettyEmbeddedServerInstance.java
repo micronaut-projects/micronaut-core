@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.netty;
+package io.micronaut.http.server.netty.discovery;
 
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.annotation.Parameter;
@@ -27,6 +27,7 @@ import io.micronaut.discovery.EmbeddedServerInstance;
 import io.micronaut.discovery.cloud.ComputeInstanceMetadata;
 import io.micronaut.discovery.cloud.ComputeInstanceMetadataResolver;
 import io.micronaut.discovery.metadata.ServiceInstanceMetadataContributor;
+import io.micronaut.http.server.netty.NettyHttpServer;
 import io.micronaut.runtime.server.EmbeddedServer;
 
 import java.net.URI;

@@ -15,34 +15,43 @@
  */
 package io.micronaut.core.graal;
 
+import com.oracle.svm.core.annotate.AutomaticFeature;
+import com.oracle.svm.core.annotate.Substitute;
+import com.oracle.svm.core.annotate.TargetClass;
+import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.beans.BeanInfo;
+import io.micronaut.core.io.IOUtils;
+import io.micronaut.core.io.service.SoftServiceLoader;
+import io.micronaut.core.reflect.exception.InstantiationException;
+import io.micronaut.core.util.ArrayUtils;
+import org.graalvm.nativeimage.ImageSingletons;
+import org.graalvm.nativeimage.hosted.Feature;
+import org.graalvm.nativeimage.hosted.RuntimeClassInitialization;
+import org.graalvm.nativeimage.hosted.RuntimeReflection;
+
 import java.io.IOException;
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.nio.file.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
-import com.oracle.svm.core.annotate.AutomaticFeature;
-import com.oracle.svm.core.annotate.Substitute;
-import com.oracle.svm.core.annotate.TargetClass;
-import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.io.IOUtils;
-import io.micronaut.core.io.service.SoftServiceLoader;
-import org.graalvm.nativeimage.ImageSingletons;
-import org.graalvm.nativeimage.hosted.Feature;
-import org.graalvm.nativeimage.hosted.RuntimeClassInitialization;
-import org.graalvm.nativeimage.hosted.RuntimeReflection;
 
 /**
  * Integrates {@link io.micronaut.core.io.service.SoftServiceLoader} with GraalVM Native Image.
@@ -55,22 +64,55 @@ import org.graalvm.nativeimage.hosted.RuntimeReflection;
 final class ServiceLoaderFeature implements Feature {
 
     @Override
+    @SuppressWarnings("java:S1119")
     public void beforeAnalysis(BeforeAnalysisAccess access) {
         configureForReflection(access);
 
         StaticServiceDefinitions staticServiceDefinitions = buildStaticServiceDefinitions(access);
         final Collection<Set<String>> allTypeNames = staticServiceDefinitions.serviceTypeMap.values();
         for (Set<String> typeNameSet : allTypeNames) {
-            for (String typeName : typeNameSet) {
+            Iterator<String> i = typeNameSet.iterator();
+            serviceLoop: while (i.hasNext()) {
+                String typeName = i.next();
                 try {
                     final Class<?> c = access.findClassByName(typeName);
                     if (c != null) {
+                        if (GraalReflectionConfigurer.class.isAssignableFrom(c)) {
+                            continue;
+                        } else if (BeanInfo.class.isAssignableFrom(c)) {
 
+                            BeanInfo<?> beanInfo;
+                            try {
+                                beanInfo = (BeanInfo<?>) c.getDeclaredConstructor().newInstance();
+                            } catch (Exception e) {
+                                continue;
+                            }
+                            Class<?> beanType = beanInfo.getBeanType();
+                            List<AnnotationValue<Annotation>> values = beanInfo.getAnnotationMetadata().getAnnotationValuesByName("io.micronaut.context.annotation.Requires");
+                            if (!values.isEmpty()) {
+                                for (AnnotationValue<Annotation> value : values) {
+                                    String[] classNames = new String[0];
+                                    if (value.contains("classes")) {
+                                        classNames = value.stringValues("classes");
+                                    }
+                                    if (value.contains("beans")) {
+                                        ArrayUtils.concat(classNames, value.stringValues("beans"));
+                                    }
+                                    for (String className : classNames) {
+                                        if (access.findClassByName(className) == null) {
+                                            i.remove();
+                                            continue serviceLoop;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        RuntimeClassInitialization.initializeAtBuildTime(c);
                         RuntimeReflection.registerForReflectiveInstantiation(c);
                         RuntimeReflection.register(c);
                     }
-                } catch (NoClassDefFoundError e) {
-                    // missing dependencies ignore and let it fail at runtime
+                } catch (NoClassDefFoundError | InstantiationException e) {
+                    i.remove();
                 }
             }
         }

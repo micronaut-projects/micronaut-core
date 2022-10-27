@@ -88,13 +88,12 @@ import java.util.stream.Stream;
  * <p>For technical reasons the class has to be marked as public, but is regarded as internal and should be used by
  * compiler tools and plugins (such as AST transformation frameworks)</p>
  *
- * <p>The {@link io.micronaut.inject.writer.BeanDefinitionWriter} class can be used to produce bean definitions at
+ * <p>The {@code io.micronaut.inject.writer.BeanDefinitionWriter} class can be used to produce bean definitions at
  * compile or runtime</p>
  *
  * @param <T> The Bean definition type
  * @author Graeme Rocher
  * @author Denis Stepanov
- * @see io.micronaut.inject.writer.BeanDefinitionWriter
  * @since 3.0
  */
 @Internal
@@ -2069,8 +2068,8 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
                 }
             }
         } catch (DisabledBeanException e) {
-            if (AbstractBeanContextConditional.LOG.isDebugEnabled()) {
-                AbstractBeanContextConditional.LOG.debug("Bean of type [{}] disabled for reason: {}", argument.getTypeName(), e.getMessage());
+            if (ConditionLog.LOG.isDebugEnabled()) {
+                ConditionLog.LOG.debug("Bean of type [{}] disabled for reason: {}", argument.getTypeName(), e.getMessage());
             }
             if (isIterable() && getAnnotationMetadata().hasDeclaredAnnotation(EachBean.class)) {
                 throw new DisabledBeanException("Bean [" + getBeanType().getSimpleName() + "] disabled by parent: " + e.getMessage());

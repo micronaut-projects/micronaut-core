@@ -188,7 +188,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 
 import static io.micronaut.scheduling.instrument.InvocationInstrumenter.NOOP;
 
@@ -315,7 +314,7 @@ public class DefaultHttpClient implements
      * @param clientCustomizer                The pipeline customizer
      * @param invocationInstrumenterFactories The invocation instrumeter factories to instrument netty handlers execution with
      * @param informationalServiceId          Optional service ID that will be passed to exceptions created by this client
-     * @param conversionService               The conversionService
+     * @param conversionService               The conversion service
      */
     public DefaultHttpClient(@Nullable LoadBalancer loadBalancer,
                              @Nullable HttpVersionSelection explicitHttpVersion,

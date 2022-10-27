@@ -28,7 +28,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
-import java.util.Comparator;
 import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.function.Consumer;
@@ -228,7 +227,7 @@ public interface JsonMapper {
     JsonStreamConfig getStreamConfig();
 
     /**
-     * Resolves the default {@link JsonMapper}
+     * Resolves the default {@link JsonMapper}.
      * @return The default {@link JsonMapper}
      * @throws IllegalStateException If no {@link JsonMapper} implementation exists on the classpath.
      * @since 4.0.0

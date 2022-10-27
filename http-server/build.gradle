@@ -3,10 +3,10 @@ plugins {
 }
 
 dependencies {
-    api project(":websocket")
     api project(":http")
     api project(":router")
 
+    compileOnly project(":websocket")
     compileOnly project(":jackson-databind")
     compileOnly libs.kotlinx.coroutines.core
     compileOnly libs.kotlinx.coroutines.reactor

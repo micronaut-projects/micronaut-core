@@ -1059,8 +1059,8 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                     path.pop();
                     return bean;
                 } catch (DisabledBeanException e) {
-                    if (AbstractBeanContextConditional.LOG.isDebugEnabled()) {
-                        AbstractBeanContextConditional.LOG.debug("Bean of type [{}] disabled for reason: {}", argument.getTypeName(), e.getMessage());
+                    if (ConditionLog.LOG.isDebugEnabled()) {
+                        ConditionLog.LOG.debug("Bean of type [{}] disabled for reason: {}", argument.getTypeName(), e.getMessage());
                     }
                     if (isIterable() && getAnnotationMetadata().hasDeclaredAnnotation(EachBean.class)) {
                         throw new DisabledBeanException("Bean [" + getBeanType().getSimpleName() + "] disabled by parent: " + e.getMessage());
@@ -1719,8 +1719,8 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 path.pop();
                 return bean;
             } catch (DisabledBeanException e) {
-                if (AbstractBeanContextConditional.LOG.isDebugEnabled()) {
-                    AbstractBeanContextConditional.LOG.debug("Bean of type [{}] disabled for reason: {}", argument.getTypeName(), e.getMessage());
+                if (ConditionLog.LOG.isDebugEnabled()) {
+                    ConditionLog.LOG.debug("Bean of type [{}] disabled for reason: {}", argument.getTypeName(), e.getMessage());
                 }
                 if (isIterable() && getAnnotationMetadata().hasDeclaredAnnotation(EachBean.class)) {
                     throw new DisabledBeanException("Bean [" + getBeanType().getSimpleName() + "] disabled by parent: " + e.getMessage());
@@ -1896,8 +1896,8 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 path.pop();
                 return bean;
             } catch (DisabledBeanException e) {
-                if (AbstractBeanContextConditional.LOG.isDebugEnabled()) {
-                    AbstractBeanContextConditional.LOG.debug("Bean of type [{}] disabled for reason: {}", argumentType.getSimpleName(), e.getMessage());
+                if (ConditionLog.LOG.isDebugEnabled()) {
+                    ConditionLog.LOG.debug("Bean of type [{}] disabled for reason: {}", argumentType.getSimpleName(), e.getMessage());
                 }
                 if (isIterable() && getAnnotationMetadata().hasDeclaredAnnotation(EachBean.class)) {
                     throw new DisabledBeanException("Bean [" + getBeanType().getSimpleName() + "] disabled by parent: " + e.getMessage());

@@ -33,7 +33,7 @@ import java.util.stream.Stream;
  */
 @AutomaticFeature
 @Internal
-public final class LogbackFeature implements Feature {
+public final class LoggingFeature implements Feature {
 
     @Override
     public void beforeAnalysis(BeforeAnalysisAccess access) {
