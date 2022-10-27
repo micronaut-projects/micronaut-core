@@ -15,7 +15,6 @@
  */
 package io.micronaut.core.graal;
 
-import com.oracle.svm.core.annotate.AutomaticFeature;
 import io.micronaut.core.annotation.Internal;
 import org.graalvm.nativeimage.hosted.Feature;
 import org.graalvm.nativeimage.hosted.RuntimeReflection;
@@ -31,7 +30,6 @@ import java.util.stream.Stream;
  * @since 4.0.0
  * @author graemerocher
  */
-@AutomaticFeature
 @Internal
 public final class LoggingFeature implements Feature {
 

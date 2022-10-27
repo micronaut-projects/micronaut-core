@@ -15,7 +15,6 @@
  */
 package io.micronaut.core.graal;
 
-import com.oracle.svm.core.annotate.AutomaticFeature;
 import com.oracle.svm.core.annotate.Substitute;
 import com.oracle.svm.core.annotate.TargetClass;
 import io.micronaut.core.annotation.AnnotationValue;
@@ -60,7 +59,6 @@ import java.util.Set;
  * @since 3.5.0
  */
 @SuppressWarnings("unused")
-@AutomaticFeature
 final class ServiceLoaderFeature implements Feature {
 
     @Override

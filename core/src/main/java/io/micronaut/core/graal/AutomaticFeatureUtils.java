@@ -31,7 +31,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Utility methods for implementing Graal's {@link com.oracle.svm.core.annotate.AutomaticFeature}.
+ * Utility methods for implementing GraalVM
  *
  * @author Álvaro Sánchez-Mariscal
  * @author graemerocher
