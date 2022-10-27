@@ -5,7 +5,6 @@ plugins {
 }
 
 configurations {
-    shadowCompile
     all {
         resolutionStrategy.eachDependency { DependencyResolveDetails details ->
             String group = details.requested.group
@@ -18,7 +17,6 @@ configurations {
 
 tasks.named("shadowJar") {
     configurations = [project.configurations.shadowCompile]
-    relocate "org.objectweb.asm", "io.micronaut.asm"
 }
 
 micronautBuild {
