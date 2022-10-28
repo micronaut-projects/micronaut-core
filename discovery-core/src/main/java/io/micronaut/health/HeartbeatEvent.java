@@ -13,11 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.discovery.heartbeat;
+package io.micronaut.health;
 
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.event.AbstractServiceInstanceEvent;
-import io.micronaut.health.HealthStatus;
 
 /**
  * A heartbeat event is an event fired periodically and configured by {@link HeartbeatConfiguration}.

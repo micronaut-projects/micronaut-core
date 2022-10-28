@@ -6,7 +6,6 @@ dependencies {
     annotationProcessor project(":inject-java")
 
     api project(':context')
-    api project(':health')
     implementation libs.managed.reactor
     compileOnly project(":jackson-databind")
     testImplementation project(":jackson-databind")

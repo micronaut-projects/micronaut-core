@@ -13,13 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.discovery.heartbeat;
+package io.micronaut.health;
 
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.event.ServiceReadyEvent;
-import io.micronaut.health.CurrentHealthStatus;
 import io.micronaut.scheduling.annotation.Scheduled;
 import jakarta.inject.Singleton;
 

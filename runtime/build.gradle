@@ -7,7 +7,6 @@ dependencies {
     annotationProcessor project(":graal")
     api project(':aop')
     api project(':discovery-core')
-    api project(':health')
     api project(':context')
     api project(":core-reactive")
     api project(":http")

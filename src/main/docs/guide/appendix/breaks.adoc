@@ -10,7 +10,6 @@ The `micronaut-runtime` module has been split into separate modules depending on
 
 * `micronaut-retry` - The retry implementation including annotations such as ann:retry.annotation.Retryable[] is now a separate module that can be optionally included in a Micronaut application.
 * `micronaut-discovery-core` - The base service discovery features are now a separate module. If you application listens for events such as api:discovery.event.ServiceReadyEvent[] or api:discovery.heartbeat.HeartBeatEvent[] this module should be added to the application classpath.
-* `micronaut-health` - The base API for health checks is now a separate module. If you depend on types such as api:health.HealthStatus[] this module should be added to the application classpath.
 
 In addition, since `micronaut-retry` is now optional declarative clients annotated with ann:http.client.annotation.Client[] no longer invoke fallbacks by default. To restore the previous behaviour add `micronaut-retry` to your classpath and annotate any declarative clients with ann:retry.annotation.Recoverable[].
 
