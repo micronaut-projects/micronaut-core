@@ -17,7 +17,7 @@ package io.micronaut.context.converters;
 
 import io.micronaut.context.BeanContext;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.reflect.ClassUtils;
 import jakarta.inject.Singleton;
@@ -49,7 +49,7 @@ public class ContextConverterRegistrar implements TypeConverterRegistrar {
     }
 
     @Override
-    public void register(ConversionService<?> conversionService) {
+    public void register(MutableConversionService conversionService) {
         conversionService.addConverter(String[].class, Class[].class, (object, targetType, context) -> {
             Class[] classes = Arrays
                     .stream(object)

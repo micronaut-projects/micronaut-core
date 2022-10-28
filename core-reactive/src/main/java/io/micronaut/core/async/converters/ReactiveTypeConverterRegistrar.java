@@ -13,14 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.runtime.converters.reactive;
+package io.micronaut.core.async.converters;
 
-import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.Publishers;
-import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import org.reactivestreams.Publisher;
-import jakarta.inject.Singleton;
 
 /**
  * Registers converters for Reactive types such as {@link Publisher}.
@@ -28,12 +27,11 @@ import jakarta.inject.Singleton;
  * @author Sergio del Amo
  * @since 3.0.0
  */
-@Singleton
-@Requires(classes = Publishers.class)
+@Internal
 public class ReactiveTypeConverterRegistrar implements TypeConverterRegistrar {
 
     @Override
-    public void register(ConversionService<?> conversionService) {
+    public void register(MutableConversionService conversionService) {
         conversionService.addConverter(Object.class, Publisher.class, obj -> {
             if (obj instanceof Publisher) {
                 return (Publisher) obj;

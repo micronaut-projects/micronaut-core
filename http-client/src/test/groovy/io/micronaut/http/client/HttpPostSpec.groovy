@@ -19,6 +19,7 @@ import groovy.transform.EqualsAndHashCode
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Introspected
+import io.micronaut.core.convert.ConversionService
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -50,6 +51,9 @@ class HttpPostSpec extends Specification {
 
     @Inject
     PostClient postClient
+
+    @Inject
+    ConversionService conversionService
 
     void "test send invalid http method"() {
         given:
@@ -382,6 +386,12 @@ class HttpPostSpec extends Specification {
     void "test http post getBody should return right type"() {
         when:
         def request = HttpRequest.POST('/', JsonObject.createObjectNode([:]))
+
+        then:
+        request.getBody(String).get() != '{}'
+
+        when:
+        request.setConversionService(conversionService)
 
         then:
         request.getBody(String).get() == '{}'

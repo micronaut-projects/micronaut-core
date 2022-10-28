@@ -17,6 +17,7 @@ package io.micronaut.http.simple.cookies;
 
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.ConversionServiceAware;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
 
@@ -29,9 +30,9 @@ import java.util.*;
  * @author Vladimir Orany
  * @since 1.0
  */
-public class SimpleCookies implements Cookies {
+public class SimpleCookies implements Cookies, ConversionServiceAware {
 
-    private final ConversionService<?> conversionService;
+    private ConversionService conversionService;
     private final Map<CharSequence, Cookie> cookies;
 
     /**
@@ -89,5 +90,10 @@ public class SimpleCookies implements Cookies {
      */
     public void putAll(Map<CharSequence, Cookie> cookies) {
         this.cookies.putAll(cookies);
+    }
+
+    @Override
+    public void setConversionService(ConversionService conversionService) {
+        this.conversionService = conversionService;
     }
 }

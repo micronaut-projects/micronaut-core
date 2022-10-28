@@ -15,11 +15,10 @@
  */
 package io.micronaut.context;
 
-import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.io.scan.ClassPathResourceLoader;
-
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.convert.MutableConversionService;
+import io.micronaut.core.io.scan.ClassPathResourceLoader;
 
 import java.util.Collections;
 import java.util.List;
@@ -85,12 +84,12 @@ public interface ApplicationContextConfiguration extends BeanContextConfiguratio
     }
 
     /**
-     * The default conversion service to use.
+     * The optional conversion service to use.
      *
      * @return The conversion service
      */
-    default @NonNull ConversionService<?> getConversionService() {
-        return ConversionService.SHARED;
+    default Optional<MutableConversionService> getConversionService() {
+        return Optional.empty();
     }
 
     /**

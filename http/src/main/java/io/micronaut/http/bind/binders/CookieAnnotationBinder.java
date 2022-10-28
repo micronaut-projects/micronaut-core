@@ -38,7 +38,7 @@ public class CookieAnnotationBinder<T> extends AbstractAnnotatedArgumentBinder<C
     /**
      * @param conversionService The conversion service
      */
-    public CookieAnnotationBinder(ConversionService<?> conversionService) {
+    public CookieAnnotationBinder(ConversionService conversionService) {
         super(conversionService);
     }
 

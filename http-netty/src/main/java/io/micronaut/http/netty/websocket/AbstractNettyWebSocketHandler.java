@@ -94,10 +94,11 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
     protected final WebSocketVersion webSocketVersion;
     protected final String subProtocol;
     protected final WebSocketSessionRepository webSocketSessionRepository;
+    protected final ConversionService conversionService;
     private final Argument<?> bodyArgument;
     private final Argument<?> pongArgument;
     private final AtomicBoolean closed = new AtomicBoolean(false);
-    private AtomicReference<CompositeByteBuf> frameBuffer = new AtomicReference<>();
+    private final AtomicReference<CompositeByteBuf> frameBuffer = new AtomicReference<>();
 
     /**
      * Default constructor.
@@ -111,6 +112,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
      * @param version                    The websocket version being used
      * @param subProtocol                The handler sub-protocol
      * @param webSocketSessionRepository The web socket repository if they are supported (like on the server), null otherwise
+     * @param conversionService          The conversion service
      */
     protected AbstractNettyWebSocketHandler(
             ChannelHandlerContext ctx,
@@ -121,10 +123,11 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
             Map<String, Object> uriVariables,
             WebSocketVersion version,
             String subProtocol,
-            WebSocketSessionRepository webSocketSessionRepository) {
+            WebSocketSessionRepository webSocketSessionRepository,
+            ConversionService conversionService) {
         this.subProtocol = subProtocol;
         this.webSocketSessionRepository = webSocketSessionRepository;
-        this.webSocketBinder = new WebSocketStateBinderRegistry(binderRegistry);
+        this.webSocketBinder = new WebSocketStateBinderRegistry(binderRegistry, conversionService);
         this.uriVariables = uriVariables;
         this.webSocketBean = webSocketBean;
         this.originatingRequest = request;
@@ -133,6 +136,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
         this.webSocketVersion = version;
         this.session = createWebSocketSession(ctx);
+        this.conversionService = conversionService;
 
         if (session != null) {
 
@@ -402,7 +406,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                 }
 
                 Argument<?> bodyArgument = this.getBodyArgument();
-                Optional<?> converted = ConversionService.SHARED.convert(content, bodyArgument);
+                Optional<?> converted = conversionService.convert(content, bodyArgument);
                 content.release();
 
                 if (!converted.isPresent()) {

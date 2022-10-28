@@ -39,7 +39,7 @@ public class HeaderAnnotationBinder<T> extends AbstractAnnotatedArgumentBinder<H
     /**
      * @param conversionService The conversion service
      */
-    public HeaderAnnotationBinder(ConversionService<?> conversionService) {
+    public HeaderAnnotationBinder(ConversionService conversionService) {
         super(conversionService);
     }
 

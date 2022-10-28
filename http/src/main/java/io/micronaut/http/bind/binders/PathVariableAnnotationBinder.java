@@ -44,7 +44,7 @@ public class PathVariableAnnotationBinder<T> extends AbstractAnnotatedArgumentBi
     /**
      * @param conversionService The conversion service
      */
-    public PathVariableAnnotationBinder(ConversionService<?> conversionService) {
+    public PathVariableAnnotationBinder(ConversionService conversionService) {
         super(conversionService);
     }
 
@@ -78,7 +78,7 @@ public class PathVariableAnnotationBinder<T> extends AbstractAnnotatedArgumentBi
         // attempt to bind from request parameters. This avoids allowing the request URI to
         // be manipulated to override POST or JSON variables
         if (hasAnnotation && matchInfo.isPresent()) {
-            final ConvertibleValues<Object> variableValues = ConvertibleValues.of(matchInfo.get().getVariableValues());
+            final ConvertibleValues<Object> variableValues = ConvertibleValues.of(matchInfo.get().getVariableValues(), conversionService);
             if (bindAll) {
                 Object value;
                 // Only maps and POJOs will "bindAll", lists work like normal

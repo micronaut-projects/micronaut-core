@@ -17,6 +17,7 @@ package io.micronaut.core.convert.value;
 
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.ConversionServiceAware;
 import io.micronaut.core.type.Argument;
 
 import java.util.Collection;
@@ -36,11 +37,15 @@ import java.util.stream.Collectors;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class ConvertibleMultiValuesMap<V> implements ConvertibleMultiValues<V> {
-    public static final ConvertibleMultiValues EMPTY = new ConvertibleMultiValuesMap<>(Collections.emptyMap());
+public class ConvertibleMultiValuesMap<V> implements ConvertibleMultiValues<V>, ConversionServiceAware {
+    public static final ConvertibleMultiValues EMPTY = new ConvertibleMultiValuesMap(Collections.emptyMap()) {
+        @Override
+        public void setConversionService(ConversionService conversionService) {
+        }
+    };
 
     protected final Map<CharSequence, List<V>> values;
-    private final ConversionService<?> conversionService;
+    private ConversionService conversionService;
 
     /**
      * Construct an empty {@link ConvertibleValuesMap}.
@@ -64,7 +69,7 @@ public class ConvertibleMultiValuesMap<V> implements ConvertibleMultiValues<V> {
      * @param values            The map
      * @param conversionService The conversion service
      */
-    public ConvertibleMultiValuesMap(Map<CharSequence, List<V>> values, ConversionService<?> conversionService) {
+    public ConvertibleMultiValuesMap(Map<CharSequence, List<V>> values, ConversionService conversionService) {
         this.values = wrapValues(values);
         this.conversionService = conversionService;
     }
@@ -137,4 +142,13 @@ public class ConvertibleMultiValuesMap<V> implements ConvertibleMultiValues<V> {
         return Collections.unmodifiableMap(values);
     }
 
+    @Override
+    public ConversionService getConversionService() {
+        return conversionService;
+    }
+
+    @Override
+    public void setConversionService(ConversionService conversionService) {
+        this.conversionService = conversionService;
+    }
 }

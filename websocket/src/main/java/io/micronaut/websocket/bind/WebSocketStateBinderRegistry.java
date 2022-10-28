@@ -51,12 +51,13 @@ public class WebSocketStateBinderRegistry implements ArgumentBinderRegistry<WebS
      * Default constructor.
      *
      * @param requestBinderRegistry The request binder registry
+     * @param conversionService     The conversionService
      */
-    public WebSocketStateBinderRegistry(RequestBinderRegistry requestBinderRegistry) {
+    public WebSocketStateBinderRegistry(RequestBinderRegistry requestBinderRegistry, ConversionService conversionService) {
         this.requestBinderRegistry = requestBinderRegistry;
         ArgumentBinder<Object, WebSocketState> sessionBinder = (context, source) -> () -> Optional.of(source.getSession());
         this.byType.put(WebSocketSession.class, sessionBinder);
-        this.queryValueArgumentBinder = new QueryValueArgumentBinder<>(ConversionService.SHARED);
+        this.queryValueArgumentBinder = new QueryValueArgumentBinder<>(conversionService);
     }
 
     @Override

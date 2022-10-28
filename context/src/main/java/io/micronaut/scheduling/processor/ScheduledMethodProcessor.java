@@ -66,7 +66,7 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
     private static final String MEMBER_SCHEDULER = "scheduler";
 
     private final BeanContext beanContext;
-    private final ConversionService<?> conversionService;
+    private final ConversionService conversionService;
     private final Queue<ScheduledFuture<?>> scheduledTasks = new ConcurrentLinkedDeque<>();
     private final TaskExceptionHandler<?, ?> taskExceptionHandler;
 
@@ -76,7 +76,7 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
      * @param taskExceptionHandler The default task exception handler
      */
     @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
-    public ScheduledMethodProcessor(BeanContext beanContext, Optional<ConversionService<?>> conversionService, TaskExceptionHandler<?, ?> taskExceptionHandler) {
+    public ScheduledMethodProcessor(BeanContext beanContext, Optional<ConversionService> conversionService, TaskExceptionHandler<?, ?> taskExceptionHandler) {
         this.beanContext = beanContext;
         this.conversionService = conversionService.orElse(ConversionService.SHARED);
         this.taskExceptionHandler = taskExceptionHandler;

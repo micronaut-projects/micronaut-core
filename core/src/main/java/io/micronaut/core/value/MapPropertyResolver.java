@@ -34,7 +34,7 @@ import java.util.stream.Collectors;
  */
 public class MapPropertyResolver implements PropertyResolver {
     private final Map<String, Object> map;
-    private final ConversionService<?> conversionService;
+    private final ConversionService conversionService;
 
     /**
      * @param map The map to resolves the properties from

@@ -53,7 +53,7 @@ public class RequestBeanAnnotationBinder<T> extends AbstractAnnotatedArgumentBin
      * @param requestBinderRegistry Original request binder registry
      * @param conversionService The conversion service
      */
-    public RequestBeanAnnotationBinder(RequestBinderRegistry requestBinderRegistry, ConversionService<?> conversionService) {
+    public RequestBeanAnnotationBinder(RequestBinderRegistry requestBinderRegistry, ConversionService conversionService) {
         super(conversionService);
         this.requestBinderRegistry = requestBinderRegistry;
     }

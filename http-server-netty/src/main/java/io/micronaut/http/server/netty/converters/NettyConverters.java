@@ -18,6 +18,7 @@ package io.micronaut.http.server.netty.converters;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.naming.NameUtils;
@@ -50,7 +51,7 @@ import java.util.Optional;
 @Internal
 public class NettyConverters implements TypeConverterRegistrar {
 
-    private final ConversionService<?> conversionService;
+    private final ConversionService conversionService;
     private final BeanProvider<MediaTypeCodecRegistry> decoderRegistryProvider;
     private final ChannelOptionFactory channelOptionFactory;
 
@@ -60,7 +61,7 @@ public class NettyConverters implements TypeConverterRegistrar {
      * @param decoderRegistryProvider The decoder registry provider
      * @param channelOptionFactory The decoder channel option factory
      */
-    public NettyConverters(ConversionService<?> conversionService,
+    public NettyConverters(ConversionService conversionService,
                            //Prevent early initialization of the codecs
                            BeanProvider<MediaTypeCodecRegistry> decoderRegistryProvider,
                            ChannelOptionFactory channelOptionFactory) {
@@ -70,7 +71,7 @@ public class NettyConverters implements TypeConverterRegistrar {
     }
 
     @Override
-    public void register(ConversionService<?> conversionService) {
+    public void register(MutableConversionService conversionService) {
         conversionService.addConverter(
                 CharSequence.class,
                 ChannelOption.class,

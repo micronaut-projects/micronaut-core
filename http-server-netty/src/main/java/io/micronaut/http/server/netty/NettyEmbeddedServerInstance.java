@@ -20,6 +20,7 @@ import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Prototype;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.discovery.EmbeddedServerInstance;
@@ -48,6 +49,7 @@ class NettyEmbeddedServerInstance implements EmbeddedServerInstance {
     private final Environment environment;
     private final List<ServiceInstanceMetadataContributor> metadataContributors;
     private final BeanLocator beanLocator;
+    private final ConversionService conversionService;
 
     private ConvertibleValues<String> instanceMetadata;
 
@@ -57,19 +59,21 @@ class NettyEmbeddedServerInstance implements EmbeddedServerInstance {
      * @param environment          The Environment
      * @param beanLocator          The bean locator
      * @param metadataContributors The {@link ServiceInstanceMetadataContributor}
+     * @param conversionService    The conversion service
      */
     NettyEmbeddedServerInstance(
-            @Parameter String id,
-            @Parameter NettyHttpServer nettyHttpServer,
-            Environment environment,
-            BeanLocator beanLocator,
-            List<ServiceInstanceMetadataContributor> metadataContributors) {
+        @Parameter String id,
+        @Parameter NettyHttpServer nettyHttpServer,
+        Environment environment,
+        BeanLocator beanLocator,
+        List<ServiceInstanceMetadataContributor> metadataContributors, ConversionService conversionService) {
 
         this.id = id;
         this.nettyHttpServer = nettyHttpServer;
         this.environment = environment;
         this.beanLocator = beanLocator;
         this.metadataContributors = metadataContributors;
+        this.conversionService = conversionService;
     }
 
     @Override
@@ -108,7 +112,7 @@ class NettyEmbeddedServerInstance implements EmbeddedServerInstance {
             if (cloudMetadata != null) {
                 cloudMetadata.putAll(metadata);
             }
-            instanceMetadata = ConvertibleValues.of(cloudMetadata);
+            instanceMetadata = ConvertibleValues.of(cloudMetadata, conversionService);
         }
         return instanceMetadata;
     }

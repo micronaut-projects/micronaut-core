@@ -23,7 +23,6 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionContext;
-import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ParametrizedBeanFactory;
@@ -106,7 +105,7 @@ public abstract class AbstractParametrizedBeanDefinition<T> extends AbstractBean
                 Object value = requiredArgumentValues.get(argumentName);
                 boolean requiresConversion = value != null && !requiredArgument.getType().isInstance(value);
                 if (requiresConversion) {
-                    Optional<?> converted = ConversionService.SHARED.convert(value, requiredArgument.getType(), ConversionContext.of(requiredArgument));
+                    Optional<?> converted = context.getConversionService().convert(value, requiredArgument.getType(), ConversionContext.of(requiredArgument));
                     Object finalValue = value;
                     value = converted.orElseThrow(() -> new BeanInstantiationException(resolutionContext, "Invalid value [" + finalValue + "] for argument: " + argumentName));
                     requiredArgumentValues.put(argumentName, value);

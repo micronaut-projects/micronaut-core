@@ -39,14 +39,14 @@ import java.util.Optional;
 public abstract class AbstractAnnotatedArgumentBinder<A extends Annotation, T, S> implements AnnotatedArgumentBinder<A, T, S> {
 
     private static final String DEFAULT_VALUE_MEMBER = "defaultValue";
-    private final ConversionService<?> conversionService;
+    protected final ConversionService conversionService;
 
     /**
      * Constructor.
      *
      * @param conversionService conversionService
      */
-    protected AbstractAnnotatedArgumentBinder(ConversionService<?> conversionService) {
+    protected AbstractAnnotatedArgumentBinder(ConversionService conversionService) {
         this.conversionService = conversionService;
     }
 

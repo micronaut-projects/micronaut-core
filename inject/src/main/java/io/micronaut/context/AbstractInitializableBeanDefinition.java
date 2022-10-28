@@ -759,7 +759,7 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
                 }
                 boolean requiresConversion = value != null && !requiredArgument.getType().isInstance(value);
                 if (requiresConversion) {
-                    Optional<?> converted = ConversionService.SHARED.convert(value, requiredArgument.getType(), ConversionContext.of(requiredArgument));
+                    Optional<?> converted = context.getConversionService().convert(value, requiredArgument.getType(), ConversionContext.of(requiredArgument));
                     Object finalValue = value;
                     value = converted.orElseThrow(() -> new BeanInstantiationException(resolutionContext, "Invalid value [" + finalValue + "] for argument: " + argumentName));
                     requiredArgumentValues.put(argumentName, value);
