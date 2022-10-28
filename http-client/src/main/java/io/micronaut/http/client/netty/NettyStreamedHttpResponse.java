@@ -57,10 +57,11 @@ class NettyStreamedHttpResponse<B> implements MutableHttpResponse<B>, NettyHttpR
 
     /**
      * @param response The streamed Http response
+     * @param conversionService The conversion service
      */
-    NettyStreamedHttpResponse(StreamedHttpResponse response) {
+    NettyStreamedHttpResponse(StreamedHttpResponse response, ConversionService conversionService) {
         this.nettyResponse = response;
-        this.headers = new NettyHttpHeaders(response.headers(), ConversionService.SHARED);
+        this.headers = new NettyHttpHeaders(response.headers(), conversionService);
     }
 
     /**

@@ -15,10 +15,9 @@
  */
 package io.micronaut.http.client.loadbalance;
 
-import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.http.client.LoadBalancer;
-import jakarta.inject.Singleton;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -30,11 +29,10 @@ import java.net.URL;
  * @author graemerocher
  * @since 1.0
  */
-@Singleton
 public class LoadBalancerConverters implements TypeConverterRegistrar {
-    @SuppressWarnings("deprecation")
+
     @Override
-    public void register(ConversionService<?> conversionService) {
+    public void register(MutableConversionService conversionService) {
         conversionService.addConverter(URI.class, LoadBalancer.class, LoadBalancer::fixed);
         conversionService.addConverter(URL.class, LoadBalancer.class, LoadBalancer::fixed);
         conversionService.addConverter(String.class, LoadBalancer.class, url -> {

@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.attr.MutableAttributeHolder;
+import io.micronaut.core.convert.ConversionServiceProvider;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanIdentifier;
 import io.micronaut.inject.validation.BeanDefinitionValidator;
@@ -45,7 +46,8 @@ public interface BeanContext extends
         BeanDefinitionRegistry,
         ApplicationEventPublisher<Object>,
         AnnotationMetadataResolver,
-        MutableAttributeHolder {
+        MutableAttributeHolder,
+    ConversionServiceProvider {
 
     /**
      * Obtains the configuration for this context.

@@ -17,7 +17,6 @@ package io.micronaut.core.convert;
 
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.converters.MultiValuesConverterFactory;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.convert.format.Format;
@@ -69,6 +68,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
@@ -85,7 +85,7 @@ import java.util.function.Function;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class DefaultConversionService implements ConversionService<DefaultConversionService> {
+public class DefaultMutableConversionService implements MutableConversionService {
 
     private static final int CACHE_MAX = 150;
     private static final TypeConverter UNCONVERTIBLE = (object, targetType, context) -> Optional.empty();
@@ -98,7 +98,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
     /**
      * Constructor.
      */
-    public DefaultConversionService() {
+    public DefaultMutableConversionService() {
         registerDefaultConverters();
     }
 
@@ -113,7 +113,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         }
         targetType = targetType.isPrimitive() ? ReflectionUtils.getWrapperType(targetType) : targetType;
 
-        if (targetType.isInstance(object) && !Iterable.class.isInstance(object) && !Map.class.isInstance(object)) {
+        if (targetType.isInstance(object) && !(object instanceof Iterable) && !(object instanceof Map)) {
             return Optional.of((T) object);
         }
 
@@ -123,7 +123,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             Optional<String> formattingAnn = annotationMetadata.getAnnotationNameByStereotype(Format.class);
             String formattingAnnotation = formattingAnn.orElse(null);
             ConvertiblePair pair = new ConvertiblePair(sourceType, targetType, formattingAnnotation);
-            TypeConverter typeConverter = converterCache.get(pair);
+            TypeConverter<Object, T> typeConverter = converterCache.get(pair);
             if (typeConverter == null) {
                 typeConverter = findTypeConverter(sourceType, targetType, formattingAnnotation);
                 if (typeConverter == null) {
@@ -141,7 +141,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             }
         } else {
             ConvertiblePair pair = new ConvertiblePair(sourceType, targetType, null);
-            TypeConverter typeConverter = converterCache.get(pair);
+            TypeConverter<Object, T> typeConverter = converterCache.get(pair);
             if (typeConverter == null) {
                 typeConverter = findTypeConverter(sourceType, targetType, null);
                 if (typeConverter == null) {
@@ -166,7 +166,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
     @Override
     public <S, T> boolean canConvert(Class<S> sourceType, Class<T> targetType) {
         ConvertiblePair pair = new ConvertiblePair(sourceType, targetType, null);
-        TypeConverter typeConverter = converterCache.get(pair);
+        TypeConverter<Object, T> typeConverter = converterCache.get(pair);
         if (typeConverter == null) {
             typeConverter = findTypeConverter(sourceType, targetType, null);
             if (typeConverter != null) {
@@ -179,40 +179,25 @@ public class DefaultConversionService implements ConversionService<DefaultConver
     }
 
     @Override
-    public <S, T> DefaultConversionService addConverter(Class<S> sourceType, Class<T> targetType, TypeConverter<S, T> typeConverter) {
+    public <S, T> void addConverter(Class<S> sourceType, Class<T> targetType, TypeConverter<S, T> typeConverter) {
         ConvertiblePair pair = newPair(sourceType, targetType, typeConverter);
         typeConverters.put(pair, typeConverter);
         converterCache.put(pair, typeConverter);
-        return this;
     }
 
     @Override
-    public <S, T> DefaultConversionService addConverter(Class<S> sourceType, Class<T> targetType, Function<S, T> function) {
+    public <S, T> void addConverter(Class<S> sourceType, Class<T> targetType, Function<S, T> function) {
         ConvertiblePair pair = new ConvertiblePair(sourceType, targetType);
         TypeConverter<S, T> typeConverter = TypeConverter.of(sourceType, targetType, function);
         typeConverters.put(pair, typeConverter);
         converterCache.put(pair, typeConverter);
-        return this;
-    }
-
-
-    /**
-     * Reset internal state.
-     *
-     * @since 3.5.3
-     */
-    @Internal
-    public void reset() {
-        typeConverters.clear();
-        converterCache.clear();
-        registerDefaultConverters();
     }
 
     /**
      * Default Converters.
      */
     @SuppressWarnings({"OptionalIsPresent", "unchecked"})
-    protected void registerDefaultConverters() {
+    private void registerDefaultConverters() {
         // primitive array to wrapper array
         @SuppressWarnings("rawtypes")
         Function primitiveArrayToWrapperArray = ArrayUtils::toWrapperArray;
@@ -235,7 +220,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         addConverter(Object.class, List.class, (object, targetType, context) -> {
             Optional<Argument<?>> firstTypeVariable = context.getFirstTypeVariable();
             Argument<?> argument = firstTypeVariable.orElse(Argument.OBJECT_ARGUMENT);
-            Optional converted = DefaultConversionService.this.convert(object, context.with(argument));
+            Optional converted = DefaultMutableConversionService.this.convert(object, context.with(argument));
             if (converted.isPresent()) {
                 return Optional.of(Collections.singletonList(converted.get()));
             }
@@ -246,7 +231,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         addConverter(CharSequence.class, Class.class, (object, targetType, context) -> {
             ClassLoader classLoader = targetType.getClassLoader();
             if (classLoader == null) {
-                classLoader = DefaultConversionService.class.getClassLoader();
+                classLoader = DefaultMutableConversionService.class.getClassLoader();
             }
             return ClassUtils.forName(object.toString(), classLoader);
         });
@@ -321,9 +306,9 @@ public class DefaultConversionService implements ConversionService<DefaultConver
 
         // InputStream -> Number
         addConverter(InputStream.class, Number.class, (object, targetType, context) -> {
-            Optional<String> convert = DefaultConversionService.this.convert(object, String.class, context);
+            Optional<String> convert = DefaultMutableConversionService.this.convert(object, String.class, context);
             if (convert.isPresent()) {
-                return convert.flatMap(val -> DefaultConversionService.this.convert(val, targetType, context));
+                return convert.flatMap(val -> DefaultMutableConversionService.this.convert(val, targetType, context));
             }
             return Optional.empty();
         });
@@ -974,8 +959,8 @@ public class DefaultConversionService implements ConversionService<DefaultConver
      * @param <T> Generic type
      * @return type converter
      */
-    protected <T> TypeConverter findTypeConverter(Class<?> sourceType, Class<T> targetType, String formattingAnnotation) {
-        TypeConverter typeConverter = UNCONVERTIBLE;
+    protected <T> TypeConverter<Object, T> findTypeConverter(Class<?> sourceType, Class<T> targetType, String formattingAnnotation) {
+        TypeConverter<Object, T> typeConverter = UNCONVERTIBLE;
         List<Class> sourceHierarchy = ClassUtils.resolveHierarchy(sourceType);
         List<Class> targetHierarchy = ClassUtils.resolveHierarchy(targetType);
         for (Class sourceSuperType : sourceHierarchy) {
@@ -1025,19 +1010,21 @@ public class DefaultConversionService implements ConversionService<DefaultConver
     /**
      * Binds the source and target.
      */
-    private final class ConvertiblePair {
-        final Class source;
-        final Class target;
+    private static final class ConvertiblePair {
+        final Class<?> source;
+        final Class<?> target;
         final String formattingAnnotation;
+        final int hashCode;
 
-        ConvertiblePair(Class source, Class target) {
+        ConvertiblePair(Class<?> source, Class<?> target) {
             this(source, target, null);
         }
 
-        ConvertiblePair(Class source, Class target, String formattingAnnotation) {
+        ConvertiblePair(Class<?> source, Class<?> target, String formattingAnnotation) {
             this.source = source;
             this.target = target;
             this.formattingAnnotation = formattingAnnotation;
+            this.hashCode = Objects.hash(source, target, formattingAnnotation);
         }
 
         @Override
@@ -1048,24 +1035,19 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             if (o == null || getClass() != o.getClass()) {
                 return false;
             }
-
             ConvertiblePair pair = (ConvertiblePair) o;
-
             if (!source.equals(pair.source)) {
                 return false;
             }
             if (!target.equals(pair.target)) {
                 return false;
             }
-            return formattingAnnotation != null ? formattingAnnotation.equals(pair.formattingAnnotation) : pair.formattingAnnotation == null;
+            return Objects.equals(formattingAnnotation, pair.formattingAnnotation);
         }
 
         @Override
         public int hashCode() {
-            int result = source.hashCode();
-            result = 31 * result + target.hashCode();
-            result = 31 * result + (formattingAnnotation != null ? formattingAnnotation.hashCode() : 0);
-            return result;
+            return hashCode;
         }
     }
 }

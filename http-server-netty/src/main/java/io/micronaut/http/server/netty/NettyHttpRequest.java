@@ -627,8 +627,17 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     private class NettyMutableHttpRequest implements MutableHttpRequest<T>, NettyHttpRequestBuilder {
 
         private URI uri = NettyHttpRequest.this.uri;
+        @Nullable
         private MutableHttpParameters httpParameters;
+        @Nullable
         private Object body;
+
+        @Override
+        public void setConversionService(ConversionService conversionService) {
+            if (httpParameters != null) {
+                httpParameters.setConversionService(conversionService);
+            }
+        }
 
         @Override
         public MutableHttpRequest<T> cookie(Cookie cookie) {

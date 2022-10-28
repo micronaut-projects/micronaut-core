@@ -176,7 +176,8 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 nettyEmbeddedServices,
                 ioExecutor,
                 httpContentProcessorResolver,
-                httpRequestTerminatedEventPublisher
+                httpRequestTerminatedEventPublisher,
+                applicationContext.getConversionService()
         );
         this.hostResolver = new DefaultHttpHostResolver(serverConfiguration, () -> NettyHttpServer.this);
 

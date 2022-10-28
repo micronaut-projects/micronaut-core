@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2022 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,10 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package io.micronaut.core.convert;
+
+import io.micronaut.core.annotation.NonNull;
+
 /**
- * Contains classes for reactive streams conversion.
+ * Interface for a component to provide the access to its {@link ConversionService}.
  *
- * @author Sergio del Amo
- * @since 3.0.0
+ * @author Denis Stepanov
+ * @since 4.0.0
  */
-package io.micronaut.runtime.converters.reactive;
+public interface ConversionServiceProvider {
+
+    /**
+     * Provides the conversion service.
+     *
+     * @return the conversion service
+     */
+    @NonNull
+    ConversionService getConversionService();
+
+}

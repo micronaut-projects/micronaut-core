@@ -45,8 +45,9 @@ class ContentNegotiationSpec extends Specification {
         [new MediaType("application/json;q=0.5"), new MediaType("application/xml;q=0.9")] | XML
         [MediaType.APPLICATION_JSON_TYPE]                                                 | JSON
         [MediaType.APPLICATION_JSON_TYPE, MediaType.APPLICATION_XML_TYPE]                 | JSON
-        [MediaType.APPLICATION_XML_TYPE, MediaType.APPLICATION_JSON_TYPE]                 | XML
-        [MediaType.APPLICATION_XML_TYPE]                                                  | XML
+// Add Micronaut Jackson XML after v4 Migration
+//        [MediaType.APPLICATION_XML_TYPE, MediaType.APPLICATION_JSON_TYPE]                 | XML
+//        [MediaType.APPLICATION_XML_TYPE]                                                  | XML
         [MediaType.TEXT_PLAIN_TYPE]                                                       | TEXT
         [MediaType.ALL_TYPE]                                                              | JSON
 
@@ -72,7 +73,8 @@ class ContentNegotiationSpec extends Specification {
         contentType                     | expectedContentType             | expectedBody
         null                            | MediaType.APPLICATION_JSON_TYPE | '{"name":"Fred","age":10}'
         MediaType.APPLICATION_JSON_TYPE | MediaType.APPLICATION_JSON_TYPE | '{"name":"Fred","age":10}'
-        MediaType.APPLICATION_XML_TYPE  | MediaType.APPLICATION_XML_TYPE  | '<Person><name>Fred</name><age>10</age></Person>'
+// Add Micronaut Jackson XML after v4 Migration
+//        MediaType.APPLICATION_XML_TYPE  | MediaType.APPLICATION_XML_TYPE  | '<Person><name>Fred</name><age>10</age></Person>'
     }
 
     void "test send unacceptable type"() {

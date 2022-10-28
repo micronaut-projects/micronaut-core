@@ -661,7 +661,7 @@ class PropertySourcePropertyResolverSpec extends Specification {
                 @Override
                 @NonNull
                 <T> Optional<T> resolve(@NonNull PropertyResolver propertyResolver,
-                                        @NonNull ConversionService<? extends ConversionService> conversionService,
+                                        @NonNull ConversionService conversionService,
                                         @NonNull String expression,
                                         @NonNull Class<T> requiredType) {
                     assert requiredType == String.class
@@ -706,7 +706,7 @@ class PropertySourcePropertyResolverSpec extends Specification {
                 @Override
                 @NonNull
                 <T> Optional<T> resolve(@NonNull PropertyResolver propertyResolver,
-                                        @NonNull ConversionService<? extends ConversionService> conversionService,
+                                        @NonNull ConversionService conversionService,
                                         @NonNull String expression,
                                         @NonNull Class<T> requiredType) {
                     Optional.empty()

@@ -42,13 +42,13 @@ import java.util.Set;
 public class JsonNodeConvertibleValues<V> implements ConvertibleValues<V> {
 
     private final JsonNode objectNode;
-    private final ConversionService<?> conversionService;
+    private final ConversionService conversionService;
 
     /**
      * @param objectNode        The node that maps to JSON object structure
      * @param conversionService To convert the JSON node into given type
      */
-    public JsonNodeConvertibleValues(JsonNode objectNode, ConversionService<?> conversionService) {
+    public JsonNodeConvertibleValues(JsonNode objectNode, ConversionService conversionService) {
         if (!objectNode.isObject()) {
             throw new IllegalArgumentException("Expected object node");
         }
@@ -82,5 +82,10 @@ public class JsonNodeConvertibleValues<V> implements ConvertibleValues<V> {
         } else {
             return conversionService.convert(jsonNode, conversionContext);
         }
+    }
+
+    @Override
+    public ConversionService getConversionService() {
+        return conversionService;
     }
 }

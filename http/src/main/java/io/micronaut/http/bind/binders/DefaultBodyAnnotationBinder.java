@@ -36,7 +36,7 @@ import java.util.Optional;
  */
 public class DefaultBodyAnnotationBinder<T> implements BodyArgumentBinder<T> {
 
-    protected final ConversionService<?> conversionService;
+    protected final ConversionService conversionService;
 
     /**
      * @param conversionService The conversion service

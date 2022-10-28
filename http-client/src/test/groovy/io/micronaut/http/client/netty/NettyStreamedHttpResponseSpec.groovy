@@ -1,5 +1,6 @@
 package io.micronaut.http.client.netty
 
+import io.micronaut.core.convert.ConversionService
 import io.micronaut.http.cookie.Cookie
 import io.micronaut.http.cookie.Cookies
 import io.micronaut.http.netty.stream.DefaultStreamedHttpResponse
@@ -21,7 +22,7 @@ class NettyStreamedHttpResponseSpec extends Specification {
         streamedHttpResponse.headers().set(httpHeaders)
 
         when:
-        NettyStreamedHttpResponse response = new NettyStreamedHttpResponse(streamedHttpResponse)
+        NettyStreamedHttpResponse response = new NettyStreamedHttpResponse(streamedHttpResponse, ConversionService.SHARED)
 
         then:
         Cookies cookies = response.getCookies()
@@ -44,7 +45,7 @@ class NettyStreamedHttpResponseSpec extends Specification {
         streamedHttpResponse.headers().set(httpHeaders)
 
         when:
-        NettyStreamedHttpResponse response = new NettyStreamedHttpResponse(streamedHttpResponse)
+        NettyStreamedHttpResponse response = new NettyStreamedHttpResponse(streamedHttpResponse, ConversionService.SHARED)
 
         then:
         Cookies cookies = response.getCookies()
@@ -68,7 +69,7 @@ class NettyStreamedHttpResponseSpec extends Specification {
         streamedHttpResponse.headers().set(httpHeaders)
 
         when:
-        NettyStreamedHttpResponse response = new NettyStreamedHttpResponse(streamedHttpResponse)
+        NettyStreamedHttpResponse response = new NettyStreamedHttpResponse(streamedHttpResponse, ConversionService.SHARED)
         response.cookie(Cookie.of("ADDED", "xyz").httpOnly(true).domain(".foo.com"))
 
         then:

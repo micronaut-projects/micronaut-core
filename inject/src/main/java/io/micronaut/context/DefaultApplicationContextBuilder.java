@@ -46,21 +46,21 @@ import java.util.Set;
  * @since 1.0
  */
 public class DefaultApplicationContextBuilder implements ApplicationContextBuilder, ApplicationContextConfiguration {
-    private List<Object> singletons = new ArrayList<>();
-    private List<String> environments = new ArrayList<>();
-    private List<String> defaultEnvironments = new ArrayList<>();
-    private List<String> packages = new ArrayList<>();
-    private Map<String, Object> properties = new LinkedHashMap<>();
-    private List<PropertySource> propertySources = new ArrayList<>();
-    private Collection<String> configurationIncludes = new HashSet<>();
-    private Collection<String> configurationExcludes = new HashSet<>();
+    private final List<Object> singletons = new ArrayList<>();
+    private final List<String> environments = new ArrayList<>();
+    private final List<String> defaultEnvironments = new ArrayList<>();
+    private final List<String> packages = new ArrayList<>();
+    private final Map<String, Object> properties = new LinkedHashMap<>();
+    private final List<PropertySource> propertySources = new ArrayList<>();
+    private final Collection<String> configurationIncludes = new HashSet<>();
+    private final Collection<String> configurationExcludes = new HashSet<>();
     private Boolean deduceEnvironments = null;
     private ClassLoader classLoader = getClass().getClassLoader();
     private boolean envPropertySource = true;
-    private List<String> envVarIncludes = new ArrayList<>();
-    private List<String> envVarExcludes = new ArrayList<>();
+    private final List<String> envVarIncludes = new ArrayList<>();
+    private final List<String> envVarExcludes = new ArrayList<>();
     private String[] args = new String[0];
-    private Set<Class<? extends Annotation>> eagerInitAnnotated = new HashSet<>(3);
+    private final Set<Class<? extends Annotation>> eagerInitAnnotated = new HashSet<>(3);
     private String[] overrideConfigLocations;
     private boolean banner = true;
     private ClassPathResourceLoader classPathResourceLoader;
@@ -89,7 +89,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     }
 
     @Override
-    @NonNull 
+    @NonNull
     public ApplicationContextBuilder enableDefaultPropertySources(boolean areEnabled) {
         this.enableDefaultPropertySources = areEnabled;
         return this;

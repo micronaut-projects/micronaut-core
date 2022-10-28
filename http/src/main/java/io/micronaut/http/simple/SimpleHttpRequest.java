@@ -40,7 +40,7 @@ import java.util.Set;
  */
 public class SimpleHttpRequest<B> implements MutableHttpRequest<B> {
 
-    private final MutableConvertibleValues<Object> attributes = new MutableConvertibleValuesMap<>();
+    private final MutableConvertibleValuesMap<Object> attributes = new MutableConvertibleValuesMap<>();
     private final SimpleCookies cookies = new SimpleCookies(ConversionService.SHARED);
     private final SimpleHttpHeaders headers = new SimpleHttpHeaders(ConversionService.SHARED);
     private final SimpleHttpParameters parameters = new SimpleHttpParameters(ConversionService.SHARED);
@@ -125,5 +125,13 @@ public class SimpleHttpRequest<B> implements MutableHttpRequest<B> {
     @Override
     public Optional<B> getBody() {
         return (Optional<B>) Optional.ofNullable(this.body);
+    }
+
+    @Override
+    public void setConversionService(ConversionService conversionService) {
+        attributes.setConversionService(conversionService);
+        cookies.setConversionService(conversionService);
+        headers.setConversionService(conversionService);
+        parameters.setConversionService(conversionService);
     }
 }

@@ -36,12 +36,12 @@ import java.util.Optional;
  */
 public class JdkSerializer implements ObjectSerializer {
 
-    private final ConversionService<?> conversionService;
+    private final ConversionService conversionService;
 
     /**
      * @param conversionService The conversion service
      */
-    public JdkSerializer(ConversionService<?> conversionService) {
+    public JdkSerializer(ConversionService conversionService) {
         this.conversionService = conversionService;
     }
 

@@ -46,7 +46,7 @@ class ErrorRouteMatch<T, R> extends AbstractRouteMatch<T, R> {
      * @param abstractRoute The abstract route
      * @param conversionService The conversion service
      */
-    ErrorRouteMatch(Throwable error, DefaultRouteBuilder.AbstractRoute abstractRoute, ConversionService<?> conversionService) {
+    ErrorRouteMatch(Throwable error, DefaultRouteBuilder.AbstractRoute abstractRoute, ConversionService conversionService) {
         super(abstractRoute, conversionService);
         this.error = error;
         this.variables = new LinkedHashMap<>();

@@ -44,7 +44,7 @@ public class DeleteEndpointRouteBuilder extends AbstractEndpointRouteBuilder {
      */
     public DeleteEndpointRouteBuilder(ApplicationContext beanContext,
                                       UriNamingStrategy uriNamingStrategy,
-                                      ConversionService<?> conversionService,
+                                      ConversionService conversionService,
                                       EndpointDefaultConfiguration endpointDefaultConfiguration) {
         super(beanContext, uriNamingStrategy, conversionService, endpointDefaultConfiguration);
     }

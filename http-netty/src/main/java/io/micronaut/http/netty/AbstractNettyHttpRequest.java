@@ -54,7 +54,7 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
     public static final AsciiString STREAM_ID = HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text();
     public static final AsciiString HTTP2_SCHEME = HttpConversionUtil.ExtensionHeaderNames.SCHEME.text();
     protected final io.netty.handler.codec.http.HttpRequest nettyRequest;
-    protected final ConversionService<?> conversionService;
+    protected final ConversionService conversionService;
     protected final HttpMethod httpMethod;
     protected final URI uri;
     protected final String httpMethodName;

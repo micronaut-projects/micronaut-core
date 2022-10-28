@@ -65,7 +65,7 @@ abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implemen
      */
     AbstractEndpointRouteBuilder(ApplicationContext applicationContext,
                                  UriNamingStrategy uriNamingStrategy,
-                                 ConversionService<?> conversionService,
+                                 ConversionService conversionService,
                                  EndpointDefaultConfiguration endpointDefaultConfiguration) {
         super(applicationContext, uriNamingStrategy, conversionService);
         this.beanContext = applicationContext;

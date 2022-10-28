@@ -40,7 +40,7 @@ class StatusRouteMatch<T, R> extends AbstractRouteMatch<T, R> {
      * @param abstractRoute The abstract route
      * @param conversionService The conversion service
      */
-    StatusRouteMatch(HttpStatus httpStatus, DefaultRouteBuilder.AbstractRoute abstractRoute, ConversionService<?> conversionService) {
+    StatusRouteMatch(HttpStatus httpStatus, DefaultRouteBuilder.AbstractRoute abstractRoute, ConversionService conversionService) {
         super(abstractRoute, conversionService);
         this.httpStatus = httpStatus;
         this.requiredArguments = new ArrayList<>(Arrays.asList(getArguments()));

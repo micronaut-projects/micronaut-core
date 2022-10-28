@@ -77,7 +77,7 @@ public class AnnotatedFunctionRouteBuilder
     public AnnotatedFunctionRouteBuilder(
         ExecutionHandleLocator executionHandleLocator,
         UriNamingStrategy uriNamingStrategy,
-        ConversionService<?> conversionService,
+        ConversionService conversionService,
         MediaTypeCodecRegistry codecRegistry,
         @Value("${micronaut.function.context-path:/}") String contextPath) {
         super(executionHandleLocator, uriNamingStrategy, conversionService);

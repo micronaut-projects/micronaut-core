@@ -55,7 +55,7 @@ class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> implements Uri
      */
     DefaultUriRouteMatch(UriMatchInfo matchInfo,
                          DefaultRouteBuilder.DefaultUriRoute uriRoute,
-                         Charset defaultCharset, ConversionService<?> conversionService
+                         Charset defaultCharset, ConversionService conversionService
     ) {
         super(uriRoute, conversionService);
         this.uriRoute = uriRoute;

@@ -39,19 +39,19 @@ import java.util.Optional;
  */
 @Internal
 final class MutableHttpRequestWrapper<B> extends HttpRequestWrapper<B> implements MutableHttpRequest<B> {
-    private final ConversionService<?> conversionService;
+    private ConversionService conversionService;
 
     @Nullable
     private B body;
     @Nullable
     private URI uri;
 
-    MutableHttpRequestWrapper(ConversionService<?> conversionService, HttpRequest<B> delegate) {
+    MutableHttpRequestWrapper(ConversionService conversionService, HttpRequest<B> delegate) {
         super(delegate);
         this.conversionService = conversionService;
     }
 
-    static MutableHttpRequest<?> wrapIfNecessary(ConversionService<?> conversionService, HttpRequest<?> request) {
+    static MutableHttpRequest<?> wrapIfNecessary(ConversionService conversionService, HttpRequest<?> request) {
         if (request instanceof MutableHttpRequest<?>) {
             return (MutableHttpRequest<?>) request;
         } else {
@@ -127,5 +127,10 @@ final class MutableHttpRequestWrapper<B> extends HttpRequestWrapper<B> implement
     public <T> MutableHttpRequest<T> body(T body) {
         this.body = (B) body;
         return (MutableHttpRequest<T>) this;
+    }
+
+    @Override
+    public void setConversionService(ConversionService conversionService) {
+        this.conversionService = conversionService;
     }
 }
