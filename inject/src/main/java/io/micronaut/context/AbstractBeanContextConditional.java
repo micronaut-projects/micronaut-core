@@ -62,9 +62,9 @@ abstract class AbstractBeanContextConditional implements BeanContextConditional,
 
     @SuppressWarnings("java:S3416")
     static final class ConditionLog {
+        static final Logger LOG = LoggerFactory.getLogger(Condition.class);
+
         private ConditionLog() {
         }
-
-        static final Logger LOG = LoggerFactory.getLogger(Condition.class);
     }
 }
