@@ -31,7 +31,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Utility methods for implementing GraalVM
+ * Utility methods for implementing GraalVM.
  *
  * @author Álvaro Sánchez-Mariscal
  * @author graemerocher
