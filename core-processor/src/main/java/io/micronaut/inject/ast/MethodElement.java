@@ -23,7 +23,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
-import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
+import io.micronaut.inject.ast.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
 
 import java.lang.annotation.Annotation;

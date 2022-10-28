@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.inject.ast;
+package io.micronaut.inject.ast.annotation;
 
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
@@ -32,7 +32,7 @@ import java.util.function.Predicate;
  * @since 4.0.0
  */
 @Internal
-public interface ElementMutableAnnotatiConMetadataDelegate<R> extends MutableAnnotationMetadataDelegate<R> {
+public interface ElementMutableAnnotationMetadataDelegate<R> extends MutableAnnotationMetadataDelegate<R> {
 
     /**
      * Provides the return type instance.

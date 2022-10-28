@@ -22,11 +22,11 @@ import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.ElementAnnotationMetadata;
-import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.ElementModifier;
-import io.micronaut.inject.ast.MutableAnnotationMetadataDelegate;
-import io.micronaut.inject.ast.ElementMutableAnnotationMetadataDelegate;
+import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
+import io.micronaut.inject.ast.annotation.ElementMutableAnnotationMetadataDelegate;
 import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.TypedElement;
 
@@ -133,52 +133,52 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
 
     @Override
     public <T extends Annotation> io.micronaut.inject.ast.Element annotate(String annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
-        return io.micronaut.inject.ast.ElementMutableAnnotationMetadataDelegate.super.annotate(annotationType, consumer);
+        return ElementMutableAnnotationMetadataDelegate.super.annotate(annotationType, consumer);
     }
 
     @Override
     public io.micronaut.inject.ast.Element removeAnnotation(String annotationType) {
-        return io.micronaut.inject.ast.ElementMutableAnnotationMetadataDelegate.super.removeAnnotation(annotationType);
+        return ElementMutableAnnotationMetadataDelegate.super.removeAnnotation(annotationType);
     }
 
     @Override
     public <T extends Annotation> io.micronaut.inject.ast.Element removeAnnotation(Class<T> annotationType) {
-        return io.micronaut.inject.ast.ElementMutableAnnotationMetadataDelegate.super.removeAnnotation(annotationType);
+        return ElementMutableAnnotationMetadataDelegate.super.removeAnnotation(annotationType);
     }
 
     @Override
     public <T extends Annotation> io.micronaut.inject.ast.Element removeAnnotationIf(Predicate<AnnotationValue<T>> predicate) {
-        return io.micronaut.inject.ast.ElementMutableAnnotationMetadataDelegate.super.removeAnnotationIf(predicate);
+        return ElementMutableAnnotationMetadataDelegate.super.removeAnnotationIf(predicate);
     }
 
     @Override
     public io.micronaut.inject.ast.Element removeStereotype(String annotationType) {
-        return io.micronaut.inject.ast.ElementMutableAnnotationMetadataDelegate.super.removeStereotype(annotationType);
+        return ElementMutableAnnotationMetadataDelegate.super.removeStereotype(annotationType);
     }
 
     @Override
     public <T extends Annotation> io.micronaut.inject.ast.Element removeStereotype(Class<T> annotationType) {
-        return io.micronaut.inject.ast.ElementMutableAnnotationMetadataDelegate.super.removeStereotype(annotationType);
+        return ElementMutableAnnotationMetadataDelegate.super.removeStereotype(annotationType);
     }
 
     @Override
     public io.micronaut.inject.ast.Element annotate(String annotationType) {
-        return io.micronaut.inject.ast.ElementMutableAnnotationMetadataDelegate.super.annotate(annotationType);
+        return ElementMutableAnnotationMetadataDelegate.super.annotate(annotationType);
     }
 
     @Override
     public <T extends Annotation> io.micronaut.inject.ast.Element annotate(Class<T> annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
-        return io.micronaut.inject.ast.ElementMutableAnnotationMetadataDelegate.super.annotate(annotationType, consumer);
+        return ElementMutableAnnotationMetadataDelegate.super.annotate(annotationType, consumer);
     }
 
     @Override
     public <T extends Annotation> io.micronaut.inject.ast.Element annotate(Class<T> annotationType) {
-        return io.micronaut.inject.ast.ElementMutableAnnotationMetadataDelegate.super.annotate(annotationType);
+        return ElementMutableAnnotationMetadataDelegate.super.annotate(annotationType);
     }
 
     @Override
     public <T extends Annotation> io.micronaut.inject.ast.Element annotate(AnnotationValue<T> annotationValue) {
-        return io.micronaut.inject.ast.ElementMutableAnnotationMetadataDelegate.super.annotate(annotationValue);
+        return ElementMutableAnnotationMetadataDelegate.super.annotate(annotationValue);
     }
 
     @Override

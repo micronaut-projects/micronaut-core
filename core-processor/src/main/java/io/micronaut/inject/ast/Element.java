@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.naming.Described;
+import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 
 import java.lang.annotation.Annotation;
 import java.util.Collections;
