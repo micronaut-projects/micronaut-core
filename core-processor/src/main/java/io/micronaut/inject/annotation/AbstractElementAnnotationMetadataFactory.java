@@ -29,7 +29,7 @@ import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.EnumConstantElement;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
-import io.micronaut.inject.ast.ElementMutableAnnotationMetadata;
+import io.micronaut.inject.ast.MutableAnnotationMetadataDelegate;
 import io.micronaut.inject.ast.PackageElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PropertyElement;
@@ -318,7 +318,7 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
             if (annotationMetadata instanceof AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata) {
                 throw new IllegalStateException();
             }
-            if (annotationMetadata instanceof ElementMutableAnnotationMetadata) {
+            if (annotationMetadata instanceof MutableAnnotationMetadataDelegate) {
                 throw new IllegalStateException();
             }
             if (annotationMetadata.isEmpty()) {

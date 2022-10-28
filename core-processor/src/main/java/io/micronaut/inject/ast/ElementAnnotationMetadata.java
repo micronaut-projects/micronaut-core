@@ -23,5 +23,5 @@ import io.micronaut.core.annotation.AnnotationMetadata;
  * @author Denis Stepanov
  * @since 4.0.0
  */
-public interface ElementAnnotationMetadata extends ElementMutableAnnotationMetadata<AnnotationMetadata> {
+public interface ElementAnnotationMetadata extends MutableAnnotationMetadataDelegate<AnnotationMetadata> {
 }

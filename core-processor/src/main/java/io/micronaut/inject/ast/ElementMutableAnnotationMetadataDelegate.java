@@ -17,6 +17,7 @@ package io.micronaut.inject.ast;
 
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 
 import java.lang.annotation.Annotation;
@@ -26,89 +27,90 @@ import java.util.function.Predicate;
 /**
  * Mutable annotation metadata provider.
  *
- * @param <Rtr> The return type
+ * @param <R> The return type
  * @author Denis Stepanov
  * @since 4.0.0
  */
-public interface ElementMutableAnnotationMetadataDelegate<Rtr> extends ElementMutableAnnotationMetadata<Rtr> {
+@Internal
+public interface ElementMutableAnnotatiConMetadataDelegate<R> extends MutableAnnotationMetadataDelegate<R> {
 
     /**
      * Provides the return type instance.
      *
      * @return the return instance
      */
-    Rtr getReturnInstance();
+    R getReturnInstance();
 
     @Override
     @NonNull
-    ElementMutableAnnotationMetadata<?> getAnnotationMetadata();
+    MutableAnnotationMetadataDelegate<?> getAnnotationMetadata();
 
     @Override
     @NonNull
-    default <T extends Annotation> Rtr annotate(@NonNull String annotationType, @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
+    default <T extends Annotation> R annotate(@NonNull String annotationType, @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
         getAnnotationMetadata().annotate(annotationType, consumer);
         return getReturnInstance();
     }
 
     @Override
     @NonNull
-    default Rtr removeAnnotation(@NonNull String annotationType) {
+    default R removeAnnotation(@NonNull String annotationType) {
         getAnnotationMetadata().removeAnnotation(annotationType);
         return getReturnInstance();
     }
 
     @Override
     @NonNull
-    default <T extends Annotation> Rtr removeAnnotation(@NonNull Class<T> annotationType) {
+    default <T extends Annotation> R removeAnnotation(@NonNull Class<T> annotationType) {
         getAnnotationMetadata().removeAnnotation(annotationType);
         return getReturnInstance();
     }
 
     @Override
     @NonNull
-    default <T extends Annotation> Rtr removeAnnotationIf(@NonNull Predicate<AnnotationValue<T>> predicate) {
+    default <T extends Annotation> R removeAnnotationIf(@NonNull Predicate<AnnotationValue<T>> predicate) {
         getAnnotationMetadata().removeAnnotationIf(predicate);
         return getReturnInstance();
     }
 
     @Override
     @NonNull
-    default Rtr removeStereotype(@NonNull String annotationType) {
+    default R removeStereotype(@NonNull String annotationType) {
         getAnnotationMetadata().removeStereotype(annotationType);
         return getReturnInstance();
     }
 
     @Override
     @NonNull
-    default <T extends Annotation> Rtr removeStereotype(@NonNull Class<T> annotationType) {
+    default <T extends Annotation> R removeStereotype(@NonNull Class<T> annotationType) {
         getAnnotationMetadata().removeStereotype(annotationType);
         return getReturnInstance();
     }
 
     @Override
     @NonNull
-    default Rtr annotate(@NonNull String annotationType) {
+    default R annotate(@NonNull String annotationType) {
         getAnnotationMetadata().annotate(annotationType);
         return getReturnInstance();
     }
 
     @Override
     @NonNull
-    default <T extends Annotation> Rtr annotate(@NonNull Class<T> annotationType, @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
+    default <T extends Annotation> R annotate(@NonNull Class<T> annotationType, @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
         getAnnotationMetadata().annotate(annotationType, consumer);
         return getReturnInstance();
     }
 
     @Override
     @NonNull
-    default <T extends Annotation> Rtr annotate(@NonNull Class<T> annotationType) {
+    default <T extends Annotation> R annotate(@NonNull Class<T> annotationType) {
         getAnnotationMetadata().annotate(annotationType);
         return getReturnInstance();
     }
 
     @Override
     @NonNull
-    default <T extends Annotation> Rtr annotate(@NonNull AnnotationValue<T> annotationValue) {
+    default <T extends Annotation> R annotate(@NonNull AnnotationValue<T> annotationValue) {
         getAnnotationMetadata().annotate(annotationValue);
         return getReturnInstance();
     }

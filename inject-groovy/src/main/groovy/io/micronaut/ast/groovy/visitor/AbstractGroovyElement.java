@@ -29,7 +29,7 @@ import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementAnnotationMetadata;
 import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.ElementModifier;
-import io.micronaut.inject.ast.ElementMutableAnnotationMetadata;
+import io.micronaut.inject.ast.MutableAnnotationMetadataDelegate;
 import io.micronaut.inject.ast.ElementMutableAnnotationMetadataDelegate;
 import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.ClassNode;
@@ -146,7 +146,7 @@ public abstract class AbstractGroovyElement implements Element, ElementMutableAn
     }
 
     @Override
-    public ElementMutableAnnotationMetadata<?> getAnnotationMetadata() {
+    public MutableAnnotationMetadataDelegate<?> getAnnotationMetadata() {
         if (elementAnnotationMetadata == null) {
             if (presetAnnotationMetadata == null) {
                 elementAnnotationMetadata = elementAnnotationMetadataFactory.build(this);

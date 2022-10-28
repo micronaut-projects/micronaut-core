@@ -25,7 +25,7 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementAnnotationMetadata;
 import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.ElementModifier;
-import io.micronaut.inject.ast.ElementMutableAnnotationMetadata;
+import io.micronaut.inject.ast.MutableAnnotationMetadataDelegate;
 import io.micronaut.inject.ast.ElementMutableAnnotationMetadataDelegate;
 import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.TypedElement;
@@ -95,7 +95,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
     }
 
     @Override
-    public ElementMutableAnnotationMetadata<?> getAnnotationMetadata() {
+    public MutableAnnotationMetadataDelegate<?> getAnnotationMetadata() {
         if (elementAnnotationMetadata == null) {
             if (presetAnnotationMetadata == null) {
                 elementAnnotationMetadata = elementAnnotationMetadataFactory.build(this);
