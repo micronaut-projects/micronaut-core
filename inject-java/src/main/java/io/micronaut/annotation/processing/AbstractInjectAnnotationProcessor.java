@@ -19,7 +19,7 @@ import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.inject.ast.annotation.AbstractAnnotationMetadataBuilder;
+import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 

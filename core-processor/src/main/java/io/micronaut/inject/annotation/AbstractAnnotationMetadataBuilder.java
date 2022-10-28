@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.inject.ast.annotation;
+package io.micronaut.inject.annotation;
 
 import io.micronaut.context.annotation.*;
 import io.micronaut.core.annotation.AnnotatedElement;
@@ -33,18 +33,6 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
-import io.micronaut.inject.annotation.AnnotatedElementValidator;
-import io.micronaut.inject.annotation.AnnotationMapper;
-import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
-import io.micronaut.inject.annotation.AnnotationMetadataReference;
-import io.micronaut.inject.annotation.AnnotationRemapper;
-import io.micronaut.inject.annotation.AnnotationTransformer;
-import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
-import io.micronaut.inject.annotation.MutableAnnotationMetadata;
-import io.micronaut.inject.annotation.NamedAnnotationMapper;
-import io.micronaut.inject.annotation.NamedAnnotationTransformer;
-import io.micronaut.inject.annotation.TypedAnnotationMapper;
-import io.micronaut.inject.annotation.TypedAnnotationTransformer;
 import io.micronaut.inject.qualifiers.InterceptorBindingQualifier;
 import io.micronaut.inject.visitor.VisitorContext;
 import jakarta.inject.Qualifier;
