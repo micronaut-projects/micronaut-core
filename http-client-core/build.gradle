@@ -9,7 +9,7 @@ dependencies {
 
     api project(":http")
     api project(":json-core")
-    api project(":discovery")
+    api project(":discovery-core")
 
     compileOnly libs.kotlin.stdlib
 
