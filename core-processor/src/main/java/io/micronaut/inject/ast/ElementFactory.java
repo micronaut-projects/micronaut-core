@@ -16,6 +16,7 @@
 package io.micronaut.inject.ast;
 
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 
 import java.util.Map;
 

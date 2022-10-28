@@ -17,12 +17,18 @@ package io.micronaut.inject.ast;
 
 import io.micronaut.core.annotation.AnnotatedElement;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.naming.Described;
+import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 
+import java.lang.annotation.Annotation;
 import java.util.Collections;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 /**
  * Stores data about a compile time element. The underlying object can be a class, field, or method.
@@ -31,7 +37,7 @@ import java.util.Set;
  * @author graemerocher
  * @since 1.0
  */
-public interface Element extends ElementMutableAnnotationMetadata<Element>, AnnotatedElement, Described {
+public interface Element extends MutableAnnotationMetadataDelegate<Element>, AnnotatedElement, Described {
 
     /**
      * An empty array of elements.
@@ -158,5 +164,55 @@ public interface Element extends ElementMutableAnnotationMetadata<Element>, Anno
      */
     default Element withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
         throw new UnsupportedOperationException("Element of type [" + getClass() + "] does not support copy constructor");
+    }
+
+    @Override
+    default <T extends Annotation> Element annotate(String annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
+        return MutableAnnotationMetadataDelegate.super.annotate(annotationType, consumer);
+    }
+
+    @Override
+    default Element removeAnnotation(String annotationType) {
+        return MutableAnnotationMetadataDelegate.super.removeAnnotation(annotationType);
+    }
+
+    @Override
+    default <T extends Annotation> Element removeAnnotation(Class<T> annotationType) {
+        return MutableAnnotationMetadataDelegate.super.removeAnnotation(annotationType);
+    }
+
+    @Override
+    default <T extends Annotation> Element removeAnnotationIf(Predicate<AnnotationValue<T>> predicate) {
+        return MutableAnnotationMetadataDelegate.super.removeAnnotationIf(predicate);
+    }
+
+    @Override
+    default Element removeStereotype(String annotationType) {
+        return MutableAnnotationMetadataDelegate.super.removeStereotype(annotationType);
+    }
+
+    @Override
+    default <T extends Annotation> Element removeStereotype(Class<T> annotationType) {
+        return MutableAnnotationMetadataDelegate.super.removeStereotype(annotationType);
+    }
+
+    @Override
+    default Element annotate(String annotationType) {
+        return MutableAnnotationMetadataDelegate.super.annotate(annotationType);
+    }
+
+    @Override
+    default <T extends Annotation> Element annotate(Class<T> annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
+        return MutableAnnotationMetadataDelegate.super.annotate(annotationType, consumer);
+    }
+
+    @Override
+    default <T extends Annotation> Element annotate(Class<T> annotationType) {
+        return MutableAnnotationMetadataDelegate.super.annotate(annotationType);
+    }
+
+    @Override
+    default <T extends Annotation> Element annotate(AnnotationValue<T> annotationValue) {
+        return MutableAnnotationMetadataDelegate.super.annotate(annotationValue);
     }
 }

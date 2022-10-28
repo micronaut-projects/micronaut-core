@@ -17,6 +17,8 @@ package io.micronaut.ast.groovy.visitor;
 
 import groovy.transform.PackageScope;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.ArrayUtils;
@@ -24,11 +26,11 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
-import io.micronaut.inject.ast.ElementAnnotationMetadata;
-import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.ElementModifier;
-import io.micronaut.inject.ast.ElementMutableAnnotationMetadata;
-import io.micronaut.inject.ast.ElementMutableAnnotationMetadataDelegate;
+import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
+import io.micronaut.inject.ast.annotation.ElementMutableAnnotationMetadataDelegate;
 import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.FieldNode;
@@ -37,6 +39,7 @@ import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.control.CompilationUnit;
 import org.codehaus.groovy.control.SourceUnit;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -47,6 +50,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
 /**
@@ -86,12 +91,62 @@ public abstract class AbstractGroovyElement implements Element, ElementMutableAn
     }
 
     @Override
+    public <T extends Annotation> Element annotate(String annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
+        return ElementMutableAnnotationMetadataDelegate.super.annotate(annotationType, consumer);
+    }
+
+    @Override
+    public Element removeAnnotation(String annotationType) {
+        return ElementMutableAnnotationMetadataDelegate.super.removeAnnotation(annotationType);
+    }
+
+    @Override
+    public <T extends Annotation> Element removeAnnotation(Class<T> annotationType) {
+        return ElementMutableAnnotationMetadataDelegate.super.removeAnnotation(annotationType);
+    }
+
+    @Override
+    public <T extends Annotation> Element removeAnnotationIf(Predicate<AnnotationValue<T>> predicate) {
+        return ElementMutableAnnotationMetadataDelegate.super.removeAnnotationIf(predicate);
+    }
+
+    @Override
+    public Element removeStereotype(String annotationType) {
+        return ElementMutableAnnotationMetadataDelegate.super.removeStereotype(annotationType);
+    }
+
+    @Override
+    public <T extends Annotation> Element removeStereotype(Class<T> annotationType) {
+        return ElementMutableAnnotationMetadataDelegate.super.removeStereotype(annotationType);
+    }
+
+    @Override
+    public Element annotate(String annotationType) {
+        return ElementMutableAnnotationMetadataDelegate.super.annotate(annotationType);
+    }
+
+    @Override
+    public <T extends Annotation> Element annotate(Class<T> annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
+        return ElementMutableAnnotationMetadataDelegate.super.annotate(annotationType, consumer);
+    }
+
+    @Override
+    public <T extends Annotation> Element annotate(Class<T> annotationType) {
+        return ElementMutableAnnotationMetadataDelegate.super.annotate(annotationType);
+    }
+
+    @Override
+    public <T extends Annotation> Element annotate(AnnotationValue<T> annotationValue) {
+        return ElementMutableAnnotationMetadataDelegate.super.annotate(annotationValue);
+    }
+
+    @Override
     public Element getReturnInstance() {
         return this;
     }
 
     @Override
-    public ElementMutableAnnotationMetadata<?> getAnnotationMetadata() {
+    public MutableAnnotationMetadataDelegate<?> getAnnotationMetadata() {
         if (elementAnnotationMetadata == null) {
             if (presetAnnotationMetadata == null) {
                 elementAnnotationMetadata = elementAnnotationMetadataFactory.build(this);

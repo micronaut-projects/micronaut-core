@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.inject.ast;
+package io.micronaut.inject.ast.annotation;
 
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.annotation.AnnotationValue;
@@ -29,11 +29,11 @@ import java.util.function.Predicate;
 /**
  * Mutable annotation metadata.
  *
- * @param <Rtr> The return type
+ * @param <R> The return type
  * @author Denis Stepanov
  * @since 4.0.0
  */
-public interface ElementMutableAnnotationMetadata<Rtr> extends AnnotationMetadataDelegate {
+public interface MutableAnnotationMetadataDelegate<R> extends AnnotationMetadataDelegate {
 
     /**
      * Annotate this element with the given annotation type. If the annotation is already present then
@@ -45,7 +45,7 @@ public interface ElementMutableAnnotationMetadata<Rtr> extends AnnotationMetadat
      * @return This element
      */
     @NonNull
-    default <T extends Annotation> Rtr annotate(@NonNull String annotationType, @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
+    default <T extends Annotation> R annotate(@NonNull String annotationType, @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
         throw new UnsupportedOperationException("Element of type [" + getClass() + "] does not support adding annotations at compilation time");
     }
 
@@ -62,7 +62,7 @@ public interface ElementMutableAnnotationMetadata<Rtr> extends AnnotationMetadat
      * @return This element
      */
     @NonNull
-    default Rtr removeAnnotation(@NonNull String annotationType) {
+    default R removeAnnotation(@NonNull String annotationType) {
         throw new UnsupportedOperationException("Element of type [" + getClass() + "] does not support removing annotations at compilation time");
     }
 
@@ -73,7 +73,7 @@ public interface ElementMutableAnnotationMetadata<Rtr> extends AnnotationMetadat
      * @return This element
      */
     @NonNull
-    default <T extends Annotation> Rtr removeAnnotation(@NonNull Class<T> annotationType) {
+    default <T extends Annotation> R removeAnnotation(@NonNull Class<T> annotationType) {
         return removeAnnotation(Objects.requireNonNull(annotationType).getName());
     }
 
@@ -84,7 +84,7 @@ public interface ElementMutableAnnotationMetadata<Rtr> extends AnnotationMetadat
      * @return This element
      */
     @NonNull
-    default <T extends Annotation> Rtr removeAnnotationIf(@NonNull Predicate<AnnotationValue<T>> predicate) {
+    default <T extends Annotation> R removeAnnotationIf(@NonNull Predicate<AnnotationValue<T>> predicate) {
         throw new UnsupportedOperationException("Element of type [" + getClass() + "] does not support removing annotations at compilation time");
     }
 
@@ -94,7 +94,7 @@ public interface ElementMutableAnnotationMetadata<Rtr> extends AnnotationMetadat
      * @return This element
      */
     @NonNull
-    default Rtr removeStereotype(@NonNull String annotationType) {
+    default R removeStereotype(@NonNull String annotationType) {
         throw new UnsupportedOperationException("Element of type [" + getClass() + "] does not support removing annotations at compilation time");
     }
 
@@ -105,7 +105,7 @@ public interface ElementMutableAnnotationMetadata<Rtr> extends AnnotationMetadat
      * @return This element
      */
     @NonNull
-    default <T extends Annotation> Rtr removeStereotype(@NonNull Class<T> annotationType) {
+    default <T extends Annotation> R removeStereotype(@NonNull Class<T> annotationType) {
         return removeStereotype(Objects.requireNonNull(annotationType).getName());
     }
 
@@ -117,7 +117,7 @@ public interface ElementMutableAnnotationMetadata<Rtr> extends AnnotationMetadat
      * @return This element
      */
     @NonNull
-    default Rtr annotate(@NonNull String annotationType) {
+    default R annotate(@NonNull String annotationType) {
         return annotate(annotationType, annotationValueBuilder -> { });
     }
 
@@ -131,7 +131,7 @@ public interface ElementMutableAnnotationMetadata<Rtr> extends AnnotationMetadat
      * @return This element
      */
     @NonNull
-    default <T extends Annotation> Rtr annotate(@NonNull Class<T> annotationType, @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
+    default <T extends Annotation> R annotate(@NonNull Class<T> annotationType, @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
         ArgumentUtils.requireNonNull("annotationType", annotationType);
         ArgumentUtils.requireNonNull("consumer", consumer);
         return annotate(annotationType.getName(), consumer);
@@ -146,7 +146,7 @@ public interface ElementMutableAnnotationMetadata<Rtr> extends AnnotationMetadat
      * @return This element
      */
     @NonNull
-    default <T extends Annotation> Rtr annotate(@NonNull Class<T> annotationType) {
+    default <T extends Annotation> R annotate(@NonNull Class<T> annotationType) {
         ArgumentUtils.requireNonNull("annotationType", annotationType);
         return annotate(annotationType.getName(), annotationValueBuilder -> { });
     }
@@ -161,7 +161,7 @@ public interface ElementMutableAnnotationMetadata<Rtr> extends AnnotationMetadat
      * @since 3.0.0
      */
     @NonNull
-    default <T extends Annotation> Rtr annotate(@NonNull AnnotationValue<T> annotationValue) {
+    default <T extends Annotation> R annotate(@NonNull AnnotationValue<T> annotationValue) {
         throw new UnsupportedOperationException("Element of type [" + getClass() + "] does not support adding annotations at compilation time");
     }
 

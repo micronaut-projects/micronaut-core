@@ -13,15 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.inject.ast;
-
-import io.micronaut.core.annotation.AnnotationMetadata;
-
 /**
- * Element's annotation metadata.
+ * The AST package contains internal classes to support annotation metadata on {@link io.micronaut.inject.ast.Element} instances.
  *
- * @author Denis Stepanov
- * @since 4.0.0
+ * @see io.micronaut.inject.visitor.TypeElementVisitor
+ * @author graemerocher
+ * @since 1.0
  */
-public interface ElementAnnotationMetadata extends ElementMutableAnnotationMetadata<AnnotationMetadata> {
-}
+@Internal
+package io.micronaut.inject.ast.annotation;
+
+import io.micronaut.core.annotation.Internal;

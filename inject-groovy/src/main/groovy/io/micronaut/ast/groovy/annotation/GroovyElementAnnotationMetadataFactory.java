@@ -15,8 +15,8 @@
  */
 package io.micronaut.ast.groovy.annotation;
 
-import io.micronaut.inject.annotation.AbstractElementAnnotationMetadataFactory;
-import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
+import io.micronaut.inject.ast.annotation.AbstractElementAnnotationMetadataFactory;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.AnnotationNode;
 

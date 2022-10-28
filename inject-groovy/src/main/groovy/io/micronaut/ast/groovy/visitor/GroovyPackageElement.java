@@ -17,7 +17,7 @@ package io.micronaut.ast.groovy.visitor;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.PackageElement;
 import org.codehaus.groovy.ast.PackageNode;
 
