@@ -4,7 +4,7 @@ plugins {
 
 dependencies {
     annotationProcessor project(":inject-java")
-
+    annotationProcessor project(":graal")
     api project(':context')
     implementation libs.managed.reactor
     compileOnly project(":jackson-databind")
