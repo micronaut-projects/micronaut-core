@@ -61,6 +61,18 @@ public class Qualifiers {
     }
 
     /**
+     * Allows looking up for beans without any qualifier.
+     *
+     * @param <T> The generic type
+     * @return The none qualifier.
+     * @since 3.8.0
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> Qualifier<T> none() {
+        return NoneQualifier.INSTANCE;
+    }
+
+    /**
      * Build a qualifier for the given argument.
      *
      * @param argument The argument

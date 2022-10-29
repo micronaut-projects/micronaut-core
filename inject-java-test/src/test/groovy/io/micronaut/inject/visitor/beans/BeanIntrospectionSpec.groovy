@@ -725,6 +725,41 @@ public record Foo(int x, int y){
     }
 
     @Requires({ jvm.isJava14Compatible() })
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/8187')
+    void "test secondary constructor for Java 14+ records with initializer"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
+package test;
+
+import io.micronaut.core.annotation.Creator;
+import java.util.List;
+import javax.validation.constraints.Min;
+
+@io.micronaut.core.annotation.Introspected
+public record Foo(int x, int y){
+    public Foo {
+        if (x < 0) {
+            throw new IllegalArgumentException("Invalid argument");
+        }
+    }
+    public Foo(int x) {
+        this(x, 20);
+    }
+    public Foo() {
+        this(20, 20);
+    }
+}
+''')
+        when:
+        def obj = introspection.instantiate(5, 10)
+
+        then:
+        introspection.getConstructorArguments().length == 2
+        obj.x() == 5
+        obj.y() == 10
+    }
+
+    @Requires({ jvm.isJava14Compatible() })
     void "test serializing records respects json annotations"() {
         given:
         BeanIntrospection introspection = buildBeanIntrospection('json.test.Foo', '''

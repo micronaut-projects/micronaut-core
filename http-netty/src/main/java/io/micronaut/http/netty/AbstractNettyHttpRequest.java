@@ -75,7 +75,7 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
         this.conversionService = conversionService;
         URI fullUri = URI.create(nettyRequest.uri());
         if (fullUri.getAuthority() != null || fullUri.getScheme() != null) {
-            // http://example.com/foo -> /foo
+            // https://example.com/foo -> /foo
             try {
                 fullUri = new URI(
                         null, // scheme
