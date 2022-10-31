@@ -99,19 +99,16 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
         registerDefaultAnnotationBinders(byAnnotation);
 
         byType.put(Argument.of(HttpHeaders.class).typeHashCode(), (RequestArgumentBinder<HttpHeaders>) (argument, source) -> () -> Optional.of(source.getHeaders()));
-        byType.put(Argument.of(HttpRequest.class).typeHashCode(), (RequestArgumentBinder<HttpRequest>) (argument, source) -> {
-            Optional<Argument<?>> typeVariable = argument.getFirstTypeVariable()
+        byType.put(Argument.of(HttpRequest.class).typeHashCode(), (RequestArgumentBinder<HttpRequest<?>>) (argument, source) -> {
+            if (HttpMethod.permitsRequestBody(source.getMethod())) {
+                Optional<Argument<?>> typeVariable = argument.getFirstTypeVariable()
                     .filter(arg -> arg.getType() != Object.class)
                     .filter(arg -> arg.getType() != Void.class);
-            if (typeVariable.isPresent() && HttpMethod.permitsRequestBody(source.getMethod())) {
-                if (source.getBody().isPresent()) {
+                if (typeVariable.isPresent()) {
                     return () -> Optional.of(new FullHttpRequest(source, typeVariable.get()));
-                } else {
-                    return ArgumentBinder.BindingResult.UNSATISFIED;
                 }
-            } else {
-                return () -> Optional.of(source);
             }
+            return () -> Optional.of(source);
         });
         byType.put(Argument.of(PushCapableHttpRequest.class).typeHashCode(), (RequestArgumentBinder<PushCapableHttpRequest>) (argument, source) -> {
             if (source instanceof PushCapableHttpRequest) {

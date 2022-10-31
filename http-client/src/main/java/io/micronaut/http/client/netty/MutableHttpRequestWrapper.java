@@ -18,9 +18,9 @@ package io.micronaut.http.client.netty;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpRequestWrapper;
 import io.micronaut.http.MutableHttpHeaders;
@@ -79,13 +79,12 @@ final class MutableHttpRequestWrapper<B> extends HttpRequestWrapper<B> implement
         }
     }
 
-    @NonNull
     @Override
-    public <T> Optional<T> getBody(@NonNull Argument<T> type) {
+    public <T> Optional<T> getBody(ArgumentConversionContext<T> conversionContext) {
         if (body == null) {
-            return getDelegate().getBody(type);
+            return getDelegate().getBody(conversionContext);
         } else {
-            return conversionService.convert(body, ConversionContext.of(type));
+            return conversionService.convert(body, conversionContext);
         }
     }
 
