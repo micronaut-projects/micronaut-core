@@ -17,35 +17,22 @@ package io.micronaut.annotation.processing;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.core.naming.NameUtils;
-import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.processing.JavaModelUtils;
 
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
-import javax.lang.model.element.ExecutableElement;
-import javax.lang.model.element.Modifier;
-import javax.lang.model.element.Name;
-import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
-import javax.lang.model.util.ElementFilter;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
-import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
-import static javax.lang.model.element.Modifier.ABSTRACT;
-import static javax.lang.model.element.Modifier.FINAL;
-import static javax.lang.model.element.Modifier.PRIVATE;
-import static javax.lang.model.element.Modifier.PROTECTED;
-import static javax.lang.model.element.Modifier.PUBLIC;
-import static javax.lang.model.element.Modifier.STATIC;
+import static javax.lang.model.element.Modifier.*;
 import static javax.lang.model.type.TypeKind.NONE;
 
 /**
@@ -86,118 +73,10 @@ public class ModelUtils {
         while (element != null && !(JavaModelUtils.isClassOrInterface(element) || JavaModelUtils.isRecord(element) || JavaModelUtils.isEnum(element))) {
             element = element.getEnclosingElement();
         }
-        if (element instanceof  TypeElement) {
-            return (TypeElement) element;
+        if (element instanceof  TypeElement e) {
+            return e;
         }
         return null;
-    }
-
-    /**
-     * The binary name of the type as a String.
-     *
-     * @param typeElement The type element
-     * @return The class name
-     */
-    String simpleBinaryNameFor(TypeElement typeElement) {
-        Name elementBinaryName = elementUtils.getBinaryName(typeElement);
-        PackageElement packageElement = elementUtils.getPackageOf(typeElement);
-
-        String packageName = packageElement.getQualifiedName().toString();
-        return elementBinaryName.toString().replaceFirst(packageName + "\\.", "");
-    }
-
-    /**
-     * Resolves a setter method for a field.
-     *
-     * @param field The field
-     * @return An optional setter method
-     */
-    Optional<ExecutableElement> findGetterMethodFor(Element field) {
-        // FIXME refine this to discover one of possible overloaded methods with correct signature (i.e. single arg of field type)
-        TypeElement typeElement = classElementFor(field);
-        if (typeElement == null) {
-            return Optional.empty();
-        }
-
-        String getterName = getterNameFor(field);
-        List<? extends Element> elements = typeElement.getEnclosedElements();
-        List<ExecutableElement> methods = ElementFilter.methodsIn(elements);
-        return methods.stream()
-                .filter(method -> {
-                    String methodName = method.getSimpleName().toString();
-                    if (getterName.equals(methodName)) {
-                        Set<Modifier> modifiers = method.getModifiers();
-                        return
-                                // it's not static
-                                !modifiers.contains(STATIC)
-                                        // it's either public or package visibility
-                                        && modifiers.contains(PUBLIC)
-                                        || !(modifiers.contains(PRIVATE) || modifiers.contains(PROTECTED));
-                    }
-                    return false;
-                })
-                .findFirst();
-    }
-
-    /**
-     * Resolves a setter method for a field.
-     *
-     * @param field The field
-     * @return An optional setter method
-     */
-    Optional<ExecutableElement> findSetterMethodFor(Element field) {
-        String name = field.getSimpleName().toString();
-        if (field.asType().getKind() == TypeKind.BOOLEAN && name.length() > 2 && Character.isUpperCase(name.charAt(2))) {
-            name = name.replaceFirst("^(is)(.+)", "$2");
-        }
-        // FIXME refine this to discover one of possible overloaded methods with correct signature (i.e. single arg of field type)
-        TypeElement typeElement = classElementFor(field);
-        if (typeElement == null) {
-            return Optional.empty();
-        }
-
-        String setterName = setterNameFor(name);
-        List<? extends Element> elements = typeElement.getEnclosedElements();
-        List<ExecutableElement> methods = ElementFilter.methodsIn(elements);
-        return methods.stream()
-            .filter(method -> {
-                String methodName = method.getSimpleName().toString();
-                if (setterName.equals(methodName)) {
-                    Set<Modifier> modifiers = method.getModifiers();
-                    return
-                        // it's not static
-                        !modifiers.contains(STATIC)
-                            // it's either public or package visibility
-                            && modifiers.contains(PUBLIC)
-                            || !(modifiers.contains(PRIVATE) || modifiers.contains(PROTECTED));
-                }
-                return false;
-            })
-            .findFirst();
-    }
-
-    /**
-     * The name of a getter for the given field.
-     *
-     * @param field The field in question
-     * @return The getter name
-     */
-    String getterNameFor(Element field) {
-        String methodNamePrefix = "get";
-        if (field.asType().getKind() == TypeKind.BOOLEAN) {
-            methodNamePrefix = "is";
-        }
-        return methodNamePrefix + NameUtils.capitalize(field.getSimpleName().toString());
-    }
-
-    /**
-     * The name of a setter for the given field name.
-     *
-     * @param fieldName The field name
-     * @return The setter name
-     */
-    String setterNameFor(String fieldName) {
-        return "set" + NameUtils.capitalize(fieldName);
     }
 
     /**
@@ -268,19 +147,6 @@ public class ModelUtils {
     }
 
     /**
-     * Returns whether an element is package private.
-     *
-     * @param element The element
-     * @return True if it is package provide
-     */
-    public boolean isPackagePrivate(Element element) {
-        Set<Modifier> modifiers = element.getModifiers();
-        return !(modifiers.contains(PUBLIC)
-            || modifiers.contains(PROTECTED)
-            || modifiers.contains(PRIVATE));
-    }
-
-    /**
      * @param aClass A class
      * @return All the interfaces
      */
@@ -306,8 +172,7 @@ public class ModelUtils {
     private Set<TypeElement> populateInterfaces(TypeElement aClass, Set<TypeElement> interfaces) {
         for (TypeMirror anInterface : aClass.getInterfaces()) {
             final Element e = typeUtils.asElement(anInterface);
-            if (e instanceof TypeElement) {
-                final TypeElement te = (TypeElement) e;
+            if (e instanceof TypeElement te) {
                 if (!interfaces.contains(te)) {
                     interfaces.add(te);
                     populateInterfaces(te, interfaces);
@@ -318,8 +183,7 @@ public class ModelUtils {
             TypeMirror superclass = aClass.getSuperclass();
             while (superclass != null) {
                 final Element e = typeUtils.asElement(superclass);
-                if (e instanceof TypeElement) {
-                    TypeElement superTypeElement = (TypeElement) e;
+                if (e instanceof TypeElement superTypeElement) {
                     populateInterfaces(superTypeElement, interfaces);
                     superclass = superTypeElement.getSuperclass();
                 } else {
@@ -328,104 +192,6 @@ public class ModelUtils {
             }
         }
         return interfaces;
-    }
-
-    /**
-     * Return whether the given method or field is inherited but not public.
-     *
-     * @param concreteClass  The concrete class
-     * @param declaringClass The declaring class of the field
-     * @param methodOrField  The method or field
-     * @return True if it is inherited and not public
-     */
-    boolean isInheritedAndNotPublic(TypeElement concreteClass, TypeElement declaringClass, Element methodOrField) {
-        PackageElement packageOfDeclaringClass = elementUtils.getPackageOf(declaringClass);
-        PackageElement packageOfConcreteClass = elementUtils.getPackageOf(concreteClass);
-
-        return declaringClass != concreteClass &&
-            !packageOfDeclaringClass.getQualifiedName().equals(packageOfConcreteClass.getQualifiedName())
-            && (isProtected(methodOrField) || !isPublic(methodOrField));
-    }
-
-    /**
-     * Return whether the given method or field is inherited but not public.
-     *
-     * @param concreteClass  The concrete class
-     * @param declaringClass The declaring class of the field
-     * @param methodOrField  The method or field
-     * @return True if it is inherited and not public
-     */
-    boolean isInheritedAndNotPublic(ClassElement concreteClass, ClassElement declaringClass, io.micronaut.inject.ast.Element methodOrField) {
-        String packageOfDeclaringClass = declaringClass.getPackageName();
-        String packageOfConcreteClass = concreteClass.getPackageName();
-
-        return declaringClass != concreteClass &&
-                !packageOfDeclaringClass.equals(packageOfConcreteClass)
-                && (methodOrField.isProtected() || !methodOrField.isPublic());
-    }
-
-    /**
-     * Tests if candidate method is overridden from a given class or subclass.
-     *
-     * @param overridden   the candidate overridden method
-     * @param classElement the type element that may contain the overriding method, either directly or in a subclass
-     * @param strict       Whether to use strict checks for overriding and not include logic to handle method overloading
-     * @return the overriding method
-     */
-    public Optional<ExecutableElement> overridingOrHidingMethod(ExecutableElement overridden, TypeElement classElement, boolean strict) {
-        List<ExecutableElement> methods = ElementFilter.methodsIn(elementUtils.getAllMembers(classElement));
-        for (ExecutableElement method : methods) {
-            if (strict) {
-                if (elementUtils.overrides(method, overridden, classElement)) {
-                    return Optional.of(method);
-                }
-            } else {
-                if (!method.equals(overridden) &&
-                        method.getSimpleName().equals(overridden.getSimpleName())) {
-                    return Optional.of(method);
-                }
-            }
-
-        }
-        // might be looking for a package private & packages differ method in a superclass
-        // that is not visible to the most concrete subclass, really!
-        // e.g. see injectPackagePrivateMethod4() for SpareTire -> Tire -> RoundThing in Inject tck
-        // check the superclass until we reach Object, then bail out with empty if necessary.
-        TypeElement superClass = superClassFor(classElement);
-        if (superClass != null && !isObjectClass(superClass)) {
-            return overridingOrHidingMethod(overridden, superClass, strict);
-        }
-        return Optional.empty();
-    }
-
-    /**
-     * Return whether the element is private.
-     *
-     * @param element The element
-     * @return True if it is private
-     */
-    boolean isPrivate(Element element) {
-        return element.getModifiers().contains(PRIVATE);
-    }
-
-    /**
-     * Return whether the element is protected.
-     *
-     * @param element The element
-     * @return True if it is protected
-     */
-    boolean isProtected(Element element) {
-        return element.getModifiers().contains(PROTECTED);
-    }
-
-    /**
-     * Return whether the element is public.
-     *
-     * @param element The element
-     * @return True if it is public
-     */
-    boolean isPublic(Element element) {
-        return element.getModifiers().contains(PUBLIC);
     }
 
     /**
@@ -446,27 +212,6 @@ public class ModelUtils {
      */
     boolean isStatic(Element element) {
         return element.getModifiers().contains(STATIC);
-    }
-
-
-    /**
-     * Return whether the element is final.
-     *
-     * @param element The element
-     * @return True if it is final
-     */
-    boolean isFinal(Element element) {
-        return element.getModifiers().contains(FINAL);
-    }
-
-    /**
-     * Is the given type mirror an optional.
-     *
-     * @param mirror The mirror
-     * @return True if it is
-     */
-    boolean isOptional(TypeMirror mirror) {
-        return typeUtils.erasure(mirror).toString().equals(Optional.class.getName());
     }
 
     /**

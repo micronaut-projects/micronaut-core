@@ -28,6 +28,7 @@ import io.micronaut.inject.ast.ArrayableClassElement;
 import io.micronaut.inject.ast.BeanPropertiesQuery;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
+import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
@@ -45,6 +46,7 @@ import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
+import javax.lang.model.element.RecordComponentElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.TypeParameterElement;
 import javax.lang.model.element.VariableElement;
@@ -560,6 +562,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
 
     @NonNull
     @Override
+    @SuppressWarnings("java:S1119")
     public Optional<MethodElement> getPrimaryConstructor() {
         if (JavaModelUtils.isRecord(classElement)) {
             Optional<MethodElement> staticCreator = findStaticCreator();
@@ -578,6 +581,24 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                 return annotatedConstructor.map(c -> c);
             }
             // with records the record constructor is always the last constructor
+            List<? extends RecordComponentElement> recordComponents = classElement.getRecordComponents();
+            constructorSearch: for (ConstructorElement constructor : constructors) {
+                ParameterElement[] parameters = constructor.getParameters();
+                if (parameters.length == recordComponents.size()) {
+                    for (int i = 0; i < parameters.length; i++) {
+                        ParameterElement parameter = parameters[i];
+                        RecordComponentElement rce = recordComponents.get(i);
+                        VariableElement ve = (VariableElement) parameter.getNativeType();
+                        TypeMirror leftType = visitorContext.getTypes().erasure(ve.asType());
+                        TypeMirror rightType = visitorContext.getTypes().erasure(rce.asType());
+                        if (!leftType.equals(rightType)) {
+                            // types don't match, continue searching constructors
+                            continue constructorSearch;
+                        }
+                    }
+                    return Optional.of(constructor);
+                }
+            }
             return Optional.of(constructors.get(constructors.size() - 1));
         }
         return ArrayableClassElement.super.getPrimaryConstructor();
