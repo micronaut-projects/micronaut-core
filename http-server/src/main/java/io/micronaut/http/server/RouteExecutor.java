@@ -20,6 +20,7 @@ import io.micronaut.context.exceptions.BeanCreationException;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.execution.ExecutionFlow;
@@ -648,8 +649,9 @@ public final class RouteExecutor {
         if (errorRoute == null) {
             // Second try is by status route if the status is known
             HttpStatus errorStatus = null;
-            if (cause instanceof UnsatisfiedRouteException) {
+            if (cause instanceof UnsatisfiedRouteException || cause instanceof CodecException) {
                 // when arguments do not match, then there is UnsatisfiedRouteException, we can handle this with a routed bad request
+                // or when incoming request body is not in the expected format
                 errorStatus = HttpStatus.BAD_REQUEST;
             } else if (cause instanceof HttpStatusException) {
                 errorStatus = ((HttpStatusException) cause).getStatus();
