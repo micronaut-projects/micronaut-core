@@ -1,6 +1,5 @@
 package io.micronaut.docs.reactor
 
-import io.micronaut.NameRequestBody
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Introspected
@@ -102,6 +101,9 @@ class SomeService {
     }
 
 }
+
+@Introspected
+class NameRequestBody(val name: String)
 
 @Requires(property = "mdc.reactortestpropagation.enabled")
 // tag::simplefilter[]

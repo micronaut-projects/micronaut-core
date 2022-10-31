@@ -8,8 +8,12 @@ dependencies {
     api project(':inject')
     api project(':aop')
     api libs.managed.validation
+
     compileOnly project(':core-reactive')
     compileOnly project(':core-processor')
+    compileOnly libs.log4j
+    compileOnly libs.managed.logback
+
     testCompileOnly project(":inject-groovy")
     testAnnotationProcessor project(":inject-java")
     testImplementation project(":core-reactive")

@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 
 import io.micronaut.context.ApplicationContext;
@@ -33,10 +34,10 @@ import io.micronaut.http.server.netty.ssl.ServerSslBuilder;
 import io.micronaut.scheduling.executor.ExecutorSelector;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.resource.StaticResourceResolver;
-import io.micronaut.websocket.context.WebSocketBeanRegistry;
 import io.netty.channel.ChannelOutboundHandler;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.ServerChannel;
+import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.channel.socket.ServerSocketChannel;
 
 /**
@@ -117,10 +118,11 @@ public interface NettyEmbeddedServices {
     HttpCompressionStrategy getHttpCompressionStrategy();
 
     /**
-     * @return The websocket bean registry
+     * @param embeddedServer The server
+     * @return The websocket upgrade handler if present
      */
-    @NonNull
-    WebSocketBeanRegistry getWebSocketBeanRegistry();
+    @SuppressWarnings("java:S1452")
+    Optional<SimpleChannelInboundHandler<NettyHttpRequest<?>>> getWebSocketUpgradeHandler(NettyEmbeddedServer embeddedServer);
 
     /**
      * @return The event loop group registry.

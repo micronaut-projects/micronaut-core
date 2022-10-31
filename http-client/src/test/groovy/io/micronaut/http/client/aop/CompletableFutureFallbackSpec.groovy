@@ -19,6 +19,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.http.annotation.*
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.retry.annotation.Fallback
+import io.micronaut.retry.annotation.Recoverable
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -92,6 +93,7 @@ class CompletableFutureFallbackSpec extends Specification {
 
 
     @Client('/future/fallback/books')
+    @Recoverable
     static interface BookClient extends BookApi {
     }
 

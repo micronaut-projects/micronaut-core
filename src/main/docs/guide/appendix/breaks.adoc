@@ -4,6 +4,33 @@ This section documents breaking changes between Micronaut versions
 
 === Core Changes
 
+==== Further Micronaut Modularization
+
+The `micronaut-runtime` module has been split into separate modules depending on the application's use case:
+
+* `micronaut-retry` - The retry implementation including annotations such as ann:retry.annotation.Retryable[] is now a separate module that can be optionally included in a Micronaut application.
+* `micronaut-discovery-core` - The base service discovery features are now a separate module. If you application listens for events such as api:discovery.event.ServiceReadyEvent[] or api:discovery.heartbeat.HeartBeatEvent[] this module should be added to the application classpath.
+
+In addition, since `micronaut-retry` is now optional declarative clients annotated with ann:http.client.annotation.Client[] no longer invoke fallbacks by default. To restore the previous behaviour add `micronaut-retry` to your classpath and annotate any declarative clients with ann:retry.annotation.Recoverable[].
+
+==== WebSocket No Longer Required
+
+The `micronaut-websocket` API is no longer a required dependency of the HTTP server. If you are using annotations such as ann:websocket.annotation.ServerWebSocket[] you should add the `micronaut-websocket` dependency to your application classpath:
+
+dependency::micronaut-websocket[]
+
+==== Reactor Instrumentation Moved to Reactor Module
+
+The instrumentation features for Reactor have been moved to the `micronaut-reactor` module. If you require instrumentation of reactive code paths (for distributed tracing for example) you should make sure your application depends on `micronaut-reactor`:
+
+dependency::micronaut-reactor[groupId="io.micronaut.reactor"]
+
+==== Kotlin Flow Support Moved to Kotlin Module
+
+Support for the Kotlin `Flow` type has been moved to the `micronaut-kotlin` module. If your application uses Kotlin `Flow` you should ensure the `micronaut-kotlin-runtime` module is on your application classpath:
+
+dependency::micronaut-kotlin-runtime[groupId="io.micronaut.kotlin"]
+
 ==== Compilation Time API Split into new module
 
 In order to keep the runtime small all types and interfaces that are used at compilation time only (like the `io.micronaut.inject.ast` API) have been moved into a separate module:

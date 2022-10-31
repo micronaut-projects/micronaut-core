@@ -7,7 +7,8 @@ dependencies {
     annotationProcessor project(":graal")
 
     api project(":router")
-    api project(":runtime")
+    api project(":discovery-core")
+    compileOnly project(":jackson-databind")
     compileOnly(libs.managed.micronaut.sql.jdbc) {
         exclude module:'micronaut-inject'
         exclude module:'micronaut-bom'
@@ -18,6 +19,7 @@ dependencies {
     testImplementation project(":http-client")
     testImplementation project(":inject-groovy")
     testImplementation project(":http-server-netty")
+    testImplementation project(":jackson-databind")
     testImplementation(libs.managed.micronaut.sql.jdbc.tomcat) {
         exclude module:'micronaut-inject'
         exclude module:'micronaut-bom'

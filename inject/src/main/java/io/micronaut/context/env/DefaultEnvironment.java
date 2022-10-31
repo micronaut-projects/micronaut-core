@@ -102,9 +102,8 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private static final List<String> DEFAULT_CONFIG_LOCATIONS = Arrays.asList("classpath:/", "file:config/");
     protected final ClassPathResourceLoader resourceLoader;
     protected final List<PropertySource> refreshablePropertySources = new ArrayList<>(10);
-
+    protected final MutableConversionService mutableConversionService;
     private EnvironmentsAndPackage environmentsAndPackage;
-
     private final Set<String> names;
     private final ClassLoader classLoader;
     private final Collection<String> packages = new ConcurrentLinkedQueue<>();
@@ -119,7 +118,6 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private final Boolean deduceEnvironments;
     private final ApplicationContextConfiguration configuration;
     private final Collection<String> configLocations;
-    protected final MutableConversionService mutableConversionService;
 
     /**
      * Construct a new environment for the given configuration.

@@ -25,8 +25,6 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.discovery.ServiceInstance;
-import io.micronaut.discovery.metadata.ServiceInstanceMetadataContributor;
 import io.micronaut.function.DefaultLocalFunctionRegistry;
 import io.micronaut.function.FunctionBean;
 import io.micronaut.function.LocalFunctionRegistry;
@@ -60,7 +58,7 @@ import java.util.stream.Stream;
 @Replaces(DefaultLocalFunctionRegistry.class)
 public class AnnotatedFunctionRouteBuilder
     extends DefaultRouteBuilder
-    implements ExecutableMethodProcessor<FunctionBean>, LocalFunctionRegistry, ServiceInstanceMetadataContributor, MediaTypeCodecRegistry {
+    implements ExecutableMethodProcessor<FunctionBean>, LocalFunctionRegistry, MediaTypeCodecRegistry {
 
     private final LocalFunctionRegistry localFunctionRegistry;
     private final String contextPath;
@@ -242,14 +240,6 @@ public class AnnotatedFunctionRouteBuilder
     @Override
     public <T, U, R> Optional<ExecutableMethod<BiFunction<T, U, R>, R>> findBiFunction(String name) {
         return localFunctionRegistry.findBiFunction(name);
-    }
-
-    @Override
-    public void contribute(ServiceInstance instance, Map<String, String> metadata) {
-        for (Map.Entry<String, URI> entry : availableFunctions.entrySet()) {
-            String functionName = entry.getKey();
-            metadata.put(FUNCTION_PREFIX + functionName, entry.getValue().toString());
-        }
     }
 
     @Override

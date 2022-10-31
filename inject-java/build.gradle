@@ -39,6 +39,7 @@ dependencies {
     }
     testImplementation libs.managed.micrometer.core
     testImplementation project(":validation")
+    testImplementation project(":jackson-databind")
     testImplementation libs.junit.jupiter.api
     testImplementation(platform(libs.boms.micronaut.tracing))
     testImplementation(libs.micronaut.tracing.zipkin) {

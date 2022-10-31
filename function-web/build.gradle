@@ -13,7 +13,7 @@ dependencies {
     testImplementation project(":http-client")
     testImplementation project(":inject")
     testImplementation project(":http-server-netty")
-
+    testImplementation project(":jackson-databind")
     testAnnotationProcessor project(":inject-java")
     testCompileOnly project(":inject-groovy")
 }

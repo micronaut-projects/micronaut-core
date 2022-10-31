@@ -874,8 +874,8 @@ public class DefaultBeanContext implements InitializableBeanContext {
         try {
             return getBean(null, beanType, qualifier);
         } catch (DisabledBeanException e) {
-            if (AbstractBeanContextConditional.LOG.isDebugEnabled()) {
-                AbstractBeanContextConditional.LOG.debug("Bean of type [{}] disabled for reason: {}", beanType.getSimpleName(), e.getMessage());
+            if (AbstractBeanContextConditional.ConditionLog.LOG.isDebugEnabled()) {
+                AbstractBeanContextConditional.ConditionLog.LOG.debug("Bean of type [{}] disabled for reason: {}", beanType.getSimpleName(), e.getMessage());
             }
             throw new NoSuchBeanException(beanType, qualifier);
         }
@@ -1693,8 +1693,8 @@ public class DefaultBeanContext implements InitializableBeanContext {
                 return Optional.of(beanRegistration.bean);
             }
         } catch (DisabledBeanException e) {
-            if (AbstractBeanContextConditional.LOG.isDebugEnabled()) {
-                AbstractBeanContextConditional.LOG.debug("Bean of type [{}] disabled for reason: {}", beanType.getSimpleName(), e.getMessage());
+            if (AbstractBeanContextConditional.ConditionLog.LOG.isDebugEnabled()) {
+                AbstractBeanContextConditional.ConditionLog.LOG.debug("Bean of type [{}] disabled for reason: {}", beanType.getSimpleName(), e.getMessage());
             }
             return Optional.empty();
         }
@@ -1923,8 +1923,8 @@ public class DefaultBeanContext implements InitializableBeanContext {
                 try {
                     loadContextScopeBean(contextScopeDefinition);
                 } catch (DisabledBeanException e) {
-                    if (AbstractBeanContextConditional.LOG.isDebugEnabled()) {
-                        AbstractBeanContextConditional.LOG.debug("Bean of type [{}] disabled for reason: {}", contextScopeDefinition.getBeanType().getSimpleName(), e.getMessage());
+                    if (AbstractBeanContextConditional.ConditionLog.LOG.isDebugEnabled()) {
+                        AbstractBeanContextConditional.ConditionLog.LOG.debug("Bean of type [{}] disabled for reason: {}", contextScopeDefinition.getBeanType().getSimpleName(), e.getMessage());
                     }
                 } catch (Throwable e) {
                     throw new BeanInstantiationException("Bean definition [" + contextScopeDefinition.getName() + "] could not be loaded: " + e.getMessage(), e);
@@ -3523,8 +3523,8 @@ public class DefaultBeanContext implements InitializableBeanContext {
                 LOG.debug("Found a registration {} for candidate: {} with qualifier: {}", beanRegistration, candidate, qualifier);
             }
         } catch (DisabledBeanException e) {
-            if (AbstractBeanContextConditional.LOG.isDebugEnabled()) {
-                AbstractBeanContextConditional.LOG.debug("Bean of type [{}] disabled for reason: {}", beanType.getTypeName(), e.getMessage());
+            if (AbstractBeanContextConditional.ConditionLog.LOG.isDebugEnabled()) {
+                AbstractBeanContextConditional.ConditionLog.LOG.debug("Bean of type [{}] disabled for reason: {}", beanType.getTypeName(), e.getMessage());
             }
         }
 

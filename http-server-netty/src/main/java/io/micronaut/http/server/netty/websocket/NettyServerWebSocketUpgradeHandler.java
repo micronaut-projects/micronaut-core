@@ -26,8 +26,6 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.bind.RequestBinderRegistry;
-import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.netty.NettyHttpHeaders;
@@ -86,9 +84,7 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
     private static final AsciiString WEB_SOCKET_HEADER_VALUE = AsciiString.cached("websocket");
 
     private final Router router;
-    private final RequestBinderRegistry binderRegistry;
     private final WebSocketBeanRegistry webSocketBeanRegistry;
-    private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
     private final WebSocketSessionRepository webSocketSessionRepository;
     private final RouteExecutor routeExecutor;
     private final NettyEmbeddedServices nettyEmbeddedServices;
@@ -104,9 +100,7 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
     public NettyServerWebSocketUpgradeHandler(NettyEmbeddedServices embeddedServices,
                                               WebSocketSessionRepository webSocketSessionRepository) {
         this.router = embeddedServices.getRouter();
-        this.binderRegistry = embeddedServices.getRequestArgumentSatisfier().getBinderRegistry();
-        this.webSocketBeanRegistry = embeddedServices.getWebSocketBeanRegistry();
-        this.mediaTypeCodecRegistry = embeddedServices.getMediaTypeCodecRegistry();
+        this.webSocketBeanRegistry = WebSocketBeanRegistry.forServer(embeddedServices.getApplicationContext());
         this.webSocketSessionRepository = webSocketSessionRepository;
         this.routeExecutor = embeddedServices.getRouteExecutor();
         this.nettyEmbeddedServices = embeddedServices;

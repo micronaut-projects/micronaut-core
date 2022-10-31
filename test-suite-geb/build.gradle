@@ -17,5 +17,6 @@ dependencies {
     testImplementation project(':http')
     testImplementation project(':http-server-netty')
 
-    testRuntimeOnly "ch.qos.logback:logback-classic:1.2.3"
+    testRuntimeOnly libs.managed.logback
+    testImplementation project(":jackson-databind")
 }

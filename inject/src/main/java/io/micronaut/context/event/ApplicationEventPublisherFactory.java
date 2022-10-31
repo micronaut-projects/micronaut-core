@@ -60,7 +60,7 @@ import org.slf4j.LoggerFactory;
 public final class ApplicationEventPublisherFactory<T>
         implements BeanDefinition<ApplicationEventPublisher<T>>, BeanFactory<ApplicationEventPublisher<T>>,
                    BeanDefinitionReference<ApplicationEventPublisher<T>> {
-    private static final Logger EVENT_LOGGER = LoggerFactory.getLogger(ApplicationEventPublisher.class);
+
     private static final Argument<Object> TYPE_VARIABLE = Argument.ofTypeVariable(Object.class, "T");
     private final AnnotationMetadata annotationMetadata;
     private ApplicationEventPublisher applicationObjectEventPublisher;
@@ -223,8 +223,8 @@ public final class ApplicationEventPublisherFactory<T>
             @Override
             public void publishEvent(Object event) {
                 if (event != null) {
-                    if (EVENT_LOGGER.isDebugEnabled()) {
-                        EVENT_LOGGER.debug("Publishing event: {}", event);
+                    if (EventLogger.LOG.isDebugEnabled()) {
+                        EventLogger.LOG.debug("Publishing event: {}", event);
                     }
                     notifyEventListeners(event, lazyListeners.get());
                 }
@@ -250,21 +250,21 @@ public final class ApplicationEventPublisherFactory<T>
 
     private void notifyEventListeners(@NonNull Object event, Collection<ApplicationEventListener> eventListeners) {
         if (!eventListeners.isEmpty()) {
-            if (EVENT_LOGGER.isTraceEnabled()) {
-                EVENT_LOGGER.trace("Established event listeners {} for event: {}", eventListeners, event);
+            if (EventLogger.LOG.isTraceEnabled()) {
+                EventLogger.LOG.trace("Established event listeners {} for event: {}", eventListeners, event);
             }
             for (ApplicationEventListener listener : eventListeners) {
                 if (listener.supports(event)) {
                     try {
-                        if (EVENT_LOGGER.isTraceEnabled()) {
-                            EVENT_LOGGER.trace("Invoking event listener [{}] for event: {}", listener, event);
+                        if (EventLogger.LOG.isTraceEnabled()) {
+                            EventLogger.LOG.trace("Invoking event listener [{}] for event: {}", listener, event);
                         }
                         listener.onApplicationEvent(event);
                     } catch (ClassCastException ex) {
                         String msg = ex.getMessage();
                         if (msg == null || msg.startsWith(event.getClass().getName())) {
-                            if (EVENT_LOGGER.isDebugEnabled()) {
-                                EVENT_LOGGER.debug("Incompatible listener for event: " + listener, ex);
+                            if (EventLogger.LOG.isDebugEnabled()) {
+                                EventLogger.LOG.debug("Incompatible listener for event: " + listener, ex);
                             }
                         } else {
                             throw ex;
@@ -272,6 +272,13 @@ public final class ApplicationEventPublisherFactory<T>
                     }
                 }
             }
+        }
+    }
+
+    private static final class EventLogger {
+        private static final Logger LOG = LoggerFactory.getLogger(ApplicationEventPublisher.class);
+
+        private EventLogger() {
         }
     }
 }
