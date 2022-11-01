@@ -928,4 +928,79 @@ class SuccessfulTest extends AbstractExample {
             props[1].name.contains "dummy"
             props[2].name.contains "sharedCtx"
     }
+
+    void "test fields selection"() {
+        given:
+            ClassElement classElement = buildClassElement('test.PetOperations', '''
+package test
+
+import groovy.transform.PackageScope;
+import io.micronaut.http.annotation.*;
+import jakarta.inject.Inject;
+
+@Controller("/pets")
+interface PetOperations<T extends Pet> {
+
+    @Post("/")
+    T save(String name, int age);
+}
+
+class Pet {
+    public int pub;
+
+    private String prvn;
+
+    protected String protectme;
+
+    @PackageScope
+    String packprivme;
+
+    public static String PUB_CONST;
+
+    private static String PRV_CONST;
+
+    protected static String PROT_CONST;
+
+    @PackageScope
+    static String PACK_PRV_CONST;
+}
+
+''')
+        when:
+            List<FieldElement> publicFields = classElement.getFirstTypeArgument()
+                    .get()
+                    .getEnclosedElements(ElementQuery.ALL_FIELDS.modifiers(mods -> mods.contains(ElementModifier.PUBLIC) && mods.size() == 1))
+        then:
+            publicFields.size() == 1
+            publicFields.stream().map(FieldElement::getName).toList() == ["pub"]
+
+        when:
+            List<FieldElement> publicFields2 = classElement.getFirstTypeArgument()
+                    .get()
+                    .getEnclosedElements(ElementQuery.ALL_FIELDS.filter(e -> e.isPublic()))
+        then:
+            publicFields2.size() == 2
+            publicFields2.stream().map(FieldElement::getName).toList() == ["pub", "PUB_CONST"]
+        when:
+            List<FieldElement> protectedFields = classElement.getFirstTypeArgument()
+                    .get()
+                    .getEnclosedElements(ElementQuery.ALL_FIELDS.filter(e -> e.isProtected()))
+        then:
+            protectedFields.size() == 2
+            protectedFields.stream().map(FieldElement::getName).toList() == ["protectme", "PROT_CONST"]
+        when:
+            List<FieldElement> privateFields = classElement.getFirstTypeArgument()
+                    .get()
+                    .getEnclosedElements(ElementQuery.ALL_FIELDS.filter(e -> e.isPrivate()))
+        then:
+            privateFields.size() == 2
+            privateFields.stream().map(FieldElement::getName).toList() == ["prvn", "PRV_CONST"]
+        when:
+            List<FieldElement> packPrvFields = classElement.getFirstTypeArgument()
+                    .get()
+                    .getEnclosedElements(ElementQuery.ALL_FIELDS.filter(e -> e.isPackagePrivate()))
+        then:
+            packPrvFields.size() == 2
+            packPrvFields.stream().map(FieldElement::getName).toList() == ["packprivme", "PACK_PRV_CONST"]
+    }
 }
