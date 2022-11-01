@@ -17,6 +17,7 @@ package io.micronaut.http.server.exceptions.response;
 
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.annotation.Secondary;
 import io.micronaut.context.env.groovy.GroovyPropertySourceLoader;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.MutableHttpResponse;
@@ -31,6 +32,7 @@ import jakarta.inject.Singleton;
  */
 @Deprecated
 @Singleton
+@Secondary
 @Requires(classes = GroovyPropertySourceLoader.class)
 @Replaces(HateoasErrorResponseProcessor.class)
 public class HateoasErrorResponseProcessorReplacement implements ErrorResponseProcessor<JsonError> {
