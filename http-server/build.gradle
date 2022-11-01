@@ -2,6 +2,11 @@ plugins {
     id "io.micronaut.build.internal.convention-library"
 }
 
+repositories {
+    mavenCentral()
+    maven { url "https://s01.oss.sonatype.org/content/repositories/snapshots/" }
+}
+
 dependencies {
     api project(":http")
     api project(":router")
