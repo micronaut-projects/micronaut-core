@@ -1469,6 +1469,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
     }
 
     @Override
+    @SuppressWarnings("java:S2789") // performance optimization
     public <T> Optional<BeanDefinition<T>> findProxyTargetBeanDefinition(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         ArgumentUtils.requireNonNull("beanType", beanType);
         @SuppressWarnings("unchecked")
@@ -2825,6 +2826,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
         final BeanResolutionContext.Path path = resolutionContext != null ? resolutionContext.getPath() : null;
         BeanResolutionContext.Segment<?> injectionPointSegment = null;
         if (CollectionUtils.isNotEmpty(path)) {
+            @SuppressWarnings("java:S2259") // false positive
             final Iterator<BeanResolutionContext.Segment<?>> i = path.iterator();
             injectionPointSegment = i.next();
             BeanResolutionContext.Segment<?> segment = null;
@@ -3054,6 +3056,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
      * @return The concrete bean definition candidate
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
+    @SuppressWarnings("java:S2789") // performance optimization
     private <T> Optional<BeanDefinition<T>> findConcreteCandidate(@Nullable BeanResolutionContext resolutionContext,
                                                                   @NonNull Argument<T> beanType,
                                                                   @Nullable Qualifier<T> qualifier,

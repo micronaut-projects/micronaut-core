@@ -404,6 +404,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @see AnnotationSource#isAnnotationPresent(Class)
      */
     @Override
+    @SuppressWarnings("java:S2583")
     default boolean isAnnotationPresent(@NonNull Class<? extends Annotation> annotationClass) {
         //noinspection ConstantConditions
         if (annotationClass == null) {
@@ -416,6 +417,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @see AnnotationSource#isAnnotationPresent(Class)
      */
     @Override
+    @SuppressWarnings("java:S2583")
     default boolean isDeclaredAnnotationPresent(@NonNull Class<? extends Annotation> annotationClass) {
         //noinspection ConstantConditions
         if (annotationClass == null) {
@@ -429,6 +431,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @see AnnotationSource#isAnnotationPresent(String)
      */
     @Override
+    @SuppressWarnings("java:S2583")
     default boolean isAnnotationPresent(@NonNull String annotationName) {
         //noinspection ConstantConditions
         if (annotationName == null) {
@@ -441,6 +444,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @see AnnotationSource#isAnnotationPresent(String)
      */
     @Override
+    @SuppressWarnings("java:S2583")
     default boolean isDeclaredAnnotationPresent(@NonNull String annotationName) {
         //noinspection ConstantConditions
         if (annotationName == null) {
@@ -578,11 +582,11 @@ public interface AnnotationMetadata extends AnnotationSource {
      */
     default Optional<Class<? extends Annotation>> getAnnotationType(@NonNull String name, @NonNull ClassLoader classLoader) {
         ArgumentUtils.requireNonNull("name", name);
-        final Optional<Class> aClass = ClassUtils.forName(name, classLoader);
-        Class clazz = aClass.orElse(null);
+        final Optional<Class<?>> aClass = ClassUtils.forName(name, classLoader);
+        Class<?> clazz = aClass.orElse(null);
         if (clazz != null && Annotation.class.isAssignableFrom(clazz)) {
             //noinspection unchecked
-            return (Optional) aClass;
+            return (Optional<Class<? extends Annotation>>) aClass;
         }
         return Optional.empty();
     }

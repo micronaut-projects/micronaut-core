@@ -239,6 +239,7 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
                         }
                         Thread.sleep(delayMillis);
                     } catch (InterruptedException e1) {
+                        Thread.currentThread().interrupt();
                         throw e;
                     }
                 }

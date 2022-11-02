@@ -52,6 +52,7 @@ import io.netty.handler.codec.http2.Http2ServerUpgradeCodec;
 import io.netty.handler.codec.http2.Http2StreamChannel;
 import io.netty.handler.codec.http2.Http2StreamFrameToHttpObjectCodec;
 import io.netty.handler.flow.FlowControlHandler;
+import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.pcap.PcapWriteHandler;
 import io.netty.handler.ssl.ApplicationProtocolNames;
@@ -74,6 +75,7 @@ import java.net.SocketAddress;
 import java.nio.channels.ClosedChannelException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Supplier;
 
@@ -116,7 +118,8 @@ final class HttpPipelineBuilder {
         this.hostResolver = hostResolver;
         this.serverCustomizer = serverCustomizer;
 
-        loggingHandler = server.getServerConfiguration().getLogLevel().isPresent() ? new LoggingHandler(NettyHttpServer.class, server.getServerConfiguration().getLogLevel().get()) : null;
+        Optional<LogLevel> logLevel = server.getServerConfiguration().getLogLevel();
+        loggingHandler = logLevel.map(level -> new LoggingHandler(NettyHttpServer.class, level)).orElse(null);
         sslContext = embeddedServices.getServerSslBuilder() != null ? embeddedServices.getServerSslBuilder().build().orElse(null) : null;
 
         NettyHttpServerConfiguration.AccessLogger accessLogger = server.getServerConfiguration().getAccessLogger();
@@ -392,18 +395,18 @@ final class HttpPipelineBuilder {
                 @Override
                 protected void channelRead0(ChannelHandlerContext ctx, HttpMessage msg) {
                     // If this handler is hit then no upgrade has been attempted and the client is just talking HTTP.
-                    ChannelPipeline pipeline = ctx.pipeline();
+                    ChannelPipeline cp = ctx.pipeline();
 
                     // remove the handlers we don't need anymore
-                    pipeline.remove(upgradeHandler);
-                    pipeline.remove(this);
+                    cp.remove(upgradeHandler);
+                    cp.remove(this);
 
                     // reconfigure for http1
                     // note: we have to reuse the serverCodec in case it still has some data buffered
                     new StreamPipeline(channel, ssl, connectionCustomizer).insertHttp1DownstreamHandlers();
                     connectionCustomizer.onStreamPipelineBuilt();
                     onRequestPipelineBuilt();
-                    pipeline.fireChannelRead(ReferenceCountUtil.retain(msg));
+                    cp.fireChannelRead(ReferenceCountUtil.retain(msg));
                 }
             });
             connectionCustomizer.onInitialPipelineBuilt();

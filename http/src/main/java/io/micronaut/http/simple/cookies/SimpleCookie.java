@@ -229,8 +229,9 @@ public class SimpleCookie implements Cookie {
         if (isHttpOnly()) {
             buf.append(", HTTPOnly");
         }
-        if (getSameSite().isPresent()) {
-            buf.append(", SameSite=").append(getSameSite().get());
+        Optional<SameSite> ss = getSameSite();
+        if (ss.isPresent()) {
+            buf.append(", SameSite=").append(ss.get());
         }
         return buf.toString();
     }

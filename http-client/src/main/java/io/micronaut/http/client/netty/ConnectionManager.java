@@ -308,6 +308,7 @@ class ConnectionManager {
                 future.await(shutdownTimeout.toMillis());
             } catch (InterruptedException e) {
                 // ignore
+                Thread.currentThread().interrupt();
             }
         }
     }

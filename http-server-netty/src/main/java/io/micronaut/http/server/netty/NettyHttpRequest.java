@@ -559,6 +559,9 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
                         try {
                             future.sync();
                         } catch (Exception e) {
+                            if (e instanceof InterruptedException) {
+                                Thread.currentThread().interrupt();
+                            }
                             LOG.warn("Failed to complete push promise", e);
                         }
                     });

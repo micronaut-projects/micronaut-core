@@ -262,7 +262,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     }
 
     @Override
-    public @NonNull ApplicationContextBuilder mainClass(Class mainClass) {
+    public @NonNull ApplicationContextBuilder mainClass(Class<?> mainClass) {
         if (mainClass != null) {
             if (this.classLoader == null) {
                 this.classLoader = mainClass.getClassLoader();

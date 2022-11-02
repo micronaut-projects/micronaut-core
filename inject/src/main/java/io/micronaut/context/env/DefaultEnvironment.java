@@ -953,6 +953,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             }
         } catch (InterruptedException e) {
             // test negative
+            Thread.currentThread().interrupt();
         }
         return false;
     }
@@ -994,6 +995,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             }
         } catch (InterruptedException e) {
             // test negative
+            Thread.currentThread().interrupt();
         }
         return false;
     }
