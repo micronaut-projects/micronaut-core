@@ -65,5 +65,10 @@ micronautBom {
         acceptedLibraryRegressions.add("micronaut-hibernate-gorm")
         acceptedLibraryRegressions.add("micronaut-graphql-gorm")
         acceptedLibraryRegressions.add("micronaut-neo4j-gorm")
+
+        // glassfish removed from Micronaut Serialization
+        acceptedVersionRegressions.add("glassfish-jakarta-json")
+        acceptedLibraryRegressions.add("glassfish-jakarta-json")
+
     }
 }
