@@ -15,6 +15,7 @@
  */
 package io.micronaut.scheduling.executor;
 
+import io.micronaut.context.BeanProvider;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.scheduling.LoomSupport;
@@ -22,24 +23,54 @@ import io.micronaut.scheduling.TaskExecutors;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 
+import java.util.concurrent.ExecutorService;
+
 /**
  * Configures the default I/O thread pool if none is configured by the user.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-@Requires(missingProperty = ExecutorConfiguration.PREFIX_IO)
 @Factory
 public class IOExecutorServiceConfig {
 
     /**
-     * @return The default thread pool configurations
+     * @return The default IO pool configuration
      */
     @Singleton
     @Named(TaskExecutors.IO)
-    ExecutorConfiguration configuration() {
-        UserExecutorConfiguration cfg = UserExecutorConfiguration.of(TaskExecutors.IO, LoomSupport.isSupported() ? ExecutorType.THREAD_PER_TASK : ExecutorType.CACHED);
-        cfg.setVirtual(LoomSupport.isSupported());
+    @Requires(missingProperty = ExecutorConfiguration.PREFIX_IO)
+    ExecutorConfiguration io() {
+        return UserExecutorConfiguration.of(TaskExecutors.IO, ExecutorType.CACHED);
+    }
+
+    /**
+     * @return The default virtual executor configuration
+     */
+    @Singleton
+    @Named(TaskExecutors.VIRTUAL)
+    @Requires(
+        missingProperty = ExecutorConfiguration.PREFIX + "." + TaskExecutors.VIRTUAL,
+        condition = LoomSupport.LoomCondition.class)
+    ExecutorConfiguration virtual() {
+        // sanity check
+        LoomSupport.checkSupported();
+        UserExecutorConfiguration cfg = UserExecutorConfiguration.of(TaskExecutors.VIRTUAL, ExecutorType.THREAD_PER_TASK);
+        cfg.setVirtual(true);
         return cfg;
+    }
+
+    @Singleton
+    @Named(TaskExecutors.BLOCKING)
+    @Requires(missingProperty = ExecutorConfiguration.PREFIX + "." + TaskExecutors.BLOCKING)
+    ExecutorService blocking(
+        @Named(TaskExecutors.IO) BeanProvider<ExecutorService> io,
+        @Named(TaskExecutors.VIRTUAL) BeanProvider<ExecutorService> virtual
+    ) {
+        if (virtual.isPresent()) {
+            return virtual.get();
+        } else {
+            return io.get();
+        }
     }
 }

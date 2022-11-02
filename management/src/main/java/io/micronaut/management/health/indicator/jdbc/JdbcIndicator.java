@@ -71,7 +71,7 @@ public class JdbcIndicator implements HealthIndicator {
      * @param dataSourceResolver The data source resolver
      * @param healthAggregator   The health aggregator
      */
-    public JdbcIndicator(@Named(TaskExecutors.IO) ExecutorService executorService,
+    public JdbcIndicator(@Named(TaskExecutors.BLOCKING) ExecutorService executorService,
                          DataSource[] dataSources,
                          @Nullable DataSourceResolver dataSourceResolver,
                          HealthAggregator<?> healthAggregator) {

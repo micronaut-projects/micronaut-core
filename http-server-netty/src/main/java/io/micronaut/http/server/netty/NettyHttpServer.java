@@ -160,7 +160,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 .getEventPublisher(HttpRequestTerminatedEvent.class);
         final Supplier<ExecutorService> ioExecutor = SupplierUtil.memoized(() ->
                 nettyEmbeddedServices.getExecutorSelector()
-                        .select(TaskExecutors.IO).orElse(null)
+                        .select(TaskExecutors.BLOCKING).orElse(null)
         );
         this.httpContentProcessorResolver = new DefaultHttpContentProcessorResolver(
                 nettyEmbeddedServices.getApplicationContext(),

@@ -15,6 +15,8 @@
  */
 package io.micronaut.scheduling;
 
+import io.micronaut.context.condition.Condition;
+import io.micronaut.context.condition.ConditionContext;
 import io.micronaut.core.annotation.Internal;
 
 import java.lang.invoke.MethodHandle;
@@ -101,6 +103,23 @@ public final class LoomSupport {
             return (ThreadFactory) MH_factory.invoke(builder);
         } catch (Throwable e) {
             throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * Condition that only matches if virtual threads are supported on this platform.
+     */
+    @Internal
+    public static class LoomCondition implements Condition {
+        @SuppressWarnings("rawtypes")
+        @Override
+        public boolean matches(ConditionContext context) {
+            if (isSupported()) {
+                return true;
+            } else {
+                context.fail("Virtual threads support not available: " + failure.getMessage());
+                return false;
+            }
         }
     }
 }
