@@ -1,4 +1,9 @@
 //Micronaut {version} includes the following changes:
+== 3.8.0
+
+Key features:
+
+- https://www.graalvm.org/release-notes/22_3/[GraalVM 22.3 Support]
 
 == 3.7.0
 
