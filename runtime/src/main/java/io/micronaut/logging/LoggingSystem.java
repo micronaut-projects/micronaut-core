@@ -39,7 +39,7 @@ public interface LoggingSystem {
     void setLogLevel(@NotBlank String name, @NotNull LogLevel level);
 
     /**
-     * Refreshes Logging System with the goal of cleaning its internal caches
+     * Refreshes Logging System with the goal of cleaning its internal caches.
      *
      */
     default void refresh() {
