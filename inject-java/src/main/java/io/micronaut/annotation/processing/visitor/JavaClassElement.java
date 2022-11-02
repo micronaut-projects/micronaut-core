@@ -466,10 +466,17 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
 
     @Override
     public <T extends io.micronaut.inject.ast.Element> List<T> getEnclosedElements(@NonNull ElementQuery<T> query) {
-        if (getNativeType() instanceof TypeElement) {
-            return enclosedElementsQuery.getEnclosedElements(this, query);
+        ClassElement classElementToInspect;
+        if (this instanceof GenericPlaceholderElement genericPlaceholderElement) {
+            List<? extends ClassElement> bounds = genericPlaceholderElement.getBounds();
+            if (bounds.isEmpty()) {
+                return Collections.emptyList();
+            }
+            classElementToInspect = bounds.get(0);
+        } else {
+            classElementToInspect = this;
         }
-        return Collections.emptyList();
+        return enclosedElementsQuery.getEnclosedElements(classElementToInspect, query);
     }
 
     @Override
