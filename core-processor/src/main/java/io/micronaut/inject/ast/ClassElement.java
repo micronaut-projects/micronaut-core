@@ -39,6 +39,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalDouble;
+import java.util.OptionalInt;
+import java.util.OptionalLong;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -115,7 +118,17 @@ public interface ClassElement extends TypedElement {
      * @since 2.3.0
      */
     default boolean isOptional() {
-        return isAssignable(Optional.class);
+        return isAssignable(Optional.class) || isAssignable(OptionalLong.class) || isAssignable(OptionalDouble.class) || isAssignable(OptionalInt.class);
+    }
+
+    /**
+     * Gets optional value type.
+     *
+     * @return the value type
+     * @since 4.0.0
+     */
+    default Optional<ClassElement> getOptionalValueType() {
+        return Optional.empty();
     }
 
     /**

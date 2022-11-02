@@ -74,6 +74,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalDouble;
+import java.util.OptionalInt;
+import java.util.OptionalLong;
 import java.util.Set;
 import java.util.Spliterator;
 import java.util.Spliterators;
@@ -661,7 +664,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     @Override
     public boolean isStatic() {
         // I assume Groovy can decide not to make the class static internally
-        // and isStaticClass will be false even if the class has static modifier
+        // and isStaticClass will be false even if the class has a static modifier
         return classNode.isStaticClass() || Modifier.isStatic(classNode.getModifiers());
     }
 
@@ -698,6 +701,23 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     @Override
     public boolean isAssignable(ClassElement type) {
         return AstClassUtils.isSubclassOfOrImplementsInterface(classNode, type.getName());
+    }
+
+    @Override
+    public Optional<ClassElement> getOptionalValueType() {
+        if (isAssignable(Optional.class)) {
+            return getFirstTypeArgument().or(() -> visitorContext.getClassElement(Object.class));
+        }
+        if (isAssignable(OptionalLong.class)) {
+            return visitorContext.getClassElement(Long.class);
+        }
+        if (isAssignable(OptionalDouble.class)) {
+            return visitorContext.getClassElement(Double.class);
+        }
+        if (isAssignable(OptionalInt.class)) {
+            return visitorContext.getClassElement(Integer.class);
+        }
+        return Optional.empty();
     }
 
     @NonNull

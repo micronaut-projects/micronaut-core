@@ -77,34 +77,6 @@ class Test<T extends CharSequence> {
         introspection.beanMethods.first().returnType.type == CharSequence[].class
     }
 
-    void "test property type is defined by its setter"() {
-        given:
-        def introspection = buildBeanIntrospection('test.Test', '''
-package test;
-
-import io.micronaut.core.annotation.Introspected;
-import io.micronaut.context.annotation.Executable;
-import io.micronaut.core.annotation.Nullable;
-import java.util.Optional;
-
-@Introspected
-class Test {
-    @Nullable
-    private String foo;
-
-    public Optional<String> getFoo() {
-        return Optional.ofNullable(foo);
-    }
-
-    public void setFoo(@Nullable String foo) {
-        this.foo = foo;
-    }
-}
-''')
-        expect:
-        introspection.getProperty("foo").get().type == String.class
-    }
-
     void "test property type is defined by its writer field"() {
         given:
         def introspection = buildBeanIntrospection('test.Test', '''
@@ -128,6 +100,74 @@ class Test {
 ''')
         expect:
         introspection.getProperty("foo").get().type == String.class
+    }
+
+    void "test optional property type is defined by its setter"() {
+        given:
+            def introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.core.annotation.Nullable;
+import java.util.*;
+
+@Introspected
+class Test {
+    @Nullable
+    private String foo;
+    @Nullable
+    private Long lng;
+    @Nullable
+    private Double dbl;
+    @Nullable
+    private Integer ingr;
+
+    public Optional<String> getFoo() {
+        return Optional.ofNullable(foo);
+    }
+
+    public OptionalDouble getDbl() {
+        return OptionalDouble.of(dbl);
+    }
+
+    public OptionalLong getLng() {
+        return OptionalLong.of(lng);
+    }
+
+    public OptionalInt getIngr() {
+        return OptionalInt.of(ingr);
+    }
+
+    public void setFoo(@Nullable String foo) {
+        this.foo = foo;
+    }
+
+    public void setLng(@Nullable Long lng) {
+        this.lng = lng;
+    }
+
+    public void setDbl(@Nullable Double dbl) {
+        this.dbl = dbl;
+    }
+
+    public void setIngr(@Nullable Integer ingr) {
+        this.ingr = ingr;
+    }
+
+}
+''')
+        expect:
+            introspection.getPropertyNames().length == 4
+            introspection.getProperty("foo").get().type == String.class
+            introspection.getProperty("lng").get().type == Long.class
+            introspection.getProperty("dbl").get().type == Double.class
+            introspection.getProperty("ingr").get().type == Integer.class
+
+            introspection.getProperty("foo").get().isReadWrite()
+            introspection.getProperty("lng").get().isReadWrite()
+            introspection.getProperty("dbl").get().isReadWrite()
+            introspection.getProperty("ingr").get().isReadWrite()
     }
 
     void "test property type is not defined by its not accessible field"() {

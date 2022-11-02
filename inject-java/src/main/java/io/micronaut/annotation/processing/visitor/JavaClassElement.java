@@ -64,6 +64,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalDouble;
+import java.util.OptionalInt;
+import java.util.OptionalLong;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -466,10 +469,17 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
 
     @Override
     public <T extends io.micronaut.inject.ast.Element> List<T> getEnclosedElements(@NonNull ElementQuery<T> query) {
-        if (getNativeType() instanceof TypeElement) {
-            return enclosedElementsQuery.getEnclosedElements(this, query);
+        ClassElement classElementToInspect;
+        if (this instanceof GenericPlaceholderElement genericPlaceholderElement) {
+            List<? extends ClassElement> bounds = genericPlaceholderElement.getBounds();
+            if (bounds.isEmpty()) {
+                return Collections.emptyList();
+            }
+            classElementToInspect = bounds.get(0);
+        } else {
+            classElementToInspect = this;
         }
-        return Collections.emptyList();
+        return enclosedElementsQuery.getEnclosedElements(classElementToInspect, query);
     }
 
     @Override
@@ -551,6 +561,23 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             return isAssignable((TypeElement) nativeType);
         }
         return isAssignable(type.getName());
+    }
+
+    @Override
+    public Optional<ClassElement> getOptionalValueType() {
+        if (isAssignable(Optional.class)) {
+            return getFirstTypeArgument().or(() -> visitorContext.getClassElement(Object.class));
+        }
+        if (isAssignable(OptionalLong.class)) {
+            return visitorContext.getClassElement(Long.class);
+        }
+        if (isAssignable(OptionalDouble.class)) {
+            return visitorContext.getClassElement(Double.class);
+        }
+        if (isAssignable(OptionalInt.class)) {
+            return visitorContext.getClassElement(Integer.class);
+        }
+        return Optional.empty();
     }
 
     private boolean isAssignable(TypeElement otherElement) {
