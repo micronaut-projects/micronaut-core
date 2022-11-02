@@ -233,7 +233,8 @@ public class DefaultMutableConversionService implements MutableConversionService
             if (classLoader == null) {
                 classLoader = DefaultMutableConversionService.class.getClassLoader();
             }
-            return ClassUtils.forName(object.toString(), classLoader);
+            //noinspection rawtypes
+            return (Optional) ClassUtils.forName(object.toString(), classLoader);
         });
 
         // AnnotationClassValue -> Class

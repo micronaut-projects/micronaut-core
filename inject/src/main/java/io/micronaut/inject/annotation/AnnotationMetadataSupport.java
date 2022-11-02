@@ -156,15 +156,16 @@ public final class AnnotationMetadataSupport {
             return Optional.of(type);
         } else {
             // last resort, try dynamic load, shouldn't normally happen.
-            final Optional<Class> aClass = ClassUtils.forName(name, classLoader);
-            return aClass.flatMap((Function<Class, Optional<Class<? extends Annotation>>>) aClass1 -> {
-                if (Annotation.class.isAssignableFrom(aClass1)) {
+            @SuppressWarnings("unchecked") final Class<? extends Annotation> aClass =
+                (Class<? extends Annotation>) ClassUtils.forName(name, classLoader).orElse(null);
+            if (aClass != null) {
+                if (Annotation.class.isAssignableFrom(aClass)) {
                     //noinspection unchecked
-                    ANNOTATION_TYPES.put(name, aClass1);
-                    return Optional.of(aClass1);
+                    ANNOTATION_TYPES.put(name, aClass);
+                    return Optional.of(aClass);
                 }
-                return Optional.empty();
-            });
+            }
+            return Optional.empty();
         }
     }
 

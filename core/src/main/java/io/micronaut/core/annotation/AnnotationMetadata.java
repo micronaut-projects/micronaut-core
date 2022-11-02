@@ -586,7 +586,7 @@ public interface AnnotationMetadata extends AnnotationSource {
         Class<?> clazz = aClass.orElse(null);
         if (clazz != null && Annotation.class.isAssignableFrom(clazz)) {
             //noinspection unchecked
-            return (Optional<Class<? extends Annotation>>) aClass;
+            return (Optional) aClass;
         }
         return Optional.empty();
     }

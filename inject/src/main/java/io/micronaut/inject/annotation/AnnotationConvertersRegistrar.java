@@ -38,21 +38,27 @@ public final class AnnotationConvertersRegistrar implements TypeConverterRegistr
     @Override
     public void register(MutableConversionService conversionService) {
         conversionService.addConverter(io.micronaut.core.annotation.AnnotationValue.class, Annotation.class, (object, targetType, context) -> {
-            Optional<Class> annotationClass = ClassUtils.forName(object.getAnnotationName(), targetType.getClassLoader());
-            return annotationClass.map(aClass -> AnnotationMetadataSupport.buildAnnotation(aClass, object));
+            @SuppressWarnings("unchecked") Class<? extends Annotation> aClass =
+                (Class<? extends Annotation>) ClassUtils.forName(object.getAnnotationName(), targetType.getClassLoader()).orElse(null);
+
+            if (aClass != null) {
+                return Optional.of(AnnotationMetadataSupport.buildAnnotation(aClass, object));
+            }
+            return Optional.empty();
         });
 
         conversionService.addConverter(io.micronaut.core.annotation.AnnotationValue[].class, Object[].class, (object, targetType, context) -> {
-            List result = new ArrayList();
-            Class annotationClass = null;
+            List<Annotation> result = new ArrayList<>();
+            Class<? extends Annotation> annotationClass = null;
             for (io.micronaut.core.annotation.AnnotationValue annotationValue : object) {
                 if (annotationClass == null) {
                     // all annotations will be on the same type
-                    Optional<Class> aClass = ClassUtils.forName(annotationValue.getAnnotationName(), targetType.getClassLoader());
-                    if (!aClass.isPresent()) {
+                    @SuppressWarnings("unchecked") Class<? extends Annotation> aClass =
+                        (Class<? extends Annotation>) ClassUtils.forName(annotationValue.getAnnotationName(), targetType.getClassLoader()).orElse(null);
+                    if (aClass == null) {
                         break;
                     }
-                    annotationClass = aClass.get();
+                    annotationClass = aClass;
                 }
                 Annotation annotation = AnnotationMetadataSupport.buildAnnotation(annotationClass, annotationValue);
                 result.add(annotation);

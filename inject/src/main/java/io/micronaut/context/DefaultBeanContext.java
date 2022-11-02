@@ -3055,8 +3055,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
      * @param <T>            The bean generic type
      * @return The concrete bean definition candidate
      */
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    @SuppressWarnings("java:S2789") // performance optimization
+    @SuppressWarnings({"unchecked", "rawtypes", "java:S2789"}) // performance optimization
     private <T> Optional<BeanDefinition<T>> findConcreteCandidate(@Nullable BeanResolutionContext resolutionContext,
                                                                   @NonNull Argument<T> beanType,
                                                                   @Nullable Qualifier<T> qualifier,

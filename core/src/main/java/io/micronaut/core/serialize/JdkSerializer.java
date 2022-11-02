@@ -121,7 +121,7 @@ public class JdkSerializer implements ObjectSerializer {
         return new ObjectInputStream(inputStream) {
             @Override
             protected Class<?> resolveClass(ObjectStreamClass desc) throws IOException, ClassNotFoundException {
-                Optional<Class> aClass = ClassUtils.forName(desc.getName(), requiredType.getClassLoader());
+                Optional<Class<?>> aClass = ClassUtils.forName(desc.getName(), requiredType.getClassLoader());
                 if (aClass.isPresent()) {
                     return aClass.get();
                 }
