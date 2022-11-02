@@ -15,6 +15,7 @@
  */
 package io.micronaut.http;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.type.Argument;
@@ -72,7 +73,7 @@ public class HttpMessageWrapper<B> implements HttpMessage<B> {
     }
 
     @Override
-    public <T> Optional<T> getBody(ArgumentConversionContext<T> conversionContext) {
+    public <T> Optional<T> getBody(@NonNull ArgumentConversionContext<T> conversionContext) {
         return delegate.getBody(conversionContext);
     }
 }
