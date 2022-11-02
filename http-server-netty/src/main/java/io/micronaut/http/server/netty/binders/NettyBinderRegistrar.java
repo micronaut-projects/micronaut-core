@@ -60,7 +60,7 @@ class NettyBinderRegistrar implements BeanCreatedEventListener<RequestBinderRegi
                          HttpContentProcessorResolver httpContentProcessorResolver,
                          BeanLocator beanLocator,
                          BeanProvider<HttpServerConfiguration> httpServerConfiguration,
-                         @Named(TaskExecutors.IO) BeanProvider<ExecutorService> executorService) {
+                         @Named(TaskExecutors.BLOCKING) BeanProvider<ExecutorService> executorService) {
         this.conversionService = conversionService;
         this.httpContentProcessorResolver = httpContentProcessorResolver;
         this.beanLocator = beanLocator;

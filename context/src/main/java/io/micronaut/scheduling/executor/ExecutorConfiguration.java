@@ -76,6 +76,11 @@ public interface ExecutorConfiguration {
     @Min(1L) Integer getCorePoolSize();
 
     /**
+     * @return Whether the pool should use virtual threads.
+     */
+    boolean isVirtual();
+
+    /**
      * @return The class to use as the {@link ThreadFactory}
      */
     Optional<Class<? extends ThreadFactory>> getThreadFactoryClass();
