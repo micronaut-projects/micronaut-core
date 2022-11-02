@@ -35,7 +35,7 @@ import java.util.function.IntFunction;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class ArrayUtils {
+public final class ArrayUtils {
 
     /**
      * An empty object array.
