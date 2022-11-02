@@ -253,7 +253,7 @@ public final class AstBeanPropertiesUtils {
 
     private static ClassElement unwrapType(ClassElement type) {
         if (type.isOptional()) {
-            return type.getFirstTypeArgument().orElse(type);
+            return type.getOptionalValueType().orElse(type);
         }
         return type;
     }

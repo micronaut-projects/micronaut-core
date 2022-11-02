@@ -124,7 +124,8 @@ final class ConfigurationReaderBeanElementCreator extends DeclaredBeanElementCre
     private boolean isPropertyParameter(ParameterElement parameter) {
         ClassElement parameterType = parameter.getGenericType();
         if (parameterType.isOptional() || parameterType.isAssignable(BeanProvider.class) || parameterType.isAssignable(Provider.class)) {
-            parameterType = parameterType.getFirstTypeArgument().orElse(parameterType);
+            ClassElement finalParameterType = parameterType;
+            parameterType = parameterType.getOptionalValueType().or(finalParameterType::getFirstTypeArgument).orElse(parameterType);
             // Get the class with type annotations
             parameterType = visitorContext.getClassElement(parameterType.getCanonicalName()).orElse(parameterType);
         }
