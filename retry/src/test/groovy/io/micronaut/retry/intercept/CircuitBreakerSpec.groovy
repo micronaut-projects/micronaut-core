@@ -186,6 +186,9 @@ class CircuitBreakerSpec extends Specification{
 
         then:"It executes until successful"
         result == 2
+
+        cleanup:
+        context.stop()
     }
 
     @Singleton
