@@ -246,6 +246,7 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
     }
 
     @Override
+    @SuppressWarnings("java:S2789") // performance optimization
     public final Optional<Argument<?>> getContainerElement() {
         if (isContainerType) {
             if (containerElement != null) {
@@ -385,7 +386,12 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
     @Override
     public final ConstructorInjectionPoint<T> getConstructor() {
         if (constructor == null) {
-            constructorInjectionPoint = null;
+            constructorInjectionPoint = new DefaultConstructorInjectionPoint<>(
+                this,
+                getBeanType(),
+                AnnotationMetadata.EMPTY_METADATA,
+                Argument.ZERO_ARGUMENTS
+            );
         } else {
             if (constructor instanceof MethodReference) {
                 MethodReference methodConstructor = (MethodReference) constructor;
@@ -736,6 +742,7 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
      * @return The instantiated bean
      * @throws BeanInstantiationException If the bean cannot be instantiated for the arguments supplied
      */
+    @SuppressWarnings({"java:S2789", "OptionalAssignedToNull"}) // performance optimization
     public final T build(BeanResolutionContext resolutionContext,
                          BeanContext context,
                          BeanDefinition<T> definition,
@@ -1285,7 +1292,7 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
     protected final Object getBeanForConstructorArgument(BeanResolutionContext resolutionContext, BeanContext context, int argIndex, Qualifier qualifier) {
         MethodReference constructorMethodRef = (MethodReference) constructor;
         Argument<?> argument = resolveArgument(context, argIndex, constructorMethodRef.arguments);
-        if (argument.isDeclaredNullable()) {
+        if (argument != null && argument.isDeclaredNullable()) {
             BeanResolutionContext.Segment current = resolutionContext.getPath().peek();
             if (current != null && current.getArgument().equals(argument)) {
                 return null;

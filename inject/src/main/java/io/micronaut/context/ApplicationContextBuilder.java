@@ -174,7 +174,7 @@ public interface ApplicationContextBuilder {
      * @param mainClass The main class
      * @return This builder
      */
-    @NonNull ApplicationContextBuilder mainClass(@Nullable Class mainClass);
+    @NonNull ApplicationContextBuilder mainClass(@Nullable Class<?> mainClass);
 
     /**
      * The class loader to be used.

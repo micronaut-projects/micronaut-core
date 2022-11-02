@@ -1024,7 +1024,11 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             return resolutionContext;
         } else if (argument.isArray()) {
             Collection beansOfType = getBeansOfTypeForConstructorArgument(resolutionContext, context, constructorInjectionPoint, argument);
-            return beansOfType.toArray((Object[]) Array.newInstance(beanType.getComponentType(), beansOfType.size()));
+            if (beansOfType != null) {
+                return beansOfType.toArray((Object[]) Array.newInstance(beanType.getComponentType(), beansOfType.size()));
+            } else {
+                return Array.newInstance(beanType.getComponentType(), 0);
+            }
         } else if (Collection.class.isAssignableFrom(beanType)) {
             Collection beansOfType = getBeansOfTypeForConstructorArgument(resolutionContext, context, constructorInjectionPoint, argument);
             return coerceCollectionToCorrectType(beanType, beansOfType);
@@ -1695,7 +1699,11 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         final Class beanClass = injectionPoint.getType();
         if (beanClass.isArray()) {
             Collection beansOfType = getBeansOfTypeForField(resolutionContext, context, injectionPoint);
-            return beansOfType.toArray((Object[]) Array.newInstance(beanClass.getComponentType(), beansOfType.size()));
+            if (beansOfType != null) {
+                return beansOfType.toArray((Object[]) Array.newInstance(beanClass.getComponentType(), beansOfType.size()));
+            } else {
+                return Array.newInstance(beanClass.getComponentType(), 0);
+            }
         } else if (Collection.class.isAssignableFrom(beanClass)) {
             Collection beansOfType = getBeansOfTypeForField(resolutionContext, context, injectionPoint);
             if (beanClass.isInstance(beansOfType)) {
@@ -2033,6 +2041,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 beanContext.findBeanDefinition(argumentType).map(bd -> bd.hasStereotype(ConfigurationReader.class) || bd.isIterable()).isPresent();
     }
 
+    @SuppressWarnings("java:S1872") // internal requirement
     private boolean isInnerOfAnySuperclass(Class argumentType) {
         Class beanType = getBeanType();
         while (beanType != null) {
@@ -2145,6 +2154,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         }
     }
 
+    @SuppressWarnings("java:S2259") // false positive
     private Object doResolveBeanRegistrations(BeanResolutionContext resolutionContext, DefaultBeanContext context, Argument<?> argument, BeanResolutionContext.Path path) {
         final Collection<BeanRegistration<Object>> beanRegistrations = resolveBeanRegistrationsWithGenericsFromArgument(resolutionContext, argument, path,
                 (beanType, qualifier) -> context.getBeanRegistrations(resolutionContext, beanType, qualifier)

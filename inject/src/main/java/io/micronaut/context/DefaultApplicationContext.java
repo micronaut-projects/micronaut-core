@@ -223,7 +223,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     }
 
     @Override
-    protected void registerConfiguration(BeanConfiguration configuration) {
+    protected synchronized void registerConfiguration(BeanConfiguration configuration) {
         if (getEnvironment().isActive(configuration)) {
             super.registerConfiguration(configuration);
         }

@@ -150,6 +150,7 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
      * @return True if it matches
      */
     @Override
+    @SuppressWarnings("java:S2789") // performance optimization
     public Optional<UriMatchInfo> match(String uri) {
         if (uri == null) {
             throw new IllegalArgumentException("Argument 'uri' cannot be null");

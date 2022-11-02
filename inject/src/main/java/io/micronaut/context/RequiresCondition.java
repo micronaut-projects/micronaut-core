@@ -423,6 +423,7 @@ public class RequiresCondition implements Condition {
 
                                 // non-semantic versioning in play
                                 int majorVersion = resolveJavaMajorVersion(javaVersion);
+                                @SuppressWarnings("java:S2259") // false positive
                                 int requiredVersion = resolveJavaMajorVersion(version);
 
                                 if (majorVersion >= requiredVersion) {

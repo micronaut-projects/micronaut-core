@@ -161,7 +161,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
         Optional<Class<? extends Annotation>> httpMethodMapping = context.getAnnotationTypeByStereotype(HttpMethodMapping.class);
         HttpClient httpClient = clientFactory.getClient(annotationMetadata);
-        if (context.hasStereotype(HttpMethodMapping.class) && httpClient != null) {
+        if (httpMethodMapping.isPresent() && context.hasStereotype(HttpMethodMapping.class) && httpClient != null) {
             AnnotationValue<HttpMethodMapping> mapping = context.getAnnotation(HttpMethodMapping.class);
             String uri = mapping.getRequiredValue(String.class);
             if (StringUtils.isEmpty(uri)) {

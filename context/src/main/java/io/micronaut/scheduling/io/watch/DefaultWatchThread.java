@@ -127,6 +127,7 @@ public class DefaultWatchThread implements LifeCycle<DefaultWatchThread> {
                             }
                         } catch (InterruptedException | ClosedWatchServiceException e) {
                             // ignore
+                            Thread.currentThread().interrupt();
                         }
                     }
                 }, "micronaut-filewatch-thread").start();

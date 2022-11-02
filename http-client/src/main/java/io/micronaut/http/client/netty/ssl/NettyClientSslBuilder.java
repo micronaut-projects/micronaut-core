@@ -84,16 +84,19 @@ public final class NettyClientSslBuilder extends SslBuilder<SslContext> {
             .forClient()
             .keyManager(getKeyManagerFactory(ssl))
             .trustManager(getTrustManagerFactory(ssl));
-        if (ssl.getProtocols().isPresent()) {
-            sslBuilder.protocols(ssl.getProtocols().get());
+        Optional<String[]> protocols = ssl.getProtocols();
+        if (protocols.isPresent()) {
+            sslBuilder.protocols(protocols.get());
         }
-        if (ssl.getCiphers().isPresent()) {
-            sslBuilder = sslBuilder.ciphers(Arrays.asList(ssl.getCiphers().get()));
+        Optional<String[]> ciphers = ssl.getCiphers();
+        if (ciphers.isPresent()) {
+            sslBuilder = sslBuilder.ciphers(Arrays.asList(ciphers.get()));
         } else if (versionSelection.isHttp2CipherSuites()) {
             sslBuilder.ciphers(Http2SecurityUtil.CIPHERS, SupportedCipherSuiteFilter.INSTANCE);
         }
-        if (ssl.getClientAuthentication().isPresent()) {
-            ClientAuthentication clientAuth = ssl.getClientAuthentication().get();
+        Optional<ClientAuthentication> clientAuthentication = ssl.getClientAuthentication();
+        if (clientAuthentication.isPresent()) {
+            ClientAuthentication clientAuth = clientAuthentication.get();
             if (clientAuth == ClientAuthentication.NEED) {
                 sslBuilder = sslBuilder.clientAuth(ClientAuth.REQUIRE);
             } else if (clientAuth == ClientAuthentication.WANT) {

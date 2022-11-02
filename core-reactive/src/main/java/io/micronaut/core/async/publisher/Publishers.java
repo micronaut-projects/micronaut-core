@@ -83,7 +83,7 @@ public class Publishers {
                     "io.reactivex.rxjava3.core.Observable"
             );
             for (String name : typeNames) {
-                Optional<Class> aClass = ClassUtils.forName(name, classLoader);
+                Optional<Class<?>> aClass = ClassUtils.forName(name, classLoader);
                 aClass.ifPresent(reactiveTypes::add);
             }
             for (String name : Arrays.asList(
@@ -93,7 +93,7 @@ public class Publishers {
                     "io.reactivex.rxjava3.core.Single",
                     "io.reactivex.rxjava3.core.Maybe"
             )) {
-                Optional<Class> aClass = ClassUtils.forName(name, classLoader);
+                Optional<Class<?>> aClass = ClassUtils.forName(name, classLoader);
                 aClass.ifPresent(aClass1 -> {
                     singleTypes.add(aClass1);
                     reactiveTypes.add(aClass1);
@@ -101,7 +101,7 @@ public class Publishers {
             }
 
             for (String name : Arrays.asList("io.reactivex.Completable", "io.reactivex.rxjava3.core.Completable")) {
-                Optional<Class> aClass = ClassUtils.forName(name, classLoader);
+                Optional<Class<?>> aClass = ClassUtils.forName(name, classLoader);
                 aClass.ifPresent(aClass1 -> {
                     completableTypes.add(aClass1);
                     reactiveTypes.add(aClass1);

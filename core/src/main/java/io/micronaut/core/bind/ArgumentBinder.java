@@ -110,6 +110,7 @@ public interface ArgumentBinder<T, S> {
          *
          * @return The value
          */
+        @SuppressWarnings({"java:S3655", "OptionalGetWithoutIsPresent"})
         default T get() {
             return getValue().get();
         }

@@ -76,8 +76,12 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
     public AnnotationProcessingOutputVisitor(Filer filer) {
         super(isEclipseFiler(filer));
         this.filer = filer;
-        final String filerName = filer.getClass().getName();
-        this.isGradleFiler = filerName.startsWith("org.gradle.api") || filerName.startsWith("org.jetbrains.kotlin.kapt3");
+        if (filer != null) {
+            final String filerName = filer.getClass().getName();
+            this.isGradleFiler = filerName.startsWith("org.gradle.api") || filerName.startsWith("org.jetbrains.kotlin.kapt3");
+        } else {
+            this.isGradleFiler = false;
+        }
     }
 
     //--add-opens=java.base/$hostPackageName=ALL-UNNAMED

@@ -81,9 +81,9 @@ public class DefaultBodyAnnotationBinder<T> implements BodyArgumentBinder<T> {
         }
     }
 
+    @SuppressWarnings("java:S3655") // false positive
     private BindingResult<T> newResult(T converted, ArgumentConversionContext<T> context) {
         final Optional<ConversionError> lastError = context.getLastError();
-        //noinspection OptionalIsPresent
         if (lastError.isPresent()) {
             return new BindingResult<T>() {
                 @Override
