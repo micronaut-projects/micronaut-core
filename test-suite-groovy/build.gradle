@@ -30,7 +30,9 @@ dependencies {
     testImplementation project(":inject")
     testImplementation project(":management")
     testImplementation(platform(libs.boms.micronaut.session))
-    testImplementation(libs.micronaut.session)
+    testImplementation(libs.micronaut.session) {
+        exclude module: 'micronaut-aop'
+    }
     testImplementation libs.managed.jcache
     testImplementation libs.managed.groovy.sql
     testImplementation libs.managed.groovy.templates

@@ -13,6 +13,7 @@ micronautBuild {
 }
 
 repositories {
+    mavenLocal()
     mavenCentral()
     maven {
         url "https://s01.oss.sonatype.org/content/repositories/snapshots/"
@@ -50,7 +51,9 @@ dependencies {
     testImplementation project(':validation')
     testImplementation project(":http-client")
     testImplementation(platform(libs.boms.micronaut.session))
-    testImplementation(libs.micronaut.session)
+    testImplementation(libs.micronaut.session) {
+        exclude module: 'micronaut-aop'
+    }
     testImplementation project(":jackson-databind")
     testImplementation libs.managed.groovy.templates
 
