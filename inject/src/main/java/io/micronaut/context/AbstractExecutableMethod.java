@@ -142,12 +142,12 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
     }
 
     @Override
-    public Class[] getArgumentTypes() {
+    public Class<?>[] getArgumentTypes() {
         return argTypes;
     }
 
     @Override
-    public Class getDeclaringType() {
+    public Class<?> getDeclaringType() {
         return declaringType;
     }
 

@@ -36,7 +36,7 @@ import java.util.Arrays;
 @Internal
 class StreamTypeHandler implements NettyCustomizableResponseTypeHandler<Object> {
 
-    private static final Class<?>[] SUPPORTED_TYPES = new Class[]{NettyStreamedCustomizableResponseType.class, InputStream.class};
+    private static final Class<?>[] SUPPORTED_TYPES = new Class<?>[]{NettyStreamedCustomizableResponseType.class, InputStream.class};
 
     @Override
     public ChannelFuture handle(Object object, HttpRequest<?> request, MutableHttpResponse<?> response, ChannelHandlerContext context) {

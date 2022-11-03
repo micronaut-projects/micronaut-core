@@ -133,7 +133,7 @@ public final class JsonConverterRegistrar implements TypeConverterRegistrar {
                 return Optional.empty();
             }
             Map<String, Argument<?>> typeVariables = context.getTypeVariables();
-            Class elementType = typeVariables.isEmpty() ? Map.class : typeVariables.values().iterator().next().getType();
+            Class<?> elementType = typeVariables.isEmpty() ? Map.class : typeVariables.values().iterator().next().getType();
             for (int i = 0; i < node.size(); i++) {
                 Optional<?> converted = conversionService.convert(node.get(i), elementType, context);
                 converted.ifPresent(results::add);

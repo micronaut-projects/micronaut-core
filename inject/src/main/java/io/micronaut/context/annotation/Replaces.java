@@ -36,18 +36,18 @@ public @interface Replaces {
      * @return The bean type that this bean replaces
      */
     @AliasFor(member = "bean")
-    Class value() default void.class;
+    Class<?> value() default void.class;
 
     /**
      * @return The bean type that this bean replaces
      */
     @AliasFor(member = "value")
-    Class bean() default void.class;
+    Class<?> bean() default void.class;
 
     /**
      * @return The declaring bean type
      */
-    Class factory() default void.class;
+    Class<?> factory() default void.class;
 
     /**
      * The name of the qualifiers of the bean that should be replaced.

@@ -223,7 +223,7 @@ public class InterceptorChain<B, R> extends AbstractInterceptorChain<B, R> imple
     private static Interceptor[] resolveInterceptorsInternal(ExecutableMethod<?, ?> method, Class<? extends Annotation> annotationType, Interceptor[] interceptors, @NonNull ClassLoader classLoader) {
         List<Class<? extends Annotation>> annotations = method.getAnnotationTypesByStereotype(annotationType, classLoader);
 
-        Set<Class> applicableClasses = new HashSet<>();
+        Set<Class<?>> applicableClasses = new HashSet<>();
 
         for (Class<? extends Annotation> aClass: annotations) {
             if (annotationType == Around.class && aClass.getAnnotation(Around.class) == null && aClass.getAnnotation(Introduction.class) != null) {

@@ -344,14 +344,13 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
                     return Optional.of((Class<? extends T>) t);
                 }
                 return Optional.empty();
-            } else if (o instanceof Class) {
-                Class t = (Class) o;
+            } else if (o instanceof Class<?> t) {
                 if (requiredType.isAssignableFrom(t)) {
                     return Optional.of((Class<? extends T>) t);
                 }
                 return Optional.empty();
             } else if (o != null) {
-                Class t = ClassUtils.forName(o.toString(), getClass().getClassLoader()).orElse(null);
+                Class<?> t = ClassUtils.forName(o.toString(), getClass().getClassLoader()).orElse(null);
                 if (t != null && requiredType.isAssignableFrom(t)) {
                     return Optional.of((Class<? extends T>) t);
                 }
@@ -1432,7 +1431,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         } else if (value instanceof AnnotationClassValue) {
             Class<?> type = ((AnnotationClassValue<?>) value).getType().orElse(null);
             if (type != null) {
-                return new Class[]{type};
+                return new Class<?>[]{type};
             }
         } else if (value instanceof AnnotationValue[]) {
             AnnotationValue[] array = (AnnotationValue[]) value;
@@ -1449,7 +1448,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
             return ((AnnotationValue) value).classValues();
         } else if (value instanceof Object[]) {
             Object[] values = (Object[]) value;
-            if (values instanceof Class[]) {
+            if (values instanceof Class<?>[]) {
                 return (Class<?>[]) values;
             } else {
                 return Arrays.stream(values).flatMap(o -> {
@@ -1463,7 +1462,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
                 }).toArray(Class[]::new);
             }
         } else if (value instanceof Class) {
-            return new Class[]{(Class) value};
+            return new Class<?>[]{(Class<?>) value};
         }
         return null;
     }

@@ -206,7 +206,7 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
      * @return true if matches
      */
     @UsedByGeneratedCode
-    protected final boolean methodAtIndexMatches(int index, String name, Class[] argumentTypes) {
+    protected final boolean methodAtIndexMatches(int index, String name, Class<?>[] argumentTypes) {
         MethodReference methodReference = methodsReferences[index];
         Argument<?>[] arguments = methodReference.arguments;
         if (arguments.length != argumentTypes.length || !methodReference.methodName.equals(name)) {
@@ -215,7 +215,7 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
         return argumentsTypesMatch(argumentTypes, arguments);
     }
 
-    private boolean argumentsTypesMatch(Class[] argumentTypes, Argument<?>[] arguments) {
+    private boolean argumentsTypesMatch(Class<?>[] argumentTypes, Argument<?>[] arguments) {
         for (int i = 0; i < arguments.length; i++) {
             if (!argumentTypes[i].equals(arguments[i].getType())) {
                 return false;

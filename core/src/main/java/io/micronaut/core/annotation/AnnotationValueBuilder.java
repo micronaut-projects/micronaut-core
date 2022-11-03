@@ -690,7 +690,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
             for (Map.Entry<CharSequence, Object> entry: members.entrySet()) {
                 Object value = entry.getValue();
                 if (value != null) {
-                    Class clazz = value.getClass();
+                    Class<?> clazz = value.getClass();
                     boolean isArray = clazz.isArray();
                     if (isArray) {
                         clazz = clazz.getComponentType();

@@ -476,7 +476,7 @@ final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.microna
                                     } else {
                                         typeVariable = argument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
                                     }
-                                    Class typeVariableType = typeVariable.getType();
+                                    Class<?> typeVariableType = typeVariable.getType();
 
                                     Sinks.Many<Object> namedSubject = subjectsByDataName.computeIfAbsent(name, key -> makeDownstreamUnicastProcessor());
 

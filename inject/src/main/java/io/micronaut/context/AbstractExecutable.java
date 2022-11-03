@@ -36,9 +36,9 @@ import java.util.Objects;
 @Internal
 abstract class AbstractExecutable implements Executable {
 
-    protected final Class declaringType;
+    protected final Class<?> declaringType;
     protected final String methodName;
-    protected final Class[] argTypes;
+    protected final Class<?>[] argTypes;
 
     private Argument[] arguments;
     private Method method;

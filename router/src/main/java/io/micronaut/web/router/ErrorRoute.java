@@ -56,7 +56,7 @@ public interface ErrorRoute extends MethodBasedRoute {
      * @param <T>              The type
      * @return The route match
      */
-    <T> Optional<RouteMatch<T>> match(Class originatingClass, Throwable exception);
+    <T> Optional<RouteMatch<T>> match(Class<?> originatingClass, Throwable exception);
 
     @Override
     ErrorRoute consumes(MediaType... mediaType);

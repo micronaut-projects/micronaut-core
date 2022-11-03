@@ -15,9 +15,9 @@ package test;
 import io.micronaut.context.annotation.*;
 import io.micronaut.inject.configuration.Engine;
 
-@ConfigurationProperties("test.props")    
+@ConfigurationProperties("test.props")
 final class TestProps {
-    @ConfigurationBuilder(prefixes = "with") 
+    @ConfigurationBuilder(prefixes = "with")
     private Engine.Builder builder = Engine.builder();
 
     public final Engine.Builder getBuilder() {
@@ -28,7 +28,7 @@ final class TestProps {
         ctx.getEnvironment().addPropertySource(PropertySource.of(["test.props.manufacturer": "Toyota"]))
 
         when:
-        Class testProps = ctx.classLoader.loadClass("test.TestProps")
+        Class<?> testProps = ctx.classLoader.loadClass("test.TestProps")
         def testPropBean = ctx.getBean(testProps)
 
         then:
@@ -45,9 +45,9 @@ package test;
 import io.micronaut.context.annotation.*;
 import io.micronaut.inject.configuration.Engine;
 
-@ConfigurationProperties("test.props")    
+@ConfigurationProperties("test.props")
 final class TestProps {
-    @ConfigurationBuilder(prefixes = "with") 
+    @ConfigurationBuilder(prefixes = "with")
     private Engine.Builder builder = Engine.builder();
 }
 ''')
@@ -66,14 +66,14 @@ package test;
 import io.micronaut.context.annotation.*;
 import io.micronaut.inject.configuration.Engine;
 
-@ConfigurationProperties("test.props")    
-final class TestProps {     
+@ConfigurationProperties("test.props")
+final class TestProps {
     Engine.Builder builder = Engine.builder();
-    
+
     Engine.Builder getBuilder() {
         return this.builder;
     }
-    
+
     @ConfigurationBuilder(prefixes = "with")
     void setBuilder(Engine.Builder p0) {
         this.builder = p0;
@@ -83,7 +83,7 @@ final class TestProps {
         ctx.getEnvironment().addPropertySource(PropertySource.of(["test.props.manufacturer": "Toyota"]))
 
         when:
-        Class testProps = ctx.classLoader.loadClass("test.TestProps")
+        Class<?> testProps = ctx.classLoader.loadClass("test.TestProps")
         def testPropBean = ctx.getBean(testProps)
 
         then:

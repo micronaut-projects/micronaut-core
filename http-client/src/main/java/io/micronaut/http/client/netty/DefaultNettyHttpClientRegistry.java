@@ -482,7 +482,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
         String path = metadata.stringValue(Client.class, "path").orElse(null);
         List<String> filterAnnotation = metadata
                 .getAnnotationNamesByStereotype(FilterMatcher.class);
-        final Class configurationClass =
+        final Class<?> configurationClass =
                 metadata.classValue(Client.class, "configuration").orElse(null);
         JsonFeatures jsonFeatures = jsonMapper.detectFeatures(metadata).orElse(null);
 

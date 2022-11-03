@@ -78,7 +78,7 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor<JsonNode>
             TypedSubscriber typedSubscriber = (TypedSubscriber) subscriber;
             Argument typeArgument = typedSubscriber.getTypeArgument();
 
-            Class targetType = typeArgument.getType();
+            Class<?> targetType = typeArgument.getType();
             if (Publishers.isConvertibleToPublisher(targetType) && !Publishers.isSingle(targetType)) {
                 Optional<Argument<?>> genericArgument = typeArgument.getFirstTypeVariable();
                 if (genericArgument.isPresent() && !Iterable.class.isAssignableFrom(genericArgument.get().getType()) && !isJsonStream) {

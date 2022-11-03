@@ -45,7 +45,7 @@ class DefaultMethodInjectionPoint<B, T> implements MethodInjectionPoint<B, T>, E
     private final AnnotationMetadata annotationMetadata;
     private final Class<?> declaringType;
     private final String methodName;
-    private final Class[] argTypes;
+    private final Class<?>[] argTypes;
     private final Argument<?>[] arguments;
     private Environment environment;
 

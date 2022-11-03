@@ -200,7 +200,7 @@ public class BeanIntrospectionModule extends SimpleModule {
         AnnotationValue<?> jsonSerializeAnnotation = beanProperty.getAnnotation(annotationType);
         if (jsonSerializeAnnotation != null) {
             // ideally, we'd use SerializerProvider here, but it's not exposed to the BeanSerializerModifier
-            Class using = jsonSerializeAnnotation.classValue("using").orElse(null);
+            Class<?> using = jsonSerializeAnnotation.classValue("using").orElse(null);
             if (using != null) {
                 BeanIntrospection<Object> usingIntrospection = findIntrospection(using);
                 if (usingIntrospection != null) {
@@ -291,7 +291,7 @@ public class BeanIntrospectionModule extends SimpleModule {
                         }
                     }
                 };
-                
+
                 newBuilder.setAnyGetter(builder.getAnyGetter());
                 final List<BeanPropertyWriter> properties = builder.getProperties();
                 final Collection<BeanProperty<Object, Object>> beanProperties = introspection.getBeanProperties();

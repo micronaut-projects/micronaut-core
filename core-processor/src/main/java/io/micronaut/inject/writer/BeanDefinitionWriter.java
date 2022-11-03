@@ -489,7 +489,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private final String beanDefinitionName;
     private final String beanDefinitionInternalName;
     private final Type beanType;
-    private final Set<Class> interfaceTypes;
+    private final Set<Class<?>> interfaceTypes;
     private final Map<String, Integer> defaultsStorage = new HashMap<>();
     private final Map<String, GeneratorAdapter> loadTypeMethods = new LinkedHashMap<>();
     private final Map<String, ClassWriter> innerClasses = new LinkedHashMap<>(2);
@@ -970,7 +970,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         }
 
         String[] interfaceInternalNames = new String[interfaceTypes.size()];
-        Iterator<Class> j = interfaceTypes.iterator();
+        Iterator<Class<?>> j = interfaceTypes.iterator();
         for (int i = 0; i < interfaceInternalNames.length; i++) {
             interfaceInternalNames[i] = Type.getInternalName(j.next());
         }
