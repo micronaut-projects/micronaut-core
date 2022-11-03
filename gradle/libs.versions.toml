@@ -119,6 +119,7 @@ managed-micronaut-rxjava3 = "2.3.0"
 managed-micronaut-security = "3.8.1"
 managed-micronaut-serialization = "2.0.0-SNAPSHOT"
 managed-micronaut-servlet = "3.3.2"
+managed-micronaut-session = "1.0.0-SNAPSHOT"
 managed-micronaut-spring = "4.3.1"
 managed-micronaut-sql = "4.7.2"
 managed-micronaut-test = "3.7.0"
@@ -181,6 +182,7 @@ boms-micronaut-reactor = { module = "io.micronaut.reactor:micronaut-reactor-bom"
 boms-micronaut-security = { module = "io.micronaut.security:micronaut-security-bom", version.ref = "managed-micronaut-security" }
 boms-micronaut-serialization = { module = "io.micronaut.serde:micronaut-serde-bom", version.ref = "managed-micronaut-serialization" }
 boms-micronaut-servlet = { module = "io.micronaut.servlet:micronaut-servlet-bom", version.ref = "managed-micronaut-servlet" }
+boms-micronaut-session = { module = "io.micronaut.session:micronaut-session-bom", version.ref = "managed-micronaut-session" }
 boms-micronaut-spring = { module = "io.micronaut.spring:micronaut-spring-bom", version.ref = "managed-micronaut-spring" }
 boms-micronaut-sql = { module = "io.micronaut.sql:micronaut-sql-bom", version.ref = "managed-micronaut-sql" }
 boms-micronaut-test = { module = "io.micronaut.test:micronaut-test-bom", version.ref = "managed-micronaut-test" }
@@ -440,6 +442,8 @@ systemlambda = { module = "com.github.stefanbirkner:system-lambda", version.ref 
 
 micronaut-tracing-jaeger = { module = "io.micronaut.tracing:micronaut-tracing-jaeger" }
 micronaut-tracing-zipkin = { module = "io.micronaut.tracing:micronaut-tracing-zipkin" }
+
+micronaut-session = { module = "io.micronaut.session:micronaut-session" }
 
 testcontainers-spock = { module = "org.testcontainers:spock", version.ref = "managed-testcontainers" }
 

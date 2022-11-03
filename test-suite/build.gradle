@@ -22,6 +22,16 @@ micronautBuild {
     }
 }
 
+repositories {
+    mavenCentral()
+    maven {
+        url "https://s01.oss.sonatype.org/content/repositories/snapshots/"
+        mavenContent {
+            snapshotsOnly()
+        }
+    }
+}
+
 dependencies {
     annotationProcessor project(":inject-java")
     api project(":core-processor")
@@ -40,7 +50,8 @@ dependencies {
     testImplementation project(":inject")
     testImplementation project(":function-client")
     testImplementation project(":function-web")
-    testImplementation project(":session")
+    testImplementation(platform(libs.boms.micronaut.session))
+    testImplementation(libs.micronaut.session)
 
     // Adding these for now since micronaut-test isnt resolving correctly ... probably need to upgrade gradle there too
     testImplementation libs.junit.jupiter.api

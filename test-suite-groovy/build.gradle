@@ -9,6 +9,16 @@ micronautBuild {
     }
 }
 
+repositories {
+    mavenCentral()
+    maven {
+        url "https://s01.oss.sonatype.org/content/repositories/snapshots/"
+        mavenContent {
+            snapshotsOnly()
+        }
+    }
+}
+
 dependencies {
     testImplementation libs.managed.netty.codec.http
     testImplementation project(":http-client")
@@ -19,7 +29,8 @@ dependencies {
     testImplementation project(":validation")
     testImplementation project(":inject")
     testImplementation project(":management")
-    testImplementation project(":session")
+    testImplementation(platform(libs.boms.micronaut.session))
+    testImplementation(libs.micronaut.session)
     testImplementation libs.managed.jcache
     testImplementation libs.managed.groovy.sql
     testImplementation libs.managed.groovy.templates
