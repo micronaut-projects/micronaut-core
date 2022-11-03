@@ -227,6 +227,8 @@ public class DefaultMutableConversionService implements MutableConversionService
             return Optional.empty();
         });
 
+        addConverter(byte[].class, String.class, (bytes, targetType, context) -> Optional.of(new String(bytes, context.getCharset())));
+
         // String -> Class
         addConverter(CharSequence.class, Class.class, (object, targetType, context) -> {
             ClassLoader classLoader = targetType.getClassLoader();
