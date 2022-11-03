@@ -77,6 +77,124 @@ class Test<T extends CharSequence> {
         introspection.beanMethods.first().returnType.type == CharSequence[].class
     }
 
+    void "test property type is defined by its writer field"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.core.annotation.Nullable;
+import java.util.Optional;
+
+@Introspected(accessKind = {Introspected.AccessKind.METHOD, Introspected.AccessKind.FIELD})
+class Test {
+    @Nullable
+    String foo;
+
+    public Optional<String> getFoo() {
+        return Optional.ofNullable(foo);
+    }
+
+}
+''')
+        expect:
+        introspection.getProperty("foo").get().type == String.class
+    }
+
+    void "test optional property type is defined by its setter"() {
+        given:
+            def introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.core.annotation.Nullable;
+import java.util.*;
+
+@Introspected
+class Test {
+    @Nullable
+    private String foo;
+    @Nullable
+    private Long lng;
+    @Nullable
+    private Double dbl;
+    @Nullable
+    private Integer ingr;
+
+    public Optional<String> getFoo() {
+        return Optional.ofNullable(foo);
+    }
+
+    public OptionalDouble getDbl() {
+        return OptionalDouble.of(dbl);
+    }
+
+    public OptionalLong getLng() {
+        return OptionalLong.of(lng);
+    }
+
+    public OptionalInt getIngr() {
+        return OptionalInt.of(ingr);
+    }
+
+    public void setFoo(@Nullable String foo) {
+        this.foo = foo;
+    }
+
+    public void setLng(@Nullable Long lng) {
+        this.lng = lng;
+    }
+
+    public void setDbl(@Nullable Double dbl) {
+        this.dbl = dbl;
+    }
+
+    public void setIngr(@Nullable Integer ingr) {
+        this.ingr = ingr;
+    }
+
+}
+''')
+        expect:
+            introspection.getPropertyNames().length == 4
+            introspection.getProperty("foo").get().type == String.class
+            introspection.getProperty("lng").get().type == Long.class
+            introspection.getProperty("dbl").get().type == Double.class
+            introspection.getProperty("ingr").get().type == Integer.class
+
+            introspection.getProperty("foo").get().isReadWrite()
+            introspection.getProperty("lng").get().isReadWrite()
+            introspection.getProperty("dbl").get().isReadWrite()
+            introspection.getProperty("ingr").get().isReadWrite()
+    }
+
+    void "test property type is not defined by its not accessible field"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.core.annotation.Nullable;
+import java.util.Optional;
+
+@Introspected(accessKind = {Introspected.AccessKind.METHOD, Introspected.AccessKind.FIELD})
+class Test {
+    @Nullable
+    private String foo;
+
+    public Optional<String> getFoo() {
+        return Optional.ofNullable(foo);
+    }
+
+}
+''')
+        expect:
+        introspection.getProperty("foo").get().type == Optional.class
+    }
+
     void 'test favor method access'() {
         given:
         BeanIntrospection introspection = buildBeanIntrospection('fieldaccess.Test','''\
@@ -642,6 +760,41 @@ public record Foo(int x, int y){
         def obj = introspection.instantiate(5, 10)
 
         then:
+        obj.x() == 5
+        obj.y() == 10
+    }
+
+    @Requires({ jvm.isJava14Compatible() })
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/8187')
+    void "test secondary constructor for Java 14+ records with initializer"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
+package test;
+
+import io.micronaut.core.annotation.Creator;
+import java.util.List;
+import javax.validation.constraints.Min;
+
+@io.micronaut.core.annotation.Introspected
+public record Foo(int x, int y){
+    public Foo {
+        if (x < 0) {
+            throw new IllegalArgumentException("Invalid argument");
+        }
+    }
+    public Foo(int x) {
+        this(x, 20);
+    }
+    public Foo() {
+        this(20, 20);
+    }
+}
+''')
+        when:
+        def obj = introspection.instantiate(5, 10)
+
+        then:
+        introspection.getConstructorArguments().length == 2
         obj.x() == 5
         obj.y() == 10
     }

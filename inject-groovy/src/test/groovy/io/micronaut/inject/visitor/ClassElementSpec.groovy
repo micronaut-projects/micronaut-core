@@ -15,8 +15,8 @@
  */
 package io.micronaut.inject.visitor
 
-import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.ast.groovy.TypeElementVisitorStart
+import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.context.exceptions.BeanContextException
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.ElementModifier
@@ -26,6 +26,7 @@ import io.micronaut.inject.ast.FieldElement
 import io.micronaut.inject.ast.MemberElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.PackageElement
+import io.micronaut.inject.ast.PrimitiveElement
 import io.micronaut.inject.ast.PropertyElement
 import io.micronaut.inject.ast.TypedElement
 import spock.lang.Issue
@@ -45,6 +46,29 @@ class ClassElementSpec extends AbstractBeanDefinitionSpec {
 
     def cleanup() {
         AllElementsVisitor.clearVisited()
+    }
+
+    void "test equals with primitive"() {
+        given:
+            def element = buildClassElement("""
+package test
+
+class Test {
+
+boolean test1
+
+}
+""")
+
+        expect:
+            element != PrimitiveElement.BOOLEAN
+            element != PrimitiveElement.VOID
+            element != PrimitiveElement.BOOLEAN.withArrayDimensions(4)
+            PrimitiveElement.VOID != element
+            PrimitiveElement.INT != element
+            PrimitiveElement.INT.withArrayDimensions(2) != element
+            element.getFields().get(0).getType() == PrimitiveElement.BOOLEAN
+            PrimitiveElement.BOOLEAN == element.getFields().get(0).getType()
     }
 
     @Issue("https://github.com/micronaut-projects/micronaut-openapi/issues/670")
@@ -339,7 +363,9 @@ interface AnotherInterface {
     void "test find matching methods using ElementQuery"() {
         given:
         ClassElement classElement = buildClassElement('''
-package elementquery;
+package elementquery
+
+import groovy.transform.PackageScope;
 
 class Test extends SuperType implements AnotherInterface, SomeInt {
 
@@ -364,7 +390,8 @@ class Test extends SuperType implements AnotherInterface, SomeInt {
 }
 
 class SuperType {
-    protected boolean s1;
+    @PackageScope
+    boolean s1;
     private boolean s2;
     private boolean privateMethod() {
         return true;
@@ -391,15 +418,15 @@ interface AnotherInterface {
     boolean publicMethod();
 }
 ''')
-        when:"all methods are retrieved"
+        when: "all methods are retrieved"
         def allMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS)
 
-        then:"All methods, including non-accessible are returned but not overridden"
+        then: "All methods, including non-accessible are returned but not overridden"
         allMethods.size() == 7
-        allMethods.find { it.name == 'publicMethod'}.declaringType.simpleName == 'Test'
-        allMethods.find { it.name == 'otherSuper'}.declaringType.simpleName == 'SuperType'
+        allMethods.find { it.name == 'publicMethod' }.declaringType.simpleName == 'Test'
+        allMethods.find { it.name == 'otherSuper' }.declaringType.simpleName == 'SuperType'
 
-        when:"obtaining only the declared methods"
+        when: "obtaining only the declared methods"
         def declared = classElement.getEnclosedElements(ElementQuery.of(MethodElement).onlyDeclared())
 
         then:"The declared are correct"
@@ -407,31 +434,32 @@ interface AnotherInterface {
         // part of the methods declared by classNode.getMethods() and there is no way to distinguish them
         declared*.name as Set == ['privateMethod', 'packagePrivateMethod', 'publicMethod', 'staticMethod', 'itfeMethod'] as Set
 
-        when:"Accessible methods are retrieved"
+        when: "Accessible methods are retrieved"
         def accessible = classElement.getEnclosedElements(ElementQuery.of(MethodElement).onlyAccessible())
 
-        then:"Only accessible methods, excluding those that require reflection"
+        then: "Only accessible methods, excluding those that require reflection"
+        accessible.size() == 5
         accessible*.name as Set == ['otherSuper', 'itfeMethod', 'publicMethod', 'packagePrivateMethod', 'staticMethod'] as Set
 
-        when:"static methods are resolved"
+        when: "static methods are resolved"
         def staticMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS.modifiers({
             it.contains(ElementModifier.STATIC)
         }))
 
-        then:"We only get statics"
+        then: "We only get statics"
         staticMethods.size() == 1
         staticMethods.first().name == 'staticMethod'
 
-        when:"All fields are retrieved"
+        when: "All fields are retrieved"
         def allFields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS)
 
-        then:"we get everything"
+        then: "we get everything"
         allFields.size() == 4
 
-        when:"Accessible fields are retrieved"
+        when: "Accessible fields are retrieved"
         def accessibleFields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS.onlyAccessible())
 
-        then:"we get everything"
+        then: "we get everything"
         accessibleFields.size() == 2
         accessibleFields*.name as Set == ['s1', 't1'] as Set
     }
@@ -713,9 +741,6 @@ enum Test {
         when:
         List<FieldElement> allFields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS)
         List<String> expected = [
-                'A',
-                'B',
-                'C',
                 'publicStaticFinalField',
                 'publicStaticField',
                 'publicFinalField',
@@ -732,10 +757,8 @@ enum Test {
                 'privateStaticField',
                 'privateFinalField',
                 'privateField',
-                'MIN_VALUE',
-                'MAX_VALUE',
-                'name',
-                'ordinal',
+                'MIN_VALUE', // Extra field in Groovy
+                'MAX_VALUE' // Extra field in Groovy
         ]
 
         then:
@@ -746,6 +769,7 @@ enum Test {
 
         when:
         allFields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS.includeEnumConstants())
+        expected = ['A', 'B', 'C'] + expected
 
         then:
         for (String name : allFields*.name) {
@@ -839,5 +863,144 @@ class MyBean implements MyInt {
             allMethods.size() == 1
             allMethods.get(0).isAbstract() == false
             allMethods.get(0).isDefault() == false
+    }
+
+    void "test synthetic properties aren't removed"() {
+        given:
+            ClassElement classElement = buildClassElement('elementquery.SuccessfulTest', '''
+package elementquery
+
+import io.micronaut.context.ApplicationContext;
+import spock.lang.Shared
+import spock.lang.Specification
+
+import jakarta.inject.Inject
+
+class AbstractExample extends Specification {
+
+    @Inject
+    @Shared
+    ApplicationContext sharedCtx
+
+    @Inject
+    ApplicationContext ctx
+
+}
+
+class FailingTest extends AbstractExample {
+
+    def 'injection is not null'() {
+        expect:
+        ctx != null
+    }
+
+    def 'shared injection is not null'() {
+        expect:
+        sharedCtx != null
+    }
+}
+
+class SuccessfulTest extends AbstractExample {
+
+    @Shared
+    @Inject
+    ApplicationContext dummy
+
+    def 'injection is not null'() {
+        expect:
+        ctx != null
+    }
+
+    def 'shared injection is not null'() {
+        expect:
+        sharedCtx != null
+    }
+}
+
+
+''')
+        when:
+            def props = classElement.getSyntheticBeanProperties()
+            def allFields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS)
+        then:
+            props.size() == 3
+            props[0].name == "ctx"
+            props[1].name.contains "dummy"
+            props[2].name.contains "sharedCtx"
+    }
+
+    void "test fields selection"() {
+        given:
+            ClassElement classElement = buildClassElement('test.PetOperations', '''
+package test
+
+import groovy.transform.PackageScope;
+import io.micronaut.http.annotation.*;
+import jakarta.inject.Inject;
+
+@Controller("/pets")
+interface PetOperations<T extends Pet> {
+
+    @Post("/")
+    T save(String name, int age);
+}
+
+class Pet {
+    public int pub;
+
+    private String prvn;
+
+    protected String protectme;
+
+    @PackageScope
+    String packprivme;
+
+    public static String PUB_CONST;
+
+    private static String PRV_CONST;
+
+    protected static String PROT_CONST;
+
+    @PackageScope
+    static String PACK_PRV_CONST;
+}
+
+''')
+        when:
+            List<FieldElement> publicFields = classElement.getFirstTypeArgument()
+                    .get()
+                    .getEnclosedElements(ElementQuery.ALL_FIELDS.modifiers(mods -> mods.contains(ElementModifier.PUBLIC) && mods.size() == 1))
+        then:
+            publicFields.size() == 1
+            publicFields.stream().map(FieldElement::getName).toList() == ["pub"]
+
+        when:
+            List<FieldElement> publicFields2 = classElement.getFirstTypeArgument()
+                    .get()
+                    .getEnclosedElements(ElementQuery.ALL_FIELDS.filter(e -> e.isPublic()))
+        then:
+            publicFields2.size() == 2
+            publicFields2.stream().map(FieldElement::getName).toList() == ["pub", "PUB_CONST"]
+        when:
+            List<FieldElement> protectedFields = classElement.getFirstTypeArgument()
+                    .get()
+                    .getEnclosedElements(ElementQuery.ALL_FIELDS.filter(e -> e.isProtected()))
+        then:
+            protectedFields.size() == 2
+            protectedFields.stream().map(FieldElement::getName).toList() == ["protectme", "PROT_CONST"]
+        when:
+            List<FieldElement> privateFields = classElement.getFirstTypeArgument()
+                    .get()
+                    .getEnclosedElements(ElementQuery.ALL_FIELDS.filter(e -> e.isPrivate()))
+        then:
+            privateFields.size() == 2
+            privateFields.stream().map(FieldElement::getName).toList() == ["prvn", "PRV_CONST"]
+        when:
+            List<FieldElement> packPrvFields = classElement.getFirstTypeArgument()
+                    .get()
+                    .getEnclosedElements(ElementQuery.ALL_FIELDS.filter(e -> e.isPackagePrivate()))
+        then:
+            packPrvFields.size() == 2
+            packPrvFields.stream().map(FieldElement::getName).toList() == ["packprivme", "PACK_PRV_CONST"]
     }
 }

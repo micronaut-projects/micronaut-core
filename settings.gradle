@@ -14,7 +14,7 @@ pluginManagement {
 }
 
 plugins {
-    id 'io.micronaut.build.shared.settings' version '5.3.14'
+    id 'io.micronaut.build.shared.settings' version '6.0.1'
 }
 
 rootProject.name = 'micronaut'
@@ -25,7 +25,9 @@ include "parent"
 include "buffer-netty"
 include "core"
 include "core-reactive"
+include "core-processor"
 include "context"
+include "discovery-core"
 include "function"
 include "function-client"
 include "function-web"
@@ -49,6 +51,7 @@ include "jackson-databind"
 include "json-core"
 include "management"
 include "messaging"
+include "retry"
 include "router"
 include "runtime"
 include "runtime-osx"

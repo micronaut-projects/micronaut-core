@@ -33,8 +33,6 @@ import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.ProviderNotFoundException;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -141,23 +139,8 @@ public class IOUtils {
             // This check makes our class loading resilient to that
             return jarPath;
         }
-        FileSystem zipfs;
-        try {
-            // can't use newFileSystem(Path) here (without CL) because it doesn't exist on java 8
-            // the CL cast is necessary because since java 13 there is a newFileSystem(Path, Map)
-            zipfs = FileSystems.newFileSystem(jarPath, (ClassLoader) null);
-            toClose.add(0, zipfs);
-        } catch (ProviderNotFoundException e) {
-            // java versions earlier than 11 do not support nested zipfs and will fail with this
-            // exception. Try to extract the file instead. This is not efficient, but what else can
-            // we do?
-            Path tmp = Files.createTempFile("micronaut-IOUtils-nested-zip", ".zip");
-            toClose.add(0, () -> Files.deleteIfExists(tmp));
-            Files.copy(jarPath, tmp, StandardCopyOption.REPLACE_EXISTING);
-
-            zipfs = FileSystems.newFileSystem(tmp, (ClassLoader) null);
-            toClose.add(0, zipfs);
-        }
+        FileSystem zipfs = FileSystems.newFileSystem(jarPath, (ClassLoader) null);
+        toClose.add(0, zipfs);
         return zipfs.getPath(jarUri.substring(sep + 1));
     }
 
@@ -194,15 +177,12 @@ public class IOUtils {
                     reader.close();
                 }
             } catch (IOException e) {
-                if (IOLogging.LOG.isWarnEnabled()) {
-                    IOLogging.LOG.warn("Failed to close reader: " + e.getMessage(), e);
+                Logger logger = LoggerFactory.getLogger(Logger.class);
+                if (logger.isWarnEnabled()) {
+                    logger.warn("Failed to close reader: " + e.getMessage(), e);
                 }
             }
         }
         return answer.toString();
-    }
-
-    private static final class IOLogging {
-        private static final Logger LOG = LoggerFactory.getLogger(IOLogging.class);
     }
 }

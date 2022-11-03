@@ -273,7 +273,7 @@ public class ClassUtils {
      * @param classLoader The classloader. If null will fallback to attempt the thread context loader, otherwise the system loader
      * @return An optional of the class
      */
-    public static Optional<Class> forName(String name, @Nullable ClassLoader classLoader) {
+    public static Optional<Class<?>> forName(String name, @Nullable ClassLoader classLoader) {
         try {
             if (MISSING_TYPES.contains(name)) {
                 return Optional.empty();
@@ -285,7 +285,7 @@ public class ClassUtils {
                 classLoader = ClassLoader.getSystemClassLoader();
             }
 
-            Optional<Class> commonType = Optional.ofNullable(COMMON_CLASS_MAP.get(name));
+            Optional<Class<?>> commonType = Optional.ofNullable(COMMON_CLASS_MAP.get(name));
             if (commonType.isPresent()) {
                 return commonType;
             } else {

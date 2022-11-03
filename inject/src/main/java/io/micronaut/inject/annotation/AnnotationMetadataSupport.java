@@ -41,7 +41,6 @@ import java.lang.reflect.Proxy;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
-import java.util.function.Function;
 
 /**
  * Support method for {@link io.micronaut.core.annotation.AnnotationMetadata}.
@@ -156,15 +155,13 @@ public final class AnnotationMetadataSupport {
             return Optional.of(type);
         } else {
             // last resort, try dynamic load, shouldn't normally happen.
-            final Optional<Class> aClass = ClassUtils.forName(name, classLoader);
-            return aClass.flatMap((Function<Class, Optional<Class<? extends Annotation>>>) aClass1 -> {
-                if (Annotation.class.isAssignableFrom(aClass1)) {
-                    //noinspection unchecked
-                    ANNOTATION_TYPES.put(name, aClass1);
-                    return Optional.of(aClass1);
-                }
-                return Optional.empty();
-            });
+            @SuppressWarnings("unchecked") final Class<? extends Annotation> aClass =
+                (Class<? extends Annotation>) ClassUtils.forName(name, classLoader).orElse(null);
+            if (aClass != null && Annotation.class.isAssignableFrom(aClass)) {
+                ANNOTATION_TYPES.put(name, aClass);
+                return Optional.of(aClass);
+            }
+            return Optional.empty();
         }
     }
 

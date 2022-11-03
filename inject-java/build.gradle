@@ -9,8 +9,7 @@ micronautBuild {
 }
 
 dependencies {
-    api project(":inject")
-    api project(':aop')
+    api project(":core-processor")
 
     if (!JavaVersion.current().isJava9Compatible()) {
         compileOnly files(org.gradle.internal.jvm.Jvm.current().toolsJar)
@@ -40,6 +39,7 @@ dependencies {
     }
     testImplementation libs.managed.micrometer.core
     testImplementation project(":validation")
+    testImplementation project(":jackson-databind")
     testImplementation libs.junit.jupiter.api
     testImplementation(platform(libs.boms.micronaut.tracing))
     testImplementation(libs.micronaut.tracing.zipkin) {

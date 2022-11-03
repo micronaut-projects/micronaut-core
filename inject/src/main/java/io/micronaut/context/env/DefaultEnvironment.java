@@ -20,6 +20,7 @@ import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionContext;
+import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.ResourceResolver;
@@ -101,15 +102,14 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private static final List<String> DEFAULT_CONFIG_LOCATIONS = Arrays.asList("classpath:/", "file:config/");
     protected final ClassPathResourceLoader resourceLoader;
     protected final List<PropertySource> refreshablePropertySources = new ArrayList<>(10);
-
+    protected final MutableConversionService mutableConversionService;
     private EnvironmentsAndPackage environmentsAndPackage;
-
     private final Set<String> names;
     private final ClassLoader classLoader;
     private final Collection<String> packages = new ConcurrentLinkedQueue<>();
     private final BeanIntrospectionScanner annotationScanner;
-    private Collection<String> configurationIncludes = new HashSet<>(3);
-    private Collection<String> configurationExcludes = new HashSet<>(3);
+    private final Collection<String> configurationIncludes = new HashSet<>(3);
+    private final Collection<String> configurationExcludes = new HashSet<>(3);
     private final AtomicBoolean running = new AtomicBoolean(false);
     private Collection<PropertySourceLoader> propertySourceLoaderList;
     private final Map<String, PropertySourceLoader> loaderByFormatMap = new ConcurrentHashMap<>();
@@ -125,7 +125,8 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      * @param configuration The configuration
      */
     public DefaultEnvironment(@NonNull ApplicationContextConfiguration configuration) {
-        super(configuration.getConversionService());
+        super(configuration.getConversionService().orElseGet(MutableConversionService::create));
+        this.mutableConversionService = (MutableConversionService) conversionService;
         this.configuration = configuration;
         this.resourceLoader = configuration.getResourceLoader();
 
@@ -302,24 +303,22 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     @Override
     public <T> Optional<T> convert(Object object, Class<T> targetType, ConversionContext context) {
-        return conversionService.convert(object, targetType, context);
+        return mutableConversionService.convert(object, targetType, context);
     }
 
     @Override
     public <S, T> boolean canConvert(Class<S> sourceType, Class<T> targetType) {
-        return conversionService.canConvert(sourceType, targetType);
+        return mutableConversionService.canConvert(sourceType, targetType);
     }
 
     @Override
-    public <S, T> Environment addConverter(Class<S> sourceType, Class<T> targetType, TypeConverter<S, T> typeConverter) {
-        conversionService.addConverter(sourceType, targetType, typeConverter);
-        return this;
+    public <S, T> void addConverter(Class<S> sourceType, Class<T> targetType, TypeConverter<S, T> typeConverter) {
+        mutableConversionService.addConverter(sourceType, targetType, typeConverter);
     }
 
     @Override
-    public <S, T> Environment addConverter(Class<S> sourceType, Class<T> targetType, Function<S, T> typeConverter) {
-        conversionService.addConverter(sourceType, targetType, typeConverter);
-        return this;
+    public <S, T> void addConverter(Class<S> sourceType, Class<T> targetType, Function<S, T> typeConverter) {
+        mutableConversionService.addConverter(sourceType, targetType, typeConverter);
     }
 
     @Override
@@ -954,6 +953,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             }
         } catch (InterruptedException e) {
             // test negative
+            Thread.currentThread().interrupt();
         }
         return false;
     }
@@ -995,6 +995,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             }
         } catch (InterruptedException e) {
             // test negative
+            Thread.currentThread().interrupt();
         }
         return false;
     }

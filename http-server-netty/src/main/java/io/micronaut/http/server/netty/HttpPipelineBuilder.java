@@ -17,6 +17,7 @@ package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.naming.Named;
+import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.context.event.HttpRequestReceivedEvent;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.stream.HttpStreamsServerHandler;
@@ -51,6 +52,7 @@ import io.netty.handler.codec.http2.Http2ServerUpgradeCodec;
 import io.netty.handler.codec.http2.Http2StreamChannel;
 import io.netty.handler.codec.http2.Http2StreamFrameToHttpObjectCodec;
 import io.netty.handler.flow.FlowControlHandler;
+import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.pcap.PcapWriteHandler;
 import io.netty.handler.ssl.ApplicationProtocolNames;
@@ -73,8 +75,9 @@ import java.net.SocketAddress;
 import java.nio.channels.ClosedChannelException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 
 /**
  * Helper class that manages the {@link ChannelPipeline} of incoming HTTP connections.
@@ -86,6 +89,8 @@ import java.util.concurrent.atomic.AtomicReference;
  * @author ywkat
  */
 final class HttpPipelineBuilder {
+    static final Supplier<AttributeKey<StreamPipeline>> STREAM_PIPELINE_ATTRIBUTE =
+        SupplierUtil.memoized(() -> AttributeKey.newInstance("stream-pipeline"));
 
     private static final Logger LOG = LoggerFactory.getLogger(HttpPipelineBuilder.class);
 
@@ -113,7 +118,8 @@ final class HttpPipelineBuilder {
         this.hostResolver = hostResolver;
         this.serverCustomizer = serverCustomizer;
 
-        loggingHandler = server.getServerConfiguration().getLogLevel().isPresent() ? new LoggingHandler(NettyHttpServer.class, server.getServerConfiguration().getLogLevel().get()) : null;
+        Optional<LogLevel> logLevel = server.getServerConfiguration().getLogLevel();
+        loggingHandler = logLevel.map(level -> new LoggingHandler(NettyHttpServer.class, level)).orElse(null);
         sslContext = embeddedServices.getServerSslBuilder() != null ? embeddedServices.getServerSslBuilder().build().orElse(null) : null;
 
         NettyHttpServerConfiguration.AccessLogger accessLogger = server.getServerConfiguration().getAccessLogger();
@@ -129,8 +135,8 @@ final class HttpPipelineBuilder {
                 embeddedServices.getEventPublisher(HttpRequestReceivedEvent.class));
         responseEncoder = new HttpResponseEncoder(
                 embeddedServices.getMediaTypeCodecRegistry(),
-                server.getServerConfiguration()
-        );
+                server.getServerConfiguration(),
+                embeddedServices.getApplicationContext().getConversionService());
     }
 
     boolean supportsSsl() {
@@ -389,18 +395,18 @@ final class HttpPipelineBuilder {
                 @Override
                 protected void channelRead0(ChannelHandlerContext ctx, HttpMessage msg) {
                     // If this handler is hit then no upgrade has been attempted and the client is just talking HTTP.
-                    ChannelPipeline pipeline = ctx.pipeline();
+                    ChannelPipeline cp = ctx.pipeline();
 
                     // remove the handlers we don't need anymore
-                    pipeline.remove(upgradeHandler);
-                    pipeline.remove(this);
+                    cp.remove(upgradeHandler);
+                    cp.remove(this);
 
                     // reconfigure for http1
                     // note: we have to reuse the serverCodec in case it still has some data buffered
                     new StreamPipeline(channel, ssl, connectionCustomizer).insertHttp1DownstreamHandlers();
                     connectionCustomizer.onStreamPipelineBuilt();
                     onRequestPipelineBuilt();
-                    pipeline.fireChannelRead(ReferenceCountUtil.retain(msg));
+                    cp.fireChannelRead(ReferenceCountUtil.retain(msg));
                 }
             });
             connectionCustomizer.onInitialPipelineBuilt();
@@ -464,7 +470,7 @@ final class HttpPipelineBuilder {
          * and netty requests, and routing.
          */
         private void insertMicronautHandlers() {
-            channel.attr(StreamPipelineAttributeKeyHolder.getInstance()).set(this);
+            channel.attr(STREAM_PIPELINE_ATTRIBUTE.get()).set(this);
 
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_COMPRESSOR, new SmartHttpContentCompressor(embeddedServices.getHttpCompressionStrategy()));
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECOMPRESSOR, new HttpContentDecompressor());
@@ -480,9 +486,10 @@ final class HttpPipelineBuilder {
                 pipeline.addLast("request-certificate-handler", requestCertificateHandler);
             }
             pipeline.addLast(HttpResponseEncoder.ID, responseEncoder);
-            pipeline.addLast(NettyServerWebSocketUpgradeHandler.ID, new NettyServerWebSocketUpgradeHandler(
-                    embeddedServices,
-                    server.getWebSocketSessionRepository()));
+            embeddedServices.getWebSocketUpgradeHandler(server).ifPresent(websocketHandler ->
+                pipeline.addLast(ChannelPipelineCustomizer.HANDLER_WEBSOCKET_UPGRADE, websocketHandler)
+            );
+
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_INBOUND, routingInBoundHandler);
         }
 
@@ -516,25 +523,6 @@ final class HttpPipelineBuilder {
                 }
                 pipeline.addLast(name, outboundHandlerAdapter);
             }
-        }
-    }
-
-    // We need the AttributeKey to be static, as it's used in NettyHttpRequest, but we can't eagerly initialize it
-    // as it would fail in Graal
-    static final class StreamPipelineAttributeKeyHolder {
-
-        private static final AtomicReference<AttributeKey<StreamPipeline>> INSTANCE = new AtomicReference<>();
-
-        private StreamPipelineAttributeKeyHolder() {
-        }
-
-        static AttributeKey<StreamPipeline> getInstance() {
-            return INSTANCE.updateAndGet(key -> {
-                if (key == null) {
-                    return AttributeKey.newInstance("micronaut-stream-pipeline");
-                }
-                return key;
-            });
         }
     }
 }

@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.server.netty.binding
 
-import io.micronaut.core.convert.DefaultConversionService
+import io.micronaut.core.convert.DefaultMutableConversionService
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MutableHttpResponse
@@ -37,7 +37,7 @@ class NettyHttpResponseSpec extends Specification {
     void "test add headers"() {
         given:
         DefaultFullHttpResponse nettyResponse = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
-        NettyMutableHttpResponse response = new NettyMutableHttpResponse(nettyResponse, new DefaultConversionService())
+        NettyMutableHttpResponse response = new NettyMutableHttpResponse(nettyResponse, new DefaultMutableConversionService())
 
         response.status(HttpStatus."$status")
         response.headers.add(header, value)
@@ -54,7 +54,7 @@ class NettyHttpResponseSpec extends Specification {
     void "test add simple cookie"() {
         given:
         DefaultFullHttpResponse nettyResponse = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
-        MutableHttpResponse response = new NettyMutableHttpResponse(nettyResponse, new DefaultConversionService())
+        MutableHttpResponse response = new NettyMutableHttpResponse(nettyResponse, new DefaultMutableConversionService())
 
         response.status(HttpStatus."$status")
         response.cookie(Cookie.of("foo", "bar"))
@@ -71,7 +71,7 @@ class NettyHttpResponseSpec extends Specification {
     void "test add cookie with max age"() {
         given:
         DefaultFullHttpResponse nettyResponse = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
-        MutableHttpResponse response = new NettyMutableHttpResponse(nettyResponse, new DefaultConversionService())
+        MutableHttpResponse response = new NettyMutableHttpResponse(nettyResponse, new DefaultMutableConversionService())
 
         response.status(HttpStatus."$status")
         response.cookie(Cookie.of("foo", "bar").maxAge(Duration.ofHours(2)))
@@ -89,7 +89,7 @@ class NettyHttpResponseSpec extends Specification {
     void "test multiple cookies"() {
         given:
         DefaultFullHttpResponse nettyResponse = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
-        MutableHttpResponse response = new NettyMutableHttpResponse(nettyResponse, new DefaultConversionService())
+        MutableHttpResponse response = new NettyMutableHttpResponse(nettyResponse, new DefaultMutableConversionService())
 
         response.cookies([Cookie.of("a", "b"), Cookie.of("c", "d")] as Set)
 

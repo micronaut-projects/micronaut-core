@@ -236,9 +236,9 @@ public class MultiValuesConverterFactory {
      */
     private abstract static class AbstractConverterFromMultiValues<T>
             implements FormattingTypeConverter<ConvertibleMultiValues, T, Format> {
-        protected ConversionService<?> conversionService;
+        protected ConversionService conversionService;
 
-        AbstractConverterFromMultiValues(ConversionService<?> conversionService) {
+        AbstractConverterFromMultiValues(ConversionService conversionService) {
             this.conversionService = conversionService;
         }
 
@@ -336,7 +336,7 @@ public class MultiValuesConverterFactory {
      * A converter to convert from {@link ConvertibleMultiValues} to an {@link Iterable}.
      */
     public static class MultiValuesToIterableConverter extends AbstractConverterFromMultiValues<Iterable> {
-        public MultiValuesToIterableConverter(ConversionService<?> conversionService) {
+        public MultiValuesToIterableConverter(ConversionService conversionService) {
             super(conversionService);
         }
 
@@ -407,7 +407,7 @@ public class MultiValuesConverterFactory {
      * A converter to convert from {@link ConvertibleMultiValues} to an {@link Map}.
      */
     public static class MultiValuesToMapConverter extends AbstractConverterFromMultiValues<Map> {
-        public MultiValuesToMapConverter(ConversionService<?> conversionService) {
+        public MultiValuesToMapConverter(ConversionService conversionService) {
             super(conversionService);
         }
 
@@ -484,7 +484,7 @@ public class MultiValuesConverterFactory {
      */
     public static class MultiValuesToObjectConverter extends AbstractConverterFromMultiValues<Object> {
 
-        public MultiValuesToObjectConverter(ConversionService<?> conversionService) {
+        public MultiValuesToObjectConverter(ConversionService conversionService) {
             super(conversionService);
         }
 
@@ -556,9 +556,9 @@ public class MultiValuesConverterFactory {
      */
     public abstract static class AbstractConverterToMultiValues<T>
             implements FormattingTypeConverter<T, ConvertibleMultiValues, Format> {
-        protected ConversionService<?> conversionService;
+        protected ConversionService conversionService;
 
-        public AbstractConverterToMultiValues(ConversionService<?> conversionService) {
+        public AbstractConverterToMultiValues(ConversionService conversionService) {
             this.conversionService = conversionService;
         }
 
@@ -655,7 +655,7 @@ public class MultiValuesConverterFactory {
      * A converter from {@link Iterable} to {@link ConvertibleMultiValues}.
      */
     public static class IterableToMultiValuesConverter extends AbstractConverterToMultiValues<Iterable> {
-        public IterableToMultiValuesConverter(ConversionService<?> conversionService) {
+        public IterableToMultiValuesConverter(ConversionService conversionService) {
             super(conversionService);
         }
 
@@ -704,7 +704,7 @@ public class MultiValuesConverterFactory {
      * A converter from {@link Map} to {@link ConvertibleMultiValues}.
      */
     public static class MapToMultiValuesConverter extends AbstractConverterToMultiValues<Map> {
-        public MapToMultiValuesConverter(ConversionService<?> conversionService) {
+        public MapToMultiValuesConverter(ConversionService conversionService) {
             super(conversionService);
         }
 
@@ -759,7 +759,7 @@ public class MultiValuesConverterFactory {
      * A converter from generic {@link Object} to {@link ConvertibleMultiValues}.
      */
     public static class ObjectToMultiValuesConverter extends AbstractConverterToMultiValues<Object> {
-        public ObjectToMultiValuesConverter(ConversionService<?> conversionService) {
+        public ObjectToMultiValuesConverter(ConversionService conversionService) {
             super(conversionService);
         }
 

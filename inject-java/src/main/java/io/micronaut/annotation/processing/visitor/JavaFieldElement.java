@@ -19,8 +19,9 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.FieldElement;
+import io.micronaut.inject.ast.MemberElement;
 
 import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
@@ -88,7 +89,7 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
                     variableElement.asType(),
                     visitorContext,
                     owningType.getGenericTypeInfo(),
-                    false
+                    true
                 );
             }
         }
@@ -136,6 +137,14 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
             }
         }
         return resolvedDeclaringClass;
+    }
+
+    @Override
+    public boolean hides(MemberElement hidden) {
+        if (isStatic() && getDeclaringType().isInterface()) {
+            return false;
+        }
+        return visitorContext.getElements().hides((Element) getNativeType(), (Element) hidden.getNativeType());
     }
 
     @Override

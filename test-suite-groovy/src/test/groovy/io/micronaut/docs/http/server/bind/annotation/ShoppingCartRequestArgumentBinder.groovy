@@ -17,11 +17,11 @@ import jakarta.inject.Singleton
 class ShoppingCartRequestArgumentBinder
         implements AnnotatedRequestArgumentBinder<ShoppingCart, Object> { //<1>
 
-    private final ConversionService<?> conversionService
+    private final ConversionService conversionService
     private final JacksonObjectSerializer objectSerializer
 
     ShoppingCartRequestArgumentBinder(
-            ConversionService<?> conversionService,
+            ConversionService conversionService,
             JacksonObjectSerializer objectSerializer) {
         this.conversionService = conversionService
         this.objectSerializer = objectSerializer

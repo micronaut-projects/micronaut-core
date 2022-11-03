@@ -38,7 +38,7 @@ public class RequestAttributeAnnotationBinder<T> extends AbstractAnnotatedArgume
     /**
      * @param conversionService conversionService
      */
-    public RequestAttributeAnnotationBinder(ConversionService<?> conversionService) {
+    public RequestAttributeAnnotationBinder(ConversionService conversionService) {
         super(conversionService);
     }
 

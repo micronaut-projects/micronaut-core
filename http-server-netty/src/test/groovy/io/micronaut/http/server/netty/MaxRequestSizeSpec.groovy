@@ -2,6 +2,7 @@ package io.micronaut.http.server.netty
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.NonNull
+import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Body
@@ -50,10 +51,8 @@ import io.netty.handler.ssl.SupportedCipherSuiteFilter
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
-import io.micronaut.core.async.annotation.SingleResult
 import spock.lang.Ignore
 import spock.lang.Issue
-import spock.lang.PendingFeature
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 

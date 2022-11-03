@@ -24,11 +24,12 @@ micronautBuild {
 
 dependencies {
     annotationProcessor project(":inject-java")
-    api project(":inject")
+    api project(":core-processor")
 
     testImplementation project(":context")
     testImplementation libs.managed.netty.codec.http
     testImplementation project(":http-server-netty")
+    testImplementation project(":jackson-databind")
     testImplementation project(":http-client")
     testImplementation project(":validation")
     testImplementation project(":inject-groovy")

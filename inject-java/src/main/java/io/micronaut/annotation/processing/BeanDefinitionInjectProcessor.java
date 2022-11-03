@@ -23,14 +23,15 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Vetoed;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
-import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.processing.BeanDefinitionCreator;
 import io.micronaut.inject.processing.BeanDefinitionCreatorFactory;
 import io.micronaut.inject.processing.JavaModelUtils;
+import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.BeanElementVisitor;
 import io.micronaut.inject.visitor.VisitorConfiguration;
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
@@ -185,15 +186,16 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         }
 
                         String name = typeElement.getQualifiedName().toString();
-                        if (!beanDefinitions.contains(name) && !processed.contains(name) && !name.endsWith(BeanDefinitionVisitor.PROXY_SUFFIX)) {
-                            boolean isInterface = JavaModelUtils.resolveKind(typeElement, ElementKind.INTERFACE).isPresent();
-                            if (!isInterface) {
+                        if (beanDefinitions.contains(name) || processed.contains(name) || name.endsWith(BeanDefinitionVisitor.PROXY_SUFFIX)) {
+                            return;
+                        }
+                        boolean isInterface = JavaModelUtils.resolveKind(typeElement, ElementKind.INTERFACE).isPresent();
+                        if (!isInterface) {
+                            beanDefinitions.add(name);
+                        } else {
+                            AnnotationMetadata annotationMetadata = annotationMetadataBuilder.lookupOrBuildForType(typeElement);
+                            if (annotationMetadata.hasStereotype(INTRODUCTION_TYPE) || annotationMetadata.hasStereotype(ConfigurationReader.class)) {
                                 beanDefinitions.add(name);
-                            } else {
-                                AnnotationMetadata annotationMetadata = annotationMetadataBuilder.lookupOrBuildForType(typeElement);
-                                if (annotationMetadata.hasStereotype(INTRODUCTION_TYPE) || annotationMetadata.hasStereotype(ConfigurationReader.class)) {
-                                    beanDefinitions.add(name);
-                                }
                             }
                         }
                     }));
@@ -219,6 +221,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             }
                             JavaClassElement classElement = javaVisitorContext.getElementFactory()
                                 .newClassElement(typeElement, annotationMetadataFactory);
+                            if (classElement.hasAnnotation(Vetoed.class) || classElement.getPackage().hasAnnotation(Vetoed.class)) {
+                                continue;
+                            }
                             BeanDefinitionCreator beanDefinitionCreator = BeanDefinitionCreatorFactory.produce(classElement, javaVisitorContext);
                             for (BeanDefinitionVisitor writer : beanDefinitionCreator.build()) {
                                 if (processed.add(writer.getBeanDefinitionName())) {

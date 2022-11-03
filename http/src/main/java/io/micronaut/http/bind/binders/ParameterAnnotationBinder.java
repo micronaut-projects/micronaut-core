@@ -43,7 +43,7 @@ public class ParameterAnnotationBinder<T> extends AbstractAnnotatedArgumentBinde
     /**
      * @param conversionService The conversion service
      */
-    public ParameterAnnotationBinder(ConversionService<?> conversionService) {
+    public ParameterAnnotationBinder(ConversionService conversionService) {
         super(conversionService);
         this.queryValueArgumentBinder = new QueryValueArgumentBinder<>(conversionService);
     }

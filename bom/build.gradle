@@ -5,6 +5,11 @@ plugins {
 group projectGroupId
 version projectVersion
 
+repositories {
+    mavenCentral()
+    maven { url "https://s01.oss.sonatype.org/content/repositories/snapshots/" }
+}
+
 micronautBom {
     extraExcludedProjects = [
             "benchmarks",
@@ -52,5 +57,18 @@ micronautBom {
 
         // The R2DBC bom that we include mentions dependencies which do not belong to io.r2dbc group
         bomAuthorizedGroupIds.put("io.r2dbc:r2dbc-bom", ["com.google.cloud", "com.oracle.database.r2dbc", "org.mariadb", "dev.miku"] as Set)
+
+        // No GORM until it supports Groovy 4
+        acceptedLibraryRegressions.add("micronaut-multitenancy-gorm")
+        acceptedLibraryRegressions.add("micronaut-mongo-gorm")
+        acceptedLibraryRegressions.add("micronaut-gorm-common")
+        acceptedLibraryRegressions.add("micronaut-hibernate-gorm")
+        acceptedLibraryRegressions.add("micronaut-graphql-gorm")
+        acceptedLibraryRegressions.add("micronaut-neo4j-gorm")
+
+        // glassfish removed from Micronaut Serialization
+        acceptedVersionRegressions.add("glassfish-jakarta-json")
+        acceptedLibraryRegressions.add("glassfish-jakarta-json")
+
     }
 }

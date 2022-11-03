@@ -21,10 +21,12 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class AllElementsVisitor implements TypeElementVisitor<Controller, Object> {
@@ -42,8 +44,6 @@ public class AllElementsVisitor implements TypeElementVisitor<Controller, Object
     @Override
     public void visitClass(ClassElement element, VisitorContext context) {
         visit(element);
-        // Java 9+ doesn't allow resolving elements was the compiler
-        // is finished being used so this test cannot be made to work beyond Java 8 the way it is currently written
         element.getBeanProperties(); // Preload properties for tests otherwise it fails because the compiler is done
         element.getAnnotationMetadata();
         VISITED_CLASS_ELEMENTS.add(element);
@@ -52,9 +52,28 @@ public class AllElementsVisitor implements TypeElementVisitor<Controller, Object
     @Override
     public void visitMethod(MethodElement element, VisitorContext context) {
         VISITED_METHOD_ELEMENTS.add(element);
-        element.getReturnType().getBeanProperties().forEach(AnnotationMetadataProvider::getAnnotationMetadata); // Preload
+        // Preload
+        element.getReturnType().getBeanProperties().forEach(AnnotationMetadataProvider::getAnnotationMetadata);
+        Arrays.stream(element.getParameters()).flatMap(p -> p.getType().getBeanProperties().stream()).forEach(propertyElement -> {
+            initialize(propertyElement);
+            propertyElement.getField().ifPresent(this::initialize);
+            propertyElement.getWriteMethod().ifPresent(methodElement -> {
+                initialize(methodElement.getReturnType());
+                Arrays.stream(methodElement.getParameters()).forEach(this::initialize);
+            });
+            propertyElement.getReadMethod().ifPresent(methodElement -> {
+                initialize(methodElement.getReturnType());
+                Arrays.stream(methodElement.getParameters()).forEach(this::initialize);
+            });
+        });
         element.getAnnotationMetadata();
         visit(element);
+    }
+
+    private void initialize(TypedElement typedElement) {
+        typedElement.getAnnotationMetadata();
+        typedElement.getType().getAnnotationMetadata();
+        typedElement.getGenericType().getAnnotationMetadata();
     }
 
     @Override

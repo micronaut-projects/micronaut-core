@@ -88,13 +88,12 @@ import java.util.stream.Stream;
  * <p>For technical reasons the class has to be marked as public, but is regarded as internal and should be used by
  * compiler tools and plugins (such as AST transformation frameworks)</p>
  *
- * <p>The {@link io.micronaut.inject.writer.BeanDefinitionWriter} class can be used to produce bean definitions at
+ * <p>The {@code io.micronaut.inject.writer.BeanDefinitionWriter} class can be used to produce bean definitions at
  * compile or runtime</p>
  *
  * @param <T> The Bean definition type
  * @author Graeme Rocher
  * @author Denis Stepanov
- * @see io.micronaut.inject.writer.BeanDefinitionWriter
  * @since 3.0
  */
 @Internal
@@ -247,6 +246,7 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
     }
 
     @Override
+    @SuppressWarnings("java:S2789") // performance optimization
     public final Optional<Argument<?>> getContainerElement() {
         if (isContainerType) {
             if (containerElement != null) {
@@ -386,7 +386,12 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
     @Override
     public final ConstructorInjectionPoint<T> getConstructor() {
         if (constructor == null) {
-            constructorInjectionPoint = null;
+            constructorInjectionPoint = new DefaultConstructorInjectionPoint<>(
+                this,
+                getBeanType(),
+                AnnotationMetadata.EMPTY_METADATA,
+                Argument.ZERO_ARGUMENTS
+            );
         } else {
             if (constructor instanceof MethodReference) {
                 MethodReference methodConstructor = (MethodReference) constructor;
@@ -737,6 +742,7 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
      * @return The instantiated bean
      * @throws BeanInstantiationException If the bean cannot be instantiated for the arguments supplied
      */
+    @SuppressWarnings({"java:S2789", "OptionalAssignedToNull"}) // performance optimization
     public final T build(BeanResolutionContext resolutionContext,
                          BeanContext context,
                          BeanDefinition<T> definition,
@@ -759,7 +765,7 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
                 }
                 boolean requiresConversion = value != null && !requiredArgument.getType().isInstance(value);
                 if (requiresConversion) {
-                    Optional<?> converted = ConversionService.SHARED.convert(value, requiredArgument.getType(), ConversionContext.of(requiredArgument));
+                    Optional<?> converted = context.getConversionService().convert(value, requiredArgument.getType(), ConversionContext.of(requiredArgument));
                     Object finalValue = value;
                     value = converted.orElseThrow(() -> new BeanInstantiationException(resolutionContext, "Invalid value [" + finalValue + "] for argument: " + argumentName));
                     requiredArgumentValues.put(argumentName, value);
@@ -1286,7 +1292,7 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
     protected final Object getBeanForConstructorArgument(BeanResolutionContext resolutionContext, BeanContext context, int argIndex, Qualifier qualifier) {
         MethodReference constructorMethodRef = (MethodReference) constructor;
         Argument<?> argument = resolveArgument(context, argIndex, constructorMethodRef.arguments);
-        if (argument.isDeclaredNullable()) {
+        if (argument != null && argument.isDeclaredNullable()) {
             BeanResolutionContext.Segment current = resolutionContext.getPath().peek();
             if (current != null && current.getArgument().equals(argument)) {
                 return null;
@@ -2069,8 +2075,8 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
                 }
             }
         } catch (DisabledBeanException e) {
-            if (AbstractBeanContextConditional.LOG.isDebugEnabled()) {
-                AbstractBeanContextConditional.LOG.debug("Bean of type [{}] disabled for reason: {}", argument.getTypeName(), e.getMessage());
+            if (ConditionLog.LOG.isDebugEnabled()) {
+                ConditionLog.LOG.debug("Bean of type [{}] disabled for reason: {}", argument.getTypeName(), e.getMessage());
             }
             if (isIterable() && getAnnotationMetadata().hasDeclaredAnnotation(EachBean.class)) {
                 throw new DisabledBeanException("Bean [" + getBeanType().getSimpleName() + "] disabled by parent: " + e.getMessage());

@@ -40,6 +40,7 @@ dependencies {
     testImplementation project(':validation')
     testImplementation project(":http-client")
     testImplementation project(":session")
+    testImplementation project(":jackson-databind")
     testImplementation libs.managed.groovy.templates
 
     testImplementation project(":function-client")

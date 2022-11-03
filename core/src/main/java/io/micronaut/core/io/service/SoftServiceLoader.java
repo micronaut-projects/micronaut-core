@@ -150,7 +150,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
             return Optional.of(i.next());
         }
 
-        @SuppressWarnings("unchecked") Class<S> alternativeClass = ClassUtils.forName(alternative, classLoader)
+        @SuppressWarnings("unchecked") Class<S> alternativeClass = (Class<S>) ClassUtils.forName(alternative, classLoader)
                 .orElse(null);
         if (alternativeClass != null) {
             return Optional.of(createService(alternative, alternativeClass));

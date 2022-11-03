@@ -16,6 +16,7 @@
 package io.micronaut.http.client.interceptor;
 
 import io.micronaut.aop.InterceptedMethod;
+import io.micronaut.aop.InterceptorBean;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
@@ -55,8 +56,8 @@ import io.micronaut.http.annotation.HttpMethodMapping;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.client.BlockingHttpClient;
 import io.micronaut.http.client.HttpClient;
-import io.micronaut.http.client.ReactiveClientResultTransformer;
 import io.micronaut.http.client.HttpClientRegistry;
+import io.micronaut.http.client.ReactiveClientResultTransformer;
 import io.micronaut.http.client.StreamingHttpClient;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.bind.ClientArgumentRequestBinder;
@@ -68,7 +69,6 @@ import io.micronaut.http.sse.Event;
 import io.micronaut.http.uri.UriBuilder;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.json.codec.JsonMediaTypeCodec;
-import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
@@ -98,7 +98,7 @@ import java.util.function.Supplier;
  * @author graemerocher
  * @since 1.0
  */
-@Singleton
+@InterceptorBean(Client.class)
 @Internal
 @BootstrapContextCompatible
 public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, Object> {
@@ -114,7 +114,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
     private final HttpClientBinderRegistry binderRegistry;
     private final JsonMediaTypeCodec jsonMediaTypeCodec;
     private final HttpClientRegistry<?> clientFactory;
-    private final ConversionService<?> conversionService;
+    private final ConversionService conversionService;
 
     /**
      * Constructor for advice class to setup things like Headers, Cookies, Parameters for Clients.
@@ -130,7 +130,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             JsonMediaTypeCodec jsonMediaTypeCodec,
             List<ReactiveClientResultTransformer> transformers,
             HttpClientBinderRegistry binderRegistry,
-            ConversionService<?> conversionService) {
+            ConversionService conversionService) {
         this.clientFactory = clientFactory;
         this.jsonMediaTypeCodec = jsonMediaTypeCodec;
         this.transformers = transformers != null ? transformers : Collections.emptyList();
@@ -161,7 +161,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
         Optional<Class<? extends Annotation>> httpMethodMapping = context.getAnnotationTypeByStereotype(HttpMethodMapping.class);
         HttpClient httpClient = clientFactory.getClient(annotationMetadata);
-        if (context.hasStereotype(HttpMethodMapping.class) && httpClient != null) {
+        if (httpMethodMapping.isPresent() && context.hasStereotype(HttpMethodMapping.class) && httpClient != null) {
             AnnotationValue<HttpMethodMapping> mapping = context.getAnnotation(HttpMethodMapping.class);
             String uri = mapping.getRequiredValue(String.class);
             if (StringUtils.isEmpty(uri)) {
@@ -194,7 +194,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                             .orElse(argument.getName());
                     // Convert and put as path param
                     if (argument.getAnnotationMetadata().hasStereotype(Format.class)) {
-                        ConversionService.SHARED.convert(value,
+                        conversionService.convert(value,
                                 ConversionContext.STRING.with(argument.getAnnotationMetadata()))
                                 .ifPresent(v -> pathParams.put(name, v));
                     } else {
@@ -461,9 +461,9 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 if (reactiveValueType == ByteBuffer.class) {
                     return byteBufferPublisher;
                 } else {
-                    if (ConversionService.SHARED.canConvert(ByteBuffer.class, reactiveValueType)) {
+                    if (conversionService.canConvert(ByteBuffer.class, reactiveValueType)) {
                         // It would be nice if we could capture the TypeConverter here
-                        return Publishers.map(byteBufferPublisher, value -> ConversionService.SHARED.convert(value, reactiveValueType).get());
+                        return Publishers.map(byteBufferPublisher, value -> conversionService.convert(value, reactiveValueType).get());
                     } else {
                         throw new ConfigurationException("Cannot create the generated HTTP client's " +
                                 "required return type, since no TypeConverter from ByteBuffer to " +

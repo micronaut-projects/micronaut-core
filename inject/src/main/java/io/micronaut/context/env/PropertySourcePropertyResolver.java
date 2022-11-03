@@ -77,7 +77,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     private static final Pattern RANDOM_PATTERN = Pattern.compile("\\$\\{" + RANDOM_PREFIX + "(" + RANDOM_UPPER_LIMIT + "|" + RANDOM_RANGE + ")?\\}");
     private static final Object NO_VALUE = new Object();
     private static final PropertyCatalog[] CONVENTIONS = {PropertyCatalog.GENERATED, PropertyCatalog.RAW};
-    protected final ConversionService<?> conversionService;
+    protected final ConversionService conversionService;
     protected final PropertyPlaceholderResolver propertyPlaceholderResolver;
     protected final Map<String, PropertySource> propertySources = new ConcurrentHashMap<>(10);
     // properties are stored in an array of maps organized by character in the alphabet
@@ -96,7 +96,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      *
      * @param conversionService The {@link ConversionService}
      */
-    public PropertySourcePropertyResolver(ConversionService<?> conversionService) {
+    public PropertySourcePropertyResolver(ConversionService conversionService) {
         this.conversionService = conversionService;
         this.propertyPlaceholderResolver = new DefaultPropertyPlaceholderResolver(this, conversionService);
     }
@@ -385,9 +385,8 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     public Map<String, Object> getAllProperties(StringConvention keyConvention, MapFormat.MapTransformation transformation) {
         Map<String, Object> map = new HashMap<>();
         boolean isNested = transformation == MapFormat.MapTransformation.NESTED;
-
         Arrays
-            .stream(catalog)
+            .stream(getCatalog(keyConvention == StringConvention.RAW ? PropertyCatalog.RAW : PropertyCatalog.GENERATED))
             .filter(Objects::nonNull)
             .map(Map::entrySet)
             .flatMap(Collection::stream)

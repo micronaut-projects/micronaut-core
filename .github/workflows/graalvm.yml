@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        java: ['11', '17']
+        java: ['17']
         graalvm: ['latest', 'dev']
     steps:
        # https://github.com/actions/virtual-environments/issues/709
@@ -58,7 +58,7 @@ jobs:
            PREDICTIVE_TEST_SELECTION: "${{ github.event_name == 'pull_request' && 'true' || 'false' }}"
       - name: Publish Test Report
         if: always()
-        uses: mikepenz/action-junit-report@v3.5.1
+        uses: mikepenz/action-junit-report@v3.5.2
         with:
           check_name: GraalVM CE CI / Test Report (Java ${{ matrix.java }})
           report_paths: '**/build/test-results/test/TEST-*.xml'

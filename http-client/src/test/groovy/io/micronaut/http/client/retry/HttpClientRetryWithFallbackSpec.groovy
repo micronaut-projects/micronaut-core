@@ -23,6 +23,7 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.retry.annotation.Fallback
 import io.micronaut.retry.annotation.Retryable
+import io.micronaut.retry.annotation.Recoverable
 import io.micronaut.runtime.server.EmbeddedServer
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Mono
@@ -92,6 +93,7 @@ class HttpClientRetryWithFallbackSpec extends Specification{
     @Requires(property = 'spec.name', value = 'HttpClientRetryWithFallbackSpec')
     @Client("/retry-fallback")
     @Retryable(attempts = '5', delay = '5ms')
+    @Recoverable
     static interface CountClient extends CountService {
 
     }

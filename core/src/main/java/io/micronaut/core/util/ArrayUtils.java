@@ -35,7 +35,7 @@ import java.util.function.IntFunction;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class ArrayUtils {
+public final class ArrayUtils {
 
     /**
      * An empty object array.
@@ -82,6 +82,9 @@ public class ArrayUtils {
      * An empty short array.
      */
     public static final short[] EMPTY_SHORT_ARRAY = new short[0];
+
+    private ArrayUtils() {
+    }
 
     /**
      * Concatenate two arrays.
@@ -312,25 +315,25 @@ public class ArrayUtils {
      */
     private static final class ArrayIterator<T> implements Iterator<T>, Iterable<T> {
 
-        private final T[] _a;
-        private int _index;
+        private final T[] array;
+        private int index;
 
         private ArrayIterator(T[] a) {
-            _a = a;
-            _index = 0;
+            array = a;
+            index = 0;
         }
 
         @Override
         public boolean hasNext() {
-            return _index < _a.length;
+            return index < array.length;
         }
 
         @Override
         public T next() {
-            if (_index >= _a.length) {
+            if (index >= array.length) {
                 throw new NoSuchElementException();
             }
-            return _a[_index++];
+            return array[index++];
         }
 
         @Override public void remove() {
@@ -338,7 +341,7 @@ public class ArrayUtils {
         }
 
         @Override public Iterator<T> iterator() {
-            return this;
+            return new ArrayIterator<>(array);
         }
     }
 
@@ -350,25 +353,25 @@ public class ArrayUtils {
      */
     private static final class ReverseArrayIterator<T> implements Iterator<T>, Iterable<T> {
 
-        private final T[] _a;
-        private int _index;
+        private final T[] array;
+        private int index;
 
         private ReverseArrayIterator(T[] a) {
-            _a = a;
-            _index = a.length > 0 ? a.length - 1 : -1;
+            array = a;
+            index = a.length > 0 ? a.length - 1 : -1;
         }
 
         @Override
         public boolean hasNext() {
-            return _index > -1;
+            return index > -1;
         }
 
         @Override
         public T next() {
-            if (_index <= -1) {
+            if (index <= -1) {
                 throw new NoSuchElementException();
             }
-            return _a[_index--];
+            return array[index--];
         }
 
         @Override public void remove() {
@@ -376,7 +379,7 @@ public class ArrayUtils {
         }
 
         @Override public Iterator<T> iterator() {
-            return this;
+            return new ReverseArrayIterator<>(array);
         }
     }
 }

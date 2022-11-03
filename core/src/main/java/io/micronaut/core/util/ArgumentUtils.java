@@ -106,7 +106,7 @@ public class ArgumentUtils {
             @NonNull Argument<?>[] arguments,
             @NonNull Object[] values) {
         int requiredCount = arguments.length;
-        @SuppressWarnings("ConstantConditions") int actualCount = values == null ? 0 : values.length;
+        @SuppressWarnings("ConstantConditions") int actualCount = ArrayUtils.isEmpty(values) ? 0 : values.length;
         if (requiredCount != actualCount) {
             throw new IllegalArgumentException("Wrong number of arguments to " + (described instanceof Executable ? "method" : "constructor") + ": " + described.getDescription());
         }

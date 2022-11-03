@@ -8,7 +8,6 @@ import io.micronaut.context.event.BeanCreatedEventListener;
 import io.micronaut.http.client.netty.NettyClientCustomizer;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.netty.channel.Channel;
-import io.netty.channel.ChannelPipeline;
 import jakarta.inject.Singleton;
 import org.zalando.logbook.Logbook;
 import org.zalando.logbook.netty.LogbookClientHandler;
@@ -47,8 +46,9 @@ public class LogbookNettyClientCustomizer
         }
 
         @Override
-        public void onStreamPipelineBuilt() {
-            channel.pipeline().addLast( // <5>
+        public void onRequestPipelineBuilt() {
+            channel.pipeline().addBefore( // <5>
+                ChannelPipelineCustomizer.HANDLER_HTTP_STREAM,
                 "logbook",
                 new LogbookClientHandler(logbook)
             );

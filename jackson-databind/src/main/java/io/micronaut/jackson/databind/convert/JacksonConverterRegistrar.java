@@ -32,6 +32,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.convert.value.ConvertibleValues;
@@ -59,7 +60,7 @@ import java.util.Optional;
 public class JacksonConverterRegistrar implements TypeConverterRegistrar {
 
     private final BeanProvider<ObjectMapper> objectMapper;
-    private final ConversionService<?> conversionService;
+    private final ConversionService conversionService;
 
     /**
      * Default constructor.
@@ -69,13 +70,13 @@ public class JacksonConverterRegistrar implements TypeConverterRegistrar {
     @Inject
     protected JacksonConverterRegistrar(
             BeanProvider<ObjectMapper> objectMapper,
-            ConversionService<?> conversionService) {
+            ConversionService conversionService) {
         this.objectMapper = objectMapper;
         this.conversionService = conversionService;
     }
 
     @Override
-    public void register(ConversionService<?> conversionService) {
+    public void register(MutableConversionService conversionService) {
         conversionService.addConverter(
                 ArrayNode.class,
                 Object[].class,

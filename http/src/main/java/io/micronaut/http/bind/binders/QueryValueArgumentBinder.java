@@ -44,16 +44,13 @@ public class QueryValueArgumentBinder<T>
         extends AbstractAnnotatedArgumentBinder<QueryValue, T, HttpRequest<?>>
         implements AnnotatedRequestArgumentBinder<QueryValue, T> {
 
-    private final ConversionService<?> conversionService;
-
     /**
      * Constructor.
      *
      * @param conversionService conversion service
      */
-    public QueryValueArgumentBinder(ConversionService<?> conversionService) {
+    public QueryValueArgumentBinder(ConversionService conversionService) {
         super(conversionService);
-        this.conversionService = conversionService;
     }
 
     @Override

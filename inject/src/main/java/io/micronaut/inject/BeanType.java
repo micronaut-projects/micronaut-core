@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.beans.BeanInfo;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.DefaultArgument;
 import io.micronaut.core.util.ArrayUtils;
@@ -36,7 +37,7 @@ import java.util.Set;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface BeanType<T> extends AnnotationMetadataProvider, BeanContextConditional {
+public interface BeanType<T> extends AnnotationMetadataProvider, BeanContextConditional, BeanInfo<T> {
 
     /**
      * @return Whether the bean definition is the {@link io.micronaut.context.annotation.Primary}
@@ -50,7 +51,7 @@ public interface BeanType<T> extends AnnotationMetadataProvider, BeanContextCond
      *
      * @return The underlying bean type
      */
-    Class<T> getBeanType();
+    @NonNull Class<T> getBeanType();
 
     /**
      * Checks whether the bean type is a container type.

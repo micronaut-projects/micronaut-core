@@ -17,23 +17,23 @@ package io.micronaut.ast.groovy
 
 import groovy.transform.CompilationUnitAware
 import groovy.transform.CompileStatic
-import groovy.transform.PackageScope
 import io.micronaut.ast.groovy.visitor.GroovyClassElement
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.ast.groovy.visitor.LoadedVisitor
 import io.micronaut.core.annotation.Generated
 import io.micronaut.core.order.OrderUtil
-import io.micronaut.inject.processing.ProcessingException
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.ElementQuery
+import io.micronaut.inject.ast.EnumConstantElement
+import io.micronaut.inject.ast.FieldElement
+import io.micronaut.inject.ast.MemberElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.PropertyElement
+import io.micronaut.inject.processing.ProcessingException
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder
 import org.codehaus.groovy.ast.ASTNode
-import org.codehaus.groovy.ast.AnnotatedNode
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.ConstructorNode
-import org.codehaus.groovy.ast.FieldNode
 import org.codehaus.groovy.ast.InnerClassNode
 import org.codehaus.groovy.ast.ModuleNode
 import org.codehaus.groovy.control.CompilationUnit
@@ -43,8 +43,6 @@ import org.codehaus.groovy.transform.ASTTransformation
 import org.codehaus.groovy.transform.GroovyASTTransformation
 
 import java.lang.reflect.Modifier
-
-import static org.codehaus.groovy.ast.ClassHelper.makeCached
 /**
  * Executes type element visitors.
  *
@@ -132,10 +130,6 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
             this.visitorContext = visitorContext
         }
 
-        protected boolean isPackagePrivate(AnnotatedNode annotatedNode, int modifiers) {
-            return ((!Modifier.isProtected(modifiers) && !Modifier.isPublic(modifiers) && !Modifier.isPrivate(modifiers)) || !annotatedNode.getAnnotations(makeCached(PackageScope)).isEmpty())
-        }
-
         void visitClass(ClassNode node) {
             if (targetClassElement.getNativeType() != node) {
                 targetClassElement = visitorContext.getElementFactory().newSourceClassElement(node, visitorContext.getElementAnnotationMetadataFactory())
@@ -146,21 +140,21 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
                 }
             }
             GroovyClassElement classElement = targetClassElement as GroovyClassElement
-            // Pre cache methods because of their source flag
-            def methods = classElement.getSourceEnclosedElements(ElementQuery.ALL_METHODS)
-
             def properties = classElement.getSyntheticBeanProperties()
             for (PropertyElement pn : (properties)) {
                 visitNativeProperty(pn)
             }
-            for (FieldNode fn : node.getFields()) {
-                visitField(fn)
-            }
             for (ConstructorNode cn : node.getDeclaredConstructors()) {
                 visitConstructor(cn)
             }
-            for (MethodElement methodElement : methods) {
-                visitMethod(methodElement)
+            for (MemberElement memberElement : classElement.getSourceEnclosedElements(ElementQuery.ALL_FIELD_AND_METHODS)) {
+                if (memberElement instanceof FieldElement) {
+                    visitField(memberElement)
+                } else if (memberElement instanceof MethodElement) {
+                    visitMethod(memberElement)
+                } else {
+                    throw new IllegalStateException("Unknown element: " + memberElement)
+                }
             }
         }
 
@@ -182,29 +176,18 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
             }
         }
 
-        void visitField(FieldNode fieldNode) {
-            if (fieldNode.name == 'metaClass') return
-            int modifiers = fieldNode.modifiers
-            if (Modifier.isFinal(modifiers) || Modifier.isStatic(modifiers)) {
-                return
-            }
-            if (fieldNode.isSynthetic() && !isPackagePrivate(fieldNode, fieldNode.modifiers)) {
-                return
-            }
-            if (fieldNode.enum) {
-                def e = visitorContext.getElementFactory()
-                        .newEnumConstantElement(targetClassElement, fieldNode, visitorContext.getElementAnnotationMetadataFactory())
+        void visitField(FieldElement fieldElement) {
+            if (fieldElement instanceof EnumConstantElement) {
+                EnumConstantElement enumConstantElement = fieldElement
                 for (LoadedVisitor it : typeElementVisitors) {
-                    if (it.matchesElement(e)) {
-                        it.getVisitor().visitEnumConstant(e, visitorContext)
+                    if (it.matchesElement(enumConstantElement)) {
+                        it.getVisitor().visitEnumConstant(enumConstantElement, visitorContext)
                     }
                 }
             } else {
-                def e = visitorContext.getElementFactory()
-                        .newFieldElement(targetClassElement, fieldNode, visitorContext.getElementAnnotationMetadataFactory())
                 for (LoadedVisitor it : typeElementVisitors) {
-                    if (it.matchesElement(e)) {
-                        it.getVisitor().visitField(e, visitorContext)
+                    if (it.matchesElement(fieldElement)) {
+                        it.getVisitor().visitField(fieldElement, visitorContext)
                     }
                 }
             }

@@ -14,6 +14,7 @@ dependencies {
     testImplementation project(":http-client")
     testImplementation project(":inject-groovy")
     testImplementation project(":http-server-netty")
+    testImplementation project(":jackson-databind")
     testImplementation project(":runtime")
     testImplementation project(":validation")
     testImplementation project(":inject")

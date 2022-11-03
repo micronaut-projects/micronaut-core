@@ -121,11 +121,19 @@ public interface GraalReflectionConfigurer extends AnnotationMetadataProvider {
                             }
                         }
                         if (n.equals("<init>")) {
-                            ReflectionUtils.findConstructor(t, parameterTypes)
-                                    .ifPresent(context::register);
+                            try {
+                                Constructor<?> c = t.getDeclaredConstructor(parameterTypes);
+                                context.register(c);
+                            } catch (NoSuchMethodException e) {
+                                // ignore
+                            }
                         } else {
-                            ReflectionUtils.findMethod(t, n, parameterTypes)
-                                    .ifPresent(context::register);
+                            try {
+                                Method method = t.getDeclaredMethod(n, parameterTypes);
+                                context.register(method);
+                            } catch (NoSuchMethodException e) {
+                                // ignore
+                            }
                         }
                     });
                 }

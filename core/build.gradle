@@ -11,18 +11,10 @@ micronautBuild {
     }
 }
 
-tasks.named("shadowJar") {
-    exclude "module-info.class"
-}
-
 dependencies {
     compileOnly libs.managed.jsr305
     compileOnly libs.managed.graal
     compileOnly libs.kotlin.stdlib
-    compileOnly libs.asm.tree
-
-    shadowCompile libs.bundles.asm
-    shadowCompile libs.asm.tree
 }
 
 spotless {

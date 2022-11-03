@@ -50,7 +50,7 @@ import java.util.function.Predicate;
 abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
 
     protected final MethodExecutionHandle<T, R> executableMethod;
-    protected final ConversionService<?> conversionService;
+    protected final ConversionService conversionService;
     protected final DefaultRouteBuilder.AbstractRoute abstractRoute;
     protected final List<MediaType> consumedMediaTypes;
     protected final List<MediaType> producedMediaTypes;
@@ -61,7 +61,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
      * @param abstractRoute     The abstract route builder
      * @param conversionService The conversion service
      */
-    protected AbstractRouteMatch(DefaultRouteBuilder.AbstractRoute abstractRoute, ConversionService<?> conversionService) {
+    protected AbstractRouteMatch(DefaultRouteBuilder.AbstractRoute abstractRoute, ConversionService conversionService) {
         this.abstractRoute = abstractRoute;
         //noinspection unchecked
         this.executableMethod = (MethodExecutionHandle<T, R>) abstractRoute.targetMethod;
@@ -208,7 +208,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
 
     @Override
     public R invoke(Object... arguments) {
-        ConversionService<?> conversionService = this.conversionService;
+        ConversionService conversionService = this.conversionService;
 
         Argument[] targetArguments = getArguments();
         if (targetArguments.length == 0) {
@@ -245,7 +245,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
         if (targetArguments.length == 0) {
             return executableMethod.invoke();
         } else {
-            ConversionService<?> conversionService = this.conversionService;
+            ConversionService conversionService = this.conversionService;
             Map<String, Object> uriVariables = getVariableValues();
             List<Object> argumentList = new ArrayList<>(argumentValues.size());
 

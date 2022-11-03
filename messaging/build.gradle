@@ -4,8 +4,7 @@ plugins {
 
 dependencies {
     annotationProcessor project(":inject-java")
-    api project(":inject")
-    api project(":runtime")
+    api project(":context")
 
     testAnnotationProcessor project(":inject-java")
     testImplementation project(":inject")

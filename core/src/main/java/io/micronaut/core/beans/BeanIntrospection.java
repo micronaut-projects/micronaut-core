@@ -45,7 +45,7 @@ import java.util.Optional;
  * @since 1.1
  */
 @Immutable
-public interface BeanIntrospection<T> extends AnnotationMetadataDelegate {
+public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanInfo<T> {
 
     /**
      * @return A immutable collection of properties.

@@ -67,7 +67,7 @@ public class JsonViewServerFilter implements HttpServerFilter {
      */
     public JsonViewServerFilter(
             JsonViewCodecResolver jsonViewCodecResolver,
-            @Named(TaskExecutors.IO) ExecutorService executorService) {
+            @Named(TaskExecutors.BLOCKING) ExecutorService executorService) {
         this.codecFactory = jsonViewCodecResolver;
         this.executorService = executorService;
     }

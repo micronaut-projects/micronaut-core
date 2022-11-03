@@ -22,7 +22,7 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
-import static java.lang.annotation.RetentionPolicy.SOURCE;
+import static java.lang.annotation.RetentionPolicy.CLASS;
 
 /**
  * Internal method marks a type, method or a field for validation.
@@ -31,7 +31,7 @@ import static java.lang.annotation.RetentionPolicy.SOURCE;
  * @since 4.0.0
  */
 @Documented
-@Retention(SOURCE)
+@Retention(CLASS)
 @Target({ElementType.METHOD, ElementType.TYPE, ElementType.FIELD})
 @Internal
 public @interface RequiresValidation {

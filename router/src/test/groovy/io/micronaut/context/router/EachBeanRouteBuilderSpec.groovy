@@ -59,7 +59,7 @@ class EachBeanRouteBuilderSpec extends Specification {
 
         MyRouteBuilder(ExecutionHandleLocator executionHandleLocator,
                        UriNamingStrategy uriNamingStrategy,
-                       ConversionService<?> conversionService,
+                       ConversionService conversionService,
                        BeanContext beanContext) {
             super(executionHandleLocator, uriNamingStrategy, conversionService)
 

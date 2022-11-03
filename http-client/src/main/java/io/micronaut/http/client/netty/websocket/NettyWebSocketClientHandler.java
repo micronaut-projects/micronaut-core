@@ -87,23 +87,26 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
 
     /**
      * Default constructor.
-     *  @param request The originating request that created the WebSocket.
-     * @param webSocketBean The WebSocket client bean.
-     * @param handshaker The handshaker
-     * @param requestBinderRegistry The request binder registry
+     *
+     * @param request                The originating request that created the WebSocket.
+     * @param webSocketBean          The WebSocket client bean.
+     * @param handshaker             The handshaker
+     * @param requestBinderRegistry  The request binder registry
      * @param mediaTypeCodecRegistry The media type codec registry
+     * @param conversionService      The conversionService
      */
     public NettyWebSocketClientHandler(
             MutableHttpRequest<?> request,
             WebSocketBean<T> webSocketBean,
             final WebSocketClientHandshaker handshaker,
             RequestBinderRegistry requestBinderRegistry,
-            MediaTypeCodecRegistry mediaTypeCodecRegistry) {
-        super(null, requestBinderRegistry, mediaTypeCodecRegistry, webSocketBean, request, Collections.emptyMap(), handshaker.version(), handshaker.actualSubprotocol(), null);
+            MediaTypeCodecRegistry mediaTypeCodecRegistry,
+            ConversionService conversionService) {
+        super(null, requestBinderRegistry, mediaTypeCodecRegistry, webSocketBean, request, Collections.emptyMap(), handshaker.version(), handshaker.actualSubprotocol(), null, conversionService);
         this.codecRegistry = mediaTypeCodecRegistry;
         this.handshaker = handshaker;
         this.genericWebSocketBean = webSocketBean;
-        this.webSocketStateBinderRegistry = new WebSocketStateBinderRegistry(requestBinderRegistry != null ? requestBinderRegistry : new DefaultRequestBinderRegistry(ConversionService.SHARED));
+        this.webSocketStateBinderRegistry = new WebSocketStateBinderRegistry(requestBinderRegistry != null ? requestBinderRegistry : new DefaultRequestBinderRegistry(conversionService), conversionService);
         String clientPath = webSocketBean.getBeanDefinition().stringValue(ClientWebSocket.class).orElse("");
         UriMatchTemplate matchTemplate = UriMatchTemplate.of(clientPath);
         this.matchInfo = matchTemplate.match(request.getPath()).orElse(null);
@@ -146,7 +149,14 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
 
     @Override
     public void channelActive(final ChannelHandlerContext ctx) {
-        handshaker.handshake(ctx.channel());
+        handshaker.handshake(ctx.channel()).addListener(future -> {
+            if (future.isSuccess()) {
+                ctx.channel().config().setAutoRead(true);
+                ctx.read();
+            } else {
+                handshakeFuture.tryFailure(future.cause());
+            }
+        });
     }
 
     @Override
@@ -275,7 +285,7 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
                 @Override
                 public ConvertibleValues<Object> getUriVariables() {
                     if (matchInfo != null) {
-                        return ConvertibleValues.of(matchInfo.getVariableValues());
+                        return ConvertibleValues.of(matchInfo.getVariableValues(), conversionService);
                     }
                     return ConvertibleValues.empty();
                 }

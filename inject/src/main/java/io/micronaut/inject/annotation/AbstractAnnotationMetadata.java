@@ -214,13 +214,14 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
         if (CollectionUtils.isNotEmpty(names)) {
             List<Annotation> annotations = new ArrayList<>();
             for (String name : names) {
-                Optional<Class> loaded = ClassUtils.forName(name, getClass().getClassLoader());
-                loaded.ifPresent(aClass -> {
+                @SuppressWarnings("unchecked")
+                Class<? extends Annotation> aClass = (Class<? extends Annotation>) ClassUtils.forName(name, getClass().getClassLoader()).orElse(null);
+                if (aClass != null) {
                     Annotation ann = synthesize(aClass);
                     if (ann != null) {
                         annotations.add(ann);
                     }
-                });
+                }
             }
             return annotations.toArray(new Annotation[0]);
         }

@@ -64,8 +64,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.Order;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
-import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.convert.DefaultConversionService;
+import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
@@ -238,6 +237,9 @@ public class DefaultBeanContext implements InitializableBeanContext {
     private Set<Map.Entry<Class<?>, List<BeanPreDestroyEventListener>>> beanPreDestroyEventListeners;
     private Set<Map.Entry<Class<?>, List<BeanDestroyedEventListener>>> beanDestroyedEventListeners;
 
+    @Nullable
+    private MutableConversionService conversionService;
+
     /**
      * Construct a new bean context using the same classloader that loaded this DefaultBeanContext class.
      */
@@ -333,11 +335,10 @@ public class DefaultBeanContext implements InitializableBeanContext {
         if (!isRunning()) {
 
             if (initializing.compareAndSet(false, true)) {
-                // Reset possibly modified shared context
-                ((DefaultConversionService) ConversionService.SHARED).reset();
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Starting BeanContext");
                 }
+                registerConversionService();
                 finalizeConfiguration();
                 if (LOG.isDebugEnabled()) {
                     String activeConfigurations = beanConfigurations
@@ -361,6 +362,13 @@ public class DefaultBeanContext implements InitializableBeanContext {
         return this;
     }
 
+    /**
+     * Registers conversion service.
+     */
+    protected void registerConversionService() {
+        conversionService = MutableConversionService.create();
+        registerSingleton(MutableConversionService.class, conversionService,  null, false);
+    }
 
     /**
      * The close method will shut down the context calling {@link jakarta.annotation.PreDestroy} hooks on loaded
@@ -421,7 +429,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
             beanCreationEventListeners = null;
             beanPreDestroyEventListeners = null;
             beanDestroyedEventListeners = null;
-            ((DefaultConversionService) ConversionService.SHARED).reset();
+            conversionService = null;
             terminating.set(false);
             running.set(false);
         }
@@ -866,8 +874,8 @@ public class DefaultBeanContext implements InitializableBeanContext {
         try {
             return getBean(null, beanType, qualifier);
         } catch (DisabledBeanException e) {
-            if (AbstractBeanContextConditional.LOG.isDebugEnabled()) {
-                AbstractBeanContextConditional.LOG.debug("Bean of type [{}] disabled for reason: {}", beanType.getSimpleName(), e.getMessage());
+            if (AbstractBeanContextConditional.ConditionLog.LOG.isDebugEnabled()) {
+                AbstractBeanContextConditional.ConditionLog.LOG.debug("Bean of type [{}] disabled for reason: {}", beanType.getSimpleName(), e.getMessage());
             }
             throw new NoSuchBeanException(beanType, qualifier);
         }
@@ -1034,6 +1042,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
         if (LOG.isTraceEnabled()) {
             LOG.trace("Creating bean for parameters: {}", ArrayUtils.toString(args));
         }
+        MutableConversionService conversionService = getConversionService();
         Argument[] requiredArguments = ((ParametrizedBeanFactory) definition).getRequiredArguments();
         Map<String, Object> argumentValues = new LinkedHashMap<>(requiredArguments.length);
         BeanResolutionContext.Path currentPath = resolutionContext.getPath();
@@ -1047,7 +1056,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                         if (argumentType.isInstance(val) && !CollectionUtils.isIterableOrMap(argumentType)) {
                             argumentValues.put(requiredArgument.getName(), val);
                         } else {
-                            argumentValues.put(requiredArgument.getName(), ConversionService.SHARED.convert(val, requiredArgument).orElseThrow(() ->
+                            argumentValues.put(requiredArgument.getName(), conversionService.convert(val, requiredArgument).orElseThrow(() ->
                                     new BeanInstantiationException(resolutionContext, "Invalid bean @Argument [" + requiredArgument + "]. Cannot convert object [" + val + "] to required type: " + argumentType)
                             ));
                         }
@@ -1460,6 +1469,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
     }
 
     @Override
+    @SuppressWarnings("java:S2789") // performance optimization
     public <T> Optional<BeanDefinition<T>> findProxyTargetBeanDefinition(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         ArgumentUtils.requireNonNull("beanType", beanType);
         @SuppressWarnings("unchecked")
@@ -1684,8 +1694,8 @@ public class DefaultBeanContext implements InitializableBeanContext {
                 return Optional.of(beanRegistration.bean);
             }
         } catch (DisabledBeanException e) {
-            if (AbstractBeanContextConditional.LOG.isDebugEnabled()) {
-                AbstractBeanContextConditional.LOG.debug("Bean of type [{}] disabled for reason: {}", beanType.getSimpleName(), e.getMessage());
+            if (AbstractBeanContextConditional.ConditionLog.LOG.isDebugEnabled()) {
+                AbstractBeanContextConditional.ConditionLog.LOG.debug("Bean of type [{}] disabled for reason: {}", beanType.getSimpleName(), e.getMessage());
             }
             return Optional.empty();
         }
@@ -1914,8 +1924,8 @@ public class DefaultBeanContext implements InitializableBeanContext {
                 try {
                     loadContextScopeBean(contextScopeDefinition);
                 } catch (DisabledBeanException e) {
-                    if (AbstractBeanContextConditional.LOG.isDebugEnabled()) {
-                        AbstractBeanContextConditional.LOG.debug("Bean of type [{}] disabled for reason: {}", contextScopeDefinition.getBeanType().getSimpleName(), e.getMessage());
+                    if (AbstractBeanContextConditional.ConditionLog.LOG.isDebugEnabled()) {
+                        AbstractBeanContextConditional.ConditionLog.LOG.debug("Bean of type [{}] disabled for reason: {}", contextScopeDefinition.getBeanType().getSimpleName(), e.getMessage());
                     }
                 } catch (Throwable e) {
                     throw new BeanInstantiationException("Bean definition [" + contextScopeDefinition.getName() + "] could not be loaded: " + e.getMessage(), e);
@@ -2427,6 +2437,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
         } else {
             convertedValues = new LinkedHashMap<>();
         }
+        MutableConversionService conversionService = getConversionService();
         if (convertedValues != null) {
             for (Argument<?> requiredArgument : requiredArguments) {
                 String argumentName = requiredArgument.getName();
@@ -2440,7 +2451,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                     if (requiredArgument.getType().isInstance(val)) {
                         convertedValue = val;
                     } else {
-                        convertedValue = ConversionService.SHARED.convert(val, requiredArgument).orElseThrow(() ->
+                        convertedValue = conversionService.convert(val, requiredArgument).orElseThrow(() ->
                                 new BeanInstantiationException(resolutionContext, "Invalid bean argument [" + requiredArgument + "]. Cannot convert object [" + val + "] to required type: " + requiredArgument.getType())
                         );
                     }
@@ -2815,6 +2826,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
         final BeanResolutionContext.Path path = resolutionContext != null ? resolutionContext.getPath() : null;
         BeanResolutionContext.Segment<?> injectionPointSegment = null;
         if (CollectionUtils.isNotEmpty(path)) {
+            @SuppressWarnings("java:S2259") // false positive
             final Iterator<BeanResolutionContext.Segment<?>> i = path.iterator();
             injectionPointSegment = i.next();
             BeanResolutionContext.Segment<?> segment = null;
@@ -3043,7 +3055,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
      * @param <T>            The bean generic type
      * @return The concrete bean definition candidate
      */
-    @SuppressWarnings({"unchecked", "rawtypes"})
+    @SuppressWarnings({"unchecked", "rawtypes", "java:S2789"}) // performance optimization
     private <T> Optional<BeanDefinition<T>> findConcreteCandidate(@Nullable BeanResolutionContext resolutionContext,
                                                                   @NonNull Argument<T> beanType,
                                                                   @Nullable Qualifier<T> qualifier,
@@ -3513,8 +3525,8 @@ public class DefaultBeanContext implements InitializableBeanContext {
                 LOG.debug("Found a registration {} for candidate: {} with qualifier: {}", beanRegistration, candidate, qualifier);
             }
         } catch (DisabledBeanException e) {
-            if (AbstractBeanContextConditional.LOG.isDebugEnabled()) {
-                AbstractBeanContextConditional.LOG.debug("Bean of type [{}] disabled for reason: {}", beanType.getTypeName(), e.getMessage());
+            if (AbstractBeanContextConditional.ConditionLog.LOG.isDebugEnabled()) {
+                AbstractBeanContextConditional.ConditionLog.LOG.debug("Bean of type [{}] disabled for reason: {}", beanType.getTypeName(), e.getMessage());
             }
         }
 
@@ -3649,7 +3661,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
             if (type.isInstance(o)) {
                 return Optional.of((T) o);
             } else if (o != null) {
-                return ConversionService.SHARED.convert(o, type);
+                return getConversionService().convert(o, type);
             }
         }
         return Optional.empty();
@@ -3682,6 +3694,11 @@ public class DefaultBeanContext implements InitializableBeanContext {
     public void finalizeConfiguration() {
         readAllBeanConfigurations();
         readAllBeanDefinitionClasses();
+    }
+
+    @Override
+    public MutableConversionService getConversionService() {
+        return conversionService;
     }
 
     /**

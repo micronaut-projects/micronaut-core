@@ -1,0 +1,13 @@
+plugins {
+    id "io.micronaut.build.internal.convention-library"
+}
+
+dependencies {
+    api project(":inject")
+    api project(":aop")
+    api libs.asm.tree
+    api libs.bundles.asm
+
+    compileOnly libs.kotlin.stdlib.jdk8
+    compileOnly libs.managed.validation
+}

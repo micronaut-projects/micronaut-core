@@ -21,8 +21,9 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
+import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PrimitiveElement;
@@ -149,6 +150,14 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
 //            }
 //        }
         return MethodElement.super.overrides(overridden);
+    }
+
+    @Override
+    public boolean hides(MemberElement hidden) {
+        if (isStatic() && getDeclaringType().isInterface()) {
+            return false;
+        }
+        return visitorContext.getElements().hides((Element) getNativeType(), (Element) hidden.getNativeType());
     }
 
     @NonNull

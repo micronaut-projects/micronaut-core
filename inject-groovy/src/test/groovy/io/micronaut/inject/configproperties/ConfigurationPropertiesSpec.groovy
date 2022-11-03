@@ -65,4 +65,23 @@ class ConfigurationPropertiesSpec extends Specification {
         !applicationContext.getBeanDefinition(MyConfig).getAnnotation(BeanProperties.class)
     }
 
+    void "test optional configuration"() {
+        ApplicationContext context = ApplicationContext.run([
+                "config.optional.str": "tst",
+                "config.optional.dbl": "123.123",
+                "config.optional.itgr": "456",
+                "config.optional.lng": "334455",
+        ])
+        OptionalProperties config = context.getBean(OptionalProperties.class)
+
+        expect:
+            config.getStr().get() == "tst"
+            config.getDbl().asDouble == 123.123 as double
+            config.getItgr().asInt == 456
+            config.getLng().asLong == 334455
+
+        cleanup:
+            context.close()
+    }
+
 }

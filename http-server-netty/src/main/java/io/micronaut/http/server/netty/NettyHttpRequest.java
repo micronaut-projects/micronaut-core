@@ -527,7 +527,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
             );
 
             int ourStream = ((Http2StreamChannel) channelHandlerContext.channel()).stream().id();
-            HttpPipelineBuilder.StreamPipeline originalStreamPipeline = channelHandlerContext.channel().attr(HttpPipelineBuilder.StreamPipelineAttributeKeyHolder.getInstance()).get();
+            HttpPipelineBuilder.StreamPipeline originalStreamPipeline = channelHandlerContext.channel().attr(HttpPipelineBuilder.STREAM_PIPELINE_ATTRIBUTE.get()).get();
 
             new Http2StreamChannelBootstrap(channelHandlerContext.channel().parent())
                     .handler(new ChannelInitializer<Http2StreamChannel>() {
@@ -559,6 +559,9 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
                         try {
                             future.sync();
                         } catch (Exception e) {
+                            if (e instanceof InterruptedException) {
+                                Thread.currentThread().interrupt();
+                            }
                             LOG.warn("Failed to complete push promise", e);
                         }
                     });
@@ -627,8 +630,17 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     private class NettyMutableHttpRequest implements MutableHttpRequest<T>, NettyHttpRequestBuilder {
 
         private URI uri = NettyHttpRequest.this.uri;
+        @Nullable
         private MutableHttpParameters httpParameters;
+        @Nullable
         private Object body;
+
+        @Override
+        public void setConversionService(ConversionService conversionService) {
+            if (httpParameters != null) {
+                httpParameters.setConversionService(conversionService);
+            }
+        }
 
         @Override
         public MutableHttpRequest<T> cookie(Cookie cookie) {

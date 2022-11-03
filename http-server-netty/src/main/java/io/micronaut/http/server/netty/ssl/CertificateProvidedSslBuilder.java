@@ -107,17 +107,20 @@ public class CertificateProvidedSslBuilder extends SslBuilder<SslContext> implem
     }
 
     static void setupSslBuilder(SslContextBuilder sslBuilder, SslConfiguration ssl, HttpVersion httpVersion) {
-        if (ssl.getProtocols().isPresent()) {
-            sslBuilder.protocols(ssl.getProtocols().get());
+        Optional<String[]> protocols = ssl.getProtocols();
+        if (protocols.isPresent()) {
+            sslBuilder.protocols(protocols.get());
         }
         final boolean isHttp2 = httpVersion == HttpVersion.HTTP_2_0;
-        if (ssl.getCiphers().isPresent()) {
-            sslBuilder = sslBuilder.ciphers(Arrays.asList(ssl.getCiphers().get()));
+        Optional<String[]> ciphers = ssl.getCiphers();
+        if (ciphers.isPresent()) {
+            sslBuilder = sslBuilder.ciphers(Arrays.asList(ciphers.get()));
         } else if (isHttp2) {
             sslBuilder.ciphers(Http2SecurityUtil.CIPHERS, SupportedCipherSuiteFilter.INSTANCE);
         }
-        if (ssl.getClientAuthentication().isPresent()) {
-            ClientAuthentication clientAuth = ssl.getClientAuthentication().get();
+        Optional<ClientAuthentication> clientAuthentication = ssl.getClientAuthentication();
+        if (clientAuthentication.isPresent()) {
+            ClientAuthentication clientAuth = clientAuthentication.get();
             if (clientAuth == ClientAuthentication.NEED) {
                 sslBuilder.clientAuth(ClientAuth.REQUIRE);
             } else if (clientAuth == ClientAuthentication.WANT) {

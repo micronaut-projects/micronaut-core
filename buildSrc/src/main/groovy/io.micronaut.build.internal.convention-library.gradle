@@ -18,7 +18,6 @@ configurations {
 
 tasks.named("shadowJar") {
     configurations = [project.configurations.shadowCompile]
-    relocate "org.objectweb.asm", "io.micronaut.asm"
 }
 
 micronautBuild {

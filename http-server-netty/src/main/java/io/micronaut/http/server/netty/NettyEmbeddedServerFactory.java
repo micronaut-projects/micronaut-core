@@ -51,6 +51,6 @@ public interface NettyEmbeddedServerFactory {
      */
     @NonNull
     default NettyEmbeddedServer build(@NonNull NettyHttpServerConfiguration configuration, @Nullable ServerSslConfiguration sslConfiguration) {
-        return build(configuration, null);
+        return build(configuration);
     }
 }

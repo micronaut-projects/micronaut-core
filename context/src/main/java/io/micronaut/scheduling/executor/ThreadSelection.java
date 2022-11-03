@@ -25,7 +25,7 @@ public enum ThreadSelection {
     /**
      * Automatically select the thread to run operations on based on the return type and/or {@link io.micronaut.core.annotation.Blocking} or {@link io.micronaut.core.annotation.NonBlocking} annotations.
      *
-     * <p>This is the default strategy in 1.x and will run operations on the I/O thread pool if the return type
+     * <p>This is the default strategy in 1.x and will run operations on the {@link io.micronaut.scheduling.TaskExecutors#BLOCKING blocking executor} if the return type
      * of the method is not a reactive top and the method is not annotated with {@link io.micronaut.core.annotation.NonBlocking}</p>
      *
      * <p>If the return type is a reactive type and the method is not annotated with {@link io.micronaut.core.annotation.Blocking} then the server event loop thread will used to run the operation.</p>
@@ -39,5 +39,9 @@ public enum ThreadSelection {
     /**
      * I/O selection will run all operations regardless of return type and annotations on the I/O thread pool and will never schedule an operation on the server event loop thread.
      */
-    IO
+    IO,
+    /**
+     * I/O selection will run all operations regardless of return type and annotations on the {@link io.micronaut.scheduling.TaskExecutors#BLOCKING blocking executor} and will never schedule an operation on the server event loop thread.
+     */
+    BLOCKING
 }

@@ -18,10 +18,10 @@ package io.micronaut.annotation.processing.visitor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.ElementModifier;
 import io.micronaut.inject.ast.EnumConstantElement;
-import io.micronaut.inject.ast.MemberElement;
+import io.micronaut.inject.ast.FieldElement;
 
 import javax.lang.model.element.VariableElement;
 import java.util.Set;
@@ -59,8 +59,8 @@ final class JavaEnumConstantElement extends AbstractJavaElement implements EnumC
     }
 
     @Override
-    public MemberElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
-        return (MemberElement) super.withAnnotationMetadata(annotationMetadata);
+    public FieldElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
+        return (FieldElement) super.withAnnotationMetadata(annotationMetadata);
     }
 
     @Override

@@ -27,9 +27,6 @@ import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.io.socket.SocketUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.SupplierUtil;
-import io.micronaut.discovery.EmbeddedServerInstance;
-import io.micronaut.discovery.event.ServiceReadyEvent;
-import io.micronaut.discovery.event.ServiceStoppedEvent;
 import io.micronaut.http.context.event.HttpRequestTerminatedEvent;
 import io.micronaut.http.netty.channel.ChannelPipelineListener;
 import io.micronaut.http.netty.channel.DefaultEventLoopGroupConfiguration;
@@ -127,7 +124,6 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     private boolean shutdownParent = false;
     private EventLoopGroup workerGroup;
     private EventLoopGroup parentGroup;
-    private EmbeddedServerInstance serviceInstance;
     private final Collection<ChannelPipelineListener> pipelineListeners = new ArrayList<>(2);
     @Nullable
     private volatile List<Listener> activeListeners = null;
@@ -164,7 +160,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 .getEventPublisher(HttpRequestTerminatedEvent.class);
         final Supplier<ExecutorService> ioExecutor = SupplierUtil.memoized(() ->
                 nettyEmbeddedServices.getExecutorSelector()
-                        .select(TaskExecutors.IO).orElse(null)
+                        .select(TaskExecutors.BLOCKING).orElse(null)
         );
         this.httpContentProcessorResolver = new DefaultHttpContentProcessorResolver(
                 nettyEmbeddedServices.getApplicationContext(),
@@ -176,7 +172,8 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 nettyEmbeddedServices,
                 ioExecutor,
                 httpContentProcessorResolver,
-                httpRequestTerminatedEventPublisher
+                httpRequestTerminatedEventPublisher,
+                applicationContext.getConversionService()
         );
         this.hostResolver = new DefaultHttpHostResolver(serverConfiguration, () -> NettyHttpServer.this);
 
@@ -292,7 +289,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                             .map(l -> l.serverChannel.localAddress())
                             .filter(InetSocketAddress.class::isInstance)
                             .map(addr -> ((InetSocketAddress) addr).getPort())
-                            .collect(Collectors.toList()));
+                            .toList());
                 }
             }
             fireStartupEvents();
@@ -578,14 +575,6 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         Optional<String> applicationName = serverConfiguration.getApplicationConfiguration().getName();
         applicationContext.getEventPublisher(ServerStartupEvent.class)
                 .publishEvent(new ServerStartupEvent(this));
-        applicationName.ifPresent(id -> {
-            if (serviceInstance == null) {
-                serviceInstance = applicationContext.createBean(NettyEmbeddedServerInstance.class, id, this);
-            }
-            applicationContext
-                    .getEventPublisher(ServiceReadyEvent.class)
-                    .publishEvent(new ServiceReadyEvent(serviceInstance));
-        });
     }
 
     private void logShutdownErrorIfNecessary(Future<?> future) {
@@ -617,10 +606,6 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             }
             webSocketSessions.close();
             applicationContext.getEventPublisher(ServerShutdownEvent.class).publishEvent(new ServerShutdownEvent(this));
-            if (serviceInstance != null) {
-                applicationContext.getEventPublisher(ServiceStoppedEvent.class)
-                        .publishEvent(new ServiceStoppedEvent(serviceInstance));
-            }
             if (isDefault && applicationContext.isRunning() && stopApplicationContext) {
                 applicationContext.stop();
             }

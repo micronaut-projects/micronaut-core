@@ -29,7 +29,7 @@ import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
-import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
@@ -62,7 +62,6 @@ import java.util.stream.Collectors;
  */
 public class DefaultApplicationContext extends DefaultBeanContext implements ApplicationContext {
 
-    private final ConversionService conversionService;
     private final ClassPathResourceLoader resourceLoader;
     private final ApplicationContextConfiguration configuration;
     private Environment environment;
@@ -116,7 +115,6 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         super(configuration);
         ArgumentUtils.requireNonNull("configuration", configuration);
         this.configuration = configuration;
-        this.conversionService = createConversionService();
         this.resourceLoader = configuration.getResourceLoader();
     }
 
@@ -162,25 +160,15 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         return false;
     }
 
-    /**
-     * Creates the default conversion service.
-     *
-     * @return The conversion service
-     */
-    protected @NonNull
-    ConversionService createConversionService() {
-        return ConversionService.SHARED;
+    @Override
+    @NonNull
+    public MutableConversionService getConversionService() {
+        return getEnvironment();
     }
 
     @Override
-    public @NonNull
-    ConversionService<?> getConversionService() {
-        return conversionService;
-    }
-
-    @Override
-    public @NonNull
-    Environment getEnvironment() {
+    @NonNull
+    public Environment getEnvironment() {
         if (environment == null) {
             environment = createEnvironment(configuration);
         }
@@ -188,16 +176,23 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     }
 
     @Override
-    public synchronized @NonNull
-    ApplicationContext start() {
+    @NonNull
+    public synchronized ApplicationContext start() {
         startEnvironment();
         return (ApplicationContext) super.start();
     }
 
     @Override
+    protected void registerConversionService() {
+        // Conversion service is represented by the environment
+    }
+
+    @Override
     public synchronized @NonNull
     ApplicationContext stop() {
-        return (ApplicationContext) super.stop();
+        ApplicationContext stop = (ApplicationContext) super.stop();
+        environment = null;
+        return stop;
     }
 
     @Override
@@ -228,7 +223,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     }
 
     @Override
-    protected void registerConfiguration(BeanConfiguration configuration) {
+    protected synchronized void registerConfiguration(BeanConfiguration configuration) {
         if (getEnvironment().isActive(configuration)) {
             super.registerConfiguration(configuration);
         }
@@ -517,6 +512,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
      * @param beanContext The bean context
      */
     protected void initializeTypeConverters(BeanContext beanContext) {
+        MutableConversionService mutableConversionService = getConversionService();
         for (BeanRegistration<TypeConverter> typeConverterRegistration : beanContext.getBeanRegistrations(TypeConverter.class)) {
             TypeConverter typeConverter = typeConverterRegistration.getBean();
             List<Argument<?>> typeArguments = typeConverterRegistration.getBeanDefinition().getTypeArguments(TypeConverter.class);
@@ -524,12 +520,12 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                 Class<?> source = typeArguments.get(0).getType();
                 Class<?> target = typeArguments.get(1).getType();
                 if (!(source == Object.class && target == Object.class)) {
-                    getConversionService().addConverter(source, target, typeConverter);
+                    mutableConversionService.addConverter(source, target, typeConverter);
                 }
             }
         }
         for (TypeConverterRegistrar registrar : beanContext.getBeansOfType(TypeConverterRegistrar.class)) {
-            registrar.register(conversionService);
+            registrar.register(mutableConversionService);
         }
     }
 
@@ -583,7 +579,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
         private List<PropertySource> propertySourceList;
 
-        BootstrapEnvironment(ClassPathResourceLoader resourceLoader, ConversionService conversionService, ApplicationContextConfiguration configuration, String... activeEnvironments) {
+        BootstrapEnvironment(ClassPathResourceLoader resourceLoader, MutableConversionService conversionService, ApplicationContextConfiguration configuration, String... activeEnvironments) {
             super(new ApplicationContextConfiguration() {
                 @Override
                 public Optional<Boolean> getDeduceEnvironments() {
@@ -621,8 +617,8 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
                 @NonNull
                 @Override
-                public ConversionService<?> getConversionService() {
-                    return conversionService;
+                public Optional<MutableConversionService> getConversionService() {
+                    return Optional.of(conversionService);
                 }
 
                 @NonNull
@@ -812,7 +808,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         private BootstrapEnvironment createBootstrapEnvironment(String... environmentNames) {
             return new BootstrapEnvironment(
                     resourceLoader,
-                    conversionService,
+                    mutableConversionService,
                     configuration,
                     environmentNames);
         }

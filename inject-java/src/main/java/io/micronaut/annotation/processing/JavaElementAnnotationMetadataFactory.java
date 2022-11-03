@@ -15,8 +15,8 @@
  */
 package io.micronaut.annotation.processing;
 
-import io.micronaut.inject.annotation.AbstractElementAnnotationMetadataFactory;
-import io.micronaut.inject.ast.ElementAnnotationMetadataFactory;
+import io.micronaut.inject.ast.annotation.AbstractElementAnnotationMetadataFactory;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.Element;

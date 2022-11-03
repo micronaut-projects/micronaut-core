@@ -1,6 +1,0 @@
-io.micronaut.inject.annotation.internal.CoreNullableTransformer
-io.micronaut.inject.annotation.internal.CoreNonNullTransformer
-io.micronaut.inject.annotation.internal.KotlinNullableMapper
-io.micronaut.inject.annotation.internal.KotlinNotNullMapper
-io.micronaut.inject.annotation.internal.JakartaPostConstructTransformer
-io.micronaut.inject.annotation.internal.JakartaPreDestroyTransformer
