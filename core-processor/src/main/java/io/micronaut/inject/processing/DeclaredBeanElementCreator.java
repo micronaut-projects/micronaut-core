@@ -24,6 +24,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NextMajorVersion;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.annotation.Vetoed;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
@@ -150,8 +151,10 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
         }
         List<MemberElement> memberElements = new ArrayList<>(classElement.getEnclosedElements(memberQuery));
         memberElements.removeIf(processedFields::contains);
-        // Process subtype fields first
         for (MemberElement memberElement : memberElements) {
+            if (memberElement.hasAnnotation(Vetoed.class)) {
+                continue;
+            }
             if (memberElement instanceof FieldElement fieldElement) {
                 visitFieldInternal(visitor, fieldElement);
             } else if (memberElement instanceof MethodElement methodElement) {

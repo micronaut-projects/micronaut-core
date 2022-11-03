@@ -2184,15 +2184,11 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             } else {
                 return defaultMetadata;
             }
-        } else if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
-            AnnotationMetadataHierarchy hierarchy = (AnnotationMetadataHierarchy) annotationMetadata;
+        } else if (annotationMetadata instanceof AnnotationMetadataHierarchy hierarchy) {
             AnnotationMetadata declaredMetadata = annotate(hierarchy.getDeclaredMetadata(), annotationValue);
-            return hierarchy.createSibling(
-                declaredMetadata
-            );
-        } else {
-            throw new IllegalStateException("Unrecognized annotation metadata: " + annotationMetadata);
+            return hierarchy.createSibling(declaredMetadata);
         }
+        throw new IllegalStateException("Unrecognized annotation metadata: " + annotationMetadata);
     }
 
     /**
@@ -2204,6 +2200,9 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @since 3.0.0
      */
     public AnnotationMetadata removeAnnotation(AnnotationMetadata annotationMetadata, String annotationType) {
+        if (annotationMetadata.isEmpty()) {
+            return annotationMetadata;
+        }
         // we only care if the metadata is an hierarchy or default mutable
         final boolean isHierarchy = annotationMetadata instanceof AnnotationMetadataHierarchy;
         AnnotationMetadata declaredMetadata = annotationMetadata;
@@ -2212,8 +2211,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         }
         // if it is anything else other than DefaultAnnotationMetadata here it is probably empty
         // in which case nothing needs to be done
-        if (declaredMetadata instanceof DefaultAnnotationMetadata) {
-            final DefaultAnnotationMetadata defaultMetadata = (DefaultAnnotationMetadata) declaredMetadata;
+        if (declaredMetadata instanceof DefaultAnnotationMetadata defaultMetadata) {
             T annotationMirror = getAnnotationMirror(annotationType).orElse(null);
             if (annotationMirror != null) {
                 String repeatableName = getRepeatableNameForType(annotationMirror);
@@ -2227,12 +2225,9 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             }
 
             if (isHierarchy) {
-                return ((AnnotationMetadataHierarchy) annotationMetadata).createSibling(
-                    declaredMetadata
-                );
-            } else {
-                return declaredMetadata;
+                return ((AnnotationMetadataHierarchy) annotationMetadata).createSibling(declaredMetadata);
             }
+            return declaredMetadata;
         } else {
             throw new IllegalStateException("Unrecognized annotation metadata: " + annotationMetadata);
         }
@@ -2247,6 +2242,9 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @since 3.0.0
      */
     public AnnotationMetadata removeStereotype(AnnotationMetadata annotationMetadata, String annotationType) {
+        if (annotationMetadata.isEmpty()) {
+            return annotationMetadata;
+        }
         // we only care if the metadata is an hierarchy or default mutable
         final boolean isHierarchy = annotationMetadata instanceof AnnotationMetadataHierarchy;
         AnnotationMetadata declaredMetadata = annotationMetadata;
@@ -2255,8 +2253,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         }
         // if it is anything else other than DefaultAnnotationMetadata here it is probably empty
         // in which case nothing needs to be done
-        if (declaredMetadata instanceof DefaultAnnotationMetadata) {
-            final DefaultAnnotationMetadata defaultMetadata = (DefaultAnnotationMetadata) declaredMetadata;
+        if (declaredMetadata instanceof DefaultAnnotationMetadata defaultMetadata) {
             T annotationMirror = getAnnotationMirror(annotationType).orElse(null);
             if (annotationMirror != null) {
                 String repeatableName = getRepeatableNameForType(annotationMirror);
@@ -2268,17 +2265,12 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             } else {
                 defaultMetadata.removeStereotype(annotationType);
             }
-
             if (isHierarchy) {
-                return ((AnnotationMetadataHierarchy) annotationMetadata).createSibling(
-                    declaredMetadata
-                );
-            } else {
-                return declaredMetadata;
+                return ((AnnotationMetadataHierarchy) annotationMetadata).createSibling(declaredMetadata);
             }
-        } else {
-            throw new IllegalStateException("Unrecognized annotation metadata: " + annotationMetadata);
+            return declaredMetadata;
         }
+        throw new IllegalStateException("Unrecognized annotation metadata: " + annotationMetadata);
     }
 
     /**
@@ -2292,6 +2284,9 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     public @NonNull <T1 extends Annotation> AnnotationMetadata removeAnnotationIf(
         @NonNull AnnotationMetadata annotationMetadata,
         @NonNull Predicate<AnnotationValue<T1>> predicate) {
+        if (annotationMetadata.isEmpty()) {
+            return annotationMetadata;
+        }
         // we only care if the metadata is an hierarchy or default mutable
         final boolean isHierarchy = annotationMetadata instanceof AnnotationMetadataHierarchy;
         AnnotationMetadata declaredMetadata = annotationMetadata;
@@ -2300,21 +2295,14 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         }
         // if it is anything else other than DefaultAnnotationMetadata here it is probably empty
         // in which case nothing needs to be done
-        if (declaredMetadata instanceof DefaultAnnotationMetadata) {
-            final DefaultAnnotationMetadata defaultMetadata = (DefaultAnnotationMetadata) declaredMetadata;
-
+        if (declaredMetadata instanceof DefaultAnnotationMetadata defaultMetadata) {
             defaultMetadata.removeAnnotationIf(predicate);
-
             if (isHierarchy) {
-                return ((AnnotationMetadataHierarchy) annotationMetadata).createSibling(
-                    declaredMetadata
-                );
-            } else {
-                return declaredMetadata;
+                return ((AnnotationMetadataHierarchy) annotationMetadata).createSibling(declaredMetadata);
             }
-        } else {
-            throw new IllegalStateException("Unrecognized annotation metadata: " + annotationMetadata);
+            return declaredMetadata;
         }
+        throw new IllegalStateException("Unrecognized annotation metadata: " + annotationMetadata);
     }
 
     /**
