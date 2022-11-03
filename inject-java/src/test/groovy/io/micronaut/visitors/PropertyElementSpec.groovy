@@ -361,7 +361,5 @@ class Parameters {
                 'io.micronaut.context.annotation.BeanProperties',
                 'io.micronaut.core.annotation.Introspected'
         ]
-
-        beanProperty.field.get().getAnnotationMetadata().booleanValue(io.swagger.v3.oas.annotations.media.Schema.class, "hidden").orElse(false)
     }
 }
