@@ -8,6 +8,9 @@ import java.lang.annotation.Target;
 
 /**
  * Veto the processing of the element.
+ *
+ * @author Denis Stepanov
+ * @since 4.0.0
  */
 @Target({ElementType.TYPE, ElementType.METHOD, ElementType.CONSTRUCTOR, ElementType.FIELD, ElementType.PACKAGE})
 @Retention(RetentionPolicy.CLASS)
