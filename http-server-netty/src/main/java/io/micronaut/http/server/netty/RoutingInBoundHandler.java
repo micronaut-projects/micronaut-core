@@ -367,7 +367,7 @@ final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.microna
         }
         Optional<Argument<?>> bodyArgument = routeMatch.getBodyArgument()
             .filter(argument -> argument.getAnnotationMetadata().hasAnnotation(Body.class));
-        if (bodyArgument.isEmpty() || !routeMatch.isSatisfied(bodyArgument.get().getName())) {
+        if (bodyArgument.isPresent() && !routeMatch.isSatisfied(bodyArgument.get().getName())) {
             // Body argument in the method
             return true;
         }
