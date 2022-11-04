@@ -53,6 +53,7 @@ import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.server.RouteExecutor;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.http.server.exceptions.InternalServerException;
+import io.micronaut.http.server.multipart.MultipartBody;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.multipart.NettyCompletedFileUpload;
 import io.micronaut.http.server.netty.multipart.NettyPartData;
@@ -63,6 +64,7 @@ import io.micronaut.http.server.netty.types.files.NettyStreamedFileCustomizableR
 import io.micronaut.http.server.netty.types.files.NettySystemFileCustomizableResponseType;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
 import io.micronaut.runtime.http.codec.TextPlainCodec;
+import io.micronaut.web.router.MethodBasedRouteMatch;
 import io.micronaut.web.router.RouteInfo;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.resource.StaticResourceResolver;
@@ -113,6 +115,7 @@ import java.net.URL;
 import java.nio.channels.ClosedChannelException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -362,16 +365,22 @@ final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.microna
             // Illegal state: The request body is required, so at this point we must have a StreamedHttpRequest
             return false;
         }
-        // Body argument in the method
         Optional<Argument<?>> bodyArgument = routeMatch.getBodyArgument()
             .filter(argument -> argument.getAnnotationMetadata().hasAnnotation(Body.class));
         if (bodyArgument.isEmpty() || !routeMatch.isSatisfied(bodyArgument.get().getName())) {
+            // Body argument in the method
             return true;
         }
-        // HttpRequest argument in the method
         if (routeMatch.getRequiredArguments()
             .stream().anyMatch(argument -> argument.isAssignableFrom(HttpRequest.class))) {
+            // HttpRequest argument in the method
             return true;
+        }
+        if (routeMatch instanceof MethodBasedRouteMatch<?, ?> methodBasedRouteMatch) {
+            if (Arrays.stream(methodBasedRouteMatch.getArguments()).anyMatch(argument -> argument.isAssignableFrom(MultipartBody.class))) {
+                // MultipartBody will subscribe to the request body in MultipartBodyArgumentBinder
+                return false;
+            }
         }
         // Might be some body parts
         return !routeMatch.isExecutable();

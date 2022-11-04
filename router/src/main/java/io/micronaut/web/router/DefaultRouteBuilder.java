@@ -423,7 +423,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         protected List<MediaType> producesMediaTypes;
         protected String bodyArgumentName;
         protected Argument<?> bodyArgument;
-        protected final Map<String, Argument> requiredInputs;
+        protected final Map<String, Argument<?>> requiredInputs;
         protected final Class<?> declaringType;
         protected boolean consumesMediaTypesContainsAll;
         protected boolean producesMediaTypesContainsAll;
@@ -456,15 +456,15 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             isVoid = RouteInfo.super.isVoid();
             specifiedSingle = RouteInfo.super.isSpecifiedSingle();
             isAsyncOrReactive = RouteInfo.super.isAsyncOrReactive();
-            for (Argument argument : targetMethod.getArguments()) {
+            for (Argument<?> argument : targetMethod.getArguments()) {
                 if (argument.getAnnotationMetadata().hasAnnotation(Body.class)) {
                     this.bodyArgument = argument;
                 }
             }
-            Argument[] requiredArguments = targetMethod.getArguments();
+            Argument<?>[] requiredArguments = targetMethod.getArguments();
             if (requiredArguments.length > 0) {
-                Map<String, Argument> requiredInputs = new LinkedHashMap<>(requiredArguments.length);
-                for (Argument requiredArgument : requiredArguments) {
+                Map<String, Argument<?>> requiredInputs = new LinkedHashMap<>(requiredArguments.length);
+                for (Argument<?> requiredArgument : requiredArguments) {
                     String inputName = resolveInputName(requiredArgument);
                     requiredInputs.put(inputName, requiredArgument);
                 }
