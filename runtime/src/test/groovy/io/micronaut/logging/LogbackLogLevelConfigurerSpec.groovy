@@ -21,22 +21,17 @@ class LogbackLogLevelConfigurerSpec extends Specification {
     @Unroll
     void 'test that log levels on logger "#loggerName" can be configured via properties'() {
         given:
-            ((Logger) LoggerFactory.getLogger('foo.bar1')).setLevel(Level.DEBUG)
-            ((Logger) LoggerFactory.getLogger('foo.bar2')).setLevel(Level.DEBUG)
-            ((Logger) LoggerFactory.getLogger('foo.bar3')).setLevel(Level.ERROR)
-            ((Logger) LoggerFactory.getLogger('foo.barBaz')).setLevel(Level.WARN)
-            ((Logger) LoggerFactory.getLogger('ignoring.error')).setLevel(Level.INFO)
+            def loggerLevels = [
+                    'logger.levels.aaa.bbb.ccc'   : 'ERROR',
+                    'logger.levels.foo.bar1'      : 'DEBUG',
+                    'logger.levels.foo.bar2'      : 'INFO',
+                    'logger.levels.foo.bar3'      : '',
+                    'logger.levels.foo.barBaz'    : 'INFO',
+                    'logger.levels.ignoring.error': 'OFF',
+            ]
 
         when:
-            ApplicationContext context = ApplicationContext.run(
-                    [
-                            'logger.levels.aaa.bbb.ccc'   : 'ERROR',
-                            'logger.levels.foo.bar2'      : 'INFO',
-                            'logger.levels.foo.bar3'      : '',
-                            'logger.levels.foo.barBaz'    : 'INFO',
-                            'logger.levels.ignoring.error': 'OFF',
-                    ]
-            )
+            ApplicationContext context = ApplicationContext.run(loggerLevels)
 
         then:
             ((Logger) LoggerFactory.getLogger(loggerName)).getLevel() == expectedLevel
@@ -93,13 +88,11 @@ logger:
     }
 
     void 'test that log levels can be configured via environment variables'() {
-        given:
-            ((Logger) LoggerFactory.getLogger('foo.bar1')).setLevel(Level.DEBUG)
-            ((Logger) LoggerFactory.getLogger('foo.bar2')).setLevel(Level.DEBUG)
-
         when:
             ApplicationContext context = ApplicationContext.builder().build()
-            SystemLambda.withEnvironmentVariable("LOGGER_LEVELS_FOO_BAR2", "INFO")
+            SystemLambda
+                    .withEnvironmentVariable("LOGGER_LEVELS_FOO_BAR1", "DEBUG")
+                    .and("LOGGER_LEVELS_FOO_BAR2", "INFO")
                     .execute(() -> {
                         context.start()
                     })
