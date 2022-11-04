@@ -365,22 +365,21 @@ final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.microna
             // Illegal state: The request body is required, so at this point we must have a StreamedHttpRequest
             return false;
         }
-        Optional<Argument<?>> bodyArgument = routeMatch.getBodyArgument()
-            .filter(argument -> argument.getAnnotationMetadata().hasAnnotation(Body.class));
-        if (bodyArgument.isPresent() && !routeMatch.isSatisfied(bodyArgument.get().getName())) {
-            // Body argument in the method
-            return true;
-        }
-        if (routeMatch.getRequiredArguments()
-            .stream().anyMatch(argument -> argument.isAssignableFrom(HttpRequest.class))) {
-            // HttpRequest argument in the method
-            return true;
-        }
         if (routeMatch instanceof MethodBasedRouteMatch<?, ?> methodBasedRouteMatch) {
-            if (Arrays.stream(methodBasedRouteMatch.getArguments()).anyMatch(argument -> argument.isAssignableFrom(MultipartBody.class))) {
+            if (Arrays.stream(methodBasedRouteMatch.getArguments()).anyMatch(argument -> MultipartBody.class.equals(argument.getType()))) {
                 // MultipartBody will subscribe to the request body in MultipartBodyArgumentBinder
                 return false;
             }
+        }
+        Optional<Argument<?>> bodyArgument = routeMatch.getBodyArgument()
+            .filter(argument -> argument.getAnnotationMetadata().hasAnnotation(Body.class));
+        if (bodyArgument.isEmpty() || !routeMatch.isSatisfied(bodyArgument.get().getName())) {
+            // Body argument in the method
+            return true;
+        }
+        if (routeMatch.getRequiredArguments().stream().anyMatch(argument -> HttpRequest.class.equals(argument.getType()))) {
+            // HttpRequest argument in the method
+            return true;
         }
         // Might be some body parts
         return !routeMatch.isExecutable();
