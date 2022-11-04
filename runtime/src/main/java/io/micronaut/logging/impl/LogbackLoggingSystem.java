@@ -42,7 +42,7 @@ import org.slf4j.LoggerFactory;
 @Internal
 public final class LogbackLoggingSystem implements LoggingSystem {
 
-    private static String DEFAULT_LOGBACK_LOCATION = "logback.xml";
+    private static final String DEFAULT_LOGBACK_LOCATION = "logback.xml";
 
     @Property(name = "logger.config")
     private Optional<String> logbackXmlLocation;

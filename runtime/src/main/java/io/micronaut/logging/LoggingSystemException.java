@@ -16,7 +16,7 @@
 package io.micronaut.logging;
 
 /**
- * Thrown when something goes wrong on Logging System
+ * Thrown when something goes wrong on Logging System.
  *
  * @author Luis Duarte
  * @since 3.8
