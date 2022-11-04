@@ -296,7 +296,7 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
      * @return The {@link ApplicationContext}
      */
     public static ApplicationContext run(String... args) {
-        return run(new Class[0], args);
+        return run(new Class<?>[0], args);
     }
 
     /**
@@ -307,7 +307,7 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
      * @return The {@link ApplicationContext}
      */
     public static ApplicationContext run(Class<?> cls, String... args) {
-        return run(new Class[]{cls}, args);
+        return run(new Class<?>[]{cls}, args);
     }
 
     /**
@@ -336,7 +336,7 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
         Integer code = exitCodeMapper.apply(exception);
         if (code > 0 && !environment.getActiveNames().contains(Environment.TEST)) {
             if (LOG.isErrorEnabled()) {
-                LOG.error("Error starting Micronaut server: " + exception.getMessage(), exception);
+                LOG.error("Error starting Micronaut server: {}", exception.getMessage(), exception);
             }
             System.exit(code);
         }

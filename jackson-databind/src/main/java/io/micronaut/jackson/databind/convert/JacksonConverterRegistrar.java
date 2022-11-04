@@ -178,7 +178,7 @@ public class JacksonConverterRegistrar implements TypeConverterRegistrar {
     protected TypeConverter<ArrayNode, Iterable> arrayNodeToIterableConverter() {
         return (node, targetType, context) -> {
             Map<String, Argument<?>> typeVariables = context.getTypeVariables();
-            Class elementType = typeVariables.isEmpty() ? Map.class : typeVariables.values().iterator().next().getType();
+            Class<?> elementType = typeVariables.isEmpty() ? Map.class : typeVariables.values().iterator().next().getType();
             List results = new ArrayList();
             node.elements().forEachRemaining(jsonNode -> {
                 Optional converted = conversionService.convert(jsonNode, elementType, context);

@@ -88,8 +88,8 @@ final class NoInjectionBeanDefinition<T> implements BeanDefinition<T>, BeanDefin
     public List<Argument<?>> getTypeArguments(Class<?> type) {
         List<Argument<?>> result = typeArguments.get(type);
         if (result == null) {
-            Class[] classes = type.isInterface() ? GenericTypeUtils.resolveInterfaceTypeArguments(singletonClass, type) : GenericTypeUtils.resolveSuperTypeGenericArguments(singletonClass, type);
-            result = Arrays.stream(classes).map((Function<Class, Argument<?>>) Argument::of).collect(Collectors.toList());
+            Class<?>[] classes = type.isInterface() ? GenericTypeUtils.resolveInterfaceTypeArguments(singletonClass, type) : GenericTypeUtils.resolveSuperTypeGenericArguments(singletonClass, type);
+            result = Arrays.stream(classes).map((Function<Class<?>, Argument<?>>) Argument::of).collect(Collectors.toList());
             typeArguments.put(type, result);
         }
 

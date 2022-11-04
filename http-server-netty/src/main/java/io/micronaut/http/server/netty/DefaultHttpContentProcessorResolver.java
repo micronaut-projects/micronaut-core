@@ -53,7 +53,7 @@ import java.util.function.Supplier;
 @Internal
 class DefaultHttpContentProcessorResolver implements HttpContentProcessorResolver {
 
-    private static final Set<Class> RAW_BODY_TYPES = CollectionUtils.setOf(String.class, byte[].class, ByteBuffer.class, InputStream.class);
+    private static final Set<Class<?>> RAW_BODY_TYPES = CollectionUtils.setOf(String.class, byte[].class, ByteBuffer.class, InputStream.class);
 
     private final BeanLocator beanLocator;
     private final BeanProvider<NettyHttpServerConfiguration> serverConfiguration;

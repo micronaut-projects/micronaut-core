@@ -202,10 +202,10 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
     private final Map<Argument, Collection<BeanDefinition>> beanCandidateCache = new ConcurrentLinkedHashMap.Builder<Argument, Collection<BeanDefinition>>().maximumWeightedCapacity(30).build();
 
-    private final Map<Class, Collection<BeanDefinitionReference>> beanIndex = new ConcurrentHashMap<>(12);
+    private final Map<Class<?>, Collection<BeanDefinitionReference>> beanIndex = new ConcurrentHashMap<>(12);
 
     private final ClassLoader classLoader;
-    private final Set<Class> thisInterfaces = CollectionUtils.setOf(
+    private final Set<Class<?>> thisInterfaces = CollectionUtils.setOf(
             BeanDefinitionRegistry.class,
             BeanContext.class,
             AnnotationMetadataResolver.class,
@@ -216,7 +216,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
             ValueResolver.class,
             PropertyPlaceholderResolver.class
     );
-    private final Set<Class> indexedTypes = CollectionUtils.setOf(
+    private final Set<Class<?>> indexedTypes = CollectionUtils.setOf(
             ResourceLoader.class,
             TypeConverter.class,
             TypeConverterRegistrar.class,
@@ -541,7 +541,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
     }
 
     @Override
-    public <T, R> Optional<MethodExecutionHandle<T, R>> findExecutionHandle(Class<T> beanType, String method, Class... arguments) {
+    public <T, R> Optional<MethodExecutionHandle<T, R>> findExecutionHandle(Class<T> beanType, String method, Class<?>... arguments) {
         return findExecutionHandle(beanType, null, method, arguments);
     }
 
@@ -612,7 +612,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
     @SuppressWarnings("unchecked")
     @Override
-    public <T, R> Optional<MethodExecutionHandle<T, R>> findExecutionHandle(Class<T> beanType, Qualifier<?> qualifier, String method, Class... arguments) {
+    public <T, R> Optional<MethodExecutionHandle<T, R>> findExecutionHandle(Class<T> beanType, Qualifier<?> qualifier, String method, Class<?>... arguments) {
         Optional<? extends BeanDefinition<?>> foundBean = findBeanDefinition(beanType, (Qualifier) qualifier);
         if (foundBean.isPresent()) {
             BeanDefinition<?> beanDefinition = foundBean.get();
@@ -625,7 +625,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                 return beanDefinition.findPossibleMethods(method)
                         .findFirst()
                         .filter(m -> {
-                            Class[] argTypes = m.getArgumentTypes();
+                            Class<?>[] argTypes = m.getArgumentTypes();
                             if (argTypes.length == arguments.length) {
                                 for (int i = 0; i < argTypes.length; i++) {
                                     if (!arguments[i].isAssignableFrom(argTypes[i])) {
@@ -643,7 +643,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
     }
 
     @Override
-    public <T, R> Optional<ExecutableMethod<T, R>> findExecutableMethod(Class<T> beanType, String method, Class[] arguments) {
+    public <T, R> Optional<ExecutableMethod<T, R>> findExecutableMethod(Class<T> beanType, String method, Class<?>[] arguments) {
         if (beanType != null) {
             Collection<BeanDefinition<T>> definitions = getBeanDefinitions(beanType);
             if (!definitions.isEmpty()) {
@@ -662,7 +662,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
     @SuppressWarnings("unchecked")
     @Override
-    public <T, R> Optional<MethodExecutionHandle<T, R>> findExecutionHandle(T bean, String method, Class[] arguments) {
+    public <T, R> Optional<MethodExecutionHandle<T, R>> findExecutionHandle(T bean, String method, Class<?>[] arguments) {
         if (bean != null) {
             Optional<? extends BeanDefinition<?>> foundBean = findBeanDefinition(bean.getClass());
             if (foundBean.isPresent()) {
@@ -731,7 +731,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                         }
 
                         @Override
-                        public Class getBeanType() {
+                        public Class<?> getBeanType() {
                             return type;
                         }
                     });
@@ -1438,7 +1438,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
     @NonNull
     @Override
-    public <T, R> Optional<ExecutableMethod<T, R>> findProxyTargetMethod(@NonNull Class<T> beanType, @NonNull String method, @NonNull Class[] arguments) {
+    public <T, R> Optional<ExecutableMethod<T, R>> findProxyTargetMethod(@NonNull Class<T> beanType, @NonNull String method, @NonNull Class<?>[] arguments) {
         ArgumentUtils.requireNonNull("beanType", beanType);
         ArgumentUtils.requireNonNull("method", method);
         BeanDefinition<T> definition = getProxyTargetBeanDefinition(beanType, null);
@@ -1447,7 +1447,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
     @NonNull
     @Override
-    public <T, R> Optional<ExecutableMethod<T, R>> findProxyTargetMethod(@NonNull Class<T> beanType, Qualifier<T> qualifier, @NonNull String method, Class... arguments) {
+    public <T, R> Optional<ExecutableMethod<T, R>> findProxyTargetMethod(@NonNull Class<T> beanType, Qualifier<T> qualifier, @NonNull String method, Class<?>... arguments) {
         ArgumentUtils.requireNonNull("beanType", beanType);
         ArgumentUtils.requireNonNull("method", method);
         BeanDefinition<T> definition = getProxyTargetBeanDefinition(beanType, qualifier);
@@ -1455,7 +1455,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
     }
 
     @Override
-    public <T, R> Optional<ExecutableMethod<T, R>> findProxyTargetMethod(@NonNull Argument<T> beanType, Qualifier<T> qualifier, @NonNull String method, Class... arguments) {
+    public <T, R> Optional<ExecutableMethod<T, R>> findProxyTargetMethod(@NonNull Argument<T> beanType, Qualifier<T> qualifier, @NonNull String method, Class<?>... arguments) {
         ArgumentUtils.requireNonNull("beanType", beanType);
         ArgumentUtils.requireNonNull("method", method);
         BeanDefinition<T> definition = getProxyTargetBeanDefinition(beanType, qualifier);
@@ -3170,7 +3170,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
     private <T> void filterProxiedTypes(Collection<BeanDefinition<T>> candidates, boolean filterProxied, boolean filterDelegates, Predicate<BeanDefinition<T>> predicate) {
         int count = candidates.size();
-        Set<Class> proxiedTypes = new HashSet<>(count);
+        Set<Class<?>> proxiedTypes = new HashSet<>(count);
         Iterator<BeanDefinition<T>> i = candidates.iterator();
         Collection<BeanDefinition<T>> delegates = filterDelegates ? new ArrayList<>(count) : Collections.emptyList();
         while (i.hasNext()) {
@@ -3304,16 +3304,16 @@ public class DefaultBeanContext implements InitializableBeanContext {
                 }
             }
             final AnnotationMetadata annotationMetadata = beanDefinitionReference.getAnnotationMetadata();
-            Class[] indexes = annotationMetadata.classValues(INDEXES_TYPE);
+            Class<?>[] indexes = annotationMetadata.classValues(INDEXES_TYPE);
             if (indexes.length > 0) {
                 //noinspection ForLoopReplaceableByForEach
                 for (int i = 0; i < indexes.length; i++) {
-                    Class indexedType = indexes[i];
+                    Class<?> indexedType = indexes[i];
                     resolveTypeIndex(indexedType).add(beanDefinitionReference);
                 }
             } else {
                 if (annotationMetadata.hasStereotype(ADAPTER_TYPE)) {
-                    final Class aClass = annotationMetadata.classValue(ADAPTER_TYPE, AnnotationMetadata.VALUE_MEMBER).orElse(null);
+                    final Class<?> aClass = annotationMetadata.classValue(ADAPTER_TYPE, AnnotationMetadata.VALUE_MEMBER).orElse(null);
                     if (indexedTypes.contains(aClass)) {
                         resolveTypeIndex(aClass).add(beanDefinitionReference);
                     }
@@ -3584,11 +3584,11 @@ public class DefaultBeanContext implements InitializableBeanContext {
         List<BeanRegistration> sorted = new ArrayList<>(nullSafe(initial.get(true)));
         List<BeanRegistration> unsorted = new ArrayList<>(nullSafe(initial.get(false)));
         // Optimization which knows about types which are already in the sorted list
-        Set<Class> satisfied = new HashSet<>();
+        Set<Class<?>> satisfied = new HashSet<>();
 
         // Optimization for types which we know are already unsatisified
         // in a single iteration, allowing to skip the loop on unsorted elements
-        Set<Class> unsatisfied = new HashSet<>();
+        Set<Class<?>> unsatisfied = new HashSet<>();
 
         //loop until all items have been sorted
         while (!unsorted.isEmpty()) {
@@ -3601,7 +3601,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                 boolean found = false;
 
                 //determine if any components are in the unsorted list
-                Collection<Class> components = bean.getBeanDefinition().getRequiredComponents();
+                Collection<Class<?>> components = bean.getBeanDefinition().getRequiredComponents();
                 for (Class<?> clazz : components) {
                     if (satisfied.contains(clazz)) {
                         continue;
@@ -3887,7 +3887,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
          * @param qualifier     The qualifier
          * @param typeArguments The type arguments
          */
-        BeanKey(Class<T> beanType, Qualifier<T> qualifier, @Nullable Class... typeArguments) {
+        BeanKey(Class<T> beanType, Qualifier<T> qualifier, @Nullable Class<?>... typeArguments) {
             this(Argument.of(beanType, typeArguments), qualifier);
         }
 

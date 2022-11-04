@@ -308,7 +308,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     }
 
     @Override
-    public <R> Optional<RouteMatch<R>> route(@NonNull Class originatingClass, @NonNull HttpStatus status) {
+    public <R> Optional<RouteMatch<R>> route(@NonNull Class<?> originatingClass, @NonNull HttpStatus status) {
         for (StatusRoute statusRoute : statusRoutes) {
             Optional<RouteMatch<R>> match = statusRoute.match(originatingClass, status);
             if (match.isPresent()) {
@@ -319,7 +319,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     }
 
     @Override
-    public <R> Optional<RouteMatch<R>> route(@NonNull Class originatingClass, @NonNull Throwable error) {
+    public <R> Optional<RouteMatch<R>> route(@NonNull Class<?> originatingClass, @NonNull Throwable error) {
         Map<ErrorRoute, RouteMatch<R>> matchedRoutes = new LinkedHashMap<>();
         for (ErrorRoute errorRoute : errorRoutes) {
             Optional<RouteMatch<R>> match = errorRoute.match(originatingClass, error);
@@ -514,17 +514,17 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         } else if (matchedRoutes.size() > 1) {
             int minCount = Integer.MAX_VALUE;
 
-            Supplier<List<Class>> hierarchySupplier = () -> ClassUtils.resolveHierarchy(error.getClass());
+            Supplier<List<Class<?>>> hierarchySupplier = () -> ClassUtils.resolveHierarchy(error.getClass());
             Optional<RouteMatch<T>> match = Optional.empty();
-            Class errorClass = error.getClass();
+            Class<?> errorClass = error.getClass();
 
             for (Map.Entry<ErrorRoute, RouteMatch<T>> entry: matchedRoutes.entrySet()) {
-                Class exceptionType = entry.getKey().exceptionType();
+                Class<?> exceptionType = entry.getKey().exceptionType();
                 if (exceptionType.equals(errorClass)) {
                     match = Optional.of(entry.getValue());
                     break;
                 } else {
-                    List<Class> hierarchy = hierarchySupplier.get();
+                    List<Class<?>> hierarchy = hierarchySupplier.get();
                     //measures the distance in the hierarchy from the error and the route error type
                     int index = hierarchy.indexOf(exceptionType);
                     //the class closest in the hierarchy should be chosen

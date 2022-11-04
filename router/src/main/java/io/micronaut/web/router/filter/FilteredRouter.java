@@ -123,7 +123,7 @@ public class FilteredRouter implements Router {
     }
 
     @Override
-    public <R> Optional<RouteMatch<R>> route(@NonNull Class originatingClass, @NonNull HttpStatus status) {
+    public <R> Optional<RouteMatch<R>> route(@NonNull Class<?> originatingClass, @NonNull HttpStatus status) {
         return router.route(originatingClass, status);
     }
 
@@ -133,7 +133,7 @@ public class FilteredRouter implements Router {
     }
 
     @Override
-    public <R> Optional<RouteMatch<R>> route(@NonNull Class originatingClass, @NonNull Throwable error) {
+    public <R> Optional<RouteMatch<R>> route(@NonNull Class<?> originatingClass, @NonNull Throwable error) {
         return router.route(originatingClass, error);
     }
 

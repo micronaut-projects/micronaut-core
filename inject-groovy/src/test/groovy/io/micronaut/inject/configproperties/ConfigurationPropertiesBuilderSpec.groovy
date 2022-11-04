@@ -33,14 +33,14 @@ import io.micronaut.context.annotation.*
 
 @ConfigurationProperties("test")
 class MyPropertiesAA {
-    
+
     TestAA test
-    
+
     @ConfigurationBuilder(factoryMethod="build", includes="foo")
     void setTest(TestAA test) {
       this.test = test;
     }
-    
+
     TestAA getTest() {
       return this.test
     }
@@ -49,25 +49,25 @@ class MyPropertiesAA {
 class TestAA {
     private String foo
     private String bar
-    
+
     private TestAA() {}
-    
-    public void setFoo(String s) { 
+
+    public void setFoo(String s) {
         this.foo = s;
     }
     public String getFoo() {
         return foo;
     }
-    public void setBar(String s) { 
+    public void setBar(String s) {
         this.bar = s;
     }
     public String getBar() {
         return bar;
     }
-    
+
     static TestAA build() {
         new TestAA()
-    } 
+    }
 }
 ''')
 
@@ -93,7 +93,7 @@ import io.micronaut.context.annotation.*
 
 @ConfigurationProperties("test")
 class MyPropertiesA {
-    
+
     @ConfigurationBuilder(factoryMethod="build", includes="foo")
     TestA test
 }
@@ -101,25 +101,25 @@ class MyPropertiesA {
 class TestA {
     private String foo
     private String bar
-    
+
     private TestA() {}
-    
-    public void setFoo(String s) { 
+
+    public void setFoo(String s) {
         this.foo = s;
     }
     public String getFoo() {
         return foo;
     }
-    public void setBar(String s) { 
+    public void setBar(String s) {
         this.bar = s;
     }
     public String getBar() {
         return bar;
     }
-    
+
     static TestA build() {
         new TestA()
-    } 
+    }
 }
 ''')
 
@@ -146,20 +146,20 @@ import io.micronaut.context.annotation.*
 
 @ConfigurationProperties("test")
 class MyPropertiesB {
-    
+
     @ConfigurationBuilder(factoryMethod="build")
     TestB test
-    
+
 }
 
 class TestB {
     String bar
-    
+
     private TestB() {}
 
     static TestB build() {
         new TestB()
-    } 
+    }
 }
 ''')
 
@@ -183,14 +183,14 @@ import io.micronaut.context.annotation.*
 
 @ConfigurationProperties("test")
 class MyProperties {
-    
+
     @ConfigurationBuilder
     TestC test = new TestC()
-   
+
 }
 
 class TestC {
-    public void setFoo(String s) { 
+    public void setFoo(String s) {
         throw new NoSuchMethodError("setFoo")
     }
 }
@@ -223,7 +223,7 @@ class MyProperties {
 class TestD {
     String foo
     int bar
-    
+
     @Deprecated
     Long baz
 }
@@ -262,9 +262,9 @@ import org.neo4j.driver.v1.*
 @ConfigurationProperties("neo4j.test")
 class Neo4jProperties {
     protected java.net.URI uri
-    
+
     @ConfigurationBuilder(
-        prefixes="with", 
+        prefixes="with",
         allowZeroArgs=true
     )
     Config.ConfigBuilder options = Config.build()
@@ -309,14 +309,14 @@ import org.neo4j.driver.v1.*
 class Neo4jProperties {
 
     protected java.net.URI uri
-    
+
     @ConfigurationBuilder(
-        prefixes="with", 
+        prefixes="with",
         allowZeroArgs=true,
         configurationPrefix="options"
     )
     Config.ConfigBuilder options = Config.build()
-   
+
 }
 ''')
         then:
@@ -357,14 +357,14 @@ import org.neo4j.driver.v1.*
 class Neo4jProperties {
 
     protected java.net.URI uri
-    
+
     @ConfigurationBuilder(
-        prefixes="with", 
+        prefixes="with",
         allowZeroArgs=true,
         value="options"
     )
     Config.ConfigBuilder options = Config.build()
-   
+
 }
 ''')
         then:
@@ -404,13 +404,13 @@ import org.neo4j.driver.v1.*
 @ConfigurationProperties("neo4j.test")
 class Neo4jProperties {
     protected java.net.URI uri
-    
+
     @ConfigurationBuilder(
-        prefixes="with", 
+        prefixes="with",
         allowZeroArgs=true
     )
     Config.ConfigBuilder options = Config.build()
-        
+
 }
 ''')
         then:
@@ -445,13 +445,13 @@ import org.neo4j.driver.v1.*
 
 @ConfigurationProperties("neo4j.test")
 class Neo4jProperties {
-    
+
     @ConfigurationBuilder(
-        prefixes="with", 
+        prefixes="with",
         allowZeroArgs=true
     )
     final Config.ConfigBuilder options = Config.build()
-        
+
 }
 ''')
         BeanFactory factory = beanDefinition
@@ -479,53 +479,53 @@ package cpbtest11
 
 import io.micronaut.context.annotation.*
 
-@ConfigurationProperties("pool")    
-final class PoolConfig { 
-    
+@ConfigurationProperties("pool")
+final class PoolConfig {
+
     @ConfigurationBuilder(prefixes = [""])
     public ConnectionPool.Builder builder = DefaultConnectionPool.builder()
-    
+
 }
 
 interface ConnectionPool {
-    
+
     interface Builder {
         Builder maxConcurrency(Integer maxConcurrency)
         ConnectionPool build()
     }
-    
+
     int getMaxConcurrency()
 }
 
 class DefaultConnectionPool implements ConnectionPool {
     private final int maxConcurrency
-    
+
     DefaultConnectionPool(int maxConcurrency) {
         this.maxConcurrency = maxConcurrency
     }
-    
+
     static ConnectionPool.Builder builder() {
         return new DefaultBuilder()
     }
-    
-    @Override 
+
+    @Override
     int getMaxConcurrency() {
         return maxConcurrency
     }
-    
+
     private static class DefaultBuilder implements ConnectionPool.Builder {
-    
+
         private int maxConcurrency
-    
+
         private DefaultBuilder() {
         }
-    
+
         @Override
         ConnectionPool.Builder maxConcurrency(Integer maxConcurrency) {
             this.maxConcurrency = maxConcurrency
             return this
         }
-        
+
         ConnectionPool build() {
             return new DefaultConnectionPool(maxConcurrency)
         }
@@ -535,7 +535,7 @@ class DefaultConnectionPool implements ConnectionPool {
         ctx.getEnvironment().addPropertySource(PropertySource.of(["pool.max-concurrency": 123]))
 
         when:
-        Class testProps = ctx.classLoader.loadClass("cpbtest11.PoolConfig")
+        Class<?> testProps = ctx.classLoader.loadClass("cpbtest11.PoolConfig")
         def testPropBean = ctx.getBean(testProps)
 
         then:

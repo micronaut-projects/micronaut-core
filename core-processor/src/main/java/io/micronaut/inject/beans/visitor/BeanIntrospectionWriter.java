@@ -794,7 +794,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         throw new IllegalStateException("Property not found: " + propertyName + " " + classElement.getName());
     }
 
-    private void writeInstantiateMethod(ClassWriter classWriter, MethodElement constructor, String methodName, Class... args) {
+    private void writeInstantiateMethod(ClassWriter classWriter, MethodElement constructor, String methodName, Class<?>... args) {
         final String desc = getMethodDescriptor(Object.class, Arrays.asList(args));
         final GeneratorAdapter instantiateInternal = new GeneratorAdapter(classWriter.visitMethod(
                 ACC_PUBLIC,

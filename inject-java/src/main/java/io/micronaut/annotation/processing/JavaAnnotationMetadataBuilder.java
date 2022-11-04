@@ -748,7 +748,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
         private class ArrayValueVisitor extends AbstractAnnotationValueVisitor8<Object, Object> {
 
             private List values = new ArrayList();
-            private Class arrayType;
+            private Class<?> arrayType;
 
             Object[] getValues() {
                 if (arrayType != null) {

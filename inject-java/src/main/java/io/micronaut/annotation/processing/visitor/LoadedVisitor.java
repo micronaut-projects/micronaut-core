@@ -71,15 +71,15 @@ public class LoadedVisitor implements Ordered {
                 elementAnnotation = elementName;
             }
         } else {
-            Class[] classes = GenericTypeUtils.resolveInterfaceTypeArguments(aClass, TypeElementVisitor.class);
+            Class<?>[] classes = GenericTypeUtils.resolveInterfaceTypeArguments(aClass, TypeElementVisitor.class);
             if (classes != null && classes.length == 2) {
-                Class classGeneric = classes[0];
+                Class<?> classGeneric = classes[0];
                 if (classGeneric == Object.class) {
                     classAnnotation = visitor.getClassType();
                 } else {
                     classAnnotation = classGeneric.getName();
                 }
-                Class elementGeneric = classes[1];
+                Class<?> elementGeneric = classes[1];
                 if (elementGeneric == Object.class) {
                     elementAnnotation = visitor.getElementType();
                 } else {

@@ -259,7 +259,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
                     value = argumentValues.get(name);
                 }
 
-                Class argumentType = argument.getType();
+                Class<?> argumentType = argument.getType();
                 if (value instanceof UnresolvedArgument) {
                     UnresolvedArgument<?> unresolved = (UnresolvedArgument<?>) value;
                     ArgumentBinder.BindingResult<?> bindingResult = unresolved.get();
@@ -304,7 +304,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
         }
     }
 
-    private void convertValueAndAddToList(ConversionService conversionService, List argumentList, Argument argument, Object value, Class argumentType) {
+    private void convertValueAndAddToList(ConversionService conversionService, List argumentList, Argument argument, Object value, Class<?> argumentType) {
         if (argumentType.isInstance(value)) {
             if (argument.isContainerType()) {
                 if (argument.hasTypeVariables()) {
@@ -391,7 +391,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
                         if (value instanceof UnresolvedArgument || value instanceof NullArgument) {
                             newVariables.put(name, value);
                         } else {
-                            Class type = requiredArgument.getType();
+                            Class<?> type = requiredArgument.getType();
                             if (type.isInstance(value)) {
                                 newVariables.put(name, value);
                             } else {

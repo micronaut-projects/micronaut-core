@@ -45,7 +45,7 @@ class DefaultConstructorInjectionPoint<T> implements ConstructorInjectionPoint<T
 
     private final BeanDefinition<T> declaringBean;
     private final Class<T> declaringType;
-    private final Class[] argTypes;
+    private final Class<?>[] argTypes;
     private final AnnotationMetadata annotationMetadata;
     private final Argument<?>[] arguments;
 

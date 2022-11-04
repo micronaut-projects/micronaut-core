@@ -58,8 +58,8 @@ final class AdapterIntroduction implements MethodInterceptor<Object, Object> {
         }
 
         String beanQualifier  = method.stringValue(Adapter.class, ADAPTED_QUALIFIER).orElse(null);
-        Class[] argumentTypes = method.classValues(Adapter.class, ADAPTED_ARGUMENT_TYPES);
-        Class[] methodArgumentTypes = method.getArgumentTypes();
+        Class<?>[] argumentTypes = method.classValues(Adapter.class, ADAPTED_ARGUMENT_TYPES);
+        Class<?>[] methodArgumentTypes = method.getArgumentTypes();
         if (StringUtils.isNotEmpty(beanQualifier)) {
             this.executionHandle = beanContext.findExecutionHandle(
                     beanType,

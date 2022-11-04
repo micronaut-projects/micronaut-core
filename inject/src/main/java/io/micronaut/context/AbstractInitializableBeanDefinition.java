@@ -345,7 +345,7 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
 
     @Override
     public String toString() {
-        Class declaringType = constructor == null ? type : constructor.declaringType;
+        Class<?> declaringType = constructor == null ? type : constructor.declaringType;
         return "Definition: " + declaringType.getName();
     }
 
@@ -2366,7 +2366,7 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
         final Class declaringType;
         final boolean requiresReflection;
 
-        public MethodOrFieldReference(Class declaringType, boolean requiresReflection) {
+        public MethodOrFieldReference(Class<?> declaringType, boolean requiresReflection) {
             this.declaringType = declaringType;
             this.requiresReflection = requiresReflection;
         }

@@ -2027,7 +2027,7 @@ class Book {
     }
 }
 ''')
-        Class clazz = context.classLoader.loadClass('test.$Book$IntrospectionRef')
+        Class<?> clazz = context.classLoader.loadClass('test.$Book$IntrospectionRef')
         BeanIntrospectionReference reference = (BeanIntrospectionReference) clazz.newInstance()
 
         expect:
@@ -2089,7 +2089,7 @@ class Book {
     }
 }
 ''')
-        Class clazz = context.classLoader.loadClass('test.$Book$IntrospectionRef')
+        Class<?> clazz = context.classLoader.loadClass('test.$Book$IntrospectionRef')
         BeanIntrospectionReference reference = (BeanIntrospectionReference) clazz.newInstance()
 
         expect:
@@ -4416,7 +4416,7 @@ public record Foo(String name, String isSurname, boolean contains, Boolean purge
     @Replaces(BeanIntrospectionModule)
     @io.micronaut.context.annotation.Requires(property = "bean.introspection.test")
     static class StaticBeanIntrospectionModule extends BeanIntrospectionModule {
-        Map<Class, BeanIntrospection> introspectionMap = [:]
+        Map<Class<?>, BeanIntrospection> introspectionMap = [:]
         @Override
         protected BeanIntrospection<Object> findIntrospection(Class<?> beanClass) {
             return introspectionMap.get(beanClass)

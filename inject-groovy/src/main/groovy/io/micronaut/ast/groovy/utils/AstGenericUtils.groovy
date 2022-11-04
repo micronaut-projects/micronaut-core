@@ -168,7 +168,7 @@ class AstGenericUtils {
      * @param itfe The interface
      * @return The generic type or null
      */
-    static ClassNode resolveInterfaceGenericType(ClassNode classNode, Class itfe) {
+    static ClassNode resolveInterfaceGenericType(ClassNode classNode, Class<?> itfe) {
         ClassNode foundInterface = classNode.allInterfaces.find() { it.name == itfe.name }
         if (foundInterface != null) {
             if (foundInterface.genericsTypes) {

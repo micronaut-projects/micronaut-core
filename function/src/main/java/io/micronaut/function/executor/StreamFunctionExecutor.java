@@ -143,7 +143,7 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
      * @param output outputstream
      * @throws IOException input/output exception
      */
-    static void encode(Environment environment, LocalFunctionRegistry registry, Class returnType, Object result, OutputStream output) throws IOException {
+    static void encode(Environment environment, LocalFunctionRegistry registry, Class<?> returnType, Object result, OutputStream output) throws IOException {
         if (ClassUtils.isJavaLangType(returnType)) {
             if (result instanceof Byte) {
                 output.write((Byte) result);

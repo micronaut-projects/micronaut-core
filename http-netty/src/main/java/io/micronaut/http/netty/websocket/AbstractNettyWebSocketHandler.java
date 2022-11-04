@@ -634,7 +634,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
     private Map<Argument<?>, Object> prepareBoundVariables(ExecutableMethod<?, ?> executable, List<?> parameters) {
         Map<Argument<?>, Object> preBound = new HashMap<>(executable.getArguments().length);
         for (Argument argument : executable.getArguments()) {
-            Class type = argument.getType();
+            Class<?> type = argument.getType();
             for (Object object : parameters) {
                 if (type.isInstance(object)) {
                     preBound.put(argument, object);

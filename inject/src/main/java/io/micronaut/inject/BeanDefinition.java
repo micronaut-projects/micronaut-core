@@ -370,7 +370,7 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
             if (typeArguments.isEmpty()) {
                 return ReflectionUtils.EMPTY_CLASS_ARRAY;
             }
-            Class[] params = new Class[typeArguments.size()];
+            Class<?>[] params = new Class<?>[typeArguments.size()];
             int i = 0;
             for (Argument<?> argument : typeArguments) {
                 params[i++] = argument.getType();

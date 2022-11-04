@@ -513,8 +513,8 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     @Internal
     @UsedByGeneratedCode
     protected final AbstractBeanDefinition addInjectionPoint(
-            Class declaringType,
-            Class fieldType,
+            Class<?> declaringType,
+            Class<?> fieldType,
             String field,
             @Nullable AnnotationMetadata annotationMetadata,
             @Nullable Argument[] typeArguments,
@@ -562,7 +562,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     @Internal
     @UsedByGeneratedCode
     protected final AbstractBeanDefinition addInjectionPoint(
-            Class declaringType,
+            Class<?> declaringType,
             String method,
             @Nullable Argument[] arguments,
             @Nullable AnnotationMetadata annotationMetadata,
@@ -888,7 +888,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             String valueAnnStr = argument.getAnnotationMetadata().stringValue(Value.class).orElse(null);
             String valString = resolvePropertyValueName(resolutionContext, injectionPoint.getAnnotationMetadata(), argument, valueAnnStr);
             ApplicationContext applicationContext = (ApplicationContext) context;
-            Class type = argument.getType();
+            Class<?> type = argument.getType();
             boolean isConfigProps = type.isAnnotationPresent(ConfigurationProperties.class);
             boolean result = isConfigProps || Map.class.isAssignableFrom(type) || Collection.class.isAssignableFrom(type) ? applicationContext.containsProperties(valString) : applicationContext.containsProperty(valString);
             if (!result && isConfigurationProperties()) {
@@ -1622,7 +1622,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             String valueAnnVal = annotationMetadata.stringValue(Value.class).orElse(null);
             String valString = resolvePropertyValueName(resolutionContext, injectionPoint, valueAnnVal, annotationMetadata);
             ApplicationContext applicationContext = (ApplicationContext) context;
-            Class fieldType = injectionPoint.getType();
+            Class<?> fieldType = injectionPoint.getType();
             boolean isConfigProps = fieldType.isAnnotationPresent(ConfigurationProperties.class);
             boolean result = isConfigProps || Map.class.isAssignableFrom(fieldType) || Collection.class.isAssignableFrom(fieldType) ? applicationContext.containsProperties(valString) : applicationContext.containsProperty(valString);
             if (!result && isConfigurationProperties()) {
@@ -1847,7 +1847,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     }
 
     private AbstractBeanDefinition addInjectionPointInternal(
-            Class declaringType,
+            Class<?> declaringType,
             String method,
             @Nullable Argument[] arguments,
             @Nullable AnnotationMetadata annotationMetadata,
@@ -1883,7 +1883,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     }
 
     private Object getBeanForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, MethodInjectionPoint injectionPoint, Argument argument) {
-        Class argumentType = argument.getType();
+        Class<?> argumentType = argument.getType();
         if (argumentType.isArray()) {
             Collection beansOfType = getBeansOfTypeForMethodArgument(resolutionContext, context, injectionPoint, argument);
             return beansOfType.toArray((Object[]) Array.newInstance(argumentType.getComponentType(), beansOfType.size()));
@@ -2042,8 +2042,8 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     }
 
     @SuppressWarnings("java:S1872") // internal requirement
-    private boolean isInnerOfAnySuperclass(Class argumentType) {
-        Class beanType = getBeanType();
+    private boolean isInnerOfAnySuperclass(Class<?> argumentType) {
+        Class<?> beanType = getBeanType();
         while (beanType != null) {
             if ((beanType.getName() + "$" + argumentType.getSimpleName()).equals(argumentType.getName())) {
                 return true;
@@ -2058,7 +2058,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         path.pushMethodArgumentResolve(this, injectionPoint, argument);
         try {
             Qualifier qualifier = resolveQualifier(resolutionContext, argument);
-            Class argumentType = argument.getType();
+            Class<?> argumentType = argument.getType();
             Argument genericType = resolveGenericType(argument, argumentType);
             @SuppressWarnings("unchecked") B bean = (B) beanResolver.resolveBean(genericType != null ? genericType : argument, qualifier);
             path.pop();
@@ -2068,7 +2068,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         }
     }
 
-    private Argument resolveGenericType(Argument argument, Class argumentType) {
+    private Argument resolveGenericType(Argument argument, Class<?> argumentType) {
         Argument genericType;
         if (argument.isArray()) {
             genericType = Argument.of(argumentType.getComponentType());
@@ -2083,7 +2083,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         BeanResolutionContext.Path path = resolutionContext.getPath();
         path.pushConstructorResolve(this, argument);
         try {
-            Class argumentType = argument.getType();
+            Class<?> argumentType = argument.getType();
             Argument genericType = resolveGenericType(argument, argumentType);
             Qualifier qualifier = resolveQualifier(resolutionContext, argument);
             @SuppressWarnings("unchecked") B bean = (B) beanResolver.resolveBean(genericType != null ? genericType : argument, qualifier);
@@ -2312,9 +2312,9 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
      */
     private final class MethodKey {
         final String name;
-        final Class[] argumentTypes;
+        final Class<?>[] argumentTypes;
 
-        MethodKey(String name, Class[] argumentTypes) {
+        MethodKey(String name, Class<?>[] argumentTypes) {
             this.name = name;
             this.argumentTypes = argumentTypes;
         }

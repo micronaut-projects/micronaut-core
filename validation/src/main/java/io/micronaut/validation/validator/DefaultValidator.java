@@ -913,7 +913,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                 }
             } else {
 
-                final Class t = argument.getFirstTypeVariable().map(Argument::getType).orElse(null);
+                final Class<?> t = argument.getFirstTypeVariable().map(Argument::getType).orElse(null);
                 validateParameterInternal(
                         rootClass,
                         object,
@@ -974,7 +974,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                 }
             } else {
 
-                final Class t = argument.getFirstTypeVariable().map(Argument::getType).orElse(null);
+                final Class<?> t = argument.getFirstTypeVariable().map(Argument::getType).orElse(null);
                 validateParameterInternal(
                         rootClass,
                         object,
@@ -1321,7 +1321,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             DefaultConstraintValidatorContext context,
             Set overallViolations,
             AnnotatedElement cascadeProperty,
-            Class propertyType,
+            Class<?> propertyType,
             Object propertyValue,
             @Nullable DefaultPropertyNode container) {
 
@@ -1419,7 +1419,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             @Nullable T rootBean,
             @NonNull Object object,
             @NonNull AnnotatedElement constrainedProperty,
-            @NonNull Class propertyType,
+            @NonNull Class<?> propertyType,
             @Nullable Object propertyValue,
             DefaultConstraintValidatorContext context,
             Set<ConstraintViolation<Object>> overallViolations,
@@ -1449,7 +1449,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             @Nullable Object object,
             @NonNull DefaultConstraintValidatorContext context,
             @NonNull Set<ConstraintViolation<Object>> overallViolations,
-            @NonNull Class propertyType,
+            @NonNull Class<?> propertyType,
             @NonNull AnnotatedElement constrainedProperty,
             @Nullable Object propertyValue) {
         final AnnotationMetadata annotationMetadata = constrainedProperty.getAnnotationMetadata();
@@ -1499,7 +1499,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             DefaultConstraintValidatorContext context,
             Set<ConstraintViolation<Object>> overallViolations,
             AnnotatedElement constrainedProperty,
-            Class propertyType,
+            Class<?> propertyType,
             @Nullable Object propertyValue,
             Class<? extends Annotation> constraintType) {
         final AnnotationMetadata annotationMetadata = constrainedProperty
@@ -1516,7 +1516,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                         constraints.add(annotationValue);
                     }
                 } else {
-                    final List<Class> constraintGroups = Arrays.asList(classValues);
+                    final List<Class<?>> constraintGroups = Arrays.asList(classValues);
                     if (constraintGroups.contains(group)) {
                         constraints.add(annotationValue);
                     }
@@ -1524,7 +1524,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             }
         }
 
-        @SuppressWarnings("unchecked") final Class<Object> targetType = propertyValue != null ? (Class<Object>) propertyValue.getClass() : propertyType;
+        @SuppressWarnings("unchecked") final Class<Object> targetType = propertyValue != null ? (Class<Object>) propertyValue.getClass() : (Class<Object>) propertyType;
         final ConstraintValidator<? extends Annotation, Object> validator = constraintValidatorRegistry
                 .findConstraintValidator(constraintType, targetType).orElse(null);
         if (validator != null) {
@@ -1619,7 +1619,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         final boolean hasValid = annotationMetadata.hasStereotype(Valid.class);
         final boolean hasConstraint = annotationMetadata.hasStereotype(Constraint.class);
         final Class<T> parameterType = argument.getType();
-        final Class rootClass = injectionPoint.getDeclaringBean().getBeanType();
+        final Class<?> rootClass = injectionPoint.getDeclaringBean().getBeanType();
         DefaultConstraintValidatorContext context = new DefaultConstraintValidatorContext(value);
         Set overallViolations = new HashSet<>(5);
         if (hasConstraint) {
@@ -1937,7 +1937,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                 }
 
                 @Override
-                public Class getDeclaringType() {
+                public Class<Object> getDeclaringType() {
                     return null;
                 }
 

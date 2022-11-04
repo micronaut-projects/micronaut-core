@@ -791,7 +791,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * @param injectMethodVisitor The {@link MethodVisitor}
      */
     protected static void pushBoxPrimitiveIfNecessary(Type fieldType, MethodVisitor injectMethodVisitor) {
-        final Optional<Class> pt = ClassUtils.getPrimitiveType(fieldType.getClassName());
+        final Optional<Class<?>> pt = ClassUtils.getPrimitiveType(fieldType.getClassName());
         Class<?> wrapperType = pt.map(ReflectionUtils::getWrapperType).orElse(null);
         if (wrapperType != null && wrapperType != Void.class) {
             Type wrapper = Type.getType(wrapperType);
@@ -825,7 +825,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         ClassElement type = fieldType.getType();
         if (type.isPrimitive() && !type.isArray()) {
             String primitiveName = type.getName();
-            final Optional<Class> pt = ClassUtils.getPrimitiveType(primitiveName);
+            final Optional<Class<?>> pt = ClassUtils.getPrimitiveType(primitiveName);
             Class<?> wrapperType = pt.map(ReflectionUtils::getWrapperType).orElse(null);
             if (wrapperType != null && wrapperType != Void.class) {
                 Type wrapper = Type.getType(wrapperType);
@@ -844,7 +844,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         String internalName = getInternalNameForCast(type);
         methodVisitor.visitTypeInsn(CHECKCAST, internalName);
         Type primitiveType = null;
-        final Optional<Class> pt = ClassUtils.getPrimitiveType(type.getClassName());
+        final Optional<Class<?>> pt = ClassUtils.getPrimitiveType(type.getClassName());
         if (pt.isPresent()) {
             primitiveType = Type.getType(pt.get());
         }
@@ -899,7 +899,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         methodVisitor.visitTypeInsn(CHECKCAST, internalName);
         Type primitiveType = null;
         if (type.isPrimitive() && !type.isArray()) {
-            final Optional<Class> pt = ClassUtils.getPrimitiveType(type.getType().getName());
+            final Optional<Class<?>> pt = ClassUtils.getPrimitiveType(type.getType().getName());
             if (pt.isPresent()) {
                 primitiveType = Type.getType(pt.get());
             }
@@ -1452,7 +1452,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * @param superClass    The super class
      * @param argumentTypes The argument types
      */
-    protected void invokeConstructor(MethodVisitor cv, Class superClass, Class... argumentTypes) {
+    protected void invokeConstructor(MethodVisitor cv, Class<?> superClass, Class<?>... argumentTypes) {
         try {
             Type superType = Type.getType(superClass);
             Type superConstructor = Type.getType(superClass.getDeclaredConstructor(argumentTypes));
@@ -1471,7 +1471,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * @param targetType The target type
      * @param method     The method
      */
-    protected static void invokeInterfaceStaticMethod(MethodVisitor visitor, Class targetType, Method method) {
+    protected static void invokeInterfaceStaticMethod(MethodVisitor visitor, Class<?> targetType, Method method) {
         Type type = Type.getType(targetType);
         String owner = type.getSort() == Type.ARRAY ? type.getDescriptor()
                 : type.getInternalName();
@@ -1485,7 +1485,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * @param methodName  The method name
      * @return TheThe {@link GeneratorAdapter} for the method
      */
-    protected GeneratorAdapter startPublicMethodZeroArgs(ClassWriter classWriter, Class returnType, String methodName) {
+    protected GeneratorAdapter startPublicMethodZeroArgs(ClassWriter classWriter, Class<?> returnType, String methodName) {
         Type methodType = Type.getMethodType(Type.getType(returnType));
 
         return new GeneratorAdapter(classWriter.visitMethod(ACC_PUBLIC, methodName, methodType.getDescriptor(), null, null), ACC_PUBLIC, methodName, methodType.getDescriptor());
@@ -1497,7 +1497,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * @param methodName  The method name
      * @return TheThe {@link GeneratorAdapter} for the method
      */
-    protected GeneratorAdapter startPublicFinalMethodZeroArgs(ClassWriter classWriter, Class returnType, String methodName) {
+    protected GeneratorAdapter startPublicFinalMethodZeroArgs(ClassWriter classWriter, Class<?> returnType, String methodName) {
         Type methodType = Type.getMethodType(Type.getType(returnType));
 
         return new GeneratorAdapter(
@@ -1531,7 +1531,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         ClassElement ce = type.getType();
         if (ce.isPrimitive() && !ce.isArray()) {
 
-            final Optional<Class> pt = ClassUtils.getPrimitiveType(ce.getName());
+            final Optional<Class<?>> pt = ClassUtils.getPrimitiveType(ce.getName());
             if (pt.isPresent()) {
                 return Type.getInternalName(ReflectionUtils.getWrapperType(pt.get()));
             } else {
@@ -1558,7 +1558,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * @return the internal name for cast
      */
     protected static String getInternalNameForCast(Type type) {
-        final Optional<Class> pt = ClassUtils.getPrimitiveType(type.getClassName());
+        final Optional<Class<?>> pt = ClassUtils.getPrimitiveType(type.getClassName());
         if (pt.isPresent()) {
             return Type.getInternalName(ReflectionUtils.getWrapperType(pt.get()));
         } else {

@@ -497,7 +497,7 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
                     return pe.getPropertyAsString();
                 } else {
                     if (propertyType.isResolved()) {
-                        Class typeClass = propertyType.getTypeClass();
+                        Class<?> typeClass = propertyType.getTypeClass();
                         try {
                             final Field f = ReflectionUtils.getRequiredField(typeClass, pe.getPropertyAsString());
                             f.setAccessible(true);

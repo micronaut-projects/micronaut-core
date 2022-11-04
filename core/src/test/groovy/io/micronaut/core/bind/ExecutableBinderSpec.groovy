@@ -46,7 +46,7 @@ class ExecutableBinderSpec extends Specification {
             }
 
             @Override
-            Class getDeclaringType() {
+            Class<?> getDeclaringType() {
                 return null
             }
         }
@@ -89,7 +89,7 @@ class ExecutableBinderSpec extends Specification {
             }
 
             @Override
-            Class getDeclaringType() {
+            Class<?> getDeclaringType() {
                 return null
             }
         }
@@ -127,7 +127,7 @@ class ExecutableBinderSpec extends Specification {
             }
 
             @Override
-            Class getDeclaringType() {
+            Class<?> getDeclaringType() {
                 return null
             }
         }

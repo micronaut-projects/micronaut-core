@@ -67,6 +67,8 @@ import java.util.stream.Collectors;
  */
 public abstract class AbstractAnnotationMetadataBuilder<T, A> {
 
+    protected static final List<String> EXCLUDES = Arrays.asList(AnnotationUtil.KOTLIN_METADATA, "jdk.internal.ValueBased");
+
     /**
      * Names of annotations that should produce deprecation warnings.
      * The key in the map is the deprecated annotation the value the replacement.
@@ -80,8 +82,6 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     private static final List<String> DEFAULT_ANNOTATE_EXCLUDES = Arrays.asList(Internal.class.getName(),
         Experimental.class.getName(), "jdk.internal.ValueBased");
     private static final Map<String, Map<String, Object>> ANNOTATION_DEFAULTS = new HashMap<>(20);
-
-    protected static final List<String> EXCLUDES = Arrays.asList(AnnotationUtil.KOTLIN_METADATA, "jdk.internal.ValueBased");
 
     static {
         for (AnnotationMapper mapper : SoftServiceLoader.load(AnnotationMapper.class, AbstractAnnotationMetadataBuilder.class.getClassLoader())
