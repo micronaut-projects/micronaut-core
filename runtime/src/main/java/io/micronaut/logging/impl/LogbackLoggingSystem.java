@@ -15,12 +15,19 @@
  */
 package io.micronaut.logging.impl;
 
+import java.net.URL;
+import java.util.Optional;
+
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.LoggerContext;
+import ch.qos.logback.classic.joran.JoranConfigurator;
+import ch.qos.logback.core.joran.spi.JoranException;
+import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.logging.LogLevel;
 import io.micronaut.logging.LoggingSystem;
+import io.micronaut.logging.LoggingSystemException;
 import jakarta.inject.Singleton;
 import org.slf4j.LoggerFactory;
 
@@ -35,6 +42,11 @@ import org.slf4j.LoggerFactory;
 @Internal
 public final class LogbackLoggingSystem implements LoggingSystem {
 
+    private static String DEFAULT_LOGBACK_LOCATION = "logback.xml";
+
+    @Property(name = "logger.config")
+    private Optional<String> logbackXmlLocation;
+
     @Override
     public void setLogLevel(String name, LogLevel level) {
         getLoggerContext().getLogger(name).setLevel(toLevel(level));
@@ -43,6 +55,16 @@ public final class LogbackLoggingSystem implements LoggingSystem {
     @Override
     public void refresh() {
         getLoggerContext().reset();
+        JoranConfigurator joranConfigurator = new JoranConfigurator();
+        joranConfigurator.setContext(getLoggerContext());
+        String logbackXml = logbackXmlLocation.orElse(DEFAULT_LOGBACK_LOCATION);
+
+        try {
+            URL resource = getClass().getClassLoader().getResource(logbackXml);
+            joranConfigurator.doConfigure(resource);
+        } catch (JoranException e) {
+            throw new LoggingSystemException("Error while refreshing Logback", e);
+        }
     }
 
     /**

@@ -2,6 +2,10 @@ package io.micronaut.logging
 
 import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.Logger
+import ch.qos.logback.classic.LoggerContext
+import ch.qos.logback.classic.spi.ILoggingEvent
+import ch.qos.logback.core.Appender
+import ch.qos.logback.core.ConsoleAppender
 import com.github.stefanbirkner.systemlambda.SystemLambda
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.PropertySource
@@ -144,20 +148,38 @@ logger:
 
     void 'logging refresh is properly called on application start'() {
         given:
+        def map = new YamlPropertySourceLoader().read("application.yml", '''
+logger:
+  config: logback-env-test.xml
+  levels:
+    foo.bar4: ERROR
+'''.bytes)
+
         ApplicationContext context = ApplicationContext.builder()
+                .propertySources(PropertySource.of("application", map, YamlPropertySourceLoader.DEFAULT_POSITION))
                 .build()
 
-        def loggingSystem = context.getBean(LoggingSystem.class)
-        def spy = Spy(loggingSystem)
-
         when:
-        SystemLambda.withEnvironmentVariable("LOGGER_LEVELS_FOO_BAR3", "INFO")
+        SystemLambda.withEnvironmentVariable("SOME_ENV_VAR", "FOO")
                 .execute(() -> {
                     context.start()
+                    LoggerFactory.getLogger("foo.bar4").error("Some error")
                 })
 
+        ConsoleAppender<ILoggingEvent> consoleAppender
+        for (Logger logger : ((LoggerContext)LoggerFactory.getILoggerFactory()).getLoggerList()) {
+            for (Iterator<Appender<ILoggingEvent>> index = logger.iteratorForAppenders(); index.hasNext();) {
+                Appender<ILoggingEvent> appender = index.next()
+                if (appender.getName() == "STDOUT") {
+                    consoleAppender = (ConsoleAppender<ILoggingEvent>) appender
+                    break
+                }
+            }
+        }
+
         then:
-        1 * spy.refresh()
+        consoleAppender != null
+        consoleAppender.getEncoder().getProperties()["pattern"].contains("[FOO]")
 
         cleanup:
         context.close()
