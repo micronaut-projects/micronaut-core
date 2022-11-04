@@ -370,15 +370,15 @@ final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.microna
                 // MultipartBody will subscribe to the request body in MultipartBodyArgumentBinder
                 return false;
             }
+            if (Arrays.stream(methodBasedRouteMatch.getArguments()).anyMatch(argument -> HttpRequest.class.equals(argument.getType()))) {
+                // HttpRequest argument in the method
+                return true;
+            }
         }
         Optional<Argument<?>> bodyArgument = routeMatch.getBodyArgument()
             .filter(argument -> argument.getAnnotationMetadata().hasAnnotation(Body.class));
-        if (bodyArgument.isEmpty() || !routeMatch.isSatisfied(bodyArgument.get().getName())) {
+        if (bodyArgument.isPresent() && !routeMatch.isSatisfied(bodyArgument.get().getName())) {
             // Body argument in the method
-            return true;
-        }
-        if (routeMatch.getRequiredArguments().stream().anyMatch(argument -> HttpRequest.class.equals(argument.getType()))) {
-            // HttpRequest argument in the method
             return true;
         }
         // Might be some body parts
