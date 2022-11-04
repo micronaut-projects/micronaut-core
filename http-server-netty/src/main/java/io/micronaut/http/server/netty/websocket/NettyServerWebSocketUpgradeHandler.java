@@ -128,16 +128,20 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
             .findFirst();
 
         MutableHttpResponse<?> proceed = HttpResponse.ok();
+
+        if (optionalRoute.isPresent()) {
+            UriRouteMatch<Object, Object> rm = optionalRoute.get();
+            msg.setAttribute(HttpAttributes.ROUTE_MATCH, rm);
+            msg.setAttribute(HttpAttributes.ROUTE_INFO, rm);
+            proceed.setAttribute(HttpAttributes.ROUTE_MATCH, rm);
+            proceed.setAttribute(HttpAttributes.ROUTE_INFO, rm);
+        }
+
         AtomicReference<HttpRequest<?>> requestReference = new AtomicReference<>(msg);
 
         ExecutionFlow<MutableHttpResponse<?>> responseFlow = ExecutionFlow.async(ctx.channel().eventLoop(), () -> routeExecutor.filterPublisher(requestReference, () -> {
             ExecutionFlow<MutableHttpResponse<?>> response;
             if (optionalRoute.isPresent()) {
-                UriRouteMatch<Object, Object> rm = optionalRoute.get();
-                msg.setAttribute(HttpAttributes.ROUTE_MATCH, rm);
-                msg.setAttribute(HttpAttributes.ROUTE_INFO, rm);
-                proceed.setAttribute(HttpAttributes.ROUTE_MATCH, rm);
-                proceed.setAttribute(HttpAttributes.ROUTE_INFO, rm);
                 response = ExecutionFlow.just(proceed);
             } else {
                 response = routeExecutor.onError(new HttpStatusException(HttpStatus.NOT_FOUND, "WebSocket Not Found"), msg);

@@ -22,7 +22,6 @@ import jakarta.inject.Inject
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
-import spock.lang.PendingFeature
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
@@ -36,8 +35,6 @@ class WebsocketRouteMatchSpec extends Specification {
     @Inject
     EmbeddedServer embeddedServer
 
-
-    @PendingFeature
     void "request attributes contains a route match for WebSocketServer"() {
         given:
         WebSocketClient wsClient = embeddedServer.applicationContext.createBean(WebSocketClient.class, embeddedServer.getURL())
