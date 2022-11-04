@@ -8,5 +8,5 @@ dependencies {
     testImplementation project(":context")
     testImplementation project(":inject")
     testImplementation libs.javax.inject
-    testImplementation libs.managed.javax.annotation.api
+    testImplementation libs.javax.annotation.api
 }

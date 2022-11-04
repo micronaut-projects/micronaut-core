@@ -73,7 +73,7 @@ dependencies {
 
     testImplementation libs.caffeine
     testImplementation libs.managed.groovy
-    testImplementation(libs.managed.spock) {
+    testImplementation(libs.spock) {
         exclude module: 'groovy-all'
     }
 

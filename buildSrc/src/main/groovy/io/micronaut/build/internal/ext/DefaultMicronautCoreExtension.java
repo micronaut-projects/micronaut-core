@@ -62,7 +62,7 @@ public abstract class DefaultMicronautCoreExtension implements MicronautCoreExte
 
     private void addTestImplementationDependency(String lib) {
         dependencyHandler.addProvider("testImplementation", libs.findLibrary(
-                "managed.micronaut.test." + lib
+                "micronaut.test." + lib
         ).get(), DefaultMicronautCoreExtension::excludeMicronautLibs);
     }
 

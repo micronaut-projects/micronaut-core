@@ -25,31 +25,27 @@ dependencies {
 
     testImplementation libs.managed.reactor
 
-    testImplementation libs.managed.spotbugs
+    testImplementation libs.spotbugs
     testImplementation libs.hibernate
     testImplementation libs.compile.testing
-    testImplementation(libs.managed.neo4j.bolt) {
-        version {
-            require "1.4.5"
-        }
-    }
+    testImplementation(libs.neo4j.bolt)
     testImplementation libs.managed.groovy.json
     if (!JavaVersion.current().isJava9Compatible()) {
         testImplementation files(org.gradle.internal.jvm.Jvm.current().toolsJar)
     }
-    testImplementation libs.managed.micrometer.core
+    testImplementation libs.micrometer.core
     testImplementation project(":validation")
     testImplementation project(":jackson-databind")
     testImplementation libs.junit.jupiter.api
-    testImplementation(platform(libs.boms.micronaut.tracing))
+    testImplementation(platform(libs.test.boms.micronaut.tracing))
     testImplementation(libs.micronaut.tracing.zipkin) {
         exclude module: 'micronaut-bom'
         exclude module: 'micronaut-http-client'
         exclude module: 'micronaut-inject'
         exclude module: 'micronaut-runtime'
     }
-    testImplementation libs.managed.javax.annotation.api
-    testImplementation libs.managed.snakeyaml
+    testImplementation libs.javax.annotation.api
+    testImplementation libs.snakeyaml
     testRuntimeOnly libs.javax.el.impl
     testRuntimeOnly libs.javax.el
 }

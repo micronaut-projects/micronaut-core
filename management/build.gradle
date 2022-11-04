@@ -9,7 +9,7 @@ dependencies {
     api project(":router")
     api project(":discovery-core")
     compileOnly project(":jackson-databind")
-    compileOnly(libs.managed.micronaut.sql.jdbc) {
+    compileOnly(libs.micronaut.sql.jdbc) {
         exclude module:'micronaut-inject'
         exclude module:'micronaut-bom'
     }
@@ -20,17 +20,17 @@ dependencies {
     testImplementation project(":inject-groovy")
     testImplementation project(":http-server-netty")
     testImplementation project(":jackson-databind")
-    testImplementation(libs.managed.micronaut.sql.jdbc.tomcat) {
+    testImplementation(libs.micronaut.sql.jdbc.tomcat) {
         exclude module:'micronaut-inject'
         exclude module:'micronaut-bom'
     }
     testImplementation libs.managed.groovy.json
 
-    testRuntimeOnly(platform(libs.boms.micronaut.sql))
-    testRuntimeOnly libs.managed.h2
+    testRuntimeOnly(platform(libs.test.boms.micronaut.sql))
+    testRuntimeOnly libs.h2
     testRuntimeOnly libs.mysql.driver
 
-    compileOnly libs.managed.logback
+    compileOnly libs.logback
     compileOnly libs.log4j
 
 }

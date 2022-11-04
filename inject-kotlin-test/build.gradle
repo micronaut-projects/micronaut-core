@@ -8,7 +8,7 @@ dependencies {
 
     api project(":inject-java")
     api libs.managed.groovy
-    api(libs.managed.spock) {
+    api(libs.spock) {
         exclude module:'groovy-all'
     }
     if (!JavaVersion.current().isJava9Compatible()) {
