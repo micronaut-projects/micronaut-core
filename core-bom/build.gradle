@@ -1,0 +1,29 @@
+plugins {
+    id 'io.micronaut.build.internal.bom'
+}
+
+group projectGroupId
+version projectVersion
+
+repositories {
+    mavenCentral()
+    maven { url "https://s01.oss.sonatype.org/content/repositories/snapshots/" }
+}
+
+micronautBom {
+    extraExcludedProjects = [
+            "benchmarks",
+            "inject-test-utils",
+            "inject-java-test",
+            "inject-kotlin-test",
+            "inject-groovy-test"
+    ]
+    propertyName = 'core'
+}
+
+micronautBuild {
+    binaryCompatibility {
+        def (major, minor, patch) = (version - '-SNAPSHOT').split('[.]').collect { it.toInteger() }
+        enabled = major > 4 || (major == 4 && minor > 0) || (major == 4 && minor == 0 && patch > 0)
+    }
+}
