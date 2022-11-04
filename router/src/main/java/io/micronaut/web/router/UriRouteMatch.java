@@ -47,12 +47,12 @@ public interface UriRouteMatch<T, R> extends UriMatchInfo, MethodBasedRouteMatch
      * @return The required arguments in order to invoke this route
      */
     @Override
-    default List<Argument> getRequiredArguments() {
-        Argument[] arguments = getArguments();
+    default List<Argument<?>> getRequiredArguments() {
+        Argument<?>[] arguments = getArguments();
         if (ArrayUtils.isNotEmpty(arguments)) {
             Map<String, Object> matchVariables = getVariableValues();
-            List<Argument> actualArguments = new ArrayList<>(arguments.length);
-            for (Argument argument : arguments) {
+            List<Argument<?>> actualArguments = new ArrayList<>(arguments.length);
+            for (Argument<?> argument : arguments) {
                 if (!matchVariables.containsKey(argument.getName())) {
                     actualArguments.add(argument);
                 }

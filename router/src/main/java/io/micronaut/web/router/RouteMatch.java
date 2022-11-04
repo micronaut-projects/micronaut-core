@@ -91,7 +91,7 @@ public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest>, Rout
      *
      * @return The required arguments in order to invoke this route
      */
-    default Collection<Argument> getRequiredArguments() {
+    default Collection<Argument<?>> getRequiredArguments() {
         return Collections.emptyList();
     }
 
