@@ -19,7 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
-import io.micronaut.core.convert.ConversionContext;
+import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
@@ -345,7 +345,6 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         return newValue;
     }
 
-    @SuppressWarnings("unchecked")
     @Override
     public <T1> Optional<T1> getBody(Class<T1> type) {
         return getBody(Argument.of(type));
@@ -353,8 +352,8 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
 
     @SuppressWarnings("unchecked")
     @Override
-    public <T1> Optional<T1> getBody(Argument<T1> type) {
-        return getBody().flatMap(t -> bodyConvertor.convert(type, t));
+    public <T1> Optional<T1> getBody(ArgumentConversionContext<T1> conversionContext) {
+        return getBody().flatMap(t -> bodyConvertor.convert(conversionContext, t));
     }
 
     /**
@@ -611,14 +610,14 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         return new BodyConvertor() {
 
             @Override
-            public Optional convert(Argument valueType, Object value) {
+            public Optional convert(ArgumentConversionContext conversionContext, Object value) {
                 if (value == null) {
                     return Optional.empty();
                 }
-                if (Argument.OBJECT_ARGUMENT.equalsType(valueType)) {
+                if (Argument.OBJECT_ARGUMENT.equalsType(conversionContext.getArgument())) {
                     return Optional.of(value);
                 }
-                return convertFromNext(conversionService, valueType, value);
+                return convertFromNext(conversionService, conversionContext, value);
             }
 
         };
@@ -786,25 +785,34 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
 
         private BodyConvertor<T> nextConvertor;
 
-        public abstract Optional<T> convert(Argument<T> valueType, T value);
+        public abstract Optional<T> convert(ArgumentConversionContext<T> conversionContext, T value);
 
-        protected synchronized Optional<T> convertFromNext(ConversionService conversionService, Argument<T> conversionValueType, T value) {
+        protected synchronized Optional<T> convertFromNext(ConversionService conversionService, ArgumentConversionContext<T> conversionContext, T value) {
             if (nextConvertor == null) {
-                Optional<T> conversion = conversionService.convert(value, ConversionContext.of(conversionValueType));
+                Optional<T> conversion = conversionService.convert(value, conversionContext);
                 nextConvertor = new BodyConvertor<T>() {
 
                     @Override
-                    public Optional<T> convert(Argument<T> valueType, T value) {
-                        if (conversionValueType.equalsType(valueType)) {
+                    public Optional<T> convert(ArgumentConversionContext<T> currentConversionContext, T value) {
+                        if (currentConversionContext == conversionContext) {
                             return conversion;
                         }
-                        return convertFromNext(conversionService, valueType, value);
+                        if (currentConversionContext.getArgument().equalsType(conversionContext.getArgument())) {
+                            conversionContext.getLastError().ifPresent(error -> {
+                                error.getOriginalValue().ifPresentOrElse(
+                                    originalValue -> currentConversionContext.reject(originalValue, error.getCause()),
+                                    () -> currentConversionContext.reject(error.getCause())
+                                );
+                            });
+                            return conversion;
+                        }
+                        return convertFromNext(conversionService, currentConversionContext, value);
                     }
 
                 };
                 return conversion;
             }
-            return nextConvertor.convert(conversionValueType, value);
+            return nextConvertor.convert(conversionContext, value);
         }
 
         public void cleanup() {

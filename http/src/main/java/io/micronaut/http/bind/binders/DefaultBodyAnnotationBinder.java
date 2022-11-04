@@ -64,21 +64,18 @@ public class DefaultBodyAnnotationBinder<T> implements BodyArgumentBinder<T> {
 
                 Optional<T> value = values.get(component, context);
                 return newResult(value.orElse(null), context);
-            } else {
-                //noinspection unchecked
-                return BindingResult.EMPTY;
             }
-        } else {
-            Optional<?> body = source.getBody();
-            if (!body.isPresent()) {
-
-                return BindingResult.EMPTY;
-            } else {
-                Object o = body.get();
-                Optional<T> converted = conversionService.convert(o, context);
-                return newResult(converted.orElse(null), context);
-            }
+            //noinspection unchecked
+            return BindingResult.EMPTY;
         }
+        Optional<?> body = source.getBody();
+        if (body.isEmpty()) {
+            //noinspection unchecked
+            return BindingResult.EMPTY;
+        }
+        Object o = body.get();
+        Optional<T> converted = conversionService.convert(o, context);
+        return newResult(converted.orElse(null), context);
     }
 
     @SuppressWarnings("java:S3655") // false positive

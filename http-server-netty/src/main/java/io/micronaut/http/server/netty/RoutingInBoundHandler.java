@@ -53,6 +53,7 @@ import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.server.RouteExecutor;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.http.server.exceptions.InternalServerException;
+import io.micronaut.http.server.multipart.MultipartBody;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.multipart.NettyCompletedFileUpload;
 import io.micronaut.http.server.netty.multipart.NettyPartData;
@@ -63,6 +64,7 @@ import io.micronaut.http.server.netty.types.files.NettyStreamedFileCustomizableR
 import io.micronaut.http.server.netty.types.files.NettySystemFileCustomizableResponseType;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
 import io.micronaut.runtime.http.codec.TextPlainCodec;
+import io.micronaut.web.router.MethodBasedRouteMatch;
 import io.micronaut.web.router.RouteInfo;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.resource.StaticResourceResolver;
@@ -113,6 +115,7 @@ import java.net.URL;
 import java.nio.channels.ClosedChannelException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -292,16 +295,7 @@ final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.microna
             }
             // try to fulfill the argument requirements of the route
             RouteMatch<?> route = requestArgumentSatisfier.fulfillArgumentRequirements(routeMatch, httpRequest, false);
-
-            Optional<Argument<?>> bodyArgument = route.getBodyArgument()
-                .filter(argument -> argument.getAnnotationMetadata().hasAnnotation(Body.class));
-
-            // The request body is required, so at this point we must have a StreamedHttpRequest
-            io.netty.handler.codec.http.HttpRequest nativeRequest1 = nettyHttpRequest.getNativeRequest();
-            if (!route.isExecutable() &&
-                HttpMethod.permitsRequestBody(nettyHttpRequest.getMethod()) &&
-                nativeRequest1 instanceof StreamedHttpRequest &&
-                (bodyArgument.isEmpty() || !route.isSatisfied(bodyArgument.get().getName()))) {
+            if (shouldReadBody(nettyHttpRequest, route)) {
                 return ReactiveExecutionFlow.fromPublisher(
                     Mono.create(emitter -> httpContentProcessorResolver.resolve(nettyHttpRequest, route)
                         .subscribe(buildSubscriber(nettyHttpRequest, route, emitter))
@@ -360,6 +354,35 @@ final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.microna
                 );
             }
         }
+    }
+
+    private boolean shouldReadBody(NettyHttpRequest<?> nettyHttpRequest, RouteMatch<?> routeMatch) {
+        if (!HttpMethod.permitsRequestBody(nettyHttpRequest.getMethod())) {
+            return false;
+        }
+        io.netty.handler.codec.http.HttpRequest nativeRequest = nettyHttpRequest.getNativeRequest();
+        if (!(nativeRequest instanceof StreamedHttpRequest)) {
+            // Illegal state: The request body is required, so at this point we must have a StreamedHttpRequest
+            return false;
+        }
+        if (routeMatch instanceof MethodBasedRouteMatch<?, ?> methodBasedRouteMatch) {
+            if (Arrays.stream(methodBasedRouteMatch.getArguments()).anyMatch(argument -> MultipartBody.class.equals(argument.getType()))) {
+                // MultipartBody will subscribe to the request body in MultipartBodyArgumentBinder
+                return false;
+            }
+            if (Arrays.stream(methodBasedRouteMatch.getArguments()).anyMatch(argument -> HttpRequest.class.equals(argument.getType()))) {
+                // HttpRequest argument in the method
+                return true;
+            }
+        }
+        Optional<Argument<?>> bodyArgument = routeMatch.getBodyArgument()
+            .filter(argument -> argument.getAnnotationMetadata().hasAnnotation(Body.class));
+        if (bodyArgument.isPresent() && !routeMatch.isSatisfied(bodyArgument.get().getName())) {
+            // Body argument in the method
+            return true;
+        }
+        // Might be some body parts
+        return !routeMatch.isExecutable();
     }
 
     @Override
