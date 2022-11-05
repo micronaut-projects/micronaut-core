@@ -16,6 +16,7 @@
 package io.micronaut.visitors
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.core.annotation.Introspected
 import io.micronaut.http.annotation.Get
 import io.micronaut.inject.ast.ClassElement
 import spock.lang.IgnoreIf
@@ -361,5 +362,49 @@ class Parameters {
                 'io.micronaut.context.annotation.BeanProperties',
                 'io.micronaut.core.annotation.Introspected'
         ]
+    }
+
+    void "test get annotations from placeholder element type"() {
+        buildBeanDefinition('test.TestController', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Get;
+import io.reactivex.rxjava3.core.Flowable;
+
+@Controller("/pets")
+interface TestController<T extends Pet> {
+
+    @Get("/flowable")
+    Flowable<T> flowable();
+}
+
+@Introspected(accessKind = Introspected.AccessKind.FIELD)
+class Pet {
+    private PetType type;
+
+    public void setType(PetType t) {
+        type = t;
+    }
+
+    public PetType getType() {
+        return type;
+    }
+}
+
+enum PetType {
+    DOG, CAT
+}
+''')
+        expect:
+        AllElementsVisitor.VISITED_CLASS_ELEMENTS.size() == 1
+        def method = AllElementsVisitor.VISITED_METHOD_ELEMENTS[0]
+        def type = method.returnType
+
+        def genericType = type.getFirstTypeArgument().orElse(null)
+
+        def annIntrospected = genericType.getDeclaredAnnotation(Introspected.class)
+        annIntrospected
     }
 }
