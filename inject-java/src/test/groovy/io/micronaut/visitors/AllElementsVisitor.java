@@ -53,6 +53,7 @@ public class AllElementsVisitor implements TypeElementVisitor<Controller, Object
     public void visitMethod(MethodElement element, VisitorContext context) {
         VISITED_METHOD_ELEMENTS.add(element);
         // Preload
+        element.getReturnType().getFirstTypeArgument().orElse(element.getReturnType()).getTargetAnnotationMetadata();
         element.getReturnType().getBeanProperties().forEach(AnnotationMetadataProvider::getAnnotationMetadata);
         Arrays.stream(element.getParameters()).flatMap(p -> p.getType().getBeanProperties().stream()).forEach(propertyElement -> {
             initialize(propertyElement);
