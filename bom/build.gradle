@@ -66,6 +66,9 @@ micronautBom {
         acceptedLibraryRegressions.add("micronaut-graphql-gorm")
         acceptedLibraryRegressions.add("micronaut-neo4j-gorm")
 
+        // Switched to Jakarta-mail in email 2.0.0
+        acceptedLibraryRegressions.add("javax-mail")
+
         // glassfish removed from Micronaut Serialization
         acceptedVersionRegressions.add("glassfish-jakarta-json")
         acceptedLibraryRegressions.add("glassfish-jakarta-json")
