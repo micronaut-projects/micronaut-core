@@ -5,18 +5,10 @@ plugins {
 group projectGroupId
 version projectVersion
 
-repositories {
-    mavenCentral()
-    maven { url "https://s01.oss.sonatype.org/content/repositories/snapshots/" }
-}
-
 micronautBom {
     extraExcludedProjects = [
             "benchmarks",
-            "inject-test-utils",
-            "inject-java-test",
-            "inject-kotlin-test",
-            "inject-groovy-test"
+            "inject-test-utils"
     ]
     propertyName = 'core'
 }
