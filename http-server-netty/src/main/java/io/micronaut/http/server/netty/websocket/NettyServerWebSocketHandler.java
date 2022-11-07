@@ -171,7 +171,7 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
         request.setAttribute(HttpAttributes.ROUTE_MATCH, routeMatch);
         request.setAttribute(HttpAttributes.ROUTE, routeMatch.getRoute());
 
-        Flux.from(callOpenMethod(ctx)).subscribe(v -> {}, t -> {
+        Flux.from(callOpenMethod(ctx)).subscribe(v -> { }, t -> {
             forwardErrorToUser(ctx, e -> {
                 if (LOG.isErrorEnabled()) {
                     LOG.error("Error Opening WebSocket [" + webSocketBean + "]: " + e.getMessage(), e);

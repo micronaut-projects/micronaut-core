@@ -206,7 +206,7 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
             }
 
             Flux.from(callOpenMethod(ctx)).subscribe(
-                o -> {},
+                o -> { },
                 error -> completion.tryEmitError(new WebSocketSessionException("Error opening WebSocket client session: " + error.getMessage(), error)),
                 () -> completion.tryEmitValue(targetBean)
             );

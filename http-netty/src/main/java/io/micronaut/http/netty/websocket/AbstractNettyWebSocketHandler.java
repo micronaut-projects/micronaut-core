@@ -137,6 +137,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
      * Calls the open method of the websocket bean.
      *
      * @param ctx The handler context
+     * @return Publisher for any errors, or the result of the open method
      */
     protected Publisher<?> callOpenMethod(ChannelHandlerContext ctx) {
         WebSocketSession session = getSession();
@@ -199,7 +200,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         forwardErrorToUser(ctx, e -> handleUnexpected(ctx, e), cause);
     }
 
-    protected void forwardErrorToUser(ChannelHandlerContext ctx, Consumer<Throwable> fallback, Throwable cause) {
+    protected final void forwardErrorToUser(ChannelHandlerContext ctx, Consumer<Throwable> fallback, Throwable cause) {
         Optional<? extends MethodExecutionHandle<?, ?>> opt = webSocketBean.errorMethod();
 
         if (opt.isPresent()) {
