@@ -152,7 +152,7 @@ compile-testing = { module = "com.google.testing.compile:compile-testing", versi
 
 geb-spock = { module = "org.gebish:geb-spock", version.ref = "geb" }
 spock-for-geb = { module = "org.spockframework:spock-core", version.ref = "geb-spock" }
-geb-groovy-test = { module = "org.codehaus.groovy:groovy-test", version.ref = "geb-groovy" }
+geb-groovy-test = { module = "org.apache.groovy:groovy-test", version.ref = "geb-groovy" }
 gorm = { module = "org.grails:grails-datastore-core", version.ref = "gorm" }
 graal = { module = "org.graalvm.nativeimage:svm", version.ref = "graal-svm" }
 groovy-test-junit5 = { module = "org.apache.groovy:groovy-test-junit5", version.ref = "managed-groovy" }
