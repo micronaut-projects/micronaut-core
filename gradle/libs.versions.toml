@@ -86,7 +86,7 @@ test-boms-micronaut-aws = { module = "io.micronaut.aws:micronaut-aws-bom", versi
 test-boms-micronaut-sql = { module = "io.micronaut.sql:micronaut-sql-bom", version.ref = "micronaut-sql" }
 test-boms-micronaut-tracing = { module = "io.micronaut.tracing:micronaut-tracing-bom", version.ref = "micronaut-tracing" }
 
-boms-groovy = { module = "org.codehaus.groovy:groovy-bom", version.ref = "managed-groovy" }
+boms-groovy = { module = "org.apache.groovy:groovy-bom", version.ref = "managed-groovy" }
 boms-netty = { module = "io.netty:netty-bom", version.ref = "managed-netty" }
 boms-jackson = { module = "com.fasterxml.jackson:jackson-bom", version.ref = "managed-jackson" }
 
