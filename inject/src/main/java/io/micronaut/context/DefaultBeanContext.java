@@ -940,6 +940,44 @@ public class DefaultBeanContext implements InitializableBeanContext {
     }
 
     /**
+     * Obtains a map of beans of the given type and qualifier.
+     * @param resolutionContext  The resolution context
+     * @param beanType           The bean type
+     * @param qualifier          The qualifier
+     * @param <K>                The key type
+     * @param <V>                The bean type
+     * @return A map of beans, never {@code null}.
+     * @since 4.0.0
+     */
+    protected <V, K extends CharSequence> @NonNull Map<K, V> mapOfType(@NonNull BeanResolutionContext resolutionContext, @NonNull Argument<V> beanType, @Nullable Qualifier<V> qualifier) {
+        // try and find a bean that implements the map with the generics
+        Argument<Map<CharSequence, V>> mapType = Argument.mapOf(Argument.of(CharSequence.class), beanType);
+        @SuppressWarnings("unchecked") Qualifier<Map<CharSequence, V>> mapQualifier = (Qualifier<Map<CharSequence, V>>) qualifier;
+        BeanDefinition<Map<CharSequence, V>> existingBean = findBeanDefinition(mapType, mapQualifier, false).orElse(null);
+        if (existingBean != null) {
+            return (Map<K, V>) getBean(existingBean);
+        } else {
+            Collection<BeanRegistration<V>> beanRegistrations = getBeanRegistrations(resolutionContext, beanType, qualifier);
+            if (beanRegistrations.isEmpty()) {
+                return Collections.emptyMap();
+            } else {
+                try {
+                    return beanRegistrations.stream().collect(Collectors.toUnmodifiableMap(
+                        reg -> (K) reg.identifier.getName(),
+                        reg -> reg.bean
+                    ));
+                } catch (IllegalStateException e) { // occurs for duplicate keys
+                    throw new DependencyInjectionException(
+                        resolutionContext,
+                        "Injecting a map of beans requires each bean to define a qualifier. Multiple beans were found missing a qualifier resulting in duplicate keys: " + e.getMessage(),
+                        e
+                    );
+                }
+            }
+        }
+    }
+
+    /**
      * Obtains a stream of beans of the given type and qualifier.
      *
      * @param resolutionContext The bean resolution context

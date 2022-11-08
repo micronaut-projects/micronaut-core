@@ -430,7 +430,12 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
         }
         if (fieldAnnotationMetadata.hasStereotype(AnnotationUtil.INJECT)
             || fieldAnnotationMetadata.hasDeclaredStereotype(AnnotationUtil.QUALIFIER)) {
-            visitor.visitFieldInjectionPoint(fieldElement.getDeclaringType(), fieldElement, fieldElement.isReflectionRequired(classElement));
+            visitor.visitFieldInjectionPoint(
+                fieldElement.getDeclaringType(),
+                fieldElement,
+                fieldElement.isReflectionRequired(classElement),
+                visitorContext
+            );
             return true;
         }
         return false;
