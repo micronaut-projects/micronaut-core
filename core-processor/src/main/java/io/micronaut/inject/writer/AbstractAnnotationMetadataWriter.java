@@ -45,6 +45,11 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
      */
     public static final String FIELD_ANNOTATION_METADATA = "$ANNOTATION_METADATA";
 
+    /**
+     * Field name for empty metadata.
+     */
+    public static final String FIELD_EMPTY_METADATA = "EMPTY_METADATA";
+
     protected final Type targetClassType;
     protected final AnnotationMetadata annotationMetadata;
     protected final Map<String, GeneratorAdapter> loadTypeMethods = new HashMap<>();
@@ -96,7 +101,7 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
         // then we setup an annotation metadata reference from the method to the class (or inherited method) metadata
         AnnotationMetadata annotationMetadata = this.annotationMetadata.getTargetAnnotationMetadata();
         if (annotationMetadata.isEmpty()) {
-            annotationMetadataMethod.getStatic(Type.getType(AnnotationMetadata.class), "EMPTY_METADATA", Type.getType(AnnotationMetadata.class));
+            annotationMetadataMethod.getStatic(Type.getType(AnnotationMetadata.class), FIELD_EMPTY_METADATA, Type.getType(AnnotationMetadata.class));
         } else if (annotationMetadata instanceof AnnotationMetadataReference) {
             AnnotationMetadataReference reference = (AnnotationMetadataReference) annotationMetadata;
             String className = reference.getClassName();
@@ -140,7 +145,7 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
             if (writeAnnotationDefault) {
                 AnnotationMetadata annotationMetadata = this.annotationMetadata.getTargetAnnotationMetadata();
                 if (annotationMetadata.isEmpty()) {
-                    staticInit.getStatic(Type.getType(AnnotationMetadata.class), "EMPTY_METADATA", Type.getType(AnnotationMetadata.class));
+                    staticInit.getStatic(Type.getType(AnnotationMetadata.class), FIELD_EMPTY_METADATA, Type.getType(AnnotationMetadata.class));
                 } else {
                     if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
                         annotationMetadata = ((AnnotationMetadataHierarchy) annotationMetadata).merge();
@@ -179,7 +184,7 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
 
         AnnotationMetadata annotationMetadata = this.annotationMetadata.getTargetAnnotationMetadata();
         if (annotationMetadata.isEmpty()) {
-            staticInit.getStatic(Type.getType(AnnotationMetadata.class), "EMPTY_METADATA", Type.getType(AnnotationMetadata.class));
+            staticInit.getStatic(Type.getType(AnnotationMetadata.class), FIELD_EMPTY_METADATA, Type.getType(AnnotationMetadata.class));
         } else if (annotationMetadata instanceof DefaultAnnotationMetadata) {
             AnnotationMetadataWriter.instantiateNewMetadata(
                     targetClassType,

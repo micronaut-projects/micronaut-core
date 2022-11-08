@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.processing;
 
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.ast.Element;
 
 /**
@@ -25,20 +26,20 @@ import io.micronaut.inject.ast.Element;
  */
 public final class ProcessingException extends RuntimeException {
 
-    private final Object originatingElement;
+    private final transient Element originatingElement;
     private final String message;
 
     public ProcessingException(Element element, String message) {
-        this(element.getNativeType(), message);
-    }
-
-    public ProcessingException(Object originatingElement, String message) {
-        this.originatingElement = originatingElement;
+        this.originatingElement = element;
         this.message = message;
     }
 
+    @Nullable
     public Object getOriginatingElement() {
-        return originatingElement;
+        if (originatingElement != null) {
+            return originatingElement.getNativeType();
+        }
+        return null;
     }
 
     @Override

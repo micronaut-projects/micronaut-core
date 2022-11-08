@@ -30,7 +30,8 @@ import java.util.stream.Stream;
  */
 @Internal
 public final class PrimaryQualifier<T> implements Qualifier<T> {
-    @SuppressWarnings("rawtypes")
+
+    @SuppressWarnings({"rawtypes", "java:S1845"})
     public static final PrimaryQualifier INSTANCE = new PrimaryQualifier();
 
     private PrimaryQualifier() {

@@ -82,6 +82,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     private static final List<String> DEFAULT_ANNOTATE_EXCLUDES = Arrays.asList(Internal.class.getName(),
         Experimental.class.getName(), "jdk.internal.ValueBased");
     private static final Map<String, Map<String, Object>> ANNOTATION_DEFAULTS = new HashMap<>(20);
+    private static final String MSG_UNRECOGNIZED_ANNOTATION_METADATA = "Unrecognized annotation metadata: ";
 
     static {
         for (AnnotationMapper mapper : SoftServiceLoader.load(AnnotationMapper.class, AbstractAnnotationMetadataBuilder.class.getClassLoader())
@@ -2188,7 +2189,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             AnnotationMetadata declaredMetadata = annotate(hierarchy.getDeclaredMetadata(), annotationValue);
             return hierarchy.createSibling(declaredMetadata);
         }
-        throw new IllegalStateException("Unrecognized annotation metadata: " + annotationMetadata);
+        throw new IllegalStateException(MSG_UNRECOGNIZED_ANNOTATION_METADATA + annotationMetadata);
     }
 
     /**
@@ -2229,7 +2230,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             }
             return declaredMetadata;
         } else {
-            throw new IllegalStateException("Unrecognized annotation metadata: " + annotationMetadata);
+            throw new IllegalStateException(MSG_UNRECOGNIZED_ANNOTATION_METADATA + annotationMetadata);
         }
     }
 
@@ -2270,7 +2271,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             }
             return declaredMetadata;
         }
-        throw new IllegalStateException("Unrecognized annotation metadata: " + annotationMetadata);
+        throw new IllegalStateException(MSG_UNRECOGNIZED_ANNOTATION_METADATA + annotationMetadata);
     }
 
     /**
@@ -2302,7 +2303,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             }
             return declaredMetadata;
         }
-        throw new IllegalStateException("Unrecognized annotation metadata: " + annotationMetadata);
+        throw new IllegalStateException(MSG_UNRECOGNIZED_ANNOTATION_METADATA + annotationMetadata);
     }
 
     /**
