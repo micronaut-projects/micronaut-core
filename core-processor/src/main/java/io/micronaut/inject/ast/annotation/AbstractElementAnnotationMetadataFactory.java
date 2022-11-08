@@ -336,6 +336,7 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
         }
 
         @Override
+        @SuppressWarnings("java:S1192")
         public <T extends Annotation> AnnotationMetadata annotate(@NonNull String annotationType, @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
             ArgumentUtils.requireNonNull("annotationType", annotationType);
             AnnotationValueBuilder<T> builder = AnnotationValue.builder(annotationType);

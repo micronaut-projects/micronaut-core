@@ -53,7 +53,7 @@ class NettyStreamedHttpResponse<B> implements MutableHttpResponse<B>, NettyHttpR
     @GuardedBy("this")
     private NettyCookies nettyCookies; // initialized lazily
     private B body;
-    private volatile MutableConvertibleValues<Object> attributes;
+    private MutableConvertibleValues<Object> attributes;
 
     /**
      * @param response The streamed Http response
@@ -88,17 +88,17 @@ class NettyStreamedHttpResponse<B> implements MutableHttpResponse<B>, NettyHttpR
 
     @Override
     public MutableConvertibleValues<Object> getAttributes() {
-        MutableConvertibleValues<Object> attributes = this.attributes;
-        if (attributes == null) {
+        MutableConvertibleValues<Object> mcv = this.attributes;
+        if (mcv == null) {
             synchronized (this) { // double check
-                attributes = this.attributes;
-                if (attributes == null) {
-                    attributes = new MutableConvertibleValuesMap<>();
-                    this.attributes = attributes;
+                mcv = this.attributes;
+                if (mcv == null) {
+                    mcv = new MutableConvertibleValuesMap<>();
+                    this.attributes = mcv;
                 }
             }
         }
-        return attributes;
+        return mcv;
     }
 
     /**
@@ -140,8 +140,7 @@ class NettyStreamedHttpResponse<B> implements MutableHttpResponse<B>, NettyHttpR
 
     @Override
     public synchronized MutableHttpResponse<B> cookie(Cookie cookie) {
-        if (cookie instanceof NettyCookie) {
-            NettyCookie nettyCookie = (NettyCookie) cookie;
+        if (cookie instanceof NettyCookie nettyCookie) {
             // this is a response cookie, encode with server encoder
             String value = ServerCookieEncoder.STRICT.encode(nettyCookie.getNettyCookie());
             headers.add(HttpHeaderNames.SET_COOKIE, value);

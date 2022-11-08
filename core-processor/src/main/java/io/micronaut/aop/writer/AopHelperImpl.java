@@ -58,7 +58,10 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 @Internal
 @NextMajorVersion("Correct project dependency so this hack is not needed")
-public final class AopHelperImpl implements AopHelper {
+public final class  AopHelperImpl implements AopHelper {
+
+    private static final String MSG_ADAPTER_METHOD_PREFIX = "Cannot adapt method [";
+    private static final String MSG_TARGET_METHOD_PREFIX = "] to target method [";
 
     @Override
     public BeanDefinitionVisitor visitAdaptedMethod(ClassElement classElement,
@@ -71,7 +74,7 @@ public final class AopHelperImpl implements AopHelper {
         Optional<ClassElement> interfaceToAdaptValue = methodAnnotationMetadata.getValue(Adapter.class, String.class)
             .flatMap(clazz -> visitorContext.getClassElement(clazz, visitorContext.getElementAnnotationMetadataFactory().readOnly()));
 
-        if (!interfaceToAdaptValue.isPresent()) {
+        if (interfaceToAdaptValue.isEmpty()) {
             return null;
         }
         ClassElement interfaceToAdapt = interfaceToAdaptValue.get();
@@ -110,10 +113,10 @@ public final class AopHelperImpl implements AopHelper {
 
         int paramLen = targetParams.length;
         if (paramLen != sourceParams.length) {
-            throw new ProcessingException(sourceMethod, "Cannot adapt method [" + sourceMethod + "] to target method [" + targetMethod + "]. Argument lengths don't match.");
+            throw new ProcessingException(sourceMethod, MSG_ADAPTER_METHOD_PREFIX + sourceMethod + MSG_TARGET_METHOD_PREFIX + targetMethod + "]. Argument lengths don't match.");
         }
         if (sourceMethod.isSuspend()) {
-            throw new ProcessingException(sourceMethod, "Cannot adapt method [" + sourceMethod + "] to target method [" + targetMethod + "]. Kotlin suspend method not supported here.");
+            throw new ProcessingException(sourceMethod, MSG_ADAPTER_METHOD_PREFIX + sourceMethod + MSG_TARGET_METHOD_PREFIX + targetMethod + "]. Kotlin suspend method not supported here.");
         }
 
         Map<String, ClassElement> typeVariables = interfaceToAdapt.getTypeArguments();
@@ -142,7 +145,7 @@ public final class AopHelperImpl implements AopHelper {
             }
 
             if (!sourceType.isAssignable(targetGenericType.getName())) {
-                throw new ProcessingException(sourceMethod, "Cannot adapt method [" + sourceMethod + "] to target method [" + targetMethod + "]. Type [" + sourceType.getName() + "] is not a subtype of type [" + targetGenericType.getName() + "] for argument at position " + i);
+                throw new ProcessingException(sourceMethod, MSG_ADAPTER_METHOD_PREFIX + sourceMethod + MSG_TARGET_METHOD_PREFIX + targetMethod + "]. Type [" + sourceType.getName() + "] is not a subtype of type [" + targetGenericType.getName() + "] for argument at position " + i);
             }
         }
 
