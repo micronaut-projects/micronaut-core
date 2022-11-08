@@ -381,6 +381,7 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
      */
     protected void applyConfigurationInjectionIfNecessary(BeanDefinitionVisitor visitor,
                                                           MethodElement constructor) {
+        // default to do nothing
     }
 
     /**
