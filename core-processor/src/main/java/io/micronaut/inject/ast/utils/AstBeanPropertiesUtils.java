@@ -150,9 +150,15 @@ public final class AstBeanPropertiesUtils {
                 // and it has more type arguments annotations - use it as the property type
                 if (value.field != null
                     && value.field.getType().equals(value.type)
-                    && hasGenericTypeAnnotations(value.field.getType())
-                    && !hasGenericTypeAnnotations(value.type.getType())) {
+                    && countGenericTypeAnnotations(value.field.getType()) > countGenericTypeAnnotations(value.type.getType())) {
                     value.type = value.field.getGenericType();
+                }
+                // In a case when the getter's type is the same as the selected property type,
+                // and it has more type arguments annotations - use it as the property type
+                if (value.getter != null
+                    && value.getter.getGenericReturnType().equals(value.type)
+                    && countGenericTypeAnnotations(value.getter.getGenericReturnType()) > countGenericTypeAnnotations(value.type.getType())) {
+                    value.type = value.getter.getGenericReturnType();
                 }
                 if (value.readAccessKind != null || value.writeAccessKind != null) {
                     value.isExcluded = shouldExclude(includes, excludes, propertyName)
@@ -169,8 +175,8 @@ public final class AstBeanPropertiesUtils {
         return Collections.emptyList();
     }
 
-    private static boolean hasGenericTypeAnnotations(ClassElement cl) {
-        return cl.getTypeArguments().values().stream().anyMatch(t -> !t.getAnnotationMetadata().isEmpty());
+    private static int countGenericTypeAnnotations(ClassElement cl) {
+        return cl.getTypeArguments().values().stream().mapToInt(t -> t.getAnnotationMetadata().getAnnotationNames().size()).sum();
     }
 
     private static boolean isExcludedBecauseOfMissingAccess(BeanPropertyData value) {
