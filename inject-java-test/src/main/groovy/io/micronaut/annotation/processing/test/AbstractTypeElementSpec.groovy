@@ -31,6 +31,7 @@ import io.micronaut.context.ApplicationContextBuilder
 import io.micronaut.context.ApplicationContextConfiguration
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.Qualifier
+import io.micronaut.context.env.Environment
 import io.micronaut.context.event.ApplicationEventPublisherFactory
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.Experimental
@@ -245,7 +246,8 @@ class Test {
         builder.classLoader(classLoader)
         builder.environments("test")
         configureContext(builder)
-        return new DefaultApplicationContext((ApplicationContextConfiguration) builder) {
+        def env = builder.build().environment
+        def context = new DefaultApplicationContext((ApplicationContextConfiguration) builder) {
             @Override
             protected List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
                 def references = StreamSupport.stream(files.spliterator(), false)
@@ -261,7 +263,13 @@ class Test {
 
                 return references + (includeAllBeans ? super.resolveBeanDefinitionReferences() : getBuiltInBeanReferences())
             }
-        }.start()
+
+            @Override
+            protected Environment createEnvironment(@NonNull ApplicationContextConfiguration configuration) {
+                return env
+            }
+        }
+        return context.start()
     }
 
     /**

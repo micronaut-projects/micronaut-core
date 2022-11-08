@@ -47,6 +47,7 @@ import jakarta.inject.Provider;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
@@ -123,11 +124,16 @@ final class ConfigurationReaderBeanElementCreator extends DeclaredBeanElementCre
 
     private boolean isPropertyParameter(ParameterElement parameter) {
         ClassElement parameterType = parameter.getGenericType();
-        if (parameterType.isOptional() || parameterType.isAssignable(BeanProvider.class) || parameterType.isAssignable(Provider.class)) {
+        if (parameterType.isOptional() || parameterType.isAssignable(BeanProvider.class) || parameterType.isAssignable(Provider.class) || parameterType.isAssignable(Iterable.class)) {
             ClassElement finalParameterType = parameterType;
             parameterType = parameterType.getOptionalValueType().or(finalParameterType::getFirstTypeArgument).orElse(parameterType);
             // Get the class with type annotations
             parameterType = visitorContext.getClassElement(parameterType.getCanonicalName()).orElse(parameterType);
+        } else if (parameterType.isAssignable(Map.class)) {
+            ClassElement t = parameterType.getTypeArguments().get("V");
+            if (t != null) {
+                parameterType = t;
+            }
         }
         return !parameterType.hasStereotype(AnnotationUtil.SCOPE) && !parameterType.hasStereotype(Bean.class);
     }
