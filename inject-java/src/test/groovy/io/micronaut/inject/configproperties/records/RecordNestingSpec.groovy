@@ -1,13 +1,11 @@
 package io.micronaut.inject.configproperties.records
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
-import io.micronaut.context.ApplicationContext
 import io.micronaut.context.ApplicationContextBuilder
-import spock.lang.Specification
 
 class RecordNestingSpec extends AbstractTypeElementSpec {
 
-    void "test compile record nesting"() {
+    void "test nesting records within each other"() {
         given:
         def context = buildContext('''
 package test;
@@ -64,29 +62,5 @@ record RecordOuterConfig(
             'test.inners.one.count':'30',
             'test.inners.one.nested.num':'40'
         )
-    }
-
-    void 'test record nesting'() {
-        given:
-        def context = ApplicationContext.run(
-                'test.name':'test1',
-                'test.age':'10',
-                'test.inner.foo':'test2',
-                'test.inner.nested.num':'20',
-                'test.inners.one.count':'30',
-                'test.inners.one.nested.num':'40'
-        )
-
-        when:
-        def config = context.getBean(RecordOuterConfig)
-
-        then:
-        config.name() == 'test1'
-        config.age() == 10
-        config.inner().foo() == 'test2'
-        config.inner().thirdLevel().num() == 20
-        config.inners().size() == 1
-        config.inners()[0].count() == 30
-        config.inners()[0].thirdLevel().num() == 40
     }
 }
