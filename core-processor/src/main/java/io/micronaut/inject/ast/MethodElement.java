@@ -489,6 +489,7 @@ public interface MethodElement extends MemberElement {
             }
 
             @Override
+            @SuppressWarnings("java:S1192")
             public <T extends Annotation> Element annotate(@NonNull String annotationType, @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
                 ArgumentUtils.requireNonNull("annotationType", annotationType);
                 AnnotationValueBuilder<T> builder = AnnotationValue.builder(annotationType);
@@ -510,6 +511,7 @@ public interface MethodElement extends MemberElement {
             }
 
             @Override
+            @SuppressWarnings("java:S1192")
             public Element removeAnnotation(@NonNull String annotationType) {
                 ArgumentUtils.requireNonNull("annotationType", annotationType);
                 annotationMetadata = metadataBuilder.removeAnnotation(getAnnotationMetadata(), annotationType);
@@ -525,6 +527,7 @@ public interface MethodElement extends MemberElement {
             }
 
             @Override
+            @SuppressWarnings("java:S1192")
             public Element removeStereotype(@NonNull String annotationType) {
                 ArgumentUtils.requireNonNull("annotationType", annotationType);
                 annotationMetadata = metadataBuilder.removeStereotype(getAnnotationMetadata(), annotationType);

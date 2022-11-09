@@ -45,6 +45,7 @@ import java.util.function.Supplier;
 @Experimental
 final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextConditional implements RuntimeBeanDefinition<T> {
     private static final AtomicInteger REF_COUNT = new AtomicInteger(0);
+    private static final String MSG_BEAN_TYPE_CANNOT_BE_NULL = "Bean type cannot be null";
     private final Argument<T> beanType;
     private final Supplier<T> supplier;
     private final AnnotationMetadata annotationMetadata;
@@ -62,7 +63,7 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
         boolean isSingleton,
         @Nullable Class<? extends Annotation> scope,
         Class<?>[] exposedTypes) {
-        Objects.requireNonNull(beanType, "Bean type cannot be null");
+        Objects.requireNonNull(beanType, MSG_BEAN_TYPE_CANNOT_BE_NULL);
         Objects.requireNonNull(supplier, "Bean supplier cannot be null");
 
         this.beanType = beanType;
@@ -126,7 +127,7 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
      * @return The bean name
      */
     static String generateBeanName(@NonNull Class<?> beanType) {
-        Objects.requireNonNull(beanType, "Bean type cannot be null");
+        Objects.requireNonNull(beanType, MSG_BEAN_TYPE_CANNOT_BE_NULL);
         return beanType.getName() + "$DynamicDefinition" + REF_COUNT.incrementAndGet();
     }
 
@@ -198,7 +199,7 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
         private Class<?>[] exposedTypes = ReflectionUtils.EMPTY_CLASS_ARRAY;
 
         RuntimeBeanBuilder(Argument<B> beanType, Supplier<B> supplier) {
-            this.beanType = Objects.requireNonNull(beanType, "Bean type cannot be null");
+            this.beanType = Objects.requireNonNull(beanType, MSG_BEAN_TYPE_CANNOT_BE_NULL);
             this.supplier = Objects.requireNonNull(supplier, "Bean supplier cannot be null");
         }
 
