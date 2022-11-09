@@ -79,7 +79,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     }
 
     @Override
-    public <V, K extends CharSequence> Map<K, V> mapOfType(Argument<V> beanType, Qualifier<V> qualifier) {
+    public <V> Map<String, V> mapOfType(Argument<V> beanType, Qualifier<V> qualifier) {
         return context.mapOfType(this, beanType, qualifier);
     }
 

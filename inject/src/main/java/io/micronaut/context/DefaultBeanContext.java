@@ -71,6 +71,7 @@ import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.io.service.SoftServiceLoader;
+import io.micronaut.core.naming.NameResolver;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.order.Ordered;
@@ -926,6 +927,11 @@ public class DefaultBeanContext implements InitializableBeanContext {
         return streamOfType(null, beanType, qualifier);
     }
 
+    @Override
+    public <V> Map<String, V> mapOfType(Argument<V> beanType, Qualifier<V> qualifier) {
+        return mapOfType(null, beanType, qualifier);
+    }
+
     /**
      * Obtains a stream of beans of the given type and qualifier.
      *
@@ -949,13 +955,13 @@ public class DefaultBeanContext implements InitializableBeanContext {
      * @return A map of beans, never {@code null}.
      * @since 4.0.0
      */
-    protected <V, K extends CharSequence> @NonNull Map<K, V> mapOfType(@NonNull BeanResolutionContext resolutionContext, @NonNull Argument<V> beanType, @Nullable Qualifier<V> qualifier) {
+    protected <V> @NonNull Map<String, V> mapOfType(@Nullable BeanResolutionContext resolutionContext, @NonNull Argument<V> beanType, @Nullable Qualifier<V> qualifier) {
         // try and find a bean that implements the map with the generics
-        Argument<Map<CharSequence, V>> mapType = Argument.mapOf(Argument.of(CharSequence.class), beanType);
-        @SuppressWarnings("unchecked") Qualifier<Map<CharSequence, V>> mapQualifier = (Qualifier<Map<CharSequence, V>>) qualifier;
-        BeanDefinition<Map<CharSequence, V>> existingBean = findBeanDefinition(mapType, mapQualifier, false).orElse(null);
+        Argument<Map<String, V>> mapType = Argument.mapOf(Argument.of(String.class), beanType);
+        @SuppressWarnings("unchecked") Qualifier<Map<String, V>> mapQualifier = (Qualifier<Map<String, V>>) qualifier;
+        BeanDefinition<Map<String, V>> existingBean = findBeanDefinition(mapType, mapQualifier, false).orElse(null);
         if (existingBean != null) {
-            return (Map<K, V>) getBean(existingBean);
+            return getBean(existingBean);
         } else {
             Collection<BeanRegistration<V>> beanRegistrations = getBeanRegistrations(resolutionContext, beanType, qualifier);
             if (beanRegistrations.isEmpty()) {
@@ -963,7 +969,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
             } else {
                 try {
                     return beanRegistrations.stream().collect(Collectors.toUnmodifiableMap(
-                        reg -> (K) reg.identifier.getName(),
+                        DefaultBeanContext::resolveKey,
                         reg -> reg.bean
                     ));
                 } catch (IllegalStateException e) { // occurs for duplicate keys
@@ -979,6 +985,16 @@ public class DefaultBeanContext implements InitializableBeanContext {
                 }
             }
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    @NonNull
+    private static String resolveKey(BeanRegistration<?> reg) {
+        BeanDefinition<?> definition = reg.beanDefinition;
+        if (definition instanceof NameResolver resolver) {
+            return resolver.resolveName().orElse(reg.identifier.getName());
+        }
+        return reg.identifier.getName();
     }
 
     /**

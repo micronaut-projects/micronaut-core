@@ -1288,12 +1288,11 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
      * @param genericType       The generic type
      * @param qualifier         The qualifier
      * @return The resolved bean
-     * @param <K>               The key type
      * @param <V>               The bean type
      */
     @Internal
     @UsedByGeneratedCode
-    protected final <K extends CharSequence, V> Map<K, V> getMapOfTypeForMethodArgument(
+    protected final <V> Map<String, V> getMapOfTypeForMethodArgument(
         BeanResolutionContext resolutionContext,
         BeanContext context,
         int methodIndex,
@@ -1302,7 +1301,7 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
         Qualifier<V> qualifier) {
         @SuppressWarnings("ConstantConditions")
         MethodReference methodRef = methodInjection[methodIndex];
-        Argument<Map<K, V>> argument = resolveArgument(context, argIndex, methodRef.arguments);
+        Argument<Map<String, V>> argument = resolveArgument(context, argIndex, methodRef.arguments);
         try (BeanResolutionContext.Path ignored =
                  resolutionContext.getPath().pushMethodArgumentResolve(this, methodRef.methodName, argument, methodRef.arguments, methodRef.requiresReflection)) {
             return resolveMapOfType(resolutionContext, argument, resolveEnvironmentArgument(context, genericType), qualifier);
@@ -1609,12 +1608,11 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
      * @param genericType       The generic type
      * @param qualifier         The qualifier
      * @return The resolved bean
-     * @param <K>               The key type
      * @param <V>               The bean type
      */
     @Internal
     @UsedByGeneratedCode
-    protected final <K extends CharSequence, V> Map<K, V> getMapOfTypeForConstructorArgument(
+    protected final <V> Map<String, V> getMapOfTypeForConstructorArgument(
         BeanResolutionContext resolutionContext,
         BeanContext context,
         int argIndex,
@@ -1624,7 +1622,7 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
         if (constructorMethodRef == null) {
             throw new IllegalStateException("No constructor found for bean: " + getBeanType());
         }
-        Argument<Map<K, V>> argument = resolveArgument(context, argIndex, constructorMethodRef.arguments);
+        Argument<Map<String, V>> argument = resolveArgument(context, argIndex, constructorMethodRef.arguments);
         try (BeanResolutionContext.Path ignored = resolutionContext.getPath().pushConstructorResolve(this, argument)) {
             return resolveMapOfType(resolutionContext, argument, resolveEnvironmentArgument(context, genericType), qualifier);
         }
@@ -1949,13 +1947,12 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
      * @param fieldIndex        The field index
      * @param genericType       The generic type
      * @param qualifier         The qualifier
-     * @param <K>               The key type
      * @param <V>               The bean type
      * @return The resolved bean
      */
     @Internal
     @UsedByGeneratedCode
-    protected final <K extends CharSequence, V> Map<K, V> getMapOfTypeForField(
+    protected final <V> Map<String, V> getMapOfTypeForField(
         BeanResolutionContext resolutionContext,
         BeanContext context, int fieldIndex,
         Argument<V> genericType,
@@ -1963,7 +1960,7 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
         @SuppressWarnings("ConstantConditions")
         FieldReference fieldRef = fieldInjection[fieldIndex];
         @SuppressWarnings("unchecked")
-        Argument<Map<K, V>> argument = resolveEnvironmentArgument(context, fieldRef.argument);
+        Argument<Map<String, V>> argument = resolveEnvironmentArgument(context, fieldRef.argument);
         try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
             .pushFieldResolve(this, argument, fieldRef.requiresReflection)) {
             return resolveMapOfType(resolutionContext, argument, resolveEnvironmentArgument(context, genericType), qualifier);
@@ -2272,16 +2269,16 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
         return resolutionContext.streamOfType(resultGenericType, qualifier);
     }
 
-    private <K extends CharSequence, V> Map<K, V> resolveMapOfType(
+    private <V> Map<String, V> resolveMapOfType(
         BeanResolutionContext resolutionContext,
-        Argument<Map<K, V>> argument,
+        Argument<Map<String, V>> argument,
         Argument<V> resultGenericType,
         Qualifier<V> qualifier) {
         if (resultGenericType == null) {
             throw new DependencyInjectionException(resolutionContext, "Type " + argument.getType() + " has no generic argument");
         }
         qualifier = qualifier == null ? resolveQualifier(resolutionContext, resultGenericType) : qualifier;
-        Map<K, V> map = resolutionContext.mapOfType(resultGenericType, qualifier);
+        Map<String, V> map = resolutionContext.mapOfType(resultGenericType, qualifier);
         if (argument.isInstance(map)) {
             return map;
         } else {

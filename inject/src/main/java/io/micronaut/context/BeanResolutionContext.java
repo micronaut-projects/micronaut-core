@@ -90,13 +90,12 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      *
      * @param beanType          The bean type
      * @param qualifier         The qualifier
-     * @param <K>               The key type
      * @param <V>               The bean type
      * @return A map of beans, never {@code null}.
      * @since 4.0.0
      */
     @NonNull
-    default <V, K extends CharSequence> Map<K, V> mapOfType(@NonNull Argument<V> beanType, @Nullable Qualifier<V> qualifier) {
+    default <V> Map<String, V> mapOfType(@NonNull Argument<V> beanType, @Nullable Qualifier<V> qualifier) {
         return Collections.emptyMap();
     }
 
