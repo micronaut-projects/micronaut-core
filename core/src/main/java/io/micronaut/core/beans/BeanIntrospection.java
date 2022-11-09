@@ -22,7 +22,6 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 
 import io.micronaut.core.annotation.NonNull;
-import javax.annotation.concurrent.Immutable;
 import java.lang.annotation.Annotation;
 import java.util.Collection;
 import java.util.Collections;
@@ -44,7 +43,7 @@ import java.util.Optional;
  * @author graemerocher
  * @since 1.1
  */
-@Immutable
+//@Immutable
 public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanInfo<T> {
 
     /**

@@ -25,6 +25,7 @@ import io.micronaut.retry.event.RetryEventListener
 import jakarta.inject.Singleton
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Mono
+import spock.lang.Retry
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 import io.micronaut.core.async.annotation.SingleResult
@@ -35,7 +36,7 @@ import io.micronaut.core.async.annotation.SingleResult
  */
 class CircuitBreakerSpec extends Specification{
 
-
+    @Retry
     void "test blocking circuit breaker"() {
         given:
         ApplicationContext context = ApplicationContext.run()

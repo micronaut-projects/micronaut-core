@@ -19,7 +19,6 @@ import io.micronaut.core.beans.exceptions.IntrospectionException;
 import io.micronaut.core.util.ArgumentUtils;
 
 import io.micronaut.core.annotation.NonNull;
-import javax.annotation.concurrent.Immutable;
 import java.lang.annotation.Annotation;
 import java.util.Arrays;
 import java.util.Collection;
@@ -34,7 +33,7 @@ import java.util.function.Predicate;
  * @see io.micronaut.core.annotation.Introspected
  * @see BeanIntrospection
  */
-@Immutable
+//@Immutable
 public interface BeanIntrospector {
 
     /**
