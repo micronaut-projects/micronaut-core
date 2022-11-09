@@ -967,10 +967,14 @@ public class DefaultBeanContext implements InitializableBeanContext {
                         reg -> reg.bean
                     ));
                 } catch (IllegalStateException e) { // occurs for duplicate keys
+                    List<BeanDefinition<V>> beanDefinitions = beanRegistrations.stream().map(reg -> reg.beanDefinition).toList();
                     throw new DependencyInjectionException(
                         resolutionContext,
                         "Injecting a map of beans requires each bean to define a qualifier. Multiple beans were found missing a qualifier resulting in duplicate keys: " + e.getMessage(),
-                        e
+                        new NonUniqueBeanException(
+                            beanType.getType(),
+                            beanDefinitions.iterator()
+                        )
                     );
                 }
             }
