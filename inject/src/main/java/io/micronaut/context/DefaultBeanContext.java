@@ -2813,9 +2813,14 @@ public class DefaultBeanContext implements InitializableBeanContext {
             registration = null;
         }
         if ((registration == null || registration.bean == null) && throwNoSuchBean) {
-            throw new NoSuchBeanException(beanType, qualifier);
+            throw newNoSuchBeanException(resolutionContext, beanType, qualifier);
         }
         return registration;
+    }
+
+    @NonNull
+    protected <T> NoSuchBeanException newNoSuchBeanException(@Nullable BeanResolutionContext resolutionContext, @NonNull Argument<T> beanType, @NonNull Qualifier<T> qualifier) {
+        return new NoSuchBeanException(beanType, qualifier);
     }
 
     @Nullable
