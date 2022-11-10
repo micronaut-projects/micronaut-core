@@ -85,11 +85,7 @@ public final class AstBeanPropertiesUtils {
         Map<String, BeanPropertyData> props = new LinkedHashMap<>();
         for (MethodElement methodElement : methodsSupplier.get()) {
             // Records include everything
-            if (methodElement.isStatic() && !configuration.isAllowStaticProperties()
-                || !excludeElementsInRole && (methodElement.hasDeclaredAnnotation(AnnotationUtil.INJECT)
-                || methodElement.hasDeclaredAnnotation(AnnotationUtil.PRE_DESTROY)
-                || methodElement.hasDeclaredAnnotation(AnnotationUtil.POST_CONSTRUCT))
-            ) {
+            if (methodElement.isStatic() && !configuration.isAllowStaticProperties() || !excludeElementsInRole && isMethodInRole(methodElement)) {
                 continue;
             }
             String methodName = methodElement.getName();
@@ -117,11 +113,7 @@ public final class AstBeanPropertiesUtils {
             }
         }
         for (FieldElement fieldElement : fieldSupplier.get()) {
-            if (fieldElement.isStatic() && !configuration.isAllowStaticProperties()
-                || !excludeElementsInRole && (fieldElement.hasDeclaredAnnotation(AnnotationUtil.INJECT)
-                || fieldElement.hasStereotype(Value.class)
-                || fieldElement.hasStereotype(Property.class))
-            ) {
+            if (fieldElement.isStatic() && !configuration.isAllowStaticProperties() || !excludeElementsInRole && isFieldInRole(fieldElement)) {
                 continue;
             }
             String propertyName = fieldElement.getSimpleName();
@@ -164,6 +156,7 @@ public final class AstBeanPropertiesUtils {
                     value.isExcluded = shouldExclude(includes, excludes, propertyName)
                         || isExcludedByAnnotations(configuration, value)
                         || isExcludedBecauseOfMissingAccess(value);
+
                     PropertyElement propertyElement = propertyCreator.apply(value);
                     if (propertyElement != null) {
                         beanProperties.add(propertyElement);
@@ -173,6 +166,18 @@ public final class AstBeanPropertiesUtils {
             return beanProperties;
         }
         return Collections.emptyList();
+    }
+
+    private static boolean isFieldInRole(FieldElement fieldElement) {
+        return fieldElement.hasDeclaredAnnotation(AnnotationUtil.INJECT)
+            || fieldElement.hasStereotype(Value.class)
+            || fieldElement.hasStereotype(Property.class);
+    }
+
+    private static boolean isMethodInRole(MethodElement methodElement) {
+        return methodElement.hasDeclaredAnnotation(AnnotationUtil.INJECT)
+            || methodElement.hasDeclaredAnnotation(AnnotationUtil.PRE_DESTROY)
+            || methodElement.hasDeclaredAnnotation(AnnotationUtil.POST_CONSTRUCT);
     }
 
     private static int countGenericTypeAnnotations(ClassElement cl) {
@@ -269,51 +274,33 @@ public final class AstBeanPropertiesUtils {
             return;
         }
         ClassElement fieldType = unwrapType(fieldElement.getGenericType());
-        if (beanPropertyData.setter == null) {
-            if (beanPropertyData.type != null) {
-                if (fieldType.isAssignable(unwrapType(beanPropertyData.type))) {
-                    beanPropertyData.field = fieldElement;
-                    if (isAccessor) {
-                        beanPropertyData.writeAccessKind = BeanProperties.AccessKind.FIELD;
-                    }
-                }
-                // Else: not compatible field
-            } else {
-                beanPropertyData.field = fieldElement;
-                beanPropertyData.type = fieldElement.getGenericType();
-                if (isAccessor) {
-                    beanPropertyData.writeAccessKind = BeanProperties.AccessKind.FIELD;
-                }
-            }
-        } else if (beanPropertyData.type.isAssignable(fieldElement.getGenericType())) {
+        if (beanPropertyData.type == null || fieldType.isAssignable(unwrapType(beanPropertyData.type))) {
             beanPropertyData.field = fieldElement;
+        } else {
+            isAccessor = false; // not compatible field or setter is present
+        }
+        if (beanPropertyData.setter == null && isAccessor) {
+            // Use the field for read
+            beanPropertyData.writeAccessKind = BeanProperties.AccessKind.FIELD;
+        }
+        if (beanPropertyData.type == null) {
+            beanPropertyData.type = fieldElement.getGenericType();
         }
     }
 
     private static void resolveReadAccessForField(FieldElement fieldElement, boolean isAccessor, BeanPropertyData beanPropertyData) {
-        ClassElement unwrappedFieldType = unwrapType(fieldElement.getGenericType());
-        if (beanPropertyData.getter == null) {
-            if (beanPropertyData.type != null) {
-                if (unwrappedFieldType.isAssignable(unwrapType(beanPropertyData.type))) {
-                    // Override the existing type to include generic annotations
-                    if (beanPropertyData.type.isAssignable(fieldElement.getGenericType())) {
-                        beanPropertyData.type = fieldElement.getGenericType();
-                    }
-                    beanPropertyData.field = fieldElement;
-                    if (isAccessor) {
-                        beanPropertyData.readAccessKind = BeanProperties.AccessKind.FIELD;
-                    }
-                }
-                // Else: not compatible field
-            } else {
-                beanPropertyData.field = fieldElement;
-                beanPropertyData.type = fieldElement.getGenericType();
-                if (isAccessor) {
-                    beanPropertyData.readAccessKind = BeanProperties.AccessKind.FIELD;
-                }
-            }
-        } else if (beanPropertyData.type.isAssignable(fieldElement.getGenericType())) {
+        ClassElement fieldType = unwrapType(fieldElement.getGenericType());
+        if (beanPropertyData.type == null || fieldType.isAssignable(unwrapType(beanPropertyData.type))) {
             beanPropertyData.field = fieldElement;
+        }  else {
+            isAccessor = false; // not compatible field or getter is present
+        }
+        if (beanPropertyData.getter == null && isAccessor) {
+            // Use the field for write
+            beanPropertyData.readAccessKind = BeanProperties.AccessKind.FIELD;
+        }
+        if (beanPropertyData.type == null) {
+            beanPropertyData.type = fieldElement.getGenericType();
         }
     }
 
