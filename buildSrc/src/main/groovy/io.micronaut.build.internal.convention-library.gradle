@@ -20,3 +20,11 @@ micronautBuild {
         enabled.set(false)
     }
 }
+
+// Workaround for javadoc not finding java source
+// files for classes written in an alternate language (Kotlin, Groovy)
+configurations {
+    internalJavadocClasspathElements {
+        outgoing.artifact(tasks.named("jar"))
+    }
+}
