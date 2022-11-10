@@ -336,6 +336,13 @@ class EachPropertySpec extends Specification {
         bean2.configuration.inner.enabled == 'false'
 
 
+        when:
+        def map = applicationContext.mapOfType(MyBeanWithPrimary)
+
+        then:
+        map['one'].is(bean)
+        map['two'].is(bean2)
+
         cleanup:
         applicationContext.close()
     }

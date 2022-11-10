@@ -127,6 +127,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
@@ -186,6 +187,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     private static final Method GET_STREAM_OF_TYPE_FOR_CONSTRUCTOR_ARGUMENT = getBeanLookupMethod("getStreamOfTypeForConstructorArgument", true);
 
+    private static final Method GET_MAP_OF_TYPE_FOR_CONSTRUCTOR_ARGUMENT = getBeanLookupMethod("getMapOfTypeForConstructorArgument", true);
+
     private static final Method FIND_BEAN_FOR_CONSTRUCTOR_ARGUMENT = getBeanLookupMethod("findBeanForConstructorArgument", true);
 
     private static final Method GET_BEAN_FOR_FIELD = getBeanLookupMethod("getBeanForField", false);
@@ -202,6 +205,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     private static final Method GET_STREAM_OF_TYPE_FOR_FIELD = getBeanLookupMethod("getStreamOfTypeForField", true);
 
+    private static final Method GET_MAP_OF_TYPE_FOR_FIELD = getBeanLookupMethod("getMapOfTypeForField", true);
+
     private static final Method FIND_BEAN_FOR_FIELD = getBeanLookupMethod("findBeanForField", true);
 
     private static final Method GET_VALUE_FOR_PATH = ReflectionUtils.getRequiredInternalMethod(AbstractInitializableBeanDefinition.class, "getValueForPath", BeanResolutionContext.class, BeanContext.class, Argument.class, String.class);
@@ -217,6 +222,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private static final Method GET_BEANS_OF_TYPE_FOR_METHOD_ARGUMENT = getBeanLookupMethodForArgument("getBeansOfTypeForMethodArgument", true);
 
     private static final Method GET_STREAM_OF_TYPE_FOR_METHOD_ARGUMENT = getBeanLookupMethodForArgument("getStreamOfTypeForMethodArgument", true);
+
+    private static final Method GET_MAP_OF_TYPE_FOR_METHOD_ARGUMENT = getBeanLookupMethodForArgument("getMapOfTypeForMethodArgument", true);
 
     private static final Method FIND_BEAN_FOR_METHOD_ARGUMENT = getBeanLookupMethodForArgument("findBeanForMethodArgument", true);
 
@@ -1688,25 +1695,37 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     @Override
     public void visitFieldInjectionPoint(
-            TypedElement declaringType,
-            FieldElement fieldElement,
-            boolean requiresReflection) {
+        TypedElement declaringType,
+        FieldElement fieldElement,
+        boolean requiresReflection,
+        VisitorContext visitorContext) {
 
-        visitFieldInjectionPointInternal(declaringType, fieldElement, fieldElement.getAnnotationMetadata(), requiresReflection);
+        visitFieldInjectionPointInternal(
+            declaringType,
+            fieldElement,
+            fieldElement.getAnnotationMetadata(),
+            requiresReflection,
+            visitorContext
+        );
     }
 
     private void visitFieldInjectionPointInternal(
-            TypedElement declaringType,
-            FieldElement fieldElement,
-            AnnotationMetadata annotationMetadata,
-            boolean requiresReflection) {
+        TypedElement declaringType,
+        FieldElement fieldElement,
+        AnnotationMetadata annotationMetadata,
+        boolean requiresReflection,
+        VisitorContext visitorContext) {
 
         boolean requiresGenericType = false;
         Method methodToInvoke;
         final ClassElement genericType = fieldElement.getGenericType();
         boolean isArray = genericType.isArray();
         boolean isCollection = genericType.isAssignable(Collection.class);
-        if (isCollection || isArray) {
+        boolean isMap = isInjectableMap(genericType);
+        if (isMap) {
+            requiresGenericType = true;
+            methodToInvoke = GET_MAP_OF_TYPE_FOR_FIELD;
+        } else if (isCollection || isArray) {
             requiresGenericType = true;
             ClassElement typeArgument = genericType.isArray() ? genericType.fromArray() : genericType.getFirstTypeArgument().orElse(null);
             if (typeArgument != null && !typeArgument.isPrimitive()) {
@@ -1740,6 +1759,20 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 isArray,
                 requiresGenericType
         );
+    }
+
+    private static boolean isInjectableMap(ClassElement genericType) {
+        boolean typeMatches = Stream.of(Map.class, HashMap.class, LinkedHashMap.class, TreeMap.class)
+                                    .anyMatch(t -> genericType.getName().equals(t.getName()));
+        if (typeMatches) {
+
+            Map<String, ClassElement> typeArgs = genericType.getTypeArguments();
+            if (typeArgs.size() == 2) {
+                ClassElement k = typeArgs.get("K");
+                return k != null && k.isAssignable(CharSequence.class);
+            }
+        }
+        return false;
     }
 
     private boolean isInnerType(ClassElement genericType) {
@@ -1799,7 +1832,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         Label falseCondition = isOptional ? pushPropertyContainsCheck(injectMethodVisitor, fieldElement.getType(), fieldElement.getName(), annotationMetadata) : null;
 
         if (isInnerType(fieldElement.getGenericType())) {
-            visitFieldInjectionPointInternal(declaringType, fieldElement, annotationMetadata, requiresReflection);
+            visitFieldInjectionPointInternal(declaringType, fieldElement, annotationMetadata, requiresReflection, visitorContext);
         } else if (!isConfigurationProperties || requiresReflection) {
             visitFieldInjectionPointInternal(
                     declaringType,
@@ -2399,6 +2432,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             final ClassElement genericType = entry.getGenericType();
             Method methodToInvoke;
             boolean isCollection = genericType.isAssignable(Collection.class);
+            boolean isMap = isInjectableMap(genericType);
             boolean isArray = genericType.isArray();
 
             if (isValueType(argMetadata) && !isInnerType(entry.getGenericType())) {
@@ -2425,6 +2459,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                     methodToInvoke = GET_BEAN_FOR_METHOD_ARGUMENT;
                     requiresGenericType = false;
                 }
+            } else if (isMap) {
+                requiresGenericType = true;
+                methodToInvoke = GET_MAP_OF_TYPE_FOR_METHOD_ARGUMENT;
             } else if (genericType.isAssignable(Stream.class)) {
                 requiresGenericType = true;
                 methodToInvoke = GET_STREAM_OF_TYPE_FOR_METHOD_ARGUMENT;
@@ -3578,8 +3615,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         } else if (argumentType.getGenericType().isAssignable(BeanResolutionContext.class)) {
             buildMethodVisitor.loadArg(0);
         } else {
-            boolean isArray = false;
             boolean hasGenericType = false;
+            boolean isArray = false;
             Method methodToInvoke;
             final ClassElement genericType = argumentType.getGenericType();
             if (isValueType(annotationMetadata) && !isInnerType(genericType)) {
@@ -3588,9 +3625,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                     pushInvokeGetPropertyValueForConstructor(buildMethodVisitor, index, argumentType, property.get());
                 } else {
                     Optional<String> valueValue = argumentType.stringValue(Value.class);
-                    if (valueValue.isPresent()) {
-                        pushInvokeGetPropertyPlaceholderValueForConstructor(buildMethodVisitor, index, argumentType, valueValue.get());
-                    }
+                    valueValue.ifPresent(s -> pushInvokeGetPropertyPlaceholderValueForConstructor(buildMethodVisitor, index, argumentType, s));
                 }
                 return;
             } else {
@@ -3608,6 +3643,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                         methodToInvoke = GET_BEAN_FOR_CONSTRUCTOR_ARGUMENT;
                         hasGenericType = false;
                     }
+                } else if (isInjectableMap(genericType)) {
+                    hasGenericType = true;
+                    methodToInvoke = GET_MAP_OF_TYPE_FOR_CONSTRUCTOR_ARGUMENT;
                 } else if (genericType.isAssignable(Stream.class)) {
                     hasGenericType = true;
                     methodToInvoke = GET_STREAM_OF_TYPE_FOR_CONSTRUCTOR_ARGUMENT;
@@ -3689,7 +3727,11 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private void resolveConstructorArgumentGenericType(GeneratorAdapter visitor, ClassElement type, int argumentIndex) {
         if (!resolveArgumentGenericType(visitor, type)) {
             resolveConstructorArgument(visitor, argumentIndex);
-            resolveFirstTypeArgument(visitor);
+            if (type.isAssignable(Map.class)) {
+                resolveSecondTypeArgument(visitor);
+            } else {
+                resolveFirstTypeArgument(visitor);
+            }
             resolveInnerTypeArgumentIfNeeded(visitor, type);
         }
     }
@@ -3707,7 +3749,11 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private void resolveMethodArgumentGenericType(GeneratorAdapter visitor, ClassElement type, int methodIndex, int argumentIndex) {
         if (!resolveArgumentGenericType(visitor, type)) {
             resolveMethodArgument(visitor, methodIndex, argumentIndex);
-            resolveFirstTypeArgument(visitor);
+            if (type.isAssignable(Map.class)) {
+                resolveSecondTypeArgument(visitor);
+            } else {
+                resolveFirstTypeArgument(visitor);
+            }
             resolveInnerTypeArgumentIfNeeded(visitor, type);
         }
     }
@@ -3726,7 +3772,11 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private void resolveFieldArgumentGenericType(GeneratorAdapter visitor, ClassElement type, int fieldIndex) {
         if (!resolveArgumentGenericType(visitor, type)) {
             resolveFieldArgument(visitor, fieldIndex);
-            resolveFirstTypeArgument(visitor);
+            if (type.isAssignable(Map.class)) {
+                resolveSecondTypeArgument(visitor);
+            } else {
+                resolveFirstTypeArgument(visitor);
+            }
             resolveInnerTypeArgumentIfNeeded(visitor, type);
         }
     }
@@ -3790,6 +3840,13 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         visitor.invokeInterface(Type.getType(TypeVariableResolver.class),
                 org.objectweb.asm.commons.Method.getMethod(ReflectionUtils.getRequiredInternalMethod(TypeVariableResolver.class, "getTypeParameters")));
         visitor.push(0);
+        visitor.arrayLoad(Type.getType(Argument.class));
+    }
+
+    private void resolveSecondTypeArgument(GeneratorAdapter visitor) {
+        visitor.invokeInterface(Type.getType(TypeVariableResolver.class),
+            org.objectweb.asm.commons.Method.getMethod(ReflectionUtils.getRequiredInternalMethod(TypeVariableResolver.class, "getTypeParameters")));
+        visitor.push(1);
         visitor.arrayLoad(Type.getType(Argument.class));
     }
 

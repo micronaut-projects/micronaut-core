@@ -71,6 +71,8 @@ import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.io.service.SoftServiceLoader;
+import io.micronaut.core.naming.NameResolver;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.order.Ordered;
@@ -926,6 +928,11 @@ public class DefaultBeanContext implements InitializableBeanContext {
         return streamOfType(null, beanType, qualifier);
     }
 
+    @Override
+    public <V> Map<String, V> mapOfType(Argument<V> beanType, Qualifier<V> qualifier) {
+        return mapOfType(null, beanType, qualifier);
+    }
+
     /**
      * Obtains a stream of beans of the given type and qualifier.
      *
@@ -937,6 +944,66 @@ public class DefaultBeanContext implements InitializableBeanContext {
      */
     protected <T> Stream<T> streamOfType(BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier) {
         return streamOfType(resolutionContext, Argument.of(beanType), qualifier);
+    }
+
+    /**
+     * Obtains a map of beans of the given type and qualifier.
+     * @param resolutionContext  The resolution context
+     * @param beanType           The bean type
+     * @param qualifier          The qualifier
+     * @param <V>                The bean type
+     * @return A map of beans, never {@code null}.
+     * @since 4.0.0
+     */
+    protected <V> @NonNull Map<String, V> mapOfType(@Nullable BeanResolutionContext resolutionContext, @NonNull Argument<V> beanType, @Nullable Qualifier<V> qualifier) {
+        // try and find a bean that implements the map with the generics
+        Argument<Map<String, V>> mapType = Argument.mapOf(Argument.of(String.class), beanType);
+        @SuppressWarnings("unchecked") Qualifier<Map<String, V>> mapQualifier = (Qualifier<Map<String, V>>) qualifier;
+        BeanDefinition<Map<String, V>> existingBean = findBeanDefinition(mapType, mapQualifier, false).orElse(null);
+        if (existingBean != null) {
+            return getBean(existingBean);
+        } else {
+            Collection<BeanRegistration<V>> beanRegistrations = getBeanRegistrations(resolutionContext, beanType, qualifier);
+            if (beanRegistrations.isEmpty()) {
+                return Collections.emptyMap();
+            } else {
+                try {
+                    return beanRegistrations.stream().collect(Collectors.toUnmodifiableMap(
+                        DefaultBeanContext::resolveKey,
+                        reg -> reg.bean
+                    ));
+                } catch (IllegalStateException e) { // occurs for duplicate keys
+                    List<BeanDefinition<V>> beanDefinitions = beanRegistrations.stream().map(reg -> reg.beanDefinition).toList();
+                    throw new DependencyInjectionException(
+                        resolutionContext,
+                        "Injecting a map of beans requires each bean to define a qualifier. Multiple beans were found missing a qualifier resulting in duplicate keys: " + e.getMessage(),
+                        new NonUniqueBeanException(
+                            beanType.getType(),
+                            beanDefinitions.iterator()
+                        )
+                    );
+                }
+            }
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    @NonNull
+    private static String resolveKey(BeanRegistration<?> reg) {
+        BeanDefinition<?> definition = reg.beanDefinition;
+        BeanIdentifier identifier = reg.identifier;
+        if (definition instanceof NameResolver resolver) {
+            return resolver.resolveName().orElse(identifier.getName());
+        } else {
+            String name = identifier.getName();
+            if (name.equals(Primary.SIMPLE_NAME)) {
+                Class<?> candidateType = reg.beanDefinition.getBeanType();
+                String candidateSimpleName = candidateType.getSimpleName();
+                return NameUtils.decapitalize(candidateSimpleName);
+            } else {
+                return name;
+            }
+        }
     }
 
     /**

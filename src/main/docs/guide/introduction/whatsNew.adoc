@@ -4,6 +4,10 @@
 
 === Core Changes
 
+==== Injection of Maps
+
+It is now possible to inject a `java.util.Map` of beans where the key is the bean name. The name of the bean is derived from the <<qualifiers, qualifier>> or (if not present) the simple name of the class.
+
 ==== Improved Error Messages for Missing Beans
 
 When a bean annotated with ann:context.annotation.EachProperty[] or ann:context.annotation.Bean[] is not found due to missing configuration an error is thrown showing the configuration prefix necessary to resolve the issue.

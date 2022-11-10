@@ -8,9 +8,13 @@ In addition to being able to inject beans, Micronaut natively supports injecting
 |An `Optional` of a bean. `empty()` is injected if the bean doesn't exist
 |`Optional<Engine>`
 
-|link:{jdkapi}/java/util/Collection.html[java.lang.Collection]
+|link:{jdkapi}/java/util/Collection.html[java.util.Collection]
 |An `Collection` or subtype of `Collection` (e.g. `List`, `Set`, etc.)
 |`Collection<Engine>`
+
+|link:{jdkapi}/java/util/Map.html[java.util.Map]
+|An `Map` or subtype of `Map` (e.g. `LinkedHashMap`, `TreeMap`, etc.) where the key is the qualifier
+|`Map<String, Engine>`
 
 |link:{jdkapi}/java/util/stream/Stream.html[java.util.stream.Stream]
 |A lazy `Stream` of beans

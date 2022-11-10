@@ -31,6 +31,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
 
@@ -83,6 +84,20 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      */
     @NonNull
     <T> Stream<T> streamOfType(@NonNull  Argument<T> beanType, @Nullable  Qualifier<T> qualifier);
+
+    /**
+     * Obtains a map of beans of the given type and qualifier.
+     *
+     * @param beanType          The bean type
+     * @param qualifier         The qualifier
+     * @param <V>               The bean type
+     * @return A map of beans, never {@code null}.
+     * @since 4.0.0
+     */
+    @NonNull
+    default <V> Map<String, V> mapOfType(@NonNull Argument<V> beanType, @Nullable Qualifier<V> qualifier) {
+        return Collections.emptyMap();
+    }
 
     /**
      * Find an optional bean of the given type and qualifier.
