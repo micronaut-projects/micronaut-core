@@ -35,6 +35,8 @@ class FieldMapInjectionSpec extends Specification {
         b.all['one'] instanceof AImpl
         b.all == b.linked
         b.bean.size() == 1 // prioritize explicit beans
+        b.animalMap['dog'] instanceof Dog
+        b.animalMap['cat'] instanceof Cat
 
         cleanup:
         context.close()

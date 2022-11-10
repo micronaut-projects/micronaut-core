@@ -72,6 +72,7 @@ import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.naming.NameResolver;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.order.Ordered;
@@ -991,10 +992,19 @@ public class DefaultBeanContext implements InitializableBeanContext {
     @NonNull
     private static String resolveKey(BeanRegistration<?> reg) {
         BeanDefinition<?> definition = reg.beanDefinition;
+        BeanIdentifier identifier = reg.identifier;
         if (definition instanceof NameResolver resolver) {
-            return resolver.resolveName().orElse(reg.identifier.getName());
+            return resolver.resolveName().orElse(identifier.getName());
+        } else {
+            String name = identifier.getName();
+            if (name.equals(Primary.SIMPLE_NAME)) {
+                Class<?> candidateType = reg.beanDefinition.getBeanType();
+                String candidateSimpleName = candidateType.getSimpleName();
+                return NameUtils.decapitalize(candidateSimpleName);
+            } else {
+                return name;
+            }
         }
-        return reg.identifier.getName();
     }
 
     /**

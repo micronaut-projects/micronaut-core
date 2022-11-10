@@ -26,6 +26,9 @@ public class B {
     Map<String, A> all;
 
     @Inject
+    Map<String, Animal> animalMap;
+
+    @Inject
     LinkedHashMap<String, A> linked;
 
     @Inject
