@@ -57,7 +57,7 @@ public final class InterceptedMethodUtil {
     @NonNull
     public static InterceptedMethod of(@NonNull MethodInvocationContext<?, ?> context, @NonNull ConversionService conversionService) {
         if (context.isSuspend()) {
-            KotlinInterceptedMethod kotlinInterceptedMethod = KotlinInterceptedMethod.of(context);
+            KotlinInterceptedMethodImpl kotlinInterceptedMethod = KotlinInterceptedMethodImpl.of(context);
             if (kotlinInterceptedMethod != null) {
                 return kotlinInterceptedMethod;
             }

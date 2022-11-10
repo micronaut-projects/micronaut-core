@@ -39,19 +39,19 @@ import java.util.function.Consumer;
  */
 @Internal
 @Experimental
-final class KotlinInterceptedMethod implements io.micronaut.aop.kotlin.KotlinInterceptedMethod {
+final class KotlinInterceptedMethodImpl implements io.micronaut.aop.kotlin.KotlinInterceptedMethod {
 
     private final MethodInvocationContext<?, ?> context;
-    private Continuation continuation;
+    private Continuation<?> continuation;
     private final Consumer<Object> replaceContinuation;
     private final Argument<?> returnTypeValue;
     private final boolean isUnitValueType;
 
-    private KotlinInterceptedMethod(MethodInvocationContext<?, ?> context,
-                                    Continuation<?> continuation,
-                                    Consumer<Object> replaceContinuation,
-                                    Argument<?> returnTypeValue,
-                                    boolean isUnitValueType) {
+    private KotlinInterceptedMethodImpl(MethodInvocationContext<?, ?> context,
+                                        Continuation<?> continuation,
+                                        Consumer<Object> replaceContinuation,
+                                        Argument<?> returnTypeValue,
+                                        boolean isUnitValueType) {
         this.context = context;
         this.continuation = continuation;
         this.returnTypeValue = returnTypeValue;
@@ -65,7 +65,7 @@ final class KotlinInterceptedMethod implements io.micronaut.aop.kotlin.KotlinInt
      * @param context {@link MethodInvocationContext}
      * @return true if Kotlin coroutine
      */
-    public static KotlinInterceptedMethod of(MethodInvocationContext<?, ?> context) {
+    public static KotlinInterceptedMethodImpl of(MethodInvocationContext<?, ?> context) {
         if (!KotlinUtils.KOTLIN_COROUTINES_SUPPORTED || !context.getExecutableMethod().isSuspend()) {
             return null;
         }
@@ -75,15 +75,14 @@ final class KotlinInterceptedMethod implements io.micronaut.aop.kotlin.KotlinInt
         }
         int lastParameterIndex = parameterValues.length - 1;
         Object lastArgumentValue = parameterValues[lastParameterIndex];
-        if (lastArgumentValue instanceof Continuation) {
-            Continuation continuation = (Continuation) lastArgumentValue;
+        if (lastArgumentValue instanceof Continuation<?> continuation) {
             Consumer<Object> replaceContinuation = value -> parameterValues[lastParameterIndex] = value;
             Argument<?> returnTypeValue = context.getArguments()[lastParameterIndex].getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
             boolean isUnitValueType = returnTypeValue.getType() == kotlin.Unit.class;
             if (isUnitValueType) {
                 returnTypeValue = Argument.VOID_OBJECT;
             }
-            return new KotlinInterceptedMethod(context, continuation, replaceContinuation, returnTypeValue, isUnitValueType);
+            return new KotlinInterceptedMethodImpl(context, continuation, replaceContinuation, returnTypeValue, isUnitValueType);
         }
         return null;
     }
@@ -100,7 +99,8 @@ final class KotlinInterceptedMethod implements io.micronaut.aop.kotlin.KotlinInt
 
     @Override
     public CompletableFuture<Object> interceptResultAsCompletionStage() {
-        CompletableFutureContinuation completableFutureContinuation = new CompletableFutureContinuation(continuation);
+        @SuppressWarnings("unchecked")
+        CompletableFutureContinuation completableFutureContinuation = new CompletableFutureContinuation((Continuation<Object>) continuation);
         replaceContinuation.accept(completableFutureContinuation);
         Object result = context.proceed();
         replaceContinuation.accept(continuation);
@@ -112,7 +112,8 @@ final class KotlinInterceptedMethod implements io.micronaut.aop.kotlin.KotlinInt
 
     @Override
     public CompletableFuture<Object> interceptResultAsCompletionStage(Interceptor<?, ?> from) {
-        CompletableFutureContinuation completableFutureContinuation = new CompletableFutureContinuation(continuation);
+        @SuppressWarnings("unchecked")
+        CompletableFutureContinuation completableFutureContinuation = new CompletableFutureContinuation((Continuation<Object>) continuation);
         replaceContinuation.accept(completableFutureContinuation);
         Object result = context.proceed(from);
         replaceContinuation.accept(continuation);
@@ -134,13 +135,14 @@ final class KotlinInterceptedMethod implements io.micronaut.aop.kotlin.KotlinInt
 
     @Override
     public Object handleResult(Object result) {
-        CompletionStage completionStageResult;
+        CompletionStage<?> completionStageResult;
         if (result instanceof CompletionStage) {
             completionStageResult = (CompletionStage<?>) result;
         } else {
             throw new IllegalStateException("Cannot convert " + result + "  to 'java.util.concurrent.CompletionStage'");
         }
-        return KotlinInterceptedMethodHelper.handleResult(completionStageResult, isUnitValueType, continuation);
+        //noinspection unchecked
+        return KotlinInterceptedMethodHelper.handleResult(completionStageResult, isUnitValueType, (Continuation<? super Object>) continuation);
     }
 
     @Override
@@ -153,8 +155,9 @@ final class KotlinInterceptedMethod implements io.micronaut.aop.kotlin.KotlinInt
         return continuation.getContext();
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public void updateCoroutineContext(CoroutineContext coroutineContext) {
-        continuation = new DelegatingContextContinuation(continuation, coroutineContext);
+        continuation = new DelegatingContextContinuation((Continuation<Object>) continuation, coroutineContext);
     }
 }
