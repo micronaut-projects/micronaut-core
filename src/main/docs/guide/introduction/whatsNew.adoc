@@ -2,6 +2,12 @@
 
 == 4.0.0
 
+=== Core Changes
+
+==== Improved Error Messages for Missing Beans
+
+When a bean annotated with ann:context.annotation.EachProperty[] or ann:context.annotation.Bean[] is not found due to missing configuration an error is thrown showing the configuration prefix necessary to resolve the issue.
+
 === Other Dependency Upgrades
 
 - Kotlin 1.7.10
