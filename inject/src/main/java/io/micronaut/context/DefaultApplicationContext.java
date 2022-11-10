@@ -350,7 +350,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
             prefix += "." + definition.stringValue(EachProperty.class, "primary").orElse("*");
         }
 
-        return "One or more configuration entries under the prefix [" + prefix + "] are missing. Provide the necessary configuration to resolve this issue.";
+        return "No configuration entries found under the prefix: [" + prefix + "]. Provide the necessary configuration to resolve this issue.";
     }
 
     @Override

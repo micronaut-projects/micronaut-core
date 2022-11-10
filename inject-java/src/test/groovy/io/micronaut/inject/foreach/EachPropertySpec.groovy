@@ -41,14 +41,14 @@ class EachPropertySpec extends Specification {
 
         then:
         def error = thrown(NoSuchBeanException)
-        error.message == 'No bean of type [io.micronaut.inject.foreach.MyConfiguration] exists. One or more configuration entries under the prefix [foo.bar.*] are missing. Provide the necessary configuration to resolve this issue.'
+        error.message == 'No bean of type [io.micronaut.inject.foreach.MyConfiguration] exists. No configuration entries found under the prefix: [foo.bar.*]. Provide the necessary configuration to resolve this issue.'
 
         when:
         context.getBean(MyConfiguration, Qualifiers.byName("baz"))
 
         then:
         error = thrown(NoSuchBeanException)
-        error.message == 'No bean of type [io.micronaut.inject.foreach.MyConfiguration] exists for the given qualifier: @Named(\'baz\'). One or more configuration entries under the prefix [foo.bar.baz] are missing. Provide the necessary configuration to resolve this issue.'
+        error.message == 'No bean of type [io.micronaut.inject.foreach.MyConfiguration] exists for the given qualifier: @Named(\'baz\'). No configuration entries found under the prefix: [foo.bar.baz]. Provide the necessary configuration to resolve this issue.'
 
         cleanup:
         context.close()
@@ -65,7 +65,7 @@ class EachPropertySpec extends Specification {
         def error = thrown(NoSuchBeanException)
         error.message.startsWith("No bean of type [io.micronaut.inject.foreach.MyBean] exists.")
         error.message.contains("* [MyBean] requires the presence of a bean of type [io.micronaut.inject.foreach.MyConfiguration] which does not exist.")
-        error.message.endsWith("* [MyConfiguration] requires the presence of configuration. One or more configuration entries under the prefix [foo.bar.*] are missing. Provide the necessary configuration to resolve this issue.")
+        error.message.endsWith("* [MyConfiguration] requires the presence of configuration. No configuration entries found under the prefix: [foo.bar.*]. Provide the necessary configuration to resolve this issue.")
 
         when:
         context.getBean(C.class, Qualifiers.byName("test"))
@@ -74,7 +74,7 @@ class EachPropertySpec extends Specification {
         error = thrown(NoSuchBeanException)
         error.message.contains('* [C] requires the presence of a bean of type [io.micronaut.inject.foreach.nested.B] with qualifier [@Named(\'test\')] which does not exist.')
         error.message.contains("* [B] requires the presence of a bean of type [io.micronaut.inject.foreach.nested.A] with qualifier [@Named('test')] which does not exist.")
-        error.message.endsWith('* [A] requires the presence of configuration. One or more configuration entries under the prefix [foo.test] are missing. Provide the necessary configuration to resolve this issue.')
+        error.message.endsWith('* [A] requires the presence of configuration. No configuration entries found under the prefix: [foo.test]. Provide the necessary configuration to resolve this issue.')
 
         cleanup:
         context.close()
