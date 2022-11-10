@@ -29,6 +29,7 @@ import java.util.stream.Stream;
  * @since 3.5.0
  */
 @Internal
+@SuppressWarnings("java:S1845")
 public final class PrimaryQualifier<T> implements Qualifier<T> {
 
     @SuppressWarnings({"rawtypes", "java:S1845"})

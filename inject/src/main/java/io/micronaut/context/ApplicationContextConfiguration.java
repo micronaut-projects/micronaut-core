@@ -93,6 +93,7 @@ public interface ApplicationContextConfiguration extends BeanContextConfiguratio
     /**
      * @return The environment variables to include in configuration
      */
+    @SuppressWarnings("java:S1168") // null used to establish absence of config
     default @Nullable List<String> getEnvironmentVariableIncludes() {
         return null;
     }
@@ -100,6 +101,7 @@ public interface ApplicationContextConfiguration extends BeanContextConfiguratio
     /**
      * @return The environment variables to exclude from configuration
      */
+    @SuppressWarnings("java:S1168") // null used to establish absence of config
     default @Nullable List<String> getEnvironmentVariableExcludes() {
         return null;
     }
@@ -127,6 +129,7 @@ public interface ApplicationContextConfiguration extends BeanContextConfiguratio
      *
      * @return The config locations
      */
+    @SuppressWarnings("java:S1168") // null used to establish absence of config
     default @Nullable List<String> getOverrideConfigLocations() {
         return null;
     }
@@ -141,6 +144,7 @@ public interface ApplicationContextConfiguration extends BeanContextConfiguratio
     }
 
     @Nullable
+    @SuppressWarnings("java:S2447") // null used to establish absence of config
     default Boolean isBootstrapEnvironmentEnabled() {
         return null;
     }
