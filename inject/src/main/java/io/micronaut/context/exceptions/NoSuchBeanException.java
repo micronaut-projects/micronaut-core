@@ -28,18 +28,21 @@ import io.micronaut.core.type.Argument;
  */
 public class NoSuchBeanException extends BeanContextException {
 
+    private static final String MESSAGE_PREFIX = "No bean of type [";
+    private static final String MESSAGE_SUFFIX = "] exists.";
+
     /**
      * @param beanType The bean type
      */
     public NoSuchBeanException(@NonNull Class<?> beanType) {
-        super("No bean of type [" + beanType.getName() + "] exists." + additionalMessage());
+        super(MESSAGE_PREFIX + beanType.getName() + MESSAGE_SUFFIX + additionalMessage());
     }
 
     /**
      * @param beanType The bean type
      */
     public NoSuchBeanException(@NonNull Argument<?> beanType) {
-        super("No bean of type [" + beanType.getTypeName() + "] exists." + additionalMessage());
+        super(MESSAGE_PREFIX + beanType.getTypeName() + MESSAGE_SUFFIX + additionalMessage());
     }
 
     /**
@@ -48,7 +51,7 @@ public class NoSuchBeanException extends BeanContextException {
      * @param <T>       The type
      */
     public <T> NoSuchBeanException(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier) {
-        super("No bean of type [" + beanType.getName() + "] exists" + (qualifier != null ? " for the given qualifier: " + qualifier : "") + "." + additionalMessage());
+        super(MESSAGE_PREFIX + beanType.getName() + "] exists" + (qualifier != null ? " for the given qualifier: " + qualifier : "") + "." + additionalMessage());
     }
 
     /**
@@ -57,7 +60,18 @@ public class NoSuchBeanException extends BeanContextException {
      * @param <T>       The type
      */
     public <T> NoSuchBeanException(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
-        super("No bean of type [" + beanType.getTypeName() + "] exists" + (qualifier != null ? " for the given qualifier: " + qualifier : "") + "." + additionalMessage());
+        super(MESSAGE_PREFIX + beanType.getTypeName() + "] exists" + (qualifier != null ? " for the given qualifier: " + qualifier : "") + "." + additionalMessage());
+    }
+
+    /**
+     * @param beanType  The bean type
+     * @param qualifier The qualifier
+     * @param message   The message
+     * @param <T>       The type
+     * @since 4.0.0
+     */
+    public <T> NoSuchBeanException(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier, String message) {
+        super(MESSAGE_PREFIX + beanType.getTypeName() + "] exists" + (qualifier != null ? " for the given qualifier: " + qualifier : "") + ". " + message);
     }
 
     /**
