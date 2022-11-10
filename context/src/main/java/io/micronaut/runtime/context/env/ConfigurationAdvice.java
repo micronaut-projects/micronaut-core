@@ -31,7 +31,6 @@ import java.lang.annotation.RetentionPolicy;
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Introduction
-@Type(ConfigurationIntroductionAdvice.class)
 @Internal
 public @interface ConfigurationAdvice {
     /**

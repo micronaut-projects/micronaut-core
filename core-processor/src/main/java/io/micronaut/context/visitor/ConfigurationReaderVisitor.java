@@ -15,6 +15,8 @@
  */
 package io.micronaut.context.visitor;
 
+import io.micronaut.context.BeanProvider;
+import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Property;
@@ -26,6 +28,7 @@ import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.naming.NameUtils;
+import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.validation.RequiresValidation;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
@@ -33,6 +36,9 @@ import io.micronaut.inject.configuration.ConfigurationMetadata;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
+import jakarta.inject.Provider;
+
+import java.util.Map;
 
 /**
  * The visitor adds Validated annotation if one of the parameters is a constraint or @Valid.
@@ -95,6 +101,26 @@ public class ConfigurationReaderVisitor implements TypeElementVisitor<Configurat
         }
     }
 
+    public static boolean isPropertyParameter(ParameterElement parameter, VisitorContext visitorContext) {
+        ClassElement genericType = parameter.getGenericType();
+        return isPropertyParameter(genericType, visitorContext);
+    }
+
+    private static boolean isPropertyParameter(ClassElement genericType, VisitorContext visitorContext) {
+        if (genericType.isOptional() || genericType.isAssignable(BeanProvider.class) || genericType.isAssignable(Provider.class) || genericType.isAssignable(Iterable.class)) {
+            ClassElement finalParameterType = genericType;
+            genericType = genericType.getOptionalValueType().or(finalParameterType::getFirstTypeArgument).orElse(genericType);
+            // Get the class with type annotations
+            genericType = visitorContext.getClassElement(genericType.getCanonicalName()).orElse(genericType);
+        } else if (genericType.isAssignable(Map.class)) {
+            ClassElement t = genericType.getTypeArguments().get("V");
+            if (t != null) {
+                genericType = t;
+            }
+        }
+        return !genericType.hasStereotype(AnnotationUtil.SCOPE) && !genericType.hasStereotype(Bean.class);
+    }
+
     private void visitAbstractMethod(MethodElement method, VisitorContext context) {
         String methodName = method.getName();
         if (!isGetter(methodName)) {
@@ -110,27 +136,35 @@ public class ConfigurationReaderVisitor implements TypeElementVisitor<Configurat
             return;
         }
 
-        final String propertyName = getPropertyNameForGetter(methodName);
+        boolean isPropertyParameter = isPropertyParameter(method.getGenericReturnType(), context);
+        if (isPropertyParameter) {
+            final String propertyName = getPropertyNameForGetter(methodName);
+            String path = metadataBuilder.visitProperty(
+                method.getOwningType(),
+                method.getOwningType(), // interface methods don't inherit the prefix
+                method.getReturnType(),
+                propertyName,
+                ConfigurationMetadataBuilder.resolveJavadocDescription(method),
+                method.getAnnotationMetadata().stringValue(Bindable.class, "defaultValue").orElse(null)
+            ).getPath();
 
-        String path = metadataBuilder.visitProperty(
-            method.getOwningType(),
-            method.getOwningType(), // interface methods don't inherit the prefix
-            method.getReturnType(),
-            propertyName,
-            method.getDocumentation().orElse(null),
-            method.getAnnotationMetadata().stringValue(Bindable.class, "defaultValue").orElse(null)
-        ).getPath();
-
-        method.annotate(Property.class, builder -> builder.member("name", path));
+            method.annotate(Property.class, builder -> builder.member("name", path));
+        }
 
         method.annotate(ANN_CONFIGURATION_ADVICE, annBuilder -> {
-            if (!method.getReturnType().isPrimitive() && method.getReturnType().hasStereotype(AnnotationUtil.SCOPE)) {
+
+            if (!isPropertyParameter) {
                 annBuilder.member("bean", true);
             }
             if (method.hasStereotype(EachProperty.class)) {
                 annBuilder.member("iterable", true);
             }
         });
+    }
+
+    private static boolean isBeanReturnType(MethodElement method) {
+        ClassElement returnType = method.getGenericReturnType();
+        return !returnType.isPrimitive() && returnType.hasStereotype(AnnotationUtil.SCOPE);
     }
 
     private String getPropertyNameForGetter(String methodName) {
