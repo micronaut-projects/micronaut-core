@@ -285,7 +285,7 @@ public final class AstBeanPropertiesUtils {
                     beanPropertyData.writeAccessKind = BeanProperties.AccessKind.FIELD;
                 }
             }
-        } else {
+        } else if (beanPropertyData.type.isAssignable(fieldElement.getGenericType())) {
             beanPropertyData.field = fieldElement;
         }
     }
@@ -312,12 +312,8 @@ public final class AstBeanPropertiesUtils {
                     beanPropertyData.readAccessKind = BeanProperties.AccessKind.FIELD;
                 }
             }
-        } else {
+        } else if (beanPropertyData.type.isAssignable(fieldElement.getGenericType())) {
             beanPropertyData.field = fieldElement;
-            if (beanPropertyData.type.isAssignable(fieldElement.getGenericType())) {
-                // Override the existing type to include generic annotations
-                beanPropertyData.type = fieldElement.getGenericType();
-            }
         }
     }
 
