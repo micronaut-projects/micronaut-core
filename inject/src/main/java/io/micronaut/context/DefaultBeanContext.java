@@ -784,7 +784,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
     @Override
     public <T> BeanDefinition<T> getBeanDefinition(Argument<T> beanType, Qualifier<T> qualifier) {
         return findBeanDefinition(beanType, qualifier)
-                .orElseThrow(() -> new NoSuchBeanException(beanType, qualifier));
+                .orElseThrow(() -> newNoSuchBeanException(null, beanType, qualifier, null));
     }
 
     @Override
@@ -877,7 +877,12 @@ public class DefaultBeanContext implements InitializableBeanContext {
             if (AbstractBeanContextConditional.ConditionLog.LOG.isDebugEnabled()) {
                 AbstractBeanContextConditional.ConditionLog.LOG.debug("Bean of type [{}] disabled for reason: {}", beanType.getSimpleName(), e.getMessage());
             }
-            throw new NoSuchBeanException(beanType, qualifier);
+            throw newNoSuchBeanException(
+                null,
+                beanType,
+                qualifier,
+                e.getMessage()
+            );
         }
     }
 
@@ -994,7 +999,12 @@ public class DefaultBeanContext implements InitializableBeanContext {
                 return doCreateBean(resolutionContext, candidate.get(), qualifier, argumentValues);
             }
         }
-        throw new NoSuchBeanException(beanType);
+        throw newNoSuchBeanException(
+            null,
+            Argument.of(beanType),
+            qualifier,
+            null
+        );
     }
 
     @NonNull
@@ -1009,7 +1019,12 @@ public class DefaultBeanContext implements InitializableBeanContext {
                 return doCreateBean(resolutionContext, definition, beanArg, qualifier, args);
             }
         }
-        throw new NoSuchBeanException(beanType);
+        throw newNoSuchBeanException(
+            null,
+            Argument.of(beanType),
+            qualifier,
+            null
+        );
     }
 
     /**
@@ -1330,7 +1345,12 @@ public class DefaultBeanContext implements InitializableBeanContext {
                 return doCreateBean(context, candidate, qualifier);
             }
         }
-        throw new NoSuchBeanException(beanType);
+        throw newNoSuchBeanException(
+            resolutionContext,
+            Argument.of(beanType),
+            qualifier,
+            null
+        );
     }
 
     /**
@@ -2813,14 +2833,33 @@ public class DefaultBeanContext implements InitializableBeanContext {
             registration = null;
         }
         if ((registration == null || registration.bean == null) && throwNoSuchBean) {
-            throw newNoSuchBeanException(resolutionContext, beanType, qualifier);
+            throw newNoSuchBeanException(resolutionContext, beanType, qualifier, null);
         }
         return registration;
     }
 
+    /**
+     * Trigger a no such bean exception. Subclasses can improve the exception with downstream diagnosis as necessary.
+     *
+     * @param <T>               The type of the bean
+     * @param resolutionContext The resolution context
+     * @param beanType          The bean type
+     * @param qualifier         The qualifier
+     * @param message           A message to use
+     * @return A no such bean exception
+     */
+    @Internal
     @NonNull
-    protected <T> NoSuchBeanException newNoSuchBeanException(@Nullable BeanResolutionContext resolutionContext, @NonNull Argument<T> beanType, @NonNull Qualifier<T> qualifier) {
-        return new NoSuchBeanException(beanType, qualifier);
+    protected <T> NoSuchBeanException newNoSuchBeanException(
+        @Nullable BeanResolutionContext resolutionContext,
+        @NonNull Argument<T> beanType,
+        @NonNull Qualifier<T> qualifier,
+        @Nullable String message) {
+        if (message != null) {
+            return new NoSuchBeanException(beanType, qualifier, message);
+        } else {
+            return new NoSuchBeanException(beanType, qualifier);
+        }
     }
 
     @Nullable
@@ -2851,7 +2890,12 @@ public class DefaultBeanContext implements InitializableBeanContext {
         if (injectionPointSegment == null || !injectionPointSegment.getArgument().isNullable()) {
             throw new BeanContextException("Failed to obtain injection point. No valid injection path present in path: " + path);
         } else if (throwNoSuchBean) {
-            throw new NoSuchBeanException(beanType, qualifier);
+            throw newNoSuchBeanException(
+                resolutionContext,
+                beanType,
+                qualifier,
+                null
+            );
         }
         return null;
     }

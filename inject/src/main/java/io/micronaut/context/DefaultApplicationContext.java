@@ -258,15 +258,15 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     }
 
     @Override
-    protected <T> NoSuchBeanException newNoSuchBeanException(@Nullable BeanResolutionContext resolutionContext, Argument<T> beanType, Qualifier<T> qualifier) {
+    protected <T> NoSuchBeanException newNoSuchBeanException(@Nullable BeanResolutionContext resolutionContext, Argument<T> beanType, Qualifier<T> qualifier, String message) {
         BeanDefinition<T> definition = findAnyBeanDefinition(resolutionContext, beanType);
         if (definition != null && definition.isIterable()) {
             if (definition.hasDeclaredAnnotation(EachProperty.class)) {
-                String message = computeEachPropertyMissingBeanMessage(qualifier, definition);
+                String propertyMissingMessage = computeEachPropertyMissingBeanMessage(qualifier, definition);
                 return new NoSuchBeanException(
                     beanType,
                     qualifier,
-                    message
+                    propertyMissingMessage
                 );
             } else if (definition.hasDeclaredAnnotation(EachBean.class)) {
 
@@ -289,12 +289,12 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                     messageBuilder.append(" which does not exist.");
                     if (beanDefinition.hasDeclaredAnnotation(EachProperty.class)) {
                         messageBuilder.append(ls);
-                        String message = computeEachPropertyMissingBeanMessage(qualifier, beanDefinition);
+                        String propertyMissingMessage = computeEachPropertyMissingBeanMessage(qualifier, beanDefinition);
                         messageBuilder.append("* ")
                             .append("[")
                             .append(nextBeanType.getTypeString(true))
                             .append("] requires the presence of configuration. ")
-                            .append(message);
+                            .append(propertyMissingMessage);
                         break;
                     }
                     requiredBeanType = nextBeanType;
@@ -307,7 +307,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                 );
             }
         }
-        return super.newNoSuchBeanException(resolutionContext, beanType, qualifier);
+        return super.newNoSuchBeanException(resolutionContext, beanType, qualifier, message);
     }
 
     @Nullable
