@@ -888,8 +888,8 @@ public class DefaultMutableConversionService implements MutableConversionService
                 }
                 return Argument.of(Object.class, "V");
             });
-            Class<?> keyType = keyArgument.getType();
-            Class<?> valueType = valArgument.getType();
+            Class<?> keyType = isProperties ? Object.class : keyArgument.getType();
+            Class<?> valueType = isProperties ? Object.class : valArgument.getType();
             ConversionContext keyContext = context.with(keyArgument);
             ConversionContext valContext = context.with(valArgument);
 
