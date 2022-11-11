@@ -197,7 +197,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
     private final BeanContextConfiguration beanContextConfiguration;
     private final Collection<BeanDefinitionReference> beanDefinitionsClasses = new ConcurrentLinkedQueue<>();
 
-    private final Collection<BeanDefinitionReference> disabledBeans = new ConcurrentLinkedQueue<>();
+    private final Map<BeanKey<?>, BeanDefinitionReference> disabledBeans = new ConcurrentHashMap<>(20);
     private final Map<String, List<String>> disabledConfigurations = new ConcurrentHashMap<>(5);
     private final Map<String, BeanConfiguration> beanConfigurations = new HashMap<>(10);
     private final Map<BeanKey, Boolean> containsBeanCache = new ConcurrentHashMap<>(30);
@@ -393,7 +393,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                 Argument<Object> argument = (Argument<Object>) beanType.getGenericBeanType();
                 @SuppressWarnings("unchecked")
                 Qualifier<Object> declaredQualifier = (Qualifier<Object>) beanType.getDeclaredQualifier();
-                this.disabledBeans.add(new DisabledBean<>(
+                this.disabledBeans.put(new BeanKey<Object>(argument, declaredQualifier), new DisabledBean<>(
                     argument,
                     declaredQualifier,
                     reasons
@@ -3018,7 +3018,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                 beanType,
                 true,
                 null,
-                disabledBeans
+                disabledBeans.values()
             );
             if (qualifier != null) {
                 beanDefinitions = qualifier
