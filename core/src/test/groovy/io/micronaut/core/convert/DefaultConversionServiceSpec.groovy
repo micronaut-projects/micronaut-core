@@ -1,18 +1,3 @@
-/*
- * Copyright 2017-2019 original authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package io.micronaut.core.convert
 
 import io.micronaut.core.convert.exceptions.ConversionErrorException
@@ -29,7 +14,6 @@ import java.time.DayOfWeek
  */
 class DefaultConversionServiceSpec extends Specification {
 
-    @Unroll
     void "test default conversion service converts a #sourceObject.class.name to a #targetType.name"() {
         given:
         ConversionService conversionService = new DefaultMutableConversionService()
@@ -68,6 +52,35 @@ class DefaultConversionServiceSpec extends Specification {
         "N/A"                                   | Status      | Status.N_OR_A
         ["OK", "N/A"]                           | Status[]    | [Status.OK, Status.N_OR_A]
         "test".getBytes(StandardCharsets.UTF_8) | String      | "test"
+    }
+
+    void 'test properties conversion'() {
+        given:
+        ConversionService conversionService = new DefaultMutableConversionService()
+
+        when:
+        def sourceObject = [num: 1, name: 'tim', cool: true]
+        def targetType = Properties
+
+        then:
+        with(conversionService.convert(sourceObject, targetType).get()) {
+            it.size() == 3
+            it.num == 1
+            it.name == 'tim'
+            it.cool == true
+        }
+
+        when:
+        sourceObject = [1: 1, name: 'tim', cool: true]
+
+        then:
+        with(conversionService.convert(sourceObject, targetType).get()) {
+            it.size() == 3
+            it.containsKey(1)
+            it.get(1) == 1
+            it.name == 'tim'
+            it.cool == true
+        }
     }
 
     void "test empty string conversion"() {
