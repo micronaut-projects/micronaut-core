@@ -259,55 +259,64 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
     @Override
     protected <T> NoSuchBeanException newNoSuchBeanException(@Nullable BeanResolutionContext resolutionContext, Argument<T> beanType, Qualifier<T> qualifier, String message) {
+        if (message == null) {
+            message = super.resolveDisabledBeanMessage(resolutionContext, beanType, qualifier);
+        }
+
+        if (message == null) {
+            message = resolveIterableBeanMissingMessage(resolutionContext, beanType, qualifier, message);
+        }
+
+        return super.newNoSuchBeanException(resolutionContext, beanType, qualifier, message);
+    }
+
+    private <T> String resolveIterableBeanMissingMessage(BeanResolutionContext resolutionContext, Argument<T> beanType, Qualifier<T> qualifier, String message) {
         BeanDefinition<T> definition = findAnyBeanDefinition(resolutionContext, beanType);
         if (definition != null && definition.isIterable()) {
             if (definition.hasDeclaredAnnotation(EachProperty.class)) {
-                String propertyMissingMessage = computeEachPropertyMissingBeanMessage(qualifier, definition);
-                return new NoSuchBeanException(
-                    beanType,
-                    qualifier,
-                    propertyMissingMessage
-                );
+                message = resolveEachPropertyMissingBeanMessage(qualifier, definition);
             } else if (definition.hasDeclaredAnnotation(EachBean.class)) {
-
-                List<BeanDefinition<?>> dependencyChain = calculateDependencyChain(resolutionContext, definition);
-                StringBuilder messageBuilder = new StringBuilder();
-                Argument<?> requiredBeanType = beanType;
-                Iterator<BeanDefinition<?>> i = dependencyChain.iterator();
-                String ls = System.getProperty("line.separator");
-                while (i.hasNext()) {
-                    messageBuilder.append(ls);
-                    BeanDefinition<?> beanDefinition = i.next();
-                    Argument<?> nextBeanType = beanDefinition.asArgument();
-                    messageBuilder.append("* [").append(requiredBeanType.getTypeString(true))
-                                  .append("] requires the presence of a bean of type [")
-                                  .append(nextBeanType.getTypeString(false))
-                                  .append("]");
-                    if (qualifier != null) {
-                        messageBuilder.append(" with qualifier [").append(qualifier).append("]");
-                    }
-                    messageBuilder.append(" which does not exist.");
-                    if (beanDefinition.hasDeclaredAnnotation(EachProperty.class)) {
-                        messageBuilder.append(ls);
-                        String propertyMissingMessage = computeEachPropertyMissingBeanMessage(qualifier, beanDefinition);
-                        messageBuilder.append("* ")
-                            .append("[")
-                            .append(nextBeanType.getTypeString(true))
-                            .append("] requires the presence of configuration. ")
-                            .append(propertyMissingMessage);
-                        break;
-                    }
-                    requiredBeanType = nextBeanType;
-                }
-
-                return new NoSuchBeanException(
-                    beanType,
-                    qualifier,
-                    messageBuilder.toString()
-                );
+                message = resolveEachBeanMissingMessage(resolutionContext, beanType, qualifier, definition);
             }
         }
-        return super.newNoSuchBeanException(resolutionContext, beanType, qualifier, message);
+        return message;
+    }
+
+    @NonNull
+    private <T> String resolveEachBeanMissingMessage(BeanResolutionContext resolutionContext, Argument<T> beanType, Qualifier<T> qualifier, BeanDefinition<T> definition) {
+        String message;
+        List<BeanDefinition<?>> dependencyChain = calculateDependencyChain(resolutionContext, definition);
+        StringBuilder messageBuilder = new StringBuilder();
+        Argument<?> requiredBeanType = beanType;
+        Iterator<BeanDefinition<?>> i = dependencyChain.iterator();
+        String ls = System.getProperty("line.separator");
+        while (i.hasNext()) {
+            messageBuilder.append(ls);
+            BeanDefinition<?> beanDefinition = i.next();
+            Argument<?> nextBeanType = beanDefinition.asArgument();
+            messageBuilder.append("* [").append(requiredBeanType.getTypeString(true))
+                .append("] requires the presence of a bean of type [")
+                .append(nextBeanType.getTypeString(false))
+                .append("]");
+            if (qualifier != null) {
+                messageBuilder.append(" with qualifier [").append(qualifier).append("]");
+            }
+            messageBuilder.append(" which does not exist.");
+            if (beanDefinition.hasDeclaredAnnotation(EachProperty.class)) {
+                messageBuilder.append(ls);
+                String propertyMissingMessage = resolveEachPropertyMissingBeanMessage(qualifier, beanDefinition);
+                messageBuilder.append("* ")
+                    .append("[")
+                    .append(nextBeanType.getTypeString(true))
+                    .append("] requires the presence of configuration. ")
+                    .append(propertyMissingMessage);
+                break;
+            }
+            requiredBeanType = nextBeanType;
+        }
+
+        message = messageBuilder.toString();
+        return message;
     }
 
     @Nullable
@@ -338,7 +347,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     }
 
     @NonNull
-    private static String computeEachPropertyMissingBeanMessage(Qualifier<?> qualifier, BeanDefinition<?> definition) {
+    private static String resolveEachPropertyMissingBeanMessage(Qualifier<?> qualifier, BeanDefinition<?> definition) {
         String prefix = definition.stringValue(EachProperty.class).orElse("");
         if (qualifier != null) {
             if (qualifier instanceof Named named) {

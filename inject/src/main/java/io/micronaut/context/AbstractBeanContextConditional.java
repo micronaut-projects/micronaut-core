@@ -42,19 +42,23 @@ abstract class AbstractBeanContextConditional implements BeanContextConditional,
     public boolean isEnabled(@NonNull BeanContext context, @Nullable BeanResolutionContext resolutionContext) {
         AnnotationMetadata annotationMetadata = getAnnotationMetadata();
         Condition condition = annotationMetadata.hasStereotype(Requires.class) ? new RequiresCondition(annotationMetadata) : null;
+        DefaultBeanContext defaultBeanContext = (DefaultBeanContext) context;
         DefaultConditionContext<AbstractBeanContextConditional> conditionContext = new DefaultConditionContext<>(
-                (DefaultBeanContext) context,
+                defaultBeanContext,
                 this, resolutionContext);
         boolean enabled = condition == null || condition.matches(conditionContext);
-        if (ConditionLog.LOG.isDebugEnabled() && !enabled) {
-            if (this instanceof BeanConfiguration) {
-                ConditionLog.LOG.debug("{} will not be loaded due to failing conditions:", this);
-            } else {
-                ConditionLog.LOG.debug("Bean [{}] will not be loaded due to failing conditions:", this);
+        if (!enabled) {
+            if (ConditionLog.LOG.isDebugEnabled()) {
+                if (this instanceof BeanConfiguration) {
+                    ConditionLog.LOG.debug("{} will not be loaded due to failing conditions:", this);
+                } else {
+                    ConditionLog.LOG.debug("Bean [{}] will not be loaded due to failing conditions:", this);
+                }
+                for (Failure failure : conditionContext.getFailures()) {
+                    ConditionLog.LOG.debug("* {}", failure.getMessage());
+                }
             }
-            for (Failure failure : conditionContext.getFailures()) {
-                ConditionLog.LOG.debug("* {}", failure.getMessage());
-            }
+            defaultBeanContext.trackDisabledComponent(conditionContext);
         }
 
         return enabled;

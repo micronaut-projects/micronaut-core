@@ -46,7 +46,7 @@ import jakarta.inject.Singleton;
  * @since 1.0
  */
 @Internal
-public interface BeanDefinitionReference<T> extends BeanType<T> {
+public interface BeanDefinitionReference<T> extends QualifiedBeanType<T> {
 
     /**
      * @return The class name of the backing {@link BeanDefinition}

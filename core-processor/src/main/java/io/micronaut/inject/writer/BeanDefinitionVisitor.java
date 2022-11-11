@@ -106,6 +106,12 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
     );
 
     /**
+     * @return A map of the type arguments for the bean.
+     */
+    @NonNull
+    Map<String, ClassElement> getTypeArgumentMap();
+
+    /**
      * @return The name of the bean definition reference class.
      */
     @NonNull
