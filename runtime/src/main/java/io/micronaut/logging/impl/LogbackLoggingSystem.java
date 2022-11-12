@@ -20,7 +20,7 @@ import java.util.Optional;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.LoggerContext;
-import ch.qos.logback.classic.joran.JoranConfigurator;
+import ch.qos.logback.classic.util.ContextInitializer;
 import ch.qos.logback.core.joran.spi.JoranException;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Requires;
@@ -54,14 +54,16 @@ public final class LogbackLoggingSystem implements LoggingSystem {
 
     @Override
     public void refresh() {
-        getLoggerContext().reset();
-        JoranConfigurator joranConfigurator = new JoranConfigurator();
-        joranConfigurator.setContext(getLoggerContext());
+        LoggerContext context = getLoggerContext();
+        context.reset();
         String logbackXml = logbackXmlLocation.orElse(DEFAULT_LOGBACK_LOCATION);
+        URL resource = getClass().getClassLoader().getResource(logbackXml);
+        if (Objects.isNull(resource)) {
+            throw new LoggingSystemException("Resource " + logbackXml + " not found");
+        }
 
-        try {
-            URL resource = getClass().getClassLoader().getResource(logbackXml);
-            joranConfigurator.doConfigure(resource);
+        try {            
+            new ContextInitializer(context).configureByResource(resource);
         } catch (JoranException e) {
             throw new LoggingSystemException("Error while refreshing Logback", e);
         }
