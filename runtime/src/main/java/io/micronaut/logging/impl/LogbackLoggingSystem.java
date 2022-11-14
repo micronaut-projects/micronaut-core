@@ -16,6 +16,7 @@
 package io.micronaut.logging.impl;
 
 import java.net.URL;
+import java.util.Objects;
 import java.util.Optional;
 
 import ch.qos.logback.classic.Level;
