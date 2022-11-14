@@ -34,6 +34,42 @@ final class TestProps {
         noExceptionThrown()
         ctx.getProperty("test.props.manufacturer", String).get() == "Toyota"
         testPropBean.getBuilder().build().getManufacturer() == "Toyota"
+
+        cleanup:
+        ctx.close()
+    }
+
+    void "test definition uses field when getter type doesn't match"() {
+        given:
+        ApplicationContext ctx = buildContext("test.TestProps", '''
+package test;
+
+import io.micronaut.context.annotation.*;
+import io.micronaut.inject.configuration.Engine;
+
+@ConfigurationProperties("test.props")
+final class TestProps {
+    @ConfigurationBuilder(prefixes = "with")
+    protected Engine.Builder engine = Engine.builder();
+
+    public final Engine getEngine() {
+        return engine.build();
+    }
+}
+''')
+        ctx.getEnvironment().addPropertySource(PropertySource.of(["test.props.manufacturer": "Toyota"]))
+
+        when:
+        Class<?> testProps = ctx.classLoader.loadClass("test.TestProps")
+        def testPropBean = ctx.getBean(testProps)
+
+        then:
+        noExceptionThrown()
+        ctx.getProperty("test.props.manufacturer", String).get() == "Toyota"
+        testPropBean.getEngine().getManufacturer() == "Toyota"
+
+        cleanup:
+        ctx.close()
     }
 
     void "test private config field with no getter throws an error"() {
@@ -55,7 +91,6 @@ final class TestProps {
         RuntimeException ex = thrown()
         ex.message.contains("ConfigurationBuilder applied to a non accessible (private or package-private/protected in a different package) field must have a corresponding non-private getter method.")
         ex.message.contains("private Engine.Builder builder = Engine.builder();")
-
     }
 
     void "test config field with setter abnormal paramater name"() {
@@ -91,6 +126,8 @@ final class TestProps {
         ctx.getProperty("test.props.manufacturer", String).get() == "Toyota"
         testPropBean.getBuilder().build().getManufacturer() == "Toyota"
 
+        cleanup:
+        ctx.close()
     }
 
     void "test configuration builder that are interfaces"() {
@@ -173,6 +210,9 @@ interface Foo {
         then:
         noExceptionThrown()
         testPropBean.builder.build().getMaxConcurrency() == 123
+
+        cleanup:
+        ctx.close()
     }
 
 }

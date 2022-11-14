@@ -526,6 +526,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
         return properties;
     }
 
+    @Nullable
     private GroovyPropertyElement mapPropertyElement(Set<String> nativeProps,
                                                      AstBeanPropertiesUtils.BeanPropertyData value,
                                                      BeanPropertiesQuery conf,
@@ -542,7 +543,10 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                     return new AnnotationMetadataHierarchy(GroovyClassElement.this, ref.get().getAnnotationMetadata());
                 }
             };
-            if (value.readAccessKind != BeanProperties.AccessKind.METHOD) {
+            if (nativePropertiesOnly && value.field == null) {
+                return null;
+            }
+            if (value.field != null && value.readAccessKind != BeanProperties.AccessKind.METHOD) {
                 String getterName = NameUtils.getterNameFor(
                     value.propertyName,
                     value.type.equals(PrimitiveElement.BOOLEAN)
@@ -563,7 +567,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                 value.getter = null;
                 value.readAccessKind = null;
             }
-            if (!value.field.isFinal() && value.writeAccessKind != BeanProperties.AccessKind.METHOD) {
+            if (value.field != null && !value.field.isFinal() && value.writeAccessKind != BeanProperties.AccessKind.METHOD) {
                 value.setter = MethodElement.of(
                     this,
                     value.field.getDeclaringType(),

@@ -233,7 +233,19 @@ final class ConfigurationReaderBeanElementCreator extends DeclaredBeanElementCre
 
     @Override
     protected boolean visitField(BeanDefinitionVisitor visitor, FieldElement fieldElement) {
-        if (fieldElement.hasStereotype(ConfigurationBuilder.class) && !fieldElement.isAccessible(classElement)) {
+        if (fieldElement.hasStereotype(ConfigurationBuilder.class)) {
+            if (fieldElement.isAccessible(classElement)) {
+                ClassElement builderType = fieldElement.getType();
+                visitor.visitConfigBuilderField(
+                    builderType,
+                    fieldElement.getName(),
+                    fieldElement.getAnnotationMetadata(),
+                    metadataBuilder,
+                    builderType.isInterface()
+                );
+                visitConfigurationBuilder(visitor, fieldElement, builderType);
+                return true;
+            }
             throw new ProcessingException(fieldElement, "ConfigurationBuilder applied to a non accessible (private or package-private/protected in a different package) field must have a corresponding non-private getter method.");
         }
         return super.visitField(visitor, fieldElement);
