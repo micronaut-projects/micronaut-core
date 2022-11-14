@@ -4,6 +4,7 @@ import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.Order
 import io.micronaut.core.order.Ordered
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.inject.BeanDefinitionReference
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Issue
 
@@ -11,6 +12,7 @@ import jakarta.inject.Named
 import jakarta.inject.Qualifier
 
 class BeanDefinitionSpec extends AbstractTypeElementSpec {
+
 
     void 'test dynamic instantiate with constructor'() {
         given:
@@ -111,10 +113,10 @@ class Test {
 }
 
 interface X {
-    
+
 }
 class Y implements X {
-    
+
 }
 
 ''')
@@ -164,10 +166,10 @@ class Test {
 }
 
 interface X {
-    
+
 }
 class Y implements X {
-    
+
 }
 
 ''')
@@ -175,6 +177,36 @@ class Y implements X {
         then:
         def e = thrown(RuntimeException)
         e.message.contains("Bean defines an exposed type [limittypes.Y] that is not implemented by the bean type")
+    }
+
+    void "test generics from factory"() {
+        when:
+        def ref = buildBeanDefinitionReference('limittypes.Test$Method0', '''
+package limittypes;
+
+import io.micronaut.context.annotation.*;
+import jakarta.inject.Singleton;
+
+@Factory
+class Test {
+
+    @Singleton
+    X<Y> method() {
+        return new Y();
+    }
+}
+
+interface X<T> {
+
+}
+class Y implements X<Y> {
+
+}
+
+''')
+
+        then:
+        ref.getGenericBeanType().getTypeString(true) == 'X<Y>'
     }
 
     void "test exposed bean types with factory invalid type"() {

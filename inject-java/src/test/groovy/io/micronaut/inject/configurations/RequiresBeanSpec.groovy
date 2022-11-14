@@ -20,6 +20,7 @@ import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.env.PropertySource
+import io.micronaut.context.exceptions.NoSuchBeanException
 import io.micronaut.inject.configurations.requiresbean.RequiresBean
 import io.micronaut.inject.configurations.requiresconditionfalse.GitHubActionsBean
 import io.micronaut.inject.configurations.requiresconditiontrue.TrueBean
@@ -34,7 +35,7 @@ class RequiresBeanSpec extends Specification {
 
     void "test that a configuration can require a bean"() {
         given:
-        BeanContext context = new DefaultBeanContext()
+        BeanContext context = BeanContext.run()
         context.start()
 
         expect:
@@ -42,6 +43,9 @@ class RequiresBeanSpec extends Specification {
         !context.containsBean(RequiresBean)
         !context.containsBean(RequiresConfig)
         Jvm.current.isJava9Compatible() || !context.containsBean(RequiresJava9)
+
+        cleanup:
+        context.close()
     }
 
     @IgnoreIf({ env["GITHUB_ACTIONS"] } ) // fails on GitHub actions, which is expected
@@ -68,10 +72,21 @@ class RequiresBeanSpec extends Specification {
     void "test requires property when not present"() {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
+
+        when:
         applicationContext.start()
 
-        expect:
+        then:
         !applicationContext.containsBean(RequiresProperty)
+
+        when:
+        applicationContext.getBean(RequiresProperty)
+
+        then:
+        def e = thrown(NoSuchBeanException)
+        def list = e.message.readLines().collect { it.trim()}
+        list[0] == 'No bean of type [io.micronaut.inject.configurations.requiresproperty.RequiresProperty] exists. The bean [RequiresProperty] is disabled because it is within the package [io.micronaut.inject.configurations.requiresproperty] which is disabled due to bean requirements:'
+        list[1] == '* Required property [data-source.url] with value [null] not present'
     }
 
     void "test requires property when present"() {

@@ -1134,6 +1134,11 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         return proxyBeanDefinitionWriter.getTypeArguments();
     }
 
+    @Override
+    public Map<String, ClassElement> getTypeArgumentMap() {
+        return proxyBeanDefinitionWriter.getTypeArgumentMap();
+    }
+
     /**
      * Write the class to output via a visitor that manages output destination.
      *
