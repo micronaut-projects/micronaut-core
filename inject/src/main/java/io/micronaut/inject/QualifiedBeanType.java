@@ -31,6 +31,7 @@ import java.util.List;
  * An interface for a {@link BeanType} that allows qualifiers.
  *
  * @param <T> The bean type
+ * @since 4.0.0
  */
 public interface QualifiedBeanType<T> extends BeanType<T>, AnnotationMetadataDelegate {
 
