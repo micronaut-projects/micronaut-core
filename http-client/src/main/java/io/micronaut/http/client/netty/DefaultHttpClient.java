@@ -184,7 +184,6 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static io.micronaut.scheduling.instrument.InvocationInstrumenter.NOOP;
 
@@ -211,10 +210,8 @@ public class DefaultHttpClient implements
     private static final int DEFAULT_HTTP_PORT = 80;
     private static final int DEFAULT_HTTPS_PORT = 443;
 
-    private static final Supplier<List<Pattern>> HEADER_MASK_PATTERNS = SupplierUtil.memoized(() ->
-        Stream.of(".*password.*", ".*cred.*", ".*cert.*", ".*key.*", ".*secret.*", ".*token.*", ".*auth.*", ".*signa.*")
-            .map(s -> Pattern.compile(s, Pattern.CASE_INSENSITIVE))
-            .collect(Collectors.toList())
+    private static final Supplier<Pattern> HEADER_MASK_PATTERNS = SupplierUtil.memoized(() ->
+        Pattern.compile(".*(password|cred|cert|key|secret|token|auth|signat).*", Pattern.CASE_INSENSITIVE)
     );
     /**
      * Which headers <i>not</i> to copy from the first request when redirecting to a second request. There doesn't
@@ -1775,7 +1772,7 @@ public class DefaultHttpClient implements
 
     private void traceHeaders(HttpHeaders headers) {
         for (String name : headers.names()) {
-            boolean isMasked = HEADER_MASK_PATTERNS.get().stream().anyMatch(pattern -> pattern.matcher(name).matches());
+            boolean isMasked = HEADER_MASK_PATTERNS.get().matcher(name).matches();
             List<String> all = headers.getAll(name);
             if (all.size() > 1) {
                 for (String value : all) {

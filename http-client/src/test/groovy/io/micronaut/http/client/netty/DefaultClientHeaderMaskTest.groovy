@@ -15,7 +15,7 @@ import java.util.concurrent.TimeUnit
 
 class DefaultClientHeaderMaskTest extends Specification {
 
-    def "check masking works"() {
+    def "check masking works for #value"() {
         given:
         def ctx = ApplicationContext.run()
         def client = ctx.createBean(DefaultHttpClient, "http://localhost:8080")
