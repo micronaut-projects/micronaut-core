@@ -107,6 +107,7 @@ class StringUtilsSpec extends Specification {
         'abc'    | 'a' | 'bc'
         'abc'    | 'd' | 'abc'
         '   abc' | ' ' | 'abc'
+        'aa'     | 'a' | ''
     }
 
     @Unroll
