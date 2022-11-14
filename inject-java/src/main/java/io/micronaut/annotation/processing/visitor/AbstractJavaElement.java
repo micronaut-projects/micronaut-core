@@ -313,91 +313,78 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
      * @param isTypeVariable         is the type a type variable
      * @return The class element
      */
-    protected @NonNull ClassElement mirrorToClassElement(
-        TypeMirror returnType,
-        JavaVisitorContext visitorContext,
-        Map<String, Map<String, TypeMirror>> genericsInfo,
-        boolean includeTypeAnnotations,
-        boolean isTypeVariable) {
+    protected @NonNull ClassElement mirrorToClassElement(TypeMirror returnType,
+                                                         JavaVisitorContext visitorContext,
+                                                         Map<String, Map<String, TypeMirror>> genericsInfo,
+                                                         boolean includeTypeAnnotations,
+                                                         boolean isTypeVariable) {
         if (genericsInfo == null) {
             genericsInfo = Collections.emptyMap();
         }
         if (returnType instanceof NoType) {
             return PrimitiveElement.VOID;
-        } else if (returnType instanceof DeclaredType) {
-            DeclaredType dt = (DeclaredType) returnType;
+        }
+        if (returnType instanceof DeclaredType dt) {
             Element e = dt.asElement();
-            //Declared types can wrap other types, like primitives
-            if (e.asType() instanceof DeclaredType) {
-                List<? extends TypeMirror> typeArguments = dt.getTypeArguments();
-                if (e instanceof TypeElement) {
-                    TypeElement typeElement = (TypeElement) e;
-                    Map<String, TypeMirror> boundGenerics = resolveBoundGenerics(visitorContext, genericsInfo);
-                    if (visitorContext.getModelUtils().resolveKind(typeElement, ElementKind.ENUM).isPresent()) {
-                        return new JavaEnumElement(
-                            typeElement,
-                            resolveElementAnnotationMetadataFactory(typeElement, dt, includeTypeAnnotations),
-                            visitorContext
-                        );
-                    } else {
-                        genericsInfo = visitorContext.getGenericUtils().alignNewGenericsInfo(
-                            typeElement,
-                            typeArguments,
-                            boundGenerics
-                        );
-                        return new JavaClassElement(
-                            typeElement,
-                            resolveElementAnnotationMetadataFactory(typeElement, dt, includeTypeAnnotations),
-                            visitorContext,
-                            typeArguments,
-                            genericsInfo,
-                            isTypeVariable
-                        );
-                    }
-                }
-            } else {
+            // Declared types can wrap other types, like primitives
+            if (!(e.asType() instanceof DeclaredType)) {
                 return mirrorToClassElement(e.asType(), visitorContext, genericsInfo, includeTypeAnnotations);
             }
-        } else if (returnType instanceof TypeVariable) {
-            TypeVariable tv = (TypeVariable) returnType;
-            return resolveTypeVariable(
-                visitorContext,
-                genericsInfo,
-                includeTypeAnnotations,
-                tv,
-                tv
-            );
-
-        } else if (returnType instanceof ArrayType) {
-            ArrayType at = (ArrayType) returnType;
+            if (e instanceof TypeElement typeElement) {
+                List<? extends TypeMirror> typeArguments = dt.getTypeArguments();
+                Map<String, TypeMirror> boundGenerics = resolveBoundGenerics(visitorContext, genericsInfo);
+                if (visitorContext.getModelUtils().resolveKind(typeElement, ElementKind.ENUM).isPresent()) {
+                    return new JavaEnumElement(
+                        typeElement,
+                        resolveElementAnnotationMetadataFactory(typeElement, dt, includeTypeAnnotations),
+                        visitorContext
+                    );
+                }
+                genericsInfo = visitorContext.getGenericUtils().alignNewGenericsInfo(
+                    typeElement,
+                    typeArguments,
+                    boundGenerics
+                );
+                return new JavaClassElement(
+                    typeElement,
+                    resolveElementAnnotationMetadataFactory(typeElement, dt, includeTypeAnnotations),
+                    visitorContext,
+                    typeArguments,
+                    genericsInfo,
+                    isTypeVariable
+                );
+            }
+            return PrimitiveElement.VOID;
+        }
+        if (returnType instanceof TypeVariable tv) {
+            return resolveTypeVariable(visitorContext, genericsInfo, includeTypeAnnotations, tv, tv);
+        }
+        if (returnType instanceof ArrayType at) {
             TypeMirror componentType = at.getComponentType();
             ClassElement arrayType;
-            if (componentType instanceof TypeVariable && componentType.getKind() == TypeKind.TYPEVAR) {
-                TypeVariable tv = (TypeVariable) componentType;
+            if (componentType instanceof TypeVariable tv && componentType.getKind() == TypeKind.TYPEVAR) {
                 arrayType = resolveTypeVariable(visitorContext, genericsInfo, includeTypeAnnotations, tv, at);
             } else {
                 arrayType = mirrorToClassElement(componentType, visitorContext, genericsInfo, includeTypeAnnotations);
             }
             return arrayType.toArray();
-        } else if (returnType instanceof PrimitiveType) {
-            PrimitiveType pt = (PrimitiveType) returnType;
+        }
+        if (returnType instanceof PrimitiveType pt) {
             return PrimitiveElement.valueOf(pt.getKind().name());
-        } else if (returnType instanceof WildcardType) {
-            WildcardType wt = (WildcardType) returnType;
+        }
+        if (returnType instanceof WildcardType wt) {
             Map<String, Map<String, TypeMirror>> finalGenericsInfo = genericsInfo;
             TypeMirror superBound = wt.getSuperBound();
             Stream<? extends TypeMirror> lowerBounds;
-            if (superBound instanceof UnionType) {
-                lowerBounds = ((UnionType) superBound).getAlternatives().stream();
-            } else if (superBound == null) {
-                lowerBounds = Stream.empty();
+            if (superBound instanceof UnionType unionType) {
+                lowerBounds = unionType.getAlternatives().stream();
             } else {
-                lowerBounds = Stream.of(superBound);
+                lowerBounds = Stream.ofNullable(superBound);
             }
             TypeMirror extendsBound = wt.getExtendsBound();
             Stream<? extends TypeMirror> upperBounds;
-            if (extendsBound instanceof IntersectionType) {
-                upperBounds = ((IntersectionType) extendsBound).getBounds().stream();
+            if (extendsBound instanceof IntersectionType it) {
+                upperBounds = it.getBounds().stream();
             } else if (extendsBound == null) {
                 upperBounds = Stream.of(visitorContext.getElements().getTypeElement("java.lang.Object").asType());
             } else {
@@ -408,10 +395,10 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
                 wt,
                 upperBounds
                     .map(tm -> (JavaClassElement) mirrorToClassElement(tm, visitorContext, finalGenericsInfo, includeTypeAnnotations))
-                    .collect(Collectors.toList()),
+                    .toList(),
                 lowerBounds
                     .map(tm -> (JavaClassElement) mirrorToClassElement(tm, visitorContext, finalGenericsInfo, includeTypeAnnotations))
-                    .collect(Collectors.toList())
+                    .toList()
             );
         }
         return PrimitiveElement.VOID;
@@ -444,19 +431,18 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
         TypeMirror bound = boundGenerics.get(tv.toString());
         if (bound != null && bound != declaration) {
             return mirrorToClassElement(bound, visitorContext, genericsInfo, includeTypeAnnotations, true);
-        } else {
-            // type variable is still free.
-            List<? extends TypeMirror> boundsUnresolved = upperBound instanceof IntersectionType ?
-                ((IntersectionType) upperBound).getBounds() :
-                Collections.singletonList(upperBound);
-            List<JavaClassElement> bounds = boundsUnresolved.stream()
-                .map(tm -> (JavaClassElement) mirrorToClassElement(tm,
-                    visitorContext,
-                    genericsInfo,
-                    includeTypeAnnotations))
-                .collect(Collectors.toList());
-            return new JavaGenericPlaceholderElement(tv, bounds, elementAnnotationMetadataFactory, 0);
         }
+        // type variable is still free.
+        List<? extends TypeMirror> boundsUnresolved = upperBound instanceof IntersectionType ?
+            ((IntersectionType) upperBound).getBounds() :
+            Collections.singletonList(upperBound);
+        List<JavaClassElement> bounds = boundsUnresolved.stream()
+            .map(tm -> (JavaClassElement) mirrorToClassElement(tm,
+                visitorContext,
+                genericsInfo,
+                includeTypeAnnotations))
+            .toList();
+        return new JavaGenericPlaceholderElement(tv, bounds, elementAnnotationMetadataFactory, 0);
     }
 
     private Map<String, TypeMirror> resolveBoundGenerics(JavaVisitorContext visitorContext, Map<String, Map<String, TypeMirror>> genericsInfo) {

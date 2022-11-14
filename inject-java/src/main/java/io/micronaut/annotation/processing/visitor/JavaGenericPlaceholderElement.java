@@ -19,8 +19,9 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
-import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
+import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 
 import javax.lang.model.element.TypeParameterElement;
 import javax.lang.model.type.TypeVariable;
@@ -56,6 +57,11 @@ final class JavaGenericPlaceholderElement extends JavaClassElement implements Ge
         );
         this.realTypeVariable = realTypeVariable;
         this.bounds = bounds;
+    }
+
+    @Override
+    public MutableAnnotationMetadataDelegate<?> getAnnotationMetadata() {
+        return bounds.get(0).getAnnotationMetadata();
     }
 
     @Override
