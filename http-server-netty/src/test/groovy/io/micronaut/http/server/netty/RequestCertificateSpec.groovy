@@ -6,13 +6,17 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.netty.handler.ssl.util.SelfSignedCertificate
 import reactor.core.publisher.Flux
+import spock.lang.Shared
 
 import java.nio.file.Files
+import java.nio.file.Path
 import java.security.KeyStore
 import java.security.cert.Certificate
 import java.security.cert.X509Certificate
 
 class RequestCertificateSpec extends AbstractMicronautSpec {
+    @Shared Path keyStorePath
+    @Shared Path trustStorePath
 
     void "test certificate extraction"() {
         when:
@@ -25,11 +29,17 @@ class RequestCertificateSpec extends AbstractMicronautSpec {
     }
 
     @Override
+    void cleanupSpec() {
+        Files.deleteIfExists(keyStorePath)
+        Files.deleteIfExists(trustStorePath)
+    }
+
+    @Override
     Map<String, Object> getConfiguration() {
         def certificate = new SelfSignedCertificate()
 
-        def keyStorePath = Files.createTempFile("micronaut-test-key-store", "pkcs12")
-        def trustStorePath = Files.createTempFile("micronaut-test-trust-store", "pkcs12")
+        keyStorePath = Files.createTempFile("micronaut-test-key-store", "pkcs12")
+        trustStorePath = Files.createTempFile("micronaut-test-trust-store", "pkcs12")
 
         KeyStore ks = KeyStore.getInstance("PKCS12")
         ks.load(null, null)
