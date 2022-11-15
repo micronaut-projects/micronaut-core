@@ -1786,7 +1786,7 @@ public class DefaultHttpClient implements
         }
     }
 
-    String mask(String value) {
+    private String mask(String value) {
         if (value == null) {
             return null;
         }
