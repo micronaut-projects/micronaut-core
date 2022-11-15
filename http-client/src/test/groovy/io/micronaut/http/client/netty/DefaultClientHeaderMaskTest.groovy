@@ -29,8 +29,8 @@ class DefaultClientHeaderMaskTest extends Specification {
         where:
         value       | expected
         null        | null
-        "foo"       | "*MASKED* [3 chars]"
-        "Tim Yates" | "*MASKED* [9 chars]"
+        "foo"       | "*MASKED*"
+        "Tim Yates" | "*MASKED*"
     }
 
     def "check mask detects common security headers"() {
@@ -60,16 +60,16 @@ class DefaultClientHeaderMaskTest extends Specification {
 
         then:
         appender.events.size() == 10
-        appender.events.join("\n") == """Authorization: *MASKED* [10 chars]
-            |Proxy-Authorization: *MASKED* [20 chars]
+        appender.events.join("\n") == """Authorization: *MASKED*
+            |Proxy-Authorization: *MASKED*
             |Cookie: baz
             |Set-Cookie: qux
             |X-Forwarded-For: quux
             |X-Forwarded-For: fred
             |X-Forwarded-Host: quuz
             |X-Real-IP: waldo
-            |Credential: *MASKED* [3 chars]
-            |Signature: *MASKED* [19 chars]""".stripMargin()
+            |Credential: *MASKED*
+            |Signature: *MASKED*""".stripMargin()
 
         cleanup:
         ctx.close()

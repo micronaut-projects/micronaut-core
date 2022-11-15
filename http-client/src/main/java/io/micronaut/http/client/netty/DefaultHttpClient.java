@@ -1786,11 +1786,12 @@ public class DefaultHttpClient implements
         }
     }
 
-    private String mask(String value) {
+    @Nullable
+    private String mask(@Nullable String value) {
         if (value == null) {
             return null;
         }
-        return "*MASKED* [" + value.length() + " chars]";
+        return "*MASKED*";
     }
 
     private static MediaTypeCodecRegistry createDefaultMediaTypeRegistry() {
