@@ -15,14 +15,14 @@ dependencies {
     api project(":core-reactive")
     api libs.managed.validation
 
-    compileOnly(libs.managed.gorm) {
+    compileOnly(libs.gorm) {
         exclude(module: 'groovy')
     }
     compileOnly project(":http-server")
 
     implementation libs.managed.reactor
 
-    testImplementation libs.managed.spotbugs
+    testImplementation libs.spotbugs
     testAnnotationProcessor project(":inject-java")
     testCompileOnly project(":inject-groovy")
     testImplementation project(":inject")

@@ -20,14 +20,14 @@ dependencies {
     testImplementation project(":inject")
     testImplementation project(":management")
     testImplementation project(":session")
-    testImplementation libs.managed.jcache
+    testImplementation libs.jcache
     testImplementation libs.managed.groovy.sql
     testImplementation libs.managed.groovy.templates
     testImplementation libs.managed.groovy.json
     testImplementation libs.logbook.netty
     testImplementation project(":function-client")
     testImplementation project(":function-web")
-    testRuntimeOnly(platform(libs.boms.micronaut.aws))
+    testRuntimeOnly(platform(libs.test.boms.micronaut.aws))
     testRuntimeOnly libs.aws.java.sdk.lambda
     testRuntimeOnly libs.bcpkix
 

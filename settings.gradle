@@ -20,7 +20,7 @@ plugins {
 rootProject.name = 'micronaut'
 
 include "aop"
-include "bom"
+include "core-bom"
 include "parent"
 include "buffer-netty"
 include "core"

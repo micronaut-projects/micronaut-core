@@ -1,0 +1,21 @@
+plugins {
+    id 'io.micronaut.build.internal.bom'
+}
+
+group projectGroupId
+version projectVersion
+
+micronautBom {
+    extraExcludedProjects = [
+            "benchmarks",
+            "inject-test-utils"
+    ]
+    propertyName = 'core'
+}
+
+micronautBuild {
+    binaryCompatibility {
+        def (major, minor, patch) = (version - '-SNAPSHOT').split('[.]').collect { it.toInteger() }
+        enabled = major > 4 || (major == 4 && minor > 0) || (major == 4 && minor == 0 && patch > 0)
+    }
+}

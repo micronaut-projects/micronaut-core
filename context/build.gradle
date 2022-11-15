@@ -12,7 +12,7 @@ dependencies {
     compileOnly project(':core-reactive')
     compileOnly project(':core-processor')
     compileOnly libs.log4j
-    compileOnly libs.managed.logback
+    compileOnly libs.logback
 
     testCompileOnly project(":inject-groovy")
     testAnnotationProcessor project(":inject-java")

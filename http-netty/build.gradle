@@ -5,7 +5,7 @@ plugins {
 dependencies {
     annotationProcessor project(":inject-java")
     annotationProcessor project(":graal")
-    compileOnly libs.managed.graal
+    compileOnly libs.graal
     compileOnly libs.managed.netty.transport.native.epoll
     compileOnly libs.managed.netty.transport.native.kqueue
     compileOnly project(":websocket")
