@@ -20,6 +20,40 @@ import io.micronaut.inject.BeanDefinition
 
 class ExecutableBeanSpec extends AbstractBeanDefinitionSpec {
 
+    void "test executable at class level"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test.ExecutableController','''\
+package test
+
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.inject.annotation.*;
+
+@jakarta.inject.Singleton
+@Executable
+class ExecutableController {
+    String foo
+
+    @Executable
+    public int round(float num) {
+        return Math.round(num);
+    }
+
+    @Executable
+    public int sum(int a, int b) {
+        return doSum()
+    }
+
+    private int doSum() {
+        return a + b
+    }
+}
+''')
+        expect:
+        definition != null
+        definition.executableMethods.size() == 2
+        definition.executableMethods*.name == ['round', 'sum'] as Set
+    }
+
     void "test executable on stereotype"() {
         given:
         BeanDefinition definition = buildBeanDefinition('test.ExecutableController','''\
@@ -105,14 +139,14 @@ class MyBean  {
         @RepeatableExecutable("b")
     ])
     void run() {
-        
+
     }
-    
-       
+
+
     @RepeatableExecutable("a")
     @RepeatableExecutable("b")
     void run2() {
-        
+
     }
 }
 ''')
