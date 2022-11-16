@@ -24,7 +24,7 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Produces
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
-import io.micronaut.http.context.ServerRequestContext
+import io.micronaut.runtime.http.scope.RequestScope
 import io.micronaut.runtime.server.EmbeddedServer
 import jakarta.inject.Inject
 import reactor.core.publisher.Flux
@@ -100,27 +100,32 @@ class CorruptedServerRequestContextSpec extends Specification {
             .collect()
     }
 
+    @RequestScope
+    static class RequestScopedBean {
+        Boolean value
+    }
+
     @Controller('/corrupted-context')
     @Produces(MediaType.TEXT_PLAIN)
     static class TestContextController {
 
         @Inject
         @Client("/corrupted-context")
-        HttpClient client;
+        HttpClient client
+
+        @Inject
+        RequestScopedBean requestScopedBean
 
         @Get("/mono-http-response-flux")
         Mono<HttpResponse<Flux<String>>> monoHttpResponseFlux() {
             Mono.from(client.exchange("/first", String.class))
                     .<HttpResponse<Flux<String>>>map(first -> {
 
-                        ServerRequestContext.currentRequest().get().setAttribute("test", "value")
+                        requestScopedBean.setValue(true)
 
                         var flux = Mono.from(client.exchange("/second", String.class))
                                 .flatMapMany(second -> {
-                                    if (!ServerRequestContext.currentRequest()
-                                            .get()
-                                            .getAttribute("test", String.class)
-                                            .isPresent()) {
+                                    if (requestScopedBean.getValue() == null) {
                                         throw new IllegalStateException("!!CONTEXT IS LOST!!")
                                     }
 
