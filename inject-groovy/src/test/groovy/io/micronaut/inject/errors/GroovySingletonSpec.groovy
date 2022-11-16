@@ -30,13 +30,13 @@ import io.micronaut.inject.qualifiers.*
 @Singleton
 class MyBean  {
     @jakarta.inject.Inject
-    @javax.annotation.Nullable
+    @io.micronaut.core.annotation.Nullable
     AnotherBean injected
 }
 
 @jakarta.inject.Singleton
 class AnotherBean {
-    
+
 }
 ''')
         then:

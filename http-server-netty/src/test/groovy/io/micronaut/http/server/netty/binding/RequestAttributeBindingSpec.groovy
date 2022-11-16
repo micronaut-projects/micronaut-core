@@ -16,7 +16,7 @@ import io.micronaut.http.server.netty.AbstractMicronautSpec
 import org.reactivestreams.Publisher
 import spock.lang.Issue
 
-import javax.annotation.Nullable
+import io.micronaut.core.annotation.Nullable
 
 class RequestAttributeBindingSpec extends AbstractMicronautSpec {
 
@@ -24,7 +24,7 @@ class RequestAttributeBindingSpec extends AbstractMicronautSpec {
     void "test request attribute binding from a filter"() {
         given:
         BlockingHttpClient client = rxClient.toBlocking()
-        
+
         expect:
         client.retrieve("/attribute/filter/implicit") == "Sally"
         client.retrieve("/attribute/filter/implicit/nonnull") == "Sally"

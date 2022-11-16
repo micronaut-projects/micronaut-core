@@ -1,11 +1,9 @@
 package io.micronaut.inject.validation;
 
-import javax.annotation.Nullable;
 import javax.persistence.Entity;
 import javax.validation.constraints.NotBlank;
 
 @Entity
-@Nullable
 public class Account3 {
 
     private Long id;

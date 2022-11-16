@@ -16,6 +16,7 @@
 package io.micronaut.inject.property
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Property
 
 class PropertyAnnotationSpec extends Specification {
     void "test inject properties"() {
@@ -58,14 +59,12 @@ class PropertyAnnotationSpec extends Specification {
     }
 }
 
-import io.micronaut.context.annotation.Property
+import io.micronaut.core.annotation.Nullable
 import io.micronaut.core.convert.format.MapFormat
 import spock.lang.Specification
 
-import javax.annotation.Nullable
 import javax.inject.Inject
 import javax.inject.Singleton
-import java.util.Map
 
 @Singleton
 class ConstructorPropertyInject {

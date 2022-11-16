@@ -15,15 +15,13 @@
  */
 package io.micronaut.visitors
 
-import io.micronaut.http.annotation.Get
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.core.annotation.Nullable
+import io.micronaut.http.annotation.Get
 import io.micronaut.inject.ast.ClassElement
-import io.micronaut.inject.ast.PropertyElement
 import spock.lang.IgnoreIf
-import spock.lang.Specification
 import spock.util.environment.Jvm
 
-import javax.annotation.Nullable
 import javax.validation.constraints.NotBlank
 
 class PropertyElementSpec extends AbstractTypeElementSpec {
@@ -59,21 +57,21 @@ import io.micronaut.http.annotation.Get;
 
 @Controller("/test")
 public class TestController {
-    
+
     private int age;
-    @javax.annotation.Nullable
+    @io.micronaut.core.annotation.Nullable
     private String name;
-    @javax.annotation.Nullable
+    @io.micronaut.core.annotation.Nullable
     private String description;
-    
+
     /**
      * The age
      */
     @Get("/getMethod")
     public int getAge() {
         return age;
-    }    
-        
+    }
+
     /**
      * The age
      */
@@ -85,7 +83,7 @@ public class TestController {
     public String getName() {
         return name;
     }
-    
+
     @javax.validation.constraints.NotBlank
     public void setName(@javax.validation.constraints.NotBlank String n) {
         name = n;
@@ -130,10 +128,10 @@ import jakarta.inject.Inject;
 
 @Controller("/test")
 public class TestController<T extends CharSequence> {
-    
+
     private int age;
     private T name;
-    
+
     public int getAge() {
         return age;
     }
@@ -141,7 +139,7 @@ public class TestController<T extends CharSequence> {
     public T getName() {
         return name;
     }
-    
+
     public void setName(T n) {
         name = n;
     }
@@ -168,9 +166,9 @@ import jakarta.inject.Inject;
 
 @Controller("/test")
 public class TestController {
-    
+
     private Response<Integer> age;
-    
+
     public Response<Integer> getAge() {
         return age;
     }

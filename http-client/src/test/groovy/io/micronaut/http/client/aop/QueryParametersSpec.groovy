@@ -32,8 +32,7 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Unroll
-
-import javax.annotation.Nullable
+import io.micronaut.core.annotation.Nullable
 
 class QueryParametersSpec extends Specification {
 
