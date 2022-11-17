@@ -17,6 +17,7 @@ package io.micronaut.http.client.netty;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -30,14 +31,27 @@ import reactor.core.publisher.Sinks;
  * @param <T> Element type
  */
 @Internal
-final class CancellableMonoSink<T> implements Publisher<T>, Sinks.One<T>, Subscription {
+final class CancellableMonoSink<T> implements Publisher<T>, Sinks.One<T>, Subscription, PoolSink<T> {
     private static final Object EMPTY = new Object();
+
+    @Nullable
+    private final BlockHint blockHint;
 
     private T value;
     private Throwable failure;
     private boolean complete = false;
     private Subscriber<? super T> subscriber = null;
     private boolean subscriberWaiting = false;
+
+    CancellableMonoSink(@Nullable BlockHint blockHint) {
+        this.blockHint = blockHint;
+    }
+
+    @Override
+    @Nullable
+    public BlockHint getBlockHint() {
+        return blockHint;
+    }
 
     @Override
     public synchronized void subscribe(Subscriber<? super T> s) {

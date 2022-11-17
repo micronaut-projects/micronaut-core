@@ -494,7 +494,8 @@ public class DefaultHttpClient implements
 
             @Override
             public <I, O, E> io.micronaut.http.HttpResponse<O> exchange(io.micronaut.http.HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType) {
-                Flux<HttpResponse<O>> publisher = Flux.from(DefaultHttpClient.this.exchange(request, bodyType, errorType));
+                BlockHint blockHint = BlockHint.willBlockThisThread();
+                Flux<HttpResponse<O>> publisher = Flux.from(DefaultHttpClient.this.exchange(request, bodyType, errorType, blockHint));
                 return publisher.doOnNext(res -> {
                     Optional<ByteBuf> byteBuf = res.getBody(ByteBuf.class);
                     byteBuf.ifPresent(bb -> {
@@ -770,11 +771,16 @@ public class DefaultHttpClient implements
 
     @Override
     public <I, O, E> Publisher<io.micronaut.http.HttpResponse<O>> exchange(@NonNull io.micronaut.http.HttpRequest<I> request, @NonNull Argument<O> bodyType, @NonNull Argument<E> errorType) {
+        return exchange(request, bodyType, errorType, null);
+    }
+
+    @NonNull
+    private <I, O, E> Flux<HttpResponse<O>> exchange(io.micronaut.http.HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType, @Nullable BlockHint blockHint) {
         setupConversionService(request);
         final io.micronaut.http.HttpRequest<Object> parentRequest = ServerRequestContext.currentRequest().orElse(null);
         Publisher<URI> uriPublisher = resolveRequestURI(request);
         return Flux.from(uriPublisher)
-                .switchMap(uri -> exchangeImpl(uri, parentRequest, toMutableRequest(request), bodyType, errorType));
+            .switchMap(uri -> exchangeImpl(uri, parentRequest, toMutableRequest(request), bodyType, errorType, blockHint));
     }
 
     @Override
@@ -1024,7 +1030,7 @@ public class DefaultHttpClient implements
         } catch (Exception e) {
             return Flux.error(e);
         }
-        return connectionManager.connect(requestKey).flatMapMany(poolHandle -> {
+        return connectionManager.connect(requestKey, null).flatMapMany(poolHandle -> {
             request.setAttribute(NettyClientHttpRequest.CHANNEL, poolHandle.channel);
 
             boolean sse = !isProxy && isAcceptEvents(request);
@@ -1074,11 +1080,12 @@ public class DefaultHttpClient implements
      * Implementation of {@link #exchange(io.micronaut.http.HttpRequest, Argument, Argument)} (after URI resolution).
      */
     private <I, O, E> Publisher<? extends io.micronaut.http.HttpResponse<O>> exchangeImpl(
-            URI requestURI,
-            io.micronaut.http.HttpRequest<?> parentRequest,
-            MutableHttpRequest<I> request,
-            @NonNull Argument<O> bodyType,
-            @NonNull Argument<E> errorType) {
+        URI requestURI,
+        io.micronaut.http.HttpRequest<?> parentRequest,
+        MutableHttpRequest<I> request,
+        @NonNull Argument<O> bodyType,
+        @NonNull Argument<E> errorType,
+        @Nullable BlockHint blockHint) {
         AtomicReference<MutableHttpRequest<?>> requestWrapper = new AtomicReference<>(request);
 
         RequestKey requestKey;
@@ -1088,7 +1095,7 @@ public class DefaultHttpClient implements
             return Flux.error(e);
         }
 
-        Mono<ConnectionManager.PoolHandle> handlePublisher = connectionManager.connect(requestKey);
+        Mono<ConnectionManager.PoolHandle> handlePublisher = connectionManager.connect(requestKey, blockHint);
 
         Flux<io.micronaut.http.HttpResponse<O>> responsePublisher = handlePublisher.flatMapMany(poolHandle -> {
             poolHandle.channel.pipeline()
@@ -2168,7 +2175,7 @@ public class DefaultHttpClient implements
 
         @Override
         protected Function<URI, Publisher<? extends HttpResponse<O>>> makeRedirectHandler(io.micronaut.http.HttpRequest<?> parentRequest, MutableHttpRequest<Object> redirectRequest) {
-            return uri -> exchangeImpl(uri, parentRequest, redirectRequest, bodyType, errorType);
+            return uri -> exchangeImpl(uri, parentRequest, redirectRequest, bodyType, errorType, null);
         }
 
         @Override

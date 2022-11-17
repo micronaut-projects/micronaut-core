@@ -35,7 +35,7 @@ import java.util.function.Consumer;
  * {@link io.micronaut.http.client.HttpClientConfiguration.ConnectionPoolConfiguration}.
  * <p>
  * This class consists of various mutator methods (e.g. {@link #addPendingRequest}) that
- * may be called concurrently and in a reentrant fashion (e.g. inside {@link #openNewConnection()}).
+ * may be called concurrently and in a reentrant fashion (e.g. inside {@link #openNewConnection)}).
  * These mutator methods update their respective fields and then mark this class as
  * {@link #dirty()}. The state management logic ensures that {@link #doSomeWork()} is called in a
  * serialized fashion (no concurrency or reentrancy) at least once after each {@link #dirty()}
@@ -50,7 +50,7 @@ abstract class PoolResizer {
 
     private final AtomicInteger pendingConnectionCount = new AtomicInteger(0);
 
-    private final Deque<Sinks.One<ConnectionManager.PoolHandle>> pendingRequests = new ConcurrentLinkedDeque<>();
+    private final Deque<PoolSink<ConnectionManager.PoolHandle>> pendingRequests = new ConcurrentLinkedDeque<>();
     private final List<ResizerConnection> http1Connections = new CopyOnWriteArrayList<>();
     private final List<ResizerConnection> http2Connections = new CopyOnWriteArrayList<>();
 
@@ -97,8 +97,9 @@ abstract class PoolResizer {
     }
 
     private void doSomeWork() {
+        BlockHint blockedPendingRequests = null;
         while (true) {
-            Sinks.One<ConnectionManager.PoolHandle> toDispatch = pendingRequests.pollFirst();
+            PoolSink<ConnectionManager.PoolHandle> toDispatch = pendingRequests.pollFirst();
             if (toDispatch == null) {
                 break;
             }
@@ -119,6 +120,8 @@ abstract class PoolResizer {
             }
             if (!dispatched) {
                 pendingRequests.addFirst(toDispatch);
+                blockedPendingRequests =
+                    BlockHint.combine(blockedPendingRequests, toDispatch.getBlockHint());
                 break;
             }
         }
@@ -148,7 +151,7 @@ abstract class PoolResizer {
             this.pendingConnectionCount.addAndGet(connectionsToOpen);
             for (int i = 0; i < connectionsToOpen; i++) {
                 try {
-                    openNewConnection();
+                    openNewConnection(blockedPendingRequests);
                 } catch (Exception e) {
                     try {
                         onNewConnectionFailure(e);
@@ -161,7 +164,7 @@ abstract class PoolResizer {
         }
     }
 
-    private boolean dispatchSafe(ResizerConnection connection, Sinks.One<ConnectionManager.PoolHandle> toDispatch) {
+    private boolean dispatchSafe(ResizerConnection connection, PoolSink<ConnectionManager.PoolHandle> toDispatch) {
         try {
             return connection.dispatch(toDispatch);
         } catch (Exception e) {
@@ -177,7 +180,7 @@ abstract class PoolResizer {
         }
     }
 
-    abstract void openNewConnection() throws Exception;
+    abstract void openNewConnection(@Nullable BlockHint blockedPendingRequests) throws Exception;
 
     static boolean incrementWithLimit(AtomicInteger variable, int limit) {
         while (true) {
@@ -221,7 +224,7 @@ abstract class PoolResizer {
         dirty();
     }
 
-    final void addPendingRequest(Sinks.One<ConnectionManager.PoolHandle> sink) {
+    final void addPendingRequest(PoolSink<ConnectionManager.PoolHandle> sink) {
         if (pendingRequests.size() >= connectionPoolConfiguration.getMaxPendingAcquires()) {
             sink.tryEmitError(new HttpClientException("Cannot acquire connection, exceeded max pending acquires configuration"));
             return;
@@ -277,6 +280,6 @@ abstract class PoolResizer {
          * @return {@code true} if the acquisition may succeed (if it fails later, the pending
          * request must be readded), or {@code false} if it fails immediately
          */
-        abstract boolean dispatch(Sinks.One<ConnectionManager.PoolHandle> sink) throws Exception;
+        abstract boolean dispatch(PoolSink<ConnectionManager.PoolHandle> sink) throws Exception;
     }
 }

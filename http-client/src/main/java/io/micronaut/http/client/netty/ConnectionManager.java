@@ -366,10 +366,11 @@ class ConnectionManager {
      * Get a connection for non-websocket http client methods.
      *
      * @param requestKey The remote to connect to
+     * @param blockHint Optional information about what threads are blocked for this connection request
      * @return A mono that will complete once the channel is ready for transmission
      */
-    Mono<PoolHandle> connect(DefaultHttpClient.RequestKey requestKey) {
-        return pools.computeIfAbsent(requestKey, Pool::new).acquire();
+    Mono<PoolHandle> connect(DefaultHttpClient.RequestKey requestKey, @Nullable BlockHint blockHint) {
+        return pools.computeIfAbsent(requestKey, Pool::new).acquire(blockHint);
     }
 
     /**
@@ -381,7 +382,7 @@ class ConnectionManager {
      * @return A mono that will complete when the handshakes complete
      */
     Mono<?> connectForWebsocket(DefaultHttpClient.RequestKey requestKey, ChannelHandler handler) {
-        Sinks.Empty<Object> initial = new CancellableMonoSink<>();
+        Sinks.Empty<Object> initial = new CancellableMonoSink<>(null);
 
         ChannelFuture connectFuture = doConnect(requestKey, new ChannelInitializer<Channel>() {
             @Override
@@ -796,8 +797,8 @@ class ConnectionManager {
             this.requestKey = requestKey;
         }
 
-        Mono<PoolHandle> acquire() {
-            Sinks.One<PoolHandle> sink = new CancellableMonoSink<>();
+        Mono<PoolHandle> acquire(@Nullable BlockHint blockHint) {
+            PoolSink<PoolHandle> sink = new CancellableMonoSink<>(blockHint);
             addPendingRequest(sink);
             Optional<Duration> acquireTimeout = configuration.getConnectionPoolConfiguration().getAcquireTimeout();
             //noinspection OptionalIsPresent
@@ -830,7 +831,7 @@ class ConnectionManager {
         }
 
         @Override
-        void openNewConnection() {
+        void openNewConnection(@Nullable BlockHint blockHint) throws Exception {
             // open a new connection
             ChannelInitializer<?> initializer;
             if (requestKey.isSecure()) {
@@ -867,7 +868,13 @@ class ConnectionManager {
                         throw new AssertionError("Unknown plaintext mode");
                 }
             }
-            addInstrumentedListener(doConnect(requestKey, initializer), future -> {
+            ChannelFuture channelFuture = doConnect(requestKey, initializer);
+            if (blockHint != null && blockHint.blocks(channelFuture.channel().eventLoop())) {
+                channelFuture.channel().close();
+                onNewConnectionFailure(BlockHint.createException());
+                return;
+            }
+            addInstrumentedListener(channelFuture, future -> {
                 if (!future.isSuccess()) {
                     onNewConnectionFailure(future.cause());
                 }
@@ -977,11 +984,16 @@ class ConnectionManager {
             }
 
             @Override
-            public boolean dispatch(Sinks.One<PoolHandle> sink) {
+            public boolean dispatch(PoolSink<PoolHandle> sink) {
                 if (!tryEarmarkForRequest()) {
                     return false;
                 }
 
+                BlockHint blockHint = sink.getBlockHint();
+                if (blockHint != null && blockHint.blocks(channel.eventLoop())) {
+                    sink.tryEmitError(BlockHint.createException());
+                    return true;
+                }
                 if (channel.eventLoop().inEventLoop()) {
                     dispatch0(sink);
                 } else {
@@ -996,7 +1008,7 @@ class ConnectionManager {
              *
              * @param sink The request for a pool handle
              */
-            abstract void dispatch0(Sinks.One<PoolHandle> sink);
+            abstract void dispatch0(PoolSink<PoolHandle> sink);
 
             /**
              * Try to add a new request to this connection. This is called outside the event loop,
@@ -1068,7 +1080,7 @@ class ConnectionManager {
             }
 
             @Override
-            void dispatch0(Sinks.One<PoolHandle> sink) {
+            void dispatch0(PoolSink<PoolHandle> sink) {
                 if (!channel.isActive()) {
                     returnPendingRequest(sink);
                     return;
@@ -1112,7 +1124,7 @@ class ConnectionManager {
                 emitPoolHandle(sink, ph);
             }
 
-            private void returnPendingRequest(Sinks.One<PoolHandle> sink) {
+            private void returnPendingRequest(PoolSink<PoolHandle> sink) {
                 // failed, but the pending request may still work on another connection.
                 addPendingRequest(sink);
                 hasLiveRequest.set(false);
@@ -1171,7 +1183,7 @@ class ConnectionManager {
             }
 
             @Override
-            void dispatch0(Sinks.One<PoolHandle> sink) {
+            void dispatch0(PoolSink<PoolHandle> sink) {
                 if (!channel.isActive() || windDownConnection) {
                     returnPendingRequest(sink);
                     return;
@@ -1221,7 +1233,7 @@ class ConnectionManager {
                 });
             }
 
-            private void returnPendingRequest(Sinks.One<PoolHandle> sink) {
+            private void returnPendingRequest(PoolSink<PoolHandle> sink) {
                 // failed, but the pending request may still work on another connection.
                 addPendingRequest(sink);
                 liveRequests.decrementAndGet();
