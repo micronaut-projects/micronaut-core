@@ -179,6 +179,68 @@ class Y implements X {
         e.message.contains("Bean defines an exposed type [limittypes.Y] that is not implemented by the bean type")
     }
 
+    void "test declared generics from definition"() {
+        when:
+        def definition = buildBeanDefinition('limittypes.Test', '''
+package limittypes;
+
+import io.micronaut.context.annotation.*;
+import jakarta.inject.Singleton;
+
+@Singleton
+class Test<K, V> {
+}
+
+
+''')
+
+        then:
+        definition.getGenericBeanType().getTypeString(true) == 'Test<Object, Object>'
+    }
+
+    void "test declared generics from reference"() {
+        when:
+        def ref = buildBeanDefinitionReference('limittypes.Test', '''
+package limittypes;
+
+import io.micronaut.context.annotation.*;
+import jakarta.inject.Singleton;
+
+@Singleton
+class Test<K, V> {
+}
+
+
+''')
+
+        then:
+        ref.getGenericBeanType().getTypeString(true) == 'Test<Object, Object>'
+    }
+
+    void "test declared generics from reference with inheritance"() {
+        when:
+        def ref = buildBeanDefinitionReference('test.DefaultKafkaConsumerConfiguration', '''
+package test;
+
+import io.micronaut.context.annotation.*;
+import jakarta.inject.Singleton;
+
+@Singleton
+@Requires(beans = KafkaDefaultConfiguration.class)
+class DefaultKafkaConsumerConfiguration<K, V> extends AbstractKafkaConsumerConfiguration<K, V> {
+}
+
+abstract class AbstractKafkaConsumerConfiguration<K, V> extends AbstractKafkaConfiguration<K, V> { }
+
+abstract class AbstractKafkaConfiguration<K, V> {}
+
+class KafkaDefaultConfiguration {}
+''')
+
+        then:
+        ref.getGenericBeanType().getTypeString(true) == 'DefaultKafkaConsumerConfiguration<Object, Object>'
+    }
+
     void "test generics from factory"() {
         when:
         def ref = buildBeanDefinitionReference('limittypes.Test$Method0', '''

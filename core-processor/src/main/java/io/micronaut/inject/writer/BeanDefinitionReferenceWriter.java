@@ -253,7 +253,7 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
             GeneratorAdapter getGenericType = startPublicMethodZeroArgs(classWriter, Argument.class, "getGenericBeanType");
             pushCreateArgument(
                 beanDefinitionReferenceClassName,
-                beanDefinitionType,
+                Type.getType(getTypeDescriptor(beanDefinitionReferenceClassName)),
                 classWriter,
                 getGenericType,
                 "T",
