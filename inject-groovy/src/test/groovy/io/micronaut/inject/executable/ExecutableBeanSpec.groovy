@@ -71,7 +71,6 @@ class ExecutableController {
         return Math.round(num);
     }
 
-    @Executable
     public int sum(int a, int b) {
         return doSum()
     }
