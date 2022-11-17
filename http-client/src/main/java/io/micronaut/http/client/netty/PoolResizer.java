@@ -35,7 +35,7 @@ import java.util.function.Consumer;
  * {@link io.micronaut.http.client.HttpClientConfiguration.ConnectionPoolConfiguration}.
  * <p>
  * This class consists of various mutator methods (e.g. {@link #addPendingRequest}) that
- * may be called concurrently and in a reentrant fashion (e.g. inside {@link #openNewConnection)}).
+ * may be called concurrently and in a reentrant fashion (e.g. inside {@link #openNewConnection}).
  * These mutator methods update their respective fields and then mark this class as
  * {@link #dirty()}. The state management logic ensures that {@link #doSomeWork()} is called in a
  * serialized fashion (no concurrency or reentrancy) at least once after each {@link #dirty()}
