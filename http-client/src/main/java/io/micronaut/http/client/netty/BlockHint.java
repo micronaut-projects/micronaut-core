@@ -63,7 +63,8 @@ record BlockHint(Thread blockedThread, @Nullable BlockHint next) {
             "Failed to perform blocking request on the event loop because request execution " +
                 "would be dispatched on the same event loop. This would lead to a deadlock. " +
                 "Either configure the HTTP client to use a different event loop, or use the " +
-                "reactive HTTP client.");
+                "reactive HTTP client. " +
+                "https://docs.micronaut.io/latest/guide/index.html#clientConfiguration");
     }
 
     boolean blocks(EventLoop eventLoop) {
