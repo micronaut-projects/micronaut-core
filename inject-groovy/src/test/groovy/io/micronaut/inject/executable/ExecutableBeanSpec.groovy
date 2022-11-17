@@ -51,7 +51,40 @@ class ExecutableController {
         expect:
         definition != null
         definition.executableMethods.size() == 2
-        definition.executableMethods*.name == ['round', 'sum'] as Set
+        definition.executableMethods*.name.toSorted() == ['round', 'sum'].toSorted()
+    }
+
+    void "test executable at class level and a property field"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test.ExecutableController','''\
+package test
+
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.inject.annotation.*;
+
+@jakarta.inject.Singleton
+@Executable
+class ExecutableController {
+    String foo
+
+    public int round(float num) {
+        return Math.round(num);
+    }
+
+    @Executable
+    public int sum(int a, int b) {
+        return doSum()
+    }
+
+    private int doSum() {
+        return a + b
+    }
+}
+''')
+        expect:
+        definition != null
+        definition.executableMethods.size() == 2
+        definition.executableMethods*.name.toSorted() == ['round', 'sum'].toSorted()
     }
 
     void "test executable on stereotype"() {
