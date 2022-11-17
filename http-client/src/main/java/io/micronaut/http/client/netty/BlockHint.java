@@ -30,16 +30,7 @@ import io.netty.channel.EventLoop;
  * @since 4.0.0
  */
 @Internal
-final class BlockHint {
-    private final Thread blockedThread;
-    @Nullable
-    private final BlockHint next;
-
-    private BlockHint(Thread blockedThread, @Nullable BlockHint next) {
-        this.blockedThread = blockedThread;
-        this.next = next;
-    }
-
+record BlockHint(Thread blockedThread, @Nullable BlockHint next) {
     public static BlockHint willBlockThisThread() {
         return new BlockHint(Thread.currentThread(), null);
     }
