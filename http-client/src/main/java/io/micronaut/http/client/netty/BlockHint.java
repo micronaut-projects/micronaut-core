@@ -26,6 +26,8 @@ import io.netty.channel.EventLoop;
  * detect deadlocks when the user does a {@link io.micronaut.http.client.BlockingHttpClient} on the
  * event loop.
  *
+ * @param blockedThread Thread that is blocked
+ * @param next Next node in the linked list of blocked threads
  * @author Jonas Konrad
  * @since 4.0.0
  */
