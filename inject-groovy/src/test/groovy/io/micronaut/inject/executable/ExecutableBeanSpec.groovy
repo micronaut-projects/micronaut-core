@@ -54,7 +54,7 @@ class ExecutableController {
         definition.executableMethods*.name.toSorted() == ['round', 'sum'].toSorted()
     }
 
-    void "test executable at class level and a property field"() {
+    void "test executable at class level 2"() {
         given:
         BeanDefinition definition = buildBeanDefinition('test.ExecutableController','''\
 package test
