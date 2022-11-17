@@ -39,6 +39,7 @@ ioc:
   beanValidation: Bean Validation
   annotationMetadata: Bean Annotation Metadata
   beanImport: Importing Beans from Libraries
+  nullabilityAnnotations: Nullability Annotations
   springBeans: Micronaut Beans And Spring
   android: Android Support
 config:
