@@ -35,6 +35,7 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpResponseWrapper;
 import io.micronaut.http.HttpStatus;
@@ -188,6 +189,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 
 import static io.micronaut.scheduling.instrument.InvocationInstrumenter.NOOP;
 
@@ -214,6 +216,9 @@ public class DefaultHttpClient implements
     private static final int DEFAULT_HTTP_PORT = 80;
     private static final int DEFAULT_HTTPS_PORT = 443;
 
+    private static final Supplier<Pattern> HEADER_MASK_PATTERNS = SupplierUtil.memoized(() ->
+        Pattern.compile(".*(password|cred|cert|key|secret|token|auth|signat).*", Pattern.CASE_INSENSITIVE)
+    );
     /**
      * Which headers <i>not</i> to copy from the first request when redirecting to a second request. There doesn't
      * appear to be a spec for this. {@link java.net.HttpURLConnection} seems to drop all headers, but that would be a
@@ -1836,15 +1841,26 @@ public class DefaultHttpClient implements
 
     private void traceHeaders(HttpHeaders headers) {
         for (String name : headers.names()) {
+            boolean isMasked = HEADER_MASK_PATTERNS.get().matcher(name).matches();
             List<String> all = headers.getAll(name);
             if (all.size() > 1) {
                 for (String value : all) {
-                    log.trace("{}: {}", name, value);
+                    String maskedValue = isMasked ? mask(value) : value;
+                    log.trace("{}: {}", name, maskedValue);
                 }
             } else if (!all.isEmpty()) {
-                log.trace("{}: {}", name, all.get(0));
+                String maskedValue = isMasked ? mask(all.get(0)) : all.get(0);
+                log.trace("{}: {}", name, maskedValue);
             }
         }
+    }
+
+    @Nullable
+    private String mask(@Nullable String value) {
+        if (value == null) {
+            return null;
+        }
+        return "*MASKED*";
     }
 
     private static MediaTypeCodecRegistry createDefaultMediaTypeRegistry() {

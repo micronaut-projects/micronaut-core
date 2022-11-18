@@ -68,7 +68,6 @@ managed-jackson = "2.14.0"
 managed-jackson-databind = "2.14.0"
 managed-maven-native-plugin = "0.9.13"
 managed-methvin-directory-watcher = "0.16.1"
-
 managed-netty = "4.1.84.Final"
 managed-reactive-streams = "1.0.4"
 # This should be kept aligned with https://github.com/micronaut-projects/micronaut-reactor/blob/master/gradle.properties from the BOM
