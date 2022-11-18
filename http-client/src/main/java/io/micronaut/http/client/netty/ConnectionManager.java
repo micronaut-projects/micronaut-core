@@ -85,7 +85,9 @@ import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 import reactor.core.scheduler.Schedulers;
 
+import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLException;
+import javax.net.ssl.SSLParameters;
 import java.net.InetSocketAddress;
 import java.net.Proxy;
 import java.net.SocketAddress;
@@ -391,9 +393,7 @@ class ConnectionManager {
 
                 SslContext sslContext = buildSslContext(requestKey);
                 if (sslContext != null) {
-                    SslHandler sslHandler = sslContext.newHandler(ch.alloc(), requestKey.getHost(), requestKey.getPort());
-                    sslHandler.setHandshakeTimeoutMillis(configuration.getSslConfiguration().getHandshakeTimeout().toMillis());
-                    ch.pipeline().addLast(sslHandler);
+                    ch.pipeline().addLast(configureSslHandler(sslContext.newHandler(ch.alloc(), requestKey.getHost(), requestKey.getPort())));
                 }
 
                 ch.pipeline()
@@ -501,6 +501,15 @@ class ConnectionManager {
             }
         });
         return builder.build();
+    }
+
+    private SslHandler configureSslHandler(SslHandler sslHandler) {
+        sslHandler.setHandshakeTimeoutMillis(configuration.getSslConfiguration().getHandshakeTimeout().toMillis());
+        SSLEngine engine = sslHandler.engine();
+        SSLParameters params = engine.getSSLParameters();
+        params.setEndpointIdentificationAlgorithm("HTTPS");
+        engine.setSSLParameters(params);
+        return sslHandler;
     }
 
     /**
@@ -613,10 +622,8 @@ class ConnectionManager {
 
             configureProxy(ch.pipeline(), true, host, port);
 
-            SslHandler sslHandler = sslContext.newHandler(ch.alloc(), host, port);
-            sslHandler.setHandshakeTimeoutMillis(configuration.getSslConfiguration().getHandshakeTimeout().toMillis());
             ch.pipeline()
-                .addLast(ChannelPipelineCustomizer.HANDLER_SSL, sslHandler)
+                .addLast(ChannelPipelineCustomizer.HANDLER_SSL, configureSslHandler(sslContext.newHandler(ch.alloc(), host, port)))
                 .addLast(
                     ChannelPipelineCustomizer.HANDLER_HTTP2_PROTOCOL_NEGOTIATOR,
                     // if the server doesn't do ALPN, fall back to HTTP 1
