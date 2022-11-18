@@ -1039,7 +1039,12 @@ public class UriTemplate implements Comparable<UriTemplate> {
                                 }
                             }
                         });
-                        result = joiner.toString();
+                        if (joiner.length() == 0) {
+                            // only null entries
+                            return "";
+                        } else {
+                            result = joiner.toString();
+                        }
                     } else {
                         String str = found.toString();
                         str = applyModifier(modifierStr, modifierChar, str, str.length());
