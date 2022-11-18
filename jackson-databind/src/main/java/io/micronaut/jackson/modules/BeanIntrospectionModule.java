@@ -551,9 +551,11 @@ public class BeanIntrospectionModule extends SimpleModule {
                                     public JsonFormat.Value findPropertyFormat(MapperConfig<?> config, Class<?> baseType) {
                                         JsonFormat.Value v1 = config.getDefaultPropertyFormat(baseType);
                                         JsonFormat.Value v2 = null;
-                                        AnnotationValue<JsonFormat> formatAnnotation = property.getAnnotation(JsonFormat.class);
-                                        if (formatAnnotation != null) {
-                                            v2 = parseJsonFormat(formatAnnotation);
+                                        if (property != null) {
+                                            AnnotationValue<JsonFormat> formatAnnotation = property.getAnnotation(JsonFormat.class);
+                                            if (formatAnnotation != null) {
+                                                v2 = parseJsonFormat(formatAnnotation);
+                                            }
                                         }
                                         if (v1 == null) {
                                             return (v2 == null) ? EMPTY_FORMAT : v2;
