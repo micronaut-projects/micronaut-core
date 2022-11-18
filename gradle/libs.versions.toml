@@ -8,6 +8,7 @@ compile-testing = "0.19"
 
 geb = "3.4.1"
 geb-groovy = "3.0.13"
+geb-micronaut-test = "3.7.0"
 geb-spock = "2.2-groovy-3.0"
 gorm = "7.3.2"
 # be sure to update graal version in gradle.properties as well
@@ -44,7 +45,8 @@ micronaut-grpc = "3.3.1"
 micronaut-groovy = "4.0.0-SNAPSHOT"
 micronaut-picocli = "4.3.0"
 micronaut-sql = "4.7.2"
-micronaut-test = "3.7.0"
+micronaut-test = "4.0.0-SNAPSHOT"
+micronaut-serde = "2.0.0-SNAPSHOT"
 micronaut-tracing = "4.4.0"
 micrometer = "1.9.5"
 neo4j-java-driver = "1.4.5"
@@ -68,7 +70,6 @@ managed-jackson = "2.14.0"
 managed-jackson-databind = "2.14.0"
 managed-maven-native-plugin = "0.9.13"
 managed-methvin-directory-watcher = "0.16.1"
-
 managed-netty = "4.1.84.Final"
 managed-reactive-streams = "1.0.4"
 # This should be kept aligned with https://github.com/micronaut-projects/micronaut-reactor/blob/master/gradle.properties from the BOM
@@ -211,6 +212,7 @@ logbook-netty = { module = "org.zalando:logbook-netty", version.ref = "logbook-n
 
 micronaut-docs = { module = "io.micronaut.docs:micronaut-docs-asciidoc-config-props", version.ref = "micronaut-docs" }
 micronaut-runtime-groovy = { module = "io.micronaut.groovy:micronaut-runtime-groovy", version.ref = "micronaut-groovy" }
+micronaut-serde-jackson = { module = "io.micronaut.serde:micronaut-serde-jackson", version.ref = "micronaut-serde" }
 micronaut-test-bom = { module = "io.micronaut.test:micronaut-test-bom", version.ref = "micronaut-test" }
 micronaut-test-core = { module = "io.micronaut.test:micronaut-test-core", version.ref = "micronaut-test" }
 micronaut-test-junit5 = { module = "io.micronaut.test:micronaut-test-junit5", version.ref = "micronaut-test" }

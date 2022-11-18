@@ -46,6 +46,7 @@ class CircuitBreakerRetry implements MutableRetryState {
     private final long openTimeout;
     private final ExecutableMethod<?, ?> method;
     private final ApplicationEventPublisher eventPublisher;
+    private final boolean throwWrappedException;
     private AtomicReference<CircuitState> state = new AtomicReference<>(CircuitState.CLOSED);
     private volatile Throwable lastError;
     private volatile long time = System.currentTimeMillis();
@@ -56,18 +57,20 @@ class CircuitBreakerRetry implements MutableRetryState {
      * @param childStateBuilder The retry state builder
      * @param method            A compile time produced invocation of a method call
      * @param eventPublisher    To publish circuit events
+     * @param throwWrappedException     If {@code true}, the original exception will be wrapped in {@link CircuitOpenException}
      */
     CircuitBreakerRetry(
         long openTimeout,
         RetryStateBuilder childStateBuilder,
         ExecutableMethod<?, ?> method,
-        ApplicationEventPublisher eventPublisher) {
+        ApplicationEventPublisher eventPublisher, boolean throwWrappedException) {
 
         this.retryStateBuilder = childStateBuilder;
         this.openTimeout = openTimeout;
         this.childState = (MutableRetryState) childStateBuilder.build();
         this.eventPublisher = eventPublisher;
         this.method = method;
+        this.throwWrappedException = throwWrappedException;
     }
 
     @Override
@@ -92,7 +95,7 @@ class CircuitBreakerRetry implements MutableRetryState {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Rethrowing existing exception for Open Circuit [{}]: {}", method, lastError.getMessage());
             }
-            if (lastError instanceof RuntimeException) {
+            if (lastError instanceof RuntimeException && !throwWrappedException) {
                 throw (RuntimeException) lastError;
             } else {
                 throw new CircuitOpenException("Circuit Open: " + lastError.getMessage(), lastError);

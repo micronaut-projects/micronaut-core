@@ -39,7 +39,7 @@ class CircuitBreakerRetrySpec extends Specification {
                 1000,
                 {->
                     new SimpleRetry(3, 2.0d, Duration.ofMillis(500))
-                }, null,null
+                }, null,null,false
         )
         retry.open()
 

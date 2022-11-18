@@ -66,6 +66,7 @@ include "test-suite-helper"
 include "test-suite-javax-inject"
 include "test-suite-jakarta-inject-bean-import"
 include "test-suite-kotlin"
+include "test-suite-graal"
 include "test-suite-groovy"
 include "test-utils"
 
