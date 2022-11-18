@@ -22,7 +22,7 @@ dependencies {
     implementation project(":graal")
     implementation project(":http-server-netty")
     implementation project(":http-client")
-    implementation project(":validation")
+    implementation libs.micronaut.validation
     implementation project(":inject-java")
 
     testAnnotationProcessor libs.bundles.asm

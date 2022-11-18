@@ -112,7 +112,7 @@ import java.util.List
 
 @ConfigurationProperties("test.valid")
 class MyConfig {
-  
+
     private List<Pojo> pojos
 
     @Valid
@@ -131,6 +131,31 @@ class MyConfig {
         beanDefinition instanceof ValidatedBeanDefinition
     }
 
+    void "test config props with constraints on properties is a validating bean definition"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.ValidatedConfig', '''
+package test
+
+import io.micronaut.context.annotation.ConfigurationProperties
+import javax.validation.constraints.NotNull
+import javax.validation.constraints.NotBlank
+import java.net.URL
+
+@ConfigurationProperties('foo.bar')
+class ValidatedConfig {
+    @NotNull
+    URL url
+
+    @NotBlank
+    String name
+}
+''')
+
+        then:
+        beanDefinition != null
+        beanDefinition instanceof ValidatedBeanDefinition
+    }
+
     void "test config props with @Valid on property is a validating bean definition"() {
         when:
         BeanDefinition beanDefinition = buildBeanDefinition('test.MyConfig', '''
@@ -144,7 +169,7 @@ import java.util.List
 
 @ConfigurationProperties("test.valid")
 class MyConfig {
-  
+
     @Valid
     List<Pojo> pojos
 }

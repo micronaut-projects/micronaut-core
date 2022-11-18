@@ -17,11 +17,11 @@ dependencies {
     api project(":http-netty")
     api libs.managed.netty.handler.proxy
 
-    testAnnotationProcessor project(":validation")
     testAnnotationProcessor project(":inject-java")
+    testCompileOnly libs.micronaut.validation.processor
 
     testCompileOnly project(":inject-groovy")
-    testImplementation project(":validation")
+    testImplementation libs.micronaut.validation
     testImplementation project(":inject")
 
     implementation libs.managed.reactor

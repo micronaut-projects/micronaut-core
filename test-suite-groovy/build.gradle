@@ -26,7 +26,7 @@ dependencies {
     testImplementation project(":http-server-netty")
     testImplementation project(":jackson-databind")
     testImplementation project(":runtime")
-    testImplementation project(":validation")
+    testImplementation libs.micronaut.validation
     testImplementation project(":inject")
     testImplementation project(":management")
     testImplementation(libs.micronaut.session)

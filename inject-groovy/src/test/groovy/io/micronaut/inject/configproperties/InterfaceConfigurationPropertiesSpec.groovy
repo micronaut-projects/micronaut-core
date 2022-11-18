@@ -8,6 +8,7 @@ import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.InstantiatableBeanDefinition
 import io.micronaut.inject.ValidatedBeanDefinition
 import io.micronaut.runtime.context.env.ConfigurationAdvice
+import spock.lang.Ignore
 
 class InterfaceConfigurationPropertiesSpec extends AbstractBeanDefinitionSpec {
 
@@ -51,15 +52,18 @@ interface MyConfig {
 
     }
 
+    @Ignore("Genric annotations do not work in Groovy yet")
     void "test optional interface config props"() {
 
         when:
         BeanDefinition beanDefinition = buildBeanDefinition('test.MyConfig$Intercepted', '''
 package test;
 
-import io.micronaut.context.annotation.*;
-import java.net.URL;
-import java.util.Optional;
+import io.micronaut.context.annotation.*
+import java.net.URL
+import java.util.Optional
+import javax.validation.constraints.Min
+import io.micronaut.core.bind.annotation.Bindable
 
 @ConfigurationProperties("foo.bar")
 @Executable
@@ -67,10 +71,9 @@ interface MyConfig {
     @javax.annotation.Nullable
     String getHost();
 
-    @javax.validation.constraints.Min(10L)
-    Optional<Integer> getServerPort();
+    Optional<@Min(10L) Integer> getServerPort();
 
-    @io.micronaut.core.bind.annotation.Bindable(defaultValue = "http://default")
+    @Bindable(defaultValue = "http://default")
     Optional<URL> getURL();
 }
 

@@ -38,7 +38,7 @@ dependencies {
     testImplementation project(":http-server-netty")
     testImplementation project(":jackson-databind")
     testImplementation project(":http-client")
-    testImplementation project(":validation")
+    testImplementation libs.micronaut.validation
     testImplementation project(":inject-groovy")
     testImplementation project(":inject-java")
     testImplementation project(":inject-java-test")

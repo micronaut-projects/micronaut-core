@@ -43,12 +43,12 @@ dependencies {
     // Adding these for now since micronaut-test isnt resolving correctly ... probably need to upgrade gradle there too
     testImplementation libs.junit.jupiter.api
 
-    testImplementation project(":validation")
+    testImplementation libs.micronaut.validation
     testImplementation project(":management")
     testImplementation project(':inject-java')
     testImplementation project(":inject")
     testImplementation libs.jcache
-    testImplementation project(':validation')
+    testImplementation libs.micronaut.validation
     testImplementation project(":http-client")
     testImplementation(libs.micronaut.session)
     testImplementation project(":jackson-databind")
@@ -59,7 +59,7 @@ dependencies {
     testImplementation libs.kotlin.kotest.junit5
     testImplementation libs.logbook.netty
     kaptTest project(':inject-java')
-    kaptTest project(':validation')
+    kaptTest libs.micronaut.validation
     testImplementation libs.javax.inject
     testImplementation(platform(libs.test.boms.micronaut.tracing))
     testImplementation(libs.micronaut.tracing.zipkin) {

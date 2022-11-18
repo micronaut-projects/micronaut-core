@@ -71,6 +71,35 @@ class ValidatedConfigurationSpec extends AbstractTypeElementSpec {
         applicationContext.close()
     }
 
+    void "test config props with constraints on properties is a validating bean definition"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.ValidatedConfig', '''
+package test;
+
+import io.micronaut.context.annotation.ConfigurationProperties;import io.micronaut.core.annotation.Introspected;
+import javax.validation.constraints.NotNull;
+import javax.validation.constraints.NotBlank;
+import java.net.URL;
+
+@ConfigurationProperties("foo.bar")
+class ValidatedConfig {
+    @NotNull
+    private URL url;
+
+    @NotBlank
+    private String name;
+
+    public ValidatedConfig(URL url, String name) { this.url = url; this.name = name; }
+    public URL getURL() { return url; }
+    public String getName() { return name; }
+}
+''')
+
+        then:
+        beanDefinition != null
+        beanDefinition instanceof ValidatedBeanDefinition
+    }
+
     void "test config props with @Valid on field is a validating bean definition"() {
         when:
         BeanDefinition beanDefinition = buildBeanDefinition('test.MyConfig', '''
@@ -116,7 +145,7 @@ import java.util.List;
 
 @ConfigurationProperties("test.valid")
 public class MyConfig {
-  
+
     private List<Pojo> pojos;
 
     @Valid
