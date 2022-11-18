@@ -8,6 +8,7 @@ compile-testing = "0.19"
 
 geb = "3.4.1"
 geb-groovy = "3.0.13"
+geb-micronaut-test = "3.7.0"
 geb-spock = "2.2-groovy-3.0"
 gorm = "7.3.2"
 # be sure to update graal version in gradle.properties as well

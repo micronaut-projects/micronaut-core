@@ -14,6 +14,16 @@ micronautBuild {
 
 group = projectGroupId
 
+configurations {
+    testCompileClasspath {
+        resolutionStrategy.eachDependency { DependencyResolveDetails details ->
+            if (details.requested.group == 'io.micronaut.test') {
+                details.useVersion libs.versions.geb.micronaut.test.get()
+                details.because "Geb doesn't work with Groovy 4"
+            }
+        }
+    }
+}
 def micronautBuild = (ExtensionAware) project.extensions.getByName("micronautBuild")
 def micronautCore = micronautBuild.extensions.create(MicronautCoreExtension, "core", DefaultMicronautCoreExtension, extensions.findByType(VersionCatalogsExtension))
 micronautCore.documented.convention(true)
