@@ -8,6 +8,11 @@ micronautBuild {
     enableProcessing = false
 }
 
+repositories {
+    mavenCentral()
+    maven { url "https://s01.oss.sonatype.org/content/repositories/snapshots/" }
+}
+
 dependencies {
     annotationProcessor libs.bundles.asm
     annotationProcessor project(":inject-java")
@@ -22,7 +27,8 @@ dependencies {
 
     testAnnotationProcessor libs.bundles.asm
     testAnnotationProcessor project(":inject-java")
-    testImplementation libs.managed.micronaut.test.junit5
+    testImplementation(libs.micronaut.serde.jackson)
+    testImplementation libs.micronaut.test.junit5
 }
 
 tasks.withType(Test).configureEach {
@@ -30,9 +36,11 @@ tasks.withType(Test).configureEach {
 }
 
 configurations {
-    // Exclude Groovy from the nativeTestCompilation classpath
     all {
-        exclude group: 'org.codehaus.groovy'
+        // Stop serde pulling in AOP
+        exclude group: 'io.micronaut', module: 'micronaut-aop'
+        // Stop pulling in inject-groovy from maven
+        exclude group: 'io.micronaut', module: 'micronaut-inject-groovy'
     }
     nativeImageTestClasspath {
         exclude module: 'groovy-test'
