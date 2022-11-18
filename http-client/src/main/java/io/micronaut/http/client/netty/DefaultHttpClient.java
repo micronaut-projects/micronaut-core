@@ -1490,10 +1490,6 @@ public class DefaultHttpClient implements
                 new FullHttpResponseHandler<>(responsePromise, poolHandle, secure, finalRequest, bodyType, errorType));
         poolHandle.notifyRequestPipelineBuilt();
         Publisher<HttpResponse<O>> publisher = new NettyFuturePublisher<>(responsePromise, true);
-        if (bodyType != null && bodyType.isVoid()) {
-            // don't emit response if bodyType is void
-            publisher = Flux.from(publisher).filter(r -> false);
-        }
         publisher.subscribe(new ForwardingSubscriber<>(emitter));
 
         requestWriter.write(channel, secure, emitter);
