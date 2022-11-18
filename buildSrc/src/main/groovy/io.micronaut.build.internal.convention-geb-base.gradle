@@ -15,7 +15,7 @@ micronautBuild {
 group = projectGroupId
 
 configurations {
-    testCompileClasspath {
+    all {
         resolutionStrategy.eachDependency { DependencyResolveDetails details ->
             if (details.requested.group == 'io.micronaut.test') {
                 details.useVersion libs.versions.geb.micronaut.test.get()
