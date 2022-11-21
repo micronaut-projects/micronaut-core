@@ -760,7 +760,12 @@ public class DefaultHttpClient implements
     @Override
     public <I, O, E> Publisher<O> retrieve(io.micronaut.http.HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType) {
         // mostly same as default impl, but with exception customization
-        return Flux.from(exchange(request, bodyType, errorType)).map(response -> {
+        Flux<HttpResponse<O>> exchange = Flux.from(exchange(request, bodyType, errorType));
+        if (bodyType.getType() == void.class) {
+            // exchange() returns a HttpResponse<Void>, we can't map the Void body properly, so just drop it and complete
+            return (Publisher<O>) exchange.ignoreElements();
+        }
+        return exchange.map(response -> {
             if (bodyType.getType() == HttpStatus.class) {
                 return (O) response.getStatus();
             } else {
@@ -1495,10 +1500,6 @@ public class DefaultHttpClient implements
                 new FullHttpResponseHandler<>(responsePromise, poolHandle, secure, finalRequest, bodyType, errorType));
         poolHandle.notifyRequestPipelineBuilt();
         Publisher<HttpResponse<O>> publisher = new NettyFuturePublisher<>(responsePromise, true);
-        if (bodyType != null && bodyType.isVoid()) {
-            // don't emit response if bodyType is void
-            publisher = Flux.from(publisher).filter(r -> false);
-        }
         publisher.subscribe(new ForwardingSubscriber<>(emitter));
 
         requestWriter.write(channel, secure, emitter);

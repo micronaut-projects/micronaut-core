@@ -55,8 +55,8 @@ import io.micronaut.http.annotation.HttpMethodMapping;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.client.BlockingHttpClient;
 import io.micronaut.http.client.HttpClient;
-import io.micronaut.http.client.ReactiveClientResultTransformer;
 import io.micronaut.http.client.HttpClientRegistry;
+import io.micronaut.http.client.ReactiveClientResultTransformer;
 import io.micronaut.http.client.StreamingHttpClient;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.bind.ClientArgumentRequestBinder;
@@ -426,7 +426,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         Class<?> argumentType = reactiveValueArgument.getType();
         if (Void.class == argumentType || returnType.isVoid()) {
             request.getHeaders().remove(HttpHeaders.ACCEPT);
-            return httpClient.exchange(request, Argument.VOID, errorType);
+            return httpClient.retrieve(request, Argument.VOID, errorType);
         } else {
             if (HttpResponse.class.isAssignableFrom(argumentType)) {
                 return httpClient.exchange(request, reactiveValueArgument, errorType);
