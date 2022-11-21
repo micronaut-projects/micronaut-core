@@ -16,7 +16,7 @@ dependencies {
     api libs.managed.jakarta.annotation.api
     api project(':core')
 
-    compileOnly libs.snakeyaml
+    compileOnly libs.managed.snakeyaml
     compileOnly libs.managed.groovy
     compileOnly libs.kotlin.stdlib.jdk8
     compileOnly libs.managed.validation
@@ -26,7 +26,7 @@ dependencies {
     testImplementation project(":inject-groovy")
     testImplementation project(":inject-test-utils")
     testImplementation libs.systemlambda
-    testImplementation libs.snakeyaml
+    testImplementation libs.managed.snakeyaml
     testRuntimeOnly libs.junit.jupiter.engine
 
 }

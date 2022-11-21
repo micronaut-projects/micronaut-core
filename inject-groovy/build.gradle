@@ -29,7 +29,7 @@ dependencies {
     testImplementation(libs.neo4j.bolt)
     testImplementation libs.managed.groovy.json
     testImplementation libs.blaze.persistence.core
-    testImplementation libs.snakeyaml
+    testImplementation libs.managed.snakeyaml
     testImplementation libs.managed.reactor
 
     functionalTestImplementation(testFixtures(project(":test-suite")))
