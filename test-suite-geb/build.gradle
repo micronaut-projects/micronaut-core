@@ -17,6 +17,6 @@ dependencies {
     testImplementation project(':http')
     testImplementation project(':http-server-netty')
 
-    testRuntimeOnly libs.logback
+    testRuntimeOnly libs.managed.logback
     testImplementation project(":jackson-databind")
 }
