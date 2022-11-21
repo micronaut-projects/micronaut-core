@@ -30,7 +30,7 @@ dependencies {
     testRuntimeOnly libs.h2
     testRuntimeOnly libs.mysql.driver
 
-    compileOnly libs.managed.logback
+    compileOnly libs.managed.logback.classic
     compileOnly libs.log4j
 
 }

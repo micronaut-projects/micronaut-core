@@ -67,7 +67,7 @@ dependencies {
     testRuntimeOnly(platform(libs.test.boms.micronaut.aws))
     testRuntimeOnly libs.h2
     testRuntimeOnly libs.junit.vintage
-    testRuntimeOnly libs.managed.logback
+    testRuntimeOnly libs.managed.logback.classic
     testRuntimeOnly libs.aws.java.sdk.lambda
 
     // needed for HTTP/2 tests
@@ -80,7 +80,7 @@ dependencies {
         }
     }
     testImplementation libs.logbook.netty
-    testImplementation libs.managed.logback
+    testImplementation libs.managed.logback.classic
 
     if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_15)) {
         testImplementation libs.bcpkix
