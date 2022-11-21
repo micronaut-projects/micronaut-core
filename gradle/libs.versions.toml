@@ -127,9 +127,9 @@ managed-reactive-streams = { module = "org.reactivestreams:reactive-streams", ve
 
 managed-reactor = { module = "io.projectreactor:reactor-core", version.ref = "managed-reactor" }
 
-managed-slf4j = { module = "org.slf4j:slf4j-api", version.ref = "managed-slf4j" }
+managed-slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "managed-slf4j" }
 managed-slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "managed-slf4j" }
-managed-logback = { module = "ch.qos.logback:logback-classic", version.ref = "managed-logback" }
+managed-logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "managed-logback" }
 
 managed-validation = { module = "javax.validation:validation-api", version.ref = "managed-validation" }
 
