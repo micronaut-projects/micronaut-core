@@ -52,7 +52,6 @@ micrometer = "1.9.5"
 neo4j-java-driver = "1.4.5"
 selenium = "3.141.59"
 smallrye = "5.5.0"
-snakeyaml = "1.33"
 spock = "2.2-groovy-4.0"
 spotbugs = "4.7.1"
 systemlambda = "1.2.1"
@@ -75,6 +74,7 @@ managed-reactive-streams = "1.0.4"
 # This should be kept aligned with https://github.com/micronaut-projects/micronaut-reactor/blob/master/gradle.properties from the BOM
 managed-reactor = "3.4.24"
 managed-slf4j = "2.0.4"
+managed-snakeyaml = "1.33"
 managed-validation = "2.0.1.Final"
 micronaut-docs = "2.0.0"
 
@@ -129,6 +129,8 @@ managed-reactor = { module = "io.projectreactor:reactor-core", version.ref = "ma
 
 managed-slf4j = { module = "org.slf4j:slf4j-api", version.ref = "managed-slf4j" }
 managed-slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "managed-slf4j" }
+
+managed-snakeyaml = { module = "org.yaml:snakeyaml", version.ref = "managed-snakeyaml" }
 
 managed-validation = { module = "javax.validation:validation-api", version.ref = "managed-validation" }
 
@@ -240,7 +242,6 @@ selenium-driver-firefox = { module = "org.seleniumhq.selenium:selenium-firefox-d
 selenium-driver-htmlunit = { module = "org.seleniumhq.selenium:htmlunit-driver", version.ref = "htmlunit" }
 
 smallrye = { module = "io.smallrye:smallrye-fault-tolerance", version.ref = "smallrye" }
-snakeyaml = { module = "org.yaml:snakeyaml", version.ref = "snakeyaml" }
 spock = { module = "org.spockframework:spock-core", version.ref = "spock" }
 spotbugs = { module = "com.github.spotbugs:spotbugs-annotations", version.ref = "spotbugs" }
 
