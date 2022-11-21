@@ -127,8 +127,8 @@ import io.micronaut.context.annotation.*;
 interface MyBean  {
 
     @Executable
-    String getBar(); 
-    
+    String getBar();
+
     @Executable
     default String getFoo() { return "good"; }
 }
@@ -179,10 +179,10 @@ class Generic {
 }
 class Specific extends Generic {
 }
-interface GenericInterface {   
+interface GenericInterface {
     Generic getObject();
 }
-interface SpecificInterface {    
+interface SpecificInterface {
     Specific getObject();
 }
 ''')
@@ -200,5 +200,98 @@ interface SpecificInterface {
         //I ended up going this route because actually calling the methods here would be relying on
         //having the target interface in the bytecode of the test
         instance.$proxyMethods.length == 2
+    }
+
+    void "test interface multiple inheritance"() {
+        when:
+            BeanDefinition beanDefinition = buildBeanDefinition('test.MyInterfaceX' + BeanDefinitionVisitor.PROXY_SUFFIX, '''
+package test;
+
+import io.micronaut.aop.introduction.*;
+import io.micronaut.context.annotation.*;
+import io.micronaut.context.annotation.Executable;
+import java.lang.annotation.Documented;
+import java.lang.annotation.Retention;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+@Stub
+@jakarta.inject.Singleton
+interface MyInterfaceX extends MyInterface2 {
+
+    @MyAnn
+    String myMethod5(String param);
+
+    default String myMethod6(String param) {
+        return myMethod3(param);
+    }
+}
+
+interface MyInterface2 extends MyInterface3, MyInterface4 {
+
+    @MyAnn
+    String myMethod1(String param);
+
+    @MyAnn
+    @Override
+    String myMethod3(String param);
+
+    @Override
+    String myMethod2(String param);
+
+    @MyAnn
+    @Override
+    String myMethod4(String param);
+
+    default String myMethod7(String param) {
+        return myMethod4(param);
+    }
+}
+
+interface MyInterface3 {
+    @MyAnn
+    String myMethod2(String param);
+}
+
+interface MyInterface4 {
+    String myMethod3(String param);
+
+    String myMethod4(String param);
+}
+
+@Documented
+@Retention(RUNTIME)
+@Executable
+@interface MyAnn {
+}
+''')
+
+        then:
+            noExceptionThrown()
+            beanDefinition != null
+
+        when:
+            def context = new DefaultBeanContext()
+            context.start()
+            def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
+            def introducer = context.getBean(StubIntroducer)
+        then:
+            instance.myMethod1("abc1") == "abc1"
+            introducer.visitedMethods["myMethod1"].hasAnnotation("test.MyAnn")
+            instance.myMethod2("abc2") == "abc2"
+            !introducer.visitedMethods["myMethod2"].hasAnnotation("test.MyAnn")
+            instance.myMethod3("abc3") == "abc3"
+            introducer.visitedMethods["myMethod3"].hasAnnotation("test.MyAnn")
+            instance.myMethod4("abc4") == "abc4"
+            introducer.visitedMethods["myMethod4"].hasAnnotation("test.MyAnn")
+            instance.myMethod5("abc5") == "abc5"
+            introducer.visitedMethods["myMethod5"].hasAnnotation("test.MyAnn")
+            instance.myMethod6("abc6") == "abc6" // Calls method3
+            introducer.visitedMethods["myMethod3"].hasAnnotation("test.MyAnn")
+            instance.myMethod7("abc7") == "abc7" // Calls method4
+            introducer.visitedMethods["myMethod4"].hasAnnotation("test.MyAnn")
+
+        cleanup:
+            context.close()
     }
 }
