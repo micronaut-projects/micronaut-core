@@ -226,6 +226,7 @@ managed-gorm-hibernate = { module = "org.grails:grails-datastore-gorm-hibernate5
 
 managed-graal = { module = "org.graalvm.nativeimage:svm", version.ref = "managed-graal-svm" }
 managed-graal-sdk = { module = "org.graalvm.sdk:graal-sdk", version.ref = "managed-graal-sdk" }
+managed-maven-native-plugin = { module = "org.graalvm.buildtools:native-maven-plugin", version.ref = "managed-maven-native-plugin" }
 
 managed-groovy = { module = "org.codehaus.groovy:groovy", version.ref = "managed-groovy" }
 managed-groovy-json = { module = "org.codehaus.groovy:groovy-json", version.ref = "managed-groovy" }
