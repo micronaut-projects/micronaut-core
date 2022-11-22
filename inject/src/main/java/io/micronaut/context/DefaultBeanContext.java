@@ -1626,7 +1626,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
             return Collections.emptyList();
         }
         if (CollectionUtils.isNotEmpty(candidates)) {
-            filterProxiedTypes(candidates, true, true, null);
+            filterProxiedTypes(candidates, true);
             filterReplacedBeans(null, candidates);
         }
         return candidates;
@@ -2043,7 +2043,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                     throw new BeanInstantiationException("Bean definition [" + contextScopeBean.getName() + "] could not be loaded: " + e.getMessage(), e);
                 }
             }
-            filterProxiedTypes((Collection) contextBeans, true, false, null);
+            filterProxiedTypes((Collection) contextBeans, false);
             filterReplacedBeans(null, (Collection) contextBeans);
             OrderUtil.sort(contextBeans);
             for (BeanDefinition contextScopeDefinition : contextBeans) {
@@ -2255,7 +2255,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
             if (!candidates.isEmpty()) {
                 if (filterProxied) {
-                    filterProxiedTypes(candidates, true, false, null);
+                    filterProxiedTypes(candidates, false);
                 }
                 filterReplacedBeans(resolutionContext, candidates);
             }
@@ -2642,7 +2642,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                         }
                     });
 
-                    filterProxiedTypes((Collection) parallelDefinitions, true, false, null);
+                    filterProxiedTypes((Collection) parallelDefinitions, false);
                     filterReplacedBeans(null, (Collection) parallelDefinitions);
 
                     parallelDefinitions.forEach(beanDefinition -> ForkJoinPool.commonPool().execute(() -> {
@@ -3322,9 +3322,8 @@ public class DefaultBeanContext implements InitializableBeanContext {
                                                                          boolean filterProxied) {
 
         Predicate<BeanDefinition<T>> predicate = candidate -> !candidate.isAbstract();
-
-        Collection<BeanDefinition<T>> candidates = new ArrayList<>(findBeanCandidates(resolutionContext, beanType, filterProxied, predicate));
-        return pickOneBean(beanType, qualifier, throwNonUnique, filterProxied, predicate, candidates);
+        Collection<BeanDefinition<T>> candidates = findBeanCandidates(resolutionContext, beanType, filterProxied, predicate);
+        return pickOneBean(beanType, qualifier, throwNonUnique, candidates);
     }
 
     @NonNull
@@ -3332,55 +3331,44 @@ public class DefaultBeanContext implements InitializableBeanContext {
         Argument<T> beanType,
         Qualifier<T> qualifier,
         boolean throwNonUnique,
-        boolean filterProxied,
-        Predicate<BeanDefinition<T>> predicate,
         Collection<BeanDefinition<T>> candidates) {
         if (candidates.isEmpty()) {
             return Optional.empty();
         }
-        filterProxiedTypes(candidates, filterProxied, false, predicate);
+        BeanDefinition<T> definition;
+        if (qualifier != null) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Qualifying bean [{}] for qualifier: {} ", beanType.getName(), qualifier);
+            }
 
-        int size = candidates.size();
-        BeanDefinition<T> definition = null;
-        if (size > 0) {
-            if (qualifier != null) {
+            Stream<BeanDefinition<T>> qualified = qualifier.reduce(beanType.getType(), candidates.stream());
+            List<BeanDefinition<T>> beanDefinitionList = qualified.toList();
+            if (beanDefinitionList.isEmpty()) {
                 if (LOG.isDebugEnabled()) {
-                    LOG.debug("Qualifying bean [{}] for qualifier: {} ", beanType.getName(), qualifier);
+                    LOG.debug("No qualifying beans of type [{}] found for qualifier: {} ", beanType.getName(), qualifier);
                 }
+                return Optional.empty();
+            }
 
-                Stream<BeanDefinition<T>> candidateStream = candidates.stream().filter(c -> {
-
-                    return !c.isAbstract();
-                });
-                Stream<BeanDefinition<T>> qualified = qualifier.reduce(beanType.getType(), candidateStream);
-                List<BeanDefinition<T>> beanDefinitionList = qualified.toList();
-                if (beanDefinitionList.isEmpty()) {
-                    if (LOG.isDebugEnabled()) {
-                        LOG.debug("No qualifying beans of type [{}] found for qualifier: {} ", beanType.getName(), qualifier);
-                    }
-                    return Optional.empty();
+            definition = lastChanceResolve(
+                beanType,
+                qualifier,
+                throwNonUnique,
+                beanDefinitionList
+            );
+        } else {
+            if (candidates.size() == 1) {
+                definition = candidates.iterator().next();
+            } else {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Searching for @Primary for type [{}] from candidates: {} ", beanType.getName(), candidates);
                 }
-
                 definition = lastChanceResolve(
                     beanType,
-                    qualifier,
+                    null,
                     throwNonUnique,
-                        beanDefinitionList
+                    candidates
                 );
-            } else {
-                if (candidates.size() == 1) {
-                    definition = candidates.iterator().next();
-                } else {
-                    if (LOG.isDebugEnabled()) {
-                        LOG.debug("Searching for @Primary for type [{}] from candidates: {} ", beanType.getName(), candidates);
-                    }
-                    definition = lastChanceResolve(
-                        beanType,
-                        qualifier,
-                        throwNonUnique,
-                        candidates
-                    );
-                }
             }
         }
         if (LOG.isDebugEnabled() && definition != null) {
@@ -3395,9 +3383,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
     private <T> void filterProxiedTypes(
         Collection<BeanDefinition<T>> candidates,
-        boolean filterProxied,
-        boolean filterDelegates,
-        Predicate<BeanDefinition<T>> predicate) {
+        boolean filterDelegates) {
         int count = candidates.size();
         Set<Class<?>> proxiedTypes = new HashSet<>(count);
         Iterator<BeanDefinition<T>> i = candidates.iterator();
@@ -3405,21 +3391,12 @@ public class DefaultBeanContext implements InitializableBeanContext {
         while (i.hasNext()) {
             BeanDefinition<T> candidate = i.next();
             if (candidate instanceof ProxyBeanDefinition<T> proxyBeanDefinition) {
-                if (filterProxied) {
-                    proxiedTypes.add(proxyBeanDefinition.getTargetDefinitionType());
-                } else {
-                    proxiedTypes.add(candidate.getClass());
-                }
-            } else if (candidate instanceof BeanDefinitionDelegate) {
-                BeanDefinition<T> delegate = ((BeanDefinitionDelegate<T>) candidate).getDelegate();
-                if (filterDelegates) {
-                    i.remove();
+                proxiedTypes.add(proxyBeanDefinition.getTargetDefinitionType());
+            } else if (filterDelegates && candidate instanceof BeanDefinitionDelegate<T> delegate) {
+                i.remove();
 
-                    if (!delegates.contains(delegate) && (predicate == null || predicate.test(delegate))) {
-                        delegates.add(delegate);
-                    }
-                } else if (filterProxied && delegate instanceof ProxyBeanDefinition<T> proxyBeanDefinition) {
-                    proxiedTypes.add(proxyBeanDefinition.getTargetDefinitionType());
+                if (!delegates.contains(delegate)) {
+                    delegates.add(delegate);
                 }
             }
         }
@@ -3428,13 +3405,14 @@ public class DefaultBeanContext implements InitializableBeanContext {
         }
         if (!proxiedTypes.isEmpty()) {
             candidates.removeIf(candidate -> {
-                if (candidate instanceof BeanDefinitionDelegate) {
-                    return proxiedTypes.contains(((BeanDefinitionDelegate<T>) candidate).getDelegate().getClass());
+                if (candidate instanceof BeanDefinitionDelegate<T> delegate) {
+                    return proxiedTypes.contains(delegate.getDelegate().getClass());
                 } else {
                     return proxiedTypes.contains(candidate.getClass());
                 }
             });
         }
+
     }
 
     private <T> BeanDefinition<T> lastChanceResolve(Argument<T> beanType,
@@ -3735,8 +3713,8 @@ public class DefaultBeanContext implements InitializableBeanContext {
             candidateStream = candidateStream.filter(c -> {
                 if (c.equals(declaringBean)) {
                     return false;
-                } else if (declaringBean instanceof ProxyBeanDefinition) {
-                    return !((ProxyBeanDefinition) declaringBean).getTargetDefinitionType().equals(c.getClass());
+                } else if (declaringBean instanceof ProxyBeanDefinition<?> proxyBeanDefinition) {
+                    return !proxyBeanDefinition.getTargetDefinitionType().equals(c.getClass());
                 }
                 return true;
             });
