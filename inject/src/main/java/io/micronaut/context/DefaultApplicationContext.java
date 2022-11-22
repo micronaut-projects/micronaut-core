@@ -51,6 +51,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -146,10 +147,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
             return Boolean.parseBoolean(bootstrapContextProp);
         }
         Boolean configBootstrapEnabled = configuration.isBootstrapEnvironmentEnabled();
-        if (configBootstrapEnabled != null) {
-            return configBootstrapEnabled;
-        }
-        return isBootstrapPropertySourceLocatorPresent();
+        return Objects.requireNonNullElseGet(configBootstrapEnabled, this::isBootstrapPropertySourceLocatorPresent);
     }
 
     private boolean isBootstrapPropertySourceLocatorPresent() {
@@ -236,7 +234,22 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     protected void startEnvironment() {
         Environment defaultEnvironment = getEnvironment();
         defaultEnvironment.start();
-        registerSingleton(Environment.class, defaultEnvironment, null, false);
+        RuntimeBeanDefinition.Builder<? extends Environment> definition;
+        if (defaultEnvironment instanceof DefaultEnvironment de) {
+            definition = RuntimeBeanDefinition
+                .builder(DefaultEnvironment.class, () -> de);
+        } else {
+            definition = RuntimeBeanDefinition
+                .builder(Environment.class, () -> defaultEnvironment);
+        }
+
+        //noinspection unchecked
+        definition = definition
+                        .singleton(true)
+                        .qualifier(PrimaryQualifier.INSTANCE);
+
+        //noinspection resource
+        registerBeanDefinition(definition.build());
     }
 
     @Override
@@ -508,8 +521,8 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                         }
                     }
 
-                    if (qualifier instanceof Named) {
-                        delegate.put(Named.class.getName(), ((Named) qualifier).getName());
+                    if (qualifier instanceof Named named) {
+                        delegate.put(Named.class.getName(), named.getName());
                     }
                     if (delegate.isEnabled(this, resolutionContext)) {
                         transformedCandidates.add((BeanDefinition<T>) delegate);
