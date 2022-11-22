@@ -63,10 +63,6 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
     @Nullable
     protected final Qualifier qualifier;
 
-    private BeanDefinitionDelegate(BeanDefinition<T> definition) {
-        this(definition, null);
-    }
-
     private BeanDefinitionDelegate(BeanDefinition<T> definition, @Nullable Qualifier qualifier) {
         this.definition = definition;
         this.qualifier = qualifier;

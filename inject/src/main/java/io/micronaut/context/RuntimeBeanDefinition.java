@@ -219,6 +219,21 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, Be
         Builder<B> exposedTypes(Class<?>...types);
 
         /**
+         * The type arguments for the type.
+         * @param arguments The arguments
+         * @return This builder
+         */
+        Builder<B> typeArguments(Argument<?>... arguments);
+
+        /**
+         * The type arguments for an implemented type of this type.
+         * @param implementedType The implemented type
+         * @param arguments The arguments
+         * @return This builder
+         */
+        Builder<B> typeArguments(Class<?> implementedType, Argument<?>... arguments);
+
+        /**
          * The annotation metadata for the bean.
          * @param annotationMetadata The annotation metadata
          * @return This builder
