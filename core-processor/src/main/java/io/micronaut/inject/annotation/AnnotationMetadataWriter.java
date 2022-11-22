@@ -292,7 +292,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             return;
         }
         List<AnnotationMetadata> notEmpty = CollectionUtils.iterableToList(hierarchy)
-                .stream().filter(h -> !h.isEmpty()).collect(Collectors.toList());
+            .stream().filter(h -> !h.isEmpty()).toList();
         if (notEmpty.size() == 1) {
             pushNewAnnotationMetadataOrReference(owningType, classWriter, generatorAdapter, defaultsStorage, loadTypeMethods, notEmpty.get(0));
             return;

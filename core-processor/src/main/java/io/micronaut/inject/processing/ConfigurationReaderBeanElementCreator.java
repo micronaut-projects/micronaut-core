@@ -280,7 +280,7 @@ final class ConfigurationReaderBeanElementCreator extends DeclaredBeanElementCre
                         return false;
                     }
                     Optional<MethodElement> writeMethod = propertyElement.getWriteMethod();
-                    if (!writeMethod.isPresent()) {
+                    if (writeMethod.isEmpty()) {
                         return false;
                     }
                     MethodElement methodElement = writeMethod.get();

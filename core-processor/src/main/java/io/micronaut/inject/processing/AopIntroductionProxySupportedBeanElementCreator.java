@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.processing;
 
+import io.micronaut.aop.writer.AopProxyWriter;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ClassElement;
@@ -41,7 +42,7 @@ final class AopIntroductionProxySupportedBeanElementCreator extends DeclaredBean
         if (classElement.isFinal()) {
             throw new ProcessingException(classElement, "Cannot apply AOP advice to final class. Class must be made non-final to support proxying: " + classElement.getName());
         }
-        aopProxyVisitor = aopHelper.createIntroductionAopProxyWriter(classElement, visitorContext);
+        aopProxyVisitor = createIntroductionAopProxyWriter(classElement, visitorContext);
         beanDefinitionWriters.add(aopProxyVisitor);
         MethodElement constructorElement = classElement.getPrimaryConstructor().orElse(null);
         if (constructorElement != null) {
@@ -60,13 +61,13 @@ final class AopIntroductionProxySupportedBeanElementCreator extends DeclaredBean
     }
 
     @Override
-    protected BeanDefinitionVisitor getAroundAopProxyVisitor(BeanDefinitionVisitor visitor, MethodElement methodElement) {
+    protected AopProxyWriter getAroundAopProxyVisitor(BeanDefinitionVisitor visitor, MethodElement methodElement) {
         return aopProxyVisitor;
     }
 
     @Override
     protected boolean visitPropertyReadElement(BeanDefinitionVisitor visitor, PropertyElement propertyElement, MethodElement readElement) {
-        if (readElement.isAbstract() && aopHelper.visitIntrospectedMethod(visitor, classElement, readElement)) {
+        if (readElement.isAbstract() && visitIntrospectedMethod(visitor, classElement, readElement)) {
             return true;
         }
         return super.visitPropertyReadElement(visitor, propertyElement, readElement);
@@ -74,7 +75,7 @@ final class AopIntroductionProxySupportedBeanElementCreator extends DeclaredBean
 
     @Override
     protected boolean visitPropertyWriteElement(BeanDefinitionVisitor visitor, PropertyElement propertyElement, MethodElement writeElement) {
-        if (writeElement.isAbstract() && aopHelper.visitIntrospectedMethod(visitor, classElement, writeElement)) {
+        if (writeElement.isAbstract() && visitIntrospectedMethod(visitor, classElement, writeElement)) {
             return true;
         }
         return super.visitPropertyWriteElement(visitor, propertyElement, writeElement);
@@ -82,7 +83,7 @@ final class AopIntroductionProxySupportedBeanElementCreator extends DeclaredBean
 
     @Override
     protected boolean visitMethod(BeanDefinitionVisitor visitor, MethodElement methodElement) {
-        if (methodElement.isAbstract() && aopHelper.visitIntrospectedMethod(visitor, classElement, methodElement)) {
+        if (methodElement.isAbstract() && visitIntrospectedMethod(visitor, classElement, methodElement)) {
             return true;
         }
         return super.visitMethod(visitor, methodElement);

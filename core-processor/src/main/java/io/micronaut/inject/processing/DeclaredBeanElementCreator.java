@@ -15,9 +15,14 @@
  */
 package io.micronaut.inject.processing;
 
+import io.micronaut.aop.Adapter;
+import io.micronaut.aop.InterceptorKind;
+import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil;
+import io.micronaut.aop.writer.AopProxyWriter;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Value;
+import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
@@ -25,19 +30,28 @@ import io.micronaut.core.annotation.NextMajorVersion;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.Vetoed;
+import io.micronaut.core.util.StringUtils;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
+import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PropertyElement;
+import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.BeanDefinitionVisitor;
 import io.micronaut.inject.writer.BeanDefinitionWriter;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -51,7 +65,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Internal
 class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
 
-    protected BeanDefinitionVisitor aopProxyVisitor;
+    private static final String MSG_ADAPTER_METHOD_PREFIX = "Cannot adapt method [";
+    private static final String MSG_TARGET_METHOD_PREFIX = "] to target method [";
+
+    protected AopProxyWriter aopProxyVisitor;
     protected final boolean isAopProxy;
     private final AtomicInteger adaptedMethodIndex = new AtomicInteger(0);
 
@@ -98,12 +115,12 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
      * @param methodElement the method that is originating the AOP proxy
      * @return The AOP proxy visitor
      */
-    protected BeanDefinitionVisitor getAroundAopProxyVisitor(BeanDefinitionVisitor visitor, @Nullable MethodElement methodElement) {
+    protected AopProxyWriter getAroundAopProxyVisitor(BeanDefinitionVisitor visitor, @Nullable MethodElement methodElement) {
         if (aopProxyVisitor == null) {
             if (classElement.isFinal()) {
                 throw new ProcessingException(classElement, "Cannot apply AOP advice to final class. Class must be made non-final to support proxying: " + classElement.getName());
             }
-            aopProxyVisitor = aopHelper.createAroundAopProxyWriter(
+            aopProxyVisitor = createAroundAopProxyWriter(
                 visitor,
                 isAopProxy || methodElement == null ? classElement.getAnnotationMetadata() : methodElement.getAnnotationMetadata(),
                 visitorContext,
@@ -351,11 +368,12 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
     protected boolean visitAopMethod(BeanDefinitionVisitor visitor, MethodElement methodElement) {
         boolean aopDefinedOnClassAndPublicMethod = isAopProxy && (methodElement.isPublic() || methodElement.isPackagePrivate());
         AnnotationMetadata methodAnnotationMetadata = getElementAnnotationMetadata(methodElement);
+
         if (aopDefinedOnClassAndPublicMethod ||
-            !isAopProxy && hasAroundStereotype(methodAnnotationMetadata) ||
-            hasDeclaredAroundAdvice(methodAnnotationMetadata) && !classElement.isAbstract()) {
+            !isAopProxy && InterceptedMethodUtil.hasAroundStereotype(methodAnnotationMetadata) ||
+            InterceptedMethodUtil.hasDeclaredAroundAdvice(methodAnnotationMetadata) && !classElement.isAbstract()) {
             if (methodElement.isFinal()) {
-                if (hasDeclaredAroundAdvice(methodAnnotationMetadata)) {
+                if (InterceptedMethodUtil.hasDeclaredAroundAdvice(methodAnnotationMetadata)) {
                     throw new ProcessingException(methodElement, "Method defines AOP advice but is declared final. Change the method to be non-final in order for AOP advice to be applied.");
                 } else if (!methodElement.isSynthetic() && aopDefinedOnClassAndPublicMethod && isDeclaredInThisClass(methodElement)) {
                     throw new ProcessingException(methodElement, "Public method inherits AOP advice but is declared final. Either make the method non-public or apply AOP advice only to public methods declared on the class.");
@@ -366,11 +384,18 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
             } else if (methodElement.isStatic()) {
                 throw new ProcessingException(methodElement, "Method defines AOP advice but is declared static");
             }
-            BeanDefinitionVisitor aopProxyVisitor = getAroundAopProxyVisitor(visitor, methodElement);
-            aopHelper.visitAroundMethod(aopProxyVisitor, classElement, methodElement);
+            AopProxyWriter aopProxyVisitor = getAroundAopProxyVisitor(visitor, methodElement);
+            visitAroundMethod(aopProxyVisitor, classElement, methodElement);
             return true;
         }
         return false;
+    }
+
+    protected void visitAroundMethod(AopProxyWriter aopProxyWriter, TypedElement beanType, MethodElement methodElement) {
+        aopProxyWriter.visitInterceptorBinding(
+            InterceptedMethodUtil.resolveInterceptorBinding(methodElement.getAnnotationMetadata(), InterceptorKind.AROUND)
+        );
+        aopProxyWriter.visitAroundMethod(beanType, methodElement);
     }
 
     /**
@@ -491,12 +516,109 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
     }
 
     private void visitAdaptedMethod(BeanDefinitionVisitor visitor, MethodElement sourceMethod) {
-        BeanDefinitionVisitor adapter = aopHelper
-            .visitAdaptedMethod(classElement, sourceMethod, adaptedMethodIndex, visitorContext);
-        if (adapter != null) {
-            visitor.visitExecutableMethod(sourceMethod.getDeclaringType(), sourceMethod, visitorContext);
-            beanDefinitionWriters.add(adapter);
+        AnnotationMetadata methodAnnotationMetadata = sourceMethod.getDeclaredMetadata();
+
+        Optional<ClassElement> interfaceToAdaptValue = methodAnnotationMetadata.getValue(Adapter.class, String.class)
+            .flatMap(clazz -> visitorContext.getClassElement(clazz, visitorContext.getElementAnnotationMetadataFactory().readOnly()));
+
+        if (interfaceToAdaptValue.isEmpty()) {
+            return;
         }
+        ClassElement interfaceToAdapt = interfaceToAdaptValue.get();
+        if (!interfaceToAdapt.isInterface()) {
+            throw new ProcessingException(sourceMethod, "Class to adapt [" + interfaceToAdapt.getName() + "] is not an interface");
+        }
+
+        String rootName = classElement.getSimpleName() + '$' + interfaceToAdapt.getSimpleName() + '$' + sourceMethod.getSimpleName();
+        String beanClassName = rootName + adaptedMethodIndex.incrementAndGet();
+
+        AopProxyWriter aopProxyWriter = new AopProxyWriter(
+            classElement.getPackageName(),
+            beanClassName,
+            true,
+            false,
+            sourceMethod,
+            new AnnotationMetadataHierarchy(classElement.getAnnotationMetadata(), methodAnnotationMetadata),
+            new ClassElement[]{interfaceToAdapt},
+            visitorContext
+        );
+
+        aopProxyWriter.visitDefaultConstructor(methodAnnotationMetadata, visitorContext);
+
+        List<MethodElement> methods = interfaceToAdapt.getEnclosedElements(ElementQuery.ALL_METHODS.onlyAbstract());
+        if (methods.isEmpty()) {
+            throw new ProcessingException(sourceMethod, "Interface to adapt [" + interfaceToAdapt.getName() + "] is not a SAM type. No methods found.");
+        }
+        if (methods.size() > 1) {
+            throw new ProcessingException(sourceMethod, "Interface to adapt [" + interfaceToAdapt.getName() + "] is not a SAM type. More than one abstract method declared.");
+        }
+
+        MethodElement targetMethod = methods.iterator().next();
+
+        ParameterElement[] sourceParams = sourceMethod.getParameters();
+        ParameterElement[] targetParams = targetMethod.getParameters();
+
+        int paramLen = targetParams.length;
+        if (paramLen != sourceParams.length) {
+            throw new ProcessingException(sourceMethod, MSG_ADAPTER_METHOD_PREFIX + sourceMethod + MSG_TARGET_METHOD_PREFIX + targetMethod + "]. Argument lengths don't match.");
+        }
+        if (sourceMethod.isSuspend()) {
+            throw new ProcessingException(sourceMethod, MSG_ADAPTER_METHOD_PREFIX + sourceMethod + MSG_TARGET_METHOD_PREFIX + targetMethod + "]. Kotlin suspend method not supported here.");
+        }
+
+        Map<String, ClassElement> typeVariables = interfaceToAdapt.getTypeArguments();
+        Map<String, ClassElement> genericTypes = new LinkedHashMap<>(paramLen);
+        for (int i = 0; i < paramLen; i++) {
+            ParameterElement targetParam = targetParams[i];
+            ParameterElement sourceParam = sourceParams[i];
+
+            ClassElement targetType = targetParam.getType();
+            ClassElement targetGenericType = targetParam.getGenericType();
+            ClassElement sourceType = sourceParam.getGenericType();
+
+            // ??? Java returns generic placeholder for the generic type and Groovy from the ordinary type
+            if (targetGenericType instanceof GenericPlaceholderElement genericPlaceholderElement) {
+                String variableName = genericPlaceholderElement.getVariableName();
+                if (typeVariables.containsKey(variableName)) {
+                    genericTypes.put(variableName, sourceType);
+                }
+            } else if (targetType instanceof GenericPlaceholderElement genericPlaceholderElement) {
+                String variableName = genericPlaceholderElement.getVariableName();
+                if (typeVariables.containsKey(variableName)) {
+                    genericTypes.put(variableName, sourceType);
+                }
+            }
+
+            if (!sourceType.isAssignable(targetGenericType.getName())) {
+                throw new ProcessingException(sourceMethod, MSG_ADAPTER_METHOD_PREFIX + sourceMethod + MSG_TARGET_METHOD_PREFIX + targetMethod + "]. Type [" + sourceType.getName() + "] is not a subtype of type [" + targetGenericType.getName() + "] for argument at position " + i);
+            }
+        }
+
+        if (!genericTypes.isEmpty()) {
+            aopProxyWriter.visitTypeArguments(Collections.singletonMap(interfaceToAdapt.getName(), genericTypes));
+        }
+
+        AnnotationClassValue<?>[] adaptedArgumentTypes = Arrays.stream(sourceParams)
+            .map(p -> new AnnotationClassValue<>(JavaModelUtils.getClassname(p.getGenericType())))
+            .toArray(AnnotationClassValue[]::new);
+
+        targetMethod = targetMethod.withNewOwningType(classElement);
+
+        targetMethod.annotate(Adapter.class, builder -> {
+            builder.member(Adapter.InternalAttributes.ADAPTED_BEAN, new AnnotationClassValue<>(JavaModelUtils.getClassname(classElement)));
+            builder.member(Adapter.InternalAttributes.ADAPTED_METHOD, sourceMethod.getName());
+            builder.member(Adapter.InternalAttributes.ADAPTED_ARGUMENT_TYPES, adaptedArgumentTypes);
+            String qualifier = classElement.stringValue(AnnotationUtil.NAMED).orElse(null);
+            if (StringUtils.isNotEmpty(qualifier)) {
+                builder.member(Adapter.InternalAttributes.ADAPTED_QUALIFIER, qualifier);
+            }
+        });
+
+        aopProxyWriter.visitAroundMethod(interfaceToAdapt, targetMethod);
+
+        visitor.visitExecutableMethod(sourceMethod.getDeclaringType(), sourceMethod, visitorContext);
+
+        beanDefinitionWriters.add(aopProxyWriter);
     }
 
 }

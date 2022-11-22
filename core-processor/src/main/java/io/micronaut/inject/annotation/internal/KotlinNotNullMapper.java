@@ -17,6 +17,7 @@ package io.micronaut.inject.annotation.internal;
 
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.annotation.NamedAnnotationTransformer;
 import io.micronaut.inject.visitor.VisitorContext;
 
@@ -31,6 +32,7 @@ import java.util.List;
  * @author graemerocher
  * @since 1.1.4
  */
+@Internal
 public class KotlinNotNullMapper implements NamedAnnotationTransformer {
     @NonNull
     @Override

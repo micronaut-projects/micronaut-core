@@ -809,8 +809,8 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         invokeBeanConstructor(instantiateInternal, constructor, (writer, con) -> {
             List<ParameterElement> constructorArguments = Arrays.asList(con.getParameters());
             Collection<Type> argumentTypes = constructorArguments.stream().map(pe ->
-                    JavaModelUtils.getTypeReference(pe.getType())
-            ).collect(Collectors.toList());
+                JavaModelUtils.getTypeReference(pe.getType())
+            ).toList();
 
             int i = 0;
             for (Type argumentType : argumentTypes) {
@@ -1106,8 +1106,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
                 });
 
                 List<BeanPropertyData> readWriteProps = beanProperties.stream()
-                        .filter(bp -> bp.setDispatchIndex != -1 && bp.getDispatchIndex != -1 && !constructorProps.contains(bp))
-                        .collect(Collectors.toList());
+                    .filter(bp -> bp.setDispatchIndex != -1 && bp.getDispatchIndex != -1 && !constructorProps.contains(bp)).toList();
 
                 if (!readWriteProps.isEmpty()) {
                     int beanTypeLocal = writer.newLocal(beanType);
