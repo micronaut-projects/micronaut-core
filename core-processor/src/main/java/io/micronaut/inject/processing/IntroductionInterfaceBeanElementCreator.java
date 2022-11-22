@@ -35,16 +35,13 @@ import java.util.List;
 @Internal
 final class IntroductionInterfaceBeanElementCreator extends AbstractBeanElementCreator {
 
-    private final String factoryBeanDefinitionName;
-
-    IntroductionInterfaceBeanElementCreator(ClassElement classElement, VisitorContext visitorContext, String factoryBeanDefinitionName) {
+    IntroductionInterfaceBeanElementCreator(ClassElement classElement, VisitorContext visitorContext) {
         super(classElement, visitorContext);
-        this.factoryBeanDefinitionName = factoryBeanDefinitionName;
     }
 
     @Override
     public void buildInternal() {
-        BeanDefinitionVisitor aopProxyWriter = aopHelper.createIntroductionAopProxyWriter(classElement, visitorContext);
+        BeanDefinitionVisitor aopProxyWriter = createIntroductionAopProxyWriter(classElement, visitorContext);
         aopProxyWriter.visitTypeArguments(classElement.getAllTypeArguments());
 
         // Because we add validated interceptor in some cases, this needs to run before the constructor visit
@@ -65,16 +62,13 @@ final class IntroductionInterfaceBeanElementCreator extends AbstractBeanElementC
         } else {
             aopProxyWriter.visitDefaultConstructor(classElement, visitorContext);
         }
-        if (factoryBeanDefinitionName != null) {
-            aopProxyWriter.visitSuperBeanDefinitionFactory(factoryBeanDefinitionName);
-        }
 
         // The introduction will include overridden methods* (find(List) <- find(Iterable)*) but ordinary class introduction doesn't
         // Because of the caching we need to process declared methods first
         List<MethodElement> methods = new ArrayList<>(classElement.getEnclosedElements(ElementQuery.ALL_METHODS.includeHiddenElements().includeOverriddenMethods()));
         Collections.reverse(methods); // reverse to process hierarchy starting from declared methods
         for (MethodElement methodElement : methods) {
-            aopHelper.visitIntrospectedMethod(aopProxyWriter, classElement, methodElement);
+            visitIntrospectedMethod(aopProxyWriter, classElement, methodElement);
         }
         beanDefinitionWriters.add(aopProxyWriter);
     }

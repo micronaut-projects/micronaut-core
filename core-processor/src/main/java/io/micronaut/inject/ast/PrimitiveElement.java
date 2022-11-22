@@ -134,10 +134,8 @@ public final class PrimitiveElement implements ArrayableClassElement {
 
     @Override
     public String toString() {
-        final StringBuilder sb = new StringBuilder("PrimitiveElement{");
-        sb.append("typeName='").append(typeName).append('\'');
-        sb.append(", arrayDimensions=").append(arrayDimensions);
-        sb.append('}');
-        return sb.toString();
+        return "PrimitiveElement{" + "typeName='" + typeName + '\'' +
+            ", arrayDimensions=" + arrayDimensions +
+            '}';
     }
 }

@@ -17,6 +17,7 @@ package io.micronaut.inject.beans.visitor;
 
 import io.micronaut.context.annotation.BeanProperties;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.annotation.TypedAnnotationTransformer;
@@ -31,6 +32,7 @@ import java.util.List;
  * @author Denis Stepanov
  * @since 4.0.0
  */
+@Internal
 public final class IntrospectedToBeanPropertiesTransformer implements TypedAnnotationTransformer<Introspected> {
 
     @Override

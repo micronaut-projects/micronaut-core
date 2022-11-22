@@ -65,6 +65,7 @@ import java.util.stream.Collectors;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 public abstract class AbstractAnnotationMetadataBuilder<T, A> {
 
     protected static final List<String> EXCLUDES = Arrays.asList(AnnotationUtil.KOTLIN_METADATA, "jdk.internal.ValueBased");
@@ -2346,7 +2347,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
 
         MetadataKey(T... elements) {
             this.elements = elements;
-            this.hashCode = Objects.hash(elements);
+            this.hashCode = Objects.hash((Object[]) elements);
         }
 
         @Override

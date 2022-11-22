@@ -43,8 +43,7 @@ public final class ConfigurationUtils {
         } else {
             typePath = getRequiredTypePath(owningType);
         }
-        String s = typePath + "." + propertyName;
-        return s;
+        return typePath + "." + propertyName;
     }
 
     public static String getRequiredTypePath(ClassElement classElement) {
@@ -85,9 +84,9 @@ public final class ConfigurationUtils {
     private static String getPath(AnnotationMetadata annotationMetadata) {
         Optional<String> basePrefixOptional = annotationMetadata.stringValue(ConfigurationReader.class, ConfigurationReader.BASE_PREFIX);
         Optional<String> prefixOptional = annotationMetadata.stringValue(ConfigurationReader.class, ConfigurationReader.PREFIX);
-        String prefix = null;
+        String prefix;
         if (basePrefixOptional.isPresent()) {
-            if (!prefixOptional.isPresent()) {
+            if (prefixOptional.isEmpty()) {
                 prefix = basePrefixOptional.get();
             } else {
                 prefix = prefixOptional.map(p -> basePrefixOptional.get() + "." + p).orElse(null);

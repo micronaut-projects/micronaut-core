@@ -27,7 +27,7 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Allows using the {@link javax.persistence.PersistenceContext} annotation in Micronaut.
+ * Allows using the `javax.persistence.PersistenceContext` annotation in Micronaut.
  *
  * @author graemerocher
  * @since 1.0

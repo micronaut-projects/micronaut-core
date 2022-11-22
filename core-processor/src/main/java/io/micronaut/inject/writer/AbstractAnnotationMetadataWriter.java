@@ -84,7 +84,7 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
             Element originatingElement,
             AnnotationMetadata annotationMetadata,
             boolean writeAnnotationDefaults) {
-        super(new Element[]{ originatingElement });
+        super(originatingElement);
         this.targetClassType = getTypeReferenceForName(className);
         this.annotationMetadata = annotationMetadata.getTargetAnnotationMetadata();
         this.writeAnnotationDefault = writeAnnotationDefaults;

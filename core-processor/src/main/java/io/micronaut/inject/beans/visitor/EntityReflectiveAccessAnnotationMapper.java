@@ -17,6 +17,7 @@ package io.micronaut.inject.beans.visitor;
 
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.ReflectiveAccess;
 import io.micronaut.inject.annotation.NamedAnnotationMapper;
@@ -32,6 +33,7 @@ import java.util.List;
  * @author Iván López
  * @since 3.0
  */
+@Internal
 public class EntityReflectiveAccessAnnotationMapper implements NamedAnnotationMapper {
     @NonNull
     @Override

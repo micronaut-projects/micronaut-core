@@ -50,7 +50,7 @@ public interface PropertyElement extends TypedElement, MemberElement {
      * @return True if the property is read only.
      */
     default boolean isReadOnly() {
-        return !getWriteMember().isPresent();
+        return getWriteMember().isEmpty();
     }
 
     /**
@@ -60,7 +60,7 @@ public interface PropertyElement extends TypedElement, MemberElement {
      * @since 4.0.0
      */
     default boolean isWriteOnly() {
-        return !getReadMember().isPresent();
+        return getReadMember().isEmpty();
     }
 
     /**
