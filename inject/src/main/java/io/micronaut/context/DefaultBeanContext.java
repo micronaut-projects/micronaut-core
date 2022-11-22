@@ -158,13 +158,13 @@ public class DefaultBeanContext implements InitializableBeanContext {
     protected static final Logger LOG = LoggerFactory.getLogger(DefaultBeanContext.class);
     protected static final Logger LOG_LIFECYCLE = LoggerFactory.getLogger(DefaultBeanContext.class.getPackage().getName() + ".lifecycle");
     @SuppressWarnings("rawtypes")
-    private static final Qualifier PROXY_TARGET_QUALIFIER = new Qualifier<Object>() {
+    private static final Qualifier PROXY_TARGET_QUALIFIER = new Qualifier<>() {
         @SuppressWarnings("rawtypes")
         @Override
-        public <BT extends BeanType<Object>> Stream<BT> reduce(Class<Object> beanType, Stream<BT> candidates) {
+        public <T extends BeanType<Object>> Stream<T> reduce(Class<Object> beanType, Stream<T> candidates) {
             return candidates.filter(bt -> {
-                if (bt instanceof BeanDefinitionDelegate) {
-                    return !(((BeanDefinitionDelegate) bt).getDelegate() instanceof ProxyBeanDefinition);
+                if (bt instanceof BeanDefinitionDelegate<?> delegate) {
+                    return !(delegate.getDelegate() instanceof ProxyBeanDefinition);
                 } else {
                     return !(bt instanceof ProxyBeanDefinition);
                 }
@@ -299,13 +299,13 @@ public class DefaultBeanContext implements InitializableBeanContext {
         this.classLoader = contextConfiguration.getClassLoader();
         this.customScopeRegistry = Objects.requireNonNull(createCustomScopeRegistry(), "Scope registry cannot be null");
         Set<Class<? extends Annotation>> eagerInitAnnotated = contextConfiguration.getEagerInitAnnotated();
-        List<String> eagerInitStereotypes = new ArrayList<>(eagerInitAnnotated.size());
+        List<String> configuredEagerSingletonAnnotations = new ArrayList<>(eagerInitAnnotated.size());
         for (Class<? extends Annotation> ann : eagerInitAnnotated) {
-            eagerInitStereotypes.add(ann.getName());
+            configuredEagerSingletonAnnotations.add(ann.getName());
         }
-        this.eagerInitStereotypes = eagerInitStereotypes.toArray(new String[0]);
-        this.eagerInitStereotypesPresent = !eagerInitStereotypes.isEmpty();
-        this.eagerInitSingletons = eagerInitStereotypesPresent && (eagerInitStereotypes.contains(AnnotationUtil.SINGLETON) || eagerInitStereotypes.contains(Singleton.class.getName()));
+        this.eagerInitStereotypes = configuredEagerSingletonAnnotations.toArray(new String[0]);
+        this.eagerInitStereotypesPresent = !configuredEagerSingletonAnnotations.isEmpty();
+        this.eagerInitSingletons = eagerInitStereotypesPresent && (configuredEagerSingletonAnnotations.contains(AnnotationUtil.SINGLETON) || configuredEagerSingletonAnnotations.contains(Singleton.class.getName()));
         this.beanContextConfiguration = contextConfiguration;
     }
 
@@ -375,6 +375,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
      */
     protected void registerConversionService() {
         conversionService = MutableConversionService.create();
+        //noinspection resource
         registerSingleton(MutableConversionService.class, conversionService,  null, false);
     }
 
@@ -393,14 +394,14 @@ public class DefaultBeanContext implements InitializableBeanContext {
                 Argument<Object> argument = (Argument<Object>) beanType.getGenericBeanType();
                 @SuppressWarnings("unchecked")
                 Qualifier<Object> declaredQualifier = (Qualifier<Object>) beanType.getDeclaredQualifier();
-                this.disabledBeans.put(new BeanKey<Object>(argument, declaredQualifier), new DisabledBean<>(
+                this.disabledBeans.put(new BeanKey<>(argument, declaredQualifier), new DisabledBean<>(
                     argument,
                     declaredQualifier,
                     reasons
                 ));
             } catch (Exception | NoClassDefFoundError e) {
                 // it is theoretically possible that resolving the generic type results in an error
-                // in this case just ignore this as the maps built here are purely to aid error diganosis
+                // in this case just ignore this as the maps built here are purely to aid error diagnosis
             }
         } else if (component instanceof BeanConfiguration configuration) {
             this.disabledConfigurations.put(configuration.getName(), reasons);
@@ -479,7 +480,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
         if (type == null) {
             return AnnotationMetadata.EMPTY_METADATA;
         }
-        return findBeanDefinition(Argument.of(type), null, false)
+        return findBeanDefinitionInternal(Argument.of(type), null)
                 .map(AnnotationMetadataProvider::getAnnotationMetadata)
                 .orElse(AnnotationMetadata.EMPTY_METADATA);
     }
@@ -584,7 +585,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
     @Override
     public MethodExecutionHandle<?, Object> createExecutionHandle(BeanDefinition<? extends Object> beanDefinition, ExecutableMethod<Object, ?> method) {
-        return new MethodExecutionHandle<Object, Object>() {
+        return new MethodExecutionHandle<>() {
 
             private Object target;
 
@@ -818,8 +819,8 @@ public class DefaultBeanContext implements InitializableBeanContext {
         return findConcreteCandidate(null, beanType, qualifier, true);
     }
 
-    private <T> Optional<BeanDefinition<T>> findBeanDefinition(Argument<T> beanType, Qualifier<T> qualifier, boolean throwNonUnique) {
-        return findConcreteCandidate(null, beanType, qualifier, throwNonUnique);
+    private <T> Optional<BeanDefinition<T>> findBeanDefinitionInternal(Argument<T> beanType, Qualifier<T> qualifier) {
+        return findConcreteCandidate(null, beanType, qualifier, false);
     }
 
     @Override
@@ -850,7 +851,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
         Objects.requireNonNull(beanType, "Bean type cannot be null");
         Collection<BeanDefinition<T>> candidates = findBeanCandidatesInternal(null, beanType);
         if (qualifier != null) {
-            candidates = qualifier.reduce(beanType.getType(), new ArrayList<>(candidates).stream()).collect(Collectors.toList());
+            candidates = qualifier.reduce(beanType.getType(), candidates.stream()).toList();
         }
         return Collections.unmodifiableCollection(candidates);
     }
@@ -979,7 +980,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
         // try and find a bean that implements the map with the generics
         Argument<Map<String, V>> mapType = Argument.mapOf(Argument.of(String.class), beanType);
         @SuppressWarnings("unchecked") Qualifier<Map<String, V>> mapQualifier = (Qualifier<Map<String, V>>) qualifier;
-        BeanDefinition<Map<String, V>> existingBean = findBeanDefinition(mapType, mapQualifier, false).orElse(null);
+        BeanDefinition<Map<String, V>> existingBean = findBeanDefinitionInternal(mapType, mapQualifier).orElse(null);
         if (existingBean != null) {
             return getBean(existingBean);
         } else {
@@ -1007,7 +1008,6 @@ public class DefaultBeanContext implements InitializableBeanContext {
         }
     }
 
-    @SuppressWarnings("unchecked")
     @NonNull
     private static String resolveKey(BeanRegistration<?> reg) {
         BeanDefinition<?> definition = reg.beanDefinition;
