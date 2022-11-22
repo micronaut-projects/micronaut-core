@@ -251,7 +251,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         */
         if (processingOver) {
             for (Map.Entry<String, Element> e : postponed.entrySet()) {
-                javaVisitorContext.warn("Bean definition [" + e.getKey() + "] skipped from processing because of the error element reported by the compiler", e.getValue());
+                javaVisitorContext.warn("Bean definition generation [" + e.getKey() + "] skipped from processing because of prior error. This error is normally due to missing classes on the classpath. Verify the compilation classpath is correct to resolve the problem.", e.getValue());
             }
 
             try {
