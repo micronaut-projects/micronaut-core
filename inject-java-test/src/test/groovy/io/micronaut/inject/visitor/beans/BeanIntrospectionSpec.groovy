@@ -28,13 +28,12 @@ import io.micronaut.inject.ExecutableMethod
 import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
 import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.jackson.modules.BeanIntrospectionModule
+import jakarta.inject.Singleton
 import spock.lang.IgnoreIf
-
 import spock.lang.Issue
 import spock.lang.Requires
 
 import javax.annotation.processing.SupportedAnnotationTypes
-import jakarta.inject.Singleton
 import javax.persistence.Column
 import javax.persistence.Entity
 import javax.persistence.Id
@@ -4366,6 +4365,53 @@ public record Foo(String name, String isSurname, boolean contains, Boolean purge
 }''')
         expect:
         introspection.propertyNames as List<String> == ["name", "isSurname", "contains", "purged", "isUpdated", "isDeleted"]
+    }
+
+    void 'test annotation on a generic field argument'() {
+        when:
+        BeanIntrospection beanIntrospection = buildBeanIntrospection('test.Book', '''
+package test;
+
+import javax.validation.Valid;
+import javax.validation.constraints.Size;
+import java.util.List;
+import io.micronaut.core.annotation.Introspected;
+
+class Author {
+}
+
+@Introspected
+class Book {
+
+    @Size(min=2)
+    private String name;
+
+    private List<@Valid Author> authors;
+
+    public Book(String name) {
+        this.name = name;
+        this.authors = null;
+    }
+
+    public Book(String name, List<Author> authors) {
+        this.name = name;
+        this.authors = authors;
+    }
+
+    public List<Author> getAuthors() {
+        return authors;
+    }
+
+    public String getName() {
+        return name;
+    }
+}
+''')
+        def property =  beanIntrospection.getBeanProperties().first()
+
+        then:
+        property.name == "authors"
+        property.asArgument().getTypeParameters()[0].annotationMetadata.hasStereotype("javax.validation.Valid")
     }
 
     @Override
