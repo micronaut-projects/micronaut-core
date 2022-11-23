@@ -15,7 +15,7 @@
  */
 package io.micronaut.validation.validator.pojo;
 
-import javax.validation.Constraint;
+import jakarta.validation.Constraint;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;

@@ -17,7 +17,7 @@ dependencies {
 
     testAnnotationProcessor project(":inject-java")
     testCompileOnly project(":inject-groovy")
-    testImplementation libs.managed.validation
+    testImplementation libs.managed.jakarta.validation.api
     testImplementation libs.javax.persistence
     testImplementation project(":runtime")
     api libs.blaze.persistence.core

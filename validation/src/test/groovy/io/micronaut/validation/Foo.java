@@ -18,9 +18,9 @@ package io.micronaut.validation;
 import groovy.lang.Singleton;
 import io.micronaut.core.annotation.Introspected;
 
-import javax.validation.Valid;
-import javax.validation.constraints.Digits;
-import javax.validation.constraints.NotNull;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Digits;
+import jakarta.validation.constraints.NotNull;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;

@@ -28,8 +28,8 @@ import io.micronaut.core.util.CollectionUtils;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
-import javax.validation.valueextraction.UnwrapByDefault;
-import javax.validation.valueextraction.ValueExtractor;
+import jakarta.validation.valueextraction.UnwrapByDefault;
+import jakarta.validation.valueextraction.ValueExtractor;
 import java.util.*;
 
 /**

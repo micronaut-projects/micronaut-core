@@ -13,7 +13,7 @@ dependencies {
     api project(':inject')
     api project(':retry')
 
-    api libs.managed.validation
+    api libs.managed.jakarta.validation.api
 
     implementation libs.managed.reactor
 

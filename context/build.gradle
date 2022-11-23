@@ -7,7 +7,7 @@ dependencies {
     annotationProcessor project(":graal")
     api project(':inject')
     api project(':aop')
-    api libs.managed.validation
+    api libs.managed.jakarta.validation.api
 
     compileOnly project(':core-reactive')
     compileOnly project(':core-processor')

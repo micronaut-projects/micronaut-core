@@ -27,10 +27,10 @@ import io.micronaut.validation.validator.Validator;
 import jakarta.inject.Singleton;
 import java.lang.reflect.Method;
 import java.util.Set;
-import javax.validation.ConstraintViolation;
-import javax.validation.ConstraintViolationException;
-import javax.validation.ValidatorFactory;
-import javax.validation.executable.ExecutableValidator;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.ValidatorFactory;
+import jakarta.validation.executable.ExecutableValidator;
 
 /**
  * A {@link MethodInterceptor} that validates method invocations.

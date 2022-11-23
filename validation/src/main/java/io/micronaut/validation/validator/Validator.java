@@ -19,9 +19,9 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.beans.BeanIntrospection;
 
-import javax.validation.Constraint;
-import javax.validation.ConstraintViolation;
-import javax.validation.Valid;
+import jakarta.validation.Constraint;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.Valid;
 import java.util.Set;
 
 /**

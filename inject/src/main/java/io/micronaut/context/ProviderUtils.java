@@ -17,7 +17,7 @@ package io.micronaut.context;
 
 import jakarta.inject.Provider;
 
-import javax.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotNull;
 
 /**
  * Helper methods for dealing with {@link javax.inject.Provider}.

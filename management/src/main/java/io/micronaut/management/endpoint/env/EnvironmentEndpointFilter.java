@@ -15,7 +15,7 @@
  */
 package io.micronaut.management.endpoint.env;
 
-import javax.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotNull;
 
 /**
  * A bean interface that allows hiding or masking of parts of the environment and its property sources when they are

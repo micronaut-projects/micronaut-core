@@ -19,7 +19,7 @@ import com.fasterxml.jackson.annotation.JsonValue;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.ReflectiveAccess;
 
-import javax.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotNull;
 import java.util.Optional;
 
 /**

@@ -18,7 +18,7 @@ package io.micronaut.validation.validator.constraints;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 
-import javax.validation.ClockProvider;
+import jakarta.validation.ClockProvider;
 
 /**
  * Subset of the {@link javax.validation.ConstraintValidatorContext} interface without the unnecessary parts.
@@ -58,5 +58,5 @@ public interface ConstraintValidatorContext {
     default void messageTemplate(@Nullable final String messageTemplate) {
         throw new UnsupportedOperationException("not implemented");
     }
-    
+
 }

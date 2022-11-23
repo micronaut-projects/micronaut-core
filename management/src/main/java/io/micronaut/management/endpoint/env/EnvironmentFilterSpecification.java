@@ -17,7 +17,7 @@ package io.micronaut.management.endpoint.env;
 
 import io.micronaut.core.util.SupplierUtil;
 
-import javax.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotNull;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;

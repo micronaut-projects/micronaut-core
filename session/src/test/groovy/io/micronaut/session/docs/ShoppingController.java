@@ -24,7 +24,7 @@ import io.micronaut.http.annotation.Post;
 import io.micronaut.session.Session;
 import io.micronaut.session.annotation.SessionValue;
 
-import javax.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotBlank;
 // end::imports[]
 
 /**

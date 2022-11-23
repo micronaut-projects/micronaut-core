@@ -14,7 +14,7 @@ dependencies {
     if (!JavaVersion.current().isJava9Compatible()) {
         compileOnly files(org.gradle.internal.jvm.Jvm.current().toolsJar)
     }
-    compileOnly libs.managed.validation
+    compileOnly libs.managed.jakarta.validation.api
 
     testImplementation project(":context")
     testImplementation project(':aop')

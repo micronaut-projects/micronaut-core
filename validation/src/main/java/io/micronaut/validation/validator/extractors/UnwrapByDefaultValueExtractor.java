@@ -15,7 +15,7 @@
  */
 package io.micronaut.validation.validator.extractors;
 
-import javax.validation.valueextraction.ValueExtractor;
+import jakarta.validation.valueextraction.ValueExtractor;
 
 /**
  * Interface based alternative for unwrap by default semantics.

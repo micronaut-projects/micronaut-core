@@ -21,8 +21,8 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.validation.validator.constraints.ConstraintValidatorRegistry;
 import io.micronaut.validation.validator.extractors.ValueExtractorRegistry;
 
-import javax.validation.ClockProvider;
-import javax.validation.TraversableResolver;
+import jakarta.validation.ClockProvider;
+import jakarta.validation.TraversableResolver;
 
 /**
  * Configuration for the {@link Validator}.

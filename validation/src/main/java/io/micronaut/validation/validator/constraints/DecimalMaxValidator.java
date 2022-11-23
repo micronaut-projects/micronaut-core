@@ -20,8 +20,8 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
 
-import javax.validation.ValidationException;
-import javax.validation.constraints.DecimalMax;
+import jakarta.validation.ValidationException;
+import jakarta.validation.constraints.DecimalMax;
 import java.math.BigDecimal;
 
 /**

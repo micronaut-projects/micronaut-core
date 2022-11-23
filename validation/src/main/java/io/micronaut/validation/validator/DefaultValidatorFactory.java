@@ -19,13 +19,13 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
 import jakarta.inject.Singleton;
 
-import javax.validation.ClockProvider;
-import javax.validation.ConstraintValidatorFactory;
-import javax.validation.MessageInterpolator;
-import javax.validation.ParameterNameProvider;
-import javax.validation.TraversableResolver;
-import javax.validation.ValidatorContext;
-import javax.validation.ValidatorFactory;
+import jakarta.validation.ClockProvider;
+import jakarta.validation.ConstraintValidatorFactory;
+import jakarta.validation.MessageInterpolator;
+import jakarta.validation.ParameterNameProvider;
+import jakarta.validation.TraversableResolver;
+import jakarta.validation.ValidatorContext;
+import jakarta.validation.ValidatorFactory;
 
 /**
  * Default validator factory implementation.

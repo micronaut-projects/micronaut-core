@@ -19,7 +19,7 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 
-import javax.validation.constraints.Digits;
+import jakarta.validation.constraints.Digits;
 import java.math.BigDecimal;
 
 /**

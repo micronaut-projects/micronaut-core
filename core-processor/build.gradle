@@ -10,5 +10,5 @@ dependencies {
     api 'com.github.javaparser:javaparser-symbol-solver-core:3.24.7'
 
     compileOnly libs.kotlin.stdlib.jdk8
-    compileOnly libs.managed.validation
+    compileOnly libs.managed.jakarta.validation.api
 }

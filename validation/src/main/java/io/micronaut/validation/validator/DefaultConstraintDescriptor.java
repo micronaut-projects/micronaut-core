@@ -20,11 +20,11 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 
-import javax.validation.ConstraintTarget;
-import javax.validation.ConstraintValidator;
-import javax.validation.Payload;
-import javax.validation.metadata.ConstraintDescriptor;
-import javax.validation.metadata.ValidateUnwrappedValue;
+import jakarta.validation.ConstraintTarget;
+import jakarta.validation.ConstraintValidator;
+import jakarta.validation.Payload;
+import jakarta.validation.metadata.ConstraintDescriptor;
+import jakarta.validation.metadata.ValidateUnwrappedValue;
 import java.lang.annotation.Annotation;
 import java.util.Collections;
 import java.util.List;

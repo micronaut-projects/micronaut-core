@@ -22,6 +22,7 @@ htmlunit = "2.64.0"
 httpcomponents-client = "4.5.13"
 jakarta-inject-api = "2.0.1"
 jakarta-inject-tck = "2.0.1"
+managed-jakarta-validation-api = "3.0.2"
 javax-annotation-api = "1.3.2"
 javax-inject = "1"
 javax-persistence = "2.2"
@@ -73,7 +74,6 @@ managed-reactive-streams = "1.0.4"
 managed-reactor = "3.4.24"
 managed-slf4j = "2.0.4"
 managed-snakeyaml = "1.33"
-managed-validation = "2.0.1.Final"
 micronaut-docs = "2.0.0"
 
 [libraries]
@@ -129,8 +129,6 @@ managed-logback-classic = { module = "ch.qos.logback:logback-classic", version.r
 
 managed-snakeyaml = { module = "org.yaml:snakeyaml", version.ref = "managed-snakeyaml" }
 
-managed-validation = { module = "javax.validation:validation-api", version.ref = "managed-validation" }
-
 #
 # Other libraries are used by Micronaut but will not appear in the BOM
 #
@@ -165,6 +163,7 @@ htmlunit = { module = "net.sourceforge.htmlunit:htmlunit", version.ref = "htmlun
 
 jakarta-inject-api = { module = "jakarta.inject:jakarta.inject-api", version.ref = "jakarta-inject-api" }
 jakarta-inject-tck = { module = "jakarta.inject:jakarta.inject-tck", version.ref = "jakarta-inject-tck" }
+managed-jakarta-validation-api = { module = "jakarta.validation:jakarta.validation-api", version.ref = "managed-jakarta-validation-api" }
 
 javax-annotation-api = { module = "javax.annotation:javax.annotation-api", version.ref = "javax-annotation-api" }
 javax-el = { module = "org.glassfish:javax.el", version.ref = "javax-el" }

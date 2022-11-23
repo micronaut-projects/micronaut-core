@@ -17,8 +17,8 @@ package io.micronaut.logging;
 
 import io.micronaut.core.annotation.Indexed;
 
-import javax.validation.constraints.NotBlank;
-import javax.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 
 /**
  * Abstraction for a logging system.

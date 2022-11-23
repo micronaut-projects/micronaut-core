@@ -20,8 +20,8 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.CollectionUtils;
 import jakarta.inject.Singleton;
 
-import javax.validation.Path;
-import javax.validation.TraversableResolver;
+import jakarta.validation.Path;
+import jakarta.validation.TraversableResolver;
 import java.lang.annotation.ElementType;
 import java.util.List;
 

@@ -26,7 +26,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import jakarta.inject.Singleton;
 
-import javax.validation.constraints.Email;
+import jakarta.validation.constraints.Email;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 

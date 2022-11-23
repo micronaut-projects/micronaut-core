@@ -17,7 +17,7 @@ package io.micronaut.retry.annotation;
 
 import io.micronaut.context.annotation.AliasFor;
 
-import javax.validation.constraints.Digits;
+import jakarta.validation.constraints.Digits;
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

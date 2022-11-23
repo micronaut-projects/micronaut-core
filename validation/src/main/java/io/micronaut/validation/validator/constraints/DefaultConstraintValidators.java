@@ -34,8 +34,8 @@ import io.micronaut.inject.qualifiers.TypeArgumentQualifier;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
-import javax.validation.ValidationException;
-import javax.validation.constraints.*;
+import jakarta.validation.ValidationException;
+import jakarta.validation.constraints.*;
 import java.lang.annotation.Annotation;
 import java.math.BigDecimal;
 import java.math.BigInteger;

@@ -20,8 +20,8 @@ import io.micronaut.core.annotation.Indexed;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 
-import javax.validation.ClockProvider;
-import javax.validation.Constraint;
+import jakarta.validation.ClockProvider;
+import jakarta.validation.Constraint;
 import java.lang.annotation.Annotation;
 import java.util.Optional;
 

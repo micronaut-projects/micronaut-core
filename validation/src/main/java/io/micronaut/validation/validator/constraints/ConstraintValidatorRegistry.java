@@ -17,7 +17,7 @@ package io.micronaut.validation.validator.constraints;
 
 import io.micronaut.core.annotation.NonNull;
 
-import javax.validation.ValidationException;
+import jakarta.validation.ValidationException;
 import java.lang.annotation.Annotation;
 import java.util.Optional;
 

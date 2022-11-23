@@ -15,7 +15,7 @@
  */
 package io.micronaut.validation.validator.ast;
 
-import javax.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotBlank;
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 

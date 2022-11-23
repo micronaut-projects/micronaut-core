@@ -1,6 +1,6 @@
 package io.micronaut.validation.validator.constraints.custom;
 
-import javax.validation.Constraint;
+import jakarta.validation.Constraint;
 import java.lang.annotation.Retention;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;

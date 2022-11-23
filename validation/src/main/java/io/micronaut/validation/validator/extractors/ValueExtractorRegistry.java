@@ -17,8 +17,8 @@ package io.micronaut.validation.validator.extractors;
 
 import io.micronaut.core.annotation.NonNull;
 
-import javax.validation.ValidationException;
-import javax.validation.valueextraction.ValueExtractor;
+import jakarta.validation.ValidationException;
+import jakarta.validation.valueextraction.ValueExtractor;
 import java.util.Optional;
 
 /**

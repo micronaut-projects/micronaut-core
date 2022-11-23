@@ -19,7 +19,7 @@ import io.micronaut.context.StaticMessageSource;
 import io.micronaut.core.annotation.Introspected;
 import jakarta.inject.Singleton;
 
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 
 /**
  * The default error messages.

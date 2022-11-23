@@ -28,15 +28,15 @@ import io.micronaut.validation.validator.extractors.ValueExtractorRegistry;
 import io.micronaut.validation.validator.messages.DefaultValidationMessages;
 import jakarta.inject.Inject;
 
-import javax.validation.ClockProvider;
-import javax.validation.ConstraintValidatorFactory;
-import javax.validation.MessageInterpolator;
-import javax.validation.ParameterNameProvider;
-import javax.validation.Path;
-import javax.validation.TraversableResolver;
-import javax.validation.Validator;
-import javax.validation.ValidatorContext;
-import javax.validation.valueextraction.ValueExtractor;
+import jakarta.validation.ClockProvider;
+import jakarta.validation.ConstraintValidatorFactory;
+import jakarta.validation.MessageInterpolator;
+import jakarta.validation.ParameterNameProvider;
+import jakarta.validation.Path;
+import jakarta.validation.TraversableResolver;
+import jakarta.validation.Validator;
+import jakarta.validation.ValidatorContext;
+import jakarta.validation.valueextraction.ValueExtractor;
 import java.lang.annotation.ElementType;
 
 /**
