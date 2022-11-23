@@ -1638,7 +1638,7 @@ public class DefaultHttpClient implements
             public Publisher<? extends io.micronaut.http.HttpResponse<?>> proceed(MutableHttpRequest<?> request) {
 
                 int pos = integer.incrementAndGet();
-                if (pos > len) {
+                if (pos >= len) {
                     throw new IllegalStateException("The FilterChain.proceed(..) method should be invoked exactly once per filter execution. The method has instead been invoked multiple times by an erroneous filter definition.");
                 }
                 HttpClientFilter httpFilter = filters.get(pos);
