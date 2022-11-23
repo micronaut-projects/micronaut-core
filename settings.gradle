@@ -21,7 +21,6 @@ rootProject.name = 'micronaut'
 
 include "aop"
 include "core-bom"
-include "parent"
 include "buffer-netty"
 include "core"
 include "core-reactive"

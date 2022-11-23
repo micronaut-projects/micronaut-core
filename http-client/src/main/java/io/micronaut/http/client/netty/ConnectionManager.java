@@ -57,6 +57,7 @@ import io.netty.handler.codec.http2.Http2FrameCodec;
 import io.netty.handler.codec.http2.Http2FrameCodecBuilder;
 import io.netty.handler.codec.http2.Http2FrameLogger;
 import io.netty.handler.codec.http2.Http2MultiplexHandler;
+import io.netty.handler.codec.http2.Http2SettingsAckFrame;
 import io.netty.handler.codec.http2.Http2SettingsFrame;
 import io.netty.handler.codec.http2.Http2StreamChannel;
 import io.netty.handler.codec.http2.Http2StreamChannelBootstrap;
@@ -585,6 +586,11 @@ class ConnectionManager {
 
             @Override
             public void channelRead(@NonNull ChannelHandlerContext ctx, @NonNull Object msg) throws Exception {
+                if (msg instanceof Http2SettingsAckFrame) {
+                    // this is fine
+                    return;
+                }
+
                 log.warn("Unexpected message on HTTP2 connection channel: {}", msg);
                 ReferenceCountUtil.release(msg);
                 ctx.read();

@@ -2619,32 +2619,6 @@ class Test {}
         context?.close()
     }
 
-    void "test write bean introspection data for package with compiled classes"() {
-        given:
-        ApplicationContext context = buildContext('test.Test', '''
-package test;
-
-import io.micronaut.core.annotation.*;
-import javax.validation.constraints.*;
-import java.util.*;
-
-@Introspected(packages="io.micronaut.inject.beans.visitor", includedAnnotations=Internal.class)
-class Test {}
-''')
-
-        when:"the reference is loaded"
-        def clazz = context.classLoader.loadClass('test.$Test$IntrospectionRef0')
-        BeanIntrospectionReference reference = clazz.newInstance()
-
-        then:"The reference is valid"
-        reference != null
-        reference.getBeanType() == IntrospectedTypeElementVisitor
-
-
-        cleanup:
-        context?.close()
-    }
-
     void "test write bean introspection data"() {
         given:
         ApplicationContext context = buildContext('test.Test', '''

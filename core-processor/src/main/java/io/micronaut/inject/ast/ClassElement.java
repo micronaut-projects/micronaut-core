@@ -231,8 +231,7 @@ public interface ClassElement extends TypedElement {
         }
         List<ConstructorElement> constructors = getAccessibleConstructors()
             .stream()
-            .filter(ctor -> ctor.getParameters().length == 0)
-            .collect(Collectors.toList());
+            .filter(ctor -> ctor.getParameters().length == 0).toList();
         if (constructors.isEmpty()) {
             return Optional.empty();
         }
@@ -281,8 +280,7 @@ public interface ClassElement extends TypedElement {
     default Optional<MethodElement> findDefaultStaticCreator() {
         List<MethodElement> staticCreators = getAccessibleStaticCreators()
             .stream()
-            .filter(c -> c.getParameters().length == 0)
-            .collect(Collectors.toList());
+            .filter(c -> c.getParameters().length == 0).toList();
         if (staticCreators.isEmpty()) {
             return Optional.empty();
         }

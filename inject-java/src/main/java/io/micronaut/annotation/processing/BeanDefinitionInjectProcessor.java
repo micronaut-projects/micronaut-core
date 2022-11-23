@@ -48,9 +48,11 @@ import javax.lang.model.element.Name;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.TypeMirror;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -96,8 +98,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
     };
 
     private Set<String> beanDefinitions;
-    private boolean processingOver;
     private final Set<String> processed = new HashSet<>();
+    private final Map<String, Element> postponed = new HashMap<>();
 
     @Override
     public final synchronized void init(ProcessingEnvironment processingEnv) {
@@ -145,8 +147,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
     @Override
     public final boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
-        processingOver = roundEnv.processingOver();
-
+        boolean processingOver = roundEnv.processingOver();
         if (!processingOver) {
             JavaAnnotationMetadataBuilder annotationMetadataBuilder = javaVisitorContext.getAnnotationMetadataBuilder();
             annotations = annotations
@@ -204,6 +205,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             // remove already processed in previous round
             for (String name : processed) {
                 beanDefinitions.remove(name);
+                postponed.remove(name);
             }
 
             // process remaining
@@ -236,6 +238,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             error((Element) ex.getOriginatingElement(), ex.getMessage());
                         } catch (PostponeToNextRoundException e) {
                             processed.remove(className);
+                            postponed.put(className, (Element) e.getErrorElement());
                         }
                     }
                 }
@@ -247,6 +250,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         processing round.
         */
         if (processingOver) {
+            for (Map.Entry<String, Element> e : postponed.entrySet()) {
+                javaVisitorContext.warn("Bean definition generation [" + e.getKey() + "] skipped from processing because of prior error. This error is normally due to missing classes on the classpath. Verify the compilation classpath is correct to resolve the problem.", e.getValue());
+            }
+
             try {
                 writeBeanDefinitionsToMetaInf();
                 for (BeanElementVisitor<?> visitor : BeanElementVisitor.VISITORS) {

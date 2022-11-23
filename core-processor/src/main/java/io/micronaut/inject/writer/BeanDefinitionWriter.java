@@ -2324,7 +2324,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     private void autoApplyNamed(Element element) {
-        if (!element.stringValue(AnnotationUtil.NAMED).isPresent()) {
+        if (element.stringValue(AnnotationUtil.NAMED).isEmpty()) {
             element.annotate(AnnotationUtil.NAMED, (builder) -> {
                 final String name;
 
@@ -3071,7 +3071,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 int constructorIndex = initInterceptedConstructorWriter(
                         buildMethodVisitor,
                         parameterList,
-                        new FactoryMethodDef(factoryType, factoryElement, methodDescriptor, factoryVar)
+                    new FactoryMethodDef(factoryType, factoryElement, methodDescriptor, factoryVar)
                 );
                 // populate an Object[] of all constructor arguments
                 final int parametersIndex = createParameterArray(parameterList, buildMethodVisitor);
@@ -3471,10 +3471,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         );
         classWriter.visitInnerClass(constructorInternalName, beanDefinitionInternalName, null, ACC_PRIVATE);
         return new InnerClassDef(
-                interceptedConstructorWriterName,
-                interceptedConstructorWriter,
-                constructorInternalName,
-                interceptedConstructorType
+            interceptedConstructorWriterName,
+            interceptedConstructorWriter,
+            constructorInternalName,
+            interceptedConstructorType
         );
     }
 
@@ -4614,7 +4614,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
 
-    private class FactoryMethodDef {
+    private static class FactoryMethodDef {
         private final Type factoryType;
         private final Element factoryMethod;
         private final String methodDescriptor;
@@ -4628,7 +4628,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         }
     }
 
-    private class InnerClassDef {
+    private static class InnerClassDef {
         private final ClassWriter innerClassWriter;
         private final String constructorInternalName;
         private final Type innerClassType;

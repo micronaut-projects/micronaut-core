@@ -4,5 +4,5 @@ plugins {
 
 dependencies {
     api libs.managed.groovy
-    testImplementation libs.snakeyaml
+    testImplementation libs.managed.snakeyaml
 }

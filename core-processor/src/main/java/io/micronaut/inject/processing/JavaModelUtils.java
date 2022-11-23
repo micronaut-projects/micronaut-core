@@ -280,8 +280,7 @@ public class JavaModelUtils {
             }
         } else {
             Object nativeType = type.getNativeType();
-            if (nativeType instanceof Class) {
-                Class<?> t = (Class<?>) nativeType;
+            if (nativeType instanceof Class<?> t) {
                 return Type.getType(t);
             } else {
                 String internalName = type.getType().getName().replace('.', '/');

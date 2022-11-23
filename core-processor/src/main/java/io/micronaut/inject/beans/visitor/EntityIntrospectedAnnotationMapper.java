@@ -17,6 +17,7 @@ package io.micronaut.inject.beans.visitor;
 
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.ReflectiveAccess;
 import io.micronaut.inject.annotation.NamedAnnotationMapper;
@@ -33,6 +34,7 @@ import java.util.List;
  * @author graemerocher
  * @since 1.1
  */
+@Internal
 // tag::class[]
 public class EntityIntrospectedAnnotationMapper implements NamedAnnotationMapper {
     @NonNull

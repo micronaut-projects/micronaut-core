@@ -23,6 +23,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.naming.NameResolver;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.type.Argument;
@@ -62,10 +63,6 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
     protected Map<String, Object> attributes;
     @Nullable
     protected final Qualifier qualifier;
-
-    private BeanDefinitionDelegate(BeanDefinition<T> definition) {
-        this(definition, null);
-    }
 
     private BeanDefinitionDelegate(BeanDefinition<T> definition, @Nullable Qualifier qualifier) {
         this.definition = definition;
@@ -139,16 +136,18 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
 
     @Override
     public T build(BeanResolutionContext resolutionContext, BeanContext context, BeanDefinition<T> definition) throws BeanInstantiationException {
-        LinkedHashMap<String, Object> oldAttributes = null;
+        Map<CharSequence, Object> oldAttributes = null;
         if (CollectionUtils.isNotEmpty(attributes)) {
-            LinkedHashMap<String, Object> oldAttrs = new LinkedHashMap<>(attributes.size());
-            attributes.forEach((key, value) -> {
-                Object previous = resolutionContext.setAttribute(key, value);
-                if (previous != null) {
-                    oldAttrs.put(key, previous);
-                }
-            });
-            oldAttributes = oldAttrs;
+            oldAttributes = resolutionContext.getAttributes();
+            Map<CharSequence, Object> newAttributes;
+            if (oldAttributes == null) {
+                newAttributes = new LinkedHashMap<>(attributes);
+            } else {
+                newAttributes = new LinkedHashMap<>(attributes.size() + oldAttributes.size(), 1);
+                newAttributes.putAll(oldAttributes);
+                newAttributes.putAll(attributes);
+            }
+            resolutionContext.setAttributes(newAttributes);
         }
 
         try {
@@ -163,14 +162,7 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
                 throw new IllegalStateException("Cannot construct a dynamically registered singleton");
             }
         } finally {
-            if (attributes != null) {
-                for (String key : attributes.keySet()) {
-                    resolutionContext.removeAttribute(key);
-                }
-            }
-            if (oldAttributes != null) {
-                oldAttributes.forEach(resolutionContext::setAttribute);
-            }
+            resolutionContext.setAttributes(oldAttributes);
         }
     }
 
@@ -180,10 +172,14 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
                                                     BeanDefinition<T> definition,
                                                     ParametrizedBeanFactory<T> parametrizedBeanFactory) {
         Argument<Object>[] requiredArguments = (Argument<Object>[]) parametrizedBeanFactory.getRequiredArguments();
-        Map<String, Object> fulfilled = new LinkedHashMap<>(requiredArguments.length);
+        if (requiredArguments.length == 0) {
+            return Collections.emptyMap();
+        }
+        MutableConversionService conversionService = context.getConversionService();
+        Map<String, Object> fulfilled = new LinkedHashMap<>(requiredArguments.length, 1);
         for (Argument<Object> argument : requiredArguments) {
             String argumentName = argument.getName();
-            Object value = resolveValueAsName(argument);
+            Object value = resolveValueAsName(conversionService, argument);
             if (value == null) {
                 Qualifier<Object> qualifier = resolveQualifier(argument);
                 if (qualifier == null) {
@@ -215,15 +211,15 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
     }
 
     @Nullable
-    private Object resolveValueAsName(Argument<?> argument) {
+    private Object resolveValueAsName(ConversionService conversionService, Argument<?> argument) {
         Object named = attributes == null ? null : attributes.get(Named.class.getName());
         Object value = null;
         if (named != null) {
-            value = ConversionService.SHARED.convert(named, argument).orElse(null);
+            value = conversionService.convert(named, argument).orElse(null);
         }
         if (value == null && isPrimary()) {
             // Backwards compatibility, all qualifiers where "Named" before
-            value = ConversionService.SHARED.convert("Primary", argument).orElse(null);
+            value = conversionService.convert("Primary", argument).orElse(null);
         }
         return value;
     }

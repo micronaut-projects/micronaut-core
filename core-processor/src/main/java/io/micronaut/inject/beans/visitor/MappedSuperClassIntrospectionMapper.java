@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.beans.visitor;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 
 /**
@@ -23,6 +24,7 @@ import io.micronaut.core.annotation.NonNull;
  * @author graemerocher
  * @since 1.1.2
  */
+@Internal
 public class MappedSuperClassIntrospectionMapper extends EntityIntrospectedAnnotationMapper {
     @NonNull
     @Override

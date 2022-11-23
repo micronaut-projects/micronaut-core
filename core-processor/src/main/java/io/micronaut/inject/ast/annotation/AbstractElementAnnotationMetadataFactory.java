@@ -62,36 +62,28 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
 
     @Override
     public ElementAnnotationMetadata build(Element element, AnnotationMetadata defaultAnnotationMetadata) {
-        if (element instanceof ClassElement) {
-            ClassElement classElement = (ClassElement) element;
+        if (element instanceof ClassElement classElement) {
             return buildForClass(defaultAnnotationMetadata, classElement);
         }
-        if (element instanceof ConstructorElement) {
-            ConstructorElement constructorElement = (ConstructorElement) element;
+        if (element instanceof ConstructorElement constructorElement) {
             return buildForConstructor(defaultAnnotationMetadata, constructorElement);
         }
-        if (element instanceof MethodElement) {
-            MethodElement methodElement = (MethodElement) element;
+        if (element instanceof MethodElement methodElement) {
             return buildForMethod(defaultAnnotationMetadata, methodElement);
         }
-        if (element instanceof FieldElement) {
-            FieldElement fieldElement = (FieldElement) element;
+        if (element instanceof FieldElement fieldElement) {
             return buildForField(defaultAnnotationMetadata, fieldElement);
         }
-        if (element instanceof ParameterElement) {
-            ParameterElement parameterElement = (ParameterElement) element;
+        if (element instanceof ParameterElement parameterElement) {
             return buildForParameter(defaultAnnotationMetadata, parameterElement);
         }
-        if (element instanceof PackageElement) {
-            PackageElement packageElement = (PackageElement) element;
+        if (element instanceof PackageElement packageElement) {
             return buildForPackage(defaultAnnotationMetadata, packageElement);
         }
-        if (element instanceof PropertyElement) {
-            PropertyElement propertyElement = (PropertyElement) element;
+        if (element instanceof PropertyElement propertyElement) {
             return buildForProperty(defaultAnnotationMetadata, propertyElement);
         }
-        if (element instanceof EnumConstantElement) {
-            EnumConstantElement enumConstantElement = (EnumConstantElement) element;
+        if (element instanceof EnumConstantElement enumConstantElement) {
             return buildForEnumConstantElement(defaultAnnotationMetadata, enumConstantElement);
         }
         throw new IllegalStateException("Unknown element: " + element.getClass() + " with native type: " + element.getNativeType());
