@@ -35,6 +35,7 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.SupplierUtil;
+import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpResponseWrapper;
 import io.micronaut.http.HttpStatus;
@@ -1188,7 +1189,13 @@ public class DefaultHttpClient implements
             Publisher<R> responsePublisher) {
 
         if (request instanceof MutableHttpRequest) {
-            ((MutableHttpRequest<I>) request).uri(requestURI);
+            MutableHttpRequest<I> mutRequest = (MutableHttpRequest<I>) request;
+            mutRequest.uri(requestURI);
+            if (informationalServiceId != null &&
+                !mutRequest.getAttribute(HttpAttributes.SERVICE_ID).isPresent()) {
+
+                mutRequest.setAttribute(HttpAttributes.SERVICE_ID, informationalServiceId);
+            }
 
             List<HttpClientFilter> filters =
                     filterResolver.resolveFilters(request, clientFilterEntries);
