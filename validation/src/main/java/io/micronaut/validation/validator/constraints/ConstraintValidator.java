@@ -27,7 +27,7 @@ import java.util.Optional;
 
 /**
  * Constraint validator that can be used at either runtime or compilation time and
- * is capable of validation {@link javax.validation.Constraint} instances. Allows defining validators that work with both Hibernate validator and Micronaut's validator.
+ * is capable of validation {@link jakarta.validation.Constraint} instances. Allows defining validators that work with both Hibernate validator and Micronaut's validator.
  *
  * <p>Unlike the specification's interface this one can uses as a functional interface. Implementor should not implement the {@link #initialize(Annotation)} method and should instead read the passed {@link AnnotationValue}.</p>
  *
@@ -36,7 +36,7 @@ import java.util.Optional;
  */
 @Indexed(ConstraintValidator.class)
 @FunctionalInterface
-public interface ConstraintValidator<A extends Annotation, T> extends javax.validation.ConstraintValidator<A, T> {
+public interface ConstraintValidator<A extends Annotation, T> extends jakarta.validation.ConstraintValidator<A, T> {
 
     /**
      * A constraint validator that just returns the object as being valid.
@@ -60,7 +60,7 @@ public interface ConstraintValidator<A extends Annotation, T> extends javax.vali
             @NonNull ConstraintValidatorContext context);
 
     @Override
-    default boolean isValid(T value, javax.validation.ConstraintValidatorContext context) {
+    default boolean isValid(T value, jakarta.validation.ConstraintValidatorContext context) {
         // simply adapt the interfaces for now.
         return isValid(value, new AnnotationValue<>(Constraint.class.getName()), new ConstraintValidatorContext() {
 

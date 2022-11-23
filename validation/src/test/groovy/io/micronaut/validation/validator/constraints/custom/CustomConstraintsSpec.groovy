@@ -7,7 +7,7 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
-import javax.validation.Valid
+import jakarta.validation.Valid
 
 class CustomConstraintsSpec extends Specification {
 

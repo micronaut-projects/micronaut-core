@@ -21,7 +21,7 @@ import io.micronaut.core.annotation.Nullable;
 import jakarta.validation.ClockProvider;
 
 /**
- * Subset of the {@link javax.validation.ConstraintValidatorContext} interface without the unnecessary parts.
+ * Subset of the {@link jakarta.validation.ConstraintValidatorContext} interface without the unnecessary parts.
  *
  * @author graemerocher
  * @since 1.2
@@ -42,7 +42,7 @@ public interface ConstraintValidatorContext {
     @NonNull ClockProvider getClockProvider();
 
     /**
-     * In case of using this constraint validator with {@code javax.validation.ConstraintValidator} returns null, because JRS-303 doesn't
+     * In case of using this constraint validator with {@code jakarta.validation.ConstraintValidator} returns null, because JRS-303 doesn't
      * support passing a root bean in their validation context.
      *
      * @return The root bean under validation.

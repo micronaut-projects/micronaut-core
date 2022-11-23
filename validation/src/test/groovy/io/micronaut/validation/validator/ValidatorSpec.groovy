@@ -11,12 +11,12 @@ import spock.lang.Ignore
 import spock.lang.Shared
 import spock.lang.Specification
 
-import javax.validation.ConstraintViolationException
-import javax.validation.ElementKind
-import javax.validation.Valid
-import javax.validation.ValidatorFactory
-import javax.validation.constraints.*
-import javax.validation.metadata.BeanDescriptor
+import jakarta.validation.ConstraintViolationException
+import jakarta.validation.ElementKind
+import jakarta.validation.Valid
+import jakarta.validation.ValidatorFactory
+import jakarta.validation.constraints.*
+import jakarta.validation.metadata.BeanDescriptor
 
 class ValidatorSpec extends Specification {
 
@@ -44,7 +44,7 @@ class ValidatorSpec extends Specification {
         expect:
         violations.size() == 4
         violations[0].invalidValue == []
-        violations[0].messageTemplate == '{javax.validation.constraints.Size.message}'
+        violations[0].messageTemplate == '{jakarta.validation.constraints.Size.message}'
         violations[0].constraintDescriptor != null
         violations[0].constraintDescriptor.annotation instanceof Size
         violations[0].constraintDescriptor.annotation.min() == 1
@@ -53,7 +53,7 @@ class ValidatorSpec extends Specification {
         violations[1].propertyPath.iterator().next().name == 'pages'
         violations[1].rootBean == b
         violations[1].rootBeanClass == Book
-        violations[1].messageTemplate == '{javax.validation.constraints.Min.message}'
+        violations[1].messageTemplate == '{jakarta.validation.constraints.Min.message}'
         violations[1].constraintDescriptor != null
         violations[1].constraintDescriptor.annotation instanceof Min
         violations[1].constraintDescriptor.annotation.value() == 100l
@@ -104,7 +104,7 @@ class ValidatorSpec extends Specification {
         def v2 = violations.find { it.propertyPath.toString() == 'primaryAuthor.name'}
         expect:
         violations.size() == 2
-        v1.messageTemplate == '{javax.validation.constraints.Max.message}'
+        v1.messageTemplate == '{jakarta.validation.constraints.Max.message}'
         v1.propertyPath.toString() == 'primaryAuthor.age'
         v1.invalidValue == 150
         v1.rootBean.is(b)
@@ -112,7 +112,7 @@ class ValidatorSpec extends Specification {
         v1.constraintDescriptor != null
         v1.constraintDescriptor.annotation instanceof Max
         v1.constraintDescriptor.annotation.value() == 100l
-        v2.messageTemplate == '{javax.validation.constraints.NotBlank.message}'
+        v2.messageTemplate == '{jakarta.validation.constraints.NotBlank.message}'
         v2.propertyPath.toString() == 'primaryAuthor.name'
         v2.constraintDescriptor != null
         v2.constraintDescriptor.annotation instanceof NotBlank
@@ -134,7 +134,7 @@ class ValidatorSpec extends Specification {
 
         expect:
         violations.size() == 2
-        v1.messageTemplate == '{javax.validation.constraints.Max.message}'
+        v1.messageTemplate == '{jakarta.validation.constraints.Max.message}'
         v1.propertyPath.toString() == 'primaryAuthor.age'
         v1.invalidValue == 150
         v1.rootBean.is(b)
@@ -142,7 +142,7 @@ class ValidatorSpec extends Specification {
         v1.constraintDescriptor != null
         v1.constraintDescriptor.annotation instanceof Max
         v1.constraintDescriptor.annotation.value() == 100l
-        v2.messageTemplate == '{javax.validation.constraints.NotBlank.message}'
+        v2.messageTemplate == '{jakarta.validation.constraints.NotBlank.message}'
         v2.propertyPath.toString() == 'primaryAuthor.name'
         v2.constraintDescriptor != null
         v2.constraintDescriptor.annotation instanceof NotBlank
@@ -164,7 +164,7 @@ class ValidatorSpec extends Specification {
 
         expect:
         violations.size() == 2
-        v1.messageTemplate == '{javax.validation.constraints.Max.message}'
+        v1.messageTemplate == '{jakarta.validation.constraints.Max.message}'
         v1.invalidValue == 150
         v1.propertyPath[0].kind == ElementKind.CONTAINER_ELEMENT
         v1.propertyPath[0].isInIterable()
@@ -177,7 +177,7 @@ class ValidatorSpec extends Specification {
         v1.constraintDescriptor != null
         v1.constraintDescriptor.annotation instanceof Max
         v1.constraintDescriptor.annotation.value() == 100l
-        v2.messageTemplate == '{javax.validation.constraints.NotBlank.message}'
+        v2.messageTemplate == '{jakarta.validation.constraints.NotBlank.message}'
         v2.constraintDescriptor != null
         v2.constraintDescriptor.annotation instanceof NotBlank
     }
@@ -190,7 +190,7 @@ class ValidatorSpec extends Specification {
         expect:
         violations.size() == 1
         violations[0].invalidValue == []
-        violations[0].messageTemplate == '{javax.validation.constraints.Size.message}'
+        violations[0].messageTemplate == '{jakarta.validation.constraints.Size.message}'
         violations[0].constraintDescriptor != null
         violations[0].constraintDescriptor.annotation instanceof Size
         violations[0].constraintDescriptor.annotation.min() == 1
@@ -203,7 +203,7 @@ class ValidatorSpec extends Specification {
         then:
         violations.size() == 1
         violations[0].invalidValue == ["a", "b", "c"]
-        violations[0].messageTemplate == '{javax.validation.constraints.Size.message}'
+        violations[0].messageTemplate == '{jakarta.validation.constraints.Size.message}'
         violations[0].constraintDescriptor != null
         violations[0].constraintDescriptor.annotation instanceof Size
         violations[0].constraintDescriptor.annotation.min() == 1
@@ -216,7 +216,7 @@ class ValidatorSpec extends Specification {
         then:
         violations.size() == 1
         violations[0].invalidValue == []
-        violations[0].messageTemplate == '{javax.validation.constraints.Size.message}'
+        violations[0].messageTemplate == '{jakarta.validation.constraints.Size.message}'
         violations[0].constraintDescriptor != null
         violations[0].constraintDescriptor.annotation instanceof Size
         violations[0].constraintDescriptor.annotation.min() == 1
@@ -229,7 +229,7 @@ class ValidatorSpec extends Specification {
         then:
         violations.size() == 1
         violations[0].invalidValue == [1L, 2L, 3L]
-        violations[0].messageTemplate == '{javax.validation.constraints.Size.message}'
+        violations[0].messageTemplate == '{jakarta.validation.constraints.Size.message}'
         violations[0].constraintDescriptor != null
         violations[0].constraintDescriptor.annotation instanceof Size
         violations[0].constraintDescriptor.annotation.min() == 1
@@ -288,7 +288,7 @@ class ValidatorSpec extends Specification {
 
         expect:
         violations.size() == 1
-        violations.first().messageTemplate == '{javax.validation.constraints.NotNull.message}'
+        violations.first().messageTemplate == '{jakarta.validation.constraints.NotNull.message}'
         violations.first().propertyPath.toString() == 'integers'
         violations.first().constraintDescriptor != null
         violations.first().constraintDescriptor.annotation instanceof  NotNull

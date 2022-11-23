@@ -17,7 +17,7 @@ import io.micronaut.inject.visitor.introspections.Person
 import spock.lang.Issue
 import spock.util.environment.RestoreSystemProperties
 
-import javax.validation.constraints.Size
+import jakarta.validation.constraints.Size
 
 @RestoreSystemProperties
 class BeanIntrospectionSpec extends AbstractBeanDefinitionSpec {
@@ -531,7 +531,7 @@ interface Test extends io.micronaut.core.naming.Named {
 package test;
 
 import io.micronaut.core.annotation.*;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import java.util.*;
 import com.fasterxml.jackson.annotation.*;
 
@@ -677,7 +677,7 @@ class Test {
 package test;
 
 import io.micronaut.core.annotation.*;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import java.util.*;
 
 @Introspected
@@ -778,7 +778,7 @@ class Test {
 package test;
 
 import io.micronaut.core.annotation.*;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import java.util.*;
 
 @Introspected
@@ -871,7 +871,7 @@ class Test {
 package test;
 
 import io.micronaut.core.annotation.*;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import javax.persistence.*;
 import java.util.*;
 
@@ -954,7 +954,7 @@ class Test {
 package test;
 
 import io.micronaut.core.annotation.*;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import java.util.*;
 import io.micronaut.core.convert.TypeConverter;
 
@@ -1122,7 +1122,7 @@ class ParentBean {
 package test
 
 import io.micronaut.core.annotation.*
-import javax.validation.constraints.*
+import jakarta.validation.constraints.*
 import io.micronaut.core.convert.TypeConverter
 
 @Introspected
@@ -1630,8 +1630,8 @@ package test;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 
-import javax.validation.constraints.NotNull;
-import javax.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
 import java.net.URL;
 
 @ConfigurationProperties("foo.bar")
@@ -1671,7 +1671,7 @@ package test
 
 import io.micronaut.context.annotation.*
 import io.micronaut.core.annotation.*
-import javax.validation.constraints.*
+import jakarta.validation.constraints.*
 
 @ConfigurationProperties("foo.bar")
 @AccessorsStyle(readPrefixes = "read")
@@ -1712,8 +1712,8 @@ package test
 
 import io.micronaut.context.annotation.ConfigurationProperties
 
-import javax.validation.constraints.NotNull
-import javax.validation.constraints.NotBlank
+import jakarta.validation.constraints.NotNull
+import jakarta.validation.constraints.NotBlank
 import java.net.URL
 
 @ConfigurationProperties("foo.bar")
@@ -1738,8 +1738,8 @@ package test
 
 import io.micronaut.context.annotation.ConfigurationProperties
 
-import javax.validation.constraints.NotNull
-import javax.validation.constraints.NotBlank
+import jakarta.validation.constraints.NotNull
+import jakarta.validation.constraints.NotBlank
 import java.net.URL
 
 @ConfigurationProperties("foo.bar")
@@ -1771,7 +1771,7 @@ class MyConfig {
     private int serverPort
 
     @ConfigurationInject
-    MyConfig(@javax.validation.constraints.NotBlank String host, int serverPort) {
+    MyConfig(@jakarta.validation.constraints.NotBlank String host, int serverPort) {
         this.host = host
         this.serverPort = serverPort
     }
@@ -1809,7 +1809,7 @@ class MyConfig {
     private int serverPort
 
     @ConfigurationInject
-    MyConfig(@javax.validation.constraints.NotBlank String host, int serverPort) {
+    MyConfig(@jakarta.validation.constraints.NotBlank String host, int serverPort) {
         this.host = host
         this.serverPort = serverPort
     }
@@ -1835,8 +1835,8 @@ package test
 
 import io.micronaut.context.annotation.ConfigurationProperties
 
-import javax.validation.constraints.NotNull
-import javax.validation.constraints.NotBlank
+import jakarta.validation.constraints.NotNull
+import jakarta.validation.constraints.NotBlank
 import java.net.URL
 
 @ConfigurationProperties("foo.bar")
@@ -1867,8 +1867,8 @@ package test
 import io.micronaut.context.annotation.ConfigurationProperties
 import io.micronaut.core.annotation.AccessorsStyle
 
-import javax.validation.constraints.NotNull
-import javax.validation.constraints.NotBlank
+import jakarta.validation.constraints.NotNull
+import jakarta.validation.constraints.NotBlank
 import java.net.URL
 
 @ConfigurationProperties("foo.bar")

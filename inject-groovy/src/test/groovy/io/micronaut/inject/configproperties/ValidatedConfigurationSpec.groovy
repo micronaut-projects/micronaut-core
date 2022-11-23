@@ -24,8 +24,8 @@ import io.micronaut.context.exceptions.BeanInstantiationException
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.ValidatedBeanDefinition
 
-import javax.validation.constraints.NotBlank
-import javax.validation.constraints.NotNull
+import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.NotNull
 
 class ValidatedConfigurationSpec extends AbstractBeanDefinitionSpec {
 
@@ -75,7 +75,7 @@ package test
 import io.micronaut.context.annotation.ConfigurationProperties
 import io.micronaut.inject.configproperties.Pojo
 
-import javax.validation.Valid
+import jakarta.validation.Valid
 import java.util.List
 
 @ConfigurationProperties("test.valid")
@@ -107,12 +107,12 @@ package test
 import io.micronaut.context.annotation.ConfigurationProperties
 import io.micronaut.inject.configproperties.Pojo
 
-import javax.validation.Valid
+import jakarta.validation.Valid
 import java.util.List
 
 @ConfigurationProperties("test.valid")
 class MyConfig {
-  
+
     private List<Pojo> pojos
 
     @Valid
@@ -139,12 +139,12 @@ package test
 import io.micronaut.context.annotation.ConfigurationProperties
 import io.micronaut.inject.configproperties.Pojo
 
-import javax.validation.Valid
+import jakarta.validation.Valid
 import java.util.List
 
 @ConfigurationProperties("test.valid")
 class MyConfig {
-  
+
     @Valid
     List<Pojo> pojos
 }

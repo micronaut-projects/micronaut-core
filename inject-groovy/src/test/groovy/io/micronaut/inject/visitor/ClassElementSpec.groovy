@@ -83,7 +83,7 @@ import io.micronaut.core.annotation.Introspected
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 
-import javax.validation.constraints.NotNull
+import jakarta.validation.constraints.NotNull
 
 @Controller
 class TestController {

@@ -20,7 +20,7 @@ import io.micronaut.context.annotation.EachProperty;
 
 @EachProperty("foo.bar")
 interface MyConfig {
-    @javax.validation.constraints.NotBlank
+    @jakarta.validation.constraints.NotBlank
     String getHost();
 
     int getPort();
@@ -47,17 +47,17 @@ import java.time.Duration;
 class MyConfig {
     private String host;
     private int serverPort;
-    
+
     @ConfigurationInject
-    MyConfig(@javax.validation.constraints.NotBlank String host, int serverPort) {
+    MyConfig(@jakarta.validation.constraints.NotBlank String host, int serverPort) {
         this.host = host;
         this.serverPort = serverPort;
     }
-    
+
     public String getHost() {
         return host;
     }
-    
+
     public int getServerPort() {
         return serverPort;
     }
@@ -99,21 +99,21 @@ import java.time.Duration;
 class MyConfig {
     private String host;
     private int serverPort;
-    
+
     @ConfigurationInject
     MyConfig(String host, int serverPort) {
         this.host = host;
         this.serverPort = serverPort;
     }
-    
+
     public String getHost() {
         return host;
     }
-    
+
     public int getServerPort() {
         return serverPort;
     }
-    
+
     @ConfigurationProperties("baz")
     static class ChildConfig {
         final String stuff;
@@ -156,17 +156,17 @@ import java.time.Duration;
 class MyConfig {
     private String host;
     private int serverPort;
-    
+
     @ConfigurationInject
     MyConfig(String host, int serverPort) {
         this.host = host;
         this.serverPort = serverPort;
     }
-    
+
     public String getHost() {
         return host;
     }
-    
+
     public int getServerPort() {
         return serverPort;
     }
@@ -212,21 +212,21 @@ import java.time.Duration;
 class MyConfig {
     private String host;
     private int serverPort;
-    
-    
+
+
     MyConfig() {
     }
-    
+
     @ConfigurationInject
     void init(String host, int serverPort) {
        this.host = host;
        this.serverPort = serverPort;
     }
-    
+
     public String getHost() {
         return host;
     }
-    
+
     public int getServerPort() {
         return serverPort;
     }

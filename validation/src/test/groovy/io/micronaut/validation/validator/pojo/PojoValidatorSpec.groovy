@@ -28,9 +28,9 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
-import javax.validation.ConstraintViolationException
-import javax.validation.Valid
-import javax.validation.constraints.NotNull
+import jakarta.validation.ConstraintViolationException
+import jakarta.validation.Valid
+import jakarta.validation.constraints.NotNull
 
 class PojoValidatorSpec extends Specification {
 

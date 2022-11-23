@@ -12,7 +12,7 @@ import spock.lang.Shared
 import spock.lang.Unroll
 
 import javax.annotation.processing.SupportedAnnotationTypes
-import javax.validation.constraints.*
+import jakarta.validation.constraints.*
 
 class ConstraintMessagesSpec extends AbstractTypeElementSpec {
 
@@ -40,10 +40,10 @@ class Test {
     public ${type.name} getField() {
         return field;
     }
-    
+
     public void setField(${type.name} f) {
         this.field = f;
-    } 
+    }
 }
 """)
         def instance = introspection.instantiate()

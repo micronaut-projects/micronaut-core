@@ -21,8 +21,8 @@ import spock.lang.Shared
 import spock.lang.Specification
 
 import javax.annotation.Nullable
-import javax.validation.Valid
-import javax.validation.constraints.Pattern
+import jakarta.validation.Valid
+import jakarta.validation.constraints.Pattern
 
 class RequestBeanSpec extends Specification {
 

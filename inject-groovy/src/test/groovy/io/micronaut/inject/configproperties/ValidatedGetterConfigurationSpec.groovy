@@ -22,9 +22,9 @@ import io.micronaut.context.env.PropertySource
 import io.micronaut.context.exceptions.BeanInstantiationException
 import spock.lang.Specification
 
-import javax.validation.Validation
-import javax.validation.constraints.NotBlank
-import javax.validation.constraints.NotNull
+import jakarta.validation.Validation
+import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.NotNull
 
 /**
  * Created by graemerocher on 15/06/2017.

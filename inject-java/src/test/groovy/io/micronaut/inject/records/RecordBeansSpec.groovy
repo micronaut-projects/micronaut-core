@@ -19,14 +19,14 @@ class RecordBeansSpec extends AbstractTypeElementSpec {
 package test;
 import io.micronaut.context.annotation.*;
 import io.micronaut.core.convert.ConversionService;
-import javax.validation.constraints.Min;
+import jakarta.validation.constraints.Min;
 import jakarta.inject.Inject;
 import io.micronaut.context.BeanContext;
 
 @ConfigurationProperties("foo")
 record Test(
-    @Min(20) int num, 
-    String name, 
+    @Min(20) int num,
+    String name,
     @Inject ConversionService conversionService,
     @Inject BeanContext beanContext) {
 }

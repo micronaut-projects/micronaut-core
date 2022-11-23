@@ -8,8 +8,8 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Unroll
 
-import javax.validation.ClockProvider
-import javax.validation.constraints.*
+import jakarta.validation.ClockProvider
+import jakarta.validation.constraints.*
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDateTime
@@ -308,6 +308,6 @@ class ConstraintsSpec extends AbstractTypeElementSpec {
     }
 
     private AnnotationValue constraintMetadata(Class annotation, String ann) {
-        buildAnnotationMetadata(ann, "javax.validation.constraints").getAnnotation(annotation)
+        buildAnnotationMetadata(ann, "jakarta.validation.constraints").getAnnotation(annotation)
     }
 }

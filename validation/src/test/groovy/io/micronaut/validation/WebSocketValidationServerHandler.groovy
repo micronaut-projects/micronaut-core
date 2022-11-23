@@ -9,8 +9,8 @@ import io.micronaut.websocket.annotation.OnOpen
 import io.micronaut.websocket.annotation.ServerWebSocket
 import jakarta.inject.Inject
 
-import javax.validation.ConstraintViolationException
-import javax.validation.Valid
+import jakarta.validation.ConstraintViolationException
+import jakarta.validation.Valid
 
 // this has to be a top-level class because groovy
 @Requires(property = 'spec.name', value = 'WebSocketClientValidationSpec')

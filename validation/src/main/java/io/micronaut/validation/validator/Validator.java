@@ -25,14 +25,14 @@ import jakarta.validation.Valid;
 import java.util.Set;
 
 /**
- * Extended version of the {@link javax.validation.Valid} interface for Micronaut's implementation.
+ * Extended version of the {@link jakarta.validation.Valid} interface for Micronaut's implementation.
  *
  * <p>The {@link #getConstraintsForClass(Class)} method is not supported by the implementation.</p>
  *
  * @author graemerocher
  * @since 1.2
  */
-public interface Validator extends javax.validation.Validator {
+public interface Validator extends jakarta.validation.Validator {
 
     /**
      * Annotation used to define an object as valid.

@@ -52,7 +52,7 @@ public class DefaultValidatorFactory implements ValidatorFactory {
     }
 
     @Override
-    public javax.validation.Validator getValidator() {
+    public jakarta.validation.Validator getValidator() {
         return validator;
     }
 

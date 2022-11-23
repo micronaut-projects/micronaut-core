@@ -59,7 +59,7 @@ public class ValidatingInterceptor implements MethodInterceptor<Object, Object> 
                                  @Nullable ValidatorFactory validatorFactory) {
 
         if (validatorFactory != null) {
-            javax.validation.Validator validator = validatorFactory.getValidator();
+            jakarta.validation.Validator validator = validatorFactory.getValidator();
             if (validator instanceof Validator) {
                 this.micronautValidator = (ExecutableMethodValidator) validator;
                 this.executableValidator = null;

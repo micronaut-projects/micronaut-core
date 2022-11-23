@@ -10,8 +10,8 @@ class DocumentationSpec extends AbstractTypeElementSpec {
         def classElement = buildClassElement("""
 package test;
 
-import javax.validation.constraints.NotBlank;
-import javax.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 
 /**
  * This is class level docs

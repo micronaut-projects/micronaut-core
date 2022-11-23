@@ -21,17 +21,17 @@ import java.time.Duration;
 class MyConfig {
     private String host;
     private int serverPort;
-    
+
     @ConfigurationInject
-    MyConfig(@javax.validation.constraints.NotBlank String host, int serverPort, @io.micronaut.core.annotation.Nullable String nullable) {
+    MyConfig(@jakarta.validation.constraints.NotBlank String host, int serverPort, @io.micronaut.core.annotation.Nullable String nullable) {
         this.host = host;
         this.serverPort = serverPort;
     }
-    
+
     public String getHost() {
         return host;
     }
-    
+
     public int getServerPort() {
         return serverPort;
     }
@@ -74,21 +74,21 @@ import java.time.Duration;
 class MyConfig {
     private String host;
     private int serverPort;
-    
+
     @ConfigurationInject
     MyConfig(String host, int serverPort) {
         this.host = host;
         this.serverPort = serverPort;
     }
-    
+
     public String getHost() {
         return host;
     }
-    
+
     public int getServerPort() {
         return serverPort;
     }
-    
+
     @ConfigurationProperties("baz")
     static class ChildConfig {
         final String stuff;

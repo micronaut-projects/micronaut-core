@@ -22,7 +22,7 @@ class InheritanceVisitorSpec extends AbstractTypeElementSpec {
 package test;
 
 import io.micronaut.core.annotation.*;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import java.util.*;
 
 @Introspected

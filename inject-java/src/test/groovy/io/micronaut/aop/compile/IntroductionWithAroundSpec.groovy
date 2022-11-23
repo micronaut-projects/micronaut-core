@@ -16,7 +16,7 @@ package test;
 import io.micronaut.aop.introduction.*;
 import io.micronaut.context.annotation.*;
 import java.net.*;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import jakarta.inject.Singleton;
 
 @Stub
@@ -24,7 +24,7 @@ import jakarta.inject.Singleton;
 abstract class MyBean {
     abstract void save(@NotBlank String name, @Min(1L) int age);
     abstract void saveTwo(@Min(1L) String name);
-    
+
     @io.micronaut.aop.simple.Mutating("name")
     public String myConcrete(String name) {
         return name;

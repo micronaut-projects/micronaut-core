@@ -41,8 +41,8 @@ import io.micronaut.runtime.server.EmbeddedServer
 import reactor.core.publisher.Flux
 import spock.lang.Specification
 
-import javax.validation.ConstraintViolationException
-import javax.validation.constraints.*
+import jakarta.validation.ConstraintViolationException
+import jakarta.validation.constraints.*
 
 /**
  * @author Graeme Rocher
