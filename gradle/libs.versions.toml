@@ -37,7 +37,7 @@ junit5 = "5.9.1"
 kotlin = "1.7.20"
 kotlin-coroutines = "1.6.4"
 ktor = "1.6.8"
-logback = "1.4.5"
+managed-logback = "1.4.5"
 logbook-netty = "2.14.0"
 log4j = "2.19.0"
 micronaut-aws = "3.9.2"
@@ -123,8 +123,9 @@ managed-reactive-streams = { module = "org.reactivestreams:reactive-streams", ve
 
 managed-reactor = { module = "io.projectreactor:reactor-core", version.ref = "managed-reactor" }
 
-managed-slf4j = { module = "org.slf4j:slf4j-api", version.ref = "managed-slf4j" }
+managed-slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "managed-slf4j" }
 managed-slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "managed-slf4j" }
+managed-logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "managed-logback" }
 
 managed-snakeyaml = { module = "org.yaml:snakeyaml", version.ref = "managed-snakeyaml" }
 
@@ -203,8 +204,6 @@ kotlinx-coroutines-slf4j = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-
 kotlinx-coroutines-reactor = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-reactor", version.ref = "kotlin-coroutines" }
 
 log4j = { module = "org.apache.logging.log4j:log4j-core", version.ref = "log4j" }
-
-logback = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
 
 logbook-netty = { module = "org.zalando:logbook-netty", version.ref = "logbook-netty" }
 

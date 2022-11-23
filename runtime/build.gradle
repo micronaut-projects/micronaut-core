@@ -24,7 +24,7 @@ dependencies {
     compileOnly libs.caffeine
     compileOnly libs.kotlinx.coroutines.core
     compileOnly libs.kotlinx.coroutines.reactive
-    testImplementation libs.logback
+    testImplementation libs.managed.logback.classic
     testImplementation libs.managed.snakeyaml
     testAnnotationProcessor project(":inject-java")
     testImplementation libs.jsr107
