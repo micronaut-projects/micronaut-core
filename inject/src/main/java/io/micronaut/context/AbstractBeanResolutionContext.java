@@ -222,6 +222,16 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         return null;
     }
 
+    @Override
+    public Map<CharSequence, Object> getAttributes() {
+        return attributes;
+    }
+
+    @Override
+    public void setAttributes(Map<CharSequence, Object> attributes) {
+        this.attributes = attributes;
+    }
+
     @Nullable
     @Override
     public Qualifier<?> getCurrentQualifier() {
