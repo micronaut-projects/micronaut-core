@@ -189,6 +189,23 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     Object removeAttribute(CharSequence key);
 
     /**
+     * Get the map representing current attributes
+     *
+     * @return All attributes
+     * @since 4.0.0
+     */
+    @Nullable
+    Map<CharSequence, Object> getAttributes();
+
+    /**
+     * Set new attributes map (The map is supposed to be mutable).
+     *
+     * @param attributes The attributes
+     * @since 4.0.0
+     */
+    void setAttributes(@Nullable Map<CharSequence, Object> attributes);
+
+    /**
      * Adds a bean that is created as part of the resolution. This is used to store references to instances passed to {@link BeanContext#inject(Object)}
      * @param beanIdentifier The bean identifier
      * @param beanRegistration The bean registration
