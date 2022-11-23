@@ -41,9 +41,7 @@ logback = "1.4.5"
 logbook-netty = "2.14.0"
 log4j = "2.19.0"
 micronaut-aws = "3.9.2"
-micronaut-grpc = "3.3.1"
 micronaut-groovy = "4.0.0-SNAPSHOT"
-micronaut-picocli = "4.3.0"
 micronaut-sql = "4.7.2"
 micronaut-test = "4.0.0-SNAPSHOT"
 micronaut-serde = "2.0.0-SNAPSHOT"
@@ -80,8 +78,6 @@ micronaut-docs = "2.0.0"
 
 [libraries]
 # Libraries prefixed with bom- are BOM files
-internal-boms-micronaut-grpc = { module = "io.micronaut.grpc:micronaut-grpc-bom", version.ref = "micronaut-grpc" }
-internal-boms-micronaut-picocli = { module = "io.micronaut.picocli:micronaut-picocli-bom", version.ref = "micronaut-picocli" }
 
 test-boms-micronaut-aws = { module = "io.micronaut.aws:micronaut-aws-bom", version.ref = "micronaut-aws" }
 test-boms-micronaut-sql = { module = "io.micronaut.sql:micronaut-sql-bom", version.ref = "micronaut-sql" }
