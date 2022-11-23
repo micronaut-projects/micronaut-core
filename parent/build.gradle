@@ -260,6 +260,7 @@ ext.extraPomInfo = {
                                             exclude "META-INF/*.SF"
                                             exclude "META-INF/*.DSA"
                                             exclude "META-INF/*.RSA"
+                                            exclude "module-info.class"
                                         }
                                     }
                                 }
