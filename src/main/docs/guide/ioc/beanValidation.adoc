@@ -1,4 +1,4 @@
-Since Micronaut 1.2, Micronaut has built-in support for validating beans annotated with `javax.validation` annotations. At a minimum include the `micronaut-validation` module as a compile dependency:
+Since Micronaut 1.2, Micronaut has built-in support for validating beans annotated with `jakarta.validation` annotations. At a minimum include the `micronaut-validation` module as a compile dependency:
 
 dependency::micronaut-validation[]
 
@@ -27,7 +27,7 @@ dependency:micronaut-hibernate-validator[groupId="io.micronaut.beanvalidation"]
 
 === Validating Bean Methods
 
-You can validate methods of any class declared as a Micronaut bean by applying `javax.validation` annotations to arguments:
+You can validate methods of any class declared as a Micronaut bean by applying `jakarta.validation` annotations to arguments:
 
 .Validating Methods
 snippet::io.micronaut.docs.ioc.validation.PersonService[tags="imports,class",indent=0]
@@ -127,7 +127,7 @@ You can use Micronaut's validator to validate annotation elements at compile tim
 
 dependency::micronaut-validation[scope="annotationProcessor"]
 
-Then Micronaut will at compile time validate annotation values that are themselves annotated with `javax.validation`. For example consider the following annotation:
+Then Micronaut will at compile time validate annotation values that are themselves annotated with `jakarta.validation`. For example consider the following annotation:
 
 .Annotation Validation
 snippet::io.micronaut.docs.ioc.validation.custom.TimeOff[tags="imports,class", indent="0"]

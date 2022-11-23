@@ -1,6 +1,6 @@
 It is easy to validate incoming data with Micronaut controllers using <<validation, Validation Advice>>.
 
-Micronaut provides native support for the `javax.validation` annotations with the `micronaut-validation` dependency:
+Micronaut provides native support for the `jakarta.validation` annotations with the `micronaut-validation` dependency:
 
 dependency::micronaut-validation[]
 
@@ -8,7 +8,7 @@ Or full JSR 380 compliance with the `micronaut-hibernate-validator` dependency:
 
 dependency:micronaut-hibernate-validator[groupId="io.micronaut.beanvalidation"]
 
-We can validate parameters using `javax.validation` annotations and the api:validation.Validated[] annotation at the class level.
+We can validate parameters using `jakarta.validation` annotations and the api:validation.Validated[] annotation at the class level.
 
 snippet::io.micronaut.docs.datavalidation.params.EmailController[tags="imports,clazz", indent=0,title="Example"]
 
@@ -25,7 +25,7 @@ Often you may want to use POJOs as controller method parameters.
 
 snippet::io.micronaut.docs.datavalidation.pogo.Email[tags="clazz", indent=0]
 
-<1> You can use `javax.validation` annotations in your POJOs.
+<1> You can use `jakarta.validation` annotations in your POJOs.
 
 Annotate your controller with api:validation.Validated[], and annotate the binding POJO with `@Valid`.
 

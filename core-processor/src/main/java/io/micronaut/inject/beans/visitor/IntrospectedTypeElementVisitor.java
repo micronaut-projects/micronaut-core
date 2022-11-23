@@ -59,9 +59,9 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
      */
     public static final int POSITION = -100;
 
-    private static final String JAVAX_VALIDATION_CONSTRAINT = "jakarta.validation.Constraint";
+    private static final String JAKARTA_VALIDATION_CONSTRAINT = "jakarta.validation.Constraint";
     private static final AnnotationValue<Introspected.IndexedAnnotation> ANN_CONSTRAINT = AnnotationValue.builder(Introspected.IndexedAnnotation.class)
-        .member("annotation", new AnnotationClassValue<>(JAVAX_VALIDATION_CONSTRAINT))
+        .member("annotation", new AnnotationClassValue<>(JAKARTA_VALIDATION_CONSTRAINT))
         .build();
     private static final String JAVAX_VALIDATION_VALID = "jakarta.validation.Valid";
     private static final AnnotationValue<Introspected.IndexedAnnotation> ANN_VALID = AnnotationValue.builder(Introspected.IndexedAnnotation.class)

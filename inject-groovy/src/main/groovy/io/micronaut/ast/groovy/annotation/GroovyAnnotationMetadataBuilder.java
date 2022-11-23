@@ -120,7 +120,7 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
         if (member != null) {
             final List<AnnotationNode> annotations = member.getAnnotations();
             if (CollectionUtils.isNotEmpty(annotations)) {
-                return annotations.stream().anyMatch((it) -> it.getClassNode().getName().startsWith("javax.validation"));
+                return annotations.stream().anyMatch((it) -> it.getClassNode().getName().startsWith("jakarta.validation"));
             }
         }
         return false;
