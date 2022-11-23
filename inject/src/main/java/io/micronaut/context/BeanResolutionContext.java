@@ -169,6 +169,7 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
 
     /**
      * Store a value within the context.
+     *
      * @param key The key
      * @param value The value
      * @return The previous value or null
@@ -183,13 +184,14 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
 
     /**
      * Remove the attribute for the given key.
+     *
      * @param key the key
      * @return The previous value
      */
     Object removeAttribute(CharSequence key);
 
     /**
-     * Get the map representing current attributes
+     * Get the map representing current attributes.
      *
      * @return All attributes
      * @since 4.0.0
@@ -206,7 +208,8 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     void setAttributes(@Nullable Map<CharSequence, Object> attributes);
 
     /**
-     * Adds a bean that is created as part of the resolution. This is used to store references to instances passed to {@link BeanContext#inject(Object)}
+     * Adds a bean that is created as part of the resolution. This is used to store references to instances passed to {@link BeanContext#inject(Object)}.
+     *
      * @param beanIdentifier The bean identifier
      * @param beanRegistration The bean registration
      * @param <T> The instance type
@@ -214,7 +217,8 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     <T> void addInFlightBean(BeanIdentifier beanIdentifier, BeanRegistration<T> beanRegistration);
 
     /**
-     * Removes a bean that is in the process of being created. This is used to store references to instances passed to {@link BeanContext#inject(Object)}
+     * Removes a bean that is in the process of being created. This is used to store references to instances passed to {@link BeanContext#inject(Object)}.
+     *
      * @param beanIdentifier The bean identifier
      */
     void removeInFlightBean(BeanIdentifier beanIdentifier);
@@ -243,6 +247,7 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
 
     /**
      * Adds a dependent bean to the resolution context.
+     *
      * @param beanRegistration The bean registration
      * @param <T> The generic type
      */
@@ -279,6 +284,7 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      *
      * @since 3.5.0
      */
+    @UsedByGeneratedCode
     default void markDependentAsFactory() {
     }
 
