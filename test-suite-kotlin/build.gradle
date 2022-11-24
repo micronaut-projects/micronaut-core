@@ -50,9 +50,7 @@ dependencies {
     testImplementation libs.jcache
     testImplementation project(':validation')
     testImplementation project(":http-client")
-    testImplementation(libs.micronaut.session) {
-        exclude module: 'micronaut-aop'
-    }
+    testImplementation(libs.micronaut.session)
     testImplementation project(":jackson-databind")
     testImplementation libs.managed.groovy.templates
 

@@ -50,9 +50,7 @@ dependencies {
     testImplementation project(":inject")
     testImplementation project(":function-client")
     testImplementation project(":function-web")
-    testImplementation(libs.micronaut.session) {
-        exclude module: 'micronaut-aop'
-    }
+    testImplementation(libs.micronaut.session)
 
     // Adding these for now since micronaut-test isnt resolving correctly ... probably need to upgrade gradle there too
     testImplementation libs.junit.jupiter.api
