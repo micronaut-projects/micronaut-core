@@ -23,16 +23,17 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.scheduling.instrument.Instrumentation;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
+import io.micronaut.scheduling.instrument.ReactiveInstrumentationContext;
 import io.micronaut.scheduling.instrument.ReactiveInvocationInstrumenterFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Hooks;
 import reactor.core.publisher.Operators;
 import reactor.core.scheduler.Schedulers;
 
-import javax.annotation.PostConstruct;
-import javax.annotation.PreDestroy;
 import java.util.ArrayList;
 import java.util.List;
+import javax.annotation.PostConstruct;
+import javax.annotation.PreDestroy;
 
 /**
  * Instruments Reactor such that the thread factory used by Micronaut is used and instrumentations can be applied to the {@link java.util.concurrent.ScheduledExecutorService}.
@@ -55,7 +56,7 @@ class ReactorInstrumentation {
     void init(ReactorInstrumenterFactory instrumenterFactory) {
         if (instrumenterFactory.hasInstrumenters()) {
             Schedulers.onScheduleHook(Environment.MICRONAUT, runnable -> {
-                InvocationInstrumenter instrumenter = instrumenterFactory.create();
+                InvocationInstrumenter instrumenter = instrumenterFactory.create(null);
                 if (instrumenter != null) {
                     return () -> {
                         try (Instrumentation ignored = instrumenter.newInstrumentation()) {
@@ -69,7 +70,7 @@ class ReactorInstrumentation {
                 if (coreSubscriber instanceof ReactorSubscriber) {
                     return coreSubscriber;
                 }
-                InvocationInstrumenter instrumenter = instrumenterFactory.create();
+                InvocationInstrumenter instrumenter = instrumenterFactory.create(coreSubscriber.currentContext());
                 if (instrumenter != null) {
                     return new ReactorSubscriber<>(instrumenter, coreSubscriber);
                 }
@@ -117,8 +118,8 @@ class ReactorInstrumentation {
          * @return new {@link InvocationInstrumenter} if instrumentation is required
          */
         @Nullable
-        public InvocationInstrumenter create() {
-            List<InvocationInstrumenter> invocationInstrumenter = getReactiveInvocationInstrumenters();
+        public InvocationInstrumenter create(reactor.util.context.Context context) {
+            List<InvocationInstrumenter> invocationInstrumenter = getReactiveInvocationInstrumenters(context);
             if (CollectionUtils.isNotEmpty(invocationInstrumenter)) {
                 return InvocationInstrumenter.combine(invocationInstrumenter);
             }
@@ -128,10 +129,13 @@ class ReactorInstrumentation {
         /**
          * @return The invocation instrumenters
          */
-        private List<InvocationInstrumenter> getReactiveInvocationInstrumenters() {
+        private List<InvocationInstrumenter> getReactiveInvocationInstrumenters(reactor.util.context.Context context) {
             List<InvocationInstrumenter> instrumenters = new ArrayList<>(reactiveInvocationInstrumenterFactories.size());
             for (ReactiveInvocationInstrumenterFactory instrumenterFactory : reactiveInvocationInstrumenterFactories) {
-                final InvocationInstrumenter instrumenter = instrumenterFactory.newReactiveInvocationInstrumenter();
+                final InvocationInstrumenter instrumenter = instrumenterFactory.newReactiveInvocationInstrumenter(
+                    context != null
+                        ? new HttpRequestReactiveInstrumentationContext(context)
+                        : null);
                 if (instrumenter != null) {
                     instrumenters.add(instrumenter);
                 }
@@ -139,5 +143,17 @@ class ReactorInstrumentation {
             return instrumenters;
         }
 
+        private static class HttpRequestReactiveInstrumentationContext implements ReactiveInstrumentationContext {
+            private final reactor.util.context.Context context;
+
+            public HttpRequestReactiveInstrumentationContext(reactor.util.context.Context context) {
+                this.context = context;
+            }
+
+            @Override
+            public <T> T getOrDefault(String key, T defaultValue) {
+                return context.getOrDefault(key, defaultValue);
+            }
+        }
     }
 }

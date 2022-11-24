@@ -16,9 +16,11 @@
 package io.micronaut.http.server.context;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.http.HttpRequest;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.micronaut.scheduling.instrument.InvocationInstrumenterFactory;
+import io.micronaut.scheduling.instrument.ReactiveInstrumentationContext;
 import io.micronaut.scheduling.instrument.ReactiveInvocationInstrumenterFactory;
 import jakarta.inject.Singleton;
 
@@ -39,6 +41,15 @@ final class ServerRequestContextInstrumentation implements InvocationInstrumente
 
     @Override
     public InvocationInstrumenter newReactiveInvocationInstrumenter() {
+        return newReactiveInvocationInstrumenter(null);
+    }
+
+    @Override
+    public InvocationInstrumenter newReactiveInvocationInstrumenter(ReactiveInstrumentationContext context) {
+        if (context != null) {
+            HttpRequest<?> httpRequest = context.getOrDefault(ServerRequestContext.KEY, null);
+            return new ServerRequestContextInvocationInstrumenter(httpRequest);
+        }
         return newInvocationInstrumenter();
     }
 

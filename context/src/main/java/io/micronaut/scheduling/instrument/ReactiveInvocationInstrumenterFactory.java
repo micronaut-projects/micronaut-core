@@ -38,4 +38,13 @@ public interface ReactiveInvocationInstrumenterFactory {
      */
     @Nullable InvocationInstrumenter newReactiveInvocationInstrumenter();
 
+    /**
+     * An optional invocation instrumentation.
+     *
+     * @param context the reactive instrumentation context
+     * @return A invocation instrumentation or null if non exists.
+     */
+    default @Nullable InvocationInstrumenter newReactiveInvocationInstrumenter(ReactiveInstrumentationContext context) {
+        return newReactiveInvocationInstrumenter();
+    }
 }
