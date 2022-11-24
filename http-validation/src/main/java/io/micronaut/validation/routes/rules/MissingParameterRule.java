@@ -15,11 +15,13 @@
  */
 package io.micronaut.validation.routes.rules;
 
+import io.micronaut.core.annotation.AnnotatedElement;
 import io.micronaut.core.bind.annotation.Bindable;
+import io.micronaut.core.naming.Named;
 import io.micronaut.http.uri.UriMatchTemplate;
+import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
-import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.validation.routes.RouteValidationResult;
 
 import java.util.ArrayList;
@@ -29,6 +31,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Validates all route uri variables are present in the route arguments.
@@ -48,16 +51,16 @@ public class MissingParameterRule implements RouteValidationRule {
                 .filter(p -> p.hasAnnotation("io.micronaut.http.annotation.Body"))
                 .map(ParameterElement::getType)
                 .filter(Objects::nonNull)
-                .flatMap(t -> t.getBeanProperties().stream())
-                .map(PropertyElement::getName)
+                .flatMap(MissingParameterRule::findProperties)
+                .map(Named::getName)
                 .collect(Collectors.toList()));
 
         // RequestBean has properties inside
         routeVariables.addAll(Arrays.stream(parameters)
                 .filter(p -> p.hasAnnotation("io.micronaut.http.annotation.RequestBean"))
                 .map(ParameterElement::getType)
-                .flatMap(t -> t.getBeanProperties().stream())
-                .filter(p -> p.hasStereotype(Bindable.class))
+                .flatMap(MissingParameterRule::findProperties)
+                .filter(p -> p.getAnnotationMetadata().hasStereotype(Bindable.class))
                 .map(p -> p.getAnnotationMetadata().stringValue(Bindable.class).orElse(p.getName()))
                 .collect(Collectors.toSet()));
 
@@ -72,4 +75,11 @@ public class MissingParameterRule implements RouteValidationRule {
         return new RouteValidationResult(errorMessages.toArray(new String[0]));
     }
 
+    private static Stream<? extends AnnotatedElement> findProperties(ClassElement t) {
+        if (t.isRecord()) {
+            return Arrays.stream(t.getPrimaryConstructor().get().getParameters());
+        } else {
+            return t.getBeanProperties().stream();
+        }
+    }
 }
