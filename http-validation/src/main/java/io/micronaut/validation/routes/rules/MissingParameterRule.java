@@ -29,6 +29,7 @@ import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -77,9 +78,11 @@ public class MissingParameterRule implements RouteValidationRule {
 
     private static Stream<? extends AnnotatedElement> findProperties(ClassElement t) {
         if (t.isRecord()) {
-            return Arrays.stream(t.getPrimaryConstructor().get().getParameters());
-        } else {
-            return t.getBeanProperties().stream();
+            Optional<MethodElement> primaryConstructor = t.getPrimaryConstructor();
+            if (primaryConstructor.isPresent()) {
+                return Arrays.stream(primaryConstructor.get().getParameters());
+            }
         }
+        return t.getBeanProperties().stream();
     }
 }
