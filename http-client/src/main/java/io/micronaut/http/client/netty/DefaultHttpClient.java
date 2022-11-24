@@ -34,6 +34,8 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.util.SupplierUtil;
+import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpResponseWrapper;
 import io.micronaut.http.HttpStatus;
@@ -181,6 +183,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static io.micronaut.scheduling.instrument.InvocationInstrumenter.NOOP;
@@ -208,6 +211,9 @@ public class DefaultHttpClient implements
     private static final int DEFAULT_HTTP_PORT = 80;
     private static final int DEFAULT_HTTPS_PORT = 443;
 
+    private static final Supplier<Pattern> HEADER_MASK_PATTERNS = SupplierUtil.memoized(() ->
+        Pattern.compile(".*(password|cred|cert|key|secret|token|auth|signat).*", Pattern.CASE_INSENSITIVE)
+    );
     /**
      * Which headers <i>not</i> to copy from the first request when redirecting to a second request. There doesn't
      * appear to be a spec for this. {@link java.net.HttpURLConnection} seems to drop all headers, but that would be a
@@ -755,7 +761,12 @@ public class DefaultHttpClient implements
     @Override
     public <I, O, E> Publisher<O> retrieve(io.micronaut.http.HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType) {
         // mostly same as default impl, but with exception customization
-        return Flux.from(exchange(request, bodyType, errorType)).map(response -> {
+        Flux<HttpResponse<O>> exchange = Flux.from(exchange(request, bodyType, errorType));
+        if (bodyType.getType() == void.class) {
+            // exchange() returns a HttpResponse<Void>, we can't map the Void body properly, so just drop it and complete
+            return (Publisher<O>) exchange.ignoreElements();
+        }
+        return exchange.map(response -> {
             if (bodyType.getType() == HttpStatus.class) {
                 return (O) response.getStatus();
             } else {
@@ -1178,7 +1189,13 @@ public class DefaultHttpClient implements
             Publisher<R> responsePublisher) {
 
         if (request instanceof MutableHttpRequest) {
-            ((MutableHttpRequest<I>) request).uri(requestURI);
+            MutableHttpRequest<I> mutRequest = (MutableHttpRequest<I>) request;
+            mutRequest.uri(requestURI);
+            if (informationalServiceId != null &&
+                !mutRequest.getAttribute(HttpAttributes.SERVICE_ID).isPresent()) {
+
+                mutRequest.setAttribute(HttpAttributes.SERVICE_ID, informationalServiceId);
+            }
 
             List<HttpClientFilter> filters =
                     filterResolver.resolveFilters(request, clientFilterEntries);
@@ -1490,10 +1507,6 @@ public class DefaultHttpClient implements
                 new FullHttpResponseHandler<>(responsePromise, poolHandle, secure, finalRequest, bodyType, errorType));
         poolHandle.notifyRequestPipelineBuilt();
         Publisher<HttpResponse<O>> publisher = new NettyFuturePublisher<>(responsePromise, true);
-        if (bodyType != null && bodyType.isVoid()) {
-            // don't emit response if bodyType is void
-            publisher = Flux.from(publisher).filter(r -> false);
-        }
         publisher.subscribe(new ForwardingSubscriber<>(emitter));
 
         requestWriter.write(channel, secure, emitter);
@@ -1632,7 +1645,7 @@ public class DefaultHttpClient implements
             public Publisher<? extends io.micronaut.http.HttpResponse<?>> proceed(MutableHttpRequest<?> request) {
 
                 int pos = integer.incrementAndGet();
-                if (pos > len) {
+                if (pos >= len) {
                     throw new IllegalStateException("The FilterChain.proceed(..) method should be invoked exactly once per filter execution. The method has instead been invoked multiple times by an erroneous filter definition.");
                 }
                 HttpClientFilter httpFilter = filters.get(pos);
@@ -1767,15 +1780,26 @@ public class DefaultHttpClient implements
 
     private void traceHeaders(HttpHeaders headers) {
         for (String name : headers.names()) {
+            boolean isMasked = HEADER_MASK_PATTERNS.get().matcher(name).matches();
             List<String> all = headers.getAll(name);
             if (all.size() > 1) {
                 for (String value : all) {
-                    log.trace("{}: {}", name, value);
+                    String maskedValue = isMasked ? mask(value) : value;
+                    log.trace("{}: {}", name, maskedValue);
                 }
             } else if (!all.isEmpty()) {
-                log.trace("{}: {}", name, all.get(0));
+                String maskedValue = isMasked ? mask(all.get(0)) : all.get(0);
+                log.trace("{}: {}", name, maskedValue);
             }
         }
+    }
+
+    @Nullable
+    private String mask(@Nullable String value) {
+        if (value == null) {
+            return null;
+        }
+        return "*MASKED*";
     }
 
     private static MediaTypeCodecRegistry createDefaultMediaTypeRegistry() {

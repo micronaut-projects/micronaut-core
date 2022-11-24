@@ -1,4 +1,9 @@
 //Micronaut {version} includes the following changes:
+== 3.8.0
+
+Key features:
+
+- https://www.graalvm.org/release-notes/22_3/[GraalVM 22.3 Support]
 
 == 3.7.0
 
@@ -60,7 +65,7 @@ public class AppHttpClientFilter implements HttpClientFilter {
 
 This version upgrades https://netty.io[Netty] from 4.1.77 to 4.1.79. Moreover, it contains improvements to the API to https://docs.micronaut.io/snapshot/guide/#nettyClientPipeline[configure the Netty Client Pipeline] and to https://docs.micronaut.io/snapshot/guide/#nettyServerPipeline[configure the Netty Server Pipeline].
 
-=== Improvements to HtttpClientException
+=== Improvements to HttpClientException
 
 If present a `serviceId` field is populated in the `HttpClientException` and shown in the exception message.
 

@@ -8,6 +8,7 @@ dependencies {
     api project(":router")
     compileOnly libs.kotlinx.coroutines.core
     compileOnly libs.kotlinx.coroutines.reactor
+    compileOnly(libs.micronaut.runtime.groovy)
     implementation libs.managed.reactor
     annotationProcessor project(":inject-java")
 

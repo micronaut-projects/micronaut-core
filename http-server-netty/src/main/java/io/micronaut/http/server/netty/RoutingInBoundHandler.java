@@ -1209,7 +1209,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             try {
                 if (!future.isSuccess()) {
                     final Throwable throwable = future.cause();
-                    if (!(throwable instanceof ClosedChannelException)) {
+                    if (!isIgnorable(throwable)) {
                         if (throwable instanceof Http2Exception.StreamException) {
                             Http2Exception.StreamException se = (Http2Exception.StreamException) throwable;
                             if (se.error() == Http2Error.STREAM_CLOSED) {
@@ -1453,7 +1453,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
      * @param cause The cause
      * @return True if it can be ignored.
      */
-    protected boolean isIgnorable(Throwable cause) {
+    final boolean isIgnorable(Throwable cause) {
         if (cause instanceof ClosedChannelException || cause.getCause() instanceof ClosedChannelException) {
             return true;
         }

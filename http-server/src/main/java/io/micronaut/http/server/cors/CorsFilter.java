@@ -237,7 +237,10 @@ public class CorsFilter implements HttpServerFilter {
                 response.header(ACCESS_CONTROL_ALLOW_HEADERS, headerValue);
             }
         } else {
-            allowHeaders.forEach(header -> response.header(ACCESS_CONTROL_ALLOW_HEADERS, header));
+            allowHeaders
+                .stream()
+                .map(StringUtils::trimLeadingWhitespace)
+                .forEach(header -> response.header(ACCESS_CONTROL_ALLOW_HEADERS, header));
         }
     }
 
