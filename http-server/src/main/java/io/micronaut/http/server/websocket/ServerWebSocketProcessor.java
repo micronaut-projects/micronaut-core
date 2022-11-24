@@ -44,7 +44,7 @@ import java.util.Set;
 @Requires(classes = {ServerWebSocket.class, WebSocketBeanRegistry.class})
 public class ServerWebSocketProcessor extends DefaultRouteBuilder implements ExecutableMethodProcessor<ServerWebSocket> {
 
-    private Set<Class> mappedWebSockets = new HashSet<>(4);
+    private Set<Class<?>> mappedWebSockets = new HashSet<>(4);
 
     /**
      * Default constructor.

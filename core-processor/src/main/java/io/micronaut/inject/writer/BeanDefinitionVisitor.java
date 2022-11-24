@@ -106,6 +106,12 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
     );
 
     /**
+     * @return A map of the type arguments for the bean.
+     */
+    @NonNull
+    Map<String, ClassElement> getTypeArgumentMap();
+
+    /**
      * @return The name of the bean definition reference class.
      */
     @NonNull
@@ -279,10 +285,12 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
      * @param declaringType      The declaring type. Either a Class or a string representing the name of the type
      * @param fieldElement       The field element
      * @param requiresReflection Whether accessing the field requires reflection
+     * @param visitorContext     The visitor context
      */
     void visitFieldInjectionPoint(TypedElement declaringType,
                                   FieldElement fieldElement,
-                                  boolean requiresReflection);
+                                  boolean requiresReflection,
+                                  VisitorContext visitorContext);
 
     /**
      * Visits an annotation injection point.

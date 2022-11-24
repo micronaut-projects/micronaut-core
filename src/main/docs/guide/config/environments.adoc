@@ -16,7 +16,7 @@ $ java -Dmicronaut.environments=foo,bar -jar myapp.jar
 
 The above activates environments called `foo` and `bar`.
 
-Finally, Cloud environment names are also detected. See the section on <<cloudConfiguration,Cloud Configuration>> for more information.
+It is also possible to enable the detection of the Cloud environment the application is deployed to (this feature is disabled by default since Micronaut 4). See the section on <<cloudConfiguration,Cloud Configuration>> for more information.
 
 == Environment Priority
 

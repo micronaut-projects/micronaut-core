@@ -18,6 +18,7 @@ package io.micronaut.context.visitor;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Import;
 import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.ArrayUtils;
@@ -41,6 +42,7 @@ import java.util.Set;
  * @author graemerocher
  * @since 3.0.0
  */
+@Internal
 public class BeanImportVisitor implements TypeElementVisitor<Import, Object> {
 
     private static final List<BeanImportHandler> BEAN_IMPORT_HANDLERS;

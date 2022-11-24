@@ -22,9 +22,11 @@ import io.micronaut.retry.event.CircuitClosedEvent
 import io.micronaut.retry.event.CircuitOpenEvent
 import io.micronaut.retry.event.RetryEvent
 import io.micronaut.retry.event.RetryEventListener
+import io.micronaut.retry.exception.CircuitOpenException
 import jakarta.inject.Singleton
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Mono
+import spock.lang.Retry
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 import io.micronaut.core.async.annotation.SingleResult
@@ -35,7 +37,7 @@ import io.micronaut.core.async.annotation.SingleResult
  */
 class CircuitBreakerSpec extends Specification{
 
-
+    @Retry
     void "test blocking circuit breaker"() {
         given:
         ApplicationContext context = ApplicationContext.run()
@@ -191,6 +193,34 @@ class CircuitBreakerSpec extends Specification{
         context.stop()
     }
 
+    void "test circuit breaker throws a wrapped exception"(){
+        given:
+        ApplicationContext context = ApplicationContext.run()
+        WrappedExceptionService service = context.getBean(WrappedExceptionService)
+
+        when:"A method is annotated retry"
+        int result = service.getCount()
+
+        then:"It executes until successful"
+        result == 2
+
+        when:"The threshold can never be met"
+        service.countThreshold = Integer.MAX_VALUE
+        service.countValue = 0
+        service.getCount()
+
+        then:"Throws the original exception"
+        thrown(IllegalStateException)
+
+        when:"the method is called again"
+        service.getCount()
+
+        then:"Throws the wrapped exception, the original logic is never invoked"
+        CircuitOpenException e = thrown()
+        e.getCause().getClass() == IllegalStateException
+
+    }
+
     @Singleton
     static class MyRetryListener implements RetryEventListener {
 
@@ -261,6 +291,21 @@ class CircuitBreakerSpec extends Specification{
     static class EmptyConfigService {
         int countValue = 0
         int countRx = 0
+        int countThreshold = 2
+
+        int getCount() {
+            countValue++
+            if(countValue < countThreshold) {
+                throw new IllegalStateException("Bad count")
+            }
+            return countValue
+        }
+    }
+
+    @Singleton
+    @CircuitBreaker(throwWrappedException = true)
+    static class WrappedExceptionService {
+        int countValue = 0
         int countThreshold = 2
 
         int getCount() {

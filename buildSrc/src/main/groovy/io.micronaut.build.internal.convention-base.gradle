@@ -10,6 +10,18 @@ micronautBuild {
     enableProcessing = false
 }
 
+repositories {
+    mavenCentral()
+    maven { url "https://s01.oss.sonatype.org/content/repositories/snapshots/" }
+}
+
+configurations {
+    testRuntimeClasspath {
+        // Use AOP from here, not from maven
+        exclude group: 'io.micronaut', module: 'micronaut-aop'
+    }
+}
+
 group = projectGroupId
 
 def micronautBuild = (ExtensionAware) project.extensions.getByName("micronautBuild")
@@ -64,7 +76,7 @@ dependencies {
         transitive = false
     }
 
-    api libs.managed.slf4j
+    api libs.managed.slf4j.api
     compileOnly libs.caffeine
     compileOnly libs.bundles.asm
 
@@ -73,7 +85,7 @@ dependencies {
 
     testImplementation libs.caffeine
     testImplementation libs.managed.groovy
-    testImplementation(libs.managed.spock) {
+    testImplementation(libs.spock) {
         exclude module: 'groovy-all'
     }
 

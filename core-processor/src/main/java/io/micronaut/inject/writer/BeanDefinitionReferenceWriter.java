@@ -24,12 +24,15 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.DefaultArgument;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.AdvisedBeanType;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
+import io.micronaut.inject.ast.ClassElement;
 import jakarta.inject.Singleton;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Type;
@@ -37,6 +40,8 @@ import org.objectweb.asm.commons.GeneratorAdapter;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Writes the bean definition class file to disk.
@@ -74,6 +79,7 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
     private final String beanDefinitionReferenceClassName;
     private final Type interceptedType;
     private final Type providedType;
+    private final Map<String, ClassElement> typeParameters;
     private boolean contextScope = false;
     private boolean requiresMethodProcessing;
 
@@ -90,6 +96,7 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
                 true);
         this.providedType = visitor.getProvidedType();
         this.beanTypeName = visitor.getBeanTypeName();
+        this.typeParameters = visitor.getTypeArgumentMap();
         this.beanDefinitionName = visitor.getBeanDefinitionName();
         this.beanDefinitionReferenceClassName = beanDefinitionName + REF_SUFFIX;
         this.beanDefinitionClassInternalName = getInternalName(beanDefinitionName) + REF_SUFFIX;
@@ -165,7 +172,6 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
                 interfaceInternalNames
         );
         Type beanDefinitionType = getTypeReferenceForName(beanDefinitionName);
-        writeAnnotationMetadataStaticInitializer(classWriter);
 
         GeneratorAdapter cv = startConstructor(classWriter);
 
@@ -241,11 +247,33 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
         getBeanType.returnValue();
         getBeanType.visitMaxs(2, 1);
 
+        if (CollectionUtils.isNotEmpty(typeParameters)) {
+            // start method: Argument<T> getGenericBeanType()
+            GeneratorAdapter getGenericType = startPublicMethodZeroArgs(classWriter, Argument.class, "getGenericBeanType");
+            pushCreateArgument(
+                beanDefinitionReferenceClassName,
+                Type.getType(getTypeDescriptor(beanDefinitionReferenceClassName)),
+                classWriter,
+                getGenericType,
+                "T",
+                ClassElement.of(beanTypeName),
+                annotationMetadata,
+                typeParameters,
+                new HashMap<>(),
+                loadTypeMethods
+            );
+            getGenericType.returnValue();
+            getGenericType.visitMaxs(2, 1);
+        }
+
+        writeAnnotationMetadataStaticInitializer(classWriter);
+
         if (interceptedType != null) {
             super.implementInterceptedTypeMethod(interceptedType, classWriter);
         }
         for (GeneratorAdapter generatorAdapter : loadTypeMethods.values()) {
             generatorAdapter.visitMaxs(3, 1);
+            generatorAdapter.visitEnd();
         }
 
         return classWriter;

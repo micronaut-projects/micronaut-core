@@ -269,7 +269,7 @@ public class Qualifiers {
      * @param <T>           The component type
      * @return The qualifier
      */
-    public static <T> Qualifier<T> byTypeArguments(Class... typeArguments) {
+    public static <T> Qualifier<T> byTypeArguments(Class<?>... typeArguments) {
         return new TypeArgumentQualifier<>(typeArguments);
     }
 
@@ -293,7 +293,7 @@ public class Qualifiers {
      * @param <T>           The component type
      * @return The qualifier
      */
-    public static <T> Qualifier<T> byTypeArgumentsClosest(Class... typeArguments) {
+    public static <T> Qualifier<T> byTypeArgumentsClosest(Class<?>... typeArguments) {
         return new ClosestTypeArgumentQualifier<>(typeArguments);
     }
 
@@ -304,7 +304,7 @@ public class Qualifiers {
      * @param <T>           The component type
      * @return The qualifier
      */
-    public static <T> Qualifier<T> byType(Class... typeArguments) {
+    public static <T> Qualifier<T> byType(Class<?>... typeArguments) {
         return new TypeAnnotationQualifier<>(typeArguments);
     }
 

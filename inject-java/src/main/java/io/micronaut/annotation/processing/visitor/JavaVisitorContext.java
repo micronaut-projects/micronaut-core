@@ -242,6 +242,21 @@ public class JavaVisitorContext implements VisitorContext, BeanElementVisitorCon
         printMessage(message, Diagnostic.Kind.WARNING, element);
     }
 
+    /**
+     * Print warning message.
+     *
+     * @param message The message
+     * @param element The element
+     * @since 4.0.0
+     */
+    public void warn(String message, @Nullable Element element) {
+        if (element == null) {
+            messager.printMessage(Diagnostic.Kind.WARNING, message);
+        } else {
+            messager.printMessage(Diagnostic.Kind.WARNING, message, element);
+        }
+    }
+
     private void printMessage(String message, Diagnostic.Kind kind, @Nullable io.micronaut.inject.ast.Element element) {
         if (StringUtils.isNotEmpty(message)) {
             if (element instanceof BeanElement) {

@@ -72,11 +72,11 @@ import io.micronaut.core.annotation.*;
 class MyBean2 implements MyInterface2 {
 
     private String myValue;
-    
+
     MyBean2(@Value('${foo.bar}') String val) {
         this.myValue = val;
     }
-    
+
     @Override
     public String someMethod() {
         return myValue;
@@ -132,7 +132,7 @@ class Service extends BaseService implements ContractService {
 
     @SomeAnnot
     public void serviceMethod() {}
-    
+
     public void interfaceServiceMethod() {}
 }
 
@@ -154,7 +154,7 @@ class SomeInterceptor implements MethodInterceptor<Object, Object>, Ordered {
 
 ''')
         then:
-        Class clazz = ctx.classLoader.loadClass("inheritmetadatatest3.ContractService")
+        Class<?> clazz = ctx.classLoader.loadClass("inheritmetadatatest3.ContractService")
         ctx.getBean(clazz)
 
         when:

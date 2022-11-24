@@ -48,7 +48,7 @@ public class InMemoryByteCodeGroovyClassLoader extends GroovyClassLoader {
 
     private Map<String, byte[]> generatedClasses = new ConcurrentHashMap<>();
     private List<URL> generatedUrls = new ArrayList<>();
-    private Map<String, Class> loadedClasses = new ConcurrentHashMap<>();
+    private Map<String, Class<?>> loadedClasses = new ConcurrentHashMap<>();
 
     /**
      * Default constructor.
@@ -139,7 +139,7 @@ public class InMemoryByteCodeGroovyClassLoader extends GroovyClassLoader {
         if (loadedClasses.containsKey(name)) {
             return loadedClasses.get(name);
         } else if (generatedClasses.containsKey(name)) {
-            final Class cls = defineClass(name, generatedClasses.get(name));
+            final Class<?> cls = defineClass(name, generatedClasses.get(name));
             loadedClasses.put(name, cls);
             return cls;
         } else {

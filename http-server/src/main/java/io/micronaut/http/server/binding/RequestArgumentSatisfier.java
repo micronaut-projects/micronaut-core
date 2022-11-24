@@ -73,7 +73,7 @@ public class RequestArgumentSatisfier {
      * @return The route
      */
     public RouteMatch<?> fulfillArgumentRequirements(RouteMatch<?> route, HttpRequest<?> request, boolean satisfyOptionals) {
-        Collection<Argument> requiredArguments = route.getRequiredArguments();
+        Collection<Argument<?>> requiredArguments = route.getRequiredArguments();
         Map<String, Object> argumentValues;
 
         if (requiredArguments.isEmpty()) {
@@ -82,7 +82,7 @@ public class RequestArgumentSatisfier {
         } else {
             argumentValues = new LinkedHashMap<>(requiredArguments.size());
             // Begin try fulfilling the argument requirements
-            for (Argument argument : requiredArguments) {
+            for (Argument<?> argument : requiredArguments) {
                 getValueForArgument(argument, request, satisfyOptionals).ifPresent(value ->
                     argumentValues.put(argument.getName(), value));
             }

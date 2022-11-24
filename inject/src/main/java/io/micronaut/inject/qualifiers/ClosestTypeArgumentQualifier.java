@@ -38,12 +38,12 @@ import java.util.stream.Stream;
 public class ClosestTypeArgumentQualifier<T> extends TypeArgumentQualifier<T> {
 
     private static final Logger LOG = ClassUtils.getLogger(ClosestTypeArgumentQualifier.class);
-    private final List<Class>[] hierarchies;
+    private final List<Class<?>>[] hierarchies;
 
     /**
      * @param typeArguments The type arguments
      */
-    ClosestTypeArgumentQualifier(Class... typeArguments) {
+    ClosestTypeArgumentQualifier(Class<?>... typeArguments) {
         super(typeArguments);
         this.hierarchies = new List[typeArguments.length];
         for (int i = 0 ; i < typeArguments.length; i++) {
@@ -56,7 +56,7 @@ public class ClosestTypeArgumentQualifier<T> extends TypeArgumentQualifier<T> {
         return candidates
                 .filter(candidate -> beanType.isAssignableFrom(candidate.getBeanType()))
                 .map(candidate -> {
-                    List<Class> typeArguments = getTypeArguments(beanType, candidate);
+                    List<Class<?>> typeArguments = getTypeArguments(beanType, candidate);
 
                     int result = compare(typeArguments);
                     if (LOG.isTraceEnabled() && result < 0) {
@@ -77,8 +77,8 @@ public class ClosestTypeArgumentQualifier<T> extends TypeArgumentQualifier<T> {
      * @param classesToCompare An array of classes
      * @return Whether the types are compatible
      */
-    protected int compare(List<Class> classesToCompare) {
-        final Class[] typeArguments = getTypeArguments();
+    protected int compare(List<Class<?>> classesToCompare) {
+        final Class<?>[] typeArguments = getTypeArguments();
         if (classesToCompare.isEmpty() && typeArguments.length == 0) {
             return 0;
         } else if (classesToCompare.size() != typeArguments.length) {
@@ -89,8 +89,8 @@ public class ClosestTypeArgumentQualifier<T> extends TypeArgumentQualifier<T> {
                 if (typeArguments[i] == Object.class) {
                     continue;
                 }
-                Class left = classesToCompare.get(i);
-                List<Class> hierarchy =  hierarchies[i];
+                Class<?> left = classesToCompare.get(i);
+                List<Class<?>> hierarchy =  hierarchies[i];
                 int index = hierarchy.indexOf(left);
                 if (index == -1) {
                     comparison = -1;

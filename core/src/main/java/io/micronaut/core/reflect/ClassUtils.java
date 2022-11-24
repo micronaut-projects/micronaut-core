@@ -58,12 +58,12 @@ public class ClassUtils {
 
     /**
      * System property to indicate whether classloader logging should be activated. This is required
-     * because this class is used both at compilation time and runtime and we don't want logging at compilation time.
+     * because this class is used both at compilation time and runtime, and we don't want logging at compilation time.
      */
     public static final String PROPERTY_MICRONAUT_CLASSLOADER_LOGGING = "micronaut.classloader.logging";
     public static final int EMPTY_OBJECT_ARRAY_HASH_CODE = Arrays.hashCode(ArrayUtils.EMPTY_OBJECT_ARRAY);
-    public static final Map<String, Class> COMMON_CLASS_MAP = new HashMap<>(34);
-    public static final Map<String, Class> BASIC_TYPE_MAP = new HashMap<>(18);
+    public static final Map<String, Class<?>> COMMON_CLASS_MAP = new HashMap<>(34);
+    public static final Map<String, Class<?>> BASIC_TYPE_MAP = new HashMap<>(18);
 
     /**
      * Default extension for class files.
@@ -85,7 +85,7 @@ public class ClassUtils {
     }
 
     @SuppressWarnings("unchecked")
-    private static final Map<String, Class> PRIMITIVE_TYPE_MAP = CollectionUtils.mapOf(
+    private static final Map<String, Class<?>> PRIMITIVE_TYPE_MAP = CollectionUtils.mapOf(
         "int", Integer.TYPE,
             "boolean", Boolean.TYPE,
             "long", Long.TYPE,
@@ -98,7 +98,7 @@ public class ClassUtils {
     );
 
     @SuppressWarnings("unchecked")
-    private static final Map<String, Class> PRIMITIVE_ARRAY_MAP = CollectionUtils.mapOf(
+    private static final Map<String, Class<?>> PRIMITIVE_ARRAY_MAP = CollectionUtils.mapOf(
             "int", int[].class,
             "boolean", boolean[].class,
             "long", long[].class,
@@ -160,7 +160,7 @@ public class ClassUtils {
      * @param type The type
      * @return The logger
      */
-    public static @NonNull Logger getLogger(@NonNull Class type) {
+    public static @NonNull Logger getLogger(@NonNull Class<?> type) {
         if (ENABLE_CLASS_LOADER_LOGGING) {
             return LoggerFactory.getLogger(type);
         } else {
@@ -173,7 +173,7 @@ public class ClassUtils {
      * @param primitiveType The primitive type name
      * @return The array type
      */
-    public static @NonNull Optional<Class> arrayTypeForPrimitive(String primitiveType) {
+    public static @NonNull Optional<Class<?>> arrayTypeForPrimitive(String primitiveType) {
         if (primitiveType != null) {
             return Optional.ofNullable(PRIMITIVE_ARRAY_MAP.get(primitiveType));
         }
@@ -200,7 +200,7 @@ public class ClassUtils {
      * Check whether the given class is present in the given classloader.
      *
      * @param name        The name of the class
-     * @param classLoader The classloader. If null will fallback to attempt the thread context loader, otherwise the system loader
+     * @param classLoader The classloader. If null will fall back to attempt the thread context loader, otherwise the system loader
      * @return True if it is
      */
     public static boolean isPresent(String name, @Nullable ClassLoader classLoader) {
@@ -213,7 +213,7 @@ public class ClassUtils {
      * @param type The type
      * @return True if it is
      */
-    public static boolean isJavaLangType(Class type) {
+    public static boolean isJavaLangType(Class<?> type) {
         String typeName = type.getName();
         return isJavaLangType(typeName);
     }
@@ -261,7 +261,7 @@ public class ClassUtils {
      * @param primitiveType The type name
      * @return An optional type
      */
-    public static Optional<Class> getPrimitiveType(String primitiveType) {
+    public static Optional<Class<?>> getPrimitiveType(String primitiveType) {
         return Optional.ofNullable(PRIMITIVE_TYPE_MAP.get(primitiveType));
     }
 
@@ -270,7 +270,7 @@ public class ClassUtils {
      * as a last resort, and note that any usage of this method will create complications on GraalVM.
      *
      * @param name        The name of the class
-     * @param classLoader The classloader. If null will fallback to attempt the thread context loader, otherwise the system loader
+     * @param classLoader The classloader. If null will fall back to attempt the thread context loader, otherwise the system loader
      * @return An optional of the class
      */
     public static Optional<Class<?>> forName(String name, @Nullable ClassLoader classLoader) {
@@ -313,10 +313,10 @@ public class ClassUtils {
      * @param type The class to start with
      * @return The class hierarchy
      */
-    public static List<Class> resolveHierarchy(Class<?> type) {
+    public static List<Class<?>> resolveHierarchy(Class<?> type) {
         Class<?> superclass = type.getSuperclass();
-        List<Class> hierarchy = new ArrayList<>();
-        List<Class> interfaces = new ArrayList<>();
+        List<Class<?>> hierarchy = new ArrayList<>();
+        List<Class<?>> interfaces = new ArrayList<>();
         if (superclass != null) {
             hierarchy.add(type);
             populateHierarchyInterfaces(type, interfaces);
@@ -345,7 +345,7 @@ public class ClassUtils {
         return hierarchy;
     }
 
-    private static void populateHierarchyInterfaces(Class<?> superclass, List<Class> hierarchy) {
+    private static void populateHierarchyInterfaces(Class<?> superclass, List<Class<?>> hierarchy) {
         for (Class<?> aClass : superclass.getInterfaces()) {
             if (!hierarchy.contains(aClass)) {
                 hierarchy.add(aClass);

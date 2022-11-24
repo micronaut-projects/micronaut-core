@@ -15,8 +15,9 @@
  */
 package io.micronaut.inject.processing;
 
-import io.micronaut.context.BeanProvider;
-import io.micronaut.context.annotation.Bean;
+import com.github.javaparser.StaticJavaParser;
+import com.github.javaparser.javadoc.Javadoc;
+import com.github.javaparser.javadoc.JavadocBlockTag;
 import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationInject;
 import io.micronaut.context.annotation.ConfigurationReader;
@@ -24,10 +25,12 @@ import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Value;
+import io.micronaut.context.visitor.ConfigurationReaderVisitor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
@@ -42,7 +45,6 @@ import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.configuration.PropertyMetadata;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.BeanDefinitionVisitor;
-import jakarta.inject.Provider;
 
 import java.time.Duration;
 import java.util.Arrays;
@@ -80,11 +82,13 @@ final class ConfigurationReaderBeanElementCreator extends DeclaredBeanElementCre
                 .getBeanProperties();
             final ParameterElement[] parameters = constructor.getParameters();
             if (beanProperties.size() == parameters.length) {
+                Javadoc javadoc = classElement.getDocumentation().map(StaticJavaParser::parseJavadoc).orElse(null);
                 for (int i = 0; i < parameters.length; i++) {
                     ParameterElement parameter = parameters[i];
                     final PropertyElement bp = beanProperties.get(i);
                     if (CONSTRUCTOR_PARAMETERS_INJECTION_ANN.stream().noneMatch(bp::hasStereotype)) {
-                        processConfigurationConstructorParameter(parameter);
+                        String paramDoc = findParameterDoc(javadoc, parameter);
+                        processConfigurationConstructorParameter(parameter, paramDoc);
                     }
                 }
                 if (constructor.hasStereotype(ANN_REQUIRES_VALIDATION)) {
@@ -96,11 +100,27 @@ final class ConfigurationReaderBeanElementCreator extends DeclaredBeanElementCre
         processConfigurationInjectionPoint(visitor, constructor);
     }
 
+    @Nullable
+    private static String findParameterDoc(Javadoc javadoc, ParameterElement parameter) {
+        String paramDoc = null;
+        if (javadoc != null) {
+            JavadocBlockTag bt = javadoc.getBlockTags()
+                .stream().filter(t -> t.getType() == JavadocBlockTag.Type.PARAM && t.getName().map(n -> n.equals(parameter.getName())).orElse(false))
+                .findFirst().orElse(null);
+            if (bt != null) {
+                paramDoc = bt.getContent().toText();
+            }
+        }
+        return paramDoc;
+    }
+
     private void processConfigurationInjectionPoint(BeanDefinitionVisitor visitor,
                                                     MethodElement constructor) {
+        Javadoc javadoc = constructor.getDocumentation().map(StaticJavaParser::parseJavadoc).orElse(null);
         for (ParameterElement parameter : constructor.getParameters()) {
             if (CONSTRUCTOR_PARAMETERS_INJECTION_ANN.stream().noneMatch(parameter::hasStereotype)) {
-                processConfigurationConstructorParameter(parameter);
+                String paramDoc = findParameterDoc(javadoc, parameter);
+                processConfigurationConstructorParameter(parameter, paramDoc);
             }
         }
         if (constructor.hasStereotype(ANN_REQUIRES_VALIDATION)) {
@@ -108,28 +128,17 @@ final class ConfigurationReaderBeanElementCreator extends DeclaredBeanElementCre
         }
     }
 
-    private void processConfigurationConstructorParameter(ParameterElement parameter) {
-        if (isPropertyParameter(parameter)) {
+    private void processConfigurationConstructorParameter(ParameterElement parameter, @Nullable String paramDoc) {
+        if (ConfigurationReaderVisitor.isPropertyParameter(parameter, visitorContext)) {
             final PropertyMetadata pm = metadataBuilder.visitProperty(
                 parameter.getMethodElement().getOwningType(),
                 parameter.getMethodElement().getDeclaringType(),
                 parameter.getGenericType(),
-                parameter.getName(), parameter.getDocumentation().orElse(null),
+                parameter.getName(), paramDoc,
                 parameter.stringValue(Bindable.class, "defaultValue").orElse(null)
             );
             parameter.annotate(Property.class, (builder) -> builder.member("name", pm.getPath()));
         }
-    }
-
-    private boolean isPropertyParameter(ParameterElement parameter) {
-        ClassElement parameterType = parameter.getGenericType();
-        if (parameterType.isOptional() || parameterType.isAssignable(BeanProvider.class) || parameterType.isAssignable(Provider.class)) {
-            ClassElement finalParameterType = parameterType;
-            parameterType = parameterType.getOptionalValueType().or(finalParameterType::getFirstTypeArgument).orElse(parameterType);
-            // Get the class with type annotations
-            parameterType = visitorContext.getClassElement(parameterType.getCanonicalName()).orElse(parameterType);
-        }
-        return !parameterType.hasStereotype(AnnotationUtil.SCOPE) && !parameterType.hasStereotype(Bean.class);
     }
 
     public static boolean isConfigurationProperties(ClassElement classElement) {
@@ -224,7 +233,19 @@ final class ConfigurationReaderBeanElementCreator extends DeclaredBeanElementCre
 
     @Override
     protected boolean visitField(BeanDefinitionVisitor visitor, FieldElement fieldElement) {
-        if (fieldElement.hasStereotype(ConfigurationBuilder.class) && !fieldElement.isAccessible(classElement)) {
+        if (fieldElement.hasStereotype(ConfigurationBuilder.class)) {
+            if (fieldElement.isAccessible(classElement)) {
+                ClassElement builderType = fieldElement.getType();
+                visitor.visitConfigBuilderField(
+                    builderType,
+                    fieldElement.getName(),
+                    fieldElement.getAnnotationMetadata(),
+                    metadataBuilder,
+                    builderType.isInterface()
+                );
+                visitConfigurationBuilder(visitor, fieldElement, builderType);
+                return true;
+            }
             throw new ProcessingException(fieldElement, "ConfigurationBuilder applied to a non accessible (private or package-private/protected in a different package) field must have a corresponding non-private getter method.");
         }
         return super.visitField(visitor, fieldElement);
@@ -236,7 +257,7 @@ final class ConfigurationReaderBeanElementCreator extends DeclaredBeanElementCre
             writeMember.getDeclaringType(),
             propertyElement.getGenericType(),
             propertyElement.getName(),
-            propertyElement.getDocumentation().orElse(null),
+            ConfigurationMetadataBuilder.resolveJavadocDescription(propertyElement),
             null
         ).getPath();
         return visitorContext.getAnnotationMetadataBuilder().annotate(annotationMetadata, AnnotationValue.builder(Property.class).member("name", path).build());
@@ -259,7 +280,7 @@ final class ConfigurationReaderBeanElementCreator extends DeclaredBeanElementCre
                         return false;
                     }
                     Optional<MethodElement> writeMethod = propertyElement.getWriteMethod();
-                    if (!writeMethod.isPresent()) {
+                    if (writeMethod.isEmpty()) {
                         return false;
                     }
                     MethodElement methodElement = writeMethod.get();

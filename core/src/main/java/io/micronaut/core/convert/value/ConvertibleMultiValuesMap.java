@@ -38,9 +38,11 @@ import java.util.stream.Collectors;
  * @since 1.0
  */
 public class ConvertibleMultiValuesMap<V> implements ConvertibleMultiValues<V>, ConversionServiceAware {
+    @SuppressWarnings("java:S1845")
     public static final ConvertibleMultiValues EMPTY = new ConvertibleMultiValuesMap(Collections.emptyMap()) {
         @Override
         public void setConversionService(ConversionService conversionService) {
+            // not needed
         }
     };
 

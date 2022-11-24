@@ -34,6 +34,7 @@ import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
@@ -94,6 +95,7 @@ import java.util.stream.Collectors;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingBeanDefinitionVisitor, Toggleable {
     public static final int MAX_LOCALS = 3;
 
@@ -1134,6 +1136,11 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         return proxyBeanDefinitionWriter.getTypeArguments();
     }
 
+    @Override
+    public Map<String, ClassElement> getTypeArgumentMap() {
+        return proxyBeanDefinitionWriter.getTypeArgumentMap();
+    }
+
     /**
      * Write the class to output via a visitor that manages output destination.
      *
@@ -1236,14 +1243,15 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
     @Override
     public void visitFieldInjectionPoint(
-            TypedElement declaringType,
-            FieldElement fieldType,
-            boolean requiresReflection) {
+        TypedElement declaringType,
+        FieldElement fieldType,
+        boolean requiresReflection, VisitorContext visitorContext) {
         deferredInjectionPoints.add(() ->
                 proxyBeanDefinitionWriter.visitFieldInjectionPoint(
                         declaringType,
                         fieldType,
-                        requiresReflection
+                        requiresReflection,
+                        visitorContext
                 )
         );
     }

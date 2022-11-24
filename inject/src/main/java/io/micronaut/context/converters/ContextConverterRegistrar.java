@@ -38,7 +38,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class ContextConverterRegistrar implements TypeConverterRegistrar {
 
     private final BeanContext beanContext;
-    private final Map<String, Class> classCache = new ConcurrentHashMap<>(10);
+    private final Map<String, Class<?>> classCache = new ConcurrentHashMap<>(10);
 
     /**
      * Default constructor.
@@ -51,7 +51,7 @@ public class ContextConverterRegistrar implements TypeConverterRegistrar {
     @Override
     public void register(MutableConversionService conversionService) {
         conversionService.addConverter(String[].class, Class[].class, (object, targetType, context) -> {
-            Class[] classes = Arrays
+            Class<?>[] classes = Arrays
                     .stream(object)
                     .map(str -> conversionService.convert(str, Class.class))
                     .filter(Optional::isPresent)
@@ -62,7 +62,7 @@ public class ContextConverterRegistrar implements TypeConverterRegistrar {
         });
 
         conversionService.addConverter(String.class, Class.class, (object, targetType, context) -> {
-                    final Class result =
+                    final Class<?> result =
                             classCache.computeIfAbsent(object, s -> ClassUtils.forName(s, beanContext.getClassLoader()).orElse(MissingClass.class));
                     if (result == MissingClass.class) {
                         return Optional.empty();

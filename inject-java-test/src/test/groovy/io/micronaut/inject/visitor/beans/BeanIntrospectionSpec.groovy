@@ -28,13 +28,12 @@ import io.micronaut.inject.ExecutableMethod
 import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
 import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.jackson.modules.BeanIntrospectionModule
+import jakarta.inject.Singleton
 import spock.lang.IgnoreIf
-
 import spock.lang.Issue
 import spock.lang.Requires
 
 import javax.annotation.processing.SupportedAnnotationTypes
-import jakarta.inject.Singleton
 import javax.persistence.Column
 import javax.persistence.Entity
 import javax.persistence.Id
@@ -2027,7 +2026,7 @@ class Book {
     }
 }
 ''')
-        Class clazz = context.classLoader.loadClass('test.$Book$IntrospectionRef')
+        Class<?> clazz = context.classLoader.loadClass('test.$Book$IntrospectionRef')
         BeanIntrospectionReference reference = (BeanIntrospectionReference) clazz.newInstance()
 
         expect:
@@ -2089,7 +2088,7 @@ class Book {
     }
 }
 ''')
-        Class clazz = context.classLoader.loadClass('test.$Book$IntrospectionRef')
+        Class<?> clazz = context.classLoader.loadClass('test.$Book$IntrospectionRef')
         BeanIntrospectionReference reference = (BeanIntrospectionReference) clazz.newInstance()
 
         expect:
@@ -2614,32 +2613,6 @@ class Test {}
 
         then:"The reference is generated"
         reference != null
-
-        cleanup:
-        context?.close()
-    }
-
-    void "test write bean introspection data for package with compiled classes"() {
-        given:
-        ApplicationContext context = buildContext('test.Test', '''
-package test;
-
-import io.micronaut.core.annotation.*;
-import javax.validation.constraints.*;
-import java.util.*;
-
-@Introspected(packages="io.micronaut.inject.beans.visitor", includedAnnotations=Internal.class)
-class Test {}
-''')
-
-        when:"the reference is loaded"
-        def clazz = context.classLoader.loadClass('test.$Test$IntrospectionRef0')
-        BeanIntrospectionReference reference = clazz.newInstance()
-
-        then:"The reference is valid"
-        reference != null
-        reference.getBeanType() == IntrospectedTypeElementVisitor
-
 
         cleanup:
         context?.close()
@@ -4394,6 +4367,53 @@ public record Foo(String name, String isSurname, boolean contains, Boolean purge
         introspection.propertyNames as List<String> == ["name", "isSurname", "contains", "purged", "isUpdated", "isDeleted"]
     }
 
+    void 'test annotation on a generic field argument'() {
+        when:
+        BeanIntrospection beanIntrospection = buildBeanIntrospection('test.Book', '''
+package test;
+
+import javax.validation.Valid;
+import javax.validation.constraints.Size;
+import java.util.List;
+import io.micronaut.core.annotation.Introspected;
+
+class Author {
+}
+
+@Introspected
+class Book {
+
+    @Size(min=2)
+    private String name;
+
+    private List<@Valid Author> authors;
+
+    public Book(String name) {
+        this.name = name;
+        this.authors = null;
+    }
+
+    public Book(String name, List<Author> authors) {
+        this.name = name;
+        this.authors = authors;
+    }
+
+    public List<Author> getAuthors() {
+        return authors;
+    }
+
+    public String getName() {
+        return name;
+    }
+}
+''')
+        def property =  beanIntrospection.getBeanProperties().first()
+
+        then:
+        property.name == "authors"
+        property.asArgument().getTypeParameters()[0].annotationMetadata.hasStereotype("javax.validation.Valid")
+    }
+
     @Override
     protected JavaParser newJavaParser() {
         return new JavaParser() {
@@ -4416,7 +4436,7 @@ public record Foo(String name, String isSurname, boolean contains, Boolean purge
     @Replaces(BeanIntrospectionModule)
     @io.micronaut.context.annotation.Requires(property = "bean.introspection.test")
     static class StaticBeanIntrospectionModule extends BeanIntrospectionModule {
-        Map<Class, BeanIntrospection> introspectionMap = [:]
+        Map<Class<?>, BeanIntrospection> introspectionMap = [:]
         @Override
         protected BeanIntrospection<Object> findIntrospection(Class<?> beanClass) {
             return introspectionMap.get(beanClass)

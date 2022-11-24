@@ -33,5 +33,5 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME
 @Documented
 @Retention(RUNTIME)
 @Executable
-@interface Stub {
+public @interface Stub {
 }

@@ -160,7 +160,7 @@ public interface Router {
      * @param <R>              The matched route
      * @return The {@link RouteMatch}
      */
-    <R> Optional<RouteMatch<R>> route(@NonNull Class originatingClass, @NonNull HttpStatus status);
+    <R> Optional<RouteMatch<R>> route(@NonNull Class<?> originatingClass, @NonNull HttpStatus status);
 
     /**
      * Match a route to an error.
@@ -179,7 +179,7 @@ public interface Router {
      * @param <R>              The matched route
      * @return The {@link RouteMatch}
      */
-    <R> Optional<RouteMatch<R>> route(@NonNull Class originatingClass, @NonNull Throwable error);
+    <R> Optional<RouteMatch<R>> route(@NonNull Class<?> originatingClass, @NonNull Throwable error);
 
     /**
      * Match a route to an error.

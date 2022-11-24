@@ -15,12 +15,15 @@
  */
 package io.micronaut.inject.ast;
 
+import io.micronaut.core.annotation.Internal;
+
 /**
  * Simple implementation of {@link io.micronaut.inject.ast.PackageElement}.
  *
  * @author graemerocher
  * @since 3.0.0
  */
+@Internal
 final class SimplePackageElement implements PackageElement {
     private final String packageName;
 

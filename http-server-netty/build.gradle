@@ -37,7 +37,7 @@ dependencies {
     testImplementation project(":inject")
     testImplementation project(":inject-java-test")
     testImplementation project(":http-client")
-    testImplementation libs.managed.spotbugs
+    testImplementation libs.spotbugs
     if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_15)) {
         testImplementation libs.bcpkix
     }
@@ -70,7 +70,7 @@ dependencies {
             classifier = Os.isArch("aarch64") ? "osx-aarch_64" : "osx-x86_64"
         }
     }
-    testImplementation libs.managed.logback
+    testImplementation libs.managed.logback.classic
 
     // Adding these for now since micronaut-test isnt resolving correctly ... probably need to upgrade gradle there too
     testImplementation libs.junit.jupiter.api

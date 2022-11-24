@@ -111,7 +111,7 @@ public class DefaultMutableConversionService implements MutableConversionService
         if (targetType == Object.class) {
             return Optional.of((T) object);
         }
-        targetType = targetType.isPrimitive() ? ReflectionUtils.getWrapperType(targetType) : targetType;
+        targetType = targetType.isPrimitive() ? (Class<T>) ReflectionUtils.getWrapperType(targetType) : targetType;
 
         if (targetType.isInstance(object) && !(object instanceof Iterable) && !(object instanceof Map)) {
             return Optional.of((T) object);
@@ -266,7 +266,7 @@ public class DefaultMutableConversionService implements MutableConversionService
             return Optional.empty();
         });
         addConverter(AnnotationClassValue[].class, Class[].class, (object, targetType, context) -> {
-            List<Class> classes = new ArrayList<>(object.length);
+            List<Class<?>> classes = new ArrayList<>(object.length);
             for (AnnotationClassValue<?> annotationClassValue : object) {
                 if (annotationClassValue != null) {
                     final Optional<? extends Class<?>> type = annotationClassValue.getType();
@@ -275,7 +275,7 @@ public class DefaultMutableConversionService implements MutableConversionService
                     }
                 }
             }
-            return Optional.of(classes.toArray(new Class[0]));
+            return Optional.of(classes.toArray(new Class<?>[0]));
         });
 
         // URI -> URL
@@ -706,7 +706,7 @@ public class DefaultMutableConversionService implements MutableConversionService
 
         // Number -> Number
         addConverter(Number.class, Number.class, (Number object, Class<Number> targetType, ConversionContext context) -> {
-            Class targetNumberType = ReflectionUtils.getWrapperType(targetType);
+            Class<?> targetNumberType = ReflectionUtils.getWrapperType(targetType);
             if (targetNumberType.isInstance(object)) {
                 return Optional.of(object);
             }
@@ -888,8 +888,8 @@ public class DefaultMutableConversionService implements MutableConversionService
                 }
                 return Argument.of(Object.class, "V");
             });
-            Class keyType = keyArgument.getType();
-            Class valueType = valArgument.getType();
+            Class<?> keyType = isProperties ? Object.class : keyArgument.getType();
+            Class<?> valueType = isProperties ? Object.class : valArgument.getType();
             ConversionContext keyContext = context.with(keyArgument);
             ConversionContext valContext = context.with(valArgument);
 
@@ -964,10 +964,10 @@ public class DefaultMutableConversionService implements MutableConversionService
      */
     protected <T> TypeConverter<Object, T> findTypeConverter(Class<?> sourceType, Class<T> targetType, String formattingAnnotation) {
         TypeConverter<Object, T> typeConverter = UNCONVERTIBLE;
-        List<Class> sourceHierarchy = ClassUtils.resolveHierarchy(sourceType);
-        List<Class> targetHierarchy = ClassUtils.resolveHierarchy(targetType);
-        for (Class sourceSuperType : sourceHierarchy) {
-            for (Class targetSuperType : targetHierarchy) {
+        List<Class<?>> sourceHierarchy = ClassUtils.resolveHierarchy(sourceType);
+        List<Class<?>> targetHierarchy = ClassUtils.resolveHierarchy(targetType);
+        for (Class<?> sourceSuperType : sourceHierarchy) {
+            for (Class<?> targetSuperType : targetHierarchy) {
                 ConvertiblePair pair = new ConvertiblePair(sourceSuperType, targetSuperType, formattingAnnotation);
                 typeConverter = typeConverters.get(pair);
                 if (typeConverter != null) {
@@ -978,8 +978,8 @@ public class DefaultMutableConversionService implements MutableConversionService
         }
         boolean hasFormatting = formattingAnnotation != null;
         if (hasFormatting) {
-            for (Class sourceSuperType : sourceHierarchy) {
-                for (Class targetSuperType : targetHierarchy) {
+            for (Class<?> sourceSuperType : sourceHierarchy) {
+                for (Class<?> targetSuperType : targetHierarchy) {
                     ConvertiblePair pair = new ConvertiblePair(sourceSuperType, targetSuperType);
                     typeConverter = typeConverters.get(pair);
                     if (typeConverter != null) {

@@ -55,6 +55,116 @@ class ConfigurationMetadataSpec extends AbstractTypeElementSpec {
         ConfigurationMetadataBuilder.reset()
     }
 
+    void "test configuration metadata and records"() {
+        when:
+        String metadataJson = buildConfigurationMetadata('''
+package test;
+
+import io.micronaut.context.annotation.*;
+
+/**
+*  My Configuration description.
+*
+ * @param name The name of the config
+ * @param age The age of the config
+*/
+@ConfigurationProperties("test")
+record MyProperties(String name, int age, NestedConfig nested) {
+    @ConfigurationProperties("nested")
+    record NestedConfig(int num) {}
+}
+
+''')
+
+        then:
+        jsonEquals(metadataJson, '''
+{"groups":[{"name":"test","type":"test.MyProperties","description":"My Configuration description."},{"name":"test.nested","type":"test.MyProperties$NestedConfig"}],"properties":[{"name":"test.name","type":"java.lang.String","sourceType":"test.MyProperties","description":"The name of the config"},{"name":"test.age","type":"int","sourceType":"test.MyProperties","description":"The age of the config"},{"name":"test.nested.num","type":"int","sourceType":"test.MyProperties$NestedConfig"}]}
+''')
+    }
+
+    void "test configuration metadata and interfaces"() {
+        when:
+        String metadataJson = buildConfigurationMetadata('''
+package test;
+
+import io.micronaut.context.annotation.*;
+
+/**
+*  My Configuration description.
+*
+*/
+@ConfigurationProperties("test")
+interface MyProperties {
+    /**
+    * @return The name
+    */
+    String getName();
+
+    /**
+     * The age
+     */
+    int getAge();
+}
+
+''')
+
+        then:
+        jsonEquals(metadataJson, '''
+{"groups":[{"name":"test","type":"test.MyProperties","description":"My Configuration description."}],"properties":[{"name":"test.name","type":"java.lang.String","sourceType":"test.MyProperties","description":"The name"},{"name":"test.age","type":"int","sourceType":"test.MyProperties","description":"The age"}]}
+''')
+    }
+
+    void "test configuration metadata and javabeans"() {
+        when:
+        String metadataJson = buildConfigurationMetadata('''
+package test;
+
+import io.micronaut.context.annotation.*;
+
+/**
+*  My Configuration description.
+*
+*/
+@ConfigurationProperties("test")
+class MyProperties {
+
+    private String name;
+
+    private int age;
+
+    public String getName() {
+        return name;
+    }
+
+    /**
+    * Sets the name.
+    * @param name The name
+    */
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public int getAge() {
+        return age;
+    }
+
+    /**
+    *
+    * @param age The age
+    */
+    public void setAge(int age) {
+        this.age = age;
+    }
+}
+
+''')
+
+        then:
+        jsonEquals(metadataJson, '''
+{"groups":[{"name":"test","type":"test.MyProperties","description":"My Configuration description."}],"properties":[{"name":"test.name","type":"java.lang.String","sourceType":"test.MyProperties","description":"Sets the name."},{"name":"test.age","type":"int","sourceType":"test.MyProperties","description":"The age"}]}
+''')
+    }
+
     void "test configuration builder on method"() {
         when:
             String metadataJson = buildConfigurationMetadata('''

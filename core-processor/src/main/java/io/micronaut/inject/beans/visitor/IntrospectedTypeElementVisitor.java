@@ -68,7 +68,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
         .member("annotation", new AnnotationClassValue<>(JAVAX_VALIDATION_VALID))
         .build();
 
-    private Map<String, BeanIntrospectionWriter> writers = new LinkedHashMap<>(10);
+    private final Map<String, BeanIntrospectionWriter> writers = new LinkedHashMap<>(10);
 
     @Override
     public int getOrder() {

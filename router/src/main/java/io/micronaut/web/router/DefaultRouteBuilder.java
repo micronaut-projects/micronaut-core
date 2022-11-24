@@ -72,7 +72,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     protected final ConversionService conversionService;
     protected final Charset defaultCharset;
 
-    private DefaultUriRoute currentParentRoute = null;
+    private DefaultUriRoute currentParentRoute;
     private List<UriRoute> uriRoutes = new ArrayList<>();
     private List<StatusRoute> statusRoutes = new ArrayList<>();
     private List<ErrorRoute> errorRoutes = new ArrayList<>();
@@ -165,18 +165,18 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     }
 
     @Override
-    public ResourceRoute resources(Class cls) {
+    public ResourceRoute resources(Class<?> cls) {
         return new DefaultResourceRoute(cls);
     }
 
     @Override
-    public ResourceRoute single(Class cls) {
+    public ResourceRoute single(Class<?> cls) {
         return new DefaultSingleRoute(cls);
     }
 
     @Override
-    public StatusRoute status(Class originatingClass, HttpStatus status, Class type, String method, Class[] parameterTypes) {
-        Optional<MethodExecutionHandle<?, Object>> executionHandle = executionHandleLocator.findExecutionHandle(type, method, parameterTypes);
+    public StatusRoute status(Class<?> originatingClass, HttpStatus status, Class<?> type, String method, Class<?>[] parameterTypes) {
+        Optional<MethodExecutionHandle<Object, Object>> executionHandle = executionHandleLocator.findExecutionHandle((Class<Object>) type, method, parameterTypes);
 
         MethodExecutionHandle<?, Object> executableHandle = executionHandle.orElseThrow(() ->
                 new RoutingException("No such route: " + type.getName() + "." + method)
@@ -188,8 +188,8 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     }
 
     @Override
-    public StatusRoute status(HttpStatus status, Class type, String method, Class[] parameterTypes) {
-        Optional<MethodExecutionHandle<?, Object>> executionHandle = executionHandleLocator.findExecutionHandle(type, method, parameterTypes);
+    public StatusRoute status(HttpStatus status, Class<?> type, String method, Class<?>[] parameterTypes) {
+        Optional<MethodExecutionHandle<Object, Object>> executionHandle = executionHandleLocator.findExecutionHandle((Class<Object>) type, method, parameterTypes);
 
         MethodExecutionHandle<?, Object> executableHandle = executionHandle.orElseThrow(() ->
             new RoutingException("No such route: " + type.getName() + "." + method)
@@ -201,8 +201,8 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     }
 
     @Override
-    public ErrorRoute error(Class originatingClass, Class<? extends Throwable> error, Class type, String method, Class[] parameterTypes) {
-        Optional<MethodExecutionHandle<?, Object>> executionHandle = executionHandleLocator.findExecutionHandle(type, method, parameterTypes);
+    public ErrorRoute error(Class<?> originatingClass, Class<? extends Throwable> error, Class<?> type, String method, Class<?>[] parameterTypes) {
+        Optional<MethodExecutionHandle<Object, Object>> executionHandle = executionHandleLocator.findExecutionHandle((Class<Object>) type, method, parameterTypes);
 
         MethodExecutionHandle<?, Object> executableHandle = executionHandle.orElseThrow(() ->
             new RoutingException("No such route: " + type.getName() + "." + method)
@@ -214,8 +214,8 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     }
 
     @Override
-    public ErrorRoute error(Class<? extends Throwable> error, Class type, String method, Class[] parameterTypes) {
-        Optional<MethodExecutionHandle<?, Object>> executionHandle = executionHandleLocator.findExecutionHandle(type, method, parameterTypes);
+    public ErrorRoute error(Class<? extends Throwable> error, Class<?> type, String method, Class<?>[] parameterTypes) {
+        Optional<MethodExecutionHandle<Object, Object>> executionHandle = executionHandleLocator.findExecutionHandle((Class<Object>) type, method, parameterTypes);
 
         MethodExecutionHandle<?, Object> executableHandle = executionHandle.orElseThrow(() ->
             new RoutingException("No such route: " + type.getName() + "." + method)
@@ -227,82 +227,82 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     }
 
     @Override
-    public UriRoute GET(String uri, Object target, String method, Class... parameterTypes) {
+    public UriRoute GET(String uri, Object target, String method, Class<?>... parameterTypes) {
         return buildRoute(HttpMethod.GET, uri, target.getClass(), method, parameterTypes);
     }
 
     @Override
-    public UriRoute GET(String uri, Class<?> type, String method, Class... parameterTypes) {
+    public UriRoute GET(String uri, Class<?> type, String method, Class<?>... parameterTypes) {
         return buildRoute(HttpMethod.GET, uri, type, method, parameterTypes);
     }
 
     @Override
-    public UriRoute POST(String uri, Object target, String method, Class... parameterTypes) {
+    public UriRoute POST(String uri, Object target, String method, Class<?>... parameterTypes) {
         return buildRoute(HttpMethod.POST, uri, target.getClass(), method, parameterTypes);
     }
 
     @Override
-    public UriRoute POST(String uri, Class type, String method, Class... parameterTypes) {
+    public UriRoute POST(String uri, Class<?> type, String method, Class<?>... parameterTypes) {
         return buildRoute(HttpMethod.POST, uri, type, method, parameterTypes);
     }
 
     @Override
-    public UriRoute PUT(String uri, Object target, String method, Class... parameterTypes) {
+    public UriRoute PUT(String uri, Object target, String method, Class<?>... parameterTypes) {
         return buildRoute(HttpMethod.PUT, uri, target.getClass(), method, parameterTypes);
     }
 
     @Override
-    public UriRoute PUT(String uri, Class type, String method, Class... parameterTypes) {
+    public UriRoute PUT(String uri, Class<?> type, String method, Class<?>... parameterTypes) {
         return buildRoute(HttpMethod.PUT, uri, type, method, parameterTypes);
     }
 
     @Override
-    public UriRoute PATCH(String uri, Object target, String method, Class... parameterTypes) {
+    public UriRoute PATCH(String uri, Object target, String method, Class<?>... parameterTypes) {
         return buildRoute(HttpMethod.PATCH, uri, target.getClass(), method, parameterTypes);
     }
 
     @Override
-    public UriRoute PATCH(String uri, Class type, String method, Class... parameterTypes) {
+    public UriRoute PATCH(String uri, Class<?> type, String method, Class<?>... parameterTypes) {
         return buildRoute(HttpMethod.PATCH, uri, type, method, parameterTypes);
     }
 
     @Override
-    public UriRoute DELETE(String uri, Object target, String method, Class... parameterTypes) {
+    public UriRoute DELETE(String uri, Object target, String method, Class<?>... parameterTypes) {
         return buildRoute(HttpMethod.DELETE, uri, target.getClass(), method, parameterTypes);
     }
 
     @Override
-    public UriRoute DELETE(String uri, Class type, String method, Class... parameterTypes) {
+    public UriRoute DELETE(String uri, Class<?> type, String method, Class<?>... parameterTypes) {
         return buildRoute(HttpMethod.DELETE, uri, type, method, parameterTypes);
     }
 
     @Override
-    public UriRoute OPTIONS(String uri, Object target, String method, Class... parameterTypes) {
+    public UriRoute OPTIONS(String uri, Object target, String method, Class<?>... parameterTypes) {
         return buildRoute(HttpMethod.OPTIONS, uri, target.getClass(), method, parameterTypes);
     }
 
     @Override
-    public UriRoute OPTIONS(String uri, Class type, String method, Class... parameterTypes) {
+    public UriRoute OPTIONS(String uri, Class<?> type, String method, Class<?>... parameterTypes) {
         return buildRoute(HttpMethod.OPTIONS, uri, type, method, parameterTypes);
     }
 
     @Override
-    public UriRoute HEAD(String uri, Object target, String method, Class... parameterTypes) {
+    public UriRoute HEAD(String uri, Object target, String method, Class<?>... parameterTypes) {
         return buildRoute(HttpMethod.HEAD, uri, target.getClass(), method, parameterTypes);
     }
 
     @Override
-    public UriRoute HEAD(String uri, Class type, String method, Class... parameterTypes) {
+    public UriRoute HEAD(String uri, Class<?> type, String method, Class<?>... parameterTypes) {
         return buildRoute(HttpMethod.HEAD, uri, type, method, parameterTypes);
     }
 
     @Override
-    public UriRoute TRACE(String uri, Object target, String method, Class[] parameterTypes) {
+    public UriRoute TRACE(String uri, Object target, String method, Class<?>[] parameterTypes) {
         return buildRoute(HttpMethod.TRACE, uri, target.getClass(), method, parameterTypes);
     }
 
     @Override
-    public UriRoute TRACE(String uri, Class type, String method, Class[] parameterTypes) {
+    public UriRoute TRACE(String uri, Class<?> type, String method, Class<?>[] parameterTypes) {
         return buildRoute(HttpMethod.TRACE, uri, type, method, parameterTypes);
     }
 
@@ -357,7 +357,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
      *
      * @return an {@link UriRoute}
      */
-    protected UriRoute buildRoute(HttpMethod httpMethod, String uri, Class<?> type, String method, Class... parameterTypes) {
+    protected UriRoute buildRoute(HttpMethod httpMethod, String uri, Class<?> type, String method, Class<?>... parameterTypes) {
         Optional<? extends MethodExecutionHandle<?, Object>> executionHandle = executionHandleLocator.findExecutionHandle(type, method, parameterTypes);
 
         MethodExecutionHandle<?, Object> executableHandle = executionHandle.orElseThrow(() ->
@@ -423,7 +423,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         protected List<MediaType> producesMediaTypes;
         protected String bodyArgumentName;
         protected Argument<?> bodyArgument;
-        protected final Map<String, Argument> requiredInputs;
+        protected final Map<String, Argument<?>> requiredInputs;
         protected final Class<?> declaringType;
         protected boolean consumesMediaTypesContainsAll;
         protected boolean producesMediaTypesContainsAll;
@@ -456,15 +456,15 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             isVoid = RouteInfo.super.isVoid();
             specifiedSingle = RouteInfo.super.isSpecifiedSingle();
             isAsyncOrReactive = RouteInfo.super.isAsyncOrReactive();
-            for (Argument argument : targetMethod.getArguments()) {
+            for (Argument<?> argument : targetMethod.getArguments()) {
                 if (argument.getAnnotationMetadata().hasAnnotation(Body.class)) {
                     this.bodyArgument = argument;
                 }
             }
-            Argument[] requiredArguments = targetMethod.getArguments();
+            Argument<?>[] requiredArguments = targetMethod.getArguments();
             if (requiredArguments.length > 0) {
-                Map<String, Argument> requiredInputs = new LinkedHashMap<>(requiredArguments.length);
-                for (Argument requiredArgument : requiredArguments) {
+                Map<String, Argument<?>> requiredInputs = new LinkedHashMap<>(requiredArguments.length);
+                for (Argument<?> requiredArgument : requiredArguments) {
                     String inputName = resolveInputName(requiredArgument);
                     requiredInputs.put(inputName, requiredArgument);
                 }
@@ -644,7 +644,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     class DefaultErrorRoute extends AbstractRoute implements ErrorRoute {
 
         private final Class<? extends Throwable> error;
-        private final Class originatingClass;
+        private final Class<?> originatingClass;
 
         /**
          * @param error The throwable
@@ -662,7 +662,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
          * @param conversionService The conversion service
          */
         public DefaultErrorRoute(
-                Class originatingClass, Class<? extends Throwable> error,
+                Class<?> originatingClass, Class<? extends Throwable> error,
                 MethodExecutionHandle targetMethod,
                 ConversionService conversionService) {
             super(targetMethod, conversionService, Collections.emptyList());
@@ -683,7 +683,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
         @SuppressWarnings("unchecked")
         @Override
-        public <T> Optional<RouteMatch<T>> match(Class originatingClass, Throwable exception) {
+        public <T> Optional<RouteMatch<T>> match(Class<?> originatingClass, Throwable exception) {
             if (originatingClass == this.originatingClass && error.isInstance(exception)) {
                 return Optional.of(new ErrorRouteMatch(exception, this, conversionService));
             }
@@ -765,7 +765,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     class DefaultStatusRoute extends AbstractRoute implements StatusRoute {
 
         private final HttpStatus status;
-        private final Class originatingClass;
+        private final Class<?> originatingClass;
 
         /**
          * @param status The HTTP Status
@@ -782,7 +782,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
          * @param targetMethod The target method execution handle
          * @param conversionService The conversion service
          */
-        public DefaultStatusRoute(Class originatingClass, HttpStatus status, MethodExecutionHandle targetMethod, ConversionService conversionService) {
+        public DefaultStatusRoute(Class<?> originatingClass, HttpStatus status, MethodExecutionHandle targetMethod, ConversionService conversionService) {
             super(targetMethod, conversionService, Collections.emptyList());
             this.originatingClass = originatingClass;
             this.status = status;
@@ -801,7 +801,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
         @SuppressWarnings("unchecked")
         @Override
-        public <T> Optional<RouteMatch<T>> match(Class originatingClass, HttpStatus status) {
+        public <T> Optional<RouteMatch<T>> match(Class<?> originatingClass, HttpStatus status) {
             if (originatingClass == this.originatingClass && this.status == status) {
                 return Optional.of(new StatusRouteMatch(status, this, conversionService));
             }
@@ -1112,7 +1112,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         /**
          * @param type The class
          */
-        DefaultSingleRoute(Class type) {
+        DefaultSingleRoute(Class<?> type) {
             super(type);
         }
 
@@ -1122,7 +1122,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        protected DefaultUriRoute buildGetRoute(Class type, Map<HttpMethod, Route> routeMap) {
+        protected DefaultUriRoute buildGetRoute(Class<?> type, Map<HttpMethod, Route> routeMap) {
             DefaultUriRoute getRoute = (DefaultUriRoute) DefaultRouteBuilder.this.GET(type);
             routeMap.put(
                 HttpMethod.GET, getRoute
@@ -1131,7 +1131,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        protected void buildRemainingRoutes(Class type, Map<HttpMethod, Route> routeMap) {
+        protected void buildRemainingRoutes(Class<?> type, Map<HttpMethod, Route> routeMap) {
             // POST /foo
             routeMap.put(
                 HttpMethod.POST, DefaultRouteBuilder.this.POST(type)
@@ -1171,7 +1171,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         /**
          * @param type The class
          */
-        DefaultResourceRoute(Class type) {
+        DefaultResourceRoute(Class<?> type) {
             this.resourceRoutes = new LinkedHashMap<>();
             // GET /foo/1
             Map<HttpMethod, Route> routeMap = this.resourceRoutes;
@@ -1261,7 +1261,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
          *
          * @return The {@link DefaultUriRoute}
          */
-        protected DefaultUriRoute buildGetRoute(Class type, Map<HttpMethod, Route> routeMap) {
+        protected DefaultUriRoute buildGetRoute(Class<?> type, Map<HttpMethod, Route> routeMap) {
             DefaultUriRoute getRoute = (DefaultUriRoute) DefaultRouteBuilder.this.GET(type, ID);
             routeMap.put(
                 HttpMethod.GET, getRoute
@@ -1275,7 +1275,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
          * @param type The class
          * @param routeMap The route info
          */
-        protected void buildRemainingRoutes(Class type, Map<HttpMethod, Route> routeMap) {
+        protected void buildRemainingRoutes(Class<?> type, Map<HttpMethod, Route> routeMap) {
             // GET /foo
             routeMap.put(
                 HttpMethod.GET, DefaultRouteBuilder.this.GET(type)

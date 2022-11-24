@@ -51,7 +51,7 @@ abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implemen
 
     private static final Pattern ENDPOINT_ID_PATTERN = Pattern.compile("\\w+");
 
-    private Map<Class, Optional<String>> endpointIds = new ConcurrentHashMap<>();
+    private Map<Class<?>, Optional<String>> endpointIds = new ConcurrentHashMap<>();
 
     private final ApplicationContext beanContext;
 

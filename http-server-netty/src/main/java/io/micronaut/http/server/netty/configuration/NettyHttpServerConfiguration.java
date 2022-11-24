@@ -624,6 +624,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
          */
         @Deprecated
         public void setPushEnabled(Boolean enabled) {
+            // deprecated
         }
 
         /**

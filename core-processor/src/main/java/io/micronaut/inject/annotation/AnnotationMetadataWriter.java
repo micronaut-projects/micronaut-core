@@ -292,7 +292,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             return;
         }
         List<AnnotationMetadata> notEmpty = CollectionUtils.iterableToList(hierarchy)
-                .stream().filter(h -> !h.isEmpty()).collect(Collectors.toList());
+            .stream().filter(h -> !h.isEmpty()).toList();
         if (notEmpty.size() == 1) {
             pushNewAnnotationMetadataOrReference(owningType, classWriter, generatorAdapter, defaultsStorage, loadTypeMethods, notEmpty.get(0));
             return;
@@ -585,9 +585,8 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             } else {
                 invokeLoadClassValueMethod(declaringType, declaringClassWriter, methodVisitor, loadTypeMethods, acv);
             }
-        } else if (value instanceof Enum) {
-            Enum enumObject = (Enum) value;
-            Class declaringClass = enumObject.getDeclaringClass();
+        } else if (value instanceof Enum<?> enumObject) {
+            Class<?> declaringClass = enumObject.getDeclaringClass();
             Type t = Type.getType(declaringClass);
             methodVisitor.getStatic(t, enumObject.name(), t);
         } else if (value.getClass().isArray()) {

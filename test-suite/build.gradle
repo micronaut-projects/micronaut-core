@@ -50,7 +50,6 @@ dependencies {
     testImplementation project(":inject")
     testImplementation project(":function-client")
     testImplementation project(":function-web")
-    testImplementation(platform(libs.boms.micronaut.session))
     testImplementation(libs.micronaut.session) {
         exclude module: 'micronaut-aop'
     }
@@ -58,8 +57,8 @@ dependencies {
     // Adding these for now since micronaut-test isnt resolving correctly ... probably need to upgrade gradle there too
     testImplementation libs.junit.jupiter.api
 
-    testImplementation libs.managed.jcache
-    testImplementation(platform(libs.boms.micronaut.tracing))
+    testImplementation libs.jcache
+    testImplementation(platform(libs.test.boms.micronaut.tracing))
     testImplementation(libs.micronaut.tracing.jaeger) {
         exclude module: 'micronaut-bom'
         exclude module: 'micronaut-http-client'
@@ -77,10 +76,10 @@ dependencies {
     testAnnotationProcessor project(":inject-java")
     testAnnotationProcessor project(":test-suite")
 
-    testRuntimeOnly(platform(libs.boms.micronaut.aws))
-    testRuntimeOnly libs.managed.h2
+    testRuntimeOnly(platform(libs.test.boms.micronaut.aws))
+    testRuntimeOnly libs.h2
     testRuntimeOnly libs.junit.vintage
-    testRuntimeOnly libs.managed.logback
+    testRuntimeOnly libs.managed.logback.classic
     testRuntimeOnly libs.aws.java.sdk.lambda
 
     // needed for HTTP/2 tests
@@ -93,7 +92,7 @@ dependencies {
         }
     }
     testImplementation libs.logbook.netty
-    testImplementation libs.managed.logback
+    testImplementation libs.managed.logback.classic
 
     if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_15)) {
         testImplementation libs.bcpkix
@@ -101,7 +100,7 @@ dependencies {
 
     testImplementation libs.managed.reactor
 
-    testFixturesApi libs.managed.spock
+    testFixturesApi libs.spock
     testFixturesApi libs.managed.groovy
     testFixturesApi libs.jetbrains.annotations
 }

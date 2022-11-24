@@ -794,7 +794,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         throw new IllegalStateException("Property not found: " + propertyName + " " + classElement.getName());
     }
 
-    private void writeInstantiateMethod(ClassWriter classWriter, MethodElement constructor, String methodName, Class... args) {
+    private void writeInstantiateMethod(ClassWriter classWriter, MethodElement constructor, String methodName, Class<?>... args) {
         final String desc = getMethodDescriptor(Object.class, Arrays.asList(args));
         final GeneratorAdapter instantiateInternal = new GeneratorAdapter(classWriter.visitMethod(
                 ACC_PUBLIC,
@@ -809,8 +809,8 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         invokeBeanConstructor(instantiateInternal, constructor, (writer, con) -> {
             List<ParameterElement> constructorArguments = Arrays.asList(con.getParameters());
             Collection<Type> argumentTypes = constructorArguments.stream().map(pe ->
-                    JavaModelUtils.getTypeReference(pe.getType())
-            ).collect(Collectors.toList());
+                JavaModelUtils.getTypeReference(pe.getType())
+            ).toList();
 
             int i = 0;
             for (Type argumentType : argumentTypes) {
@@ -1106,8 +1106,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
                 });
 
                 List<BeanPropertyData> readWriteProps = beanProperties.stream()
-                        .filter(bp -> bp.setDispatchIndex != -1 && bp.getDispatchIndex != -1 && !constructorProps.contains(bp))
-                        .collect(Collectors.toList());
+                    .filter(bp -> bp.setDispatchIndex != -1 && bp.getDispatchIndex != -1 && !constructorProps.contains(bp)).toList();
 
                 if (!readWriteProps.isEmpty()) {
                     int beanTypeLocal = writer.newLocal(beanType);

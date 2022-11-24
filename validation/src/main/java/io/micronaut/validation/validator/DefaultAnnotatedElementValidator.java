@@ -68,7 +68,7 @@ public class DefaultAnnotatedElementValidator extends DefaultValidator implement
             return validatorMap.entrySet().stream()
                     .filter(entry -> {
                                 final ValidatorKey key = entry.getKey();
-                                final Class[] left = {constraintType, targetType};
+                                final Class<?>[] left = {constraintType, targetType};
                                 return TypeArgumentQualifier.areTypesCompatible(
                                         left,
                                         Arrays.asList(key.getConstraintType(), key.getTargetType())
@@ -81,7 +81,7 @@ public class DefaultAnnotatedElementValidator extends DefaultValidator implement
             validatorMap = new HashMap<>();
             for (ConstraintValidator validator : SoftServiceLoader.load(ConstraintValidator.class).collectAll()) {
                 try {
-                    final Class[] typeArgs = GenericTypeUtils.resolveInterfaceTypeArguments(validator.getClass(), ConstraintValidator.class);
+                    final Class<?>[] typeArgs = GenericTypeUtils.resolveInterfaceTypeArguments(validator.getClass(), ConstraintValidator.class);
                     if (ArrayUtils.isNotEmpty(typeArgs) && typeArgs.length == 2) {
                         validatorMap.put(
                                 new ValidatorKey(typeArgs[0], typeArgs[1]),

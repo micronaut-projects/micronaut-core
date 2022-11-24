@@ -313,7 +313,7 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
      * @param environments The environment to use
      * @return The application context builder
      */
-    static @NonNull ApplicationContextBuilder builder(@NonNull Class mainClass, @NonNull String... environments) {
+    static @NonNull ApplicationContextBuilder builder(@NonNull Class<?> mainClass, @NonNull String... environments) {
         ArgumentUtils.requireNonNull("environments", environments);
         ArgumentUtils.requireNonNull("mainClass", mainClass);
 

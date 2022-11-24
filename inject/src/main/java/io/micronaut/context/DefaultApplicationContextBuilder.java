@@ -55,6 +55,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     private final Collection<String> configurationIncludes = new HashSet<>();
     private final Collection<String> configurationExcludes = new HashSet<>();
     private Boolean deduceEnvironments = null;
+    private boolean deduceCloudEnvironment = false;
     private ClassLoader classLoader = getClass().getClassLoader();
     private boolean envPropertySource = true;
     private final List<String> envVarIncludes = new ArrayList<>();
@@ -170,6 +171,12 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     }
 
     @Override
+    public ApplicationContextBuilder deduceCloudEnvironment(boolean deduceEnvironment) {
+        this.deduceCloudEnvironment = deduceEnvironment;
+        return this;
+    }
+
+    @Override
     public @NonNull ApplicationContextBuilder environments(@Nullable String... environments) {
         if (environments != null) {
             this.environments.addAll(Arrays.asList(environments));
@@ -234,6 +241,12 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     @Override
     public Optional<Boolean> getDeduceEnvironments() {
         return Optional.ofNullable(deduceEnvironments);
+    }
+
+    @Override
+    public boolean isDeduceCloudEnvironment() {
+        boolean basicDeduce = getDeduceEnvironments().orElse(true);
+        return basicDeduce && this.deduceCloudEnvironment;
     }
 
     @Override

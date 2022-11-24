@@ -49,8 +49,8 @@ public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Obj
 
     // sorted array of entity headers
     // https://tools.ietf.org/html/rfc2616#section-7.1
-    private static final String[] ENTITY_HEADERS = new String[] {HttpHeaders.ALLOW, HttpHeaders.CONTENT_ENCODING, HttpHeaders.CONTENT_LANGUAGE, HttpHeaders.CONTENT_LENGTH, HttpHeaders.CONTENT_LOCATION, HttpHeaders.CONTENT_MD5, HttpHeaders.CONTENT_RANGE, HttpHeaders.CONTENT_TYPE, HttpHeaders.EXPIRES, HttpHeaders.LAST_MODIFIED};
-    private static final Class<?>[] SUPPORTED_TYPES = new Class[]{File.class, StreamedFile.class, NettyFileCustomizableResponseType.class, SystemFile.class};
+    private static final String[] ENTITY_HEADERS = {HttpHeaders.ALLOW, HttpHeaders.CONTENT_ENCODING, HttpHeaders.CONTENT_LANGUAGE, HttpHeaders.CONTENT_LENGTH, HttpHeaders.CONTENT_LOCATION, HttpHeaders.CONTENT_MD5, HttpHeaders.CONTENT_RANGE, HttpHeaders.CONTENT_TYPE, HttpHeaders.EXPIRES, HttpHeaders.LAST_MODIFIED};
+    private static final Class<?>[] SUPPORTED_TYPES = new Class<?>[]{File.class, StreamedFile.class, NettyFileCustomizableResponseType.class, SystemFile.class};
     private final NettyHttpServerConfiguration.FileTypeHandlerConfiguration configuration;
 
     /**

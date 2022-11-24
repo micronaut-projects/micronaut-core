@@ -57,6 +57,7 @@ import io.netty.handler.codec.http2.Http2FrameCodec;
 import io.netty.handler.codec.http2.Http2FrameCodecBuilder;
 import io.netty.handler.codec.http2.Http2FrameLogger;
 import io.netty.handler.codec.http2.Http2MultiplexHandler;
+import io.netty.handler.codec.http2.Http2SettingsAckFrame;
 import io.netty.handler.codec.http2.Http2SettingsFrame;
 import io.netty.handler.codec.http2.Http2StreamChannel;
 import io.netty.handler.codec.http2.Http2StreamChannelBootstrap;
@@ -85,7 +86,9 @@ import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 import reactor.core.scheduler.Schedulers;
 
+import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLException;
+import javax.net.ssl.SSLParameters;
 import java.net.InetSocketAddress;
 import java.net.Proxy;
 import java.net.SocketAddress;
@@ -366,10 +369,11 @@ class ConnectionManager {
      * Get a connection for non-websocket http client methods.
      *
      * @param requestKey The remote to connect to
+     * @param blockHint Optional information about what threads are blocked for this connection request
      * @return A mono that will complete once the channel is ready for transmission
      */
-    Mono<PoolHandle> connect(DefaultHttpClient.RequestKey requestKey) {
-        return pools.computeIfAbsent(requestKey, Pool::new).acquire();
+    Mono<PoolHandle> connect(DefaultHttpClient.RequestKey requestKey, @Nullable BlockHint blockHint) {
+        return pools.computeIfAbsent(requestKey, Pool::new).acquire(blockHint);
     }
 
     /**
@@ -381,7 +385,7 @@ class ConnectionManager {
      * @return A mono that will complete when the handshakes complete
      */
     Mono<?> connectForWebsocket(DefaultHttpClient.RequestKey requestKey, ChannelHandler handler) {
-        Sinks.Empty<Object> initial = new CancellableMonoSink<>();
+        Sinks.Empty<Object> initial = new CancellableMonoSink<>(null);
 
         ChannelFuture connectFuture = doConnect(requestKey, new ChannelInitializer<Channel>() {
             @Override
@@ -390,9 +394,7 @@ class ConnectionManager {
 
                 SslContext sslContext = buildSslContext(requestKey);
                 if (sslContext != null) {
-                    SslHandler sslHandler = sslContext.newHandler(ch.alloc(), requestKey.getHost(), requestKey.getPort());
-                    sslHandler.setHandshakeTimeoutMillis(configuration.getSslConfiguration().getHandshakeTimeout().toMillis());
-                    ch.pipeline().addLast(sslHandler);
+                    ch.pipeline().addLast(configureSslHandler(sslContext.newHandler(ch.alloc(), requestKey.getHost(), requestKey.getPort())));
                 }
 
                 ch.pipeline()
@@ -502,6 +504,15 @@ class ConnectionManager {
         return builder.build();
     }
 
+    private SslHandler configureSslHandler(SslHandler sslHandler) {
+        sslHandler.setHandshakeTimeoutMillis(configuration.getSslConfiguration().getHandshakeTimeout().toMillis());
+        SSLEngine engine = sslHandler.engine();
+        SSLParameters params = engine.getSSLParameters();
+        params.setEndpointIdentificationAlgorithm("HTTPS");
+        engine.setSSLParameters(params);
+        return sslHandler;
+    }
+
     /**
      * Initializer for HTTP1.1, called either in plaintext mode, or after ALPN in TLS.
      *
@@ -575,6 +586,11 @@ class ConnectionManager {
 
             @Override
             public void channelRead(@NonNull ChannelHandlerContext ctx, @NonNull Object msg) throws Exception {
+                if (msg instanceof Http2SettingsAckFrame) {
+                    // this is fine
+                    return;
+                }
+
                 log.warn("Unexpected message on HTTP2 connection channel: {}", msg);
                 ReferenceCountUtil.release(msg);
                 ctx.read();
@@ -612,10 +628,8 @@ class ConnectionManager {
 
             configureProxy(ch.pipeline(), true, host, port);
 
-            SslHandler sslHandler = sslContext.newHandler(ch.alloc(), host, port);
-            sslHandler.setHandshakeTimeoutMillis(configuration.getSslConfiguration().getHandshakeTimeout().toMillis());
             ch.pipeline()
-                .addLast(ChannelPipelineCustomizer.HANDLER_SSL, sslHandler)
+                .addLast(ChannelPipelineCustomizer.HANDLER_SSL, configureSslHandler(sslContext.newHandler(ch.alloc(), host, port)))
                 .addLast(
                     ChannelPipelineCustomizer.HANDLER_HTTP2_PROTOCOL_NEGOTIATOR,
                     // if the server doesn't do ALPN, fall back to HTTP 1
@@ -796,8 +810,8 @@ class ConnectionManager {
             this.requestKey = requestKey;
         }
 
-        Mono<PoolHandle> acquire() {
-            Sinks.One<PoolHandle> sink = new CancellableMonoSink<>();
+        Mono<PoolHandle> acquire(@Nullable BlockHint blockHint) {
+            PoolSink<PoolHandle> sink = new CancellableMonoSink<>(blockHint);
             addPendingRequest(sink);
             Optional<Duration> acquireTimeout = configuration.getConnectionPoolConfiguration().getAcquireTimeout();
             //noinspection OptionalIsPresent
@@ -830,7 +844,7 @@ class ConnectionManager {
         }
 
         @Override
-        void openNewConnection() {
+        void openNewConnection(@Nullable BlockHint blockHint) throws Exception {
             // open a new connection
             ChannelInitializer<?> initializer;
             if (requestKey.isSecure()) {
@@ -867,7 +881,13 @@ class ConnectionManager {
                         throw new AssertionError("Unknown plaintext mode");
                 }
             }
-            addInstrumentedListener(doConnect(requestKey, initializer), future -> {
+            ChannelFuture channelFuture = doConnect(requestKey, initializer);
+            if (blockHint != null && blockHint.blocks(channelFuture.channel().eventLoop())) {
+                channelFuture.channel().close();
+                onNewConnectionFailure(BlockHint.createException());
+                return;
+            }
+            addInstrumentedListener(channelFuture, future -> {
                 if (!future.isSuccess()) {
                     onNewConnectionFailure(future.cause());
                 }
@@ -977,11 +997,16 @@ class ConnectionManager {
             }
 
             @Override
-            public boolean dispatch(Sinks.One<PoolHandle> sink) {
+            public boolean dispatch(PoolSink<PoolHandle> sink) {
                 if (!tryEarmarkForRequest()) {
                     return false;
                 }
 
+                BlockHint blockHint = sink.getBlockHint();
+                if (blockHint != null && blockHint.blocks(channel.eventLoop())) {
+                    sink.tryEmitError(BlockHint.createException());
+                    return true;
+                }
                 if (channel.eventLoop().inEventLoop()) {
                     dispatch0(sink);
                 } else {
@@ -996,7 +1021,7 @@ class ConnectionManager {
              *
              * @param sink The request for a pool handle
              */
-            abstract void dispatch0(Sinks.One<PoolHandle> sink);
+            abstract void dispatch0(PoolSink<PoolHandle> sink);
 
             /**
              * Try to add a new request to this connection. This is called outside the event loop,
@@ -1068,7 +1093,7 @@ class ConnectionManager {
             }
 
             @Override
-            void dispatch0(Sinks.One<PoolHandle> sink) {
+            void dispatch0(PoolSink<PoolHandle> sink) {
                 if (!channel.isActive()) {
                     returnPendingRequest(sink);
                     return;
@@ -1112,7 +1137,7 @@ class ConnectionManager {
                 emitPoolHandle(sink, ph);
             }
 
-            private void returnPendingRequest(Sinks.One<PoolHandle> sink) {
+            private void returnPendingRequest(PoolSink<PoolHandle> sink) {
                 // failed, but the pending request may still work on another connection.
                 addPendingRequest(sink);
                 hasLiveRequest.set(false);
@@ -1171,7 +1196,7 @@ class ConnectionManager {
             }
 
             @Override
-            void dispatch0(Sinks.One<PoolHandle> sink) {
+            void dispatch0(PoolSink<PoolHandle> sink) {
                 if (!channel.isActive() || windDownConnection) {
                     returnPendingRequest(sink);
                     return;
@@ -1221,7 +1246,7 @@ class ConnectionManager {
                 });
             }
 
-            private void returnPendingRequest(Sinks.One<PoolHandle> sink) {
+            private void returnPendingRequest(PoolSink<PoolHandle> sink) {
                 // failed, but the pending request may still work on another connection.
                 addPendingRequest(sink);
                 liveRequests.decrementAndGet();

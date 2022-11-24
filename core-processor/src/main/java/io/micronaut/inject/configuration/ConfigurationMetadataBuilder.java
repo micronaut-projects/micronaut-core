@@ -15,6 +15,12 @@
  */
 package io.micronaut.inject.configuration;
 
+import com.github.javaparser.StaticJavaParser;
+import com.github.javaparser.javadoc.Javadoc;
+import com.github.javaparser.javadoc.JavadocBlockTag;
+import com.github.javaparser.javadoc.description.JavadocDescription;
+import com.github.javaparser.javadoc.description.JavadocDescriptionElement;
+import com.github.javaparser.javadoc.description.JavadocSnippet;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
@@ -23,6 +29,8 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.writer.OriginatingElements;
 
 import java.io.IOException;
@@ -93,11 +101,52 @@ public class ConfigurationMetadataBuilder {
         ConfigurationMetadata configurationMetadata = new ConfigurationMetadata();
         configurationMetadata.name = NameUtils.hyphenate(path, true);
         configurationMetadata.type = classElement.getType().getName();
-        configurationMetadata.description = classElement.getDocumentation().orElse(null);
+        configurationMetadata.description = resolveJavadocDescription(classElement);
         configurationMetadata.includes = CollectionUtils.setOf(classElement.stringValues(ConfigurationReader.class, "includes"));
         configurationMetadata.excludes = CollectionUtils.setOf(classElement.stringValues(ConfigurationReader.class, "excludes"));
         this.configurations.add(configurationMetadata);
         return configurationMetadata;
+    }
+
+    /**
+     * Resolves the javadoc description for the given element.
+     * @param element The element
+     * @return The javadoc description.
+     */
+    @Nullable
+    public static String resolveJavadocDescription(@NonNull Element element) {
+        String resolvedDocs = null;
+        String javadoc = element.getDocumentation().orElse(null);
+        if (javadoc == null && element instanceof PropertyElement propertyElement) {
+            javadoc = propertyElement.getWriteMethod().flatMap(Element::getDocumentation).orElse(null);
+        }
+        if (javadoc != null) {
+            try {
+                Javadoc jd = StaticJavaParser.parseJavadoc(javadoc);
+                JavadocDescription description = jd.getDescription();
+                StringBuilder builder = new StringBuilder();
+                List<JavadocDescriptionElement> elements = description.getElements();
+                if (!elements.isEmpty()) {
+                    for (JavadocDescriptionElement jde : elements) {
+                        if (jde instanceof JavadocSnippet snippet) {
+                            builder.append(snippet.toText());
+                        }
+                    }
+                } else if (element instanceof MethodElement) {
+                    jd.getBlockTags()
+                        .stream().filter(bt -> bt.getType() == JavadocBlockTag.Type.RETURN)
+                        .findFirst().ifPresent(returnTag -> builder.append(returnTag.getContent().toText()));
+                } else if (element instanceof PropertyElement) {
+                    jd.getBlockTags()
+                        .stream().filter(bt -> bt.getType() == JavadocBlockTag.Type.PARAM)
+                        .findFirst().ifPresent(returnTag -> builder.append(returnTag.getContent().toText()));
+                }
+                resolvedDocs = builder.toString();
+            } catch (Exception e) {
+                // ignore
+            }
+        }
+        return resolvedDocs;
     }
 
     /**

@@ -102,9 +102,12 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
             long timeout = context
                     .getValue(CircuitBreaker.class, "reset", Duration.class)
                     .map(Duration::toMillis).orElse(Duration.ofSeconds(DEFAULT_CIRCUIT_BREAKER_TIMEOUT_IN_MILLIS).toMillis());
+            boolean wrapException = context
+                    .getValue(CircuitBreaker.class, "throwWrappedException", Boolean.class)
+                    .orElse(false);
             retryState = circuitContexts.computeIfAbsent(
                     context.getExecutableMethod(),
-                    method -> new CircuitBreakerRetry(timeout, retryStateBuilder, context, eventPublisher)
+                    method -> new CircuitBreakerRetry(timeout, retryStateBuilder, context, eventPublisher, wrapException)
             );
         } else {
             retryState = (MutableRetryState) retryStateBuilder.build();

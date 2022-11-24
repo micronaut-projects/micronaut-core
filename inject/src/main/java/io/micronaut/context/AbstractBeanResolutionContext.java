@@ -78,6 +78,11 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         return context.streamOfType(this, beanType, qualifier);
     }
 
+    @Override
+    public <V> Map<String, V> mapOfType(Argument<V> beanType, Qualifier<V> qualifier) {
+        return context.mapOfType(this, beanType, qualifier);
+    }
+
     @NonNull
     @Override
     public <T> Optional<T> findBean(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
@@ -215,6 +220,16 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
             return attributes.remove(key);
         }
         return null;
+    }
+
+    @Override
+    public Map<CharSequence, Object> getAttributes() {
+        return attributes;
+    }
+
+    @Override
+    public void setAttributes(Map<CharSequence, Object> attributes) {
+        this.attributes = attributes;
     }
 
     @Nullable

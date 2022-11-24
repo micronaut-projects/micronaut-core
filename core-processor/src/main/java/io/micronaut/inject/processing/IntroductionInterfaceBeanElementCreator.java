@@ -22,9 +22,9 @@ import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.BeanDefinitionVisitor;
 
-import java.util.HashSet;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
-import java.util.Set;
 
 /**
  * Introduction interface proxy builder.
@@ -35,16 +35,13 @@ import java.util.Set;
 @Internal
 final class IntroductionInterfaceBeanElementCreator extends AbstractBeanElementCreator {
 
-    private final String factoryBeanDefinitionName;
-
-    IntroductionInterfaceBeanElementCreator(ClassElement classElement, VisitorContext visitorContext, String factoryBeanDefinitionName) {
+    IntroductionInterfaceBeanElementCreator(ClassElement classElement, VisitorContext visitorContext) {
         super(classElement, visitorContext);
-        this.factoryBeanDefinitionName = factoryBeanDefinitionName;
     }
 
     @Override
     public void buildInternal() {
-        BeanDefinitionVisitor aopProxyWriter = aopHelper.createIntroductionAopProxyWriter(classElement, visitorContext);
+        BeanDefinitionVisitor aopProxyWriter = createIntroductionAopProxyWriter(classElement, visitorContext);
         aopProxyWriter.visitTypeArguments(classElement.getAllTypeArguments());
 
         // Because we add validated interceptor in some cases, this needs to run before the constructor visit
@@ -65,26 +62,14 @@ final class IntroductionInterfaceBeanElementCreator extends AbstractBeanElementC
         } else {
             aopProxyWriter.visitDefaultConstructor(classElement, visitorContext);
         }
-        if (factoryBeanDefinitionName != null) {
-            aopProxyWriter.visitSuperBeanDefinitionFactory(factoryBeanDefinitionName);
-        }
 
         // The introduction will include overridden methods* (find(List) <- find(Iterable)*) but ordinary class introduction doesn't
         // Because of the caching we need to process declared methods first
-        Set<MethodElement> processed = new HashSet<>();
-        List<MethodElement> declaredEnclosedElements = classElement.getEnclosedElements(ElementQuery.ALL_METHODS.includeHiddenElements().includeOverriddenMethods().onlyDeclared());
-        for (MethodElement methodElement : declaredEnclosedElements) {
-            aopHelper.visitIntrospectedMethod(aopProxyWriter, classElement, methodElement);
-            processed.add(methodElement);
+        List<MethodElement> methods = new ArrayList<>(classElement.getEnclosedElements(ElementQuery.ALL_METHODS.includeHiddenElements().includeOverriddenMethods()));
+        Collections.reverse(methods); // reverse to process hierarchy starting from declared methods
+        for (MethodElement methodElement : methods) {
+            visitIntrospectedMethod(aopProxyWriter, classElement, methodElement);
         }
-        List<MethodElement> otherEnclosedElements = classElement.getEnclosedElements(ElementQuery.ALL_METHODS.includeHiddenElements().includeOverriddenMethods());
-        for (MethodElement methodElement : otherEnclosedElements) {
-            if (processed.contains(methodElement)) {
-                continue;
-            }
-            aopHelper.visitIntrospectedMethod(aopProxyWriter, classElement, methodElement);
-        }
-
         beanDefinitionWriters.add(aopProxyWriter);
     }
 

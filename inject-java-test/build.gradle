@@ -11,7 +11,7 @@ dependencies {
 //        exclude group:'com.google.truth', module:'truth'
 //    }
     api libs.managed.groovy
-    api(libs.managed.spock) {
+    api(libs.spock) {
         exclude module:'groovy-all'
     }
     if (!JavaVersion.current().isJava9Compatible()) {

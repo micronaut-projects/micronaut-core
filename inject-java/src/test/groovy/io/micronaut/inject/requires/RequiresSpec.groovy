@@ -49,7 +49,38 @@ class MyBean {
         getBean(context, 'test.MyBean')
 
         then:
-        thrown(NoSuchBeanException)
+        def e = thrown(NoSuchBeanException)
+        def lines = e.message.readLines().collect { it.trim() }
+        lines[0] == 'No bean of type [test.MyBean] exists. The following matching beans are disabled by bean requirements:'
+        lines[1] == '* Bean of type [test.MyBean] is disabled because:'
+        lines[2] == '- Java major version [17] must be at least 800'
+
+        cleanup:
+        context.close()
+    }
+
+    void "test requires property equals - error"() {
+        given:
+        ApplicationContext context = buildContext( '''
+package test;
+
+import io.micronaut.context.annotation.*;
+
+@Requires(property="foo", value="bar")
+@jakarta.inject.Singleton
+class MyBean {
+}
+''')
+
+        when:"the bean doesn't exist"
+        getBean(context, 'test.MyBean')
+
+        then:
+        def e = thrown(NoSuchBeanException)
+        def lines = e.message.readLines().collect { it.trim() }
+        lines[0] == 'No bean of type [test.MyBean] exists. The following matching beans are disabled by bean requirements:'
+        lines[1] == '* Bean of type [test.MyBean] is disabled because:'
+        lines[2] == '- Required property [foo] with value [bar] not present'
 
         cleanup:
         context.close()

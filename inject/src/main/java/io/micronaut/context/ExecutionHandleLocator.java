@@ -50,7 +50,7 @@ public interface ExecutionHandleLocator {
      * @param arguments The arguments
      * @return The execution handle
      */
-    default <T, R> Optional<MethodExecutionHandle<T, R>> findExecutionHandle(Class<T> beanType, String method, Class... arguments) {
+    default <T, R> Optional<MethodExecutionHandle<T, R>> findExecutionHandle(Class<T> beanType, String method, Class<?>... arguments) {
         return Optional.empty();
     }
 
@@ -66,7 +66,7 @@ public interface ExecutionHandleLocator {
      * @param arguments The arguments
      * @return The execution handle
      */
-    default <T, R> Optional<MethodExecutionHandle<T, R>> findExecutionHandle(Class<T> beanType, Qualifier<?> qualifier, String method, Class... arguments) {
+    default <T, R> Optional<MethodExecutionHandle<T, R>> findExecutionHandle(Class<T> beanType, Qualifier<?> qualifier, String method, Class<?>... arguments) {
         return Optional.empty();
     }
 
@@ -81,7 +81,7 @@ public interface ExecutionHandleLocator {
      * @param arguments The arguments
      * @return The execution handle
      */
-    default <T, R> Optional<MethodExecutionHandle<T, R>> findExecutionHandle(T bean, String method, Class... arguments) {
+    default <T, R> Optional<MethodExecutionHandle<T, R>> findExecutionHandle(T bean, String method, Class<?>... arguments) {
         return Optional.empty();
     }
 
@@ -96,7 +96,7 @@ public interface ExecutionHandleLocator {
      * @param arguments The arguments
      * @return The execution handle
      */
-    default <T, R> Optional<ExecutableMethod<T, R>> findExecutableMethod(Class<T> beanType, String method, Class... arguments) {
+    default <T, R> Optional<ExecutableMethod<T, R>> findExecutableMethod(Class<T> beanType, String method, Class<?>... arguments) {
         return Optional.empty();
     }
 
@@ -110,22 +110,7 @@ public interface ExecutionHandleLocator {
      * @param arguments The arguments
      * @return The execution handle
      */
-    default <T, R> Optional<ExecutableMethod<T, R>> findProxyTargetMethod(Class<T> beanType, String method, Class... arguments) {
-        return Optional.empty();
-    }
-
-    /**
-     * Finds the original unproxied method for a {@link io.micronaut.inject.ProxyBeanDefinition}.
-     *
-     * @param <T>       The bean type class
-     * @param <R>       The result type of the execution handle
-     * @param beanType  The bean type
-     * @param qualifier The qualifier
-     * @param method    The method
-     * @param arguments The arguments
-     * @return The execution handle
-     */
-    default <T, R> Optional<ExecutableMethod<T, R>> findProxyTargetMethod(Class<T> beanType, Qualifier<T> qualifier, String method, Class... arguments) {
+    default <T, R> Optional<ExecutableMethod<T, R>> findProxyTargetMethod(Class<T> beanType, String method, Class<?>... arguments) {
         return Optional.empty();
     }
 
@@ -140,7 +125,22 @@ public interface ExecutionHandleLocator {
      * @param arguments The arguments
      * @return The execution handle
      */
-    default <T, R> Optional<ExecutableMethod<T, R>> findProxyTargetMethod(Argument<T> beanType, Qualifier<T> qualifier, String method, Class... arguments) {
+    default <T, R> Optional<ExecutableMethod<T, R>> findProxyTargetMethod(Class<T> beanType, Qualifier<T> qualifier, String method, Class<?>... arguments) {
+        return Optional.empty();
+    }
+
+    /**
+     * Finds the original unproxied method for a {@link io.micronaut.inject.ProxyBeanDefinition}.
+     *
+     * @param <T>       The bean type class
+     * @param <R>       The result type of the execution handle
+     * @param beanType  The bean type
+     * @param qualifier The qualifier
+     * @param method    The method
+     * @param arguments The arguments
+     * @return The execution handle
+     */
+    default <T, R> Optional<ExecutableMethod<T, R>> findProxyTargetMethod(Argument<T> beanType, Qualifier<T> qualifier, String method, Class<?>... arguments) {
         return Optional.empty();
     }
 
@@ -156,7 +156,7 @@ public interface ExecutionHandleLocator {
      * @return The execution handle
      * @throws NoSuchMethodException if the method cannot be found
      */
-    default <T, R> ExecutableMethod<T, R> getExecutableMethod(Class<T> beanType, String method, Class... arguments) throws NoSuchMethodException {
+    default <T, R> ExecutableMethod<T, R> getExecutableMethod(Class<T> beanType, String method, Class<?>... arguments) throws NoSuchMethodException {
         Optional<ExecutableMethod<T, R>> executableMethod = this.findExecutableMethod(beanType, method, arguments);
         return executableMethod.orElseThrow(() ->
             new NoSuchMethodException("No such method [" + method + "(" + Arrays.stream(arguments).map(Class::getName).collect(Collectors.joining(",")) + ") ] for bean [" + beanType.getName() + "]")
@@ -176,7 +176,7 @@ public interface ExecutionHandleLocator {
      * @throws NoSuchMethodException if the method cannot be found
      */
     @UsedByGeneratedCode
-    default <T, R> ExecutableMethod<T, R> getProxyTargetMethod(Class<T> beanType, String method, Class... arguments) throws NoSuchMethodException {
+    default <T, R> ExecutableMethod<T, R> getProxyTargetMethod(Class<T> beanType, String method, Class<?>... arguments) throws NoSuchMethodException {
         Optional<ExecutableMethod<T, R>> executableMethod = this.findProxyTargetMethod(beanType, method, arguments);
         return executableMethod.orElseThrow(() ->
             new NoSuchMethodException("No such method [" + method + "(" + Arrays.stream(arguments).map(Class::getName).collect(Collectors.joining(",")) + ") ] for bean [" + beanType.getName() + "]")
@@ -197,7 +197,7 @@ public interface ExecutionHandleLocator {
      * @throws NoSuchMethodException if the method cannot be found
      */
     @UsedByGeneratedCode
-    default <T, R> ExecutableMethod<T, R> getProxyTargetMethod(Class<T> beanType, Qualifier<T> qualifier, String method, Class... arguments) throws NoSuchMethodException {
+    default <T, R> ExecutableMethod<T, R> getProxyTargetMethod(Class<T> beanType, Qualifier<T> qualifier, String method, Class<?>... arguments) throws NoSuchMethodException {
         Optional<ExecutableMethod<T, R>> executableMethod = this.findProxyTargetMethod(beanType, qualifier, method, arguments);
         return executableMethod.orElseThrow(() ->
                 new NoSuchMethodException("No such method [" + method + "(" + Arrays.stream(arguments).map(Class::getName).collect(Collectors.joining(",")) + ") ] for bean [" + beanType.getName() + "]")
@@ -219,7 +219,7 @@ public interface ExecutionHandleLocator {
      * @since 3.0.0
      */
     @UsedByGeneratedCode
-    default <T, R> ExecutableMethod<T, R> getProxyTargetMethod(Argument<T> beanType, Qualifier<T> qualifier, String method, Class... arguments) throws NoSuchMethodException {
+    default <T, R> ExecutableMethod<T, R> getProxyTargetMethod(Argument<T> beanType, Qualifier<T> qualifier, String method, Class<?>... arguments) throws NoSuchMethodException {
         Optional<ExecutableMethod<T, R>> executableMethod = this.findProxyTargetMethod(beanType, qualifier, method, arguments);
         return executableMethod.orElseThrow(() ->
                 new NoSuchMethodException("No such method [" + method + "(" + Arrays.stream(arguments).map(Class::getName).collect(Collectors.joining(",")) + ") ] for bean [" + beanType.getName() + "]")
@@ -238,7 +238,7 @@ public interface ExecutionHandleLocator {
      * @return The execution handle
      * @throws NoSuchMethodException if the method cannot be found
      */
-    default <T, R> MethodExecutionHandle<T, R> getExecutionHandle(Class<T> beanType, String method, Class... arguments) throws NoSuchMethodException {
+    default <T, R> MethodExecutionHandle<T, R> getExecutionHandle(Class<T> beanType, String method, Class<?>... arguments) throws NoSuchMethodException {
         return this.<T, R>findExecutionHandle(beanType, method, arguments).orElseThrow(() ->
             new NoSuchMethodException("No such method [" + method + "(" + Arrays.stream(arguments).map(Class::getName).collect(Collectors.joining(",")) + ") ] for bean [" + beanType.getName() + "]")
         );
@@ -255,7 +255,7 @@ public interface ExecutionHandleLocator {
      * @return The execution handle
      * @throws NoSuchMethodException if the method cannot be found
      */
-    default <T, R> MethodExecutionHandle<T, R> getExecutionHandle(T bean, String method, Class... arguments) throws NoSuchMethodException {
+    default <T, R> MethodExecutionHandle<T, R> getExecutionHandle(T bean, String method, Class<?>... arguments) throws NoSuchMethodException {
         return this.<T, R>findExecutionHandle(bean, method, arguments).orElseThrow(() ->
             new NoSuchMethodException("No such method [" + method + "(" + Arrays.stream(arguments).map(Class::getName).collect(Collectors.joining(",")) + ") ] for bean [" + bean + "]")
         );

@@ -299,25 +299,25 @@ final class EmptyAnnotationMetadata implements AnnotationMetadata {
     @NonNull
     @Override
     public <T> Class<T>[] classValues(@NonNull String annotation) {
-        return ReflectionUtils.EMPTY_CLASS_ARRAY;
+        return (Class<T>[]) ReflectionUtils.EMPTY_CLASS_ARRAY;
     }
 
     @NonNull
     @Override
     public <T> Class<T>[] classValues(@NonNull String annotation, @NonNull String member) {
-        return ReflectionUtils.EMPTY_CLASS_ARRAY;
+        return (Class<T>[]) ReflectionUtils.EMPTY_CLASS_ARRAY;
     }
 
     @NonNull
     @Override
     public <T> Class<T>[] classValues(@NonNull Class<? extends Annotation> annotation) {
-        return ReflectionUtils.EMPTY_CLASS_ARRAY;
+        return (Class<T>[]) ReflectionUtils.EMPTY_CLASS_ARRAY;
     }
 
     @NonNull
     @Override
     public <T> Class<T>[] classValues(@NonNull Class<? extends Annotation> annotation, @NonNull String member) {
-        return ReflectionUtils.EMPTY_CLASS_ARRAY;
+        return (Class<T>[]) ReflectionUtils.EMPTY_CLASS_ARRAY;
     }
 
     @Override

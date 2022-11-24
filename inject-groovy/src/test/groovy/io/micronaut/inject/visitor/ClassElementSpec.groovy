@@ -18,6 +18,7 @@ package io.micronaut.inject.visitor
 import io.micronaut.ast.groovy.TypeElementVisitorStart
 import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.context.exceptions.BeanContextException
+import io.micronaut.core.annotation.Introspected
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.ElementModifier
 import io.micronaut.inject.ast.ElementQuery
@@ -1002,5 +1003,36 @@ class Pet {
         then:
             packPrvFields.size() == 2
             packPrvFields.stream().map(FieldElement::getName).toList() == ["packprivme", "PACK_PRV_CONST"]
+    }
+
+    void "test annotations on generic type"() {
+        given:
+            ClassElement classElement = buildClassElement('test.PetOperations', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+import io.micronaut.http.annotation.*
+import jakarta.inject.Inject
+
+@Controller("/pets")
+interface PetOperations<T extends Pet> {
+
+    @Post("/")
+    T save(String name, int age)
+}
+
+@Introspected
+class Pet {
+}
+
+''')
+        when:
+            def method = classElement.getEnclosedElements(ElementQuery.ALL_METHODS.named("save")).get(0)
+            def returnType = method.getReturnType()
+            def genericReturnType = method.getGenericReturnType()
+
+        then:
+            returnType.hasAnnotation(Introspected)
+            genericReturnType.hasAnnotation(Introspected)
     }
 }

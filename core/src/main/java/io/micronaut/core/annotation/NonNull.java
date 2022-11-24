@@ -15,8 +15,8 @@
  */
 package io.micronaut.core.annotation;
 
-import javax.annotation.Nonnull;
-import javax.annotation.meta.TypeQualifierNickname;
+import jakarta.annotation.Nonnull;
+
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -43,6 +43,5 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 @Nonnull
-@TypeQualifierNickname
 public @interface NonNull {
 }

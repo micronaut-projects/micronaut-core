@@ -21,6 +21,33 @@ class ApplicationContextBuilderSpec extends Specification {
         ctx.close()
     }
 
+    void "test default configuration"() {
+        given:
+        ApplicationContextBuilder builder = ApplicationContext.builder()
+        ApplicationContextConfiguration config = (ApplicationContextConfiguration) builder
+
+        expect:
+        !config.deduceEnvironments.isPresent()
+        !config.deduceCloudEnvironment
+        config.bannerEnabled
+        config.enableDefaultPropertySources
+        config.environmentPropertySource
+        !config.eagerInitConfiguration
+        !config.eagerInitSingletons
+    }
+
+    void "test enable cloud environment deduce"() {
+        given:
+        ApplicationContextBuilder builder = ApplicationContext.builder()
+        ApplicationContextConfiguration config = (ApplicationContextConfiguration) builder
+
+        when:
+        builder.deduceCloudEnvironment(true)
+
+        then:
+        config.deduceCloudEnvironment
+    }
+
     void "test context configuration"() {
         given:
         ApplicationContextBuilder builder = ApplicationContext.builder()
@@ -28,7 +55,7 @@ class ApplicationContextBuilderSpec extends Specification {
         builder.classLoader(loader)
                .environments("foo")
                .deduceEnvironment(false)
-
+               .deduceCloudEnvironment(true)
 
         ApplicationContextConfiguration config = (ApplicationContextConfiguration) builder
 
@@ -37,6 +64,5 @@ class ApplicationContextBuilderSpec extends Specification {
         config.resourceLoader.classLoader.is(loader)
         config.environments.contains('foo')
         config.deduceEnvironments.get() == false
-
     }
 }

@@ -17,6 +17,7 @@ package io.micronaut.inject.beans.visitor;
 
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Creator;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.annotation.NamedAnnotationMapper;
 import io.micronaut.inject.visitor.VisitorContext;
 
@@ -31,6 +32,7 @@ import java.util.List;
  * @author graemerocher
  * @since 1.1
  */
+@Internal
 public class JsonCreatorAnnotationMapper implements NamedAnnotationMapper {
 
     @NonNull

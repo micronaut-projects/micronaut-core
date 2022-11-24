@@ -20,8 +20,7 @@ plugins {
 rootProject.name = 'micronaut'
 
 include "aop"
-include "bom"
-include "parent"
+include "core-bom"
 include "buffer-netty"
 include "core"
 include "core-reactive"
@@ -65,6 +64,7 @@ include "test-suite-helper"
 include "test-suite-javax-inject"
 include "test-suite-jakarta-inject-bean-import"
 include "test-suite-kotlin"
+include "test-suite-graal"
 include "test-suite-groovy"
 include "test-utils"
 

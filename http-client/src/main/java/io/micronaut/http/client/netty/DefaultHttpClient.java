@@ -35,6 +35,7 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpResponseWrapper;
 import io.micronaut.http.HttpStatus;
@@ -188,6 +189,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 
 import static io.micronaut.scheduling.instrument.InvocationInstrumenter.NOOP;
 
@@ -214,6 +216,9 @@ public class DefaultHttpClient implements
     private static final int DEFAULT_HTTP_PORT = 80;
     private static final int DEFAULT_HTTPS_PORT = 443;
 
+    private static final Supplier<Pattern> HEADER_MASK_PATTERNS = SupplierUtil.memoized(() ->
+        Pattern.compile(".*(password|cred|cert|key|secret|token|auth|signat).*", Pattern.CASE_INSENSITIVE)
+    );
     /**
      * Which headers <i>not</i> to copy from the first request when redirecting to a second request. There doesn't
      * appear to be a spec for this. {@link java.net.HttpURLConnection} seems to drop all headers, but that would be a
@@ -494,7 +499,8 @@ public class DefaultHttpClient implements
 
             @Override
             public <I, O, E> io.micronaut.http.HttpResponse<O> exchange(io.micronaut.http.HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType) {
-                Flux<HttpResponse<O>> publisher = Flux.from(DefaultHttpClient.this.exchange(request, bodyType, errorType));
+                BlockHint blockHint = BlockHint.willBlockThisThread();
+                Flux<HttpResponse<O>> publisher = Flux.from(DefaultHttpClient.this.exchange(request, bodyType, errorType, blockHint));
                 return publisher.doOnNext(res -> {
                     Optional<ByteBuf> byteBuf = res.getBody(ByteBuf.class);
                     byteBuf.ifPresent(bb -> {
@@ -770,11 +776,16 @@ public class DefaultHttpClient implements
 
     @Override
     public <I, O, E> Publisher<io.micronaut.http.HttpResponse<O>> exchange(@NonNull io.micronaut.http.HttpRequest<I> request, @NonNull Argument<O> bodyType, @NonNull Argument<E> errorType) {
+        return exchange(request, bodyType, errorType, null);
+    }
+
+    @NonNull
+    private <I, O, E> Flux<HttpResponse<O>> exchange(io.micronaut.http.HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType, @Nullable BlockHint blockHint) {
         setupConversionService(request);
         final io.micronaut.http.HttpRequest<Object> parentRequest = ServerRequestContext.currentRequest().orElse(null);
         Publisher<URI> uriPublisher = resolveRequestURI(request);
         return Flux.from(uriPublisher)
-                .switchMap(uri -> exchangeImpl(uri, parentRequest, toMutableRequest(request), bodyType, errorType));
+            .switchMap(uri -> exchangeImpl(uri, parentRequest, toMutableRequest(request), bodyType, errorType, blockHint));
     }
 
     @Override
@@ -1024,7 +1035,7 @@ public class DefaultHttpClient implements
         } catch (Exception e) {
             return Flux.error(e);
         }
-        return connectionManager.connect(requestKey).flatMapMany(poolHandle -> {
+        return connectionManager.connect(requestKey, null).flatMapMany(poolHandle -> {
             request.setAttribute(NettyClientHttpRequest.CHANNEL, poolHandle.channel);
 
             boolean sse = !isProxy && isAcceptEvents(request);
@@ -1074,11 +1085,12 @@ public class DefaultHttpClient implements
      * Implementation of {@link #exchange(io.micronaut.http.HttpRequest, Argument, Argument)} (after URI resolution).
      */
     private <I, O, E> Publisher<? extends io.micronaut.http.HttpResponse<O>> exchangeImpl(
-            URI requestURI,
-            io.micronaut.http.HttpRequest<?> parentRequest,
-            MutableHttpRequest<I> request,
-            @NonNull Argument<O> bodyType,
-            @NonNull Argument<E> errorType) {
+        URI requestURI,
+        io.micronaut.http.HttpRequest<?> parentRequest,
+        MutableHttpRequest<I> request,
+        @NonNull Argument<O> bodyType,
+        @NonNull Argument<E> errorType,
+        @Nullable BlockHint blockHint) {
         AtomicReference<MutableHttpRequest<?>> requestWrapper = new AtomicReference<>(request);
 
         RequestKey requestKey;
@@ -1088,7 +1100,7 @@ public class DefaultHttpClient implements
             return Flux.error(e);
         }
 
-        Mono<ConnectionManager.PoolHandle> handlePublisher = connectionManager.connect(requestKey);
+        Mono<ConnectionManager.PoolHandle> handlePublisher = connectionManager.connect(requestKey, blockHint);
 
         Flux<io.micronaut.http.HttpResponse<O>> responsePublisher = handlePublisher.flatMapMany(poolHandle -> {
             poolHandle.channel.pipeline()
@@ -1829,15 +1841,26 @@ public class DefaultHttpClient implements
 
     private void traceHeaders(HttpHeaders headers) {
         for (String name : headers.names()) {
+            boolean isMasked = HEADER_MASK_PATTERNS.get().matcher(name).matches();
             List<String> all = headers.getAll(name);
             if (all.size() > 1) {
                 for (String value : all) {
-                    log.trace("{}: {}", name, value);
+                    String maskedValue = isMasked ? mask(value) : value;
+                    log.trace("{}: {}", name, maskedValue);
                 }
             } else if (!all.isEmpty()) {
-                log.trace("{}: {}", name, all.get(0));
+                String maskedValue = isMasked ? mask(all.get(0)) : all.get(0);
+                log.trace("{}: {}", name, maskedValue);
             }
         }
+    }
+
+    @Nullable
+    private String mask(@Nullable String value) {
+        if (value == null) {
+            return null;
+        }
+        return "*MASKED*";
     }
 
     private static MediaTypeCodecRegistry createDefaultMediaTypeRegistry() {
@@ -2168,7 +2191,7 @@ public class DefaultHttpClient implements
 
         @Override
         protected Function<URI, Publisher<? extends HttpResponse<O>>> makeRedirectHandler(io.micronaut.http.HttpRequest<?> parentRequest, MutableHttpRequest<Object> redirectRequest) {
-            return uri -> exchangeImpl(uri, parentRequest, redirectRequest, bodyType, errorType);
+            return uri -> exchangeImpl(uri, parentRequest, redirectRequest, bodyType, errorType, null);
         }
 
         @Override

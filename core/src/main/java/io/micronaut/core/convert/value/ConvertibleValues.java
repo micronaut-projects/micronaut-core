@@ -70,8 +70,8 @@ public interface ConvertibleValues<V> extends ValueResolver<CharSequence>, Itera
      */
     @SuppressWarnings("unchecked")
     default Class<V> getValueType() {
-        Optional<Class> type = GenericTypeUtils.resolveInterfaceTypeArgument(getClass(), ConvertibleValues.class);
-        return type.orElse(Object.class);
+        Optional<Class<?>> type = GenericTypeUtils.resolveInterfaceTypeArgument(getClass(), ConvertibleValues.class);
+        return (Class<V>) type.orElse(Object.class);
     }
 
     /**

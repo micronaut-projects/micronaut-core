@@ -65,7 +65,10 @@ import java.util.stream.Collectors;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 public abstract class AbstractAnnotationMetadataBuilder<T, A> {
+
+    protected static final List<String> EXCLUDES = Arrays.asList(AnnotationUtil.KOTLIN_METADATA, "jdk.internal.ValueBased");
 
     /**
      * Names of annotations that should produce deprecation warnings.
@@ -80,8 +83,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     private static final List<String> DEFAULT_ANNOTATE_EXCLUDES = Arrays.asList(Internal.class.getName(),
         Experimental.class.getName(), "jdk.internal.ValueBased");
     private static final Map<String, Map<String, Object>> ANNOTATION_DEFAULTS = new HashMap<>(20);
-
-    protected static final List<String> EXCLUDES = Arrays.asList(AnnotationUtil.KOTLIN_METADATA, "jdk.internal.ValueBased");
+    private static final String MSG_UNRECOGNIZED_ANNOTATION_METADATA = "Unrecognized annotation metadata: ";
 
     static {
         for (AnnotationMapper mapper : SoftServiceLoader.load(AnnotationMapper.class, AbstractAnnotationMetadataBuilder.class.getClassLoader())
@@ -2188,7 +2190,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             AnnotationMetadata declaredMetadata = annotate(hierarchy.getDeclaredMetadata(), annotationValue);
             return hierarchy.createSibling(declaredMetadata);
         }
-        throw new IllegalStateException("Unrecognized annotation metadata: " + annotationMetadata);
+        throw new IllegalStateException(MSG_UNRECOGNIZED_ANNOTATION_METADATA + annotationMetadata);
     }
 
     /**
@@ -2229,7 +2231,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             }
             return declaredMetadata;
         } else {
-            throw new IllegalStateException("Unrecognized annotation metadata: " + annotationMetadata);
+            throw new IllegalStateException(MSG_UNRECOGNIZED_ANNOTATION_METADATA + annotationMetadata);
         }
     }
 
@@ -2270,7 +2272,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             }
             return declaredMetadata;
         }
-        throw new IllegalStateException("Unrecognized annotation metadata: " + annotationMetadata);
+        throw new IllegalStateException(MSG_UNRECOGNIZED_ANNOTATION_METADATA + annotationMetadata);
     }
 
     /**
@@ -2302,7 +2304,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             }
             return declaredMetadata;
         }
-        throw new IllegalStateException("Unrecognized annotation metadata: " + annotationMetadata);
+        throw new IllegalStateException(MSG_UNRECOGNIZED_ANNOTATION_METADATA + annotationMetadata);
     }
 
     /**
@@ -2345,7 +2347,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
 
         MetadataKey(T... elements) {
             this.elements = elements;
-            this.hashCode = Objects.hash(elements);
+            this.hashCode = Objects.hash((Object[]) elements);
         }
 
         @Override

@@ -315,16 +315,17 @@ public class JavaElementFactory implements ElementFactory<Element, TypeElement, 
         for (VariableElement parameter : parameters) {
             failIfPostponeIsNeeded(parameter);
         }
-        TypeKind returnKind = executableElement.getReturnType().getKind();
+        TypeMirror returnType = executableElement.getReturnType();
+        TypeKind returnKind = returnType.getKind();
         if (returnKind == TypeKind.ERROR) {
-            throw new PostponeToNextRoundException();
+            throw new PostponeToNextRoundException(returnType);
         }
     }
 
     private void failIfPostponeIsNeeded(VariableElement  variableElement) {
         TypeMirror type = variableElement.asType();
         if (type.getKind() == TypeKind.ERROR) {
-            throw new PostponeToNextRoundException();
+            throw new PostponeToNextRoundException(variableElement);
         }
     }
 

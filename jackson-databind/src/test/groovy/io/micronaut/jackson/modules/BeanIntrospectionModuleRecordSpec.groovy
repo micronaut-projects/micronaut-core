@@ -40,7 +40,7 @@ record Test(String foo, String bar) {
     @Replaces(BeanIntrospectionModule)
     @Requires(property = "spec.name", value = 'BeanIntrospectionModuleRecordSpec')
     static class StaticBeanIntrospectionModule extends BeanIntrospectionModule {
-        Map<Class, BeanIntrospection> introspectionMap = [:]
+        Map<Class<?>, BeanIntrospection> introspectionMap = [:]
         @Override
         protected BeanIntrospection<Object> findIntrospection(Class<?> beanClass) {
             return introspectionMap.get(beanClass)

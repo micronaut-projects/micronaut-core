@@ -15,6 +15,8 @@
  */
 package io.micronaut.inject.processing;
 
+import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil;
+import io.micronaut.aop.writer.AopProxyWriter;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.EachProperty;
@@ -120,8 +122,7 @@ final class FactoryBeanElementCreator extends DeclaredBeanElementCreator {
 //            producingElement = producingElement.withAnnotationMetadata(producedTypeAnnotationMetadata);
             buildProducedBeanDefinition(producedBeanDefinitionWriter, producedType, producingElement, producedType.getAnnotationMetadata());
 
-            if (producingElement instanceof MethodElement) {
-                MethodElement methodElement = (MethodElement) producingElement;
+            if (producingElement instanceof MethodElement methodElement) {
                 if (isAopProxy && visitAopMethod(visitor, methodElement)) {
                     return;
                 }
@@ -182,7 +183,7 @@ final class FactoryBeanElementCreator extends DeclaredBeanElementCreator {
             producedBeanDefinitionWriter.visitBeanFactoryField(classElement, (FieldElement) producingElement);
         }
 
-        if (hasAroundStereotype(producedAnnotationMetadata) && !producedType.isAssignable("io.micronaut.aop.Interceptor")) {
+        if (InterceptedMethodUtil.hasAroundStereotype(producedAnnotationMetadata) && !producedType.isAssignable("io.micronaut.aop.Interceptor")) {
             if (producedType.isArray()) {
                 throw new ProcessingException(producingElement, "Cannot apply AOP advice to arrays");
             }
@@ -212,7 +213,7 @@ final class FactoryBeanElementCreator extends DeclaredBeanElementCreator {
                 }
             }
 
-            BeanDefinitionVisitor aopProxyWriter = aopHelper.createAroundAopProxyWriter(producedBeanDefinitionWriter, producedAnnotationMetadata, visitorContext, true);
+            AopProxyWriter aopProxyWriter = createAroundAopProxyWriter(producedBeanDefinitionWriter, producedAnnotationMetadata, visitorContext, true);
             if (constructorElement != null) {
                 aopProxyWriter.visitBeanDefinitionConstructor(constructorElement, constructorElement.isReflectionRequired(), visitorContext);
             } else {
@@ -226,7 +227,7 @@ final class FactoryBeanElementCreator extends DeclaredBeanElementCreator {
                 .stream()
                 .filter(m -> m.isPublic() && !m.isFinal() && !m.isStatic()).toList();
             methodElements
-                .forEach(methodElement -> aopHelper.visitAroundMethod(aopProxyWriter, methodElement.getDeclaringType(), methodElement));
+                .forEach(methodElement -> visitAroundMethod(aopProxyWriter, methodElement.getDeclaringType(), methodElement));
 
         } else if (producedAnnotationMetadata.hasStereotype(Executable.class)) {
             if (producedType.isArray()) {

@@ -18,6 +18,7 @@ package io.micronaut.inject.ast;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
@@ -31,6 +32,7 @@ import java.util.function.Consumer;
  * @author graemerocher
  * @since 2.3.0
  */
+@Internal
 class ReflectParameterElement implements ParameterElement {
     private final ClassElement classElement;
     private final String name;

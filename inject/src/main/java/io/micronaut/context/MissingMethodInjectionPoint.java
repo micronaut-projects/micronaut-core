@@ -58,7 +58,7 @@ class MissingMethodInjectionPoint implements MethodInjectionPoint {
 
     @Override
     public Method getMethod() {
-        Class[] types = Arrays.stream(argTypes).map(Argument::getType).toArray(Class[]::new);
+        Class<?>[] types = Arrays.stream(argTypes).map(Argument::getType).toArray(Class[]::new);
         throw ReflectionUtils.newNoSuchMethodError(declaringType, methodName, types);
     }
 
@@ -79,7 +79,7 @@ class MissingMethodInjectionPoint implements MethodInjectionPoint {
 
     @Override
     public Object invoke(Object instance, Object... args) {
-        Class[] types = Arrays.stream(argTypes).map(Argument::getType).toArray(Class[]::new);
+        Class<?>[] types = Arrays.stream(argTypes).map(Argument::getType).toArray(Class[]::new);
         throw ReflectionUtils.newNoSuchMethodError(declaringType, methodName, types);
     }
 

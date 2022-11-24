@@ -564,7 +564,7 @@ public class RequiresCondition implements Condition {
 
     private boolean matchesPresenceOfBeans(ConditionContext context, AnnotationValue<Requires> requirements) {
         if (requirements.contains(MEMBER_BEANS) || requirements.contains(MEMBER_BEAN)) {
-            Class[] beans = requirements.classValues(MEMBER_BEANS);
+            Class<?>[] beans = requirements.classValues(MEMBER_BEANS);
             if (requirements.contains(MEMBER_BEAN)) {
                 Class<?> memberBean = requirements.classValue(MEMBER_BEAN).orElse(null);
                 if (memberBean != null) {
@@ -586,7 +586,7 @@ public class RequiresCondition implements Condition {
 
     private boolean matchesAbsenceOfBeans(ConditionContext context, AnnotationValue<Requires> requirements) {
         if (requirements.contains(MEMBER_MISSING_BEANS)) {
-            Class[] missingBeans = requirements.classValues(MEMBER_MISSING_BEANS);
+            Class<?>[] missingBeans = requirements.classValues(MEMBER_MISSING_BEANS);
             AnnotationMetadataProvider component = context.getComponent();
             if (ArrayUtils.isNotEmpty(missingBeans) && component instanceof BeanDefinition) {
                 BeanDefinition bd = (BeanDefinition) component;

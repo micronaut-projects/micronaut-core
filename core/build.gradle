@@ -12,8 +12,8 @@ micronautBuild {
 }
 
 dependencies {
-    compileOnly libs.managed.jsr305
-    compileOnly libs.managed.graal
+    compileOnly libs.managed.jakarta.annotation.api
+    compileOnly libs.graal
     compileOnly libs.kotlin.stdlib
 }
 
@@ -43,4 +43,3 @@ tasks.withType(JapicmpTask).configureEach {
        addViolationTransformer(RemovedPackages, [prefixes: ['io.micronaut.caffeine'], exact: []])
    }
 }
-

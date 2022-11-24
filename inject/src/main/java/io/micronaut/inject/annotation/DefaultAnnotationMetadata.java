@@ -85,7 +85,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @Nullable
     Map<String, Map<CharSequence, Object>> annotationDefaultValues;
     @Nullable
-    Map<String, String> repeated = null;
+    Map<String, String> repeated;
     @Nullable
     Set<String> sourceRetentionAnnotations;
     private Map<String, List> annotationValuesByType = new ConcurrentHashMap<>(2);
@@ -365,7 +365,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
             return classes;
         }
         //noinspection unchecked
-        return ReflectionUtils.EMPTY_CLASS_ARRAY;
+        return (Class<T>[]) ReflectionUtils.EMPTY_CLASS_ARRAY;
     }
 
     @Override
@@ -379,7 +379,8 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                 Class<?>[] classes = ((AnnotationValue<?>) v).classValues(member);
                 return (Class<T>[]) classes;
             }
-            return ReflectionUtils.EMPTY_CLASS_ARRAY;
+            //noinspection unchecked
+            return (Class<T>[]) ReflectionUtils.EMPTY_CLASS_ARRAY;
         } else {
             return classValues(annotation.getName(), member);
         }

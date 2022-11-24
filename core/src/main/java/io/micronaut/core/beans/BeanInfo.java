@@ -17,6 +17,8 @@ package io.micronaut.core.beans;
 
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.type.Argument;
+import io.micronaut.core.type.ArgumentCoercible;
 
 /**
  * Top level interface for obtaining bean information.
@@ -24,10 +26,23 @@ import io.micronaut.core.annotation.NonNull;
  * @param <T> The type of the bean
  * @since 4.0.0
  */
-public interface BeanInfo<T> extends AnnotationMetadataProvider {
+public interface BeanInfo<T> extends AnnotationMetadataProvider, ArgumentCoercible<T> {
     /**
      * @return The bean type
      */
     @NonNull
     Class<T> getBeanType();
+
+    /**
+     * @return The generic bean type
+     */
+    @NonNull
+    default Argument<T> getGenericBeanType() {
+        return Argument.of(getBeanType());
+    }
+
+    @Override
+    default Argument<T> asArgument() {
+        return getGenericBeanType();
+    }
 }

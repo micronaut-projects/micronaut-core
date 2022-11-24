@@ -44,7 +44,7 @@ public class WebSocketStateBinderRegistry implements ArgumentBinderRegistry<WebS
 
     private final ArgumentBinderRegistry<HttpRequest<?>> requestBinderRegistry;
 
-    private final Map<Class, ArgumentBinder<?, WebSocketState>> byType = new HashMap<>(5);
+    private final Map<Class<?>, ArgumentBinder<?, WebSocketState>> byType = new HashMap<>(5);
     private final ArgumentBinder<Object, HttpRequest<?>> queryValueArgumentBinder;
 
     /**

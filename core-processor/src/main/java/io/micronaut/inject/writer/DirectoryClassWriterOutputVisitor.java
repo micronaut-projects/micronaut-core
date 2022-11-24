@@ -15,14 +15,13 @@
  */
 package io.micronaut.inject.writer;
 
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.ast.Element;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
@@ -67,7 +66,7 @@ public class DirectoryClassWriterOutputVisitor extends AbstractClassWriterOutput
         try {
             final Path filePath = targetDir.toPath().resolve(path);
             makeParent(filePath);
-            Files.write(filePath, "".getBytes(StandardCharsets.UTF_8),
+            Files.writeString(filePath, "",
                         StandardOpenOption.WRITE,
                         StandardOpenOption.CREATE
             );

@@ -22,18 +22,13 @@ import io.micronaut.context.annotation.DefaultScope;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Provided;
-import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.annotation.AnnotationUtil;
-import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ArgumentCoercible;
-import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
-import io.micronaut.inject.qualifiers.Qualifiers;
 import jakarta.inject.Singleton;
 
 import java.lang.annotation.Annotation;
@@ -52,7 +47,7 @@ import java.util.stream.Stream;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, BeanType<T>, ArgumentCoercible<T> {
+public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType<T>, ArgumentCoercible<T> {
 
     /**
      * Attribute used to store a dynamic bean name.
@@ -96,11 +91,12 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
     }
 
     @Override
+    @SuppressWarnings("java:S3776")
     default boolean isCandidateBean(@Nullable Argument<?> beanType) {
         if (beanType == null) {
             return false;
         }
-        if (BeanType.super.isCandidateBean(beanType)) {
+        if (QualifiedBeanType.super.isCandidateBean(beanType)) {
             final Argument<?>[] typeArguments = beanType.getTypeParameters();
             final int len = typeArguments.length;
             Class<?> beanClass = beanType.getType();
@@ -157,7 +153,7 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
      * @see Provided
      */
     @SuppressWarnings("DeprecatedIsStillUsed")
-    @Deprecated
+    @Deprecated(forRemoval = true, since = "2.0.0")
     default boolean isProvided() {
         return getAnnotationMetadata().hasDeclaredStereotype(Provided.class);
     }
@@ -370,7 +366,7 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
             if (typeArguments.isEmpty()) {
                 return ReflectionUtils.EMPTY_CLASS_ARRAY;
             }
-            Class[] params = new Class[typeArguments.size()];
+            Class<?>[] params = new Class<?>[typeArguments.size()];
             int i = 0;
             for (Argument<?> argument : typeArguments) {
                 params[i++] = argument.getType();
@@ -421,48 +417,23 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
         return Modifier.isAbstract(getBeanType().getModifiers());
     }
 
+    @Override
+    default Argument<T> getGenericBeanType() {
+        return asArgument();
+    }
+
     /**
      * Resolve the declared qualifier for this bean.
      * @return The qualifier or null if this isn't one
      */
     default @Nullable Qualifier<T> getDeclaredQualifier() {
-        AnnotationMetadata annotationMetadata = getTargetAnnotationMetadata();
-        if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
-            // Beans created by a factory will have AnnotationMetadataHierarchy = producing element + factory class
-            // All qualifiers are removed from the factory class anyway, so we can skip the hierarchy
-            annotationMetadata = annotationMetadata.getDeclaredMetadata();
-        }
-        List<AnnotationValue<Annotation>> annotations = annotationMetadata.getAnnotationValuesByStereotype(AnnotationUtil.QUALIFIER);
-        if (!annotations.isEmpty()) {
-            if (annotations.size() == 1) {
-                final AnnotationValue<Annotation> annotationValue = annotations.iterator().next();
-                if (annotationValue.getAnnotationName().equals(Qualifier.PRIMARY)) {
-                    // primary is the same as null
-                    return null;
-                }
-                return (Qualifier<T>) Qualifiers.byAnnotation(annotationMetadata, annotationValue);
-            } else {
-                Qualifier<T>[] qualifiers = new Qualifier[annotations.size()];
-                int i = 0;
-                for (AnnotationValue<Annotation> annotationValue : annotations) {
-                    qualifiers[i++] = (Qualifier<T>) Qualifiers.byAnnotation(annotationMetadata, annotationValue);
-                }
-                return Qualifiers.byQualifiers(qualifiers);
-            }
-        } else {
-            Qualifier<T> qualifier = resolveDynamicQualifier();
-            if (qualifier == null) {
-                String name = annotationMetadata.stringValue(AnnotationUtil.NAMED).orElse(null);
-                qualifier = name != null ? Qualifiers.byAnnotation(annotationMetadata, name) : null;
-            }
-            return qualifier;
-        }
+        return QualifiedBeanType.super.getDeclaredQualifier();
     }
 
     /**
      * @return Method that can be overridden to resolve a dynamic qualifier
      */
     default @Nullable Qualifier<T> resolveDynamicQualifier() {
-        return null;
+        return QualifiedBeanType.super.resolveDynamicQualifier();
     }
 }
