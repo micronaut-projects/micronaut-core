@@ -15,14 +15,14 @@
  */
 package io.micronaut.web.router;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
@@ -35,6 +35,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Status;
 import io.micronaut.http.filter.HttpFilter;
+import io.micronaut.http.filter.InternalFilter;
 import io.micronaut.http.uri.UriMatchInfo;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.inject.BeanDefinition;
@@ -46,7 +47,16 @@ import org.slf4j.LoggerFactory;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
@@ -123,17 +133,6 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     }
 
     @Override
-    public FilterRoute addFilter(String pathPattern, Supplier<HttpFilter> filter) {
-        DefaultFilterRoute route = new DefaultFilterRoute(
-                pathPattern,
-                filter,
-                (AnnotationMetadataResolver) executionHandleLocator
-        );
-        filterRoutes.add(route);
-        return route;
-    }
-
-    @Override
     public FilterRoute addFilter(String pathPattern, BeanLocator beanLocator, BeanDefinition<? extends HttpFilter> beanDefinition) {
         DefaultFilterRoute route = new BeanDefinitionFilterRoute(
                 pathPattern,
@@ -142,6 +141,17 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         );
         filterRoutes.add(route);
         return route;
+    }
+
+    FilterRoute addFilter(Supplier<InternalFilter> internalFilter, AnnotationMetadata annotationMetadata) {
+        FilterRoute fr = new DefaultFilterRoute(internalFilter, AnnotationMetadataResolver.DEFAULT) {
+            @Override
+            public AnnotationMetadata getAnnotationMetadata() {
+                return annotationMetadata;
+            }
+        };
+        filterRoutes.add(fr);
+        return fr;
     }
 
     @Override

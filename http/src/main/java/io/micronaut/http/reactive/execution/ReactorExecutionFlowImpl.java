@@ -139,6 +139,10 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
         throw new IllegalStateException();
     }
 
+    static <R> Mono<Object> toMono(Supplier<ExecutionFlow<R>> next) {
+        return Mono.defer(() -> toMono(next.get()));
+    }
+
     @Override
     public Publisher<Object> toPublisher() {
         return value;

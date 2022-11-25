@@ -15,17 +15,17 @@
  */
 package io.micronaut.web.router.filter;
 
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
-import io.micronaut.http.filter.HttpFilter;
+import io.micronaut.http.filter.InternalFilter;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRoute;
 import io.micronaut.web.router.UriRouteMatch;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -159,7 +159,7 @@ public class FilteredRouter implements Router {
 
     @NonNull
     @Override
-    public List<HttpFilter> findFilters(@NonNull HttpRequest<?> request) {
+    public List<InternalFilter> findFilters(@NonNull HttpRequest<?> request) {
         return router.findFilters(request);
     }
 

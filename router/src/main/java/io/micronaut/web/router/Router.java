@@ -15,13 +15,13 @@
  */
 package io.micronaut.web.router;
 
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
-import io.micronaut.http.filter.HttpFilter;
+import io.micronaut.http.filter.InternalFilter;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import java.net.URI;
 import java.util.List;
 import java.util.Optional;
@@ -239,7 +239,7 @@ public interface Router {
      * @param request The request
      * @return A new filtered publisher
      */
-    @NonNull List<HttpFilter> findFilters(
+    @NonNull List<InternalFilter> findFilters(
             @NonNull HttpRequest<?> request
     );
 

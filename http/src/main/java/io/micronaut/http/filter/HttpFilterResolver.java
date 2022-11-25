@@ -15,10 +15,10 @@
  */
 package io.micronaut.http.filter;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.HttpMethod;
@@ -34,10 +34,9 @@ import java.util.Set;
  * @author James Kleeh
  * @author graemerocher
  * @since 1.3.0
- * @param <F> The filter type
  * @param <T> The resolution context type
  */
-public interface HttpFilterResolver<F extends HttpFilter, T extends AnnotationMetadataProvider> {
+public interface HttpFilterResolver<T extends AnnotationMetadataProvider> {
 
     /**
      * Resolves the initial list of filters.
@@ -45,7 +44,7 @@ public interface HttpFilterResolver<F extends HttpFilter, T extends AnnotationMe
      * @return The filters
      * @since 2.0
      */
-    List<FilterEntry<F>> resolveFilterEntries(T context);
+    List<FilterEntry> resolveFilterEntries(T context);
 
     /**
      * Returns which filters should apply for the given request.
@@ -54,17 +53,16 @@ public interface HttpFilterResolver<F extends HttpFilter, T extends AnnotationMe
      * @param filterEntries the filter entries
      * @return The list of filters
      */
-    List<F> resolveFilters(HttpRequest<?> request, List<FilterEntry<F>> filterEntries);
+    List<InternalFilter> resolveFilters(HttpRequest<?> request, List<FilterEntry> filterEntries);
 
     /**
      * A resolved filter entry.
-     * @param <F> The filter type
      */
-    interface FilterEntry<F> extends AnnotationMetadataProvider {
+    interface FilterEntry extends AnnotationMetadataProvider {
         /**
          * @return The filter
          */
-        @NonNull F getFilter();
+        @NonNull InternalFilter getFilter();
 
         /**
          * @return The filter methods.
@@ -103,41 +101,18 @@ public interface HttpFilterResolver<F extends HttpFilter, T extends AnnotationMe
          * @param filter The filter
          * @param annotationMetadata The annotation metadata
          * @param methods The methods
-         * @param patterns The patterns
-         * @return The filter entry
-         * @param <FT> the filter type
-         */
-        static <FT extends HttpFilter> FilterEntry<FT> of(
-                @NonNull FT filter,
-                @Nullable AnnotationMetadata annotationMetadata,
-                @Nullable Set<HttpMethod> methods,
-                String...patterns) {
-            return new DefaultFilterEntry<>(
-                    Objects.requireNonNull(filter, "Filter cannot be null"),
-                    annotationMetadata != null ? annotationMetadata : AnnotationMetadata.EMPTY_METADATA,
-                    methods,
-                    null,
-                    patterns
-            );
-        }
-
-        /**
-         * Creates a filter entry for the given arguments.
-         * @param filter The filter
-         * @param annotationMetadata The annotation metadata
-         * @param methods The methods
          * @param patternStyle the pattern style
          * @param patterns The patterns
          * @return The filter entry
          * @param <FT> the filter type
          */
-        static <FT extends HttpFilter> FilterEntry<FT> of(
+        static <FT extends HttpFilter> FilterEntry of(
             @NonNull FT filter,
             @Nullable AnnotationMetadata annotationMetadata,
             @Nullable Set<HttpMethod> methods,
             @NonNull FilterPatternStyle patternStyle, String...patterns) {
-            return new DefaultFilterEntry<>(
-                Objects.requireNonNull(filter, "Filter cannot be null"),
+            return new DefaultFilterEntry(
+                new InternalFilter.AroundLegacy(Objects.requireNonNull(filter, "Filter cannot be null")),
                 annotationMetadata != null ? annotationMetadata : AnnotationMetadata.EMPTY_METADATA,
                 methods,
                 patternStyle,

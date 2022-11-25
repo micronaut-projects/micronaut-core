@@ -25,11 +25,11 @@ import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.beans.BeanMap;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.ConversionServiceAware;
+import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.io.buffer.ReferenceCounted;
-import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
@@ -73,10 +73,11 @@ import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.context.ServerRequestContext;
-import io.micronaut.http.filter.ClientFilterChain;
+import io.micronaut.http.filter.FilterRunner;
 import io.micronaut.http.filter.HttpClientFilter;
 import io.micronaut.http.filter.HttpClientFilterResolver;
 import io.micronaut.http.filter.HttpFilterResolver;
+import io.micronaut.http.filter.InternalFilter;
 import io.micronaut.http.multipart.MultipartException;
 import io.micronaut.http.netty.AbstractNettyHttpRequest;
 import io.micronaut.http.netty.NettyHttpHeaders;
@@ -88,6 +89,7 @@ import io.micronaut.http.netty.stream.HttpStreamsClientHandler;
 import io.micronaut.http.netty.stream.JsonSubscriber;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
+import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.sse.Event;
 import io.micronaut.http.uri.UriBuilder;
 import io.micronaut.http.uri.UriTemplate;
@@ -184,7 +186,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -245,7 +246,7 @@ public class DefaultHttpClient implements
 
     ConnectionManager connectionManager;
 
-    private final List<HttpFilterResolver.FilterEntry<HttpClientFilter>> clientFilterEntries;
+    private final List<HttpFilterResolver.FilterEntry> clientFilterEntries;
     private final LoadBalancer loadBalancer;
     private final HttpClientConfiguration configuration;
     private final String contextPath;
@@ -326,7 +327,7 @@ public class DefaultHttpClient implements
                              @NonNull HttpClientConfiguration configuration,
                              @Nullable String contextPath,
                              @NonNull HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver,
-                             List<HttpFilterResolver.FilterEntry<HttpClientFilter>> clientFilterEntries,
+                             List<HttpFilterResolver.FilterEntry> clientFilterEntries,
                              @Nullable ThreadFactory threadFactory,
                              @NonNull NettyClientSslBuilder nettyClientSslBuilder,
                              @NonNull MediaTypeCodecRegistry codecRegistry,
@@ -1243,32 +1244,28 @@ public class DefaultHttpClient implements
         if (request instanceof MutableHttpRequest) {
             ((MutableHttpRequest<I>) request).uri(requestURI);
 
-            List<HttpClientFilter> filters =
+            List<InternalFilter> filters =
                     filterResolver.resolveFilters(request, clientFilterEntries);
             if (parentRequest != null) {
-                filters.add(new ClientServerContextFilter(parentRequest));
+                // todo: migrate to new filter
+                filters.add(new InternalFilter.AroundLegacy(new ClientServerContextFilter(parentRequest)));
             }
 
-            OrderUtil.reverseSort(filters);
-            Publisher<R> finalResponsePublisher = responsePublisher;
-            filters.add((req, chain) -> finalResponsePublisher);
+            FilterRunner.sort(filters, true);
+            filters.add(new InternalFilter.TerminalReactive(responsePublisher));
 
-            ClientFilterChain filterChain = buildChain(requestWrapper, filters);
+            FilterRunner runner = new FilterRunner(filters);
             if (parentRequest != null) {
                 responsePublisher = ServerRequestContext.with(parentRequest, (Supplier<Publisher<R>>) () -> {
                     try {
-                        return Flux.from((Publisher<R>) filters.get(0).doFilter(request, filterChain))
+                        return Flux.from(ReactiveExecutionFlow.toPublisher(() -> (ExecutionFlow<R>) runner.run(request)))
                                 .contextWrite(ctx -> ctx.put(ServerRequestContext.KEY, parentRequest));
                     } catch (Throwable t) {
                         return Flux.error(t);
                     }
                 });
             } else {
-                try {
-                    responsePublisher = (Publisher<R>) filters.get(0).doFilter(request, filterChain);
-                } catch (Throwable t) {
-                    responsePublisher = Flux.error(t);
-                }
+                return ReactiveExecutionFlow.toPublisher(() -> (ExecutionFlow<R>) runner.run(request));
             }
         }
 
@@ -1696,27 +1693,6 @@ public class DefaultHttpClient implements
                 headers.set(HttpHeaderNames.CONTENT_LENGTH, 0);
             }
         }
-    }
-
-    private ClientFilterChain buildChain(AtomicReference<MutableHttpRequest<?>> requestWrapper, List<HttpClientFilter> filters) {
-        AtomicInteger integer = new AtomicInteger();
-        int len = filters.size();
-        return new ClientFilterChain() {
-            @Override
-            public Publisher<? extends io.micronaut.http.HttpResponse<?>> proceed(MutableHttpRequest<?> request) {
-
-                int pos = integer.incrementAndGet();
-                if (pos > len) {
-                    throw new IllegalStateException("The FilterChain.proceed(..) method should be invoked exactly once per filter execution. The method has instead been invoked multiple times by an erroneous filter definition.");
-                }
-                HttpClientFilter httpFilter = filters.get(pos);
-                try {
-                    return httpFilter.doFilter(requestWrapper.getAndSet(request), this);
-                } catch (Throwable t) {
-                    return Flux.error(t);
-                }
-            }
-        };
     }
 
     private HttpPostRequestEncoder buildFormDataRequest(MutableHttpRequest clientHttpRequest, Object bodyValue) throws HttpPostRequestEncoder.ErrorDataEncoderException {

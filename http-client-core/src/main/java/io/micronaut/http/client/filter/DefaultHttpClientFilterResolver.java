@@ -21,7 +21,6 @@ import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.core.util.Toggleable;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.annotation.Filter;
@@ -29,6 +28,7 @@ import io.micronaut.http.annotation.FilterMatcher;
 import io.micronaut.http.filter.FilterPatternStyle;
 import io.micronaut.http.filter.HttpClientFilter;
 import io.micronaut.http.filter.HttpClientFilterResolver;
+import io.micronaut.http.filter.InternalFilter;
 import jakarta.inject.Singleton;
 
 import java.util.ArrayList;
@@ -68,7 +68,7 @@ public class DefaultHttpClientFilterResolver implements HttpClientFilterResolver
     }
 
     @Override
-    public List<FilterEntry<HttpClientFilter>> resolveFilterEntries(ClientFilterResolutionContext context) {
+    public List<FilterEntry> resolveFilterEntries(ClientFilterResolutionContext context) {
         return clientFilters.stream()
                 .map(httpClientFilter -> {
                     AnnotationMetadata annotationMetadata = annotationMetadataResolver.resolveMetadata(httpClientFilter);
@@ -114,13 +114,13 @@ public class DefaultHttpClientFilterResolver implements HttpClientFilterResolver
     }
 
     @Override
-    public List<HttpClientFilter> resolveFilters(HttpRequest<?> request, List<FilterEntry<HttpClientFilter>> filterEntries) {
+    public List<InternalFilter> resolveFilters(HttpRequest<?> request, List<FilterEntry> filterEntries) {
         String requestPath = StringUtils.prependUri("/", request.getUri().getPath());
         io.micronaut.http.HttpMethod method = request.getMethod();
-        List<HttpClientFilter> filterList = new ArrayList<>(filterEntries.size());
-        for (FilterEntry<HttpClientFilter> filterEntry : filterEntries) {
-            final HttpClientFilter filter = filterEntry.getFilter();
-            if (filter instanceof Toggleable && !((Toggleable) filter).isEnabled()) {
+        List<InternalFilter> filterList = new ArrayList<>(filterEntries.size());
+        for (FilterEntry filterEntry : filterEntries) {
+            final InternalFilter filter = filterEntry.getFilter();
+            if (filter instanceof InternalFilter.AroundLegacy al && !al.isEnabled()) {
                 continue;
             }
             boolean matches = true;

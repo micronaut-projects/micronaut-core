@@ -15,13 +15,15 @@
  */
 package io.micronaut.web.router;
 
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
-import io.micronaut.core.util.*;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.util.PathMatcher;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.filter.FilterPatternStyle;
-import io.micronaut.http.filter.HttpFilter;
+import io.micronaut.http.filter.InternalFilter;
 
 import java.net.URI;
 import java.util.ArrayList;
@@ -42,31 +44,35 @@ import java.util.function.Supplier;
 class DefaultFilterRoute implements FilterRoute {
 
     private final List<String> patterns = new ArrayList<>(1);
-    private final Supplier<HttpFilter> filterSupplier;
+    private final Supplier<InternalFilter> filterSupplier;
     private final AnnotationMetadataResolver annotationMetadataResolver;
     private Set<HttpMethod> httpMethods;
     private FilterPatternStyle patternStyle;
-    private HttpFilter filter;
+    private volatile InternalFilter filter;
     private AnnotationMetadata annotationMetadata;
 
-    /**
-     * @param pattern A pattern
-     * @param filter A {@link Supplier} for an HTTP filter
-     * @param annotationMetadataResolver The annotation metadata resolver
-     */
-    DefaultFilterRoute(String pattern, Supplier<HttpFilter> filter, AnnotationMetadataResolver annotationMetadataResolver) {
-        Objects.requireNonNull(pattern, "Pattern argument is required");
-        Objects.requireNonNull(pattern, "HttpFilter argument is required");
+    DefaultFilterRoute(Supplier<InternalFilter> filter, AnnotationMetadataResolver annotationMetadataResolver) {
+        Objects.requireNonNull(filter, "HttpFilter argument is required");
         this.filterSupplier = filter;
-        this.patterns.add(pattern);
         this.annotationMetadataResolver = annotationMetadataResolver;
     }
 
     /**
      * @param pattern A pattern
      * @param filter A {@link Supplier} for an HTTP filter
+     * @param annotationMetadataResolver The annotation metadata resolver
      */
-    DefaultFilterRoute(String pattern, Supplier<HttpFilter> filter) {
+    DefaultFilterRoute(String pattern, Supplier<InternalFilter> filter, AnnotationMetadataResolver annotationMetadataResolver) {
+        this(filter, annotationMetadataResolver);
+        Objects.requireNonNull(pattern, "Pattern argument is required");
+        this.patterns.add(pattern);
+    }
+
+    /**
+     * @param pattern A pattern
+     * @param filter A {@link Supplier} for an HTTP filter
+     */
+    DefaultFilterRoute(String pattern, Supplier<InternalFilter> filter) {
        this(pattern, filter, AnnotationMetadataResolver.DEFAULT);
     }
 
@@ -87,8 +93,8 @@ class DefaultFilterRoute implements FilterRoute {
     }
 
     @Override
-    public HttpFilter getFilter() {
-        HttpFilter filter = this.filter;
+    public InternalFilter getFilter() {
+        InternalFilter filter = this.filter;
         if (filter == null) {
             synchronized (this) { // double check
                 filter = this.filter;
@@ -119,7 +125,7 @@ class DefaultFilterRoute implements FilterRoute {
     }
 
     @Override
-    public Optional<HttpFilter> match(HttpMethod method, URI uri) {
+    public Optional<InternalFilter> match(HttpMethod method, URI uri) {
         if (httpMethods != null && !httpMethods.contains(method)) {
             return Optional.empty();
         }
@@ -127,8 +133,8 @@ class DefaultFilterRoute implements FilterRoute {
         PathMatcher matcher = getPatternStyle().getPathMatcher();
         for (String pattern : patterns) {
             if (matcher.matches(pattern, uriStr)) {
-                HttpFilter filter = getFilter();
-                if (filter instanceof Toggleable && !((Toggleable) filter).isEnabled()) {
+                InternalFilter filter = getFilter();
+                if (filter instanceof InternalFilter.AroundLegacy al && !al.isEnabled()) {
                     return Optional.empty();
                 }
                 return Optional.of(filter);

@@ -270,7 +270,7 @@ final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.microna
             return;
         }
         routeExecutor.filterPublisher(new AtomicReference<>(nettyHttpRequest), () -> routeExecutor.onError(cause, nettyHttpRequest))
-            .onComplete((response, throwable) -> writeResponse(ctx, nettyHttpRequest, response, throwable));
+            .onComplete((response, throwable) -> writeResponse(ctx, nettyHttpRequest, (MutableHttpResponse<?>) response, throwable));
     }
 
     @Override
