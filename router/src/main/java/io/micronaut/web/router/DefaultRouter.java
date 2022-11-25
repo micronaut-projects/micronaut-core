@@ -30,6 +30,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.annotation.FilterMatcher;
 import io.micronaut.http.filter.FilterPatternStyle;
+import io.micronaut.http.filter.FilterRunner;
 import io.micronaut.http.filter.HttpServerFilterResolver;
 import io.micronaut.http.filter.InternalFilter;
 import io.micronaut.http.uri.UriMatchTemplate;
@@ -78,7 +79,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         for (FilterRoute filterRoute : alwaysMatchesFilterRoutes) {
             httpFilters.add(filterRoute.getFilter());
         }
-        httpFilters.sort(OrderUtil.COMPARATOR);
+        FilterRunner.sort(httpFilters);
         return httpFilters;
     });
 
@@ -463,7 +464,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             }
             filterRoute.match(method, uri).ifPresent(httpFilters::add);
         }
-        httpFilters.sort(OrderUtil.COMPARATOR);
+        FilterRunner.sort(httpFilters);
         return Collections.unmodifiableList(httpFilters);
     }
 

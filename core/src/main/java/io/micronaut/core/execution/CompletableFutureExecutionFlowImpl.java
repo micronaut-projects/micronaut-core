@@ -16,6 +16,7 @@
 package io.micronaut.core.execution;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -78,6 +79,20 @@ final class CompletableFutureExecutionFlowImpl implements CompletableFutureExecu
             fn.accept(o, throwable);
             return null;
         });
+    }
+
+    @Nullable
+    @Override
+    public ImperativeExecutionFlow<Object> asDone() {
+        if (stage.isDone()) {
+            try {
+                return new ImperativeExecutionFlowImpl(stage.getNow(null), null);
+            } catch (Throwable t) {
+                return new ImperativeExecutionFlowImpl(null, t);
+            }
+        } else {
+            return null;
+        }
     }
 
     @Override

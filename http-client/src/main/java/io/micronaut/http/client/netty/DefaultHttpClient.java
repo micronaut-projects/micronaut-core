@@ -1255,7 +1255,7 @@ public class DefaultHttpClient implements
                     new FilterOrder.Fixed(Ordered.HIGHEST_PRECEDENCE)));
             }
 
-            FilterRunner.sort(filters);
+            FilterRunner.sortReverse(filters);
             filters.add(new InternalFilter.TerminalReactive(responsePublisher));
 
             FilterRunner runner = new FilterRunner(filters);

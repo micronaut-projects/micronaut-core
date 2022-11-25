@@ -546,13 +546,20 @@ public final class RouteExecutor {
         }
         List<InternalFilter> actualFilters = new ArrayList<>(httpFilters.size() + 1);
         actualFilters.addAll(httpFilters);
-        FilterRunner.sort(actualFilters);
-        actualFilters.add(new InternalFilter.Terminal(responseFlowSupplier));
+        actualFilters.add(new InternalFilter.Terminal(req -> {
+            requestReference.set(req);
+            return responseFlowSupplier.get();
+        }));
         FilterRunner runner = new FilterRunner(actualFilters) {
             @Override
-            protected ExecutionFlow<? extends HttpResponse<?>> postProcess(HttpRequest<?> request, ExecutionFlow<? extends HttpResponse<?>> flow) {
-                return flow.flatMap(response -> handleStatusException(requestReference.get(), (MutableHttpResponse<?>) response))
-                    .onErrorResume(throwable -> onError(throwable, requestReference.get()));
+            protected ExecutionFlow<? extends HttpResponse<?>> processResponse(HttpRequest<?> request, HttpResponse<?> response) {
+                return handleStatusException(request, (MutableHttpResponse<?>) response)
+                    .onErrorResume(throwable -> onError(throwable, request));
+            }
+
+            @Override
+            protected ExecutionFlow<? extends HttpResponse<?>> processFailure(HttpRequest<?> request, Throwable failure) {
+                return onError(failure, request);
             }
         };
         return (ExecutionFlow<MutableHttpResponse<?>>) runner.run(requestReference.get());

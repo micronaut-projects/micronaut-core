@@ -143,11 +143,21 @@ public interface ExecutionFlow<T> {
     ExecutionFlow<T> putInContext(@NonNull String key, @NonNull Object value);
 
     /**
-     * Invokes a provided function when the flow is resolved.
+     * Invokes a provided function when the flow is resolved, or immediately if it is already done.
      *
      * @param fn The function
      */
     void onComplete(@NonNull BiConsumer<? super T, Throwable> fn);
+
+    /**
+     * Create an {@link ImperativeExecutionFlow} from this execution flow, if possible. The flow
+     * will have its result immediately available.
+     *
+     * @return The imperative flow, or {@code null} if this flow is not complete or does not
+     * support this operation
+     */
+    @Nullable
+    ImperativeExecutionFlow<T> asDone();
 
     /**
      * Converts the existing flow into the completable future.

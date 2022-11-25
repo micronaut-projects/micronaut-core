@@ -49,4 +49,9 @@ public interface ImperativeExecutionFlow<T> extends ExecutionFlow<T> {
     @NonNull
     Map<String, Object> getContext();
 
+    @NonNull
+    @Override
+    default ImperativeExecutionFlow<T> asDone() {
+        return this;
+    }
 }

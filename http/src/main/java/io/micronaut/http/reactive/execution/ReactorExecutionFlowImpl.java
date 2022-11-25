@@ -16,6 +16,7 @@
 package io.micronaut.http.reactive.execution;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.execution.CompletableFutureExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.execution.ImperativeExecutionFlow;
@@ -109,6 +110,13 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
                 fn.accept(value.get(), null);
             }
         });
+    }
+
+    @Nullable
+    @Override
+    public ImperativeExecutionFlow<Object> asDone() {
+        // not supported
+        return null;
     }
 
     static <R> Mono<Object> toMono(ExecutionFlow<R> next) {
