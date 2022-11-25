@@ -101,20 +101,20 @@ class CorruptedServerRequestContextSpec extends Specification {
     }
 
     @RequestScope
-    static class RequestScopedBean {
+    static class CorruptedContextRequestScopedBean {
         Boolean value
     }
 
     @Controller('/corrupted-context')
     @Produces(MediaType.TEXT_PLAIN)
-    static class TestContextController {
+    static class TestCorruptedContextController {
 
         @Inject
         @Client("/corrupted-context")
         HttpClient client
 
         @Inject
-        RequestScopedBean requestScopedBean
+        CorruptedContextRequestScopedBean requestScopedBean
 
         @Get("/mono-http-response-flux")
         Mono<HttpResponse<Flux<String>>> monoHttpResponseFlux() {
