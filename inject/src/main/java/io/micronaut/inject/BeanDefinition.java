@@ -21,10 +21,12 @@ import io.micronaut.context.Qualifier;
 import io.micronaut.context.annotation.DefaultScope;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.EachProperty;
-import io.micronaut.context.annotation.Provided;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.naming.NameResolver;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
@@ -145,17 +147,6 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
             }
         }
         return false;
-    }
-
-    /**
-     * @return Is this definition provided by another bean
-     * @deprecated Provided beans are deprecated
-     * @see Provided
-     */
-    @SuppressWarnings("DeprecatedIsStillUsed")
-    @Deprecated(forRemoval = true, since = "2.0.0")
-    default boolean isProvided() {
-        return getAnnotationMetadata().hasDeclaredStereotype(Provided.class);
     }
 
     /**

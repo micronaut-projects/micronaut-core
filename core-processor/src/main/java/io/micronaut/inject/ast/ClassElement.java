@@ -23,6 +23,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.naming.NameUtils;
+import io.micronaut.core.type.DefaultArgument;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
 
@@ -119,6 +120,30 @@ public interface ClassElement extends TypedElement {
      */
     default boolean isOptional() {
         return isAssignable(Optional.class) || isAssignable(OptionalLong.class) || isAssignable(OptionalDouble.class) || isAssignable(OptionalInt.class);
+    }
+
+    /**
+     * Checks whether the bean type is a container type.
+     * @return Whether the type is a container type like {@link Iterable}.
+     * @since 4.0.0
+     */
+    default boolean isContainerType() {
+        return DefaultArgument.CONTAINER_TYPES.contains(getName());
+    }
+
+    /**
+     * Whether this element is a {@link jakarta.inject.Provider} or similar.
+     *
+     * @return Is this element an optional
+     * @since 4.0.0
+     */
+    default boolean isProvider() {
+        for (String type : DefaultArgument.PROVIDER_TYPES) {
+            if (getName().equals(type)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

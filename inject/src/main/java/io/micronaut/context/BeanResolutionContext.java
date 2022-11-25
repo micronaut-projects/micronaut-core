@@ -15,6 +15,7 @@
  */
 package io.micronaut.context;
 
+import io.micronaut.context.env.ConfigurationPath;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -166,6 +167,13 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * @return The path that this resolution has taken so far
      */
     Path getPath();
+
+    /**
+     * @return The configuration path.
+     * @since 4.0.0
+     */
+    @NonNull
+    ConfigurationPath getConfigurationPath();
 
     /**
      * Store a value within the context.

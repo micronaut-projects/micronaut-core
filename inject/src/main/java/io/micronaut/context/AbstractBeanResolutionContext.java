@@ -17,6 +17,7 @@ package io.micronaut.context;
 
 import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.context.annotation.InjectScope;
+import io.micronaut.context.env.ConfigurationPath;
 import io.micronaut.context.exceptions.CircularDependencyException;
 import io.micronaut.context.scope.CustomScope;
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -58,6 +59,18 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         this.context = context;
         this.rootDefinition = rootDefinition;
         this.path = new DefaultPath();
+    }
+
+    @Override
+    public ConfigurationPath getConfigurationPath() {
+        Object o = getAttribute(ConfigurationPath.ATTRIBUTE);
+        if (o instanceof ConfigurationPath cp) {
+            return cp;
+        } else {
+            var configurationPath = ConfigurationPath.newPath();
+            setAttribute(ConfigurationPath.ATTRIBUTE, configurationPath);
+            return configurationPath;
+        }
     }
 
     @NonNull

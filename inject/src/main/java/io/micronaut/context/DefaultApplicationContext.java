@@ -21,12 +21,12 @@ import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.env.BootstrapPropertySourceLocator;
 import io.micronaut.context.env.CachedEnvironment;
+import io.micronaut.context.env.ConfigurationPath;
 import io.micronaut.context.env.DefaultEnvironment;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.context.exceptions.NoSuchBeanException;
-import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -47,7 +47,6 @@ import io.micronaut.inject.qualifiers.PrimaryQualifier;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -222,6 +221,11 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     }
 
     @Override
+    public Collection<List<String>> getPropertyPathMatches(String pathPattern) {
+        return getEnvironment().getPropertyPathMatches(pathPattern);
+    }
+
+    @Override
     protected synchronized void registerConfiguration(BeanConfiguration configuration) {
         if (getEnvironment().isActive(configuration)) {
             super.registerConfiguration(configuration);
@@ -382,13 +386,17 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
             List<BeanDefinition<T>> transformedCandidates = new ArrayList<>();
             for (BeanDefinition<T> candidate : candidates) {
                 if (candidate.isIterable()) {
-                    if (candidate.hasDeclaredStereotype(EachProperty.class)) {
-                        transformEachPropertyBeanDefinition(resolutionContext, candidate, transformedCandidates);
-                    } else if (candidate.hasDeclaredStereotype(EachBean.class)) {
-                        transformEachBeanBeanDefinition(resolutionContext, candidate, transformedCandidates, filterProxied);
+                    try(BeanResolutionContext rc = newResolutionContext(candidate, resolutionContext)) {
+                        if (candidate.hasDeclaredStereotype(EachProperty.class)) {
+                            transformEachPropertyBeanDefinition(rc, candidate, transformedCandidates);
+                        } else if (candidate.hasDeclaredStereotype(EachBean.class)) {
+                            transformEachBeanBeanDefinition(rc, candidate, transformedCandidates, filterProxied);
+                        }
                     }
                 } else if (candidate.hasStereotype(ConfigurationReader.class)) {
-                    transformConfigurationReaderBeanDefinition(resolutionContext, candidate, transformedCandidates);
+                    try(BeanResolutionContext rc = newResolutionContext(candidate, resolutionContext)) {
+                        transformConfigurationReaderBeanDefinition(rc, candidate, transformedCandidates);
+                    }
                 } else {
                     transformedCandidates.add(candidate);
                 }
@@ -408,77 +416,52 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                                                                 BeanDefinition<T> candidate,
                                                                 List<BeanDefinition<T>> transformedCandidates) {
         final String prefix = candidate.stringValue(ConfigurationReader.class, "prefix").orElse(null);
+        ConfigurationPath configurationPath = resolutionContext.getConfigurationPath();
         if (prefix != null) {
-            int mapIndex = prefix.indexOf("*");
-            int arrIndex = prefix.indexOf("[*]");
 
-            boolean isList = arrIndex > -1;
-            boolean isMap = mapIndex > -1;
-            if (isList || isMap) {
-                int startIndex = isList ? arrIndex : mapIndex;
-                String eachProperty = prefix.substring(0, startIndex);
-                if (eachProperty.endsWith(".")) {
-                    eachProperty = eachProperty.substring(0, eachProperty.length() - 1);
-                }
+            if (configurationPath.isNotEmpty()) {
+                ConfigurationPath newPath = configurationPath.copy();
+                newPath.pushConfigurationReader(candidate);
+                newPath.traverseResolvableSegments(getEnvironment(), subPath ->
+                    createAndAddDelegate(resolutionContext, candidate, transformedCandidates, subPath)
+                );
+            } else if (prefix.indexOf('*') == -1) {
+                // doesn't require outer configuration
+                transformedCandidates.add(candidate);
+            } else {
+                // if we have reached here we are likely in a nested a class being resolved directly from the context
+                // traverse and try reformulate the path
+                @SuppressWarnings("unchecked")
+                Class<Object> declaringClass = (Class<Object>) candidate.getBeanType().getDeclaringClass();
+                if (declaringClass != null) {
+                    Collection<BeanDefinition<Object>> beanCandidates = findBeanCandidates(resolutionContext, Argument.of(declaringClass), null, true);
+                    for (BeanDefinition<Object> beanCandidate : beanCandidates) {
+                        if (beanCandidate instanceof BeanDefinitionDelegate<Object> delegate) {
+                            ConfigurationPath cp = delegate.get(ConfigurationPath.ATTRIBUTE, ConfigurationPath.class).orElse(configurationPath).copy();
+                            cp.traverseResolvableSegments(getEnvironment(), subPath -> {
+                                subPath.pushConfigurationReader(candidate);
+                                if (getEnvironment().containsProperties(subPath.prefix())) {
+                                    createAndAddDelegate(resolutionContext, candidate, transformedCandidates, subPath);
+                                }
+                            });
+                        } else {
+                            ConfigurationPath cp = configurationPath.copy();
+                            cp.pushConfigurationReader(beanCandidate);
+                            cp.pushConfigurationReader(candidate);
+                            cp.traverseResolvableSegments(getEnvironment(), subPath -> {
+                                if (getEnvironment().containsProperties(subPath.prefix())) {
+                                    createAndAddDelegate(resolutionContext, candidate, transformedCandidates, subPath);
+                                }
+                            });
 
-                if (StringUtils.isEmpty(eachProperty)) {
-                    throw new IllegalArgumentException("Blank value specified to @Each property for bean: " + candidate);
-                }
-                if (isList) {
-                    transformConfigurationReaderList(resolutionContext, candidate, prefix, eachProperty, transformedCandidates);
-                } else {
-                    transformConfigurationReaderMap(resolutionContext, candidate, prefix, eachProperty, transformedCandidates);
-                }
-                return;
-            }
-        }
-        transformedCandidates.add(candidate);
-    }
-
-    private <T> void transformConfigurationReaderMap(BeanResolutionContext resolutionContext,
-                                                     BeanDefinition<T> candidate,
-                                                     String prefix,
-                                                     String eachProperty,
-                                                     List<BeanDefinition<T>> transformedCandidates) {
-        Map entries = getProperty(eachProperty, Map.class, Collections.emptyMap());
-        if (!entries.isEmpty()) {
-            for (Object key : entries.keySet()) {
-                BeanDefinitionDelegate<T> delegate = BeanDefinitionDelegate.create(candidate);
-                delegate.put(EachProperty.class.getName(), delegate.getBeanType());
-                delegate.put(Named.class.getName(), key.toString());
-
-                if (delegate.isEnabled(this, resolutionContext) &&
-                        containsProperties(prefix.replace("*", key.toString()))) {
-                    transformedCandidates.add(delegate);
-                }
-            }
-        }
-    }
-
-    private <T> void transformConfigurationReaderList(BeanResolutionContext resolutionContext,
-                                                      BeanDefinition<T> candidate,
-                                                      String prefix,
-                                                      String eachProperty,
-                                                      List<BeanDefinition<T>> transformedCandidates) {
-        List entries = getProperty(eachProperty, List.class, Collections.emptyList());
-        if (!entries.isEmpty()) {
-            for (int i = 0; i < entries.size(); i++) {
-                if (entries.get(i) != null) {
-                    BeanDefinitionDelegate<T> delegate = BeanDefinitionDelegate.create(candidate);
-                    String index = String.valueOf(i);
-                    delegate.put("Array", index);
-                    delegate.put(Named.class.getName(), index);
-
-                    if (delegate.isEnabled(this, resolutionContext) &&
-                            containsProperties(prefix.replace("*", index))) {
-                        transformedCandidates.add(delegate);
+                        }
                     }
                 }
             }
         }
     }
 
-    private <T> void transformEachBeanBeanDefinition(BeanResolutionContext resolutionContext,
+    private <T> void transformEachBeanBeanDefinition(@NonNull BeanResolutionContext resolutionContext,
                                                      BeanDefinition<T> candidate,
                                                      List<BeanDefinition<T>> transformedCandidates,
                                                      boolean filterProxied) {
@@ -491,108 +474,54 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         Collection<BeanDefinition> dependentCandidates = findBeanCandidates(resolutionContext, Argument.of(dependentType), filterProxied, null);
 
         if (!dependentCandidates.isEmpty()) {
-            for (BeanDefinition dependentCandidate : dependentCandidates) {
-                Qualifier qualifier;
-                if (dependentCandidate instanceof BeanDefinitionDelegate) {
-                    qualifier = dependentCandidate.resolveDynamicQualifier();
+            for (BeanDefinition<?> dependentCandidate : dependentCandidates) {
+                ConfigurationPath dependentPath = null;
+                if (dependentCandidate instanceof BeanDefinitionDelegate<?> delegate) {
+                    dependentPath = delegate.get(ConfigurationPath.ATTRIBUTE, ConfigurationPath.class).orElse(null);
+                }
+                if (dependentPath != null) {
+                    createAndAddDelegate(resolutionContext, candidate, transformedCandidates, dependentPath);
                 } else {
-                    qualifier = dependentCandidate.getDeclaredQualifier();
-                }
-                if (qualifier == null && dependentCandidate.isPrimary()) {
-                    // Backwards compatibility, `getDeclaredQualifier` strips @Primary
-                    // This should be removed if @Primary is no longer qualifier
-                    qualifier = PrimaryQualifier.INSTANCE;
-                }
-
-                BeanDefinitionDelegate<?> delegate = BeanDefinitionDelegate.create(candidate, qualifier);
-
-                if (dependentCandidate.isPrimary()) {
-                    delegate.put(BeanDefinitionDelegate.PRIMARY_ATTRIBUTE, true);
-                }
-
-                if (qualifier != null) {
-                    String qualifierKey = AnnotationUtil.QUALIFIER;
-                    Argument<?>[] arguments = candidate.getConstructor().getArguments();
-                    for (Argument<?> argument : arguments) {
-                        Class<?> argumentType = argument.getType();
-                        if (argumentType.equals(dependentType)) {
-                            delegate.put(qualifierKey, Collections.singletonMap(argument, qualifier));
-                            break;
-                        }
+                    Qualifier<?> qualifier = dependentCandidate.getDeclaredQualifier();
+                    if (qualifier == null && dependentCandidate.isPrimary()) {
+                        // Backwards compatibility, `getDeclaredQualifier` strips @Primary
+                        // This should be removed if @Primary is no longer qualifier
+                        qualifier = PrimaryQualifier.INSTANCE;
                     }
+                    BeanDefinitionDelegate<?> delegate = BeanDefinitionDelegate.create(candidate, (Qualifier<T>) qualifier);
 
-                    if (qualifier instanceof Named named) {
-                        delegate.put(Named.class.getName(), named.getName());
+                    if (dependentCandidate.isPrimary()) {
+                        delegate.put(BeanDefinitionDelegate.PRIMARY_ATTRIBUTE, true);
                     }
-                    if (delegate.isEnabled(this, resolutionContext)) {
-                        transformedCandidates.add((BeanDefinition<T>) delegate);
-                    }
+                    transformedCandidates.add((BeanDefinition<T>) delegate);
                 }
             }
         }
     }
 
-    private <T> void transformEachPropertyBeanDefinition(BeanResolutionContext resolutionContext,
+    private <T> void transformEachPropertyBeanDefinition(@NonNull BeanResolutionContext resolutionContext,
                                                          BeanDefinition<T> candidate,
                                                          List<BeanDefinition<T>> transformedCandidates) {
-        boolean isList = candidate.booleanValue(EachProperty.class, "list").orElse(false);
-        String property = candidate.stringValue(ConfigurationReader.class, ConfigurationReader.PREFIX)
-                .map(prefix ->
-                        //strip the .* or [*]
-                        prefix.substring(0, prefix.length() - (isList ? 3 : 2)))
-                .orElseGet(() -> candidate.stringValue(EachProperty.class).orElse(null));
-        String primaryPrefix = candidate.stringValue(EachProperty.class, "primary").orElse(null);
-        if (StringUtils.isEmpty(property)) {
-            throw new IllegalArgumentException("Blank value specified to @Each property for bean: " + candidate);
-        }
-        if (isList) {
-            transformEachPropertyOfList(resolutionContext, candidate, primaryPrefix, property, transformedCandidates);
-        } else {
-            transformEachPropertyOfMap(resolutionContext, candidate, primaryPrefix, property, transformedCandidates);
+        ConfigurationPath configurationPath = resolutionContext.getConfigurationPath();
+        configurationPath.pushEachPropertyRoot(candidate);
+        try {
+            ConfigurationPath rootConfig = resolutionContext.getConfigurationPath();
+            rootConfig.traverseResolvableSegments(getEnvironment(), (subPath ->
+                createAndAddDelegate(resolutionContext, candidate, transformedCandidates, subPath)
+            ));
+        } finally {
+            configurationPath.removeLast();
         }
     }
 
-    private <T> void transformEachPropertyOfMap(BeanResolutionContext resolutionContext,
-                                                BeanDefinition<T> candidate,
-                                                String primaryPrefix,
-                                                String property,
-                                                List<BeanDefinition<T>> transformedCandidates) {
-        for (String key : getEnvironment().getPropertyEntries(property)) {
-            BeanDefinitionDelegate<T> delegate = BeanDefinitionDelegate.create(candidate);
-            if (primaryPrefix != null && primaryPrefix.equals(key)) {
-                delegate.put(BeanDefinitionDelegate.PRIMARY_ATTRIBUTE, true);
-            }
-            delegate.put(EachProperty.class.getName(), delegate.getBeanType());
-            delegate.put(Named.class.getName(), key);
-
-            if (delegate.isEnabled(this, resolutionContext)) {
-                transformedCandidates.add(delegate);
-            }
-        }
-    }
-
-    private <T> void transformEachPropertyOfList(BeanResolutionContext resolutionContext,
-                                                 BeanDefinition<T> candidate,
-                                                 String primaryPrefix,
-                                                 String property,
-                                                 List<BeanDefinition<T>> transformedCandidates) {
-        List<?> entries = getEnvironment().getProperty(property, List.class, Collections.emptyList());
-        int i = 0;
-        for (Object entry : entries) {
-            if (entry != null) {
-                BeanDefinitionDelegate<T> delegate = BeanDefinitionDelegate.create(candidate);
-                String index = String.valueOf(i);
-                if (primaryPrefix != null && primaryPrefix.equals(index)) {
-                    delegate.put(BeanDefinitionDelegate.PRIMARY_ATTRIBUTE, true);
-                }
-                delegate.put("Array", index);
-                delegate.put(Named.class.getName(), index);
-
-                if (delegate.isEnabled(this, resolutionContext)) {
-                    transformedCandidates.add(delegate);
-                }
-            }
-            i++;
+    private <T> void createAndAddDelegate(BeanResolutionContext resolutionContext, BeanDefinition<T> candidate, List<BeanDefinition<T>> transformedCandidates, ConfigurationPath path) {
+        BeanDefinitionDelegate<T> delegate = BeanDefinitionDelegate.create(
+            candidate,
+            path.beanQualifier()
+        );
+        delegate.put(ConfigurationPath.ATTRIBUTE, path);
+        if (delegate.isEnabled(this, resolutionContext)) {
+            transformedCandidates.add(delegate);
         }
     }
 

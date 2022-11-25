@@ -43,6 +43,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.ListIterator;
@@ -50,6 +51,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
@@ -57,6 +59,7 @@ import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * <p>A {@link PropertyResolver} that resolves from one or many {@link PropertySource} instances.</p>
@@ -215,6 +218,49 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                                   return withoutPrefix;
                               })
                               .collect(Collectors.toSet());
+            }
+        }
+        return Collections.emptySet();
+    }
+
+    @Override
+    public Set<List<String>> getPropertyPathMatches(String pathPattern) {
+        if (StringUtils.isNotEmpty(pathPattern)) {
+            Map<String, Object> entries = resolveEntriesForKey(
+                pathPattern, false, null);
+
+            if (entries != null) {
+                boolean endsWithWildCard = pathPattern.endsWith(".*");
+                String resolvedPattern = pathPattern
+                    .replace("[*]", "\\[([\\w\\d]+?)\\]")
+                    .replace(".*.", "\\.([\\w\\d]+?)\\.");
+                if (endsWithWildCard) {
+                    resolvedPattern = resolvedPattern.replace("*.", "\\S*");
+                } else {
+                    resolvedPattern += "\\S*";
+                }
+                Pattern pattern = Pattern.compile(resolvedPattern);
+                Set<String> keys = entries.keySet();
+                Set<List<String>> results = new HashSet<>(keys.size());
+                for (String key : keys) {
+                    Matcher matcher = pattern.matcher(key);
+                    if (matcher.matches()) {
+                        int i = matcher.groupCount();
+                        if (i > 0) {
+                            if (i == 1) {
+                                results.add(Collections.singletonList(matcher.group(1)));
+                            } else {
+                                List<String> resolved = new ArrayList<>(i);
+                                for (int j = 0; j < i; j++) {
+                                    resolved.add(matcher.group(j + 1));
+                                }
+                                results.add(CollectionUtils.unmodifiableList(resolved));
+                            }
+                        }
+                    }
+                }
+
+                return Collections.unmodifiableSet(results);
             }
         }
         return Collections.emptySet();
@@ -760,18 +806,11 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
 
     private Map<String, Object>[] getCatalog(@Nullable PropertyCatalog propertyCatalog) {
         propertyCatalog = propertyCatalog != null ? propertyCatalog : PropertyCatalog.GENERATED;
-        final Map<String, Object>[] catalog;
-        switch (propertyCatalog) {
-            case RAW:
-                catalog = this.rawCatalog;
-            break;
-            case NORMALIZED:
-                catalog = this.nonGenerated;
-            break;
-            default:
-                catalog = this.catalog;
-        }
-        return catalog;
+        return switch (propertyCatalog) {
+            case RAW -> this.rawCatalog;
+            case NORMALIZED -> this.nonGenerated;
+            default -> this.catalog;
+        };
     }
 
     /**

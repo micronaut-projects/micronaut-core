@@ -19,10 +19,16 @@ import io.micronaut.aop.InterceptorBean;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.BeanContext;
+import io.micronaut.context.BeanResolutionContext;
+import io.micronaut.context.DefaultBeanContext;
+import io.micronaut.context.DefaultBeanResolutionContext;
 import io.micronaut.context.Qualifier;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
+import io.micronaut.context.annotation.EachProperty;
+import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Prototype;
+import io.micronaut.context.env.ConfigurationPath;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
@@ -31,6 +37,7 @@ import io.micronaut.core.naming.Named;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.value.PropertyNotFoundException;
+import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
 import java.util.Collections;
@@ -54,19 +61,24 @@ public class ConfigurationIntroductionAdvice implements MethodInterceptor<Object
     private static final String MEMBER_NAME = "name";
     private final Environment environment;
     private final BeanContext beanContext;
-    private final String name;
+    private final ConfigurationPath configurationPath;
+    private final BeanDefinition<?> beanDefinition;
 
     /**
      * Default constructor.
      *
-     * @param qualifier   The qualifier
-     * @param environment The environment
-     * @param beanContext The bean locator
+     * @param resolutionContext The resolution context
+     * @param environment       The environment
+     * @param beanContext       The bean locator
      */
-    ConfigurationIntroductionAdvice(Qualifier<?> qualifier, Environment environment, BeanContext beanContext) {
+    ConfigurationIntroductionAdvice(
+        BeanResolutionContext resolutionContext,
+        Environment environment,
+        BeanContext beanContext) {
+        this.beanDefinition = resolutionContext.getRootDefinition();
         this.environment = environment;
         this.beanContext = beanContext;
-        this.name = qualifier instanceof Named named ? named.getName() : null;
+        this.configurationPath = resolutionContext.getConfigurationPath().copy();
     }
 
     @Nullable
@@ -87,14 +99,13 @@ public class ConfigurationIntroductionAdvice implements MethodInterceptor<Object
         if (property == null) {
             throw new IllegalStateException("No property name available to resolve");
         }
-        boolean iterable = property.indexOf('*') > -1;
-        if (iterable && name != null) {
-            property = property.replace("*", name);
+        if (configurationPath.hasDynamicSegments()) {
+            property = configurationPath.resolveValue(property);
         }
         final String defaultValue = context.stringValue(Bindable.class, "defaultValue").orElse(null);
 
         final Optional<Object> value = environment.getProperty(
-                property,
+            property,
             argument
         );
 
@@ -114,7 +125,7 @@ public class ConfigurationIntroductionAdvice implements MethodInterceptor<Object
     }
 
     private Object resolveBean(MethodInvocationContext<Object, Object> context, Class<Object> returnType, Argument<Object> argument) {
-        final Qualifier<Object> qualifier = name != null ? Qualifiers.byName(name) : null;
+        final Qualifier<Object> qualifier = configurationPath.beanQualifier();
         if (Iterable.class.isAssignableFrom(returnType)) {
             @SuppressWarnings("unchecked")
             Argument<Object> firstArg = (Argument<Object>) argument.getFirstTypeVariable().orElse(null);
@@ -131,10 +142,13 @@ public class ConfigurationIntroductionAdvice implements MethodInterceptor<Object
                 return v;
             }
         } else {
-            return environment.convertRequired(
-                beanContext.getBean(argument, qualifier),
-                returnType
-            );
+            try (BeanResolutionContext rc = new DefaultBeanResolutionContext(beanContext, beanDefinition)) {
+                rc.setAttribute(ConfigurationPath.ATTRIBUTE, configurationPath);
+                return environment.convertRequired(
+                    ((DefaultBeanContext) beanContext).getBean(rc, argument, qualifier),
+                    returnType
+                );
+            }
         }
     }
 }

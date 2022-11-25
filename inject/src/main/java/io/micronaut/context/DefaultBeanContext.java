@@ -2933,7 +2933,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
             return beanRegistration;
         }
 
-        Optional<BeanDefinition<T>> concreteCandidate = findBeanDefinition(beanType, qualifier);
+        Optional<BeanDefinition<T>> concreteCandidate = findBeanDefinition(resolutionContext, beanType, qualifier);
 
         BeanRegistration<T> registration;
 
@@ -2951,6 +2951,14 @@ public class DefaultBeanContext implements InitializableBeanContext {
             throw newNoSuchBeanException(resolutionContext, beanType, qualifier, null);
         }
         return registration;
+    }
+
+    private <T> Optional<BeanDefinition<T>> findBeanDefinition(BeanResolutionContext resolutionContext, Argument<T> beanType, Qualifier<T> qualifier) {
+        BeanDefinition<T> beanDefinition = singletonScope.findCachedSingletonBeanDefinition(beanType, qualifier);
+        if (beanDefinition != null) {
+            return Optional.of(beanDefinition);
+        }
+        return findConcreteCandidate(resolutionContext, beanType, qualifier, true);
     }
 
     /**

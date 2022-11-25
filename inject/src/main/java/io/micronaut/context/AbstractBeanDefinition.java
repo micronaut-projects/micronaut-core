@@ -304,12 +304,6 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         return "Definition: " + declaringType.getName();
     }
 
-    @SuppressWarnings("deprecation")
-    @Override
-    public boolean isProvided() {
-        return getAnnotationMetadata().hasDeclaredStereotype(Provided.class);
-    }
-
     @Override
     public Optional<Class<? extends Annotation>> getScope() {
         return getAnnotationMetadata().getAnnotationTypeByStereotype(AnnotationUtil.SCOPE);

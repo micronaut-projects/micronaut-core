@@ -15,15 +15,15 @@
  */
 package io.micronaut.context;
 
+import io.micronaut.context.annotation.EachBean;
+import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Primary;
+import io.micronaut.context.env.ConfigurationPath;
 import io.micronaut.context.exceptions.BeanInstantiationException;
-import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
-import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.naming.NameResolver;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.type.Argument;
@@ -37,6 +37,7 @@ import io.micronaut.inject.InitializingBeanDefinition;
 import io.micronaut.inject.InjectionPoint;
 import io.micronaut.inject.ParametrizedBeanFactory;
 import io.micronaut.inject.ValidatedBeanDefinition;
+import io.micronaut.inject.qualifiers.PrimaryQualifier;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
 import java.util.Collections;
@@ -62,18 +63,27 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
     @Nullable
     protected Map<String, Object> attributes;
     @Nullable
-    protected final Qualifier qualifier;
+    protected final Qualifier<T> qualifier;
 
-    private BeanDefinitionDelegate(BeanDefinition<T> definition, @Nullable Qualifier qualifier) {
+    private BeanDefinitionDelegate(BeanDefinition<T> definition, @Nullable Qualifier<T> qualifier) {
         this.definition = definition;
         this.qualifier = qualifier;
+    }
+
+    @Override
+    public Qualifier<T> getDeclaredQualifier() {
+        if (qualifier != null) {
+            return qualifier;
+        } else {
+            return DelegatingBeanDefinition.super.getDeclaredQualifier();
+        }
     }
 
     /**
      * @return the qualifier
      */
     @Nullable
-    public Qualifier getQualifier() {
+    public Qualifier<T> getQualifier() {
         return qualifier;
     }
 
@@ -120,16 +130,20 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
 
     @Override
     public boolean isPrimary() {
-        return definition.isPrimary() || isPrimaryThroughAttribute();
+        return isLocalQualifierPrimary() || definition.isPrimary() || isPrimaryThroughAttribute();
+    }
+
+    private boolean isLocalQualifierPrimary() {
+        return qualifier != null && (qualifier == PrimaryQualifier.INSTANCE || qualifier.contains(PrimaryQualifier.INSTANCE));
     }
 
     private boolean isPrimaryThroughAttribute() {
         if (attributes == null) {
             return false;
         }
-        Object o = attributes.get(PRIMARY_ATTRIBUTE);
-        if (o instanceof Boolean) {
-            return (Boolean) o;
+        Object o = attributes.get(ConfigurationPath.ATTRIBUTE);
+        if (o instanceof ConfigurationPath path) {
+            return path.isPrimary();
         }
         return false;
     }
@@ -175,53 +189,65 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
         if (requiredArguments.length == 0) {
             return Collections.emptyMap();
         }
-        MutableConversionService conversionService = context.getConversionService();
         Map<String, Object> fulfilled = new LinkedHashMap<>(requiredArguments.length, 1);
+        ConfigurationPath configurationPath = resolutionContext.getConfigurationPath();
         for (Argument<Object> argument : requiredArguments) {
             String argumentName = argument.getName();
-            Object value = resolveValueAsName(conversionService, argument);
-            if (value == null) {
-                Qualifier<Object> qualifier = resolveQualifier(argument);
-                if (qualifier == null) {
-                    if (!isPrimary()) {
-                        continue;
+            if (argument.isAnnotationPresent(Parameter.class)) {
+                Class<Object> type = argument.getType();
+                if (isMapKeyCandidate(configurationPath, argumentName, type)) {
+                    String simpleName = configurationPath.simpleName();
+                    if (simpleName != null) {
+                        fulfilled.put(argumentName, simpleName);
+                    } else {
+                        Qualifier<?> q = resolutionContext.getCurrentQualifier();
+                        if (q instanceof Named named) {
+                            fulfilled.put(argumentName, named.getName());
+                        }
+                    }
+                } else if (isIndexCandidate(configurationPath, argumentName, type)) {
+                    fulfilled.put(argumentName, context.getConversionService().convertRequired(configurationPath.index(), argument));
+                } else if (qualifier != null && hasDeclaredAnnotation(EachBean.class) && String.class.equals(type) && "name".equals(argumentName)) {
+                    if (isLocalQualifierPrimary()) {
+                        fulfilled.put(argumentName, "Primary");
+                    } else if (qualifier instanceof Named named) {
+                        fulfilled.put(argumentName, named.getName());
+                    }
+                } else {
+                    if (argument.isProvider()) {
+                        Argument<?> pt = argument.getFirstTypeVariable().orElse(null);
+                        if (pt != null) {
+                            type = (Class<Object>) pt.getType();
+                        }
+                    }
+
+                    try (BeanResolutionContext.Path ignored = resolutionContext.getPath().pushConstructorResolve(definition, argument)) {
+                        if (type.equals(configurationPath.configurationType())) {
+                            Object bean = context.findBean(resolutionContext, argument, configurationPath.beanQualifier()).orElse(null);
+                            fulfilled.put(argumentName, bean);
+                        } else {
+                            Object old = resolutionContext.removeAttribute(ConfigurationPath.ATTRIBUTE);// reset
+                            try {
+                                Qualifier<Object> q = qualifier != null ? (Qualifier<Object>) qualifier : configurationPath.beanQualifier();
+                                Object bean = context.findBean(resolutionContext, argument, q).orElse(null);
+                                fulfilled.put(argumentName, bean);
+                            } finally {
+                                resolutionContext.setAttribute(ConfigurationPath.ATTRIBUTE, old);
+                            }
+                        }
                     }
                 }
-                try (BeanResolutionContext.Path ignored = resolutionContext.getPath().pushConstructorResolve(definition, argument)) {
-                    value = context.findBean(resolutionContext, argument, qualifier).orElse(null);
-                }
-            }
-            if (value != null) {
-                fulfilled.put(argumentName, value);
             }
         }
         return fulfilled;
     }
 
-    @Nullable
-    private <K> Qualifier<K> resolveQualifier(Argument<K> argument) {
-        Object qualifierMapValue = attributes == null ? Collections.emptyMap() : attributes.get(AnnotationUtil.QUALIFIER);
-        if (qualifierMapValue instanceof Map) {
-            Qualifier<K> qualifier = ((Map<Argument, Qualifier>) qualifierMapValue).get(argument);
-            if (qualifier != null) {
-                return qualifier;
-            }
-        }
-        return (Qualifier<K>) resolveDynamicQualifier();
+    private static boolean isIndexCandidate(ConfigurationPath configurationPath, String argumentName, Class<Object> type) {
+        return Number.class.isAssignableFrom(type) && "index".equals(argumentName);
     }
 
-    @Nullable
-    private Object resolveValueAsName(ConversionService conversionService, Argument<?> argument) {
-        Object named = attributes == null ? null : attributes.get(Named.class.getName());
-        Object value = null;
-        if (named != null) {
-            value = conversionService.convert(named, argument).orElse(null);
-        }
-        if (value == null && isPrimary()) {
-            // Backwards compatibility, all qualifiers where "Named" before
-            value = conversionService.convert("Primary", argument).orElse(null);
-        }
-        return value;
+    private static boolean isMapKeyCandidate(ConfigurationPath configurationPath, String argumentName, Class<Object> type) {
+        return CharSequence.class.isAssignableFrom(type) && "name".equals(argumentName);
     }
 
     @Override
@@ -252,7 +278,11 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
 
     @Override
     public Optional<String> resolveName() {
-        return get(Named.class.getName(), String.class);
+        if (qualifier instanceof Named named) {
+            return Optional.of(named.getName());
+        } else {
+            return get(Named.class.getName(), String.class);
+        }
     }
 
     /**
@@ -300,7 +330,7 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
      * @param <T>        The type
      * @return The new bean definition
      */
-    static <T> BeanDefinitionDelegate<T> create(BeanDefinition<T> definition, Qualifier qualifier) {
+    static <T> BeanDefinitionDelegate<T> create(BeanDefinition<T> definition, Qualifier<T> qualifier) {
         if (definition instanceof InitializingBeanDefinition || definition instanceof DisposableBeanDefinition) {
             if (definition instanceof ValidatedBeanDefinition) {
                 return new LifeCycleValidatingDelegate<>(definition, qualifier);

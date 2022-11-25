@@ -327,7 +327,12 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
         return false;
     }
 
-    private void visitMethodInjectionPoint(BeanDefinitionVisitor visitor, MethodElement methodElement) {
+    /**
+     * Visit a method injection point.
+     * @param visitor The visitor
+     * @param methodElement The method element
+     */
+    protected void visitMethodInjectionPoint(BeanDefinitionVisitor visitor, MethodElement methodElement) {
         applyConfigurationInjectionIfNecessary(visitor, methodElement);
         visitor.visitMethodInjectionPoint(
             methodElement.getDeclaringType(),

@@ -75,7 +75,7 @@ public class ConfigurationReaderVisitor implements TypeElementVisitor<Configurat
 
         ConfigurationMetadata configurationMetadata = metadataBuilder.visitProperties(classElement);
         if (configurationMetadata != null) {
-            classElement.annotate(ConfigurationReader.class, (builder) -> builder.member(ConfigurationReader.PREFIX, configurationMetadata.getName()));
+            classElement.annotate(ConfigurationReader.class, builder -> builder.member(ConfigurationReader.PREFIX, configurationMetadata.getName()));
         }
 
         if (classElement.isInterface()) {
@@ -107,7 +107,7 @@ public class ConfigurationReaderVisitor implements TypeElementVisitor<Configurat
     }
 
     private static boolean isPropertyParameter(ClassElement genericType, VisitorContext visitorContext) {
-        if (genericType.isOptional() || genericType.isAssignable(BeanProvider.class) || genericType.isAssignable(Provider.class) || genericType.isAssignable(Iterable.class)) {
+        if (genericType.isOptional() || genericType.isContainerType() || genericType.isProvider()) {
             ClassElement finalParameterType = genericType;
             genericType = genericType.getOptionalValueType().or(finalParameterType::getFirstTypeArgument).orElse(genericType);
             // Get the class with type annotations
@@ -160,11 +160,6 @@ public class ConfigurationReaderVisitor implements TypeElementVisitor<Configurat
                 annBuilder.member("iterable", true);
             }
         });
-    }
-
-    private static boolean isBeanReturnType(MethodElement method) {
-        ClassElement returnType = method.getGenericReturnType();
-        return !returnType.isPrimitive() && returnType.hasStereotype(AnnotationUtil.SCOPE);
     }
 
     private String getPropertyNameForGetter(String methodName) {
