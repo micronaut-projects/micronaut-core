@@ -16,7 +16,6 @@
 package io.micronaut.runtime.context.env;
 
 import io.micronaut.aop.Introduction;
-import io.micronaut.context.annotation.Type;
 import io.micronaut.core.annotation.Internal;
 
 import java.lang.annotation.Retention;

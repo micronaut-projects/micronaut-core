@@ -2366,18 +2366,17 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
     }
 
     private <B, R> Qualifier<B> resolveQualifier(BeanResolutionContext resolutionContext, Argument<B> beanType, Argument<R> resultType) {
-        return resolveQualiferIfConfiguration(resolutionContext, beanType, resultType);
-    }
-
-    @Nullable
-    private <B, R> Qualifier<B> resolveQualiferIfConfiguration(BeanResolutionContext resolutionContext, Argument<B> beanType, Argument<R> resultType) {
         if (isInnerConfiguration(beanType)) {
             ConfigurationPath configurationPath = resolutionContext.getConfigurationPath();
             Qualifier<B> q = configurationPath.beanQualifier();
             if (q instanceof Named named && resultType.isContainerType()) {
                 return Qualifiers.byNamePrefix(named.getName());
             } else {
-                return q;
+                if (q == null && isEachBeanParent(beanType)) {
+                    return (Qualifier<B>) resolutionContext.getCurrentQualifier();
+                } else {
+                    return q;
+                }
             }
         } else if (Qualifier.class == resultType.getType()) {
             final Qualifier<B> currentQualifier = (Qualifier<B>) resolutionContext.getCurrentQualifier();
@@ -2386,9 +2385,12 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
                 currentQualifier.getClass() != TypeAnnotationQualifier.class) {
                 return currentQualifier;
             }
+        } else if (isIterable && resultType.isAnnotationPresent(Parameter.class)) {
+            return (Qualifier<B>) resolutionContext.getCurrentQualifier();
         }
         return null;
     }
+
 
     @SuppressWarnings("unchecked")
     private <I, K extends Collection<I>> K coerceCollectionToCorrectType(Class<K> collectionType, Collection<I> beansOfType, BeanResolutionContext resolutionContext, Argument<?> argument) {

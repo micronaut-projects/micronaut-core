@@ -104,7 +104,7 @@ class Test2 {}
         beanContext.getBean(E, Qualifiers.byName("one"))
 
         then: "only the each bean argument is handled for not found"
-        thrown(DependencyInjectionException)
+        thrown(NoSuchBeanException)
 
         when:
         beanContext.getBean(F)

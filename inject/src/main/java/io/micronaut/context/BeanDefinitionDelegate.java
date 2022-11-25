@@ -203,6 +203,8 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
                         Qualifier<?> q = resolutionContext.getCurrentQualifier();
                         if (q instanceof Named named) {
                             fulfilled.put(argumentName, named.getName());
+                        } else if (q == PrimaryQualifier.INSTANCE) {
+                            fulfilled.put(argumentName, "Primary");
                         }
                     }
                 } else if (isIndexCandidate(configurationPath, argumentName, type)) {
