@@ -30,6 +30,7 @@ import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.io.buffer.ReferenceCounted;
+import io.micronaut.core.order.Ordered;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
@@ -73,6 +74,7 @@ import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.context.ServerRequestContext;
+import io.micronaut.http.filter.FilterOrder;
 import io.micronaut.http.filter.FilterRunner;
 import io.micronaut.http.filter.HttpClientFilter;
 import io.micronaut.http.filter.HttpClientFilterResolver;
@@ -1248,10 +1250,12 @@ public class DefaultHttpClient implements
                     filterResolver.resolveFilters(request, clientFilterEntries);
             if (parentRequest != null) {
                 // todo: migrate to new filter
-                filters.add(new InternalFilter.AroundLegacy(new ClientServerContextFilter(parentRequest)));
+                filters.add(
+                    new InternalFilter.AroundLegacy(new ClientServerContextFilter(parentRequest),
+                    new FilterOrder.Fixed(Ordered.HIGHEST_PRECEDENCE)));
             }
 
-            FilterRunner.sort(filters, true);
+            FilterRunner.sort(filters);
             filters.add(new InternalFilter.TerminalReactive(responsePublisher));
 
             FilterRunner runner = new FilterRunner(filters);

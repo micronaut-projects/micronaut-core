@@ -7,18 +7,33 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import org.reactivestreams.Publisher;
 
+import java.util.Comparator;
 import java.util.List;
 
 @Internal
 public class FilterRunner {
     private final List<InternalFilter> filters;
 
+    private static final Comparator<InternalFilter> SORT = Comparator.comparingInt(f -> {
+        if (f instanceof InternalFilter.Before<?> before) {
+            return before.order().getOrder(before.bean());
+        } else if (f instanceof InternalFilter.After<?> after) {
+            return after.order().getOrder(after.bean());
+        } else if (f instanceof InternalFilter.AroundLegacy around) {
+            return around.order().getOrder(around.bean());
+        } else {
+            // terminal ops shouldn't appear when sort is called
+            throw new IllegalStateException("Filter cannot be ordered: " + f);
+        }
+    });
+    private static final Comparator<InternalFilter> REVERSE_SORT = SORT.reversed();
+
     public FilterRunner(List<InternalFilter> filters) {
         this.filters = filters;
     }
 
-    public static void sort(List<InternalFilter> filters, boolean reverse) {
-        // todo
+    public static void sort(List<InternalFilter> filters) {
+        filters.sort(REVERSE_SORT);
     }
 
     protected ExecutionFlow<? extends HttpResponse<?>> postProcess(HttpRequest<?> request, ExecutionFlow<? extends HttpResponse<?>> flow) {

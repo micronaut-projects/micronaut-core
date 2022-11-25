@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.HttpMethod;
@@ -112,7 +113,9 @@ public interface HttpFilterResolver<T extends AnnotationMetadataProvider> {
             @Nullable Set<HttpMethod> methods,
             @NonNull FilterPatternStyle patternStyle, String...patterns) {
             return new DefaultFilterEntry(
-                new InternalFilter.AroundLegacy(Objects.requireNonNull(filter, "Filter cannot be null")),
+                new InternalFilter.AroundLegacy(
+                    Objects.requireNonNull(filter, "Filter cannot be null"),
+                    new FilterOrder.Dynamic(OrderUtil.getOrder(annotationMetadata))),
                 annotationMetadata != null ? annotationMetadata : AnnotationMetadata.EMPTY_METADATA,
                 methods,
                 patternStyle,

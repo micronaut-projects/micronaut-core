@@ -14,23 +14,28 @@ import java.util.function.Supplier;
 public sealed interface InternalFilter {
     record Before<T>(
         T bean,
-        ExecutableMethod<T, ?> method
+        ExecutableMethod<T, ?> method,
+        FilterOrder order
     ) implements InternalFilter {
     }
 
     record After<T>(
         T bean,
-        ExecutableMethod<T, ?> method
+        ExecutableMethod<T, ?> method,
+        FilterOrder order
     ) implements InternalFilter {
     }
 
-    record AroundLegacy(HttpFilter bean) implements InternalFilter {
+    record AroundLegacy(
+        HttpFilter bean,
+        FilterOrder order
+    ) implements InternalFilter {
         public boolean isEnabled() {
             return !(bean instanceof Toggleable t) || t.isEnabled();
         }
     }
 
-    record TerminalReactive(Publisher<? extends HttpResponse<?>> responsePublisher) implements InternalFilter{}
+    record TerminalReactive(Publisher<? extends HttpResponse<?>> responsePublisher) implements InternalFilter {}
 
-    record Terminal(Supplier<ExecutionFlow<MutableHttpResponse<?>>> responseFlowSupplier) implements InternalFilter{}
+    record Terminal(Supplier<ExecutionFlow<MutableHttpResponse<?>>> responseFlowSupplier) implements InternalFilter {}
 }

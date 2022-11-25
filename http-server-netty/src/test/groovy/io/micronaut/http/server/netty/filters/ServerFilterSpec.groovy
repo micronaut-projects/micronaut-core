@@ -2,6 +2,7 @@ package io.micronaut.http.server.netty.filters
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
+import io.micronaut.core.annotation.Order
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.annotation.Controller
@@ -36,16 +37,6 @@ class ServerFilterSpec extends Specification {
 
     @Singleton
     @Requires(property = "spec.name", value = "ServerFilterSpec")
-    @Controller
-    static class Ctrl {
-        @Get("/my-filter/index")
-        String myFilterIndex() {
-            return "foo"
-        }
-    }
-
-    @Singleton
-    @Requires(property = "spec.name", value = "ServerFilterSpec")
     @ServerFilter("/my-filter/**")
     static class MyFilter {
         def events = new ArrayList<String>()
@@ -58,6 +49,83 @@ class ServerFilterSpec extends Specification {
         @ResponseFilter
         void response(HttpRequest<?> request, HttpResponse<?> response) {
             events.add("response " + request.uri + " " + response.status)
+        }
+    }
+
+    def 'filter order'() {
+        given:
+        def ctx = ApplicationContext.run(['spec.name': 'ServerFilterSpec'])
+        def server = ctx.getBean(EmbeddedServer)
+        server.start()
+        def client = ctx.createBean(HttpClient, server.URI).toBlocking()
+        def filter = ctx.getBean(OrderFilter)
+
+        when:
+        def response = client.exchange("/order-filter/index", String)
+        then:
+        response.body() == "foo"
+        filter.events == ['request 3', 'request 2', 'request 1', 'response 1', 'response 2', 'response 3']
+
+        cleanup:
+        server.stop()
+        ctx.close()
+    }
+
+    @Singleton
+    @Requires(property = "spec.name", value = "ServerFilterSpec")
+    @ServerFilter("/order-filter/**")
+    static class OrderFilter {
+        def events = new ArrayList<String>()
+
+        @RequestFilter
+        @Order(1)
+        void requestA(HttpRequest<?> request) {
+            events.add("request 1")
+        }
+
+        @RequestFilter
+        @Order(3)
+        void requestB(HttpRequest<?> request) {
+            events.add("request 3")
+        }
+
+        @RequestFilter
+        @Order(2)
+        void requestC(HttpRequest<?> request) {
+            events.add("request 2")
+        }
+
+        @ResponseFilter
+        @Order(1)
+        void responseA(HttpRequest<?> request, HttpResponse<?> response) {
+            events.add("response 1")
+        }
+
+        @ResponseFilter
+        @Order(3)
+        void responseB(HttpRequest<?> request, HttpResponse<?> response) {
+            events.add("response 3")
+        }
+
+        @ResponseFilter
+        @Order(2)
+        void responseC(HttpRequest<?> request, HttpResponse<?> response) {
+            events.add("response 2")
+        }
+    }
+
+    @Singleton
+    @Requires(property = "spec.name", value = "ServerFilterSpec")
+    @Controller
+    static class Ctrl {
+        @Get("/my-filter/index")
+        String myFilterIndex() {
+            return "foo"
+        }
+
+        @Get("/order-filter/index")
+        String orderFilterIndex() {
+            return "foo"
         }
     }
 }

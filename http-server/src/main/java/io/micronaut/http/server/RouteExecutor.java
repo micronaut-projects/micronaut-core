@@ -544,7 +544,9 @@ public final class RouteExecutor {
         if (httpFilters.isEmpty()) {
             return responseFlowSupplier.get();
         }
-        List<InternalFilter> actualFilters = new ArrayList<>(httpFilters);
+        List<InternalFilter> actualFilters = new ArrayList<>(httpFilters.size() + 1);
+        actualFilters.addAll(httpFilters);
+        FilterRunner.sort(actualFilters);
         actualFilters.add(new InternalFilter.Terminal(responseFlowSupplier));
         FilterRunner runner = new FilterRunner(actualFilters) {
             @Override
