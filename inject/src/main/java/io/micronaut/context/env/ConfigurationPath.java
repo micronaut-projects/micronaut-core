@@ -220,7 +220,7 @@ public sealed interface ConfigurationPath
 
     /**
      * Push and adapt an existing configuration segment.
-     * @param configurationSegment
+     * @param configurationSegment The configuration segment
      */
     void pushConfigurationSegment(@NonNull ConfigurationSegment configurationSegment);
 
