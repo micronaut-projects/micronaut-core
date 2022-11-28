@@ -8,6 +8,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.Order;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.order.Ordered;
+import io.micronaut.core.util.AntPathMatcher;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpMethod;
@@ -97,8 +98,14 @@ public class ServerFilterRouteBuilder extends DefaultRouteBuilder implements Exe
         } else if (methodLevel.patterns == null) {
             patterns = beanLevel.patterns;
         } else {
-            // todo
-            throw new UnsupportedOperationException();
+            if (beanLevel.patternStyle == FilterPatternStyle.REGEX ||
+                methodLevel.patternStyle == FilterPatternStyle.REGEX) {
+                throw new UnsupportedOperationException("Concatenating regex filter patterns is " +
+                    "not supported. Please declare the full pattern on the method instead.");
+            }
+            patterns = beanLevel.patterns.stream()
+                .flatMap(p1 -> methodLevel.patterns.stream().map(p2 -> concatAntPatterns(p1, p2)))
+                .toList();
         }
 
         String contextPath = contextPathProvider != null ? contextPathProvider.getContextPath() : null;
@@ -135,6 +142,20 @@ public class ServerFilterRouteBuilder extends DefaultRouteBuilder implements Exe
             order,
             methodLevel.executeOn == null ? beanLevel.executeOn : methodLevel.executeOn
         );
+    }
+
+    static String concatAntPatterns(String p1, String p2) {
+        StringBuilder combined = new StringBuilder(p1.length() + p2.length() + 1);
+        combined.append(p1);
+        if (!p1.endsWith(AntPathMatcher.DEFAULT_PATH_SEPARATOR)) {
+            combined.append(AntPathMatcher.DEFAULT_PATH_SEPARATOR);
+        }
+        if (p2.startsWith(AntPathMatcher.DEFAULT_PATH_SEPARATOR)) {
+            combined.append(p2, AntPathMatcher.DEFAULT_PATH_SEPARATOR.length(), p2.length());
+        } else {
+            combined.append(p2);
+        }
+        return combined.toString();
     }
 
     private FilterMetadata metadata(AnnotationMetadata annotationMetadata, Class<? extends Annotation> annotationType) {
