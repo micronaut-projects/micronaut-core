@@ -2,6 +2,7 @@ package io.micronaut.http.filter;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.core.order.Ordered;
 import io.micronaut.core.type.Executable;
 import io.micronaut.core.util.Toggleable;
 import io.micronaut.http.HttpRequest;
@@ -22,7 +23,11 @@ public sealed interface InternalFilter {
         T bean,
         Executable<T, ?> method,
         FilterOrder order
-    ) implements InternalFilter {
+    ) implements InternalFilter, Ordered {
+        @Override
+        public int getOrder() {
+            return order.getOrder(bean);
+        }
     }
 
     @Internal
@@ -30,23 +35,36 @@ public sealed interface InternalFilter {
         T bean,
         Executable<T, ?> method,
         FilterOrder order
-    ) implements InternalFilter {
+    ) implements InternalFilter, Ordered {
+        @Override
+        public int getOrder() {
+            return order.getOrder(bean);
+        }
     }
 
     @Internal
     record Async(
         InternalFilter actual,
         Executor executor
-    ) implements InternalFilter {
+    ) implements InternalFilter, Ordered {
+        @Override
+        public int getOrder() {
+            return ((Ordered) actual).getOrder();
+        }
     }
 
     @Internal
     record AroundLegacy(
         HttpFilter bean,
         FilterOrder order
-    ) implements InternalFilter {
+    ) implements InternalFilter, Ordered {
         public boolean isEnabled() {
             return !(bean instanceof Toggleable t) || t.isEnabled();
+        }
+
+        @Override
+        public int getOrder() {
+            return order.getOrder(bean);
         }
     }
 

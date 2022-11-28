@@ -6,6 +6,8 @@ import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.execution.CompletableFutureExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.execution.ImperativeExecutionFlow;
+import io.micronaut.core.order.OrderUtil;
+import io.micronaut.core.order.Ordered;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -19,7 +21,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
 
-import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -56,31 +57,24 @@ public class FilterRunner {
     private SuspensionPoint<HttpResponse<?>> responseSuspensionPoint = new SuspensionPoint<>(-1, null);
     private int index;
     private boolean responseNeedsProcessing = false;
-
-    private static final Comparator<InternalFilter> SORT = Comparator.comparingInt(f -> {
-        if (f instanceof InternalFilter.Before<?> before) {
-            return before.order().getOrder(before.bean());
-        } else if (f instanceof InternalFilter.After<?> after) {
-            return after.order().getOrder(after.bean());
-        } else if (f instanceof InternalFilter.AroundLegacy around) {
-            return around.order().getOrder(around.bean());
-        } else {
-            // terminal ops shouldn't appear when sort is called
-            throw new IllegalStateException("Filter cannot be ordered: " + f);
-        }
-    });
-    private static final Comparator<InternalFilter> REVERSE_SORT = SORT.reversed();
-
     public FilterRunner(List<InternalFilter> filters) {
         this.filters = filters;
     }
 
+    private static void checkOrdered(List<InternalFilter> filters) {
+        if (!filters.stream().allMatch(f -> f instanceof Ordered)) {
+            throw new IllegalStateException("Some filters cannot be ordered: " + filters);
+        }
+    }
+
     public static void sort(List<InternalFilter> filters) {
-        filters.sort(SORT);
+        checkOrdered(filters);
+        OrderUtil.sort(filters);
     }
 
     public static void sortReverse(List<InternalFilter> filters) {
-        filters.sort(REVERSE_SORT);
+        checkOrdered(filters);
+        OrderUtil.reverseSort(filters);
     }
 
     protected ExecutionFlow<? extends HttpResponse<?>> processResponse(HttpRequest<?> request, HttpResponse<?> response) {
