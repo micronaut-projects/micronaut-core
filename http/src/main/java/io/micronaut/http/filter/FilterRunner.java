@@ -13,6 +13,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
@@ -107,7 +108,7 @@ public class FilterRunner {
         }
     }
 
-    public final ExecutionFlow<? extends HttpResponse<?>> run(HttpRequest<?> request) {
+    public final ExecutionFlow<MutableHttpResponse<?>> run(HttpRequest<?> request) {
         if (this.request != null) {
             throw new IllegalStateException("Can only process one request");
         }
@@ -115,10 +116,12 @@ public class FilterRunner {
 
         ExecutionFlow<HttpResponse<?>> resultFlow = CompletableFutureExecutionFlow.just(responseSuspensionPoint);
         workRequest();
-        return resultFlow;
+        //noinspection unchecked
+        return (ExecutionFlow) resultFlow;
     }
 
     private void workRequest() {
+        ServerRequestContext.set(request);
         while (true) {
             if (!workRequestFilter(filters.get(index++))) {
                 return;
@@ -182,6 +185,7 @@ public class FilterRunner {
     }
 
     private void workResponse() {
+        ServerRequestContext.set(request);
         while (true) {
             if (responseNeedsProcessing) {
                 responseNeedsProcessing = false;

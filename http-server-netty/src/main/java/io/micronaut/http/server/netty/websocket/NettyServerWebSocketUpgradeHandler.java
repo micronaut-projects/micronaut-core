@@ -63,7 +63,6 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Handles WebSocket upgrade requests.
@@ -137,18 +136,16 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
             proceed.setAttribute(HttpAttributes.ROUTE_INFO, rm);
         }
 
-        AtomicReference<HttpRequest<?>> requestReference = new AtomicReference<>(msg);
-
-        ExecutionFlow<? extends HttpResponse<?>> responseFlow = ExecutionFlow.async(ctx.channel().eventLoop(), () -> routeExecutor.filterPublisher(requestReference, () -> {
+        ExecutionFlow<? extends HttpResponse<?>> responseFlow = ExecutionFlow.async(ctx.channel().eventLoop(), () -> routeExecutor.buildFilterRunner(msg, req -> {
             ExecutionFlow<MutableHttpResponse<?>> response;
             if (optionalRoute.isPresent()) {
                 response = ExecutionFlow.just(proceed);
             } else {
-                response = routeExecutor.onError(new HttpStatusException(HttpStatus.NOT_FOUND, "WebSocket Not Found"), msg);
+                response = routeExecutor.onError(new HttpStatusException(HttpStatus.NOT_FOUND, "WebSocket Not Found"), req);
             }
-            response.putInContext(ServerRequestContext.KEY, requestReference.get());
+            response.putInContext(ServerRequestContext.KEY, req);
             return response;
-        }));
+        }).run(msg));
         responseFlow.onComplete((response, throwable) -> {
             if (response != null) {
                 writeResponse(ctx, msg, proceed, (MutableHttpResponse<?>) response);

@@ -204,7 +204,8 @@ public final class RouteExecutor {
             //Check if there is a file for the route before returning route not found
             FileCustomizableResponseType fileCustomizableResponseType = staticResourceResponseFinder.find(httpRequest);
             if (fileCustomizableResponseType != null) {
-                return filterPublisher(new AtomicReference<>(httpRequest), () -> ExecutionFlow.just(HttpResponse.ok(fileCustomizableResponseType)));
+                return buildFilterRunner(httpRequest, req -> ExecutionFlow.just(HttpResponse.ok(fileCustomizableResponseType)))
+                    .run(httpRequest);
             }
             return onRouteMiss(requestBodyReader, httpRequest);
         }
@@ -348,7 +349,8 @@ public final class RouteExecutor {
             }
         }
         MutableHttpResponse<?> finalDefaultResponse = defaultResponse;
-        return filterPublisher(new AtomicReference<>(httpRequest), () -> ExecutionFlow.just(finalDefaultResponse));
+        return buildFilterRunner(httpRequest, req -> ExecutionFlow.just(finalDefaultResponse))
+            .run(httpRequest);
     }
 
     private void setRouteAttributes(HttpRequest<?> request, UriRouteMatch<Object, Object> route) {
@@ -530,27 +532,12 @@ public final class RouteExecutor {
         return defaultResponseMediaType;
     }
 
-    /**
-     * Applies server filters to a request/response.
-     *
-     * @param requestReference     The request reference
-     * @param responseFlowSupplier The deferred response flow
-     * @return A new response publisher that executes server filters
-     */
-    public ExecutionFlow<MutableHttpResponse<?>> filterPublisher(AtomicReference<HttpRequest<?>> requestReference,
-                                                                 Supplier<ExecutionFlow<MutableHttpResponse<?>>> responseFlowSupplier) {
-        ServerRequestContext.set(requestReference.get());
-        List<InternalFilter> httpFilters = router.findFilters(requestReference.get());
-        if (httpFilters.isEmpty()) {
-            return responseFlowSupplier.get();
-        }
+    public FilterRunner buildFilterRunner(HttpRequest<?> request, InternalFilter.Terminal terminal) {
+        List<InternalFilter> httpFilters = router.findFilters(request);
         List<InternalFilter> actualFilters = new ArrayList<>(httpFilters.size() + 1);
         actualFilters.addAll(httpFilters);
-        actualFilters.add((InternalFilter.Terminal) req -> {
-            requestReference.set(req);
-            return responseFlowSupplier.get();
-        });
-        FilterRunner runner = new FilterRunner(actualFilters) {
+        actualFilters.add(terminal);
+        return new FilterRunner(actualFilters) {
             @Override
             protected ExecutionFlow<? extends HttpResponse<?>> processResponse(HttpRequest<?> request, HttpResponse<?> response) {
                 return handleStatusException(request, (MutableHttpResponse<?>) response)
@@ -562,7 +549,6 @@ public final class RouteExecutor {
                 return onError(failure, request);
             }
         };
-        return (ExecutionFlow<MutableHttpResponse<?>>) runner.run(requestReference.get());
     }
 
     private ExecutionFlow<MutableHttpResponse<?>> createDefaultErrorResponseFlow(HttpRequest<?> httpRequest, Throwable cause) {
@@ -755,7 +741,8 @@ public final class RouteExecutor {
                                                                boolean executeFilters,
                                                                boolean useErrorRoute,
                                                                ExecutionFlow<RouteMatch<?>> routeMatchFlow) {
-        Supplier<ExecutionFlow<MutableHttpResponse<?>>> responseFlowSupplier = () -> {
+        InternalFilter.Terminal responseFlowSupplier = req -> {
+            requestReference.set(req);
             return routeMatchFlow.flatMap(routeMatch -> {
                     ExecutorService executorService = findExecutor(routeMatch);
                     Supplier<ExecutionFlow<MutableHttpResponse<?>>> flowSupplier = () -> executeRouteAndConvertBody(routeMatch, requestReference.get());
@@ -801,9 +788,15 @@ public final class RouteExecutor {
                 });
         };
         if (!executeFilters) {
-            return responseFlowSupplier.get();
+            try {
+                //noinspection unchecked
+                return (ExecutionFlow<MutableHttpResponse<?>>) responseFlowSupplier.execute(requestReference.get());
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
         }
-        return filterPublisher(requestReference, responseFlowSupplier);
+        return buildFilterRunner(requestReference.get(), responseFlowSupplier)
+            .run(requestReference.get());
     }
 
     private ExecutionFlow<MutableHttpResponse<?>> executeRouteAndConvertBody(RouteMatch<?> routeMatch, HttpRequest<?> httpRequest) {

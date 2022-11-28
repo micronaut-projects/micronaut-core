@@ -124,7 +124,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.LongConsumer;
 import java.util.function.Supplier;
@@ -269,7 +268,8 @@ final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.microna
             ctx.writeAndFlush(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR));
             return;
         }
-        routeExecutor.filterPublisher(new AtomicReference<>(nettyHttpRequest), () -> routeExecutor.onError(cause, nettyHttpRequest))
+        routeExecutor.buildFilterRunner(nettyHttpRequest, r -> routeExecutor.onError(cause, r))
+            .run(nettyHttpRequest)
             .onComplete((response, throwable) -> writeResponse(ctx, nettyHttpRequest, (MutableHttpResponse<?>) response, throwable));
     }
 
