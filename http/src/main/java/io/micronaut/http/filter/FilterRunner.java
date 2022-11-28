@@ -389,6 +389,7 @@ public class FilterRunner {
         Object[] fulfilled = new Object[arguments.length];
         // if there is a failure, only filters that can actually handle it should be called
         boolean skipBecauseUnhandledFailure = failure != null;
+        boolean hasContinuation = false;
         for (int i = 0; i < arguments.length; i++) {
             Argument<?> argument = arguments[i];
             if (argument.getType().isAssignableFrom(MutableHttpRequest.class)) {
@@ -415,6 +416,9 @@ public class FilterRunner {
                 if (hasResponse) {
                     throw new IllegalStateException("Response filters cannot use filter continuations");
                 }
+                if (hasContinuation) {
+                    throw new IllegalStateException("Only one continuation per filter is allowed");
+                }
                 Argument<?> continuationReturnType = argument.getFirstTypeVariable().orElseThrow(() -> new IllegalStateException("Continuations must specify generic type"));
                 SuspensionPoint<HttpResponse<?>> oldSuspensionPoint = this.responseSuspensionPoint;
                 int ourIndex = this.index - 1;
@@ -429,6 +433,7 @@ public class FilterRunner {
                 // invokeBefore will detect the new suspension point and handle it accordingly
                 this.responseSuspensionPoint = newSuspensionPoint;
                 fulfilled[i] = newSuspensionPoint;
+                hasContinuation = true;
             } else {
                 throw new IllegalStateException("Unsupported filter argument type: " + argument);
             }
