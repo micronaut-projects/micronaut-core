@@ -41,10 +41,16 @@ public class ServerFilterRouteBuilder extends DefaultRouteBuilder implements Exe
      * @param executionHandleLocator The execution handler locator
      * @param uriNamingStrategy      The URI naming strategy
      * @param conversionService      The conversion service
-     * @param beanContext
-     * @param contextPathProvider
+     * @param beanContext            The bean context
+     * @param contextPathProvider    The server context path provider
      */
-    public ServerFilterRouteBuilder(ExecutionHandleLocator executionHandleLocator, UriNamingStrategy uriNamingStrategy, ConversionService conversionService, BeanContext beanContext, ServerContextPathProvider contextPathProvider) {
+    public ServerFilterRouteBuilder(
+        ExecutionHandleLocator executionHandleLocator,
+        UriNamingStrategy uriNamingStrategy,
+        ConversionService conversionService,
+        BeanContext beanContext,
+        @Nullable ServerContextPathProvider contextPathProvider
+    ) {
         super(executionHandleLocator, uriNamingStrategy, conversionService);
         this.beanContext = beanContext;
         this.contextPathProvider = contextPathProvider;
