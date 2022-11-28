@@ -44,6 +44,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class FilterRunner {
     private static final Logger LOG = LoggerFactory.getLogger(FilterRunner.class);
 
+    private static final Object[] SKIP_FILTER = new Object[0];
+
     private final List<InternalFilter> filters;
 
     private HttpRequest<?> request;
@@ -234,7 +236,11 @@ public class FilterRunner {
     private <T> boolean invokeBefore(InternalFilter.Before<T> before) {
         // todo: handle ExecuteOn
         try {
-            Object returnValue = before.method().invoke(before.bean(), satisfy(before.method().getArguments(), false));
+            Object[] args = satisfy(before.method().getArguments(), false);
+            if (args == SKIP_FILTER) {
+                return true;
+            }
+            Object returnValue = before.method().invoke(before.bean(), args);
             return handleFilterReturn(returnValue, true);
         } catch (Throwable e) {
             failure = e;
@@ -247,7 +253,11 @@ public class FilterRunner {
     private <T> boolean invokeAfter(InternalFilter.After<T> after) {
         // todo: handle ExecuteOn
         try {
-            Object returnValue = after.method().invoke(after.bean(), satisfy(after.method().getArguments(), true));
+            Object[] args = satisfy(after.method().getArguments(), true);
+            if (args == SKIP_FILTER) {
+                return true;
+            }
+            Object returnValue = after.method().invoke(after.bean(), args);
             return handleFilterReturn(returnValue, true);
         } catch (Throwable e) {
             failure = e;
@@ -275,6 +285,7 @@ public class FilterRunner {
             } else if (returnValue instanceof HttpResponse<?> resp) {
                 // cancel request pipeline, move immediately to response handling
                 this.response = resp;
+                this.failure = null;
                 this.responseNeedsProcessing = true;
                 workResponse();
                 return false;
@@ -283,6 +294,7 @@ public class FilterRunner {
             if (returnValue instanceof HttpResponse<?> resp) {
                 // cancel request pipeline, move immediately to response handling
                 this.response = resp;
+                this.failure = null;
                 this.responseNeedsProcessing = true;
                 return true;
             }
@@ -333,6 +345,8 @@ public class FilterRunner {
         boolean hasResponse
     ) throws Exception {
         Object[] fulfilled = new Object[arguments.length];
+        // if there is a failure, only filters that can actually handle it should be called
+        boolean skipBecauseUnhandledFailure = failure != null;
         for (int i = 0; i < arguments.length; i++) {
             Argument<?> argument = arguments[i];
             if (argument.getType().isAssignableFrom(MutableHttpRequest.class)) {
@@ -342,9 +356,25 @@ public class FilterRunner {
                     throw new IllegalStateException("Filter is called before the response is known, can't have a response argument");
                 }
                 fulfilled[i] = response;
+            } else if (Throwable.class.isAssignableFrom(argument.getType())) {
+                if (!hasResponse) {
+                    throw new IllegalStateException("Request filters cannot handle exceptions");
+                }
+                if (failure != null && argument.isInstance(failure)) {
+                    fulfilled[i] = failure;
+                } else if (argument.isNullable()) {
+                    fulfilled[i] = null;
+                } else {
+                    // can't fulfill this argument
+                    return SKIP_FILTER;
+                }
+                skipBecauseUnhandledFailure = false;
             } else {
                 throw new IllegalStateException("Unsupported filter argument type: " + argument);
             }
+        }
+        if (skipBecauseUnhandledFailure) {
+            return SKIP_FILTER;
         }
         return fulfilled;
     }
@@ -399,6 +429,7 @@ public class FilterRunner {
         public void onNext(HttpResponse<?> response) {
             if (!hasResponse) {
                 FilterRunner.this.response = response;
+                FilterRunner.this.failure = null;
                 responseNeedsProcessing = true;
                 hasResponse = true;
                 workResponse();

@@ -421,6 +421,76 @@ class FilterRunnerSpec extends Specification {
         events == ["terminal", "after"]
     }
 
+    def 'after should not be called if there is an exception but it cannot handle exceptions'() {
+        given:
+        def events = []
+        def testExc = new Exception("Test exception")
+        List<InternalFilter> filters = [
+                after {
+                    events.add("after")
+                    null
+                },
+                (InternalFilter.Terminal) (req -> {
+                    events.add("terminal")
+                    ExecutionFlow.error(testExc)
+                })
+        ]
+
+        when:
+        await(new FilterRunner(filters).run(HttpRequest.GET("/")))
+        then:
+        def actual = thrown Exception
+        actual == testExc
+        events == ["terminal"]
+    }
+
+    def 'after should be called if there is an exception that it can handle'() {
+        given:
+        def events = []
+        def testExc = new Exception("Test exception")
+        def resp1 = HttpResponse.ok("resp1")
+        List<InternalFilter> filters = [
+                after { Exception exc ->
+                    assert exc == testExc
+                    events.add("after")
+                    resp1
+                },
+                (InternalFilter.Terminal) (req -> {
+                    events.add("terminal")
+                    ExecutionFlow.error(testExc)
+                })
+        ]
+
+        when:
+        def resp = await(new FilterRunner(filters).run(HttpRequest.GET("/"))).value
+        then:
+        resp == resp1
+        events == ["terminal", "after"]
+    }
+
+    def 'after should not be called if there is an exception it cannot handle'() {
+        given:
+        def events = []
+        def testExc = new Exception("Test exception")
+        List<InternalFilter> filters = [
+                after { RuntimeException exc ->
+                    events.add("after")
+                    null
+                },
+                (InternalFilter.Terminal) (req -> {
+                    events.add("terminal")
+                    ExecutionFlow.error(testExc)
+                })
+        ]
+
+        when:
+        await(new FilterRunner(filters).run(HttpRequest.GET("/")))
+        then:
+        def actual = thrown Exception
+        actual == testExc
+        events == ["terminal"]
+    }
+
     private def after(Closure<?> closure) {
         return new InternalFilter.After<>(null, new LambdaExecutable(closure), new FilterOrder.Fixed(0))
     }
