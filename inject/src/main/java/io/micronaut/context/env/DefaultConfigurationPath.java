@@ -241,6 +241,11 @@ final class DefaultConfigurationPath implements ConfigurationPath {
     }
 
     @Override
+    public boolean isWithin(String prefix) {
+        return prefix != null && prefix.startsWith(path());
+    }
+
+    @Override
     public void pushEachPropertyRoot(BeanDefinition<?> beanDefinition) {
         if (!beanDefinition.getBeanType().equals(configurationType())) {
 
@@ -253,7 +258,7 @@ final class DefaultConfigurationPath implements ConfigurationPath {
             if (prefix != null) {
                 String currentPath = path();
                 if (!prefix.startsWith(currentPath)) {
-                    throw new IllegalStateException("Invalid configuration path [" + prefix + "]. Expected: " + currentPath);
+                    throw new IllegalStateException("Invalid configuration properties nesting for path [" + prefix + "]. Expected: " + currentPath);
                 }
 
                 String resolvedPrefix = prefix;
@@ -269,6 +274,7 @@ final class DefaultConfigurationPath implements ConfigurationPath {
                     property,
                     prefix,
                     isList ? ConfigurationSegment.ConfigurationKind.LIST : ConfigurationSegment.ConfigurationKind.MAP,
+                    null,
                     null,
                     primaryName,
                     -1
@@ -290,7 +296,7 @@ final class DefaultConfigurationPath implements ConfigurationPath {
             if (prefix != null) {
                 String currentPath = path();
                 if (!prefix.startsWith(currentPath)) {
-                    throw new IllegalStateException("Invalid configuration path [" + prefix + "]. Expected: " + currentPath);
+                    throw new IllegalStateException("Invalid configuration properties nesting for path [" + prefix + "]. Expected: " + currentPath);
                 }
                 String p = prefix.substring(currentPath.length() + 1);
                 list.add(new DefaultConfigurationSegment(
@@ -299,6 +305,7 @@ final class DefaultConfigurationPath implements ConfigurationPath {
                     prefix,
                     ConfigurationSegment.ConfigurationKind.ROOT,
                     name(),
+                    simpleName(),
                     primary(),
                     -1
                 ));
@@ -322,6 +329,7 @@ final class DefaultConfigurationPath implements ConfigurationPath {
                     configurationSegment.path(),
                     ConfigurationSegment.ConfigurationKind.ROOT,
                     name(), // inherit name
+                    simpleName(),
                     primary(),  // inherit name
                     index() // inherit the index
                 ));
@@ -350,6 +358,7 @@ final class DefaultConfigurationPath implements ConfigurationPath {
             p,
             ConfigurationSegment.ConfigurationKind.NAME,
             qualifiedName,
+            name,
             primary,
             -1
         ));
@@ -375,27 +384,28 @@ final class DefaultConfigurationPath implements ConfigurationPath {
             p,
             ConfigurationSegment.ConfigurationKind.INDEX,
             qualifiedName,
+            strIndex,
             primary,
             index
         ));
         recomputeState();
     }
 
-    private String computeName(String strIndex) {
-        String name = null;
+    private String computeName(String simpleName) {
+        String qualifiedName = null;
         Iterator<ConfigurationSegment> i = list.descendingIterator();
         while (i.hasNext()) {
-            name = i.next().name();
-            if (name != null) {
+            qualifiedName = i.next().name();
+            if (qualifiedName != null) {
                 break;
             }
         }
-        if (name != null) {
-            name = name + "-" + strIndex;
+        if (qualifiedName != null) {
+            qualifiedName = qualifiedName + "-" + simpleName;
         } else {
-            name = strIndex;
+            qualifiedName = simpleName;
         }
-        return name;
+        return qualifiedName;
     }
 
     private void recomputeState() {
@@ -443,6 +453,7 @@ final class DefaultConfigurationPath implements ConfigurationPath {
         String path,
         ConfigurationKind kind,
         String name,
+        String simpleName,
         String primary,
         int index) implements ConfigurationSegment {
 

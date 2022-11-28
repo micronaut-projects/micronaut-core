@@ -77,7 +77,9 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     private static final String RANDOM_PREFIX = "\\s?random\\.(\\S+?)";
     private static final String RANDOM_UPPER_LIMIT = "(\\(-?\\d+(\\.\\d+)?\\))";
     private static final String RANDOM_RANGE = "(\\[-?\\d+(\\.\\d+)?,\\s?-?\\d+(\\.\\d+)?])";
+
     private static final Pattern RANDOM_PATTERN = Pattern.compile("\\$\\{" + RANDOM_PREFIX + "(" + RANDOM_UPPER_LIMIT + "|" + RANDOM_RANGE + ")?\\}");
+
     private static final Object NO_VALUE = new Object();
     private static final PropertyCatalog[] CONVENTIONS = {PropertyCatalog.GENERATED, PropertyCatalog.RAW};
     protected final ConversionService conversionService;
@@ -232,8 +234,8 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             if (entries != null) {
                 boolean endsWithWildCard = pathPattern.endsWith(".*");
                 String resolvedPattern = pathPattern
-                    .replace("[*]", "\\[([\\w\\d]+?)\\]")
-                    .replace(".*.", "\\.([\\w\\d]+?)\\.");
+                    .replace("[*]", "\\[([\\w\\d-]+?)\\]")
+                    .replace(".*.", "\\.([\\w\\d-]+?)\\.");
                 if (endsWithWildCard) {
                     resolvedPattern = resolvedPattern.replace("*.", "\\S*");
                 } else {

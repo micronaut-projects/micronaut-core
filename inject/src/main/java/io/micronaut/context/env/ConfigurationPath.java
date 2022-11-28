@@ -225,10 +225,16 @@ public sealed interface ConfigurationPath
     void pushConfigurationSegment(@NonNull ConfigurationSegment configurationSegment);
 
     /**
+     * Check whether the given prefix is within the current path.
+     * @param prefix The prefix
+     * @return True if it is within the current path.
+     */
+    boolean isWithin(String prefix);
+
+    /**
      * A segment of configuration.
      */
     sealed interface ConfigurationSegment extends CharSequence permits DefaultConfigurationPath.DefaultConfigurationSegment {
-
 
         /**
          * @return The prefix
@@ -255,16 +261,7 @@ public sealed interface ConfigurationPath
          * @return The unqualified name.
          */
         @Nullable
-        default String simpleName() {
-            String name = name();
-            if (name != null) {
-                int i = name.lastIndexOf('-');
-                if (i > -1) {
-                    return name.substring(i + 1, name.length());
-                }
-            }
-            return name;
-        }
+        String simpleName();
 
         /**
          * @return The primary name (if any)

@@ -99,7 +99,6 @@ import java.util.stream.Stream;
 @Internal
 public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextConditional implements BeanDefinition<T>, EnvironmentConfigurable {
     private static final Logger LOG = LoggerFactory.getLogger(AbstractInitializableBeanDefinition.class);
-    private static final String NAMED_ATTRIBUTE = Named.class.getName();
 
     private final Class<T> type;
     private final AnnotationMetadata annotationMetadata;
@@ -2147,17 +2146,17 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
             return (K) qualifier;
         }
         try {
-            Object previous = !argument.isAnnotationPresent(Parameter.class) ? resolutionContext.removeAttribute(NAMED_ATTRIBUTE) : null;
-            boolean isNotInnerConfiguration = isConfigurationProperties && !isInnerConfiguration(argument);
+            Object previous = !argument.isAnnotationPresent(Parameter.class) ? resolutionContext.removeAttribute(BeanDefinition.NAMED_ATTRIBUTE) : null;
+            boolean isNotInnerConfiguration = !isConfigurationProperties || !isInnerConfiguration(argument);
             Object previousPath = isNotInnerConfiguration ? resolutionContext.removeAttribute(ConfigurationPath.ATTRIBUTE) : null;
             try {
                 return resolutionContext.getBean(argument, qualifier);
             } finally {
                 if (previous != null) {
-                    resolutionContext.setAttribute(NAMED_ATTRIBUTE, previous);
+                    resolutionContext.setAttribute(BeanDefinition.NAMED_ATTRIBUTE, previous);
                 }
                 if (previousPath != null) {
-                    resolutionContext.setAttribute(ConfigurationPath.ATTRIBUTE, previous);
+                    resolutionContext.setAttribute(ConfigurationPath.ATTRIBUTE, previousPath);
                 }
             }
         } catch (DisabledBeanException e) {
@@ -2231,7 +2230,7 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
         if (configurationPath.isNotEmpty()) {
             return configurationPath.resolveValue(valString);
         } else if (valString.indexOf('*') > -1) {
-            Optional<String> namedBean = resolutionContext.get(Named.class.getName(), ConversionContext.STRING);
+            Optional<String> namedBean = resolutionContext.get(BeanDefinition.NAMED_ATTRIBUTE, ConversionContext.STRING);
             if (namedBean.isPresent()) {
                 valString = valString.replace("*", namedBean.get());
             }

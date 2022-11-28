@@ -26,6 +26,7 @@ import io.micronaut.context.env.DefaultEnvironment;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.exceptions.ConfigurationException;
+import io.micronaut.context.exceptions.DependencyInjectionException;
 import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -415,49 +416,72 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     private <T> void transformConfigurationReaderBeanDefinition(BeanResolutionContext resolutionContext,
                                                                 BeanDefinition<T> candidate,
                                                                 List<BeanDefinition<T>> transformedCandidates) {
-        final String prefix = candidate.stringValue(ConfigurationReader.class, "prefix").orElse(null);
-        ConfigurationPath configurationPath = resolutionContext.getConfigurationPath();
-        if (prefix != null) {
+        try {
+            final String prefix = candidate.stringValue(ConfigurationReader.class, "prefix").orElse(null);
+            ConfigurationPath configurationPath = resolutionContext.getConfigurationPath();
+            if (prefix != null) {
 
-            if (configurationPath.isNotEmpty()) {
-                ConfigurationPath newPath = configurationPath.copy();
-                newPath.pushConfigurationReader(candidate);
-                newPath.traverseResolvableSegments(getEnvironment(), subPath ->
-                    createAndAddDelegate(resolutionContext, candidate, transformedCandidates, subPath)
-                );
-            } else if (prefix.indexOf('*') == -1) {
-                // doesn't require outer configuration
-                transformedCandidates.add(candidate);
-            } else {
-                // if we have reached here we are likely in a nested a class being resolved directly from the context
-                // traverse and try reformulate the path
-                @SuppressWarnings("unchecked")
-                Class<Object> declaringClass = (Class<Object>) candidate.getBeanType().getDeclaringClass();
-                if (declaringClass != null) {
-                    Collection<BeanDefinition<Object>> beanCandidates = findBeanCandidates(resolutionContext, Argument.of(declaringClass), null, true);
-                    for (BeanDefinition<Object> beanCandidate : beanCandidates) {
-                        if (beanCandidate instanceof BeanDefinitionDelegate<Object> delegate) {
-                            ConfigurationPath cp = delegate.get(ConfigurationPath.ATTRIBUTE, ConfigurationPath.class).orElse(configurationPath).copy();
-                            cp.traverseResolvableSegments(getEnvironment(), subPath -> {
-                                subPath.pushConfigurationReader(candidate);
-                                if (getEnvironment().containsProperties(subPath.prefix())) {
-                                    createAndAddDelegate(resolutionContext, candidate, transformedCandidates, subPath);
-                                }
-                            });
-                        } else {
-                            ConfigurationPath cp = configurationPath.copy();
-                            cp.pushConfigurationReader(beanCandidate);
-                            cp.pushConfigurationReader(candidate);
-                            cp.traverseResolvableSegments(getEnvironment(), subPath -> {
-                                if (getEnvironment().containsProperties(subPath.prefix())) {
-                                    createAndAddDelegate(resolutionContext, candidate, transformedCandidates, subPath);
-                                }
-                            });
+                if (configurationPath.isNotEmpty()) {
+                    if (configurationPath.isWithin(prefix)) {
 
+                        ConfigurationPath newPath = configurationPath.copy();
+                        newPath.pushConfigurationReader(candidate);
+                        newPath.traverseResolvableSegments(getEnvironment(), subPath ->
+                            createAndAddDelegate(resolutionContext, candidate, transformedCandidates, subPath)
+                        );
+                    } else {
+                        ConfigurationPath oldPath = configurationPath;
+                        ConfigurationPath newPath = ConfigurationPath.newPath();
+                        try {
+                            resolutionContext.setAttribute(ConfigurationPath.ATTRIBUTE, newPath);
+                            newPath.pushConfigurationReader(candidate);
+                            newPath.traverseResolvableSegments(getEnvironment(), subPath ->
+                                createAndAddDelegate(resolutionContext, candidate, transformedCandidates, subPath)
+                            );
+                        } finally {
+                            resolutionContext.setAttribute(ConfigurationPath.ATTRIBUTE, oldPath);
+                        }
+                    }
+                } else if (prefix.indexOf('*') == -1) {
+                    // doesn't require outer configuration
+                    transformedCandidates.add(candidate);
+                } else {
+                    // if we have reached here we are likely in a nested a class being resolved directly from the context
+                    // traverse and try reformulate the path
+                    @SuppressWarnings("unchecked")
+                    Class<Object> declaringClass = (Class<Object>) candidate.getBeanType().getDeclaringClass();
+                    if (declaringClass != null) {
+                        Collection<BeanDefinition<Object>> beanCandidates = findBeanCandidates(resolutionContext, Argument.of(declaringClass), null, true);
+                        for (BeanDefinition<Object> beanCandidate : beanCandidates) {
+                            if (beanCandidate instanceof BeanDefinitionDelegate<Object> delegate) {
+                                ConfigurationPath cp = delegate.get(ConfigurationPath.ATTRIBUTE, ConfigurationPath.class).orElse(configurationPath).copy();
+                                cp.traverseResolvableSegments(getEnvironment(), subPath -> {
+                                    subPath.pushConfigurationReader(candidate);
+                                    if (getEnvironment().containsProperties(subPath.prefix())) {
+                                        createAndAddDelegate(resolutionContext, candidate, transformedCandidates, subPath);
+                                    }
+                                });
+                            } else {
+                                ConfigurationPath cp = configurationPath.copy();
+                                cp.pushConfigurationReader(beanCandidate);
+                                cp.pushConfigurationReader(candidate);
+                                cp.traverseResolvableSegments(getEnvironment(), subPath -> {
+                                    if (getEnvironment().containsProperties(subPath.prefix())) {
+                                        createAndAddDelegate(resolutionContext, candidate, transformedCandidates, subPath);
+                                    }
+                                });
+
+                            }
                         }
                     }
                 }
             }
+        } catch (IllegalStateException e) {
+            throw new DependencyInjectionException(
+                resolutionContext,
+                e.getMessage(),
+                e
+            );
         }
     }
 
@@ -502,15 +526,23 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     private <T> void transformEachPropertyBeanDefinition(@NonNull BeanResolutionContext resolutionContext,
                                                          BeanDefinition<T> candidate,
                                                          List<BeanDefinition<T>> transformedCandidates) {
-        ConfigurationPath configurationPath = resolutionContext.getConfigurationPath();
-        configurationPath.pushEachPropertyRoot(candidate);
         try {
-            ConfigurationPath rootConfig = resolutionContext.getConfigurationPath();
-            rootConfig.traverseResolvableSegments(getEnvironment(), (subPath ->
-                createAndAddDelegate(resolutionContext, candidate, transformedCandidates, subPath)
-            ));
-        } finally {
-            configurationPath.removeLast();
+            ConfigurationPath configurationPath = resolutionContext.getConfigurationPath();
+            configurationPath.pushEachPropertyRoot(candidate);
+            try {
+                ConfigurationPath rootConfig = resolutionContext.getConfigurationPath();
+                rootConfig.traverseResolvableSegments(getEnvironment(), (subPath ->
+                    createAndAddDelegate(resolutionContext, candidate, transformedCandidates, subPath)
+                ));
+            } finally {
+                configurationPath.removeLast();
+            }
+        } catch (IllegalStateException e) {
+            throw new DependencyInjectionException(
+                resolutionContext,
+                e.getMessage(),
+                e
+            );
         }
     }
 

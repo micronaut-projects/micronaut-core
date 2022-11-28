@@ -26,6 +26,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.naming.NameResolver;
 import io.micronaut.core.naming.Named;
+import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.value.ValueResolver;
@@ -194,8 +195,8 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
         for (Argument<Object> argument : requiredArguments) {
             String argumentName = argument.getName();
             if (argument.isAnnotationPresent(Parameter.class)) {
-                Class<Object> type = argument.getType();
-                if (isMapKeyCandidate(configurationPath, argumentName, type)) {
+                Class<Object> type = (Class<Object>) argument.getWrapperType();
+                if (CharSequence.class.isAssignableFrom(type)) {
                     String simpleName = configurationPath.simpleName();
                     if (simpleName != null) {
                         fulfilled.put(argumentName, simpleName);
@@ -204,14 +205,14 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
                         if (q instanceof Named named) {
                             fulfilled.put(argumentName, named.getName());
                         } else if (q == PrimaryQualifier.INSTANCE) {
-                            fulfilled.put(argumentName, "Primary");
+                            fulfilled.put(argumentName, Primary.SIMPLE_NAME);
                         }
                     }
-                } else if (isIndexCandidate(configurationPath, argumentName, type)) {
+                } else if (Number.class.isAssignableFrom(type)) {
                     fulfilled.put(argumentName, context.getConversionService().convertRequired(configurationPath.index(), argument));
                 } else if (qualifier != null && hasDeclaredAnnotation(EachBean.class) && String.class.equals(type) && "name".equals(argumentName)) {
                     if (isLocalQualifierPrimary()) {
-                        fulfilled.put(argumentName, "Primary");
+                        fulfilled.put(argumentName, Primary.SIMPLE_NAME);
                     } else if (qualifier instanceof Named named) {
                         fulfilled.put(argumentName, named.getName());
                     }
@@ -242,14 +243,6 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
             }
         }
         return fulfilled;
-    }
-
-    private static boolean isIndexCandidate(ConfigurationPath configurationPath, String argumentName, Class<Object> type) {
-        return Number.class.isAssignableFrom(type) && "index".equals(argumentName);
-    }
-
-    private static boolean isMapKeyCandidate(ConfigurationPath configurationPath, String argumentName, Class<Object> type) {
-        return CharSequence.class.isAssignableFrom(type) && "name".equals(argumentName);
     }
 
     @Override
