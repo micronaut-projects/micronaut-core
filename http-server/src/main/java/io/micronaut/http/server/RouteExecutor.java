@@ -546,10 +546,10 @@ public final class RouteExecutor {
         }
         List<InternalFilter> actualFilters = new ArrayList<>(httpFilters.size() + 1);
         actualFilters.addAll(httpFilters);
-        actualFilters.add(new InternalFilter.Terminal(req -> {
+        actualFilters.add((InternalFilter.Terminal) req -> {
             requestReference.set(req);
             return responseFlowSupplier.get();
-        }));
+        });
         FilterRunner runner = new FilterRunner(actualFilters) {
             @Override
             protected ExecutionFlow<? extends HttpResponse<?>> processResponse(HttpRequest<?> request, HttpResponse<?> response) {

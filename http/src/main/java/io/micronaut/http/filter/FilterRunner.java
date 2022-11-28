@@ -168,7 +168,7 @@ public class FilterRunner {
                 ExecutionFlow<? extends HttpResponse<?>> terminalFlow;
                 if (filter instanceof InternalFilter.Terminal t) {
                     try {
-                        terminalFlow = t.responseFlow().apply(request);
+                        terminalFlow = t.execute(request);
                     } catch (Throwable e) {
                         terminalFlow = ExecutionFlow.error(e);
                     }

@@ -24,7 +24,7 @@ class FilterRunnerSpec extends Specification {
         List<InternalFilter> filters = [
                 after { req, resp -> events.add("after") },
                 before { req -> events.add("before") },
-                new InternalFilter.Terminal(req -> {
+                (InternalFilter.Terminal) (req -> {
                     events.add("terminal")
                     ExecutionFlow.just(HttpResponse.ok())
                 })
@@ -61,7 +61,7 @@ class FilterRunnerSpec extends Specification {
                         },
                         new FilterOrder.Fixed(0)
                 ),
-                new InternalFilter.Terminal(req -> {
+                (InternalFilter.Terminal) (req -> {
                     assert req == req2
                     events.add("terminal")
                     ExecutionFlow.just(resp1)
@@ -81,7 +81,7 @@ class FilterRunnerSpec extends Specification {
         def testExc = new Exception("Test exception")
         List<InternalFilter> filters = [
                 before { throw testExc },
-                new InternalFilter.Terminal(req -> {
+                (InternalFilter.Terminal) (req -> {
                     events.add("terminal")
                     ExecutionFlow.just(HttpResponse.ok())
                 })
@@ -101,7 +101,7 @@ class FilterRunnerSpec extends Specification {
         def testExc = new Exception("Test exception")
         List<InternalFilter> filters = [
                 after { req, resp -> throw testExc },
-                new InternalFilter.Terminal(req -> {
+                (InternalFilter.Terminal) (req -> {
                     events.add("terminal")
                     ExecutionFlow.just(HttpResponse.ok())
                 })
@@ -119,7 +119,7 @@ class FilterRunnerSpec extends Specification {
         given:
         def testExc = new RuntimeException("Test exception")
         List<InternalFilter> filters = [
-                new InternalFilter.Terminal(req -> {
+                (InternalFilter.Terminal) (req -> {
                     throw testExc
                 })
         ]
@@ -135,7 +135,7 @@ class FilterRunnerSpec extends Specification {
         given:
         def testExc = new Exception("Test exception")
         List<InternalFilter> filters = [
-                new InternalFilter.Terminal(req -> {
+                (InternalFilter.Terminal) (req -> {
                     return ExecutionFlow.error(testExc)
                 })
         ]
@@ -161,7 +161,7 @@ class FilterRunnerSpec extends Specification {
                         },
                         new FilterOrder.Fixed(0)
                 ),
-                new InternalFilter.Terminal(req -> {
+                (InternalFilter.Terminal) (req -> {
                     events.add("terminal")
                     ExecutionFlow.just(HttpResponse.ok())
                 })
@@ -189,7 +189,7 @@ class FilterRunnerSpec extends Specification {
                         },
                         new FilterOrder.Fixed(0)
                 ),
-                new InternalFilter.Terminal(req -> {
+                (InternalFilter.Terminal) (req -> {
                     events.add("terminal")
                     ExecutionFlow.just(HttpResponse.ok())
                 })
@@ -219,7 +219,7 @@ class FilterRunnerSpec extends Specification {
                         },
                         new FilterOrder.Fixed(0)
                 ),
-                new InternalFilter.Terminal(req -> {
+                (InternalFilter.Terminal) (req -> {
                     events.add("terminal")
                     ExecutionFlow.just(HttpResponse.ok())
                 })
@@ -249,7 +249,7 @@ class FilterRunnerSpec extends Specification {
                         },
                         new FilterOrder.Fixed(0)
                 ),
-                new InternalFilter.Terminal(req -> {
+                (InternalFilter.Terminal) (req -> {
                     ExecutionFlow.error(testExc)
                 })
         ]
@@ -272,7 +272,7 @@ class FilterRunnerSpec extends Specification {
                     events.add("before")
                     req2
                 },
-                new InternalFilter.Terminal(req -> {
+                (InternalFilter.Terminal) (req -> {
                     assert req == req2
                     events.add("terminal")
                     ExecutionFlow.just(HttpResponse.ok())
@@ -293,7 +293,7 @@ class FilterRunnerSpec extends Specification {
                     events.add("before")
                     HttpResponse.ok()
                 },
-                new InternalFilter.Terminal(req -> {
+                (InternalFilter.Terminal) (req -> {
                     events.add("terminal")
                     ExecutionFlow.just(HttpResponse.ok())
                 })
@@ -316,7 +316,7 @@ class FilterRunnerSpec extends Specification {
                     events.add("before")
                     Flux.just(req2)
                 },
-                new InternalFilter.Terminal(req -> {
+                (InternalFilter.Terminal) (req -> {
                     assert req == req2
                     events.add("terminal")
                     ExecutionFlow.just(HttpResponse.ok())
@@ -340,7 +340,7 @@ class FilterRunnerSpec extends Specification {
                     events.add("before")
                     CompletableFuture.completedFuture(req2)
                 },
-                new InternalFilter.Terminal(req -> {
+                (InternalFilter.Terminal) (req -> {
                     assert req == req2
                     events.add("terminal")
                     ExecutionFlow.just(HttpResponse.ok())
@@ -361,7 +361,7 @@ class FilterRunnerSpec extends Specification {
                     events.add("before")
                     Flux.just(HttpResponse.ok())
                 },
-                new InternalFilter.Terminal(req -> {
+                (InternalFilter.Terminal) (req -> {
                     events.add("terminal")
                     ExecutionFlow.just(HttpResponse.ok())
                 })
@@ -384,7 +384,7 @@ class FilterRunnerSpec extends Specification {
                     events.add("after")
                     resp2
                 },
-                new InternalFilter.Terminal(req -> {
+                (InternalFilter.Terminal) (req -> {
                     events.add("terminal")
                     ExecutionFlow.just(resp1)
                 })
@@ -408,7 +408,7 @@ class FilterRunnerSpec extends Specification {
                     events.add("after")
                     Flux.just(resp2)
                 },
-                new InternalFilter.Terminal(req -> {
+                (InternalFilter.Terminal) (req -> {
                     events.add("terminal")
                     ExecutionFlow.just(resp1)
                 })
