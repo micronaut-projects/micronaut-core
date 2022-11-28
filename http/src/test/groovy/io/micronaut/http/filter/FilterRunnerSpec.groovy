@@ -16,6 +16,8 @@ import spock.lang.Specification
 
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ExecutionException
+import java.util.concurrent.Executors
+import java.util.concurrent.ThreadFactory
 
 class FilterRunnerSpec extends Specification {
     def 'simple tasks should not suspend'() {
@@ -478,6 +480,42 @@ class FilterRunnerSpec extends Specification {
         def actual = thrown Exception
         actual == testExc
         events == ["terminal"]
+    }
+
+    def 'async filter'() {
+        given:
+        def events = []
+        def testExc = new Exception("Test exception")
+        List<InternalFilter> filters = [
+                new InternalFilter.Async(before {
+                    events.add("before " + Thread.currentThread().name)
+                    null
+                }, Executors.newCachedThreadPool(new ThreadFactory() {
+                    @Override
+                    Thread newThread(Runnable r) {
+                        return new Thread(r, "thread-before")
+                    }
+                })),
+                new InternalFilter.Async(after {
+                    events.add("after " + Thread.currentThread().name)
+                    null
+                }, Executors.newCachedThreadPool(new ThreadFactory() {
+                    @Override
+                    Thread newThread(Runnable r) {
+                        return new Thread(r, "thread-after")
+                    }
+                })),
+                (InternalFilter.Terminal) (req -> {
+                    events.add("terminal " + Thread.currentThread().name)
+                    ExecutionFlow.just(HttpResponse.ok())
+                })
+        ]
+
+        when:
+        def response = await(new FilterRunner(filters).run(HttpRequest.GET("/"))).value
+        then:
+        response.status() == HttpStatus.OK
+        events == ["before thread-before", "terminal thread-before", "after thread-after"]
     }
 
     private def after(List<Argument> arguments = closure.parameterTypes.collect { Argument.of(it) }, Closure<?> closure) {

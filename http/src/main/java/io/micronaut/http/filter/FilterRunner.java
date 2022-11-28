@@ -123,53 +123,66 @@ public class FilterRunner {
         return resultFlow;
     }
 
-    @SuppressWarnings("StatementWithEmptyBody")
     private void workRequest() {
         while (true) {
-            InternalFilter filter = filters.get(index++);
-            if (filter instanceof InternalFilter.Before<?> before) {
-                if (!invokeBefore(before)) {
-                    // suspend
-                    return;
-                }
-                // continue with next filter
-            } else if (filter instanceof InternalFilter.After<?>) {
-                // skip filter, only used for response
-            } else if (filter instanceof InternalFilter.AroundLegacy around) {
-                FilterChainImpl chainSuspensionPoint = new FilterChainImpl(index - 1, responseSuspensionPoint);
-                responseSuspensionPoint = chainSuspensionPoint;
-                try {
-                    Publisher<? extends HttpResponse<?>> result = around.bean().doFilter(request, chainSuspensionPoint);
-                    result.subscribe(chainSuspensionPoint);
-                } catch (Throwable e) {
-                    chainSuspensionPoint.handleContinuationFilterException(e);
-                }
-                // suspend
+            if (!workRequestFilter(filters.get(index++))) {
                 return;
-            } else if (filter instanceof InternalFilter.TerminalReactive || filter instanceof InternalFilter.Terminal) {
-                ExecutionFlow<? extends HttpResponse<?>> terminalFlow;
-                if (filter instanceof InternalFilter.Terminal t) {
-                    try {
-                        terminalFlow = t.execute(request);
-                    } catch (Throwable e) {
-                        terminalFlow = ExecutionFlow.error(e);
-                    }
-                } else {
-                    terminalFlow = ReactiveExecutionFlow.fromPublisher(((InternalFilter.TerminalReactive) filter).responsePublisher());
-                }
-                // this is almost never available immediately, so don't bother with asDone checks
-                terminalFlow.onComplete((resp, fail) -> {
-                    response = resp;
-                    failure = fail;
-                    responseNeedsProcessing = true;
-                    index--;
-                    workResponse();
-                });
-                // request work is done
-                return;
-            } else {
-                throw new IllegalStateException("Unknown filter type");
             }
+        }
+    }
+
+    private boolean workRequestFilter(InternalFilter filter) {
+        if (filter instanceof InternalFilter.Before<?> before) {
+            return invokeBefore(before);
+            // continue with next filter
+        } else if (filter instanceof InternalFilter.After<?>) {
+            // skip filter, only used for response
+            return true;
+        } else if (filter instanceof InternalFilter.Async async) {
+            if (async.actual() instanceof InternalFilter.After<?>) {
+                // skip filter, only used for response
+                return true;
+            }
+            async.executor().execute(() -> {
+                if (workRequestFilter(async.actual())) {
+                    workRequest();
+                }
+            });
+            return false;
+        } else if (filter instanceof InternalFilter.AroundLegacy around) {
+            FilterChainImpl chainSuspensionPoint = new FilterChainImpl(index - 1, responseSuspensionPoint);
+            responseSuspensionPoint = chainSuspensionPoint;
+            try {
+                Publisher<? extends HttpResponse<?>> result = around.bean().doFilter(request, chainSuspensionPoint);
+                result.subscribe(chainSuspensionPoint);
+            } catch (Throwable e) {
+                chainSuspensionPoint.handleContinuationFilterException(e);
+            }
+            // suspend
+            return false;
+        } else if (filter instanceof InternalFilter.TerminalReactive || filter instanceof InternalFilter.Terminal) {
+            ExecutionFlow<? extends HttpResponse<?>> terminalFlow;
+            if (filter instanceof InternalFilter.Terminal t) {
+                try {
+                    terminalFlow = t.execute(request);
+                } catch (Throwable e) {
+                    terminalFlow = ExecutionFlow.error(e);
+                }
+            } else {
+                terminalFlow = ReactiveExecutionFlow.fromPublisher(((InternalFilter.TerminalReactive) filter).responsePublisher());
+            }
+            // this is almost never available immediately, so don't bother with asDone checks
+            terminalFlow.onComplete((resp, fail) -> {
+                response = resp;
+                failure = fail;
+                responseNeedsProcessing = true;
+                index--;
+                workResponse();
+            });
+            // request work is done
+            return false;
+        } else {
+            throw new IllegalStateException("Unknown filter type");
         }
     }
 
@@ -209,6 +222,14 @@ public class FilterRunner {
                     // suspend
                     return;
                 }
+            } else if (filter instanceof InternalFilter.Async async && async.actual() instanceof InternalFilter.After<?> after) {
+                async.executor().execute(() -> {
+                    if (invokeAfter(after)) {
+                        workResponse();
+                    }
+                });
+                // suspend
+                return;
             }
         }
     }

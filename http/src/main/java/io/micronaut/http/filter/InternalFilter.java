@@ -8,6 +8,8 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import org.reactivestreams.Publisher;
 
+import java.util.concurrent.Executor;
+
 /**
  * Base interface for different filter types. Note that while the base interface is exposed, so you
  * can pass around instances of these filters, the different implementations are internal only.
@@ -28,6 +30,13 @@ public sealed interface InternalFilter {
         T bean,
         Executable<T, ?> method,
         FilterOrder order
+    ) implements InternalFilter {
+    }
+
+    @Internal
+    record Async(
+        InternalFilter actual,
+        Executor executor
     ) implements InternalFilter {
     }
 
