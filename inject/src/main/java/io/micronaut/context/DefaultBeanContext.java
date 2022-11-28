@@ -27,6 +27,7 @@ import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Secondary;
 import io.micronaut.context.condition.ConditionContext;
 import io.micronaut.context.condition.Failure;
+import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.context.env.PropertyPlaceholderResolver;
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.context.event.ApplicationEventPublisher;
@@ -3006,7 +3007,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
             String pkg = entry.getKey();
             if (beanType.getTypeName().startsWith(pkg + ".")) {
                 StringBuilder messageBuilder = new StringBuilder();
-                String ls = System.getProperty("line.separator");
+                String ls = CachedEnvironment.getProperty("line.separator");
                 messageBuilder.append("The bean [")
                               .append(beanType.getTypeString(true))
                               .append("] is disabled because it is within the package [")
@@ -3039,7 +3040,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
             if (!beanDefinitions.isEmpty()) {
                 StringBuilder messageBuilder = new StringBuilder();
-                String ls = System.getProperty("line.separator");
+                String ls = CachedEnvironment.getProperty("line.separator");
                 messageBuilder.append("The following matching beans are disabled by bean requirements: ").append(ls);
                 for (BeanDefinition<T> beanDefinition : beanDefinitions) {
                     messageBuilder.append("* Bean of type [").append(beanDefinition.asArgument().getTypeString(false))

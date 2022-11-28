@@ -307,7 +307,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         StringBuilder messageBuilder = new StringBuilder();
         Argument<?> requiredBeanType = beanType;
         Iterator<BeanDefinition<?>> i = dependencyChain.iterator();
-        String ls = System.getProperty("line.separator");
+        String ls = CachedEnvironment.getProperty("line.separator");
         while (i.hasNext()) {
             messageBuilder.append(ls);
             BeanDefinition<?> beanDefinition = i.next();
