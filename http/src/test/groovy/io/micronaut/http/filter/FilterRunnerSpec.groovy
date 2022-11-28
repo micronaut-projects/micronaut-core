@@ -38,7 +38,7 @@ class FilterRunnerSpec extends Specification {
         events == ["before", "terminal", "after"]
     }
 
-    def 'around legacy'() {
+    def 'around filter'(boolean legacy) {
         given:
         def events = []
         def req1 = HttpRequest.GET("/req1")
@@ -46,21 +46,15 @@ class FilterRunnerSpec extends Specification {
         def resp1 = HttpResponse.ok("resp1")
         def resp2 = HttpResponse.ok("resp2")
         List<InternalFilter> filters = [
-                new InternalFilter.AroundLegacy(
-                        new HttpServerFilter() {
-                            @Override
-                            Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
-                                assert request == req1
-                                events.add("before")
-                                return Flux.from(chain.proceed(req2)).map(resp -> {
-                                    assert resp == resp1
-                                    events.add("after")
-                                    return resp2
-                                })
-                            }
-                        },
-                        new FilterOrder.Fixed(0)
-                ),
+                around(legacy) { request, chain ->
+                    assert request == req1
+                    events.add("before")
+                    return Flux.from(chain.proceed(req2)).map(resp -> {
+                        assert resp == resp1
+                        events.add("after")
+                        return resp2
+                    })
+                },
                 (InternalFilter.Terminal) (req -> {
                     assert req == req2
                     events.add("terminal")
@@ -73,6 +67,9 @@ class FilterRunnerSpec extends Specification {
         then:
         result != null
         events == ["before", "terminal", "after"]
+
+        where:
+        legacy << [true, false]
     }
 
     def 'exception in before'() {
@@ -147,20 +144,14 @@ class FilterRunnerSpec extends Specification {
         actual == testExc
     }
 
-    def 'exception in legacy around: before proceed'() {
+    def 'exception in around: before proceed'(boolean legacy) {
         given:
         def events = []
         def testExc = new RuntimeException("Test exception")
         List<InternalFilter> filters = [
-                new InternalFilter.AroundLegacy(
-                        new HttpServerFilter() {
-                            @Override
-                            Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
-                                throw testExc
-                            }
-                        },
-                        new FilterOrder.Fixed(0)
-                ),
+                around(legacy) { request, chain ->
+                    throw testExc
+                },
                 (InternalFilter.Terminal) (req -> {
                     events.add("terminal")
                     ExecutionFlow.just(HttpResponse.ok())
@@ -173,22 +164,19 @@ class FilterRunnerSpec extends Specification {
         def actual = thrown Exception
         actual == testExc
         events == []
+
+        where:
+        legacy << [true, false]
     }
 
-    def 'exception in legacy around: in proceed transform'() {
+    def 'exception in around: in proceed transform'(boolean legacy) {
         given:
         def events = []
         def testExc = new RuntimeException("Test exception")
         List<InternalFilter> filters = [
-                new InternalFilter.AroundLegacy(
-                        new HttpServerFilter() {
-                            @Override
-                            Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
-                                return Flux.from(chain.proceed(request)).map(r -> { throw testExc })
-                            }
-                        },
-                        new FilterOrder.Fixed(0)
-                ),
+                around(legacy) { request, chain ->
+                    return Flux.from(chain.proceed(request)).map(r -> { throw testExc })
+                },
                 (InternalFilter.Terminal) (req -> {
                     events.add("terminal")
                     ExecutionFlow.just(HttpResponse.ok())
@@ -201,24 +189,21 @@ class FilterRunnerSpec extends Specification {
         def actual = thrown Exception
         actual == testExc
         events == ["terminal"]
+
+        where:
+        legacy << [true, false]
     }
 
-    def 'exception in legacy around: after proceed, downstream gives normal response'() {
+    def 'exception in around: after proceed, downstream gives normal response'(boolean legacy) {
         // don't do this at home
         given:
         def events = []
         def testExc = new RuntimeException("Test exception")
         List<InternalFilter> filters = [
-                new InternalFilter.AroundLegacy(
-                        new HttpServerFilter() {
-                            @Override
-                            Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
-                                Flux.from(chain.proceed(request)).subscribe()
-                                throw testExc
-                            }
-                        },
-                        new FilterOrder.Fixed(0)
-                ),
+                around(legacy) { request, chain ->
+                    Flux.from(chain.proceed(request)).subscribe()
+                    throw testExc
+                },
                 (InternalFilter.Terminal) (req -> {
                     events.add("terminal")
                     ExecutionFlow.just(HttpResponse.ok())
@@ -231,34 +216,38 @@ class FilterRunnerSpec extends Specification {
         def actual = thrown Exception
         actual == testExc
         events == ["terminal"]
+
+        where:
+        legacy << [true, false]
     }
 
-    def 'exception in legacy around: after proceed, downstream gives error'() {
+    def 'exception in around: after proceed, downstream gives error'(boolean legacy) {
         // don't do this at home
         given:
         def testExc = new RuntimeException("Test exception")
+        def terminalFuture = new CompletableFuture()
         List<InternalFilter> filters = [
-                new InternalFilter.AroundLegacy(
-                        new HttpServerFilter() {
-                            @Override
-                            Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
-                                Flux.from(chain.proceed(request)).subscribe()
-                                // this exception is logged and dropped
-                                throw new RuntimeException("Test exception 2")
-                            }
-                        },
-                        new FilterOrder.Fixed(0)
-                ),
+                around(legacy) { request, chain ->
+                    Flux.from(chain.proceed(request)).subscribe()
+                    // this exception is logged and dropped
+                    throw new RuntimeException("Test exception 2")
+                },
                 (InternalFilter.Terminal) (req -> {
-                    ExecutionFlow.error(testExc)
+                    CompletableFutureExecutionFlow.just(terminalFuture)
                 })
         ]
 
         when:
-        await(new FilterRunner(filters).run(HttpRequest.GET("/")))
+        def flow = new FilterRunner(filters).run(HttpRequest.GET("/"))
+        // after the run() call, we're suspended waiting for the terminal to finish
+        terminalFuture.completeExceptionally(testExc)
+        await(flow)
         then:
         def actual = thrown Exception
         actual == testExc
+
+        where:
+        legacy << [true, false]
     }
 
     def 'before returns new request'() {
@@ -491,12 +480,28 @@ class FilterRunnerSpec extends Specification {
         events == ["terminal"]
     }
 
-    private def after(Closure<?> closure) {
-        return new InternalFilter.After<>(null, new LambdaExecutable(closure), new FilterOrder.Fixed(0))
+    private def after(List<Argument> arguments = closure.parameterTypes.collect { Argument.of(it) }, Closure<?> closure) {
+        return new InternalFilter.After<>(null, new LambdaExecutable(closure, arguments.toArray(new Argument[0])), new FilterOrder.Fixed(0))
     }
 
-    private def before(Closure<?> closure) {
-        return new InternalFilter.Before<>(null, new LambdaExecutable(closure), new FilterOrder.Fixed(0))
+    private def before(List<Argument> arguments = closure.parameterTypes.collect { Argument.of(it) }, Closure<?> closure) {
+        return new InternalFilter.Before<>(null, new LambdaExecutable(closure, arguments.toArray(new Argument[0])), new FilterOrder.Fixed(0))
+    }
+
+    private def around(boolean legacy, Closure<Publisher<MutableHttpResponse<?>>> closure) {
+        if (legacy) {
+            return new InternalFilter.AroundLegacy(
+                    new HttpServerFilter() {
+                        @Override
+                        Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
+                            return closure(request, chain)
+                        }
+                    },
+                    new FilterOrder.Fixed(0)
+            )
+        } else {
+            return before([Argument.of(HttpRequest<?>), Argument.of(FilterContinuation, Publisher)], closure)
+        }
     }
 
     private <T> ImperativeExecutionFlow<T> await(ExecutionFlow<T> flow) {
@@ -519,9 +524,11 @@ class FilterRunnerSpec extends Specification {
 
     private static class LambdaExecutable implements Executable<Object, Object> {
         private final Closure<?> closure
+        private final Argument<?>[] arguments;
 
-        LambdaExecutable(Closure<?> closure) {
+        LambdaExecutable(Closure<?> closure, Argument<?>[] arguments) {
             this.closure = closure
+            this.arguments = arguments
         }
 
         @Override
@@ -531,7 +538,7 @@ class FilterRunnerSpec extends Specification {
 
         @Override
         Argument<?>[] getArguments() {
-            return closure.parameterTypes.collect { Argument.of(it) }
+            return arguments;
         }
 
         @Override
