@@ -116,7 +116,7 @@ public class FilterRunner {
 
         ExecutionFlow<HttpResponse<?>> resultFlow = CompletableFutureExecutionFlow.just(responseSuspensionPoint);
         workRequest();
-        //noinspection unchecked
+        //noinspection unchecked,rawtypes
         return (ExecutionFlow) resultFlow;
     }
 

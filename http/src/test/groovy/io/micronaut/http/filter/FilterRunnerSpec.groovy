@@ -24,8 +24,14 @@ class FilterRunnerSpec extends Specification {
         given:
         def events = []
         List<InternalFilter> filters = [
-                after { req, resp -> events.add("after") },
-                before { req -> events.add("before") },
+                after { req, resp ->
+                    events.add("after")
+                    null
+                },
+                before { req ->
+                    events.add("before")
+                    null
+                },
                 (InternalFilter.Terminal) (req -> {
                     events.add("terminal")
                     ExecutionFlow.just(HttpResponse.ok())
@@ -33,10 +39,9 @@ class FilterRunnerSpec extends Specification {
         ]
 
         when:
-        def result = new FilterRunner(filters).run(HttpRequest.GET("/")).asDone()
+        def result = new FilterRunner(filters).run(HttpRequest.GET("/")).asDone().value
         then:
-        result != null
-        result.value.status() == HttpStatus.OK
+        result.status() == HttpStatus.OK
         events == ["before", "terminal", "after"]
     }
 
