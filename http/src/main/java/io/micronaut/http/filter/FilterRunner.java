@@ -25,6 +25,21 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+/**
+ * @implNote Legacy filters had a strict execution flow: filter1->chain.proceed->filter2->chain.proceed...
+ * This leads to deep call stacks and requires use of reactive flows. The new filter API is more
+ * flexible. Filters do not have to accept a chain they call proceed on, they do not have to use
+ * reactive types, and so on.<br>
+ * {@link FilterRunner} takes advantage of this flexibility to optimize execution of filters. Most
+ * importantly, if a filter returns an immediate value (as opposed to a reactive flow),
+ * {@link FilterRunner} can execute filters <i>sequentially</i>, instead of in a recursive fashion.<br>
+ * The implementation of this is inspired by kotlin coroutines. Filter execution essentially
+ * happens in a loop ({@link #workRequest()} and {@link #workResponse()}), but the loop counter is
+ * an instance variable ({@link #index}), and the loop can sometimes <i>suspend</i>, e.g. when a
+ * filter returns a reactive flow instead of an immediate value. When suspension happens, the loop
+ * exits early, and {@link #workRequest()} (or {@link #workResponse()}) will be called again on
+ * unsuspend (e.g. when the reactive flow completes).
+ */
 @Internal
 public class FilterRunner {
     private static final Logger LOG = LoggerFactory.getLogger(FilterRunner.class);
