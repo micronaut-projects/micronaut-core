@@ -2257,7 +2257,7 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
     }
 
     private <R> boolean isInnerConfiguration(@Nullable Argument<R> argument) {
-        if (argument == null) {
+        if (argument == null || !isConfigurationProperties) {
             return false;
         }
         if (argument.isContainerType() || argument.isOptional() || argument.isProvider()) {
