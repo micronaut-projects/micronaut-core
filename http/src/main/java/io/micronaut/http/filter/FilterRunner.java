@@ -2,9 +2,11 @@ package io.micronaut.http.filter;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.execution.CompletableFutureExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.execution.ImperativeExecutionFlow;
+import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpRequest;
@@ -18,7 +20,9 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @Internal
@@ -213,27 +217,121 @@ public class FilterRunner {
     }
 
     private <T> boolean invokeBefore(InternalFilter.Before<T> before) {
-        // todo: better param binding, handle return value, errors
+        // todo: handle ExecuteOn
         try {
-            before.method().invoke(before.bean(), request);
+            Object returnValue = before.method().invoke(before.bean(), satisfy(before.method().getArguments(), false));
+            return handleFilterReturn(returnValue, true);
         } catch (Throwable e) {
             failure = e;
             responseNeedsProcessing = true;
             workResponse();
             return false;
         }
-        return true;
     }
 
     private <T> boolean invokeAfter(InternalFilter.After<T> after) {
-        // todo: better param binding, handle return value, errors
+        // todo: handle ExecuteOn
         try {
-            after.method().invoke(after.bean(), request, response);
+            Object returnValue = after.method().invoke(after.bean(), satisfy(after.method().getArguments(), true));
+            return handleFilterReturn(returnValue, true);
         } catch (Throwable e) {
             failure = e;
             responseNeedsProcessing = true;
         }
         return true;
+    }
+
+    /**
+     * @param requestFilter Whether this is a request filter
+     * @return {@code true} if we can continue with the next filter, {@code false} if we should
+     * suspend
+     */
+    private boolean handleFilterReturn(Object returnValue, boolean requestFilter) throws Throwable {
+        if (returnValue instanceof Optional<?> opt) {
+            returnValue = opt.orElse(null);
+        }
+        if (returnValue == null) {
+            return true;
+        }
+        if (requestFilter) {
+            if (returnValue instanceof HttpRequest<?> req) {
+                this.request = req;
+                return true;
+            } else if (returnValue instanceof HttpResponse<?> resp) {
+                // cancel request pipeline, move immediately to response handling
+                this.response = resp;
+                this.responseNeedsProcessing = true;
+                workResponse();
+                return false;
+            }
+        } else {
+            if (returnValue instanceof HttpResponse<?> resp) {
+                // cancel request pipeline, move immediately to response handling
+                this.response = resp;
+                this.responseNeedsProcessing = true;
+                return true;
+            }
+        }
+        ExecutionFlow<?> delayedFlow;
+        if (Publishers.isConvertibleToPublisher(returnValue)) {
+            //noinspection unchecked
+            delayedFlow = ReactiveExecutionFlow.fromPublisher(
+                Publishers.convertPublisher(returnValue, Publisher.class));
+        } else if (returnValue instanceof CompletionStage<?> cs) {
+            delayedFlow = CompletableFutureExecutionFlow.just(cs.toCompletableFuture());
+        } else {
+            throw new UnsupportedOperationException("Unsupported filter return type " + returnValue.getClass().getName());
+        }
+        ImperativeExecutionFlow<?> doneFlow = delayedFlow.asDone();
+        if (doneFlow != null) {
+            if (doneFlow.getError() != null) {
+                throw doneFlow.getError();
+            }
+            return handleFilterReturn(doneFlow.getValue(), requestFilter);
+        } else {
+            // suspend until flow completes
+            delayedFlow.onComplete((v, e) -> {
+                if (e == null) {
+                    try {
+                        if (handleFilterReturn(v, requestFilter)) {
+                            if (requestFilter) {
+                                workRequest();
+                            } else {
+                                workResponse();
+                            }
+                        }
+                        return;
+                    } catch (Throwable t) {
+                        e = t;
+                    }
+                }
+                failure = e;
+                responseNeedsProcessing = true;
+                workResponse();
+            });
+            return false;
+        }
+    }
+
+    private Object[] satisfy(
+        Argument<?>[] arguments,
+        boolean hasResponse
+    ) throws Exception {
+        Object[] fulfilled = new Object[arguments.length];
+        for (int i = 0; i < arguments.length; i++) {
+            Argument<?> argument = arguments[i];
+            if (argument.getType().isAssignableFrom(MutableHttpRequest.class)) {
+                fulfilled[i] = request;
+            } else if (argument.getType().isAssignableFrom(MutableHttpResponse.class)) {
+                if (!hasResponse) {
+                    throw new IllegalStateException("Filter is called before the response is known, can't have a response argument");
+                }
+                fulfilled[i] = response;
+            } else {
+                throw new IllegalStateException("Unsupported filter argument type: " + argument);
+            }
+        }
+        return fulfilled;
     }
 
     private static class SuspensionPoint<T> extends CompletableFuture<T> {

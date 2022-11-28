@@ -261,6 +261,166 @@ class FilterRunnerSpec extends Specification {
         actual == testExc
     }
 
+    def 'before returns new request'() {
+        given:
+        def events = []
+        def req1 = HttpRequest.GET("/req1")
+        def req2 = HttpRequest.GET("/req2")
+        List<InternalFilter> filters = [
+                before { req ->
+                    assert req == req1
+                    events.add("before")
+                    req2
+                },
+                new InternalFilter.Terminal(req -> {
+                    assert req == req2
+                    events.add("terminal")
+                    ExecutionFlow.just(HttpResponse.ok())
+                })
+        ]
+
+        when:
+        await(new FilterRunner(filters).run(req1))
+        then:
+        events == ["before", "terminal"]
+    }
+
+    def 'before returns response'() {
+        given:
+        def events = []
+        List<InternalFilter> filters = [
+                before {
+                    events.add("before")
+                    HttpResponse.ok()
+                },
+                new InternalFilter.Terminal(req -> {
+                    events.add("terminal")
+                    ExecutionFlow.just(HttpResponse.ok())
+                })
+        ]
+
+        when:
+        await(new FilterRunner(filters).run(HttpRequest.GET("/")))
+        then:
+        events == ["before"]
+    }
+
+    def 'before returns publisher request'() {
+        given:
+        def events = []
+        def req1 = HttpRequest.GET("/req1")
+        def req2 = HttpRequest.GET("/req2")
+        List<InternalFilter> filters = [
+                before { req ->
+                    assert req == req1
+                    events.add("before")
+                    Flux.just(req2)
+                },
+                new InternalFilter.Terminal(req -> {
+                    assert req == req2
+                    events.add("terminal")
+                    ExecutionFlow.just(HttpResponse.ok())
+                })
+        ]
+
+        when:
+        await(new FilterRunner(filters).run(req1))
+        then:
+        events == ["before", "terminal"]
+    }
+
+    def 'before returns completablefuture request'() {
+        given:
+        def events = []
+        def req1 = HttpRequest.GET("/req1")
+        def req2 = HttpRequest.GET("/req2")
+        List<InternalFilter> filters = [
+                before { req ->
+                    assert req == req1
+                    events.add("before")
+                    CompletableFuture.completedFuture(req2)
+                },
+                new InternalFilter.Terminal(req -> {
+                    assert req == req2
+                    events.add("terminal")
+                    ExecutionFlow.just(HttpResponse.ok())
+                })
+        ]
+
+        when:
+        await(new FilterRunner(filters).run(req1))
+        then:
+        events == ["before", "terminal"]
+    }
+
+    def 'before returns publisher response'() {
+        given:
+        def events = []
+        List<InternalFilter> filters = [
+                before {
+                    events.add("before")
+                    Flux.just(HttpResponse.ok())
+                },
+                new InternalFilter.Terminal(req -> {
+                    events.add("terminal")
+                    ExecutionFlow.just(HttpResponse.ok())
+                })
+        ]
+
+        when:
+        await(new FilterRunner(filters).run(HttpRequest.GET("/")))
+        then:
+        events == ["before"]
+    }
+
+    def 'after returns new response'() {
+        given:
+        def events = []
+        def resp1 = HttpResponse.ok("resp1")
+        def resp2 = HttpResponse.ok("resp2")
+        List<InternalFilter> filters = [
+                after { HttpResponse<?> resp ->
+                    assert resp == resp1
+                    events.add("after")
+                    resp2
+                },
+                new InternalFilter.Terminal(req -> {
+                    events.add("terminal")
+                    ExecutionFlow.just(resp1)
+                })
+        ]
+
+        when:
+        def resp = await(new FilterRunner(filters).run(HttpRequest.GET("/"))).value
+        then:
+        resp == resp2
+        events == ["terminal", "after"]
+    }
+
+    def 'after returns publisher response'() {
+        given:
+        def events = []
+        def resp1 = HttpResponse.ok("resp1")
+        def resp2 = HttpResponse.ok("resp2")
+        List<InternalFilter> filters = [
+                after { HttpResponse<?> resp ->
+                    assert resp == resp1
+                    events.add("after")
+                    Flux.just(resp2)
+                },
+                new InternalFilter.Terminal(req -> {
+                    events.add("terminal")
+                    ExecutionFlow.just(resp1)
+                })
+        ]
+
+        when:
+        def resp = await(new FilterRunner(filters).run(HttpRequest.GET("/"))).value
+        then:
+        resp == resp2
+        events == ["terminal", "after"]
+    }
+
     private def after(Closure<?> closure) {
         return new InternalFilter.After<>(null, new LambdaExecutable(closure), new FilterOrder.Fixed(0))
     }
