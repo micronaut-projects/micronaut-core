@@ -236,8 +236,7 @@ class FilterRunnerSpec extends Specification {
         List<InternalFilter> filters = [
                 around(legacy) { request, chain ->
                     Flux.from(chain.proceed(request)).subscribe()
-                    // this exception is logged and dropped
-                    throw new RuntimeException("Test exception 2")
+                    throw testExc
                 },
                 (InternalFilter.Terminal) (req -> {
                     CompletableFutureExecutionFlow.just(terminalFuture)
@@ -247,11 +246,36 @@ class FilterRunnerSpec extends Specification {
         when:
         def flow = new FilterRunner(filters).run(HttpRequest.GET("/"))
         // after the run() call, we're suspended waiting for the terminal to finish
-        terminalFuture.completeExceptionally(testExc)
+        // this exception is logged and dropped
+        terminalFuture.completeExceptionally(new RuntimeException("Test exception 2"))
         await(flow)
         then:
         def actual = thrown Exception
         actual == testExc
+
+        where:
+        legacy << [true, false]
+    }
+
+    def 'around filter does not call proceed'(boolean legacy) {
+        given:
+        def events = []
+        List<InternalFilter> filters = [
+                around(legacy) { request, chain ->
+                    events.add("around")
+                    Flux.just(HttpResponse.ok("foo"))
+                },
+                (InternalFilter.Terminal) (req -> {
+                    events.add("terminal")
+                    ExecutionFlow.just(HttpResponse.ok())
+                })
+        ]
+
+        when:
+        def resp = await(new FilterRunner(filters).run(HttpRequest.GET("/"))).value
+        then:
+        resp.status == HttpStatus.OK
+        events == ["around"]
 
         where:
         legacy << [true, false]

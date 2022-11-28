@@ -154,7 +154,7 @@ public class FilterRunner {
                 Publisher<? extends HttpResponse<?>> result = around.bean().doFilter(request, chainSuspensionPoint);
                 result.subscribe(chainSuspensionPoint);
             } catch (Throwable e) {
-                chainSuspensionPoint.handleContinuationFilterException(e);
+                chainSuspensionPoint.forwardResponse(null, e);
             }
             // suspend
             return false;
@@ -262,7 +262,7 @@ public class FilterRunner {
                 responseNeedsProcessing = true;
                 workResponse();
             } else {
-                passedOnContinuation.handleContinuationFilterException(e);
+                passedOnContinuation.forwardResponse(null, e);
             }
             return false;
         }
@@ -373,7 +373,7 @@ public class FilterRunner {
                     responseNeedsProcessing = true;
                     workResponse();
                 } else {
-                    passedOnContinuation.handleContinuationFilterException(e);
+                    passedOnContinuation.forwardResponse(null, e);
                 }
             });
             return false;
@@ -459,14 +459,24 @@ public class FilterRunner {
      * Continuations give the user the choice when to proceed with filter execution. This adds some
      * difficulty for concurrency: we must ensure {@link #workRequest()} (or
      * {@link #workResponse()} in case of errors) is called exactly once. For this purpose, this
-     * class has the {@link #decidedOnBranch} flag. It is set to {@link true} when the filter
+     * class has the {@link #downstreamGuard} flag. It is set to {@link true} when the filter
      * calls {@link #proceed}, or when the filter throws an exception. Only the first of these
      * events actually continues working the {@link FilterRunner}, any events that follow are
      * discarded (logged or throw an exception).
      */
     private abstract class FilterContinuationImpl<R> extends SuspensionPoint<HttpResponse<?>> implements FilterContinuation<R> {
-        final AtomicBoolean decidedOnBranch = new AtomicBoolean(false);
-        final AtomicBoolean forwardedResponse = new AtomicBoolean(false);
+        /**
+         * This flag guards <i>downstream</i> execution, i.e. the call to {@link #workRequest()}
+         * that runs downstream filters. Only the thread that claims this guard may run
+         * {@link #workRequest()}.
+         */
+        final AtomicBoolean downstreamGuard = new AtomicBoolean(false);
+        /**
+         * This flag guards <i>upstream</i> execution, i.e. the call to {@link #workResponse()}
+         * after the downstream has returned the response, or if the downstream pipeline was
+         * aborted (usually because of an error).
+         */
+        final AtomicBoolean upstreamGuard = new AtomicBoolean(false);
 
         FilterContinuationImpl(int filterIndex, @Nullable SuspensionPoint<HttpResponse<?>> next) {
             super(filterIndex, next);
@@ -477,7 +487,7 @@ public class FilterRunner {
         @Override
         public R proceed(HttpRequest<?> request) {
             FilterRunner.this.request = request;
-            if (decidedOnBranch.compareAndSet(false, true)) {
+            if (downstreamGuard.compareAndSet(false, true)) {
                 workRequest();
                 return adapt();
             } else {
@@ -485,48 +495,44 @@ public class FilterRunner {
             }
         }
 
-        void handleContinuationFilterException(Throwable e) {
-            if (decidedOnBranch.compareAndSet(false, true)) {
+        /**
+         * Forward a given response from this suspension point. If {@link #proceed} was already
+         * called, this waits for the downstream filters to finish.
+         */
+        void forwardResponse(HttpResponse<?> response, Throwable failure) {
+            if (downstreamGuard.compareAndSet(false, true)) {
                 // proceed wasn't called, continue directly to response processing
                 // cancel the suspension point, since we don't do more request processing
                 responseSuspensionPoint = next;
-                if (!forwardResponse(null, e)) {
-                    // if another thread forwarded a response too, `responseSuspensionPoint` may have changed, and we may interfere! Should never happen.
-                    LOG.warn("Potential race condition: Continuation failed early, but someone else also forwarded a response");
-                }
-            } else if (isDone()) {
-                // proceed was called and the continuation was already done. The filter likely
-                // already handled the response, and decided to error based on it.
-                forwardResponse(null, e);
-            } else {
+            } else if (!isDone()) {
                 // proceed was called, need to wait for completion to avoid concurrency issues
-                // filters should really not do this: Either throw the exception before the proceed call, or emit it from the returned publisher
+                // filters should really not do this: Either return before the proceed call, or
+                // emit it from the returned publisher after proceed() is done
                 whenComplete((resp, err) -> {
                     if (err == null) {
-                        LOG.warn("Filter method threw exception after chain.proceed() had already been called. This can lead to memory leaks, please fix your filter!", e);
-                        forwardResponse(null, e);
+                        LOG.warn("Filter method returned early after chain.proceed() had already been called. This can lead to memory leaks, please fix your filter!");
                     } else {
-                        LOG.warn("Filter method threw exception after chain.proceed() had already been called. Downstream handlers also threw an exception, that one is being forwarded.", e);
-                        forwardResponse(null, err);
+                        LOG.warn("Filter method returned early after chain.proceed() had already been called. Downstream handlers also threw an exception, which is being discarded:", err);
                     }
+                    forwardResponse(response, failure);
                 });
+                return;
             }
-        }
+            // else proceed was called and the continuation was already done. The filter likely
+            // already handled the response, and decided to continue based on it.
 
-        boolean forwardResponse(HttpResponse<?> response, Throwable failure) {
-            if (!forwardedResponse.compareAndSet(false, true)) {
+            if (!upstreamGuard.compareAndSet(false, true)) {
                 if (failure == null) {
                     LOG.warn("Two outcomes for one continuation, this one is swallowed: {}", response);
                 } else {
                     LOG.warn("Two outcomes for one continuation, this one is swallowed:", failure);
                 }
-                return false;
+                return;
             }
             FilterRunner.this.response = response;
             FilterRunner.this.failure = failure;
             responseNeedsProcessing = true;
             workResponse();
-            return true;
         }
     }
 
@@ -568,7 +574,7 @@ public class FilterRunner {
 
         @Override
         public void onComplete() {
-            if (!forwardedResponse.get()) {
+            if (!upstreamGuard.get()) {
                 forwardResponse(response, new IllegalStateException("Publisher did not return response"));
             }
         }
