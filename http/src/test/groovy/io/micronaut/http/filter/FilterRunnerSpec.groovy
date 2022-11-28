@@ -518,6 +518,36 @@ class FilterRunnerSpec extends Specification {
         events == ["before thread-before", "terminal thread-before", "after thread-after"]
     }
 
+    def 'around filter with blocking continuation'() {
+        given:
+        def events = []
+        def req1 = HttpRequest.GET("/req1")
+        def req2 = HttpRequest.GET("/req2")
+        def resp1 = HttpResponse.ok("resp1")
+        def resp2 = HttpResponse.ok("resp2")
+        List<InternalFilter> filters = [
+                before([Argument.of(HttpRequest<?>), Argument.of(FilterContinuation, HttpResponse)]) { request, chain ->
+                    assert request == req1
+                    events.add("before")
+                    def resp = chain.proceed(req2)
+                    assert resp == resp1
+                    events.add("after")
+                    return resp2
+                },
+                (InternalFilter.Terminal) (req -> {
+                    assert req == req2
+                    events.add("terminal")
+                    ExecutionFlow.just(resp1)
+                })
+        ]
+
+        when:
+        def result = await(new FilterRunner(filters).run(req1))
+        then:
+        result != null
+        events == ["before", "terminal", "after"]
+    }
+
     private def after(List<Argument> arguments = closure.parameterTypes.collect { Argument.of(it) }, Closure<?> closure) {
         return new InternalFilter.After<>(null, new LambdaExecutable(closure, arguments.toArray(new Argument[0])), new FilterOrder.Fixed(0))
     }

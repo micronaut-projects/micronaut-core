@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -414,8 +415,10 @@ public class FilterRunner {
                 SuspensionPoint<HttpResponse<?>> newSuspensionPoint;
                 if (Publishers.isConvertibleToPublisher(continuationReturnType.getType())) {
                     newSuspensionPoint = new ReactiveContinuationImpl<>(ourIndex, oldSuspensionPoint, continuationReturnType.getType());
+                } else if (continuationReturnType.getType().isAssignableFrom(MutableHttpResponse.class)) {
+                    newSuspensionPoint = new BlockingContinuationImpl(ourIndex, oldSuspensionPoint);
                 } else {
-                    throw new IllegalStateException("Unsupported filter argument type: " + argument);
+                    throw new IllegalStateException("Unsupported continuation type: " + continuationReturnType);
                 }
                 // invokeBefore will detect the new suspension point and handle it accordingly
                 this.responseSuspensionPoint = newSuspensionPoint;
@@ -573,6 +576,36 @@ public class FilterRunner {
         @Override
         protected R adapt() {
             return Publishers.convertPublisher(Mono.fromFuture(this), reactiveType);
+        }
+    }
+
+    private class BlockingContinuationImpl extends FilterContinuationImpl<HttpResponse<?>> {
+        BlockingContinuationImpl(int filterIndex, @Nullable SuspensionPoint<HttpResponse<?>> next) {
+            super(filterIndex, next);
+        }
+
+        @Override
+        protected HttpResponse<?> adapt() {
+            boolean interrupted = false;
+            while (true) {
+                try {
+                    // todo: detect event loop thread
+                    HttpResponse<?> v = get();
+                    if (interrupted) {
+                        Thread.currentThread().interrupt();
+                    }
+                    return v;
+                } catch (InterruptedException e) {
+                    interrupted = true;
+                } catch (ExecutionException e) {
+                    Throwable cause = e.getCause();
+                    if (cause instanceof RuntimeException re) {
+                        throw re;
+                    } else {
+                        throw new RuntimeException(cause);
+                    }
+                }
+            }
         }
     }
 }
