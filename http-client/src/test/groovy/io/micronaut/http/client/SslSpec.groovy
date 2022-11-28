@@ -36,7 +36,6 @@ import spock.lang.Specification
 
 import javax.net.ssl.SSLHandshakeException
 import java.security.GeneralSecurityException
-import java.security.InvalidAlgorithmParameterException
 import java.time.Duration
 import java.util.concurrent.TimeUnit
 
@@ -128,7 +127,7 @@ class SslSpec extends Specification {
         where:
         url << [
                 'https://expired.badssl.com/',
-                //'https://wrong.host.badssl.com/', cert is for *.badssl.com, we accept that
+                'https://wrong.host.badssl.com/',
                 'https://self-signed.badssl.com/',
                 'https://untrusted-root.badssl.com/',
                 //'https://revoked.badssl.com/', not implemented

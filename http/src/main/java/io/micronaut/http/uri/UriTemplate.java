@@ -27,7 +27,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.StringJoiner;
 import java.util.function.Predicate;
@@ -995,7 +994,6 @@ public class UriTemplate implements Comparable<UriTemplate> {
                         result = joiner.toString();
                     } else if (found instanceof Map) {
                         Map<Object, Object> map = (Map<Object, Object>) found;
-                        map.values().removeIf(Objects::isNull);
                         if (map.isEmpty()) {
                             return "";
                         }
@@ -1020,6 +1018,9 @@ public class UriTemplate implements Comparable<UriTemplate> {
                         }
 
                         map.forEach((key, some) -> {
+                            if (some == null) {
+                                return;
+                            }
                             String ks = key.toString();
                             Iterable<?> values = (some instanceof Iterable) ? (Iterable) some : Collections.singletonList(some);
                             for (Object value: values) {
@@ -1038,7 +1039,12 @@ public class UriTemplate implements Comparable<UriTemplate> {
                                 }
                             }
                         });
-                        result = joiner.toString();
+                        if (joiner.length() == 0) {
+                            // only null entries
+                            return "";
+                        } else {
+                            result = joiner.toString();
+                        }
                     } else {
                         String str = found.toString();
                         str = applyModifier(modifierStr, modifierChar, str, str.length());
