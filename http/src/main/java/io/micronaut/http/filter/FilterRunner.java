@@ -298,7 +298,13 @@ public class FilterRunner {
             returnValue = opt.orElse(null);
         }
         if (returnValue == null) {
-            return passedOnContinuation == null;
+            if (passedOnContinuation != null) {
+                // use response/failure from other filters
+                passedOnContinuation.forwardResponse(response, failure);
+                return false;
+            } else {
+                return true;
+            }
         }
         if (requestFilter) {
             if (returnValue instanceof HttpRequest<?> req) {

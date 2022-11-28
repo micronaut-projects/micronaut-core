@@ -11,7 +11,10 @@ import io.micronaut.http.annotation.RequestFilter
 import io.micronaut.http.annotation.ResponseFilter
 import io.micronaut.http.annotation.ServerFilter
 import io.micronaut.http.client.HttpClient
+import io.micronaut.http.filter.FilterContinuation
 import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.scheduling.TaskExecutors
+import io.micronaut.scheduling.annotation.ExecuteOn
 import jakarta.inject.Singleton
 import spock.lang.Specification
 
@@ -114,6 +117,40 @@ class ServerFilterSpec extends Specification {
         }
     }
 
+    def 'blocking filter'() {
+        given:
+        def ctx = ApplicationContext.run(['spec.name': 'ServerFilterSpec'])
+        def server = ctx.getBean(EmbeddedServer)
+        server.start()
+        def client = ctx.createBean(HttpClient, server.URI).toBlocking()
+        def filter = ctx.getBean(BlockingFilter)
+
+        when:
+        def response = client.exchange("/blocking-filter/index", String)
+        then:
+        response.body() == "foo"
+        filter.events == ['request /blocking-filter/index', 'response /blocking-filter/index OK']
+
+        cleanup:
+        server.stop()
+        ctx.close()
+    }
+
+    @Singleton
+    @Requires(property = "spec.name", value = "ServerFilterSpec")
+    @ServerFilter("/blocking-filter/**")
+    @ExecuteOn(TaskExecutors.BLOCKING)
+    static class BlockingFilter {
+        def events = new ArrayList<String>()
+
+        @RequestFilter
+        void request(HttpRequest<?> request, FilterContinuation<HttpResponse<?>> continuation) {
+            events.add("request " + request.uri)
+            def response = continuation.proceed(request)
+            events.add("response " + request.uri + " " + response.status)
+        }
+    }
+
     @Singleton
     @Requires(property = "spec.name", value = "ServerFilterSpec")
     @Controller
@@ -125,6 +162,11 @@ class ServerFilterSpec extends Specification {
 
         @Get("/order-filter/index")
         String orderFilterIndex() {
+            return "foo"
+        }
+
+        @Get("/blocking-filter/index")
+        String blockingFilterIndex() {
             return "foo"
         }
     }
