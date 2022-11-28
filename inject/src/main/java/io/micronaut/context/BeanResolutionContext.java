@@ -305,6 +305,14 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     }
 
     /**
+     * Sets the configuration path.
+     * @param configurationPath The configuration path.
+     * @return The previous path
+     */
+    @Nullable
+    ConfigurationPath setConfigurationPath(@Nullable ConfigurationPath configurationPath);
+
+    /**
      * Represents a path taken to resolve a bean definitions dependencies.
      */
     interface Path extends Deque<Segment<?>>, AutoCloseable {

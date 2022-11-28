@@ -53,7 +53,9 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
 
     /**
      * Attribute used to store a dynamic bean name.
+     * @deprecated Previous internal usage, now no longer used.
      */
+    @Deprecated(forRemoval = true, since = "4.0.0")
     String NAMED_ATTRIBUTE = Named.class.getName();
 
     /**

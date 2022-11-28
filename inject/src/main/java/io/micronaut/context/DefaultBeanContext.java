@@ -2486,9 +2486,6 @@ public class DefaultBeanContext implements InitializableBeanContext {
         boolean propagateQualifier = beanDefinition.isProxy() && declaredQualifier instanceof Named;
         Qualifier prevQualifier = resolutionContext.getCurrentQualifier();
         try {
-            if (propagateQualifier) {
-                resolutionContext.setAttribute(BeanDefinition.NAMED_ATTRIBUTE, ((Named) declaredQualifier).getName());
-            }
             resolutionContext.setCurrentQualifier(declaredQualifier != null && !AnyQualifier.INSTANCE.equals(declaredQualifier) ? declaredQualifier : qualifier);
             T bean;
             if (beanFactory instanceof ParametrizedBeanFactory) {
@@ -2515,9 +2512,6 @@ public class DefaultBeanContext implements InitializableBeanContext {
             throw new BeanInstantiationException(beanDefinition, e);
         } finally {
             resolutionContext.setCurrentQualifier(prevQualifier);
-            if (propagateQualifier) {
-                resolutionContext.removeAttribute(BeanDefinition.NAMED_ATTRIBUTE);
-            }
         }
     }
 

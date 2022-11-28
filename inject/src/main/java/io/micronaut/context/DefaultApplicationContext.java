@@ -432,14 +432,14 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                     } else {
                         ConfigurationPath oldPath = configurationPath;
                         ConfigurationPath newPath = ConfigurationPath.newPath();
+                        resolutionContext.setConfigurationPath(configurationPath);
                         try {
-                            resolutionContext.setAttribute(ConfigurationPath.ATTRIBUTE, newPath);
                             newPath.pushConfigurationReader(candidate);
                             newPath.traverseResolvableSegments(getEnvironment(), subPath ->
                                 createAndAddDelegate(resolutionContext, candidate, transformedCandidates, subPath)
                             );
                         } finally {
-                            resolutionContext.setAttribute(ConfigurationPath.ATTRIBUTE, oldPath);
+                            resolutionContext.setConfigurationPath(oldPath);
                         }
                     }
                 } else if (prefix.indexOf('*') == -1) {
@@ -454,7 +454,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                         Collection<BeanDefinition<Object>> beanCandidates = findBeanCandidates(resolutionContext, Argument.of(declaringClass), null, true);
                         for (BeanDefinition<Object> beanCandidate : beanCandidates) {
                             if (beanCandidate instanceof BeanDefinitionDelegate<Object> delegate) {
-                                ConfigurationPath cp = delegate.get(ConfigurationPath.ATTRIBUTE, ConfigurationPath.class).orElse(configurationPath).copy();
+                                ConfigurationPath cp = delegate.getConfigurationPath().orElse(configurationPath).copy();
                                 cp.traverseResolvableSegments(getEnvironment(), subPath -> {
                                     subPath.pushConfigurationReader(candidate);
                                     if (getEnvironment().containsProperties(subPath.prefix())) {
@@ -501,7 +501,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
             for (BeanDefinition<?> dependentCandidate : dependentCandidates) {
                 ConfigurationPath dependentPath = null;
                 if (dependentCandidate instanceof BeanDefinitionDelegate<?> delegate) {
-                    dependentPath = delegate.get(ConfigurationPath.ATTRIBUTE, ConfigurationPath.class).orElse(null);
+                    dependentPath = delegate.getConfigurationPath().orElse(null);
                 }
                 if (dependentPath != null) {
                     createAndAddDelegate(resolutionContext, candidate, transformedCandidates, dependentPath);
@@ -513,10 +513,6 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                         qualifier = PrimaryQualifier.INSTANCE;
                     }
                     BeanDefinitionDelegate<?> delegate = BeanDefinitionDelegate.create(candidate, (Qualifier<T>) qualifier);
-
-                    if (dependentCandidate.isPrimary()) {
-                        delegate.put(BeanDefinitionDelegate.PRIMARY_ATTRIBUTE, true);
-                    }
                     transformedCandidates.add((BeanDefinition<T>) delegate);
                 }
             }
@@ -549,9 +545,9 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     private <T> void createAndAddDelegate(BeanResolutionContext resolutionContext, BeanDefinition<T> candidate, List<BeanDefinition<T>> transformedCandidates, ConfigurationPath path) {
         BeanDefinitionDelegate<T> delegate = BeanDefinitionDelegate.create(
             candidate,
-            path.beanQualifier()
+            path.beanQualifier(),
+            path
         );
-        delegate.put(ConfigurationPath.ATTRIBUTE, path);
         if (delegate.isEnabled(this, resolutionContext)) {
             transformedCandidates.add(delegate);
         }

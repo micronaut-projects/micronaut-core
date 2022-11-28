@@ -35,11 +35,6 @@ public sealed interface ConfigurationPath
     permits DefaultConfigurationPath {
 
     /**
-     * attribute name that can be used to store the path.
-     */
-    String ATTRIBUTE = ConfigurationPath.class.getName();
-
-    /**
      * @return Creates a new path.
      */
     @NonNull

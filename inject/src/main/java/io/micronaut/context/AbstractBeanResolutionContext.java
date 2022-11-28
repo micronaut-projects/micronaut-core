@@ -51,6 +51,8 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     private List<BeanRegistration<?>> dependentBeans;
     private BeanRegistration<?> dependentFactory;
 
+    private ConfigurationPath configurationPath;
+
     /**
      * @param context        The bean context
      * @param rootDefinition The bean root definition
@@ -64,14 +66,19 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
     @Override
     public ConfigurationPath getConfigurationPath() {
-        Object o = getAttribute(ConfigurationPath.ATTRIBUTE);
-        if (o instanceof ConfigurationPath cp) {
-            return cp;
+        if (configurationPath != null) {
+            return configurationPath;
         } else {
-            var configurationPath = ConfigurationPath.newPath();
-            setAttribute(ConfigurationPath.ATTRIBUTE, configurationPath);
+            this.configurationPath = ConfigurationPath.newPath();
             return configurationPath;
         }
+    }
+
+    @Override
+    public ConfigurationPath setConfigurationPath(ConfigurationPath configurationPath) {
+        ConfigurationPath old = this.configurationPath;
+        this.configurationPath = configurationPath;
+        return old;
     }
 
     @NonNull

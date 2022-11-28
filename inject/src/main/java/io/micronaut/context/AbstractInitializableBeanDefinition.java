@@ -2146,17 +2146,13 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
             return (K) qualifier;
         }
         try {
-            Object previous = !argument.isAnnotationPresent(Parameter.class) ? resolutionContext.removeAttribute(BeanDefinition.NAMED_ATTRIBUTE) : null;
             boolean isNotInnerConfiguration = !isConfigurationProperties || !isInnerConfiguration(argument);
-            Object previousPath = isNotInnerConfiguration ? resolutionContext.removeAttribute(ConfigurationPath.ATTRIBUTE) : null;
+            ConfigurationPath previousPath = isNotInnerConfiguration ? resolutionContext.setConfigurationPath(null) : null;
             try {
                 return resolutionContext.getBean(argument, qualifier);
             } finally {
-                if (previous != null) {
-                    resolutionContext.setAttribute(BeanDefinition.NAMED_ATTRIBUTE, previous);
-                }
                 if (previousPath != null) {
-                    resolutionContext.setAttribute(ConfigurationPath.ATTRIBUTE, previousPath);
+                    resolutionContext.setConfigurationPath(previousPath);
                 }
             }
         } catch (DisabledBeanException e) {
@@ -2229,11 +2225,6 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
         ConfigurationPath configurationPath = resolutionContext.getConfigurationPath();
         if (configurationPath.isNotEmpty()) {
             return configurationPath.resolveValue(valString);
-        } else if (valString.indexOf('*') > -1) {
-            Optional<String> namedBean = resolutionContext.get(BeanDefinition.NAMED_ATTRIBUTE, ConversionContext.STRING);
-            if (namedBean.isPresent()) {
-                valString = valString.replace("*", namedBean.get());
-            }
         }
         return valString;
     }

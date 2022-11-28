@@ -16,6 +16,7 @@
 package io.micronaut.context;
 
 import io.micronaut.context.annotation.*;
+import io.micronaut.context.env.ConfigurationPath;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.event.BeanInitializedEventListener;
 import io.micronaut.context.event.BeanInitializingEvent;
@@ -2006,11 +2007,9 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     }
 
     private String substituteWildCards(BeanResolutionContext resolutionContext, String valString) {
-        if (valString.indexOf('*') > -1) {
-            Optional<String> namedBean = resolutionContext.get(BeanDefinition.NAMED_ATTRIBUTE, ConversionContext.STRING);
-            if (namedBean.isPresent()) {
-                valString = valString.replace("*", namedBean.get());
-            }
+        ConfigurationPath configurationPath = resolutionContext.getConfigurationPath();
+        if (configurationPath.isNotEmpty()) {
+            return configurationPath.resolveValue(valString);
         }
         return valString;
     }

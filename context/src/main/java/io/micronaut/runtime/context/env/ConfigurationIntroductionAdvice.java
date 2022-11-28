@@ -139,7 +139,7 @@ public class ConfigurationIntroductionAdvice implements MethodInterceptor<Object
             }
         } else {
             try (BeanResolutionContext rc = new DefaultBeanResolutionContext(beanContext, beanDefinition)) {
-                rc.setAttribute(ConfigurationPath.ATTRIBUTE, configurationPath);
+                rc.setConfigurationPath(configurationPath);
                 return environment.convertRequired(
                     ((DefaultBeanContext) beanContext).getBean(rc, argument, qualifier),
                     returnType
