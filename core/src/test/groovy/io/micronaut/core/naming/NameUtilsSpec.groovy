@@ -244,6 +244,8 @@ class NameUtilsSpec extends Specification {
         "getFoo" | true
         "getfoo" | false
         "a"      | false
+        "get_foo" | true
+        'get$foo' | true
     }
 
     @Unroll
