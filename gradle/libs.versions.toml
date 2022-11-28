@@ -86,7 +86,7 @@ managed-micronaut-hibernate-validator = "3.3.0"
 managed-micronaut-ignite = "1.0.0.RC1"
 managed-micronaut-jaxrs = "3.4.0"
 managed-micronaut-jms = "2.1.0"
-managed-micronaut-jmx = "3.1.0"
+managed-micronaut-jmx = "3.2.0"
 managed-micronaut-kafka = "4.5.0"
 managed-micronaut-kotlin = "3.2.2"
 managed-micronaut-kubernetes = "3.4.0"
@@ -158,6 +158,7 @@ boms-micronaut-grpc = { module = "io.micronaut.grpc:micronaut-grpc-bom", version
 boms-micronaut-groovy = { module = "io.micronaut.groovy:micronaut-groovy-bom", version.ref = "managed-micronaut-groovy" }
 boms-micronaut-hibernate-validator = { module = "io.micronaut.beanvalidation:micronaut-hibernate-validator-bom", version.ref = "managed-micronaut-hibernate-validator" }
 boms-micronaut-jaxrs = { module = "io.micronaut.jaxrs:micronaut-jaxrs-bom", version.ref = "managed-micronaut-jaxrs" }
+boms-micronaut-jmx = { module = "io.micronaut.jmx:micronaut-jmx-bom", version.ref = "managed-micronaut-jmx" }
 boms-micronaut-kafka = { module = "io.micronaut.kafka:micronaut-kafka-bom", version.ref = "managed-micronaut-kafka" }
 boms-micronaut-kotlin = { module = "io.micronaut.kotlin:micronaut-kotlin-bom", version.ref = "managed-micronaut-kotlin" }
 boms-micronaut-kubernetes = { module = "io.micronaut.kubernetes:micronaut-kubernetes-bom", version.ref = "managed-micronaut-kubernetes" }
@@ -294,7 +295,6 @@ managed-micronaut-jms = { module = "io.micronaut.jms:micronaut-jms-core", versio
 managed-micronaut-jms-activemq-classic = { module = "io.micronaut.jms:micronaut-jms-activemq-classic", version.ref = "managed-micronaut-jms" }
 managed-micronaut-jms-activemq-artemis = { module = "io.micronaut.jms:micronaut-jms-activemq-artemis", version.ref = "managed-micronaut-jms" }
 managed-micronaut-jms-sqs = { module = "io.micronaut.jms:micronaut-jms-sqs", version.ref = "managed-micronaut-jms" }
-managed-micronaut-jmx = { module = "io.micronaut.jmx:micronaut-jmx", version.ref = "managed-micronaut-jmx" }
 managed-micronaut-multitenancy = { module = "io.micronaut.multitenancy:micronaut-multitenancy", version.ref = "managed-micronaut-multitenancy" }
 managed-micronaut-nats = { module = "io.micronaut.nats:micronaut-nats", version.ref = "managed-micronaut-nats" }
 managed-micronaut-neo4j = { module = "io.micronaut.neo4j:micronaut-neo4j-bolt", version.ref = "managed-micronaut-neo4j" }
