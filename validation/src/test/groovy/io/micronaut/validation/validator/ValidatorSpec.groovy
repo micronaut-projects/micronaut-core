@@ -3,11 +3,14 @@ package io.micronaut.validation.validator
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Executable
 import io.micronaut.context.annotation.Prototype
+import io.micronaut.context.annotation.Value
+import io.micronaut.context.exceptions.BeanInstantiationException
 import io.micronaut.core.annotation.Introspected
+import io.micronaut.core.reflect.ClassUtils
 import io.micronaut.validation.validator.resolver.CompositeTraversableResolver
 import jakarta.inject.Singleton
 import spock.lang.AutoCleanup
-import spock.lang.Ignore
+import spock.lang.PendingFeature
 import spock.lang.Shared
 import spock.lang.Specification
 
@@ -15,14 +18,18 @@ import javax.validation.ConstraintViolationException
 import javax.validation.ElementKind
 import javax.validation.Valid
 import javax.validation.ValidatorFactory
-import javax.validation.constraints.*
+import javax.validation.constraints.Max
+import javax.validation.constraints.Min
+import javax.validation.constraints.NotBlank
+import javax.validation.constraints.NotNull
+import javax.validation.constraints.Size
 import javax.validation.metadata.BeanDescriptor
 
 class ValidatorSpec extends Specification {
 
     @Shared
     @AutoCleanup
-    ApplicationContext applicationContext = ApplicationContext.run()
+    ApplicationContext applicationContext = ApplicationContext.run(["a.number": 40])
     @Shared
     Validator validator = applicationContext.getBean(Validator)
 
@@ -67,7 +74,6 @@ class ValidatorSpec extends Specification {
         violations[3].constraintDescriptor.annotation instanceof NotBlank
 
     }
-
 
     void "test validate bean property"() {
         given:
@@ -438,7 +444,7 @@ class ValidatorSpec extends Specification {
                 "Please add @Introspected to the class and ensure Micronaut annotation processing is enabled"
     }
 
-    @Ignore("FIXME: https://github.com/micronaut-projects/micronaut-core/issues/4410")
+    @PendingFeature(reason = "FIXME: https://github.com/micronaut-projects/micronaut-core/issues/4410")
     void "test element validation in String collection" () {
         when:
         ListOfStrings strings = new ListOfStrings(strings: ["", null, "a string that's too long"])
@@ -481,6 +487,50 @@ class ValidatorSpec extends Specification {
         constraintViolations.size() == 2
         constraintViolations[0].toString() == 'DefaultConstraintViolation{rootBean=class io.micronaut.validation.validator.$BookService$Definition$Intercepted, invalidValue=50, path=saveBook.pages}'
         constraintViolations[1].toString() == 'DefaultConstraintViolation{rootBean=class io.micronaut.validation.validator.$BookService$Definition$Intercepted, invalidValue=, path=saveBook.title}'
+    }
+
+    void "test @Introspected is required to validate the bean"() {
+        when:
+            applicationContext.getBean(A)
+        then:
+            BeanInstantiationException e = thrown()
+            e.message.contains('''Cannot validate bean [io.micronaut.validation.validator.A]. No bean introspection present. Please add @Introspected.''')
+        and:
+            ClassUtils.forName('io.micronaut.validation.validator.$A$Definition', getClass().getClassLoader()).isPresent()
+            ClassUtils.forName('io.micronaut.validation.validator.$A$Definition$Intercepted', getClass().getClassLoader()).isEmpty()
+    }
+
+    void "test @Introspected is required to validate the bean and it's intercepted if one of the methods requires validation"() {
+        when:
+            def beanB = applicationContext.getBean(B)
+        then:
+            BeanInstantiationException e = thrown()
+            e.message.contains('''number - must be less than or equal to 20''')
+        and:
+            ClassUtils.forName('io.micronaut.validation.validator.$B$Definition', getClass().getClassLoader()).isPresent()
+            ClassUtils.forName('io.micronaut.validation.validator.$B$Definition$Intercepted', getClass().getClassLoader()).isPresent()
+    }
+
+    void "test @Introspected is required to validate the bean and it's intercepted if one of the methods requires validation 2"() {
+        when:
+            def beanC = applicationContext.getBean(C)
+        then:
+            beanC.number == 40
+        when:
+            beanC.updateNumber(100)
+        then:
+            Exception e = thrown()
+            e.message.contains('''updateNumber.number: must be less than or equal to 50''')
+            beanC.number == 40
+//        when:
+//            beanC.number = 100
+//        then:
+//            e = thrown()
+//            e.message.contains('''updateNumber.number: must be less than or equal to 50''')
+//            beanC.number == 40
+        and:
+            ClassUtils.forName('io.micronaut.validation.validator.$C$Definition', getClass().getClassLoader()).isPresent()
+            ClassUtils.forName('io.micronaut.validation.validator.$C$Definition$Intercepted', getClass().getClassLoader()).isPresent()
     }
 }
 
@@ -573,6 +623,50 @@ class ArrayTest {
                            @Max(20l)
                            @NotNull int[] integers) {
         new ArrayTest(integers: integers)
+    }
+}
+
+@Singleton
+class A {
+
+    @Valid
+    @Max(20l)
+    @NotNull
+    @Value('${a.number}')
+    Integer number
+}
+
+@Introspected
+@Singleton
+class B {
+
+    @Valid
+    @Max(20l)
+    @NotNull
+    @Value('${a.number}')
+    Integer number
+
+    void updateNumber(@Max(20l)
+                      @NotNull
+                      Integer number) {
+        this.number = number
+    }
+}
+
+@Introspected
+@Singleton
+class C {
+
+    @Valid
+    @Max(50l)
+    @NotNull
+    @Value('${a.number}')
+    Integer number
+
+    void updateNumber(@Max(50l)
+                      @NotNull
+                      Integer number) {
+        this.number = number
     }
 }
 

@@ -82,17 +82,26 @@ final class FactoryBeanElementCreator extends DeclaredBeanElementCreator {
     }
 
     @Override
-    protected boolean visitPropertyReadElement(BeanDefinitionVisitor visitor, PropertyElement propertyElement, MethodElement readElement) {
+    protected boolean visitPropertyReadElement(BeanDefinitionVisitor visitor, PropertyElement propertyElement, MemberElement readElement) {
         if (readElement.hasDeclaredStereotype(Bean.class.getName())) {
-            visitBeanFactoryElement(visitor, readElement.getGenericReturnType(), readElement);
+            ClassElement beanType;
+            if (readElement instanceof MethodElement methodElement) {
+                beanType = methodElement.getGenericReturnType();
+            } else if (readElement instanceof FieldElement fieldElement) {
+                beanType = fieldElement.getGenericType();
+            } else {
+                throw new IllegalStateException();
+            }
+            visitBeanFactoryElement(visitor, beanType, readElement);
             return true;
         }
         return super.visitPropertyReadElement(visitor, propertyElement, readElement);
     }
 
     @Override
-    protected boolean visitPropertyWriteElement(BeanDefinitionVisitor visitor, PropertyElement propertyElement, MethodElement writeElement) {
+    protected boolean visitPropertyWriteElement(BeanDefinitionVisitor visitor, PropertyElement propertyElement, MemberElement writeElement) {
         if (writeElement.hasDeclaredStereotype(Bean.class.getName())) {
+            // Ignore bean producer accessor
             return true;
         }
         return super.visitPropertyWriteElement(visitor, propertyElement, writeElement);
