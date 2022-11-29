@@ -104,7 +104,7 @@ managed-micronaut-openapi = "4.5.2"
 managed-micronaut-oraclecloud = "2.3.0"
 managed-micronaut-picocli = "4.3.0"
 managed-micronaut-problem = "2.5.1"
-managed-micronaut-rabbitmq = "3.3.0"
+managed-micronaut-rabbitmq = "3.4.0"
 managed-micronaut-r2dbc = "4.0.0"
 managed-micronaut-reactor = "2.4.1"
 managed-micronaut-redis = "5.3.1"
@@ -172,6 +172,7 @@ boms-micronaut-oraclecloud = { module = "io.micronaut.oraclecloud:micronaut-orac
 boms-micronaut-openapi = { module = "io.micronaut.openapi:micronaut-openapi-bom", version.ref = "managed-micronaut-openapi" }
 boms-micronaut-picocli = { module = "io.micronaut.picocli:micronaut-picocli-bom", version.ref = "managed-micronaut-picocli" }
 boms-micronaut-problem-json = { module = "io.micronaut.problem:micronaut-problem-json-bom", version.ref = "managed-micronaut-problem" }
+boms-micronaut-rabbit = { module = "io.micronaut.rabbitmq:micronaut-rabbitmq-bom", version.ref = "managed-micronaut-rabbitmq" }
 boms-micronaut-redis = { module = "io.micronaut.redis:micronaut-redis-bom", version.ref = "managed-micronaut-redis" }
 boms-micronaut-rxjava2 = { module = "io.micronaut.rxjava2:micronaut-rxjava2-bom", version.ref = "managed-micronaut-rxjava2" }
 boms-micronaut-rxjava3 = { module = "io.micronaut.rxjava3:micronaut-rxjava3-bom", version.ref = "managed-micronaut-rxjava3" }
@@ -302,7 +303,6 @@ managed-micronaut-netflix = { module = "io.micronaut.netflix:micronaut-netflix-a
 managed-micronaut-netflix-hystrix = { module = "io.micronaut.netflix:micronaut-netflix-hystrix", version.ref = "managed-micronaut-netflix" }
 managed-micronaut-netflix-ribbon = { module = "io.micronaut.netflix:micronaut-netflix-ribbon", version.ref = "managed-micronaut-netflix" }
 managed-micronaut-openapi = { module = "io.micronaut.openapi:micronaut-openapi", version.ref = "managed-micronaut-openapi" }
-managed-micronaut-rabbitmq = { module = "io.micronaut.rabbitmq:micronaut-rabbitmq", version.ref = "managed-micronaut-rabbitmq" }
 managed-micronaut-rss = { module = "io.micronaut.rss:micronaut-rss", version.ref = "managed-micronaut-rss" }
 managed-micronaut-rss-core = { module = "io.micronaut.rss:micronaut-rss-core", version.ref = "managed-micronaut-rss" }
 managed-micronaut-rss-language = { module = "io.micronaut.rss:micronaut-rss-language", version.ref = "managed-micronaut-rss" }
