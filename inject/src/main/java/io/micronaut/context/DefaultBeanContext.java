@@ -1627,7 +1627,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
             return Collections.emptyList();
         }
         if (CollectionUtils.isNotEmpty(candidates)) {
-            filterProxiedTypes(candidates, true);
+            filterProxiedTypes(candidates);
             filterReplacedBeans(null, candidates);
         }
         return candidates;
@@ -2044,7 +2044,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                     throw new BeanInstantiationException("Bean definition [" + contextScopeBean.getName() + "] could not be loaded: " + e.getMessage(), e);
                 }
             }
-            filterProxiedTypes((Collection) contextBeans, false);
+            filterProxiedTypes((Collection) contextBeans);
             filterReplacedBeans(null, (Collection) contextBeans);
             OrderUtil.sort(contextBeans);
             for (BeanDefinition contextScopeDefinition : contextBeans) {
@@ -2293,7 +2293,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
             if (!candidates.isEmpty()) {
                 if (filterProxied) {
-                    filterProxiedTypes(candidates, false);
+                    filterProxiedTypes(candidates);
                 }
                 filterReplacedBeans(resolutionContext, candidates);
             }
@@ -2687,7 +2687,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                         }
                     });
 
-                    filterProxiedTypes((Collection) parallelDefinitions, false);
+                    filterProxiedTypes((Collection) parallelDefinitions);
                     filterReplacedBeans(null, (Collection) parallelDefinitions);
 
                     parallelDefinitions.forEach(beanDefinition -> ForkJoinPool.commonPool().execute(() -> {
@@ -3441,29 +3441,17 @@ public class DefaultBeanContext implements InitializableBeanContext {
         return Optional.ofNullable(definition);
     }
 
+    @SuppressWarnings("java:S1871")
     private <T> void filterProxiedTypes(
-        Collection<BeanDefinition<T>> candidates,
-        boolean filterDelegates) {
+        Collection<BeanDefinition<T>> candidates) {
         int count = candidates.size();
         Set<Class<?>> proxiedTypes = new HashSet<>(count);
-        Iterator<BeanDefinition<T>> i = candidates.iterator();
-        Collection<BeanDefinition<T>> delegates = filterDelegates ? new ArrayList<>(count) : Collections.emptyList();
-        while (i.hasNext()) {
-            BeanDefinition<T> candidate = i.next();
+        for (BeanDefinition<T> candidate : candidates) {
             if (candidate instanceof ProxyBeanDefinition<T> proxyBeanDefinition) {
                 proxiedTypes.add(proxyBeanDefinition.getTargetDefinitionType());
             } else if (candidate instanceof BeanDefinitionDelegate<T> delegate && delegate.getTarget() instanceof ProxyBeanDefinition<T> proxyBeanDefinition) {
                 proxiedTypes.add(proxyBeanDefinition.getTargetDefinitionType());
-            } else if (filterDelegates && candidate instanceof BeanDefinitionDelegate<T> delegate) {
-                i.remove();
-
-                if (!delegates.contains(delegate)) {
-                    delegates.add(delegate);
-                }
             }
-        }
-        if (filterDelegates) {
-            candidates.addAll(delegates);
         }
         if (!proxiedTypes.isEmpty()) {
             candidates.removeIf(candidate -> {
