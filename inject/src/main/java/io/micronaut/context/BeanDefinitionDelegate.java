@@ -57,10 +57,11 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
     @Nullable
     protected final Qualifier<T> qualifier;
 
+    @Nullable
     private final ConfigurationPath configurationPath;
 
 
-    private BeanDefinitionDelegate(BeanDefinition<T> definition, @Nullable Qualifier<T> qualifier, ConfigurationPath configurationPath) {
+    private BeanDefinitionDelegate(BeanDefinition<T> definition, @Nullable Qualifier<T> qualifier, @Nullable ConfigurationPath configurationPath) {
         this.definition = definition;
         this.qualifier = qualifier;
         this.configurationPath = configurationPath;
@@ -297,7 +298,7 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
     /**
      * @param <T> The bean definition type
      */
-    interface ProxyInitializingBeanDefinition<T> extends DelegatingBeanDefinition<T>, InitializingBeanDefinition<T> {
+    sealed interface ProxyInitializingBeanDefinition<T> extends DelegatingBeanDefinition<T>, InitializingBeanDefinition<T> {
         @Override
         default T initialize(BeanResolutionContext resolutionContext, BeanContext context, T bean) {
             BeanDefinition<T> definition = getTarget();
@@ -311,7 +312,7 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
     /**
      * @param <T> The bean definition type
      */
-    interface ProxyDisposableBeanDefinition<T> extends DelegatingBeanDefinition<T>, DisposableBeanDefinition<T> {
+    sealed interface ProxyDisposableBeanDefinition<T> extends DelegatingBeanDefinition<T>, DisposableBeanDefinition<T> {
         @Override
         default T dispose(BeanResolutionContext resolutionContext, BeanContext context, T bean) {
             BeanDefinition<T> definition = getTarget();
@@ -325,7 +326,7 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
     /**
      * @param <T> The bean definition type
      */
-    interface ProxyValidatingBeanDefinition<T> extends DelegatingBeanDefinition<T>, ValidatedBeanDefinition<T> {
+    sealed interface ProxyValidatingBeanDefinition<T> extends DelegatingBeanDefinition<T>, ValidatedBeanDefinition<T> {
         @Override
         default T validate(BeanResolutionContext resolutionContext, T instance) {
             BeanDefinition<T> definition = getTarget();

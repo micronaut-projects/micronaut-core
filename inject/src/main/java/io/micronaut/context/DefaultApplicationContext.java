@@ -53,7 +53,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.function.Predicate;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -264,18 +264,6 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     }
 
     @Override
-    protected <T> Collection<BeanDefinition<T>> findBeanCandidates(BeanResolutionContext resolutionContext, Argument<T> beanType, BeanDefinition<?> filter, boolean filterProxied) {
-        Collection<BeanDefinition<T>> candidates = super.findBeanCandidates(resolutionContext, beanType, filter, filterProxied);
-        return transformIterables(resolutionContext, candidates, filterProxied);
-    }
-
-    @Override
-    protected <T> Collection<BeanDefinition<T>> findBeanCandidates(BeanResolutionContext resolutionContext, Argument<T> beanType, boolean filterProxied, Predicate<BeanDefinition<T>> predicate) {
-        Collection<BeanDefinition<T>> candidates = super.findBeanCandidates(resolutionContext, beanType, filterProxied, predicate);
-        return transformIterables(resolutionContext, candidates, filterProxied);
-    }
-
-    @Override
     protected <T> NoSuchBeanException newNoSuchBeanException(@Nullable BeanResolutionContext resolutionContext, Argument<T> beanType, Qualifier<T> qualifier, String message) {
         if (message == null) {
             message = super.resolveDisabledBeanMessage(resolutionContext, beanType, qualifier);
@@ -339,7 +327,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
     @Nullable
     private <T> BeanDefinition<T> findAnyBeanDefinition(BeanResolutionContext resolutionContext, Argument<T> beanType) {
-        Collection<BeanDefinition<T>> existing = super.findBeanCandidates(resolutionContext, beanType, true, definition -> !definition.isAbstract());
+        Collection<BeanDefinition<T>> existing = super.findBeanCandidates(resolutionContext, beanType, true, false, definition -> !definition.isAbstract());
         BeanDefinition<T> definition = null;
         if (existing.size() == 1) {
             definition = existing.iterator().next();
@@ -381,41 +369,21 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     }
 
     @Override
-    protected <T> Collection<BeanDefinition<T>> transformIterables(BeanResolutionContext resolutionContext, Collection<BeanDefinition<T>> candidates, boolean filterProxied) {
-        if (!candidates.isEmpty()) {
-
-            List<BeanDefinition<T>> transformedCandidates = new ArrayList<>();
-            for (BeanDefinition<T> candidate : candidates) {
-                if (candidate.isIterable()) {
-                    try(BeanResolutionContext rc = newResolutionContext(candidate, resolutionContext)) {
-                        if (candidate.hasDeclaredStereotype(EachProperty.class)) {
-                            transformEachPropertyBeanDefinition(rc, candidate, transformedCandidates);
-                        } else if (candidate.hasDeclaredStereotype(EachBean.class)) {
-                            transformEachBeanBeanDefinition(rc, candidate, transformedCandidates, filterProxied);
-                        }
-                    }
-                } else if (candidate.hasStereotype(ConfigurationReader.class)) {
-                    try(BeanResolutionContext rc = newResolutionContext(candidate, resolutionContext)) {
-                        transformConfigurationReaderBeanDefinition(rc, candidate, transformedCandidates);
-                    }
-                } else {
-                    transformedCandidates.add(candidate);
-                }
+    protected <T> void collectIterableBeans(BeanResolutionContext resolutionContext, BeanDefinition<T> iterableBean, Set<BeanDefinition<T>> targetSet) {
+        try(BeanResolutionContext rc = newResolutionContext(iterableBean, resolutionContext)) {
+            if (iterableBean.hasDeclaredStereotype(EachProperty.class)) {
+                transformEachPropertyBeanDefinition(rc, iterableBean, targetSet);
+            } else if (iterableBean.hasDeclaredStereotype(EachBean.class)) {
+                transformEachBeanBeanDefinition(rc, iterableBean, targetSet);
+            } else {
+                transformConfigurationReaderBeanDefinition(rc, iterableBean, targetSet);
             }
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Finalized bean definitions candidates: {}", candidates);
-                for (BeanDefinition<?> definition : transformedCandidates) {
-                    LOG.debug("  {} {} {}", definition.getBeanType(), definition.getDeclaredQualifier(), definition);
-                }
-            }
-            return transformedCandidates;
         }
-        return candidates;
     }
 
     private <T> void transformConfigurationReaderBeanDefinition(BeanResolutionContext resolutionContext,
                                                                 BeanDefinition<T> candidate,
-                                                                List<BeanDefinition<T>> transformedCandidates) {
+                                                                Set<BeanDefinition<T>> transformedCandidates) {
         try {
             final String prefix = candidate.stringValue(ConfigurationReader.class, "prefix").orElse(null);
             ConfigurationPath configurationPath = resolutionContext.getConfigurationPath();
@@ -487,15 +455,14 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
     private <T> void transformEachBeanBeanDefinition(@NonNull BeanResolutionContext resolutionContext,
                                                      BeanDefinition<T> candidate,
-                                                     List<BeanDefinition<T>> transformedCandidates,
-                                                     boolean filterProxied) {
+                                                     Set<BeanDefinition<T>> transformedCandidates) {
         Class dependentType = candidate.classValue(EachBean.class).orElse(null);
         if (dependentType == null) {
             transformedCandidates.add(candidate);
             return;
         }
 
-        Collection<BeanDefinition> dependentCandidates = findBeanCandidates(resolutionContext, Argument.of(dependentType), filterProxied, null);
+        Collection<BeanDefinition> dependentCandidates = findBeanCandidates(resolutionContext, Argument.of(dependentType), true, true, null);
 
         if (!dependentCandidates.isEmpty()) {
             for (BeanDefinition<?> dependentCandidate : dependentCandidates) {
@@ -521,7 +488,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
     private <T> void transformEachPropertyBeanDefinition(@NonNull BeanResolutionContext resolutionContext,
                                                          BeanDefinition<T> candidate,
-                                                         List<BeanDefinition<T>> transformedCandidates) {
+                                                         Set<BeanDefinition<T>> transformedCandidates) {
         try {
             ConfigurationPath configurationPath = resolutionContext.getConfigurationPath();
             configurationPath.pushEachPropertyRoot(candidate);
@@ -542,7 +509,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         }
     }
 
-    private <T> void createAndAddDelegate(BeanResolutionContext resolutionContext, BeanDefinition<T> candidate, List<BeanDefinition<T>> transformedCandidates, ConfigurationPath path) {
+    private <T> void createAndAddDelegate(BeanResolutionContext resolutionContext, BeanDefinition<T> candidate, Set<BeanDefinition<T>> transformedCandidates, ConfigurationPath path) {
         BeanDefinitionDelegate<T> delegate = BeanDefinitionDelegate.create(
             candidate,
             path.beanQualifier(),

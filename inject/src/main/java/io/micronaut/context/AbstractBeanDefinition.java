@@ -2186,7 +2186,8 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         }
     }
 
-    private boolean isConfigurationProperties() {
+    @Override
+    public boolean isConfigurationProperties() {
         return isConfigurationProperties;
     }
 

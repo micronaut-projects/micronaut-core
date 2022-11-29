@@ -230,6 +230,11 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
     }
 
     @Override
+    public final boolean isConfigurationProperties() {
+        return isConfigurationProperties;
+    }
+
+    @Override
     public Qualifier<T> getDeclaredQualifier() {
         if (declaredQualifier == null) {
             declaredQualifier = BeanDefinition.super.getDeclaredQualifier();
