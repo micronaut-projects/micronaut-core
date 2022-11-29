@@ -13,9 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.context;
-
-import jakarta.inject.Qualifier;
+package io.micronaut.context.annotation;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
@@ -23,13 +21,12 @@ import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 
 /**
- * <p>A qualifier for a proxy target. This qualifier is used internally the resolve the target class of a proxy.</p>
+ * <p>Annotation that indicates a bean is a proxy target.</p>
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-@Qualifier
 @Documented
 @Retention(RUNTIME)
-@interface ProxyTarget {
+public @interface ProxyTarget {
 }

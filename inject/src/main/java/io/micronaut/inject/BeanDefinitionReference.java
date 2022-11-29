@@ -109,4 +109,15 @@ public interface BeanDefinitionReference<T> extends QualifiedBeanType<T> {
     default boolean isConfigurationProperties() {
         return getAnnotationMetadata().hasDeclaredStereotype(ConfigurationReader.class);
     }
+
+    /**
+     * Returns whether another bean exists that proxies this bean. In other words
+     * this bean is the target of a proxy.
+     *
+     * @return Is the reference a proxy target.
+     * @since 4.0.0
+     */
+    default boolean isProxiedBean() {
+        return false;
+    }
 }

@@ -327,7 +327,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
     @Nullable
     private <T> BeanDefinition<T> findAnyBeanDefinition(BeanResolutionContext resolutionContext, Argument<T> beanType) {
-        Collection<BeanDefinition<T>> existing = super.findBeanCandidates(resolutionContext, beanType, true, false, definition -> !definition.isAbstract());
+        Collection<BeanDefinition<T>> existing = super.findBeanCandidates(resolutionContext, beanType, false, definition -> !definition.isAbstract());
         BeanDefinition<T> definition = null;
         if (existing.size() == 1) {
             definition = existing.iterator().next();
@@ -462,7 +462,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
             return;
         }
 
-        Collection<BeanDefinition> dependentCandidates = findBeanCandidates(resolutionContext, Argument.of(dependentType), true, true, null);
+        Collection<BeanDefinition> dependentCandidates = findBeanCandidates(resolutionContext, Argument.of(dependentType), true, null);
 
         if (!dependentCandidates.isEmpty()) {
             for (BeanDefinition<?> dependentCandidate : dependentCandidates) {

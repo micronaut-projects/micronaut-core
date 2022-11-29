@@ -70,7 +70,8 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
             boolean.class, // isSingleton
             boolean.class, // isConfigurationProperties
             boolean.class,  // hasExposedTypes
-            boolean.class  // requiresMethodProcessing
+            boolean.class,  // requiresMethodProcessing
+            boolean.class  // isProxiedBean
     ));
 
     private final String beanTypeName;
@@ -80,6 +81,7 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
     private final Type interceptedType;
     private final Type providedType;
     private final Map<String, ClassElement> typeParameters;
+    private final boolean proxiedBean;
     private boolean contextScope = false;
     private boolean requiresMethodProcessing;
 
@@ -101,6 +103,7 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
         this.beanDefinitionReferenceClassName = beanDefinitionName + REF_SUFFIX;
         this.beanDefinitionClassInternalName = getInternalName(beanDefinitionName) + REF_SUFFIX;
         this.interceptedType = visitor.getInterceptedType().orElse(null);
+        this.proxiedBean = visitor.isProxiedBean();
     }
 
     /**
@@ -216,6 +219,9 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
         );
         // 10: requiresMethodProcessing
         cv.push(requiresMethodProcessing);
+        // 11: isProxiedBean
+        cv.push(proxiedBean);
+
         // (...)
         cv.invokeConstructor(
                 Type.getType(AbstractInitializableBeanDefinitionReference.class),
