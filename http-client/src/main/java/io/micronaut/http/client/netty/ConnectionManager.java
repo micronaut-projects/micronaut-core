@@ -110,6 +110,8 @@ import reactor.core.publisher.Sinks;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 
+import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLParameters;
 import java.net.InetSocketAddress;
 import java.net.Proxy;
 import java.net.SocketAddress;
@@ -728,7 +730,7 @@ final class ConnectionManager {
         HttpToHttp2ConnectionHandler connectionHandler) {
         ChannelPipeline pipeline = ch.pipeline();
         // Specify Host in SSLContext New Handler to add TLS SNI Extension
-        pipeline.addLast(ChannelPipelineCustomizer.HANDLER_SSL, sslCtx.newHandler(ch.alloc(), host, port));
+        pipeline.addLast(ChannelPipelineCustomizer.HANDLER_SSL, configureSslHandler(sslCtx.newHandler(ch.alloc(), host, port)));
         // We must wait for the handshake to finish and the protocol to be negotiated before configuring
         // the HTTP/2 components of the pipeline.
         pipeline.addLast(
@@ -924,6 +926,15 @@ final class ConnectionManager {
         if (readTimeoutMillis != null && pipeline.context(ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT) != null) {
             pipeline.remove(ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT);
         }
+    }
+
+    private SslHandler configureSslHandler(SslHandler sslHandler) {
+        sslHandler.setHandshakeTimeoutMillis(configuration.getSslConfiguration().getHandshakeTimeout().toMillis());
+        SSLEngine engine = sslHandler.engine();
+        SSLParameters params = engine.getSSLParameters();
+        params.setEndpointIdentificationAlgorithm("HTTPS");
+        engine.setSSLParameters(params);
+        return sslHandler;
     }
 
     /**
@@ -1124,9 +1135,7 @@ final class ConnectionManager {
                 });
 
                 if (sslContext != null) {
-                    SslHandler sslHandler = sslContext.newHandler(ch.alloc(), host, port);
-                    sslHandler.setHandshakeTimeoutMillis(configuration.getSslConfiguration().getHandshakeTimeout().toMillis());
-                    p.addLast(ChannelPipelineCustomizer.HANDLER_SSL, sslHandler);
+                    p.addLast(ChannelPipelineCustomizer.HANDLER_SSL, configureSslHandler(sslContext.newHandler(ch.alloc(), host, port)));
                 }
 
                 // Pool connections require alternative timeout handling
