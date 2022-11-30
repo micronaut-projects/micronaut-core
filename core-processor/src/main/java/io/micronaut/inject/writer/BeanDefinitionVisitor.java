@@ -439,4 +439,24 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
     default @NonNull ClassElement[] getTypeArguments() {
         return new ClassElement[0];
     }
+
+    /**
+     * Returns whether another bean exists that proxies this bean. In other words
+     * this bean is the target of a proxy.
+     *
+     * @return Is the reference a proxy target.
+     * @since 4.0.0
+     */
+    default boolean isProxiedBean() {
+        return false;
+    }
+
+    /**
+     * Returns whether another bean is a proxy target that needs to be retained.
+     *
+     * @return Is the reference a proxy target.
+     * @since 4.0.0
+     */
+    boolean isProxyTarget();
+
 }
