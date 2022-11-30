@@ -16,6 +16,7 @@
 package io.micronaut.http.client.javanet;
 
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.convert.ConversionService;
 
 import java.net.URI;
 import java.net.http.HttpRequest;
@@ -35,7 +36,10 @@ public final class HttpRequestFactory {
     public static <I> HttpRequest.Builder builder(@NonNull URI uri, io.micronaut.http.HttpRequest<I> request) {
         HttpRequest.Builder builder = HttpRequest.newBuilder()
                 .uri(uri);
-        HttpRequest.BodyPublisher bodyPublisher = HttpRequest.BodyPublishers.noBody();
+        HttpRequest.BodyPublisher bodyPublisher = request
+            .getBody()
+            .map(body -> HttpRequest.BodyPublishers.ofByteArray(ConversionService.SHARED.convertRequired(body, byte[].class)))
+            .orElseGet(HttpRequest.BodyPublishers::noBody);
         builder = builder.method(request.getMethod().toString(), bodyPublisher);
         return builder;
     }

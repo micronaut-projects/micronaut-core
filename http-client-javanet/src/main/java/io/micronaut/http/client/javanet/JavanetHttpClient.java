@@ -18,15 +18,23 @@ package io.micronaut.http.client.javanet;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.type.Argument;
+import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.client.BlockingHttpClient;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.HttpClientConfiguration;
+import io.micronaut.http.client.exceptions.HttpClientException;
 import org.reactivestreams.Publisher;
 
+import java.io.IOException;
 import java.net.URI;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * {@link HttpClient} implementation for {@literal java.net.http.*} HTTP Client.
@@ -56,7 +64,41 @@ public class JavanetHttpClient implements HttpClient {
 
     @Override
     public <I, O, E> Publisher<HttpResponse<O>> exchange(@NonNull HttpRequest<I> request, @NonNull Argument<O> bodyType, @NonNull Argument<E> errorType) {
-        throw new UnsupportedOperationException("Not implemented");
+        java.net.http.HttpRequest.Builder builder = HttpRequestFactory.builder(uri.resolve(request.getUri()), request);
+        java.net.http.HttpRequest httpRequest = builder.build();
+        CompletableFuture<java.net.http.HttpResponse<byte[]>> completableHttpResponse = java.net.http.HttpClient.newHttpClient().sendAsync(httpRequest, java.net.http.HttpResponse.BodyHandlers.ofByteArray());
+        CompletableFuture<HttpResponse<O>> response = completableHttpResponse.thenApply(httpResponse -> new HttpResponse<O>() {
+            @Override
+            public HttpStatus getStatus() {
+                return HttpStatus.valueOf(httpResponse.statusCode());
+            }
+
+            @Override
+            public int code() {
+                return httpResponse.statusCode();
+            }
+
+            @Override
+            public String reason() {
+                throw new UnsupportedOperationException("Not implemented yet");
+            }
+
+            @Override
+            public HttpHeaders getHeaders() {
+                return new HttpHeadersAdapter(httpResponse.headers());
+            }
+
+            @Override
+            public MutableConvertibleValues<Object> getAttributes() {
+                return null;
+            }
+
+            @Override
+            public Optional<O> getBody() {
+                return Optional.empty();
+            }
+        });
+        return Publishers.fromCompletableFuture(response);
     }
 
     @Override
