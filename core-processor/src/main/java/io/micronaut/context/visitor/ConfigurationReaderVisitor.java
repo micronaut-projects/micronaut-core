@@ -27,6 +27,7 @@ import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.naming.NameUtils;
+import io.micronaut.core.type.DefaultArgument;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.validation.RequiresValidation;
 import io.micronaut.inject.ast.ClassElement;
@@ -105,7 +106,7 @@ public class ConfigurationReaderVisitor implements TypeElementVisitor<Configurat
     }
 
     private static boolean isPropertyParameter(ClassElement genericType, VisitorContext visitorContext) {
-        if (genericType.isOptional() || genericType.isContainerType() || genericType.isProvider()) {
+        if (genericType.isOptional() || genericType.isContainerType() || isProvider(genericType)) {
             ClassElement finalParameterType = genericType;
             genericType = genericType.getOptionalValueType().or(finalParameterType::getFirstTypeArgument).orElse(genericType);
             // Get the class with type annotations
@@ -117,6 +118,16 @@ public class ConfigurationReaderVisitor implements TypeElementVisitor<Configurat
             }
         }
         return !genericType.hasStereotype(AnnotationUtil.SCOPE) && !genericType.hasStereotype(Bean.class);
+    }
+
+    private static boolean isProvider(ClassElement genericType) {
+        String name = genericType.getName();
+        for (String type : DefaultArgument.PROVIDER_TYPES) {
+            if (name.equals(type)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void visitAbstractMethod(MethodElement method, VisitorContext context) {

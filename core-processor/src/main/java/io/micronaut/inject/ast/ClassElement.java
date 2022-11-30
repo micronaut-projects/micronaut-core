@@ -132,21 +132,6 @@ public interface ClassElement extends TypedElement {
     }
 
     /**
-     * Whether this element is a {@link jakarta.inject.Provider} or similar.
-     *
-     * @return Is this element an optional
-     * @since 4.0.0
-     */
-    default boolean isProvider() {
-        for (String type : DefaultArgument.PROVIDER_TYPES) {
-            if (getName().equals(type)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
      * Gets optional value type.
      *
      * @return the value type
