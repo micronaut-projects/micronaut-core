@@ -45,6 +45,11 @@ record DisabledBean<T>(
     }
 
     @Override
+    public boolean isConfigurationProperties() {
+        return BeanDefinition.super.isConfigurationProperties();
+    }
+
+    @Override
     public boolean isSingleton() {
         return BeanDefinition.super.isSingleton();
     }

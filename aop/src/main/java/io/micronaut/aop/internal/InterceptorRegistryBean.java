@@ -77,6 +77,11 @@ public final class InterceptorRegistryBean implements BeanDefinition<Interceptor
     }
 
     @Override
+    public boolean isConfigurationProperties() {
+        return false;
+    }
+
+    @Override
     public boolean isAbstract() {
         return false;
     }

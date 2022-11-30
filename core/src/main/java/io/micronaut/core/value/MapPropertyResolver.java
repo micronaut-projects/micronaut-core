@@ -22,6 +22,7 @@ import io.micronaut.core.util.StringUtils;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -84,8 +85,13 @@ public class MapPropertyResolver implements PropertyResolver {
                         return withoutPrefix;
                     })
                     // to list to retain order from linked hash map
-                    .collect(Collectors.toList());
+                    .toList();
         }
         return Collections.emptySet();
+    }
+
+    @Override
+    public List<List<String>> getPropertyPathMatches(String pathPattern) {
+        return Collections.emptyList();
     }
 }

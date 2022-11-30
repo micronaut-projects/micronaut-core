@@ -40,6 +40,7 @@ import io.micronaut.context.annotation.PropertySource;
 import io.micronaut.context.annotation.Provided;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
+import io.micronaut.context.env.ConfigurationPath;
 import io.micronaut.core.annotation.AccessorsStyle;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
@@ -1791,7 +1792,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     private boolean isInnerType(ClassElement genericType) {
         String type;
-        if (genericType.isAssignable(Collection.class)) {
+        if (genericType.isContainerType()) {
             type = genericType.getFirstTypeArgument().map(Element::getName).orElse("");
         } else if (genericType.isArray()) {
             type = genericType.fromArray().getName();
@@ -3628,6 +3629,11 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             buildMethodVisitor.loadArg(1);
         } else if (argumentType.getGenericType().isAssignable(BeanResolutionContext.class)) {
             buildMethodVisitor.loadArg(0);
+        } else if (argumentType.getGenericType().isAssignable(ConfigurationPath.class)) {
+            buildMethodVisitor.loadArg(0);
+            buildMethodVisitor.invokeInterface(Type.getType(BeanResolutionContext.class), org.objectweb.asm.commons.Method.getMethod(
+                ReflectionUtils.getRequiredInternalMethod(BeanResolutionContext.class, "getConfigurationPath")
+            ));
         } else {
             boolean hasGenericType = false;
             boolean isArray = false;
@@ -4087,7 +4093,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     private boolean isContainerType() {
-        return beanTypeElement.isArray() || DefaultArgument.CONTAINER_TYPES.stream().map(Class::getName).anyMatch(c -> c.equals(beanFullClassName));
+        return beanTypeElement.isArray() || DefaultArgument.CONTAINER_TYPES.stream().anyMatch(c -> c.equals(beanFullClassName));
     }
 
     private boolean isConfigurationProperties(AnnotationMetadata annotationMetadata) {

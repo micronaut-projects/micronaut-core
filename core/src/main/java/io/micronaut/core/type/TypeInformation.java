@@ -130,7 +130,7 @@ public interface TypeInformation<T> extends TypeVariableResolver, AnnotationMeta
      */
     default boolean isContainerType() {
         final Class<T> type = getType();
-        return Map.class == type ||  DefaultArgument.CONTAINER_TYPES.contains(type);
+        return Map.class == type ||  DefaultArgument.CONTAINER_TYPES.contains(type.getName());
     }
 
     /**

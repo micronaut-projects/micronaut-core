@@ -17,6 +17,7 @@ package io.micronaut.context.exceptions;
 
 import io.micronaut.context.AbstractBeanResolutionContext;
 import io.micronaut.context.BeanResolutionContext;
+import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
@@ -95,11 +96,15 @@ class MessageUtils {
     static String buildMessageForMethod(BeanResolutionContext resolutionContext, BeanDefinition declaringType, String methodName, Argument argument, String message, boolean circular) {
         StringBuilder builder = new StringBuilder("Failed to inject value for parameter [");
         String ls = CachedEnvironment.getProperty("line.separator");
+        String declaringTypeName = declaringType.getName();
+        if (declaringType.hasAnnotation(Factory.class)) {
+            declaringTypeName = declaringType.getConstructor().getDeclaringBeanType().getName();
+        }
         builder
                 .append(argument.getName()).append("] of method [")
                 .append(methodName)
                 .append("] of class: ")
-                .append(declaringType.getName())
+                .append(declaringTypeName)
                 .append(ls)
                 .append(ls);
 
