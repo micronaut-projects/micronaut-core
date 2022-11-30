@@ -35,7 +35,7 @@ public final class HttpRequestFactory {
     public static <I> HttpRequest.Builder builder(@NonNull URI uri, io.micronaut.http.HttpRequest<I> request) {
         HttpRequest.Builder builder = HttpRequest.newBuilder()
                 .uri(uri);
-        HttpRequest.BodyPublisher bodyPublisher = null;
+        HttpRequest.BodyPublisher bodyPublisher = HttpRequest.BodyPublishers.noBody();
         builder = builder.method(request.getMethod().toString(), bodyPublisher);
         return builder;
     }

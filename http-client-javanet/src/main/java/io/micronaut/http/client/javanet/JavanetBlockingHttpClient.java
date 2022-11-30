@@ -56,7 +56,7 @@ public class JavanetBlockingHttpClient implements BlockingHttpClient {
     public <I, O, E> io.micronaut.http.HttpResponse<O> exchange(io.micronaut.http.HttpRequest<I> request,
                                               Argument<O> bodyType,
                                               Argument<E> errorType) {
-        HttpRequest.Builder builder = HttpRequestFactory.builder(uri, request);
+        HttpRequest.Builder builder = HttpRequestFactory.builder(uri.resolve(request.getUri()), request);
         HttpRequest httpRequest = builder.build();
         try {
             HttpResponse<byte[]> httpResponse = HttpClient.newHttpClient().send(httpRequest, HttpResponse.BodyHandlers.ofByteArray());
