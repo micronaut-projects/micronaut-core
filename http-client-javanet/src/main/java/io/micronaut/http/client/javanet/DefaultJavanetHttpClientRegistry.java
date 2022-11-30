@@ -35,6 +35,7 @@ import io.micronaut.http.client.LoadBalancerResolver;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
+import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.inject.InjectionPoint;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.json.JsonFeatures;
@@ -58,15 +59,20 @@ class DefaultJavanetHttpClientRegistry implements AutoCloseable,
     private final LoadBalancerResolver loadBalancerResolver;
     private final HttpClientConfiguration defaultHttpClientConfiguration;
     private final JsonMapper jsonMapper;
+    @Nullable
+    private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
 
     public DefaultJavanetHttpClientRegistry(
         BeanContext beanContext,
         LoadBalancerResolver loadBalancerResolver, HttpClientConfiguration defaultHttpClientConfiguration,
-        JsonMapper jsonMapper) {
+        JsonMapper jsonMapper,
+        @Nullable MediaTypeCodecRegistry mediaTypeCodecRegistry
+    ) {
         this.beanContext = beanContext;
         this.loadBalancerResolver = loadBalancerResolver;
         this.defaultHttpClientConfiguration = defaultHttpClientConfiguration;
         this.jsonMapper = jsonMapper;
+        this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
     }
 
     @Bean
@@ -75,23 +81,25 @@ class DefaultJavanetHttpClientRegistry implements AutoCloseable,
     protected HttpClient httpClient(
         @Nullable InjectionPoint<?> injectionPoint,
         @Parameter @Nullable LoadBalancer loadBalancer,
-        @Parameter @Nullable HttpClientConfiguration configuration
+        @Parameter @Nullable HttpClientConfiguration configuration,
+        @Nullable MediaTypeCodecRegistry mediaTypeCodecRegistry
     ) {
-        return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration);
+        return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, mediaTypeCodecRegistry);
     }
 
     private HttpClient resolveDefaultHttpClient(
         @Nullable InjectionPoint<?> injectionPoint,
         @Nullable LoadBalancer loadBalancer,
-        @Nullable HttpClientConfiguration configuration
-    ) {
+        @Nullable HttpClientConfiguration configuration,
+        @Nullable MediaTypeCodecRegistry mediaTypeCodecRegistry
+        ) {
         if (loadBalancer == null) {
             return getClient(injectionPoint != null ? injectionPoint.getAnnotationMetadata() : AnnotationMetadata.EMPTY_METADATA);
         } else if (loadBalancer instanceof FixedLoadBalancer fixedLoadBalancer) {
             if (configuration == null) {
                 configuration = defaultHttpClientConfiguration;
             }
-            return new JavanetHttpClient(fixedLoadBalancer.getUri(), configuration);
+            return new JavanetHttpClient(fixedLoadBalancer.getUri(), configuration, mediaTypeCodecRegistry);
         } else {
             throw new UnsupportedOperationException("Unsupported load balancer type: " + loadBalancer);
         }
@@ -166,7 +174,7 @@ class DefaultJavanetHttpClientRegistry implements AutoCloseable,
                 }
             }
 
-            return new JavanetHttpClient(contextPath == null ? null : URI.create(contextPath), configuration);
+            return new JavanetHttpClient(contextPath == null ? null : URI.create(contextPath), configuration, mediaTypeCodecRegistry);
         });
     }
 

@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.HttpClientFactory;
+import io.micronaut.http.codec.MediaTypeCodecRegistry;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -33,6 +34,13 @@ import java.net.URL;
  */
 @Internal
 public class JavanetHttpClientFactory implements HttpClientFactory {
+
+    final MediaTypeCodecRegistry mediaTypeCodecRegistry;
+
+    public JavanetHttpClientFactory(@Nullable MediaTypeCodecRegistry mediaTypeCodecRegistry) {
+        this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
+    }
+
     @Override
     @NonNull
     public HttpClient createClient(URL url) {
@@ -69,6 +77,6 @@ public class JavanetHttpClientFactory implements HttpClientFactory {
 
     @NonNull
     private JavanetHttpClient createJavanetClient(@Nullable URI uri, @NonNull HttpClientConfiguration configuration) {
-        return new JavanetHttpClient(uri, configuration);
+        return new JavanetHttpClient(uri, configuration, mediaTypeCodecRegistry);
     }
 }

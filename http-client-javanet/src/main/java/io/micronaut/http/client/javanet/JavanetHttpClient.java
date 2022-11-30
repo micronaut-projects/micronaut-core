@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.type.Argument;
@@ -26,14 +27,19 @@ import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
+import io.micronaut.http.MediaType;
 import io.micronaut.http.client.BlockingHttpClient;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.exceptions.HttpClientException;
+import io.micronaut.http.codec.MediaTypeCodec;
+import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import org.reactivestreams.Publisher;
 
 import java.io.IOException;
 import java.net.URI;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
@@ -48,19 +54,26 @@ public class JavanetHttpClient implements HttpClient {
 
     @Nullable
     private final HttpClientConfiguration httpClientConfiguration;
+    @Nullable
+    private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
 
     public JavanetHttpClient(@Nullable URI uri) {
-        this(uri, null);
+        this(uri, null, null);
     }
 
-    public JavanetHttpClient(@Nullable URI uri, @Nullable HttpClientConfiguration httpClientConfiguration) {
+    public JavanetHttpClient(
+        @Nullable URI uri,
+        @Nullable HttpClientConfiguration httpClientConfiguration,
+        @Nullable MediaTypeCodecRegistry mediaTypeCodecRegistry
+        ) {
         this.uri = uri;
         this.httpClientConfiguration = httpClientConfiguration;
+        this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
     }
 
     @Override
     public BlockingHttpClient toBlocking() {
-        return new JavanetBlockingHttpClient(uri, httpClientConfiguration);
+        return new JavanetBlockingHttpClient(uri, httpClientConfiguration, mediaTypeCodecRegistry);
     }
 
     @Override
@@ -72,7 +85,7 @@ public class JavanetHttpClient implements HttpClient {
         return Publishers.fromCompletableFuture(response);
     }
 
-    static <O> HttpResponse<O> getConvertedResponse(java.net.http.HttpResponse<byte[]> httpResponse, @NonNull Argument<O> bodyType) {
+    <O> HttpResponse<O> getConvertedResponse(java.net.http.HttpResponse<byte[]> httpResponse, @NonNull Argument<O> bodyType) {
         return new HttpResponse<O>() {
             @Override
             public HttpStatus getStatus() {
@@ -101,9 +114,29 @@ public class JavanetHttpClient implements HttpClient {
 
             @Override
             public Optional<O> getBody() {
-                return ConversionService.SHARED.convert(httpResponse.body(), bodyType);
+                return convertBytes(getContentType(), httpResponse.body(), bodyType);
             }
         };
+    }
+
+    private <T> Optional convertBytes(Optional<MediaType> contentType, byte[] bytes, Argument<T> type) {
+        boolean hasContentType = contentType.isPresent();
+        if (mediaTypeCodecRegistry != null && hasContentType) {
+            if (CharSequence.class.isAssignableFrom(type.getType())) {
+                Charset charset = contentType.flatMap(MediaType::getCharset).orElse(StandardCharsets.UTF_8);
+                return Optional.of(new String(bytes, charset));
+            } else if (type.getType() == byte[].class) {
+                return Optional.of(bytes);
+            } else {
+                Optional<MediaTypeCodec> foundCodec = mediaTypeCodecRegistry.findCodec(contentType.get());
+                if (foundCodec.isPresent()) {
+                    MediaTypeCodec codec = foundCodec.get();
+                    return Optional.of(codec.decode(type, bytes));
+                }
+            }
+        }
+        // last chance, try type conversion
+        return ConversionService.SHARED.convert(bytes, ConversionContext.of(type));
     }
 
     @Override

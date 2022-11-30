@@ -29,6 +29,10 @@ import java.util.Collections;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+@SuppressWarnings({
+    "java:S2259", // The tests will show if it's null
+    "java:S5960", // We're allowed assertions, as these are used in tests only
+})
 public interface HttpMethodDeleteTest {
 
     @Test
@@ -66,6 +70,27 @@ public interface HttpMethodDeleteTest {
         try (EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class, Collections.singletonMap("spec.name", "HttpMethodDeleteTest"))) {
             try (HttpClient httpClient = server.getApplicationContext().createBean(HttpClient.class, server.getURL())) {
                 assertEquals("ok", Flux.from(httpClient.exchange(HttpRequest.DELETE("/delete/string-response"), String.class)).blockFirst().body());
+            }
+        }
+    }
+
+    @Test
+    default void blockingDeleteMethodMappingWithObjectResponse() {
+        try (EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class, Collections.singletonMap("spec.name", "HttpMethodDeleteTest"))) {
+            try (HttpClient httpClient = server.getApplicationContext().createBean(HttpClient.class, server.getURL())) {
+                BlockingHttpClient client = httpClient.toBlocking();
+                assertEquals(new HttpMethodDeleteTestController.Person("Tim", 49), client.exchange(HttpRequest.DELETE("/delete/object-response"), HttpMethodDeleteTestController.Person.class).body());
+                assertEquals("{\"name\":\"Tim\",\"age\":49}", client.exchange(HttpRequest.DELETE("/delete/object-response"), String.class).body());
+            }
+        }
+    }
+
+    @Test
+    default void deleteMethodMappingWithObjectResponse() {
+        try (EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class, Collections.singletonMap("spec.name", "HttpMethodDeleteTest"))) {
+            try (HttpClient httpClient = server.getApplicationContext().createBean(HttpClient.class, server.getURL())) {
+                assertEquals(new HttpMethodDeleteTestController.Person("Tim", 49), Flux.from(httpClient.exchange(HttpRequest.DELETE("/delete/object-response"), HttpMethodDeleteTestController.Person.class)).blockFirst().body());
+                assertEquals("{\"name\":\"Tim\",\"age\":49}", Flux.from(httpClient.exchange(HttpRequest.DELETE("/delete/object-response"), String.class)).blockFirst().body());
             }
         }
     }
