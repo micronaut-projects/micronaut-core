@@ -378,7 +378,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     private String resolveEachPropertyMissingBeanMessage(BeanResolutionContext resolutionContext, Qualifier<?> qualifier, BeanDefinition<?> definition) {
         List<BeanDefinition<?>> chain = calculateEachPropertyChain(resolutionContext, definition);
         String prefix;
-        if (!chain.isEmpty()) {
+        if (chain.size() > 1) {
             Collections.reverse(chain);
             ConfigurationPath path = ConfigurationPath.of(chain.toArray(BeanDefinition[]::new));
             prefix = path.path();
