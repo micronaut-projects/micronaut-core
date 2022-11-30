@@ -48,6 +48,7 @@ import io.micronaut.inject.qualifiers.PrimaryQualifier;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -280,7 +281,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         BeanDefinition<T> definition = findAnyBeanDefinition(resolutionContext, beanType);
         if (definition != null && definition.isIterable()) {
             if (definition.hasDeclaredAnnotation(EachProperty.class)) {
-                message = resolveEachPropertyMissingBeanMessage(qualifier, definition);
+                message = resolveEachPropertyMissingBeanMessage(resolutionContext, qualifier, definition);
             } else if (definition.hasDeclaredAnnotation(EachBean.class)) {
                 message = resolveEachBeanMissingMessage(resolutionContext, beanType, qualifier, definition);
             }
@@ -291,7 +292,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     @NonNull
     private <T> String resolveEachBeanMissingMessage(BeanResolutionContext resolutionContext, Argument<T> beanType, Qualifier<T> qualifier, BeanDefinition<T> definition) {
         String message;
-        List<BeanDefinition<?>> dependencyChain = calculateDependencyChain(resolutionContext, definition);
+        List<BeanDefinition<?>> dependencyChain = calculateEachBeanChain(resolutionContext, definition);
         StringBuilder messageBuilder = new StringBuilder();
         Argument<?> requiredBeanType = beanType;
         Iterator<BeanDefinition<?>> i = dependencyChain.iterator();
@@ -310,7 +311,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
             messageBuilder.append(" which does not exist.");
             if (beanDefinition.hasDeclaredAnnotation(EachProperty.class)) {
                 messageBuilder.append(ls);
-                String propertyMissingMessage = resolveEachPropertyMissingBeanMessage(qualifier, beanDefinition);
+                String propertyMissingMessage = resolveEachPropertyMissingBeanMessage(resolutionContext, qualifier, beanDefinition);
                 messageBuilder.append("* ")
                     .append("[")
                     .append(nextBeanType.getTypeString(true))
@@ -335,7 +336,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         return definition;
     }
 
-    private <T> List<BeanDefinition<?>> calculateDependencyChain(
+    private <T> List<BeanDefinition<?>> calculateEachBeanChain(
         BeanResolutionContext resolutionContext,
         BeanDefinition<T> definition) {
         Class<?> dependentBean = definition.classValue(EachBean.class).orElse(null);
@@ -352,18 +353,49 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         return chain;
     }
 
-    @NonNull
-    private static String resolveEachPropertyMissingBeanMessage(Qualifier<?> qualifier, BeanDefinition<?> definition) {
-        String prefix = definition.stringValue(EachProperty.class).orElse("");
-        if (qualifier != null) {
-            if (qualifier instanceof Named named) {
-                prefix += "." + named.getName();
-            } else {
-                prefix += "." + "*";
+    private List<BeanDefinition<?>> calculateEachPropertyChain(
+        BeanResolutionContext resolutionContext,
+        BeanDefinition<?> definition) {
+        List<BeanDefinition<?>> chain = new ArrayList<>();
+        while (definition != null) {
+            chain.add(definition);
+            Class<?> declaringClass = definition.getBeanType().getDeclaringClass();
+            if (declaringClass == null) {
+                break;
             }
-        } else {
-            prefix += "." + definition.stringValue(EachProperty.class, "primary").orElse("*");
+            BeanDefinition<?> dependent = findAnyBeanDefinition(resolutionContext, Argument.of(declaringClass));
+            if (dependent == null || !dependent.isConfigurationProperties()) {
+                break;
+            }
+            definition = dependent;
         }
+
+        return chain;
+    }
+
+
+    @NonNull
+    private String resolveEachPropertyMissingBeanMessage(BeanResolutionContext resolutionContext, Qualifier<?> qualifier, BeanDefinition<?> definition) {
+        List<BeanDefinition<?>> chain = calculateEachPropertyChain(resolutionContext, definition);
+        String prefix;
+        if (!chain.isEmpty()) {
+            Collections.reverse(chain);
+            ConfigurationPath path = ConfigurationPath.of(chain.toArray(BeanDefinition[]::new));
+            prefix = path.path();
+        } else {
+
+            prefix = definition.stringValue(EachProperty.class).orElse("");
+            if (qualifier != null) {
+                if (qualifier instanceof Named named) {
+                    prefix += "." + named.getName();
+                } else {
+                    prefix += "." + "*";
+                }
+            } else {
+                prefix += "." + definition.stringValue(EachProperty.class, "primary").orElse("*");
+            }
+        }
+
 
         return "No configuration entries found under the prefix: [" + prefix + "]. Provide the necessary configuration to resolve this issue.";
     }

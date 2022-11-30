@@ -82,6 +82,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
 
     private static final Object NO_VALUE = new Object();
     private static final PropertyCatalog[] CONVENTIONS = {PropertyCatalog.GENERATED, PropertyCatalog.RAW};
+    private static final String WILD_CARD_SUFFIX = ".*";
     protected final ConversionService conversionService;
     protected final PropertyPlaceholderResolver propertyPlaceholderResolver;
     protected final Map<String, PropertySource> propertySources = new ConcurrentHashMap<>(10);
@@ -232,12 +233,12 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                 pathPattern, false, null);
 
             if (entries != null) {
-                boolean endsWithWildCard = pathPattern.endsWith(".*");
+                boolean endsWithWildCard = pathPattern.endsWith(WILD_CARD_SUFFIX);
                 String resolvedPattern = pathPattern
                     .replace("[*]", "\\[([\\w\\d-]+?)\\]")
                     .replace(".*.", "\\.([\\w\\d-]+?)\\.");
                 if (endsWithWildCard) {
-                    resolvedPattern = resolvedPattern.replace("*.", "\\S*");
+                    resolvedPattern = resolvedPattern.replace(WILD_CARD_SUFFIX, "\\S*");
                 } else {
                     resolvedPattern += "\\S*";
                 }

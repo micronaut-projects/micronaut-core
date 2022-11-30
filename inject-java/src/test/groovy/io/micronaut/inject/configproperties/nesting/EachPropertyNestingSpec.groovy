@@ -3,10 +3,12 @@ package io.micronaut.inject.configproperties.nesting
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.ApplicationContextBuilder
+import io.micronaut.context.exceptions.DependencyInjectionException
+import io.micronaut.context.exceptions.NoSuchBeanException
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Specification
 
-class ClassNestingSpec extends AbstractTypeElementSpec {
+class EachPropertyNestingSpec extends AbstractTypeElementSpec {
 
     void "test nesting classes within each other"() {
         given:
@@ -123,6 +125,13 @@ class ClassOuterConfig {
         config2.inner.inners.size() == 2
         config2.inner.inners.find { it.name == '1st' }.count == 30
         config2.inner.inners.find { it.name == '2nd' }.count == 40
+
+        when:"A unresolvable bean is queried"
+        def inner = getBean(context, 'test.ClassOuterConfig$ClassInnerConfig$ClassInnerEachConfig', Qualifiers.byName("foo-bar"))
+
+        then:
+        def e = thrown(NoSuchBeanException)
+        e.message == 'No bean of type [test.ClassOuterConfig$ClassInnerConfig$ClassInnerEachConfig] exists for the given qualifier: @Named(\'foo-bar\'). No configuration entries found under the prefix: [test.*.inner.inners.*]. Provide the necessary configuration to resolve this issue.'
     }
 
     @Override

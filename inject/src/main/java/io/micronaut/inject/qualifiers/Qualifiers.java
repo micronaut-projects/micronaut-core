@@ -136,6 +136,7 @@ public class Qualifiers {
      * @param prefix The name
      * @param <T>  The component type
      * @return The qualifier
+     * @since 4.0.0
      */
     public static <T> Qualifier<T> byNamePrefix(String prefix) {
         return new PrefixQualifier<>(prefix);

@@ -2325,21 +2325,6 @@ public class DefaultBeanContext implements InitializableBeanContext {
     }
 
     /**
-     * Method that transforms iterable candidates if possible.
-     *
-     * @param resolutionContext The resolution context
-     * @param candidates        The candidates.
-     * @param filterProxied     Whether to filter proxied.
-     * @param <T>               The bean type
-     * @return The candidates
-     * @deprecated No longer invoked by the framework. Use {@link #collectIterableBeans(BeanResolutionContext, BeanDefinition, Set)} instead.
-     */
-    @Deprecated(forRemoval = true, since = "4.0.0")
-    protected <T> Collection<BeanDefinition<T>> transformIterables(BeanResolutionContext resolutionContext, Collection<BeanDefinition<T>> candidates, boolean filterProxied) {
-        return candidates;
-    }
-
-    /**
      * Find bean candidates for the given type.
      *
      * @param instance The bean instance

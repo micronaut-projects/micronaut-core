@@ -16,6 +16,8 @@
 package io.micronaut.context.env;
 
 import io.micronaut.context.Qualifier;
+import io.micronaut.context.annotation.ConfigurationReader;
+import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.value.PropertyResolver;
@@ -40,6 +42,24 @@ public sealed interface ConfigurationPath
     @NonNull
     static ConfigurationPath newPath() {
         return new DefaultConfigurationPath();
+    }
+
+    /**
+     * Computes the path for the given nested chain of definitions.
+     * @param definitions The definitions
+     * @return THe computed path
+     */
+    @NonNull
+    static ConfigurationPath of(BeanDefinition<?>... definitions) {
+        ConfigurationPath configurationPath = ConfigurationPath.newPath();
+        for (BeanDefinition<?> definition : definitions) {
+            if (definition.hasDeclaredAnnotation(EachProperty.class)) {
+                configurationPath.pushEachPropertyRoot(definition);
+            } else if (definition.hasDeclaredStereotype(ConfigurationReader.class)) {
+                configurationPath.pushConfigurationReader(definition);
+            }
+        }
+        return configurationPath;
     }
 
     /**
