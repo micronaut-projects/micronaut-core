@@ -17,6 +17,7 @@ package io.micronaut.http.client.javanet;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.type.Argument;
 
@@ -33,6 +34,8 @@ import io.micronaut.http.client.exceptions.HttpClientException;
 import java.io.IOException;
 import java.net.http.HttpResponse;
 import java.util.Optional;
+
+import static io.micronaut.http.client.javanet.JavanetHttpClient.getConvertedResponse;
 
 /**
  * {@link io.micronaut.http.client.HttpClient} implementation for {@literal java.net.http.*} HTTP Client.
@@ -60,38 +63,7 @@ public class JavanetBlockingHttpClient implements BlockingHttpClient {
         HttpRequest httpRequest = builder.build();
         try {
             HttpResponse<byte[]> httpResponse = HttpClient.newHttpClient().send(httpRequest, HttpResponse.BodyHandlers.ofByteArray());
-
-            return new io.micronaut.http.HttpResponse<O>() {
-                @Override
-                public HttpStatus getStatus() {
-                    return HttpStatus.valueOf(httpResponse.statusCode());
-                }
-
-                @Override
-                public int code() {
-                    return httpResponse.statusCode();
-                }
-
-                @Override
-                public String reason() {
-                    throw new UnsupportedOperationException("Not implemented yet");
-                }
-
-                @Override
-                public HttpHeaders getHeaders() {
-                    return new HttpHeadersAdapter(httpResponse.headers());
-                }
-
-                @Override
-                public MutableConvertibleValues<Object> getAttributes() {
-                    return null;
-                }
-
-                @Override
-                public Optional<O> getBody() {
-                    return Optional.empty();
-                }
-            };
+            return getConvertedResponse(httpResponse, bodyType);
         } catch (IOException | InterruptedException e) {
             throw new HttpClientException("error sending request", e);
         }

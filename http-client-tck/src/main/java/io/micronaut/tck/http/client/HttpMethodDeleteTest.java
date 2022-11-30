@@ -35,4 +35,23 @@ public interface HttpMethodDeleteTest {
             }
         }
     }
+
+    @Test
+    default void blockingDeleteMethodMappingWithStringResponse() {
+        try (EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class, Collections.singletonMap("spec.name", "HttpMethodDeleteTest"))) {
+            try (HttpClient httpClient = server.getApplicationContext().createBean(HttpClient.class, server.getURL())) {
+                BlockingHttpClient client = httpClient.toBlocking();
+                assertEquals("ok", client.exchange(HttpRequest.DELETE("/delete/string-response"), String.class).body());
+            }
+        }
+    }
+
+    @Test
+    default void deleteMethodMappingWithStringResponse() {
+        try (EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class, Collections.singletonMap("spec.name", "HttpMethodDeleteTest"))) {
+            try (HttpClient httpClient = server.getApplicationContext().createBean(HttpClient.class, server.getURL())) {
+                assertEquals("ok", Flux.from(httpClient.exchange(HttpRequest.DELETE("/delete/string-response"), String.class)).blockFirst().body());
+            }
+        }
+    }
 }

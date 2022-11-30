@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpHeaders;
@@ -67,7 +68,12 @@ public class JavanetHttpClient implements HttpClient {
         java.net.http.HttpRequest.Builder builder = HttpRequestFactory.builder(uri.resolve(request.getUri()), request);
         java.net.http.HttpRequest httpRequest = builder.build();
         CompletableFuture<java.net.http.HttpResponse<byte[]>> completableHttpResponse = java.net.http.HttpClient.newHttpClient().sendAsync(httpRequest, java.net.http.HttpResponse.BodyHandlers.ofByteArray());
-        CompletableFuture<HttpResponse<O>> response = completableHttpResponse.thenApply(httpResponse -> new HttpResponse<O>() {
+        CompletableFuture<HttpResponse<O>> response = completableHttpResponse.thenApply(netResponse -> getConvertedResponse(netResponse, bodyType));
+        return Publishers.fromCompletableFuture(response);
+    }
+
+    static <O> HttpResponse<O> getConvertedResponse(java.net.http.HttpResponse<byte[]> httpResponse, @NonNull Argument<O> bodyType) {
+        return new HttpResponse<O>() {
             @Override
             public HttpStatus getStatus() {
                 return HttpStatus.valueOf(httpResponse.statusCode());
@@ -95,10 +101,9 @@ public class JavanetHttpClient implements HttpClient {
 
             @Override
             public Optional<O> getBody() {
-                return Optional.empty();
+                return ConversionService.SHARED.convert(httpResponse.body(), bodyType);
             }
-        });
-        return Publishers.fromCompletableFuture(response);
+        };
     }
 
     @Override
