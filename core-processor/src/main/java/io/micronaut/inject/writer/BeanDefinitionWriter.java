@@ -4495,11 +4495,15 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         return this.originatingElements.getOriginatingElements();
     }
 
+    /**
+     * Sets whether this bean is a proxied type.
+     * @param proxiedBean True if it proxied
+     * @param isProxyTarget True if the proxied bean is a retained target
+     */
     public void setProxiedBean(boolean proxiedBean, boolean isProxyTarget) {
         this.proxiedBean = proxiedBean;
         this.isProxyTarget = isProxyTarget;
     }
-
     @Override
     public boolean isProxyTarget() {
         return isProxyTarget;
