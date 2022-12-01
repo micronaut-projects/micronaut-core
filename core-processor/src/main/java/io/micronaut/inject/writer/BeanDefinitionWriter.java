@@ -4504,10 +4504,12 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         this.proxiedBean = proxiedBean;
         this.isProxyTarget = isProxyTarget;
     }
+
     @Override
     public boolean isProxyTarget() {
         return isProxyTarget;
     }
+    
     @Override
     public boolean isProxiedBean() {
         return proxiedBean;
