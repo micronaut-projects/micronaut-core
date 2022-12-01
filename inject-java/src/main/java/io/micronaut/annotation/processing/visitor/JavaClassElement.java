@@ -367,6 +367,16 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     }
 
     private JavaPropertyElement mapToPropertyElement(AstBeanPropertiesUtils.BeanPropertyData value) {
+        if (value.setter != null && value.getter != null) {
+            // ensure types match
+            ClassElement getterType = value.getter.getGenericReturnType();
+            ClassElement setterType = value.setter.getParameters()[0].getGenericType();
+            if (!getterType.equals(setterType)) {
+                // getter and setter don't match, remove setter
+                value.setter = null;
+                value.type = getterType;
+            }
+        }
         return new JavaPropertyElement(
             JavaClassElement.this,
             value.type,
