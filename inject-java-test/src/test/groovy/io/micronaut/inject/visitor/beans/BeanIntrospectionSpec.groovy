@@ -191,15 +191,15 @@ class Test {
 ''')
         expect:
             introspection.getPropertyNames().length == 4
-            introspection.getProperty("foo").get().type == String.class
-            introspection.getProperty("lng").get().type == Long.class
-            introspection.getProperty("dbl").get().type == Double.class
-            introspection.getProperty("ingr").get().type == Integer.class
+            introspection.getProperty("foo").get().type == Optional.class
+            introspection.getProperty("lng").get().type == OptionalLong.class
+            introspection.getProperty("dbl").get().type == OptionalDouble.class
+            introspection.getProperty("ingr").get().type == OptionalInt.class
 
-            introspection.getProperty("foo").get().isReadWrite()
-            introspection.getProperty("lng").get().isReadWrite()
-            introspection.getProperty("dbl").get().isReadWrite()
-            introspection.getProperty("ingr").get().isReadWrite()
+            introspection.getProperty("foo").get().isReadOnly()
+            introspection.getProperty("lng").get().isReadOnly()
+            introspection.getProperty("dbl").get().isReadOnly()
+            introspection.getProperty("ingr").get().isReadOnly()
     }
 
     void "test property type is not defined by its not accessible field"() {

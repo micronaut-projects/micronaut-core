@@ -21,7 +21,7 @@ import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
-import io.micronaut.inject.ast.BeanPropertiesQuery;
+import io.micronaut.inject.ast.PropertyElementQuery;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
@@ -31,7 +31,6 @@ import io.micronaut.inject.ast.PropertyElement;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -66,7 +65,7 @@ public final class AstBeanPropertiesUtils {
      * @param propertyCreator                  The property creator
      * @return the list of properties
      */
-    public static List<PropertyElement> resolveBeanProperties(BeanPropertiesQuery configuration,
+    public static List<PropertyElement> resolveBeanProperties(PropertyElementQuery configuration,
                                                               ClassElement classElement,
                                                               Supplier<List<MethodElement>> methodsSupplier,
                                                               Supplier<List<FieldElement>> fieldSupplier,
@@ -132,7 +131,7 @@ public final class AstBeanPropertiesUtils {
             for (Map.Entry<String, BeanPropertyData> entry : props.entrySet()) {
                 String propertyName = entry.getKey();
                 BeanPropertyData value = entry.getValue();
-                if (value.setter != null && value.getter != null) {
+                if (configuration.isIgnoreSettersWithDifferingType() && value.setter != null && value.getter != null) {
                     // ensure types match
                     ClassElement getterType = value.getter.getGenericReturnType();
                     ClassElement setterType = value.setter.getParameters()[0].getGenericType();
@@ -211,7 +210,7 @@ public final class AstBeanPropertiesUtils {
         return value.readAccessKind == null && value.writeAccessKind == null;
     }
 
-    private static boolean isExcludedByAnnotations(BeanPropertiesQuery conf, BeanPropertyData value) {
+    private static boolean isExcludedByAnnotations(PropertyElementQuery conf, BeanPropertyData value) {
         if (conf.getExcludedAnnotations().isEmpty()) {
             return false;
         }

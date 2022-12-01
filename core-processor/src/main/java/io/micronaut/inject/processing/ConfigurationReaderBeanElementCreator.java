@@ -34,7 +34,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
-import io.micronaut.inject.ast.BeanPropertiesQuery;
+import io.micronaut.inject.ast.PropertyElementQuery;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
@@ -273,7 +273,7 @@ final class ConfigurationReaderBeanElementCreator extends DeclaredBeanElementCre
                                            ClassElement builderType) {
         try {
             String configurationPrefix = builderElement.stringValue(ConfigurationBuilder.class).map(v -> v + ".").orElse("");
-            builderType.getBeanProperties(BeanPropertiesQuery.of(builderElement))
+            builderType.getBeanProperties(PropertyElementQuery.of(builderElement))
                 .stream()
                 .filter(propertyElement -> {
                     if (propertyElement.isExcluded()) {
