@@ -214,6 +214,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         this.implementInterface = true;
         this.parentWriter = parent;
         this.isProxyTarget = settings.get(Interceptor.PROXY_TARGET).orElse(false) || parent.isInterface();
+        parent.setProxiedBean(true, isProxyTarget);
         this.hotswap = isProxyTarget && settings.get(Interceptor.HOTSWAP).orElse(false);
         this.lazy = isProxyTarget && settings.get(Interceptor.LAZY).orElse(false);
         this.cacheLazyTarget = lazy && settings.get(Interceptor.CACHEABLE_LAZY_TARGET).orElse(false);
@@ -333,8 +334,9 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
      *
      * @return True if the target bean is being proxied
      */
+    @Override
     public boolean isProxyTarget() {
-        return isProxyTarget;
+        return false;
     }
 
     @Override
@@ -726,6 +728,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             processAlreadyVisitedMethods(parentWriter);
         }
 
+        this.proxyBeanDefinitionWriter.setRequiresMethodProcessing(parentWriter != null && parentWriter.requiresMethodProcessing());
         interceptorParameter.annotate(AnnotationUtil. ANN_INTERCEPTOR_BINDING_QUALIFIER, builder -> {
             final AnnotationValue<?>[] interceptorBinding = this.interceptorBinding.toArray(new AnnotationValue[0]);
             builder.values(interceptorBinding);

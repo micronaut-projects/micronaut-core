@@ -197,6 +197,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
     private final BeanContextConfiguration beanContextConfiguration;
     private final Collection<BeanDefinitionReference> beanDefinitionsClasses = new ConcurrentLinkedQueue<>();
+    private final Collection<BeanDefinitionReference> proxyTargetBeans = new ConcurrentLinkedQueue<>();
 
     private final Map<BeanKey<?>, BeanDefinitionReference> disabledBeans = new ConcurrentHashMap<>(20);
     private final Map<String, List<String>> disabledConfigurations = new ConcurrentHashMap<>(5);
@@ -208,6 +209,9 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
     private final Map<BeanCandidateKey, Optional<BeanDefinition>> beanConcreteCandidateCache =
             new ConcurrentLinkedHashMap.Builder<BeanCandidateKey, Optional<BeanDefinition>>().maximumWeightedCapacity(30).build();
+
+    private final Map<BeanCandidateKey, Optional<BeanDefinition>> beanProxyTargetCache =
+        new ConcurrentLinkedHashMap.Builder<BeanCandidateKey, Optional<BeanDefinition>>().maximumWeightedCapacity(30).build();
 
     private final Map<Argument, Collection<BeanDefinition>> beanCandidateCache = new ConcurrentLinkedHashMap.Builder<Argument, Collection<BeanDefinition>>().maximumWeightedCapacity(30).build();
 
@@ -1580,24 +1584,12 @@ public class DefaultBeanContext implements InitializableBeanContext {
     @SuppressWarnings("java:S2789") // performance optimization
     public <T> Optional<BeanDefinition<T>> findProxyTargetBeanDefinition(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         ArgumentUtils.requireNonNull("beanType", beanType);
-        @SuppressWarnings("unchecked")
-        Qualifier<T> proxyQualifier = qualifier != null ? Qualifiers.byQualifiers(qualifier, PROXY_TARGET_QUALIFIER) : PROXY_TARGET_QUALIFIER;
-        BeanCandidateKey<T> key = new BeanCandidateKey<>(beanType, proxyQualifier, true);
+        BeanCandidateKey<T> key = new BeanCandidateKey<>(beanType, qualifier, true);
 
-        Optional beanDefinition = beanConcreteCandidateCache.get(key);
-        //noinspection OptionalAssignedToNull
+        Optional beanDefinition = beanProxyTargetCache.get(key);
         if (beanDefinition == null) {
-            BeanRegistration<T> beanRegistration = singletonScope.findCachedSingletonBeanRegistration(beanType, qualifier);
-            if (beanRegistration != null) {
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Resolved existing bean [{}] for type [{}] and qualifier [{}]", beanRegistration.bean, beanType, qualifier);
-                }
-                beanDefinition = Optional.of(beanRegistration.beanDefinition);
-            } else {
-                beanDefinition = findConcreteCandidateNoCache(null, beanType, proxyQualifier, true, false);
-            }
-
-            beanConcreteCandidateCache.put(key, beanDefinition);
+            beanDefinition = findProxyTargetNoCache(null, beanType, qualifier);
+            beanProxyTargetCache.put(key, beanDefinition);
         }
         return beanDefinition;
     }
@@ -1627,7 +1619,6 @@ public class DefaultBeanContext implements InitializableBeanContext {
             return Collections.emptyList();
         }
         if (CollectionUtils.isNotEmpty(candidates)) {
-            filterProxiedTypes(candidates);
             filterReplacedBeans(null, candidates);
         }
         return candidates;
@@ -2044,7 +2035,6 @@ public class DefaultBeanContext implements InitializableBeanContext {
                     throw new BeanInstantiationException("Bean definition [" + contextScopeBean.getName() + "] could not be loaded: " + e.getMessage(), e);
                 }
             }
-            filterProxiedTypes((Collection) contextBeans);
             filterReplacedBeans(null, (Collection) contextBeans);
             OrderUtil.sort(contextBeans);
             for (BeanDefinition contextScopeDefinition : contextBeans) {
@@ -2180,7 +2170,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                                                                    @Nullable BeanDefinition<?> filter,
                                                                    boolean filterProxied) {
         Predicate<BeanDefinition<T>> predicate = filter == null ? null : definition -> !definition.equals(filter);
-        return findBeanCandidates(resolutionContext, beanType, filterProxied, true, predicate);
+        return findBeanCandidates(resolutionContext, beanType, true, predicate);
     }
 
     /**
@@ -2189,31 +2179,6 @@ public class DefaultBeanContext implements InitializableBeanContext {
      * @param <T>               The bean generic type
      * @param resolutionContext The current resolution context
      * @param beanType          The bean type
-     * @param filterProxied     Whether to filter out bean proxy targets
-     * @param predicate         The predicate to filter candidates
-     * @return The candidates
-     */
-    @NonNull
-    protected <T> Collection<BeanDefinition<T>> findBeanCandidates(@Nullable BeanResolutionContext resolutionContext,
-                                                                   @NonNull Argument<T> beanType,
-                                                                   boolean filterProxied,
-                                                                   Predicate<BeanDefinition<T>> predicate) {
-        return findBeanCandidates(
-            resolutionContext,
-            beanType,
-            filterProxied,
-            true,
-            predicate
-        );
-    }
-
-    /**
-     * Find bean candidates for the given type.
-     *
-     * @param <T>               The bean generic type
-     * @param resolutionContext The current resolution context
-     * @param beanType          The bean type
-     * @param filterProxied     Whether to filter out bean proxy targets
      * @param collectIterables  Whether iterables should be collected
      * @param predicate         The predicate to filter candidates
      * @return The candidates
@@ -2221,7 +2186,6 @@ public class DefaultBeanContext implements InitializableBeanContext {
     @NonNull
     protected <T> Collection<BeanDefinition<T>> findBeanCandidates(@Nullable BeanResolutionContext resolutionContext,
                                                                    @NonNull Argument<T> beanType,
-                                                                   boolean filterProxied,
                                                                    boolean collectIterables,
                                                                    Predicate<BeanDefinition<T>> predicate) {
         ArgumentUtils.requireNonNull("beanType", beanType);
@@ -2245,7 +2209,6 @@ public class DefaultBeanContext implements InitializableBeanContext {
         return collectBeanCandidates(
             resolutionContext,
             beanType,
-            filterProxied,
             collectIterables,
             predicate,
             beanDefinitionsClasses
@@ -2256,7 +2219,6 @@ public class DefaultBeanContext implements InitializableBeanContext {
     private <T> Set<BeanDefinition<T>> collectBeanCandidates(
         BeanResolutionContext resolutionContext,
         Argument<T> beanType,
-        boolean filterProxied,
         boolean collectIterables,
         Predicate<BeanDefinition<T>> predicate,
         Collection<BeanDefinitionReference> beanDefinitionsClasses) {
@@ -2292,9 +2254,6 @@ public class DefaultBeanContext implements InitializableBeanContext {
             }
 
             if (!candidates.isEmpty()) {
-                if (filterProxied) {
-                    filterProxiedTypes(candidates);
-                }
                 filterReplacedBeans(resolutionContext, candidates);
             }
         } else {
@@ -2672,7 +2631,6 @@ public class DefaultBeanContext implements InitializableBeanContext {
                         }
                     });
 
-                    filterProxiedTypes((Collection) parallelDefinitions);
                     filterReplacedBeans(null, (Collection) parallelDefinitions);
 
                     parallelDefinitions.forEach(beanDefinition -> ForkJoinPool.commonPool().execute(() -> {
@@ -3063,7 +3021,6 @@ public class DefaultBeanContext implements InitializableBeanContext {
             Set<BeanDefinition<T>> beanDefinitions = collectBeanCandidates(
                 resolutionContext,
                 beanType,
-                true,
                 false,
                 null,
                 disabledBeans.values()
@@ -3352,9 +3309,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                     resolutionContext,
                     beanType,
                     qualifier,
-                    throwNonUnique,
-                    true
-            );
+                    throwNonUnique);
             beanConcreteCandidateCache.put(bk, beanDefinition);
         }
         return beanDefinition;
@@ -3363,12 +3318,25 @@ public class DefaultBeanContext implements InitializableBeanContext {
     private <T> Optional<BeanDefinition<T>> findConcreteCandidateNoCache(@Nullable BeanResolutionContext resolutionContext,
                                                                          @NonNull Argument<T> beanType,
                                                                          @Nullable Qualifier<T> qualifier,
-                                                                         boolean throwNonUnique,
-                                                                         boolean filterProxied) {
+                                                                         boolean throwNonUnique) {
 
         Predicate<BeanDefinition<T>> predicate = candidate -> !candidate.isAbstract();
-        Collection<BeanDefinition<T>> candidates = findBeanCandidates(resolutionContext, beanType, filterProxied, true, predicate);
+        Collection<BeanDefinition<T>> candidates = findBeanCandidates(resolutionContext, beanType, true, predicate);
         return pickOneBean(beanType, qualifier, throwNonUnique, candidates);
+    }
+
+    private <T> Optional<BeanDefinition<T>> findProxyTargetNoCache(@Nullable BeanResolutionContext resolutionContext,
+                                                                         @NonNull Argument<T> beanType,
+                                                                         @Nullable Qualifier<T> qualifier) {
+
+        Collection<BeanDefinition<T>> candidates = collectBeanCandidates(
+            resolutionContext,
+            beanType,
+            true,
+            null,
+            proxyTargetBeans
+        );
+        return pickOneBean(beanType, qualifier, false, candidates);
     }
 
     @NonNull
@@ -3424,30 +3392,6 @@ public class DefaultBeanContext implements InitializableBeanContext {
             }
         }
         return Optional.ofNullable(definition);
-    }
-
-    @SuppressWarnings("java:S1871")
-    private <T> void filterProxiedTypes(
-        Collection<BeanDefinition<T>> candidates) {
-        int count = candidates.size();
-        Set<Class<?>> proxiedTypes = new HashSet<>(count);
-        for (BeanDefinition<T> candidate : candidates) {
-            if (candidate instanceof ProxyBeanDefinition<T> proxyBeanDefinition) {
-                proxiedTypes.add(proxyBeanDefinition.getTargetDefinitionType());
-            } else if (candidate instanceof BeanDefinitionDelegate<T> delegate && delegate.getTarget() instanceof ProxyBeanDefinition<T> proxyBeanDefinition) {
-                proxiedTypes.add(proxyBeanDefinition.getTargetDefinitionType());
-            }
-        }
-        if (!proxiedTypes.isEmpty()) {
-            candidates.removeIf(candidate -> {
-                if (candidate instanceof BeanDefinitionDelegate<T> delegate) {
-                    return proxiedTypes.contains(delegate.getDelegate().getClass());
-                } else {
-                    return proxiedTypes.contains(candidate.getClass());
-                }
-            });
-        }
-
     }
 
     private <T> BeanDefinition<T> lastChanceResolve(Argument<T> beanType,
@@ -3528,6 +3472,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
         List<BeanDefinitionReference> parallelBeans = new ArrayList<>(10);
 
         List<BeanDefinitionReference> beanDefinitionReferences = resolveBeanDefinitionReferences();
+        List<BeanDefinitionReference> toRemove = new ArrayList<>(beanDefinitionReferences.size());
         beanDefinitionsClasses.addAll(beanDefinitionReferences);
 
         Set<BeanConfiguration> configurationsDisabled = new HashSet<>();
@@ -3541,10 +3486,23 @@ public class DefaultBeanContext implements InitializableBeanContext {
         for (BeanDefinitionReference beanDefinitionReference : beanDefinitionReferences) {
             for (BeanConfiguration disableConfiguration : configurationsDisabled) {
                 if (disableConfiguration.isWithin(beanDefinitionReference)) {
-                    beanDefinitionsClasses.remove(beanDefinitionReference);
+                    toRemove.add(beanDefinitionReference);
                     continue reference;
                 }
             }
+
+            if (beanDefinitionReference.isProxiedBean()) {
+                toRemove.add(beanDefinitionReference);
+                if (beanDefinitionReference.requiresMethodProcessing()) {
+                    processedBeans.add(beanDefinitionReference);
+                }
+                // retain only if proxy target otherwise the target is never used
+                if (beanDefinitionReference.isProxyTarget()) {
+                    this.proxyTargetBeans.add(beanDefinitionReference);
+                }
+                continue;
+            }
+
             final AnnotationMetadata annotationMetadata = beanDefinitionReference.getAnnotationMetadata();
             Class<?>[] indexes = annotationMetadata.classValues(INDEXES_TYPE);
             if (indexes.length > 0) {
@@ -3573,6 +3531,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
         }
 
+        this.beanDefinitionsClasses.removeAll(toRemove);
         this.beanDefinitionReferences = null;
         this.beanConfigurationsList = null;
 
@@ -3599,7 +3558,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
         @SuppressWarnings("rawtypes")
         Collection beanDefinitions = beanCandidateCache.get(beanType);
         if (beanDefinitions == null) {
-            beanDefinitions = findBeanCandidates(resolutionContext, beanType, true, true,null);
+            beanDefinitions = findBeanCandidates(resolutionContext, beanType, true, null);
             beanCandidateCache.put(beanType, beanDefinitions);
         }
         return beanDefinitions;
@@ -3802,7 +3761,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
     }
 
     private <T> boolean isCandidatePresent(Argument<T> beanType, Qualifier<T> qualifier) {
-        final Collection<BeanDefinition<T>> candidates = findBeanCandidates(null, beanType, true, true, null);
+        final Collection<BeanDefinition<T>> candidates = findBeanCandidates(null, beanType, true, null);
         if (!candidates.isEmpty()) {
             filterReplacedBeans(null, candidates);
             Stream<BeanDefinition<T>> stream = candidates.stream();

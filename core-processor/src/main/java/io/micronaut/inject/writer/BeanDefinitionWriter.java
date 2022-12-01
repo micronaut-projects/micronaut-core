@@ -554,6 +554,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private boolean disabled = false;
 
     private final boolean keepConfPropInjectPoints;
+    private boolean proxiedBean = false;
+    private boolean isProxyTarget = false;
 
     /**
      * Creates a bean definition writer.
@@ -4491,6 +4493,26 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     @Override
     public Element[] getOriginatingElements() {
         return this.originatingElements.getOriginatingElements();
+    }
+
+    /**
+     * Sets whether this bean is a proxied type.
+     * @param proxiedBean True if it proxied
+     * @param isProxyTarget True if the proxied bean is a retained target
+     */
+    public void setProxiedBean(boolean proxiedBean, boolean isProxyTarget) {
+        this.proxiedBean = proxiedBean;
+        this.isProxyTarget = isProxyTarget;
+    }
+
+    @Override
+    public boolean isProxyTarget() {
+        return isProxyTarget;
+    }
+    
+    @Override
+    public boolean isProxiedBean() {
+        return proxiedBean;
     }
 
     @Internal
