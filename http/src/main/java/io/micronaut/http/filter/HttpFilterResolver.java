@@ -111,7 +111,7 @@ public interface HttpFilterResolver<F extends HttpFilter, T extends AnnotationMe
                 @NonNull FT filter,
                 @Nullable AnnotationMetadata annotationMetadata,
                 @Nullable Set<HttpMethod> methods,
-                String...patterns) {
+                String... patterns) {
             return new DefaultFilterEntry<>(
                     Objects.requireNonNull(filter, "Filter cannot be null"),
                     annotationMetadata != null ? annotationMetadata : AnnotationMetadata.EMPTY_METADATA,
@@ -135,7 +135,7 @@ public interface HttpFilterResolver<F extends HttpFilter, T extends AnnotationMe
             @NonNull FT filter,
             @Nullable AnnotationMetadata annotationMetadata,
             @Nullable Set<HttpMethod> methods,
-            @NonNull FilterPatternStyle patternStyle, String...patterns) {
+            @NonNull FilterPatternStyle patternStyle, String... patterns) {
             return new DefaultFilterEntry<>(
                 Objects.requireNonNull(filter, "Filter cannot be null"),
                 annotationMetadata != null ? annotationMetadata : AnnotationMetadata.EMPTY_METADATA,
