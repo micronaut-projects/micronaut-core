@@ -51,7 +51,7 @@ public class HttpDataReference {
     final AtomicReference<Sinks.Many<Object>> subject = new AtomicReference<>();
     final AtomicReference<StreamingFileUpload> upload = new AtomicReference<>();
 
-    private final HttpData data;
+    private final MicronautHttpData<?> data;
     private final AtomicReference<RandomAccessFile> fileAccess = new AtomicReference<>();
     private final AtomicLong position = new AtomicLong(0);
     private final List<Component> components = new ArrayList<>();
@@ -60,7 +60,7 @@ public class HttpDataReference {
      * @param data The data this class is in control of
      */
     HttpDataReference(HttpData data) {
-        this.data = data;
+        this.data = (MicronautHttpData<?>) data;
         data.retain();
     }
 
@@ -68,8 +68,8 @@ public class HttpDataReference {
      * @return The content type of the http data
      */
     public Optional<MediaType> getContentType() {
-        if (data instanceof FileUpload) {
-            return Optional.of(MediaType.of(((FileUpload) data).getContentType()));
+        if (data instanceof FileUpload fu) {
+            return Optional.of(MediaType.of(fu.getContentType()));
         } else {
             return Optional.empty();
         }
@@ -127,16 +127,7 @@ public class HttpDataReference {
     }
 
     private long readableBytes(HttpData httpData) throws IOException {
-        if (httpData.isInMemory()) {
-            ByteBuf byteBuf = httpData.getByteBuf();
-            if (byteBuf != null) {
-                return byteBuf.readableBytes();
-            } else {
-                return 0;
-            }
-        } else {
-            return httpData.length();
-        }
+        return httpData.length();
     }
 
     private void updateComponentOffsets(int index) {
@@ -230,14 +221,12 @@ public class HttpDataReference {
                     return createDelegate(byteBuf, (buf, count) -> {
                         //needs to be retrieved again because the internal reference
                         //may have changed
-                        try {
-                            ByteBuf currentBuffer = data.getByteBuf();
-                            if (currentBuffer instanceof CompositeByteBuf) {
-                                ((CompositeByteBuf) currentBuffer).removeComponent(index);
-                            } else {
-                                data.delete();
-                            }
-                        } catch (IOException e) { }
+                        ByteBuf currentBuffer = data.getByteBuf();
+                        if (currentBuffer instanceof CompositeByteBuf) {
+                            ((CompositeByteBuf) currentBuffer).removeComponent(index);
+                        } else {
+                            data.delete();
+                        }
                         removeComponent(index);
                         return true;
                     });

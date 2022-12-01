@@ -46,8 +46,8 @@ public class NettyPartData implements PartData {
      * @param httpData   The data reference
      * @param component  The component reference
      */
-    public NettyPartData(HttpDataReference httpData, HttpDataReference.Component component) {
-        this(httpData::getContentType, component::getByteBuf);
+    public NettyPartData(HttpDataReference httpData, ThrowingSupplier<ByteBuf, IOException> byteBufSupplier) {
+        this(httpData::getContentType, byteBufSupplier);
     }
 
     /**
@@ -93,6 +93,7 @@ public class NettyPartData implements PartData {
     public ByteBuffer getByteBuffer() throws IOException {
         ByteBuf byteBuf = getByteBuf();
         try {
+            // todo: should return a copy
             return byteBuf.nioBuffer();
         } finally {
             byteBuf.release();

@@ -24,7 +24,6 @@ import io.netty.buffer.ByteBufHolder;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.multipart.Attribute;
-import io.netty.handler.codec.http.multipart.DefaultHttpDataFactory;
 import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.handler.codec.http.multipart.HttpData;
 import io.netty.handler.codec.http.multipart.HttpDataFactory;
@@ -80,15 +79,7 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
         super(nettyHttpRequest, configuration);
         Charset characterEncoding = nettyHttpRequest.getCharacterEncoding();
         HttpServerConfiguration.MultipartConfiguration multipart = configuration.getMultipart();
-        HttpDataFactory factory;
-        if (multipart.isDisk()) {
-            factory = new DefaultHttpDataFactory(true, characterEncoding);
-        } else if (multipart.isMixed()) {
-            factory = new DefaultHttpDataFactory(multipart.getThreshold(), characterEncoding);
-        } else {
-            factory = new DefaultHttpDataFactory(false, characterEncoding);
-        }
-        factory.setMaxLimit(multipart.getMaxFileSize());
+        HttpDataFactory factory = new MicronautHttpData.Factory(multipart, characterEncoding);
         final HttpRequest nativeRequest = nettyHttpRequest.getNativeRequest();
         if (HttpPostRequestDecoder.isMultipart(nativeRequest)) {
             this.decoder = new MicronautHttpPostMultipartRequestDecoder(factory, nativeRequest, characterEncoding);
