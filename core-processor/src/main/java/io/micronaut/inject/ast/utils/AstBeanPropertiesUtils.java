@@ -127,23 +127,21 @@ public final class AstBeanPropertiesUtils {
             resolveWriteAccessForField(fieldElement, isAccessor, beanPropertyData);
         }
 
-        for (BeanPropertyData value : props.values()) {
-            if (value.setter != null && value.getter != null) {
-                // ensure types match
-                ClassElement getterType = value.getter.getGenericReturnType();
-                ClassElement setterType = value.setter.getParameters()[0].getGenericType();
-                if (!getterType.equals(setterType)) {
-                    // getter and setter don't match, remove setter
-                    value.setter = null;
-                    value.type = getterType;
-                }
-            }
-        }
         if (!props.isEmpty()) {
             List<PropertyElement> beanProperties = new ArrayList<>(props.size());
             for (Map.Entry<String, BeanPropertyData> entry : props.entrySet()) {
                 String propertyName = entry.getKey();
                 BeanPropertyData value = entry.getValue();
+                if (value.setter != null && value.getter != null) {
+                    // ensure types match
+                    ClassElement getterType = value.getter.getGenericReturnType();
+                    ClassElement setterType = value.setter.getParameters()[0].getGenericType();
+                    if (!getterType.equals(setterType)) {
+                        // getter and setter don't match, remove setter
+                        value.setter = null;
+                        value.type = getterType;
+                    }
+                }
                 // Define the property type based on its writer element
                 if (value.writeAccessKind == BeanProperties.AccessKind.FIELD && !value.field.getType().equals(value.type)) {
                     value.type = value.field.getGenericType();
