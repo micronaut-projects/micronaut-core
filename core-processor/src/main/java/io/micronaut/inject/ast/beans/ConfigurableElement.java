@@ -36,7 +36,7 @@ public interface ConfigurableElement extends Element {
      * @param types The types
      * @return This element
      */
-    @NonNull ConfigurableElement typeArguments(@NonNull ClassElement...types);
+    @NonNull ConfigurableElement typeArguments(@NonNull ClassElement... types);
 
     /**
      * Adds a {@link jakarta.inject.Named} qualifier to the element.
