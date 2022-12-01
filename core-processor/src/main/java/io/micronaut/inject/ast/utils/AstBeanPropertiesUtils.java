@@ -31,6 +31,7 @@ import io.micronaut.inject.ast.PropertyElement;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -124,6 +125,19 @@ public final class AstBeanPropertiesUtils {
             BeanPropertyData beanPropertyData = props.computeIfAbsent(propertyName, BeanPropertyData::new);
             resolveReadAccessForField(fieldElement, isAccessor, beanPropertyData);
             resolveWriteAccessForField(fieldElement, isAccessor, beanPropertyData);
+        }
+
+        for (BeanPropertyData value : props.values()) {
+            if (value.setter != null && value.getter != null) {
+                // ensure types match
+                ClassElement getterType = value.getter.getGenericReturnType();
+                ClassElement setterType = value.setter.getParameters()[0].getGenericType();
+                if (!getterType.equals(setterType)) {
+                    // getter and setter don't match, remove setter
+                    value.setter = null;
+                    value.type = getterType;
+                }
+            }
         }
         if (!props.isEmpty()) {
             List<PropertyElement> beanProperties = new ArrayList<>(props.size());
