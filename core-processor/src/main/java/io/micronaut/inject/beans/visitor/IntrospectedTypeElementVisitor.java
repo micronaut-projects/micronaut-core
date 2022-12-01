@@ -30,6 +30,7 @@ import io.micronaut.inject.ast.ElementModifier;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.PropertyElement;
+import io.micronaut.inject.ast.PropertyElementQuery;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.ClassGenerationException;
@@ -189,9 +190,10 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                                 Set<AnnotationValue> indexedAnnotations,
                                 ClassElement ce,
                                 BeanIntrospectionWriter writer) {
-        List<PropertyElement> beanProperties = ce.getBeanProperties().stream()
+        PropertyElementQuery query = PropertyElementQuery.of(ce).ignoreSettersWithDifferingType(true);
+        List<PropertyElement> beanProperties = ce.getBeanProperties(query).stream()
             .filter(p -> !p.isExcluded())
-            .collect(Collectors.toList());
+            .toList();
         Optional<MethodElement> constructorElement = ce.getPrimaryConstructor();
         constructorElement.ifPresent(constructorEl -> {
             if (ArrayUtils.isNotEmpty(constructorEl.getParameters())) {

@@ -422,12 +422,12 @@ public interface ClassElement extends TypedElement {
     /**
      * Returns the bean properties (getters and setters) for this class element based on custom configuration.
      *
-     * @param beanPropertiesQuery The configuration
+     * @param propertyElementQuery The configuration
      * @return The bean properties for this class element
      * @since 4.0.0
      */
     @NonNull
-    default List<PropertyElement> getBeanProperties(BeanPropertiesQuery beanPropertiesQuery) {
+    default List<PropertyElement> getBeanProperties(@NonNull PropertyElementQuery propertyElementQuery) {
         return Collections.emptyList();
     }
 

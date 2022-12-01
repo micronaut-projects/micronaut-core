@@ -1,6 +1,7 @@
 package io.micronaut.inject.configproperties
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.ApplicationContextBuilder
 import io.micronaut.context.BeanContext
 import io.micronaut.context.annotation.ConfigurationReader
 import io.micronaut.context.annotation.Property
@@ -12,6 +13,42 @@ import io.micronaut.inject.BeanFactory
 import io.micronaut.inject.configuration.Engine
 
 class ConfigPropertiesParseSpec extends AbstractTypeElementSpec {
+
+    void "test configuration properties with mixed getters/setters"() {
+        when:
+        def context = buildContext('''
+package test;
+
+import io.micronaut.context.annotation.*;
+import io.micronaut.core.annotation.Nullable;
+import java.time.Duration;
+import java.util.Optional;
+
+@ConfigurationProperties("foo.bar")
+class MyConfig {
+    String host;
+
+
+    public Optional<String> getHost() {
+        return Optional.ofNullable(host);
+    }
+
+    public void setHost(@Nullable String host) {
+        this.host = host;
+    }
+}
+
+''')
+        def config = getBean(context, 'test.MyConfig')
+
+        then:
+        config.host.get() == 'bar'
+    }
+
+    @Override
+    protected void configureContext(ApplicationContextBuilder contextBuilder) {
+        contextBuilder.properties('foo.bar.host':'bar')
+    }
 
     void "test inner class paths - pojo inheritance"() {
         when:
