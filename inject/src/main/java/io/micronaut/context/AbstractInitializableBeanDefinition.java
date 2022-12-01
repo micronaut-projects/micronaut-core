@@ -2379,6 +2379,12 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
                 currentQualifier.getClass() != InterceptorBindingQualifier.class &&
                 currentQualifier.getClass() != TypeAnnotationQualifier.class) {
                 return currentQualifier;
+            } else {
+                BeanResolutionContext.Path path = resolutionContext.getPath();
+                BeanResolutionContext.Segment<?> segment = path.peek();
+                if (segment != null && segment.getDeclaringType().hasAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS)) {
+                    return resolutionContext.getConfigurationPath().beanQualifier();
+                }
             }
         } else if (isIterable && resultType.isAnnotationPresent(Parameter.class)) {
             return (Qualifier<B>) resolutionContext.getCurrentQualifier();
