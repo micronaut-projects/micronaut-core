@@ -32,6 +32,7 @@ import io.micronaut.http.hateoas.JsonError
 import io.micronaut.jackson.JacksonConfiguration
 import io.micronaut.jackson.modules.testcase.EmailTemplate
 import io.micronaut.jackson.modules.testcase.Notification
+import io.micronaut.jackson.modules.testclasses.HTTPCheck
 import io.micronaut.jackson.modules.wrappers.*
 import spock.lang.Issue
 import spock.lang.Unroll
@@ -41,6 +42,29 @@ import java.beans.ConstructorProperties
 import java.time.LocalDateTime
 
 class BeanIntrospectionModuleSpec extends Specification {
+
+    void "test serialize/deserialize convertible values"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run()
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        when:
+        HTTPCheck check = new HTTPCheck(headers:[
+                Accept:['application/json', 'application/xml']
+        ] )
+
+        def result = objectMapper.writeValueAsString(check)
+
+        then:
+        result == '{"Header":{"Accept":["application/json","application/xml"]}}'
+
+        when:
+        def read = objectMapper.readValue(result, HTTPCheck)
+
+        then:
+        check.header.getAll("Accept") == read.header.getAll("Accept")
+
+    }
 
     void "Bean introspection works with a bean without JsonIgnore annotations"() {
         given:
