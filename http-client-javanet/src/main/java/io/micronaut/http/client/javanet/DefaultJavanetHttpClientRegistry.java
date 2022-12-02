@@ -24,8 +24,12 @@ import io.micronaut.context.annotation.Primary;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.FilterMatcher;
+import io.micronaut.http.bind.DefaultRequestBinderRegistry;
+import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.HttpClientRegistry;
@@ -34,14 +38,19 @@ import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.LoadBalancerResolver;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.exceptions.HttpClientException;
+import io.micronaut.http.client.filter.ClientFilterResolutionContext;
 import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
+import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.inject.InjectionPoint;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.json.JsonFeatures;
 import io.micronaut.json.JsonMapper;
+import io.micronaut.json.codec.MapperMediaTypeCodec;
 
 import java.net.URI;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -87,21 +96,27 @@ class DefaultJavanetHttpClientRegistry implements AutoCloseable,
         return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, mediaTypeCodecRegistry);
     }
 
+
     private HttpClient resolveDefaultHttpClient(
         @Nullable InjectionPoint<?> injectionPoint,
         @Nullable LoadBalancer loadBalancer,
         @Nullable HttpClientConfiguration configuration,
         @Nullable MediaTypeCodecRegistry mediaTypeCodecRegistry
         ) {
-        if (loadBalancer == null) {
-            return getClient(injectionPoint != null ? injectionPoint.getAnnotationMetadata() : AnnotationMetadata.EMPTY_METADATA);
-        } else if (loadBalancer instanceof FixedLoadBalancer fixedLoadBalancer) {
+        if (loadBalancer != null) {
             if (configuration == null) {
                 configuration = defaultHttpClientConfiguration;
             }
-            return new JavanetHttpClient(fixedLoadBalancer.getUri(), configuration, mediaTypeCodecRegistry);
+            return buildClient(
+                loadBalancer,
+                null,
+                configuration,
+                null,
+                loadBalancer.getContextPath().orElse(null),
+                beanContext
+            );
         } else {
-            throw new UnsupportedOperationException("Unsupported load balancer type: " + loadBalancer);
+            return getClient(injectionPoint != null ? injectionPoint.getAnnotationMetadata() : AnnotationMetadata.EMPTY_METADATA);
         }
     }
 
@@ -174,8 +189,57 @@ class DefaultJavanetHttpClientRegistry implements AutoCloseable,
                 }
             }
 
-            return new JavanetHttpClient(contextPath == null ? null : URI.create(contextPath), configuration, mediaTypeCodecRegistry);
+            JavanetHttpClient client = buildClient(loadBalancer, clientKey.httpVersion, configuration, clientId, contextPath, beanContext);
+
+            final JsonFeatures jsonFeatures = clientKey.jsonFeatures;
+            if (jsonFeatures != null) {
+                List<MediaTypeCodec> codecs = new ArrayList<>(2);
+                MediaTypeCodecRegistry codecRegistry = client.getMediaTypeCodecRegistry();
+                for (MediaTypeCodec codec : codecRegistry.getCodecs()) {
+                    if (codec instanceof MapperMediaTypeCodec mapper) {
+                        codecs.add(mapper.cloneWithFeatures(jsonFeatures));
+                    } else {
+                        codecs.add(codec);
+                    }
+                }
+                if (codecRegistry.findCodec(MediaType.APPLICATION_JSON_TYPE).isEmpty()) {
+                    codecs.add(createNewJsonCodec(this.beanContext, jsonFeatures));
+                }
+                client.setMediaTypeCodecRegistry(MediaTypeCodecRegistry.of(codecs));
+            }
+            return client;
         });
+    }
+
+    private JavanetHttpClient buildClient(
+        LoadBalancer loadBalancer,
+        HttpVersionSelection httpVersion,
+        HttpClientConfiguration configuration,
+        String clientId,
+        String contextPath,
+        BeanContext beanContext
+    ) {
+        ConversionService conversionService = beanContext.getBean(ConversionService.class);
+        return new JavanetHttpClient(
+            loadBalancer,
+            httpVersion,
+            configuration,
+            contextPath,
+            mediaTypeCodecRegistry,
+            beanContext.findBean(RequestBinderRegistry.class).orElseGet(() ->
+                new DefaultRequestBinderRegistry(conversionService)
+            ),
+            clientId,
+            conversionService
+        );
+    }
+
+    private static MediaTypeCodec createNewJsonCodec(BeanContext beanContext, JsonFeatures jsonFeatures) {
+        return getJsonCodec(beanContext).cloneWithFeatures(jsonFeatures);
+    }
+
+    private static MapperMediaTypeCodec getJsonCodec(BeanContext beanContext) {
+        return beanContext.getBean(MapperMediaTypeCodec.class, Qualifiers.byName(MapperMediaTypeCodec.REGULAR_JSON_MEDIA_TYPE_CODEC_NAME));
     }
 
     @Override

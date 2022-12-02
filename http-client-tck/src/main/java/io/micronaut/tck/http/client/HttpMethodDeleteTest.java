@@ -66,6 +66,14 @@ public interface HttpMethodDeleteTest {
     }
 
     @Test
+    default void deleteMethodClientMappingWithStringResponse() {
+        try (EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class, Collections.singletonMap("spec.name", "HttpMethodDeleteTest"))) {
+            HttpMethodDeleteClient httpClient = server.getApplicationContext().getBean(HttpMethodDeleteClient.class);
+            assertEquals("ok", httpClient.response());
+        }
+    }
+
+    @Test
     default void deleteMethodMappingWithStringResponse() {
         try (EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class, Collections.singletonMap("spec.name", "HttpMethodDeleteTest"))) {
             try (HttpClient httpClient = server.getApplicationContext().createBean(HttpClient.class, server.getURL())) {

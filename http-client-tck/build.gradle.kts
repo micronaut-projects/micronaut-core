@@ -5,6 +5,7 @@ dependencies {
     annotationProcessor(project(":inject-java"))
     api("org.junit.jupiter:junit-jupiter:5.9.1")
     implementation(libs.managed.reactor)
+    implementation(project(":context"))
     implementation(project(":http-server-netty"))
     implementation(project(":http-client-core"))
 }

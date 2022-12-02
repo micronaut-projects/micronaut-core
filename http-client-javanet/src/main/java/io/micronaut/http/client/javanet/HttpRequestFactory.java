@@ -34,8 +34,7 @@ public final class HttpRequestFactory {
 
     @NonNull
     public static <I> HttpRequest.Builder builder(@NonNull URI uri, io.micronaut.http.HttpRequest<I> request) {
-        HttpRequest.Builder builder = HttpRequest.newBuilder()
-                .uri(uri);
+        HttpRequest.Builder builder = HttpRequest.newBuilder().uri(uri);
         HttpRequest.BodyPublisher bodyPublisher = request
             .getBody()
             .map(body -> HttpRequest.BodyPublishers.ofByteArray(ConversionService.SHARED.convertRequired(body, byte[].class)))

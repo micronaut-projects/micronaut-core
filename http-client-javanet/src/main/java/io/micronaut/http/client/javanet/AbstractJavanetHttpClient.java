@@ -1,3 +1,18 @@
+/*
+ * Copyright 2017-2022 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.http.client.javanet;
 
 import io.micronaut.core.annotation.NonNull;
@@ -10,32 +25,46 @@ import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.client.HttpClientConfiguration;
+import io.micronaut.http.client.HttpVersionSelection;
+import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 
-import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
 abstract sealed class AbstractJavanetHttpClient permits JavanetHttpClient, JavanetBlockingHttpClient {
 
-    protected final URI uri;
+    protected final LoadBalancer loadBalancer;
+    protected final HttpVersionSelection httpVersion;
+    protected final HttpClientConfiguration configuration;
+    protected final String contextPath;
+    protected MediaTypeCodecRegistry mediaTypeCodecRegistry;
+    protected final RequestBinderRegistry requestBinderRegistry;
+    protected final String clientId;
+    protected final ConversionService conversionService;
 
-    @Nullable
-    protected final HttpClientConfiguration httpClientConfiguration;
-    @Nullable
-    protected final MediaTypeCodecRegistry mediaTypeCodecRegistry;
-
-    AbstractJavanetHttpClient(
-        URI uri,
-        @Nullable HttpClientConfiguration httpClientConfiguration,
-        @Nullable MediaTypeCodecRegistry mediaTypeCodecRegistry
+    protected AbstractJavanetHttpClient(
+        LoadBalancer loadBalancer,
+        HttpVersionSelection httpVersion,
+        HttpClientConfiguration configuration,
+        String contextPath,
+        MediaTypeCodecRegistry mediaTypeCodecRegistry,
+        RequestBinderRegistry requestBinderRegistry,
+        String clientId,
+        ConversionService conversionService
     ) {
-        this.uri = uri;
-        this.httpClientConfiguration = httpClientConfiguration;
+        this.loadBalancer = loadBalancer;
+        this.httpVersion = httpVersion;
+        this.configuration = configuration;
+        this.contextPath = contextPath;
         this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
+        this.requestBinderRegistry = requestBinderRegistry;
+        this.clientId = clientId;
+        this.conversionService = conversionService;
     }
 
     protected <O> HttpResponse<O> getConvertedResponse(java.net.http.HttpResponse<byte[]> httpResponse, @NonNull Argument<O> bodyType) {
@@ -89,5 +118,13 @@ abstract sealed class AbstractJavanetHttpClient permits JavanetHttpClient, Javan
         }
         // last chance, try type conversion
         return ConversionService.SHARED.convert(bytes, ConversionContext.of(type));
+    }
+
+    public MediaTypeCodecRegistry getMediaTypeCodecRegistry() {
+        return mediaTypeCodecRegistry;
+    }
+
+    public void setMediaTypeCodecRegistry(MediaTypeCodecRegistry mediaTypeCodecRegistry) {
+        this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
     }
 }

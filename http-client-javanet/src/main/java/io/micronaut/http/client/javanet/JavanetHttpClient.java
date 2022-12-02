@@ -15,20 +15,33 @@
  */
 package io.micronaut.http.client.javanet;
 
+import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.bind.DefaultRequestBinderRegistry;
+import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.client.BlockingHttpClient;
+import io.micronaut.http.client.DefaultHttpClientConfiguration;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.HttpClientConfiguration;
+import io.micronaut.http.client.HttpVersionSelection;
+import io.micronaut.http.client.LoadBalancer;
+import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
+import io.micronaut.http.uri.UriBuilder;
+import io.micronaut.json.JsonMapper;
+import io.micronaut.json.codec.JsonMediaTypeCodec;
+import io.micronaut.json.codec.JsonStreamMediaTypeCodec;
+import io.micronaut.runtime.ApplicationConfiguration;
 import org.reactivestreams.Publisher;
 
 import java.net.URI;
+import java.util.Collections;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -39,27 +52,71 @@ import java.util.concurrent.CompletableFuture;
 @Internal
 public final class JavanetHttpClient extends AbstractJavanetHttpClient implements HttpClient {
 
-    public JavanetHttpClient(@Nullable URI uri) {
-        this(uri, null, null);
+    public JavanetHttpClient(
+        LoadBalancer loadBalancer,
+        HttpVersionSelection httpVersion,
+        HttpClientConfiguration configuration,
+        String contextPath,
+        MediaTypeCodecRegistry mediaTypeCodecRegistry,
+        RequestBinderRegistry orElseGet,
+        String clientId,
+        ConversionService conversionService
+    ) {
+        super(loadBalancer, httpVersion, configuration, contextPath, mediaTypeCodecRegistry, orElseGet, clientId, conversionService);
+    }
+
+    public JavanetHttpClient(URI uri) {
+        this(
+            uri == null ? null : LoadBalancer.fixed(uri),
+            null,
+            new DefaultHttpClientConfiguration(),
+            null,
+            createDefaultMediaTypeRegistry(),
+            new DefaultRequestBinderRegistry(ConversionService.SHARED),
+            null,
+            ConversionService.SHARED
+        );
     }
 
     public JavanetHttpClient(
-        @Nullable URI uri,
-        @Nullable HttpClientConfiguration httpClientConfiguration,
-        @Nullable MediaTypeCodecRegistry mediaTypeCodecRegistry
-        ) {
-        super(uri, httpClientConfiguration, mediaTypeCodecRegistry);
+        URI uri,
+        HttpClientConfiguration configuration,
+        MediaTypeCodecRegistry mediaTypeCodecRegistry
+    ) {
+        this(
+            uri == null ? null : LoadBalancer.fixed(uri),
+            null,
+            configuration,
+            null,
+            mediaTypeCodecRegistry,
+            new DefaultRequestBinderRegistry(ConversionService.SHARED),
+            null,
+            ConversionService.SHARED
+        );
+    }
+
+    private static MediaTypeCodecRegistry createDefaultMediaTypeRegistry() {
+        JsonMapper mapper = JsonMapper.createDefault();
+        ApplicationConfiguration configuration = new ApplicationConfiguration();
+        return MediaTypeCodecRegistry.of(
+            new JsonMediaTypeCodec(mapper, configuration, null),
+            new JsonStreamMediaTypeCodec(mapper, configuration, null)
+        );
     }
 
     @Override
     public BlockingHttpClient toBlocking() {
-        return new JavanetBlockingHttpClient(uri, httpClientConfiguration, mediaTypeCodecRegistry);
+        return new JavanetBlockingHttpClient(loadBalancer, httpVersion, configuration, contextPath, mediaTypeCodecRegistry, requestBinderRegistry, clientId, conversionService);
     }
 
     @Override
     public <I, O, E> Publisher<HttpResponse<O>> exchange(@NonNull HttpRequest<I> request, @NonNull Argument<O> bodyType, @NonNull Argument<E> errorType) {
-        java.net.http.HttpRequest.Builder builder = HttpRequestFactory.builder(uri.resolve(request.getUri()), request);
-        java.net.http.HttpRequest httpRequest = builder.build();
+        URI base = (loadBalancer instanceof FixedLoadBalancer fixedLoadBalancer) ? fixedLoadBalancer.getUri() : null;
+        if (base == null) {
+            throw new UnsupportedOperationException("Load balancer " + loadBalancer + " not supported");
+        }
+        java.net.http.HttpRequest httpRequest = HttpRequestFactory.builder(UriBuilder.of(base).path(contextPath).path(request.getPath()).build(), request).build();
+
         CompletableFuture<java.net.http.HttpResponse<byte[]>> completableHttpResponse = java.net.http.HttpClient.newHttpClient().sendAsync(httpRequest, java.net.http.HttpResponse.BodyHandlers.ofByteArray());
         CompletableFuture<HttpResponse<O>> response = completableHttpResponse.thenApply(netResponse -> getConvertedResponse(netResponse, bodyType));
         return Publishers.fromCompletableFuture(response);
