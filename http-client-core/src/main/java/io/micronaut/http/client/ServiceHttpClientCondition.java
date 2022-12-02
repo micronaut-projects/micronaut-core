@@ -17,6 +17,7 @@ package io.micronaut.http.client;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanContext;
+import io.micronaut.context.Qualifier;
 import io.micronaut.context.condition.Condition;
 import io.micronaut.context.condition.ConditionContext;
 import io.micronaut.context.env.Environment;
@@ -24,6 +25,7 @@ import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.value.ValueResolver;
+import io.micronaut.inject.QualifiedBeanType;
 
 import java.util.Optional;
 
@@ -40,15 +42,13 @@ final class ServiceHttpClientCondition implements Condition {
         AnnotationMetadataProvider component = context.getComponent();
         BeanContext beanContext = context.getBeanContext();
 
-        if (beanContext instanceof ApplicationContext) {
-            Environment env = ((ApplicationContext) beanContext).getEnvironment();
-            if (component instanceof ValueResolver) {
-                Optional<String> optional = ((ValueResolver) component).get(Named.class.getName(), String.class);
-                if (optional.isPresent()) {
-                    String serviceName = optional.get();
-                    String urlProp = ServiceHttpClientConfiguration.PREFIX + "." + serviceName + ".url";
-                    return env.containsProperty(urlProp) || env.containsProperty(urlProp + "s");
-                }
+        if (beanContext instanceof ApplicationContext applicationContext &&
+            component instanceof QualifiedBeanType<?> qualifiedBeanType) {
+            Qualifier<?> declaredQualifier = qualifiedBeanType.getDeclaredQualifier();
+            if (declaredQualifier instanceof Named named) {
+                String serviceName = named.getName();
+                String urlProp = ServiceHttpClientConfiguration.PREFIX + "." + serviceName + ".url";
+                return applicationContext.containsProperty(urlProp) || applicationContext.containsProperty(urlProp + "s");
             }
         }
         return true;
