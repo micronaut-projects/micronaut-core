@@ -39,6 +39,15 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
 
+/**
+ * Alternate {@link HttpData} implementation with some limited concurrency support. Only implements
+ * the features we actually need.<br>
+ * In most cases, we only access the {@link HttpData} on a single thread, with the standard
+ * {@link #get()} and friends. However, if the user wants a reactive stream of data as it comes in,
+ * this class can release chunks of that data for concurrent access by the user (see
+ * {@link #pollChunk()}).<br>
+ * This class moves data to disk dynamically once the configured threshold is reached.
+ */
 @Internal
 public abstract class MicronautHttpData<D extends HttpData> extends AbstractReferenceCounted implements HttpData {
     @SuppressWarnings("rawtypes")
@@ -101,6 +110,13 @@ public abstract class MicronautHttpData<D extends HttpData> extends AbstractRefe
         return chunks.get(chunks.size() - 1);
     }
 
+    /**
+     * Get a chunk of data. The chunk will have a fixed content, it will not be amended with
+     * further input.
+     *
+     * @return The chunk, or {@code null} if this data is {@link #isCompleted() completed} and all
+     * chunks have been polled.
+     */
     public Chunk pollChunk() {
         if (pollIndex >= chunks.size()) {
             return null;
@@ -320,6 +336,13 @@ public abstract class MicronautHttpData<D extends HttpData> extends AbstractRefe
             }
         }
 
+        /**
+         * Get the contents of this chunk as a {@link ByteBuf}. If there are concurrent operations
+         * on this data (e.g. it is being moved to disk), this method may block. Must only be
+         * called once.
+         *
+         * @return The contents of this chunk
+         */
         ByteBuf claim() {
             lock.lock();
             if (released) {
