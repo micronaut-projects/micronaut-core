@@ -3,6 +3,7 @@ package io.micronaut.http.server.netty;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
+import io.micronaut.http.MediaType;
 import io.micronaut.http.multipart.PartData;
 import io.micronaut.http.multipart.StreamingFileUpload;
 import io.micronaut.http.server.netty.multipart.NettyPartData;
@@ -40,10 +41,7 @@ final class FormRouteCompleter {
     boolean executed = false;
     final AtomicLong pressureRequested = new AtomicLong();
     final Map<String, Sinks.Many<Object>> subjectsByDataName = new HashMap<>();
-    final Collection<Sinks.Many<Object>> downstreamSubscribers = new ArrayList<>();
-    final Map<IdentityWrapper, HttpDataReference> dataReferences = new HashMap<>();
-
-    boolean inputCancelled = false;
+    final Collection<Sinks.Many<?>> downstreamSubscribers = new ArrayList<>();
 
     FormRouteCompleter(RoutingInBoundHandler rib, NettyHttpRequest<?> request, FlowControl flowControl, RouteMatch<?> routeMatch) {
         this.rib = rib;
@@ -66,9 +64,9 @@ final class FormRouteCompleter {
         }
     }
 
-    private <T> Flux<T> withFlowControl(Flux<T> flux, HttpDataReference dataReference) {
+    private <T> Flux<T> withFlowControl(Flux<T> flux, MicronautHttpData<?> data) {
         return flux
-            .doOnComplete(dataReference::destroy)
+            .doOnComplete(data::release)
             .doOnRequest(this::request);
     }
 
@@ -82,7 +80,7 @@ final class FormRouteCompleter {
             if (message instanceof ByteBufHolder) {
                 if (message instanceof HttpData data) {
                     boolean more = pressureRequested.decrementAndGet() > 0;
-                    addData(data);
+                    addData((MicronautHttpData<?>) data);
                     if (more) {
                         flowControl.read();
                     }
@@ -109,7 +107,7 @@ final class FormRouteCompleter {
         ReferenceCountUtil.release(message);
     }
 
-    private void addData(HttpData data) {
+    private void addData(MicronautHttpData<?> data) {
         if (LOG.isTraceEnabled()) {
             LOG.trace("Received HTTP Data for request [{}]: {}", request, data);
         }
@@ -124,7 +122,10 @@ final class FormRouteCompleter {
             boolean chunkedProcessing = false;
 
             if (isPublisher) {
-                HttpDataReference dataReference = dataReferences.computeIfAbsent(new IdentityWrapper(data), key -> new HttpDataReference(data));
+                if (data.attachment == null) {
+                    data.attachment = new HttpDataAttachment();
+                }
+
                 Argument typeVariable;
 
                 if (StreamingFileUpload.class.isAssignableFrom(argument.getType())) {
@@ -147,31 +148,27 @@ final class FormRouteCompleter {
                     } else {
                         typeVariable = typeVariable.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
                     }
-                    dataReference.subject.getAndUpdate(subject -> {
-                        if (subject == null) {
-                            Sinks.Many<Object> childSubject = makeDownstreamUnicastProcessor();
-                            Flux flowable = withFlowControl(childSubject.asFlux(), dataReference);
-                            if (streamingFileUpload && data instanceof FileUpload) {
-                                namedSubject.tryEmitNext(new NettyStreamingFileUpload(
-                                    (FileUpload) data,
-                                    rib.serverConfiguration.getMultipart(),
-                                    rib.getIoExecutor(),
-                                    (Flux<PartData>) flowable));
-                            } else {
-                                namedSubject.tryEmitNext(flowable);
-                            }
-
-                            return childSubject;
+                    if (data.attachment.subject == null) {
+                        Sinks.Many<PartData> childSubject = makeDownstreamUnicastProcessor();
+                        Flux<PartData> flowable = withFlowControl(childSubject.asFlux(), data);
+                        if (streamingFileUpload && data instanceof FileUpload) {
+                            namedSubject.tryEmitNext(new NettyStreamingFileUpload(
+                                (FileUpload) data,
+                                rib.serverConfiguration.getMultipart(),
+                                rib.getIoExecutor(),
+                                flowable));
+                        } else {
+                            namedSubject.tryEmitNext(flowable);
                         }
-                        return subject;
-                    });
+
+                        data.attachment.subject = childSubject;
+                    }
                 }
 
                 Sinks.Many subject;
 
-                final Sinks.Many<Object> ds = dataReference.subject.get();
-                if (ds != null) {
-                    subject = ds;
+                if (data.attachment.subject != null) {
+                    subject = data.attachment.subject;
                 } else {
                     subject = namedSubject;
                 }
@@ -179,22 +176,25 @@ final class FormRouteCompleter {
                 Object part = data;
 
                 if (chunkedProcessing) {
-                    MicronautHttpData<?>.Chunk chunk = ((MicronautHttpData<?>) data).pollChunk();
-                    part = new NettyPartData(dataReference, chunk::claim);
+                    MicronautHttpData<?>.Chunk chunk = data.pollChunk();
+                    part = new NettyPartData(() -> {
+                        if (data instanceof FileUpload fu) {
+                            return Optional.of(MediaType.of(fu.getContentType()));
+                        } else {
+                            return Optional.empty();
+                        }
+                    }, chunk::claim);
                 }
 
                 if (data instanceof FileUpload &&
                     StreamingFileUpload.class.isAssignableFrom(argument.getType())) {
-                    dataReference.upload.getAndUpdate(upload -> {
-                        if (upload == null) {
-                            return new NettyStreamingFileUpload(
-                                (FileUpload) data,
-                                rib.serverConfiguration.getMultipart(),
-                                rib.getIoExecutor(),
-                                (Flux<PartData>) withFlowControl(subject.asFlux(), dataReference));
-                        }
-                        return upload;
-                    });
+                    if (data.attachment.upload == null) {
+                        data.attachment.upload = new NettyStreamingFileUpload(
+                            (FileUpload) data,
+                            rib.serverConfiguration.getMultipart(),
+                            rib.getIoExecutor(),
+                            (Flux<PartData>) withFlowControl(subject.asFlux(), data));
+                    }
                 }
 
                 Optional<?> converted = rib.conversionService.convert(part, typeVariable);
@@ -206,12 +206,11 @@ final class FormRouteCompleter {
                 }
 
                 value = () -> {
-                    StreamingFileUpload upload = dataReference.upload.get();
-                    if (upload != null) {
-                        return upload;
+                    if (data.attachment.upload != null) {
+                        return data.attachment.upload;
                     } else {
-                        if (dataReference.subject.get() == null) {
-                            return withFlowControl(namedSubject.asFlux(), dataReference);
+                        if (data.attachment.subject == null) {
+                            return withFlowControl(namedSubject.asFlux(), data);
                         } else {
                             return namedSubject.asFlux();
                         }
@@ -269,9 +268,14 @@ final class FormRouteCompleter {
         }
     }
 
-    private Sinks.Many<Object> makeDownstreamUnicastProcessor() {
-        Sinks.Many<Object> processor = Sinks.many().unicast().onBackpressureBuffer();
+    private <T> Sinks.Many<T> makeDownstreamUnicastProcessor() {
+        Sinks.Many<T> processor = Sinks.many().unicast().onBackpressureBuffer();
         downstreamSubscribers.add(processor);
         return processor;
+    }
+
+    static class HttpDataAttachment {
+        private Sinks.Many<?> subject;
+        private StreamingFileUpload upload;
     }
 }

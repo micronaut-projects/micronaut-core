@@ -387,7 +387,7 @@ final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.microna
                             }
                         }
                     }
-                    for (Sinks.Many<Object> subject : completer.downstreamSubscribers) {
+                    for (Sinks.Many<?> subject : completer.downstreamSubscribers) {
                         subject.tryEmitError(t);
                     }
                     emitter.error(t);
@@ -395,7 +395,7 @@ final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.microna
 
                 @Override
                 protected void doOnComplete() {
-                    for (Sinks.Many<Object> subject : completer.downstreamSubscribers) {
+                    for (Sinks.Many<?> subject : completer.downstreamSubscribers) {
                         // subjects will ignore the onComplete if they're already done
                         subject.tryEmitComplete();
                     }

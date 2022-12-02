@@ -75,6 +75,11 @@ public abstract class MicronautHttpData<D extends HttpData> extends AbstractRefe
 
     private int pollIndex = 0;
 
+    /**
+     * Additional data for {@link FormRouteCompleter}
+     */
+    FormRouteCompleter.HttpDataAttachment attachment;
+
     private MicronautHttpData(Factory factory, String name) {
         this.factory = factory;
         this.name = name;
