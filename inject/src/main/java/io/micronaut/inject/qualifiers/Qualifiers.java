@@ -28,6 +28,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.inject.BeanType;
 import jakarta.inject.Named;
 
 import java.lang.annotation.Annotation;
@@ -35,6 +36,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 /**
  * Factory for {@link io.micronaut.context.annotation.Bean} qualifiers.
@@ -126,6 +128,18 @@ public class Qualifiers {
     @UsedByGeneratedCode
     public static <T> Qualifier<T> byName(String name) {
         return new NameQualifier<>(null, name);
+    }
+
+    /**
+     * Qualify by a prefix. Applies starting with logic to the name of the bean..
+     *
+     * @param prefix The name
+     * @param <T>  The component type
+     * @return The qualifier
+     * @since 4.0.0
+     */
+    public static <T> Qualifier<T> byNamePrefix(String prefix) {
+        return new PrefixQualifier<>(prefix);
     }
 
     /**
@@ -377,4 +391,20 @@ public class Qualifiers {
         return null;
     }
 
+    private record PrefixQualifier<T>(String prefix) implements Qualifier<T> {
+        @Override
+        public <B extends BeanType<T>> Stream<B> reduce(Class<T> beanType, Stream<B> candidates) {
+            return candidates.filter(candidate -> {
+                if (!QualifierUtils.matchType(beanType, candidate)) {
+                    return false;
+                }
+                if (QualifierUtils.matchAny(beanType, candidate)) {
+                    return true;
+                }
+
+                String name = candidate.getBeanName().orElse(null);
+                return name != null && name.startsWith(prefix);
+            });
+        }
+    }
 }

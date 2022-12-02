@@ -21,9 +21,10 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.ElementFactory;
 import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.TypedElement;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 
@@ -176,7 +177,7 @@ public class JavaElementFactory implements ElementFactory<Element, TypeElement, 
                                                     @NonNull ExecutableElement method,
                                                     @NonNull ElementAnnotationMetadataFactory annotationMetadataFactory) {
         validateOwningClass(declaringClass);
-        failIfPostponeIsNeeded(method);
+        failIfPostponeIsNeeded(declaringClass, method);
         return new JavaMethodElement(
             (JavaClassElement) declaringClass,
             method,
@@ -203,7 +204,7 @@ public class JavaElementFactory implements ElementFactory<Element, TypeElement, 
                                               @NonNull ExecutableElement method,
                                               @NonNull ElementAnnotationMetadataFactory annotationMetadataFactory) {
         validateOwningClass(owningType);
-        failIfPostponeIsNeeded(method);
+        failIfPostponeIsNeeded(owningType, method);
         return new JavaMethodElement(
             (JavaClassElement) owningType,
             method,
@@ -215,19 +216,19 @@ public class JavaElementFactory implements ElementFactory<Element, TypeElement, 
     /**
      * Constructs a method element with the given generic type information.
      *
-     * @param declaringClass            The declaring class
+     * @param owningType                The owning class
      * @param method                    The method
      * @param annotationMetadataFactory The annotationMetadataFactory
      * @param genericTypes              The generic type info
      * @return The method element
      */
-    public JavaMethodElement newMethodElement(ClassElement declaringClass,
+    public JavaMethodElement newMethodElement(ClassElement owningType,
                                               @NonNull ExecutableElement method,
                                               @NonNull ElementAnnotationMetadataFactory annotationMetadataFactory,
                                               @Nullable Map<String, Map<String, TypeMirror>> genericTypes) {
-        validateOwningClass(declaringClass);
-        failIfPostponeIsNeeded(method);
-        final JavaClassElement javaDeclaringClass = (JavaClassElement) declaringClass;
+        validateOwningClass(owningType);
+        failIfPostponeIsNeeded(owningType, method);
+        final JavaClassElement javaDeclaringClass = (JavaClassElement) owningType;
         final JavaVisitorContext javaVisitorContext = visitorContext;
 
         return new JavaMethodElement(
@@ -266,13 +267,13 @@ public class JavaElementFactory implements ElementFactory<Element, TypeElement, 
 
     @NonNull
     @Override
-    public JavaConstructorElement newConstructorElement(ClassElement declaringClass,
+    public JavaConstructorElement newConstructorElement(ClassElement owningType,
                                                         @NonNull ExecutableElement constructor,
                                                         @NonNull ElementAnnotationMetadataFactory annotationMetadataFactory) {
-        validateOwningClass(declaringClass);
-        failIfPostponeIsNeeded(constructor);
+        validateOwningClass(owningType);
+        failIfPostponeIsNeeded(owningType, constructor);
         return new JavaConstructorElement(
-            (JavaClassElement) declaringClass,
+            (JavaClassElement) owningType,
             constructor,
             annotationMetadataFactory,
             visitorContext
@@ -281,15 +282,15 @@ public class JavaElementFactory implements ElementFactory<Element, TypeElement, 
 
     @NonNull
     @Override
-    public JavaEnumConstantElement newEnumConstantElement(ClassElement declaringClass,
+    public JavaEnumConstantElement newEnumConstantElement(ClassElement owningType,
                                                           @NonNull VariableElement enumConstant,
                                                           @NonNull ElementAnnotationMetadataFactory annotationMetadataFactory) {
-        if (!(declaringClass instanceof JavaEnumElement)) {
+        if (!(owningType instanceof JavaEnumElement)) {
             throw new IllegalArgumentException("Declaring class must be a JavaEnumElement");
         }
-        failIfPostponeIsNeeded(enumConstant);
+        failIfPostponeIsNeeded(owningType, enumConstant);
         return new JavaEnumConstantElement(
-            (JavaEnumElement) declaringClass,
+            (JavaEnumElement) owningType,
             enumConstant,
             annotationMetadataFactory,
             visitorContext
@@ -301,7 +302,7 @@ public class JavaElementFactory implements ElementFactory<Element, TypeElement, 
     public JavaFieldElement newFieldElement(ClassElement declaringClass,
                                             @NonNull VariableElement field,
                                             @NonNull ElementAnnotationMetadataFactory annotationMetadataFactory) {
-        failIfPostponeIsNeeded(field);
+        failIfPostponeIsNeeded(declaringClass, field);
         return new JavaFieldElement(
             (JavaClassElement) declaringClass,
             field,
@@ -310,22 +311,22 @@ public class JavaElementFactory implements ElementFactory<Element, TypeElement, 
         );
     }
 
-    private void failIfPostponeIsNeeded(ExecutableElement executableElement) {
+    private void failIfPostponeIsNeeded(TypedElement member, ExecutableElement executableElement) {
         List<? extends VariableElement> parameters = executableElement.getParameters();
         for (VariableElement parameter : parameters) {
-            failIfPostponeIsNeeded(parameter);
+            failIfPostponeIsNeeded(member, parameter);
         }
         TypeMirror returnType = executableElement.getReturnType();
         TypeKind returnKind = returnType.getKind();
         if (returnKind == TypeKind.ERROR) {
-            throw new PostponeToNextRoundException(returnType);
+            throw new PostponeToNextRoundException(executableElement, member.getName() + " " + executableElement);
         }
     }
 
-    private void failIfPostponeIsNeeded(VariableElement  variableElement) {
+    private void failIfPostponeIsNeeded(TypedElement member, VariableElement variableElement) {
         TypeMirror type = variableElement.asType();
         if (type.getKind() == TypeKind.ERROR) {
-            throw new PostponeToNextRoundException(variableElement);
+            throw new PostponeToNextRoundException(variableElement, member.getName() + " " + variableElement);
         }
     }
 

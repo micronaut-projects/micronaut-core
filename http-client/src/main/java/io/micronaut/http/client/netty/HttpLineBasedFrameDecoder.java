@@ -29,6 +29,8 @@ import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.LastHttpContent;
 
+import java.util.NoSuchElementException;
+
 /**
  * Variant of {@link LineBasedFrameDecoder} that accepts
  * {@link io.netty.handler.codec.http.HttpContent} data. Note: this handler removes itself when the
@@ -78,7 +80,11 @@ final class HttpLineBasedFrameDecoder extends LineBasedFrameDecoder {
 
     @Override
     protected void handlerRemoved0(ChannelHandlerContext ctx) {
-        ctx.pipeline().remove(Wrap.NAME);
+        try {
+            ctx.pipeline().remove(Wrap.NAME);
+        } catch (NoSuchElementException ignored) {
+            // can happen if the pipeline is being shut down
+        }
     }
 
     @Sharable
@@ -88,8 +94,7 @@ final class HttpLineBasedFrameDecoder extends LineBasedFrameDecoder {
 
         @Override
         public void channelRead(@NonNull ChannelHandlerContext ctx, @NonNull Object msg) throws Exception {
-            if (msg instanceof ByteBuf) {
-                ByteBuf buffer = (ByteBuf) msg;
+            if (msg instanceof ByteBuf buffer) {
                 // todo: this is necessary because downstream handlers sometimes do the
                 //  `if (refcnt > 0) release` pattern. We should eventually fix that.
                 ByteBuf copy = buffer.copy();

@@ -25,7 +25,7 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ArrayableClassElement;
-import io.micronaut.inject.ast.BeanPropertiesQuery;
+import io.micronaut.inject.ast.PropertyElementQuery;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.ParameterElement;
@@ -310,15 +310,15 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     @Override
     public List<PropertyElement> getBeanProperties() {
         if (beanProperties == null) {
-            beanProperties = getBeanProperties(BeanPropertiesQuery.of(this));
+            beanProperties = getBeanProperties(PropertyElementQuery.of(this));
         }
         return Collections.unmodifiableList(beanProperties);
     }
 
     @Override
-    public List<PropertyElement> getBeanProperties(BeanPropertiesQuery beanPropertiesQuery) {
+    public List<PropertyElement> getBeanProperties(PropertyElementQuery propertyElementQuery) {
         if (isRecord()) {
-            return AstBeanPropertiesUtils.resolveBeanProperties(beanPropertiesQuery,
+            return AstBeanPropertiesUtils.resolveBeanProperties(propertyElementQuery,
                 this,
                 this::getRecordMethods,
                 this::getRecordFields,
@@ -355,7 +355,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                 };
             }
         }
-        return AstBeanPropertiesUtils.resolveBeanProperties(beanPropertiesQuery,
+        return AstBeanPropertiesUtils.resolveBeanProperties(propertyElementQuery,
             this,
             () -> getEnclosedElements(ElementQuery.ALL_METHODS),
             () -> getEnclosedElements(ElementQuery.ALL_FIELDS),

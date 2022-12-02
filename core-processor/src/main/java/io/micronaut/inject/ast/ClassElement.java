@@ -23,6 +23,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.naming.NameUtils;
+import io.micronaut.core.type.DefaultArgument;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
 
@@ -119,6 +120,15 @@ public interface ClassElement extends TypedElement {
      */
     default boolean isOptional() {
         return isAssignable(Optional.class) || isAssignable(OptionalLong.class) || isAssignable(OptionalDouble.class) || isAssignable(OptionalInt.class);
+    }
+
+    /**
+     * Checks whether the bean type is a container type.
+     * @return Whether the type is a container type like {@link Iterable}.
+     * @since 4.0.0
+     */
+    default boolean isContainerType() {
+        return DefaultArgument.CONTAINER_TYPES.contains(getName());
     }
 
     /**
@@ -412,12 +422,12 @@ public interface ClassElement extends TypedElement {
     /**
      * Returns the bean properties (getters and setters) for this class element based on custom configuration.
      *
-     * @param beanPropertiesQuery The configuration
+     * @param propertyElementQuery The configuration
      * @return The bean properties for this class element
      * @since 4.0.0
      */
     @NonNull
-    default List<PropertyElement> getBeanProperties(BeanPropertiesQuery beanPropertiesQuery) {
+    default List<PropertyElement> getBeanProperties(@NonNull PropertyElementQuery propertyElementQuery) {
         return Collections.emptyList();
     }
 

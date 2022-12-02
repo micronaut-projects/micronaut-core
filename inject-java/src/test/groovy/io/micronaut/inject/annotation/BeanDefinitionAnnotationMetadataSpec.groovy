@@ -71,7 +71,6 @@ class Test {
         definition.isSingleton()
         !definition.isIterable()
         definition.isPrimary()
-        !definition.isProvided()
         definition.getScopeName().get() == AnnotationUtil.SINGLETON
     }
 

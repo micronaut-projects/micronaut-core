@@ -93,7 +93,7 @@ public interface UriBuilder {
      * @param values The values
      * @return This builder
      */
-    @NonNull UriBuilder queryParam(String name, Object...values);
+    @NonNull UriBuilder queryParam(String name, Object... values);
 
     /**
      * Adds a query parameter for the give name and values. The values will be URI encoded.
@@ -103,7 +103,7 @@ public interface UriBuilder {
      * @param values The values
      * @return This builder
      */
-    @NonNull UriBuilder replaceQueryParam(String name, Object...values);
+    @NonNull UriBuilder replaceQueryParam(String name, Object... values);
 
     /**
      * The constructed URI.

@@ -89,6 +89,11 @@ public final class ApplicationEventPublisherFactory<T>
     }
 
     @Override
+    public boolean isConfigurationProperties() {
+        return false;
+    }
+
+    @Override
     public AnnotationMetadata getAnnotationMetadata() {
         return annotationMetadata;
     }

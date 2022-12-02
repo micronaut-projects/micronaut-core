@@ -60,7 +60,11 @@ tasks.withType(Jar).configureEach {
 
 configurations.all {
     resolutionStrategy.dependencySubstitution {
-        substitute module("io.micronaut:micronaut-inject-groovy") using project(":inject-groovy") because "we want to test with what we're building"
+        rootProject.subprojects.each {
+            if (!it.name.startsWith('test-')) {
+                substitute module("io.micronaut:micronaut-${it.name}") using project(":${it.name}") because "we want to test with what we're building"
+            }
+        }
     }
 }
 

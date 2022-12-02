@@ -18,10 +18,10 @@ package io.micronaut.inject;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.Qualifier;
+import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.DefaultScope;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.EachProperty;
-import io.micronaut.context.annotation.Provided;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -48,11 +48,6 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType<T>, ArgumentCoercible<T> {
-
-    /**
-     * Attribute used to store a dynamic bean name.
-     */
-    String NAMED_ATTRIBUTE = Named.class.getName();
 
     /**
      * @return The scope of the bean
@@ -148,22 +143,18 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
     }
 
     /**
-     * @return Is this definition provided by another bean
-     * @deprecated Provided beans are deprecated
-     * @see Provided
-     */
-    @SuppressWarnings("DeprecatedIsStillUsed")
-    @Deprecated(forRemoval = true, since = "2.0.0")
-    default boolean isProvided() {
-        return getAnnotationMetadata().hasDeclaredStereotype(Provided.class);
-    }
-
-    /**
      * @return Whether the bean declared with {@link io.micronaut.context.annotation.EachProperty} or
      * {@link io.micronaut.context.annotation.EachBean}
      */
     default boolean isIterable() {
         return hasDeclaredStereotype(EachProperty.class) || hasDeclaredStereotype(EachBean.class);
+    }
+
+    /**
+     * @return Is the type configuration properties.
+     */
+    default boolean isConfigurationProperties() {
+        return isIterable() || hasDeclaredStereotype(ConfigurationReader.class);
     }
 
     /**

@@ -41,9 +41,9 @@ import java.util.Objects;
 @Internal
 class DefaultMethodInjectionPoint<B, T> implements MethodInjectionPoint<B, T>, EnvironmentConfigurable {
 
+    protected final Class<?> declaringType;
     private final BeanDefinition<B> declaringBean;
     private final AnnotationMetadata annotationMetadata;
-    private final Class<?> declaringType;
     private final String methodName;
     private final Class<?>[] argTypes;
     private final Argument<?>[] arguments;

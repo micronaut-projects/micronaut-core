@@ -15,8 +15,10 @@
  */
 package io.micronaut.context;
 
+import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.context.annotation.InjectScope;
+import io.micronaut.context.env.ConfigurationPath;
 import io.micronaut.context.exceptions.CircularDependencyException;
 import io.micronaut.context.scope.CustomScope;
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -49,6 +51,8 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     private List<BeanRegistration<?>> dependentBeans;
     private BeanRegistration<?> dependentFactory;
 
+    private ConfigurationPath configurationPath;
+
     /**
      * @param context        The bean context
      * @param rootDefinition The bean root definition
@@ -58,6 +62,23 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         this.context = context;
         this.rootDefinition = rootDefinition;
         this.path = new DefaultPath();
+    }
+
+    @Override
+    public ConfigurationPath getConfigurationPath() {
+        if (configurationPath != null) {
+            return configurationPath;
+        } else {
+            this.configurationPath = ConfigurationPath.newPath();
+            return configurationPath;
+        }
+    }
+
+    @Override
+    public ConfigurationPath setConfigurationPath(ConfigurationPath configurationPath) {
+        ConfigurationPath old = this.configurationPath;
+        this.configurationPath = configurationPath;
+        return old;
     }
 
     @NonNull
@@ -506,7 +527,6 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
         private final String methodName;
         private final Argument[] arguments;
-        private final BeanDefinition declaringClass;
 
         /**
          * @param declaringClass The declaring class
@@ -518,7 +538,6 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
             super(declaringClass, declaringClass.getBeanType().getName(), argument);
             this.methodName = methodName;
             this.arguments = arguments;
-            this.declaringClass = declaringClass;
         }
 
         @Override
@@ -587,6 +606,20 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
                 throw new IllegalStateException("Outer argument inaccessible");
             }
             return outer;
+        }
+
+        @Override
+        public String toString() {
+            BeanDefinition<?> declaringBean = getDeclaringBean();
+            if (declaringBean.hasAnnotation(Factory.class)) {
+                ConstructorInjectionPoint<?> constructor = declaringBean.getConstructor();
+                var baseString = new StringBuilder(constructor.getDeclaringBeanType().getSimpleName()).append('.');
+                baseString.append(getName());
+                outputArguments(baseString, getArguments());
+                return baseString.toString();
+            } else {
+                return super.toString();
+            }
         }
     }
 

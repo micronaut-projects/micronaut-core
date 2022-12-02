@@ -37,15 +37,15 @@ import java.util.*;
 @Internal
 public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
 
-    public static final Set<Class<?>> CONTAINER_TYPES = CollectionUtils.setOf(
-        List.class,
-        Set.class,
-        Collection.class,
-        Queue.class,
-        SortedSet.class,
-        Deque.class,
-        Vector.class,
-        ArrayList.class
+    public static final Set<String> CONTAINER_TYPES = CollectionUtils.setOf(
+        List.class.getName(),
+        Set.class.getName(),
+        Collection.class.getName(),
+        Queue.class.getName(),
+        SortedSet.class.getName(),
+        Deque.class.getName(),
+        Vector.class.getName(),
+        ArrayList.class.getName()
     );
     public static final Set<String> PROVIDER_TYPES = CollectionUtils.setOf(
             "io.micronaut.context.BeanProvider",

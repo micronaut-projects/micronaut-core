@@ -43,7 +43,7 @@ public interface OriginatingElements {
      * @param elements The elements
      * @return The originating elements
      */
-    static OriginatingElements of(Element...elements) {
+    static OriginatingElements of(Element... elements) {
         if (Boolean.getBoolean("micronaut.static.originating.elements")) {
             for (Element element : elements) {
                 StaticOriginatingElements.INSTANCE.addOriginatingElement(element);

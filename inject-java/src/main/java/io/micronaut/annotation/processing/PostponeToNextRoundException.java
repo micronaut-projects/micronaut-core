@@ -21,13 +21,23 @@ package io.micronaut.annotation.processing;
 public final class PostponeToNextRoundException extends RuntimeException {
 
     private final transient Object errorElement;
+    private final String path;
 
-    public PostponeToNextRoundException(Object originatingElement) {
+    /**
+     * @param originatingElement Teh originating element
+     * @param path               The originating element path
+     */
+    public PostponeToNextRoundException(Object originatingElement, String path) {
         this.errorElement = originatingElement;
+        this.path = path;
     }
 
     public Object getErrorElement() {
         return errorElement;
+    }
+
+    public String getPath() {
+        return path;
     }
 
     @Override

@@ -194,6 +194,11 @@ public abstract class AbstractProviderDefinition<T> implements BeanDefinition<T>
     }
 
     @Override
+    public boolean isConfigurationProperties() {
+        return false;
+    }
+
+    @Override
     @NonNull
     public final List<Argument<?>> getTypeArguments(Class<?> type) {
         if (type == getBeanType()) {
@@ -206,7 +211,7 @@ public abstract class AbstractProviderDefinition<T> implements BeanDefinition<T>
     @NonNull
     public final List<Argument<?>> getTypeArguments() {
         return Collections.singletonList(TYPE_VARIABLE);
-    }    
+    }
 
     @Override
     public AnnotationMetadata getAnnotationMetadata() {

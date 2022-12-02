@@ -363,13 +363,12 @@ final class SingletonScope {
             if (beanDefinitionDelegate.definition.getClass() != that.beanDefinitionDelegate.definition.getClass()) {
                 return false;
             }
-            return Objects.equals(beanDefinitionDelegate.getAttributes(), that.beanDefinitionDelegate.getAttributes())
-                    && Objects.equals(beanDefinitionDelegate.getQualifier(), that.beanDefinitionDelegate.getQualifier());
+            return Objects.equals(beanDefinitionDelegate.getDeclaredQualifier(), that.beanDefinitionDelegate.getDeclaredQualifier());
         }
 
         @Override
         public int hashCode() {
-            return beanDefinitionDelegate.definition.hashCode();
+            return Objects.hash(beanDefinitionDelegate.getBeanType(), beanDefinitionDelegate.getDeclaredQualifier());
         }
     }
 
