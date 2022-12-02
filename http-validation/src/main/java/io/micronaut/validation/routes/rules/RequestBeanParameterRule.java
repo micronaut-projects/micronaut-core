@@ -52,15 +52,17 @@ public class RequestBeanParameterRule implements RouteValidationRule {
             // @Creator constructor
             List<ParameterElement> constructorParameters = Arrays.asList(primaryConstructor.get().getParameters());
 
-            // Check no constructor parameter has any @Bindable annotation
-            // We could allow this, but this would add some complexity, some annotations that can be used in combination
-            // with @Bindable works only on fields (e.g. bean validation annotations) and this might confuse Micronaut users
-            constructorParameters.stream()
+            if (!parameterElement.getType().isRecord()) {
+                // Check no constructor parameter has any @Bindable annotation
+                // We could allow this, but this would add some complexity, some annotations that can be used in combination
+                // with @Bindable works only on fields (e.g. bean validation annotations) and this might confuse Micronaut users
+                constructorParameters.stream()
                     .filter(p -> p.hasStereotype(Bindable.class))
                     .forEach(p -> errors.add("Parameter of Primary Constructor (or @Creator Method) [" + p.getName() + "] for type ["
-                            + parameterElement.getType().getName() + "] has one of @Bindable annotations. This is not supported."
-                            + "\nNote1: Primary constructor is a constructor that have parameters or is annotated with @Creator."
-                            + "\nNote2: In case you have multiple @Creator constructors, first is used as primary constructor."));
+                        + parameterElement.getType().getName() + "] has one of @Bindable annotations. This is not supported."
+                        + "\nNote1: Primary constructor is a constructor that have parameters or is annotated with @Creator."
+                        + "\nNote2: In case you have multiple @Creator constructors, first is used as primary constructor."));
+            }
 
             // Check readonly bindable properties can be set via constructor
             beanProperties.stream()
