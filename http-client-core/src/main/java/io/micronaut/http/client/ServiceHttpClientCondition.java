@@ -20,14 +20,10 @@ import io.micronaut.context.BeanContext;
 import io.micronaut.context.Qualifier;
 import io.micronaut.context.condition.Condition;
 import io.micronaut.context.condition.ConditionContext;
-import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.Named;
-import io.micronaut.core.value.ValueResolver;
 import io.micronaut.inject.QualifiedBeanType;
-
-import java.util.Optional;
 
 /**
  * Disables the client beans if the appropriate configuration is not present.
