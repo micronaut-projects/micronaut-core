@@ -21,7 +21,6 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
-import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.Writable;
 import io.micronaut.core.io.buffer.ByteBuffer;
@@ -50,7 +49,6 @@ import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.http.server.exceptions.InternalServerException;
 import io.micronaut.http.server.multipart.MultipartBody;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
-import io.micronaut.http.server.netty.multipart.NettyCompletedFileUpload;
 import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandler;
 import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandlerRegistry;
 import io.micronaut.http.server.netty.types.files.NettyStreamedFileCustomizableResponseType;
@@ -62,7 +60,6 @@ import io.micronaut.web.router.RouteInfo;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.resource.StaticResourceResolver;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufHolder;
 import io.netty.buffer.ByteBufOutputStream;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFuture;
@@ -81,7 +78,6 @@ import io.netty.handler.codec.http2.Http2Error;
 import io.netty.handler.codec.http2.Http2Exception;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
-import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 import org.reactivestreams.Publisher;
@@ -90,8 +86,6 @@ import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.MonoSink;
-import reactor.core.publisher.Sinks;
 
 import javax.net.ssl.SSLException;
 import java.io.File;
@@ -104,7 +98,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.Supplier;
@@ -338,115 +331,6 @@ final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.microna
             }
         }
         return null;
-    }
-
-    Subscriber<Object> buildSubscriber(NettyHttpRequest<?> request,
-                                               RouteMatch<?> finalRoute,
-                                               MonoSink<RouteMatch<?>> emitter) {
-        boolean isFormData = request.isFormOrMultipartData();
-        if (isFormData) {
-            return new CompletionAwareSubscriber<Object>() {
-                final FormRouteCompleter completer = new FormRouteCompleter(RoutingInBoundHandler.this, request, new FlowControl() {
-                    @Override
-                    public void read() {
-                        s.request(1);
-                    }
-                }, finalRoute);
-
-                Subscription s;
-
-                @Override
-                protected void doOnSubscribe(Subscription subscription) {
-                    this.s = subscription;
-                    subscription.request(1);
-                }
-
-                @Override
-                protected void doOnNext(Object message) {
-                    boolean wasExecuted = completer.executed;
-                    completer.add(message);
-                    if (!wasExecuted && completer.executed) {
-                        executeRoute();
-                    }
-                }
-
-                @Override
-                protected void doOnError(Throwable t) {
-                    s.cancel();
-                    if (!completer.executed) {
-                        // discard parameters that have already been bound
-                        for (Object toDiscard : completer.routeMatch.getVariableValues().values()) {
-                            if (toDiscard instanceof ReferenceCounted) {
-                                ((ReferenceCounted) toDiscard).release();
-                            }
-                            if (toDiscard instanceof io.netty.util.ReferenceCounted) {
-                                ((io.netty.util.ReferenceCounted) toDiscard).release();
-                            }
-                            if (toDiscard instanceof NettyCompletedFileUpload) {
-                                ((NettyCompletedFileUpload) toDiscard).discard();
-                            }
-                        }
-                    }
-                    for (Sinks.Many<?> subject : completer.downstreamSubscribers) {
-                        subject.tryEmitError(t);
-                    }
-                    emitter.error(t);
-                }
-
-                @Override
-                protected void doOnComplete() {
-                    for (Sinks.Many<?> subject : completer.downstreamSubscribers) {
-                        // subjects will ignore the onComplete if they're already done
-                        subject.tryEmitComplete();
-                    }
-                    if (!completer.executed) {
-                        completer.executed = true;
-                        executeRoute();
-                    }
-                }
-
-                private void executeRoute() {
-                    emitter.success(completer.routeMatch);
-                }
-            };
-        } else {
-            return new CompletionAwareSubscriber<Object>() {
-                private Subscription s;
-                private AtomicBoolean executed = new AtomicBoolean(false);
-
-                @Override
-                protected void doOnSubscribe(Subscription subscription) {
-                    this.s = subscription;
-                    subscription.request(1);
-                }
-
-                @Override
-                protected void doOnNext(Object message) {
-                    if (message instanceof ByteBufHolder) {
-                        request.addContent((ByteBufHolder) message);
-                        s.request(1);
-                    } else {
-                        ((NettyHttpRequest) request).setBody(message);
-                        s.request(1);
-                    }
-                    ReferenceCountUtil.release(message);
-                }
-
-                @Override
-                protected void doOnError(Throwable t) {
-                    s.cancel();
-                    emitter.error(t);
-                }
-
-                @Override
-                protected void doOnComplete() {
-                    if (executed.compareAndSet(false, true)) {
-                        emitter.success(finalRoute);
-                    }
-                }
-            };
-        }
-
     }
 
     ExecutorService getIoExecutor() {

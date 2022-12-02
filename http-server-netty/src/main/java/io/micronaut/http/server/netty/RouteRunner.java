@@ -1,5 +1,7 @@
 package io.micronaut.http.server.netty;
 
+import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
+import io.micronaut.core.execution.CompletableFutureExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
@@ -7,15 +9,16 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.context.ServerRequestContext;
-import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.server.RouteExecutor;
 import io.micronaut.web.router.RouteMatch;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.DecoderResult;
 import io.netty.handler.codec.TooLongFrameException;
+import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.publisher.Mono;
+
+import java.util.concurrent.CompletableFuture;
 
 final class RouteRunner {
     private static final Logger LOG = LoggerFactory.getLogger(RouteRunner.class);
@@ -50,10 +53,12 @@ final class RouteRunner {
             // try to fulfill the argument requirements of the route
             RouteMatch<?> route = rib.requestArgumentSatisfier.fulfillArgumentRequirements(routeMatch, request, false);
             if (rib.shouldReadBody(nettyRequest, route)) {
-                return ReactiveExecutionFlow.fromPublisher(
-                    Mono.create(emitter -> rib.httpContentProcessorResolver.resolve(nettyRequest, route)
-                        .subscribe(rib.buildSubscriber(nettyRequest, route, emitter))
-                    ));
+                HttpProcessorListener processorListener = new HttpProcessorListener(nettyRequest.isFormOrMultipartData() ?
+                    new FormRouteCompleter(rib, nettyRequest, route) :
+                    new BaseRouteCompleter(rib, nettyRequest, route));
+                rib.httpContentProcessorResolver.resolve(nettyRequest, route)
+                    .subscribe(processorListener);
+                return CompletableFutureExecutionFlow.just(processorListener.completion);
             }
             ctx.read();
             return ExecutionFlow.just(route);
@@ -77,5 +82,57 @@ final class RouteRunner {
         }
         responseFlow
             .onComplete((response, throwable) -> rib.writeResponse(ctx, nettyRequest, response, throwable));
+    }
+
+    private static class HttpProcessorListener extends CompletionAwareSubscriber<Object> {
+        private Subscription s;
+
+        final BaseRouteCompleter completer;
+        final CompletableFuture<RouteMatch<?>> completion = new CompletableFuture<>();
+
+        private HttpProcessorListener(BaseRouteCompleter completer) {
+            this.completer = completer;
+        }
+
+        @Override
+        protected void doOnSubscribe(Subscription subscription) {
+            this.s = subscription;
+            subscription.request(1);
+        }
+
+        @Override
+        protected void doOnNext(Object message) {
+            completer.needsInput = false;
+            boolean wasExecuted = completer.execute;
+            completer.add(message);
+            if (!wasExecuted && completer.execute) {
+                executeRoute();
+            }
+            if (completer.needsInput) {
+                s.request(1);
+            }
+        }
+
+        @Override
+        protected void doOnError(Throwable t) {
+            completer.completeFailure(t);
+            // this may drop the exception if the route has already been executed. However, that is
+            // only the case if there are publisher parameters, and those will still receive the
+            // failure. Hopefully.
+            completion.completeExceptionally(t);
+        }
+
+        @Override
+        protected void doOnComplete() {
+            boolean wasExecuted = completer.execute;
+            completer.completeSuccess();
+            if (!wasExecuted && completer.execute) {
+                executeRoute();
+            }
+        }
+
+        private void executeRoute() {
+            completion.complete(completer.routeMatch);
+        }
     }
 }
