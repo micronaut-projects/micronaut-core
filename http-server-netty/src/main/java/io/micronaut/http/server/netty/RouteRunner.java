@@ -94,23 +94,28 @@ final class RouteRunner {
             this.completer = completer;
         }
 
+        private void checkDemand() {
+            if (completer.needsInput) {
+                s.request(1);
+                completer.needsInput = false;
+            }
+        }
+
         @Override
         protected void doOnSubscribe(Subscription subscription) {
             this.s = subscription;
             subscription.request(1);
+            completer.checkDemand = this::checkDemand;
         }
 
         @Override
         protected void doOnNext(Object message) {
-            completer.needsInput = false;
             boolean wasExecuted = completer.execute;
             completer.add(message);
             if (!wasExecuted && completer.execute) {
                 executeRoute();
             }
-            if (completer.needsInput) {
-                s.request(1);
-            }
+            checkDemand();
         }
 
         @Override

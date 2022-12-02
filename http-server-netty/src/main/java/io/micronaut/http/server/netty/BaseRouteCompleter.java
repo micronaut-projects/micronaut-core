@@ -1,5 +1,6 @@
 package io.micronaut.http.server.netty;
 
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.http.server.netty.multipart.NettyCompletedFileUpload;
 import io.micronaut.web.router.RouteMatch;
@@ -9,7 +10,13 @@ import io.netty.util.ReferenceCountUtil;
 class BaseRouteCompleter {
     final RoutingInBoundHandler rib;
     final NettyHttpRequest<?> request;
-    boolean needsInput;
+    volatile boolean needsInput;
+    /**
+     * Optional runnable that may be called from other threads (i.e. downstream subscribers) to
+     * notify that {@link #needsInput} may have changed.
+     */
+    @Nullable
+    volatile Runnable checkDemand;
     RouteMatch<?> routeMatch;
     boolean execute = false;
 

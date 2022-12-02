@@ -41,15 +41,17 @@ final class FormRouteCompleter extends BaseRouteCompleter {
     }
 
     private void request(long n) {
-        long oldPressure = pressureRequested.getAndUpdate(old -> {
+        pressureRequested.getAndUpdate(old -> {
             if ((old + n) < old) {
                 return Long.MAX_VALUE;
             } else {
                 return old + n;
             }
         });
-        if (oldPressure <= 0) {
-            needsInput = true;
+        needsInput = true;
+        Runnable checkDemand = this.checkDemand;
+        if (checkDemand != null) {
+            checkDemand.run();
         }
     }
 
