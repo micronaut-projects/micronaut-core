@@ -32,6 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 @SuppressWarnings({
     "java:S2259", // The tests will show if it's null
     "java:S5960", // We're allowed assertions, as these are used in tests only
+    "checkstyle:MissingJavadocType",
 })
 public interface HttpMethodDeleteTest {
 

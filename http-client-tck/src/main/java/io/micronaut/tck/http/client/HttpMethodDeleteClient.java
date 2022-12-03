@@ -20,6 +20,7 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.annotation.Delete;
 import io.micronaut.http.client.annotation.Client;
 
+@SuppressWarnings("checkstyle:MissingJavadocType")
 @Requires(property = "spec.name", value = "HttpMethodDeleteTest")
 @Client("/delete")
 public interface HttpMethodDeleteClient {
