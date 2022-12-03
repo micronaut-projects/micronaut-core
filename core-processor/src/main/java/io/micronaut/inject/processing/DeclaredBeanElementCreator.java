@@ -190,9 +190,7 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
     }
 
     private void visitMethodInternal(BeanDefinitionVisitor visitor, MethodElement methodElement) {
-        if (methodElement.hasDeclaredAnnotation(ANN_REQUIRES_VALIDATION)) {
-            methodElement.annotate(ANN_VALIDATED);
-        }
+        makeInterceptedForValidationIfNeeded(methodElement);
         boolean claimed = visitMethod(visitor, methodElement);
         if (claimed) {
             addOriginatingElementIfNecessary(visitor, methodElement);
@@ -200,9 +198,6 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
     }
 
     private void visitPropertyInternal(BeanDefinitionVisitor visitor, PropertyElement propertyElement) {
-        if (propertyElement.hasAnnotation(ANN_REQUIRES_VALIDATION)) {
-            propertyElement.annotate(ANN_VALIDATED);
-        }
         boolean claimed = visitProperty(visitor, propertyElement);
         if (claimed) {
             propertyElement.getReadMethod().ifPresent(element -> addOriginatingElementIfNecessary(visitor, element));
@@ -220,15 +215,14 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
      */
     protected boolean visitProperty(BeanDefinitionVisitor visitor, PropertyElement propertyElement) {
         boolean claimed = false;
-        Optional<MethodElement> writeMethod = propertyElement.getWriteMethod();
-        if (writeMethod.isPresent()) {
-            MethodElement writeElement = writeMethod.get();
-            claimed |= visitPropertyWriteElement(visitor, propertyElement, writeElement);
+        Optional<? extends MemberElement> writeMember = propertyElement.getWriteMember();
+        if (writeMember.isPresent()) {
+            claimed |= visitPropertyWriteElement(visitor, propertyElement, writeMember.get());
         }
-        Optional<MethodElement> readMethod = propertyElement.getReadMethod();
-        if (readMethod.isPresent()) {
-            MethodElement readElement = readMethod.get();
-            claimed |= visitPropertyReadElement(visitor, propertyElement, readElement);
+        Optional<? extends MemberElement> readMember = propertyElement.getReadMember();
+        if (readMember.isPresent()) {
+            boolean readElementClaimed = visitPropertyReadElement(visitor, propertyElement, readMember.get());
+            claimed |= readElementClaimed;
         }
         // Process property's field if no methods were processed
         Optional<FieldElement> field = propertyElement.getField();
@@ -239,8 +233,32 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
         return claimed;
     }
 
+    private static void makeInterceptedForValidationIfNeeded(MethodElement element) {
+        // The method with constrains should be intercepted with the validation interceptor
+        if (element.hasDeclaredAnnotation(ANN_REQUIRES_VALIDATION)) {
+            element.annotate(ANN_VALIDATED);
+        }
+    }
+
     /**
      * Visit a property read element.
+     *
+     * @param visitor         The visitor
+     * @param propertyElement The property
+     * @param readElement     The read element
+     * @return true if processed
+     */
+    protected boolean visitPropertyReadElement(BeanDefinitionVisitor visitor,
+                                               PropertyElement propertyElement,
+                                               MemberElement readElement) {
+        if (readElement instanceof MethodElement methodReadElement) {
+            return visitPropertyReadElement(visitor, propertyElement, methodReadElement);
+        }
+        return false;
+    }
+
+    /**
+     * Visit a property method read element.
      *
      * @param visitor         The visitor
      * @param propertyElement The property
@@ -261,13 +279,35 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
      * @param writeElement    The write element
      * @return true if processed
      */
+    protected boolean visitPropertyWriteElement(BeanDefinitionVisitor visitor,
+                                                PropertyElement propertyElement,
+                                                MemberElement writeElement) {
+        if (writeElement instanceof MethodElement methodWriteElement) {
+            return visitPropertyWriteElement(visitor, propertyElement, methodWriteElement);
+        }
+        return false;
+    }
+
+    /**
+     * Visit a property write element.
+     *
+     * @param visitor         The visitor
+     * @param propertyElement The property
+     * @param writeElement    The write element
+     * @return true if processed
+     */
     @NextMajorVersion("Require @ReflectiveAccess for private methods in Micronaut 4")
     protected boolean visitPropertyWriteElement(BeanDefinitionVisitor visitor,
                                                 PropertyElement propertyElement,
                                                 MethodElement writeElement) {
+        makeInterceptedForValidationIfNeeded(writeElement);
         if (visitInjectAndLifecycleMethod(visitor, writeElement)) {
+            makeInterceptedForValidationIfNeeded(writeElement);
             return true;
         } else if (!writeElement.isStatic() && getElementAnnotationMetadata(writeElement).hasStereotype(AnnotationUtil.QUALIFIER)) {
+            if (propertyElement.getReadMethod().isPresent() && writeElement.hasStereotype(ANN_REQUIRES_VALIDATION)) {
+                visitor.setValidated(true);
+            }
             staticMethodCheck(writeElement);
             // TODO: Require @ReflectiveAccess for private methods in Micronaut 4
             visitMethodInjectionPoint(visitor, writeElement);
@@ -327,7 +367,12 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
         return false;
     }
 
-    private void visitMethodInjectionPoint(BeanDefinitionVisitor visitor, MethodElement methodElement) {
+    /**
+     * Visit a method injection point.
+     * @param visitor The visitor
+     * @param methodElement The method element
+     */
+    protected void visitMethodInjectionPoint(BeanDefinitionVisitor visitor, MethodElement methodElement) {
         applyConfigurationInjectionIfNecessary(visitor, methodElement);
         visitor.visitMethodInjectionPoint(
             methodElement.getDeclaringType(),

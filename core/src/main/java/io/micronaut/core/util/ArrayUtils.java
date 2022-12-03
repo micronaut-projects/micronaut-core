@@ -190,7 +190,7 @@ public final class ArrayUtils {
      * @param <T> The array type
      * @return The iterator
      */
-    public static <T> Iterator<T> iterator(T...array) {
+    public static <T> Iterator<T> iterator(T... array) {
         if (isNotEmpty(array)) {
             return new ArrayIterator<>(array);
         } else {
@@ -204,7 +204,7 @@ public final class ArrayUtils {
      * @param <T> The array type
      * @return The iterator
      */
-    public static <T> Iterator<T> reverseIterator(T...array) {
+    public static <T> Iterator<T> reverseIterator(T... array) {
         if (isNotEmpty(array)) {
             return new ReverseArrayIterator<>(array);
         } else {

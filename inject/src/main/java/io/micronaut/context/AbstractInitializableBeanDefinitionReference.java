@@ -46,6 +46,8 @@ public abstract class AbstractInitializableBeanDefinitionReference<T> extends Ab
     private final boolean isConfigurationProperties;
     private final boolean hasExposedTypes;
     private final boolean requiresMethodProcessing;
+    private final boolean isProxiedBean;
+    private final boolean isProxyTarget;
 
     private Boolean present;
     private Set<Class<?>> exposedTypes;
@@ -67,6 +69,28 @@ public abstract class AbstractInitializableBeanDefinitionReference<T> extends Ab
                                                         boolean isPrimary, boolean isContextScope, boolean isConditional,
                                                         boolean isContainerType, boolean isSingleton, boolean isConfigurationProperties,
                                                         boolean hasExposedTypes, boolean requiresMethodProcessing) {
+        this(beanTypeName, beanDefinitionTypeName, annotationMetadata, isPrimary, isContextScope, isConditional, isContainerType, isSingleton, isConfigurationProperties, hasExposedTypes, requiresMethodProcessing, false, false);
+    }
+
+    /**
+     * @param beanTypeName              The bean type name
+     * @param beanDefinitionTypeName    The bean definition type name
+     * @param annotationMetadata        The annotationMetadata
+     * @param isPrimary                 Is primary bean?
+     * @param isContextScope            Is context scope?
+     * @param isConditional             Is conditional? = No @Requires
+     * @param isContainerType           Is container type?
+     * @param isSingleton               Is singleton?
+     * @param isConfigurationProperties Is configuration properties?
+     * @param hasExposedTypes           Has exposed types?
+     * @param requiresMethodProcessing  Is requires method processing?
+     * @param isProxiedBean             Is the bean proxied
+     * @param isProxyTarget             Is the bean a retained proxy target
+     */
+    protected AbstractInitializableBeanDefinitionReference(String beanTypeName, String beanDefinitionTypeName, AnnotationMetadata annotationMetadata,
+                                                        boolean isPrimary, boolean isContextScope, boolean isConditional,
+                                                        boolean isContainerType, boolean isSingleton, boolean isConfigurationProperties,
+                                                        boolean hasExposedTypes, boolean requiresMethodProcessing, boolean isProxiedBean, boolean isProxyTarget) {
         this.beanTypeName = beanTypeName;
         this.beanDefinitionTypeName = beanDefinitionTypeName;
         this.annotationMetadata = annotationMetadata;
@@ -78,6 +102,18 @@ public abstract class AbstractInitializableBeanDefinitionReference<T> extends Ab
         this.isConfigurationProperties = isConfigurationProperties;
         this.hasExposedTypes = hasExposedTypes;
         this.requiresMethodProcessing = requiresMethodProcessing;
+        this.isProxiedBean = isProxiedBean;
+        this.isProxyTarget = isProxyTarget;
+    }
+
+    @Override
+    public boolean isProxyTarget() {
+        return isProxyTarget;
+    }
+
+    @Override
+    public boolean isProxiedBean() {
+        return isProxiedBean;
     }
 
     @Override

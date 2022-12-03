@@ -37,3 +37,5 @@ tasks.withType(Test) {
         jvmArgs += ['--add-opens', 'java.base/java.util=ALL-UNNAMED']
     }
 }
+
+checkstyleMain.enabled = false

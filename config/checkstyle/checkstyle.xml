@@ -96,7 +96,7 @@
         <!-- Checks for Javadoc comments.                     -->
         <!-- See https://checkstyle.org/config_javadoc.html -->
         <module name="JavadocMethod">
-            <property name="excludeScope" value="private"/>
+            <property name="accessModifiers" value="public,protected"/>
         </module>
         <module name="JavadocType"/>
         <module name="JavadocStyle"/>

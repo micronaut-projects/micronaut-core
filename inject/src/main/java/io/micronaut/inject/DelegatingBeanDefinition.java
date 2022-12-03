@@ -79,11 +79,6 @@ public interface DelegatingBeanDefinition<T> extends BeanDefinition<T> {
     }
 
     @Override
-    default boolean isProvided() {
-        return getTarget().isProvided();
-    }
-
-    @Override
     default boolean isIterable() {
         return getTarget().isIterable();
     }

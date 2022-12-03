@@ -99,7 +99,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
     private Set<String> beanDefinitions;
     private final Set<String> processed = new HashSet<>();
-    private final Map<String, Element> postponed = new HashMap<>();
+    private final Map<String, PostponeToNextRoundException> postponed = new HashMap<>();
 
     @Override
     public final synchronized void init(ProcessingEnvironment processingEnv) {
@@ -238,7 +238,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             error((Element) ex.getOriginatingElement(), ex.getMessage());
                         } catch (PostponeToNextRoundException e) {
                             processed.remove(className);
-                            postponed.put(className, (Element) e.getErrorElement());
+                            postponed.put(className, e);
                         }
                     }
                 }
@@ -250,8 +250,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         processing round.
         */
         if (processingOver) {
-            for (Map.Entry<String, Element> e : postponed.entrySet()) {
-                javaVisitorContext.warn("Bean definition generation [" + e.getKey() + "] skipped from processing because of prior error. This error is normally due to missing classes on the classpath. Verify the compilation classpath is correct to resolve the problem.", e.getValue());
+            for (Map.Entry<String, PostponeToNextRoundException> e : postponed.entrySet()) {
+                javaVisitorContext.warn("Bean definition generation [" + e.getKey() + "] skipped from processing because of prior error: [" + e.getValue().getPath() + "]." +
+                    " This error is normally due to missing classes on the classpath. Verify the compilation classpath is correct to resolve the problem.", (Element) e.getValue().getErrorElement());
             }
 
             try {

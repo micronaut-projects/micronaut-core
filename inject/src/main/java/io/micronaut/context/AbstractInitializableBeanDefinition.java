@@ -17,10 +17,10 @@ package io.micronaut.context;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.EachBean;
-import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Value;
+import io.micronaut.context.env.ConfigurationPath;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.event.BeanInitializedEventListener;
 import io.micronaut.context.event.BeanInitializingEvent;
@@ -99,12 +99,10 @@ import java.util.stream.Stream;
 @Internal
 public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextConditional implements BeanDefinition<T>, EnvironmentConfigurable {
     private static final Logger LOG = LoggerFactory.getLogger(AbstractInitializableBeanDefinition.class);
-    private static final String NAMED_ATTRIBUTE = Named.class.getName();
 
     private final Class<T> type;
     private final AnnotationMetadata annotationMetadata;
     private final Optional<String> scope;
-    private final boolean isProvided;
     private final boolean isIterable;
     private final boolean isSingleton;
     private final boolean isPrimary;
@@ -178,7 +176,6 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
                 this.annotationMetadata = annotationMetadata;
             }
         }
-        this.isProvided = isProvided;
         this.isIterable = isIterable;
         this.isSingleton = isSingleton;
         this.isPrimary = isPrimary;
@@ -230,6 +227,11 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
                 isContainerType,
                 requiresMethodProcessing);
         this.annotationInjection = annotationInjection;
+    }
+
+    @Override
+    public final boolean isConfigurationProperties() {
+        return isConfigurationProperties;
     }
 
     @Override
@@ -302,11 +304,6 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
     @Override
     public boolean isPrimary() {
         return isPrimary;
-    }
-
-    @Override
-    public boolean isProvided() {
-        return isProvided;
     }
 
     @Override
@@ -1157,7 +1154,7 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
         Argument<K> argument = resolveArgument(context, argIndex, methodRef.arguments);
         try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
                 .pushMethodArgumentResolve(this, methodRef.methodName, argument, methodRef.arguments, methodRef.requiresReflection)) {
-            return resolveBean(resolutionContext, argument, qualifier, true);
+            return resolveBean(resolutionContext, argument, qualifier);
         }
     }
 
@@ -1203,7 +1200,7 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
     protected final Object getBeanForSetter(BeanResolutionContext resolutionContext, BeanContext context, String setterName, Argument argument, Qualifier qualifier) {
         try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
                 .pushMethodArgumentResolve(this, setterName, argument, new Argument[]{argument}, false)) {
-            return resolveBean(resolutionContext, argument, qualifier, true);
+            return resolveBean(resolutionContext, argument, qualifier);
         }
     }
 
@@ -1332,7 +1329,7 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
         }
         try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
                 .pushConstructorResolve(this, argument)) {
-            return resolveBean(resolutionContext, argument, qualifier, true);
+            return resolveBean(resolutionContext, argument, qualifier);
         }
     }
 
@@ -1669,7 +1666,7 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
         final Argument<K> argument = resolveEnvironmentArgument(context, fieldInjection[fieldIndex].argument);
         try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
                 .pushFieldResolve(this, argument, fieldInjection[fieldIndex].requiresReflection)) {
-            return resolveBean(resolutionContext, argument, qualifier, true);
+            return resolveBean(resolutionContext, argument, qualifier);
         }
     }
 
@@ -2025,8 +2022,8 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
         } else {
             argumentType = argument;
         }
-        if (isInnerConfiguration(argumentType.getType())) {
-            qualifier = qualifier == null ? resolveQualifierWithInnerConfiguration(resolutionContext, argument, true) : qualifier;
+        if (isInnerConfiguration(argumentType)) {
+            qualifier = qualifier == null ? resolveQualifier(resolutionContext, argumentType, argument) : qualifier;
             if (isCollection) {
                 Collection<?> beans = resolutionContext.getBeansOfType(argumentType, qualifier);
                 return coerceCollectionToCorrectType((Class) argumentJavaType, beans, resolutionContext, argument);
@@ -2144,27 +2141,23 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
         }
     }
 
-    private <K> K resolveBean(BeanResolutionContext resolutionContext, Argument<K> argument, @Nullable Qualifier<K> qualifier) {
-        return resolveBean(resolutionContext, argument, qualifier, false);
-    }
-
     private <K> K resolveBean(
             BeanResolutionContext resolutionContext,
             Argument<K> argument,
-            @Nullable Qualifier<K> qualifier,
-            boolean resolveIsInnerConfiguration) {
-        qualifier = qualifier == null ? resolveQualifier(resolutionContext, argument, resolveIsInnerConfiguration) : qualifier;
-        if (Qualifier.class.isAssignableFrom(argument.getType())) {
+            @Nullable Qualifier<K> qualifier) {
+        qualifier = qualifier == null ? resolveQualifier(resolutionContext, argument, argument) : qualifier;
+        Class<K> t = argument.getType();
+        if (Qualifier.class.isAssignableFrom(t)) {
             return (K) qualifier;
         }
         try {
-            Object previous = !argument.isAnnotationPresent(Parameter.class) ? resolutionContext.removeAttribute(NAMED_ATTRIBUTE) : null;
+            boolean isNotInnerConfiguration = !isConfigurationProperties || !isInnerConfiguration(argument);
+            ConfigurationPath previousPath = isNotInnerConfiguration ? resolutionContext.setConfigurationPath(null) : null;
             try {
-                //noinspection unchecked
                 return resolutionContext.getBean(argument, qualifier);
             } finally {
-                if (previous != null) {
-                    resolutionContext.setAttribute(NAMED_ATTRIBUTE, previous);
+                if (previousPath != null) {
+                    resolutionContext.setConfigurationPath(previousPath);
                 }
             }
         } catch (DisabledBeanException e) {
@@ -2234,11 +2227,9 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
     }
 
     private String substituteWildCards(BeanResolutionContext resolutionContext, String valString) {
-        if (valString.indexOf('*') > -1) {
-            Optional<String> namedBean = resolutionContext.get(Named.class.getName(), ConversionContext.STRING);
-            if (namedBean.isPresent()) {
-                valString = valString.replace("*", namedBean.get());
-            }
+        ConfigurationPath configurationPath = resolutionContext.getConfigurationPath();
+        if (configurationPath.isNotEmpty()) {
+            return configurationPath.resolveValue(valString);
         }
         return valString;
     }
@@ -2252,63 +2243,84 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
         return null;
     }
 
-    private <K, R extends Collection<K>> R resolveBeansOfType(BeanResolutionContext resolutionContext, BeanContext context, Argument<R> argument, Argument<K> resultGenericType, Qualifier<K> qualifier) {
-        if (resultGenericType == null) {
-            throw new DependencyInjectionException(resolutionContext, "Type " + argument.getType() + " has no generic argument");
+    private <K, R extends Collection<K>> R resolveBeansOfType(BeanResolutionContext resolutionContext, BeanContext context, Argument<R> returnType, Argument<K> beanType, Qualifier<K> qualifier) {
+        if (beanType == null) {
+            throw new DependencyInjectionException(resolutionContext, "Type " + returnType.getType() + " has no generic argument");
         }
-        qualifier = qualifier == null ? resolveQualifier(resolutionContext, (Argument<K>) argument, true) : qualifier;
-        Collection<K> beansOfType = resolutionContext.getBeansOfType(resolveEnvironmentArgument(context, resultGenericType), qualifier);
-        return coerceCollectionToCorrectType(argument.getType(), beansOfType, resolutionContext, argument);
+        qualifier = qualifier == null ? resolveQualifier(resolutionContext, beanType, returnType) : qualifier;
+        Collection<K> beansOfType = resolutionContext.getBeansOfType(resolveEnvironmentArgument(context, beanType), qualifier);
+        return coerceCollectionToCorrectType(returnType.getType(), beansOfType, resolutionContext, returnType);
     }
 
-    private <K> Stream<K> resolveStreamOfType(BeanResolutionContext resolutionContext, Argument<K> argument, Argument<K> resultGenericType, Qualifier<K> qualifier) {
-        if (resultGenericType == null) {
-            throw new DependencyInjectionException(resolutionContext, "Type " + argument.getType() + " has no generic argument");
+    private <R> boolean isInnerConfiguration(@Nullable Argument<R> argument) {
+        if (argument == null || !isConfigurationProperties) {
+            return false;
         }
-        qualifier = qualifier == null ? resolveQualifier(resolutionContext, argument) : qualifier;
-        return resolutionContext.streamOfType(resultGenericType, qualifier);
+        if (argument.isContainerType() || argument.isOptional() || argument.isProvider()) {
+            return isInnerConfiguration(argument.getFirstTypeVariable().orElse(null));
+        } else if (isIterable && isEachBeanParent(argument)) {
+            return true;
+        }
+        return isInnerConfiguration(argument.getType());
+    }
+
+    private <R> boolean isEachBeanParent(Argument<R> argument) {
+        // treat an each bean declaration like an inner configuration
+        Class<?> t = getAnnotationMetadata().classValue(EachBean.class).orElse(null);
+        if (t != null && t.equals(argument.getType())) {
+            return true;
+        }
+        return false;
+    }
+
+    private <K> Stream<K> resolveStreamOfType(BeanResolutionContext resolutionContext, Argument<K> returnType, Argument<K> beanType, Qualifier<K> qualifier) {
+        if (beanType == null) {
+            throw new DependencyInjectionException(resolutionContext, "Type " + returnType.getType() + " has no generic argument");
+        }
+        qualifier = qualifier == null ? resolveQualifier(resolutionContext, beanType, returnType) : qualifier;
+        return resolutionContext.streamOfType(beanType, qualifier);
     }
 
     private <V> Map<String, V> resolveMapOfType(
         BeanResolutionContext resolutionContext,
-        Argument<Map<String, V>> argument,
-        Argument<V> resultGenericType,
+        Argument<Map<String, V>> returnType,
+        Argument<V> beanType,
         Qualifier<V> qualifier) {
-        if (resultGenericType == null) {
-            throw new DependencyInjectionException(resolutionContext, "Type " + argument.getType() + " has no generic argument");
+        if (beanType == null) {
+            throw new DependencyInjectionException(resolutionContext, "Type " + returnType.getType() + " has no generic returnType");
         }
-        qualifier = qualifier == null ? resolveQualifier(resolutionContext, resultGenericType) : qualifier;
-        Map<String, V> map = resolutionContext.mapOfType(resultGenericType, qualifier);
-        if (argument.isInstance(map)) {
+        qualifier = qualifier == null ? resolveQualifier(resolutionContext, beanType, returnType) : qualifier;
+        Map<String, V> map = resolutionContext.mapOfType(beanType, qualifier);
+        if (returnType.isInstance(map)) {
             return map;
         } else {
             return resolutionContext.getContext().getConversionService().convertRequired(
-                map, argument
+                map, returnType
             );
         }
     }
 
-    private <K> Optional<K> resolveOptionalBean(BeanResolutionContext resolutionContext, Argument<K> argument, Argument<K> resultGenericType, Qualifier<K> qualifier) {
-        if (resultGenericType == null) {
-            throw new DependencyInjectionException(resolutionContext, "Type " + argument.getType() + " has no generic argument");
+    private <K> Optional<K> resolveOptionalBean(BeanResolutionContext resolutionContext, Argument<K> returnType, Argument<K> beanType, Qualifier<K> qualifier) {
+        if (beanType == null) {
+            throw new DependencyInjectionException(resolutionContext, "Type " + returnType.getType() + " has no generic argument");
         }
-        qualifier = qualifier == null ? resolveQualifier(resolutionContext, argument) : qualifier;
-        return resolutionContext.findBean(resultGenericType, qualifier);
+        qualifier = qualifier == null ? resolveQualifier(resolutionContext, beanType, returnType) : qualifier;
+        return resolutionContext.findBean(beanType, qualifier);
     }
 
     private <I, K extends Collection<BeanRegistration<I>>> K resolveBeanRegistrations(BeanResolutionContext resolutionContext,
-                                                                                      Argument<K> argument,
-                                                                                      Argument<I> genericArgument,
+                                                                                      Argument<K> returnType,
+                                                                                      Argument<I> beanType,
                                                                                       Qualifier<I> qualifier) {
         try {
-            if (genericArgument == null) {
-                throw new DependencyInjectionException(resolutionContext, "Cannot resolve bean registrations. Argument [" + argument + "] missing generic type information.");
+            if (beanType == null) {
+                throw new DependencyInjectionException(resolutionContext, "Cannot resolve bean registrations. Argument [" + returnType + "] missing generic type information.");
             }
-            qualifier = qualifier == null ? resolveQualifier(resolutionContext, (Argument) argument) : qualifier;
-            Collection<BeanRegistration<I>> beanRegistrations = resolutionContext.getBeanRegistrations(genericArgument, qualifier);
-            return coerceCollectionToCorrectType(argument.getType(), beanRegistrations, resolutionContext, argument);
+            qualifier = qualifier == null ? resolveQualifier(resolutionContext, beanType, returnType) : qualifier;
+            Collection<BeanRegistration<I>> beanRegistrations = resolutionContext.getBeanRegistrations(beanType, qualifier);
+            return coerceCollectionToCorrectType(returnType.getType(), beanRegistrations, resolutionContext, returnType);
         } catch (NoSuchBeanException e) {
-            if (argument.isNullable()) {
+            if (returnType.isNullable()) {
                 return null;
             }
             throw new DependencyInjectionException(resolutionContext, e);
@@ -2333,56 +2345,53 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
     }
 
     private <B> BeanRegistration<B> resolveBeanRegistration(BeanResolutionContext resolutionContext, BeanContext context,
-                                                            Argument<B> argument, Argument<B> genericArgument, Qualifier<B> qualifier) {
+                                                            @NonNull Argument<B> returnType, Argument<B> beanType, Qualifier<B> qualifier) {
         try {
-            if (genericArgument == null) {
-                throw new DependencyInjectionException(resolutionContext, "Cannot resolve bean registration. Argument [" + argument + "] missing generic type information.");
+            if (beanType == null) {
+                throw new DependencyInjectionException(resolutionContext, "Cannot resolve bean registration. Argument [" + returnType + "] missing generic type information.");
             }
-            qualifier = qualifier == null ? resolveQualifier(resolutionContext, argument) : qualifier;
-            return context.getBeanRegistration(genericArgument, qualifier);
+            qualifier = qualifier == null ? resolveQualifier(resolutionContext, beanType, returnType) : qualifier;
+            return context.getBeanRegistration(beanType, qualifier);
         } catch (NoSuchBeanException e) {
-            if (argument.isNullable()) {
+            if (returnType.isNullable()) {
                 return null;
             }
-            throw new DependencyInjectionException(resolutionContext, argument, e);
+            throw new DependencyInjectionException(resolutionContext, returnType, e);
         }
     }
 
-    private <K> Qualifier<K> resolveQualifier(BeanResolutionContext resolutionContext, Argument<K> argument) {
-        return resolveQualifier(resolutionContext, argument, false);
-    }
-
-    private <K> Qualifier<K> resolveQualifier(BeanResolutionContext resolutionContext, Argument<K> argument, boolean resolveIsInnerConfiguration) {
-        boolean innerConfiguration = resolveIsInnerConfiguration && isInnerConfiguration(argument.getType());
-        return resolveQualifierWithInnerConfiguration(resolutionContext, argument, innerConfiguration);
-    }
-
-    private <K> Qualifier<K> resolveQualifierWithInnerConfiguration(BeanResolutionContext resolutionContext, Argument<K> argument, boolean innerConfiguration) {
-        boolean hasMetadata = argument.getAnnotationMetadata() != AnnotationMetadata.EMPTY_METADATA;
-        Qualifier<K> qualifier = null;
-        boolean isIterable = isIterable() || resolutionContext.get(EachProperty.class.getName(), Class.class).map(getBeanType()::equals).orElse(false);
-        if (isIterable) {
-            qualifier = resolutionContext.get(AnnotationUtil.QUALIFIER, Map.class)
-                    .map(map -> (Qualifier<K>) map.get(argument))
-                    .orElse(null);
-        }
-        if (qualifier == null) {
-            if ((hasMetadata && argument.isAnnotationPresent(Parameter.class)) ||
-                    (innerConfiguration && isIterable) ||
-                    Qualifier.class == argument.getType()) {
-                final Qualifier<K> currentQualifier = (Qualifier<K>) resolutionContext.getCurrentQualifier();
-                if (currentQualifier != null &&
-                        currentQualifier.getClass() != InterceptorBindingQualifier.class &&
-                        currentQualifier.getClass() != TypeAnnotationQualifier.class) {
-                    qualifier = currentQualifier;
+    private <B, R> Qualifier<B> resolveQualifier(BeanResolutionContext resolutionContext, Argument<B> beanType, Argument<R> resultType) {
+        if (isInnerConfiguration(beanType)) {
+            ConfigurationPath configurationPath = resolutionContext.getConfigurationPath();
+            Qualifier<B> q = configurationPath.beanQualifier();
+            if (q instanceof Named named && resultType.isContainerType()) {
+                return Qualifiers.byNamePrefix(named.getName());
+            } else {
+                if (q == null && isEachBeanParent(beanType)) {
+                    return (Qualifier<B>) resolutionContext.getCurrentQualifier();
                 } else {
-                    final Optional<String> n = resolutionContext.get(NAMED_ATTRIBUTE, ConversionContext.STRING);
-                    qualifier = n.map(Qualifiers::<K>byName).orElse(null);
+                    return q;
                 }
             }
+        } else if (Qualifier.class == resultType.getType()) {
+            final Qualifier<B> currentQualifier = (Qualifier<B>) resolutionContext.getCurrentQualifier();
+            if (currentQualifier != null &&
+                currentQualifier.getClass() != InterceptorBindingQualifier.class &&
+                currentQualifier.getClass() != TypeAnnotationQualifier.class) {
+                return currentQualifier;
+            } else {
+                BeanResolutionContext.Path path = resolutionContext.getPath();
+                BeanResolutionContext.Segment<?> segment = path.peek();
+                if (segment != null && segment.getDeclaringType().hasAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS)) {
+                    return resolutionContext.getConfigurationPath().beanQualifier();
+                }
+            }
+        } else if (isIterable && resultType.isAnnotationPresent(Parameter.class)) {
+            return (Qualifier<B>) resolutionContext.getCurrentQualifier();
         }
-        return qualifier;
+        return null;
     }
+
 
     @SuppressWarnings("unchecked")
     private <I, K extends Collection<I>> K coerceCollectionToCorrectType(Class<K> collectionType, Collection<I> beansOfType, BeanResolutionContext resolutionContext, Argument<?> argument) {

@@ -335,7 +335,9 @@ public class BeanIntrospectionModule extends SimpleModule {
                     final List<BeanPropertyWriter> newProperties = new ArrayList<>(properties);
                     Map<String, BeanProperty<Object, Object>> named = new LinkedHashMap<>();
                     for (BeanProperty<Object, Object> beanProperty : beanProperties) {
-                        named.put(getName(config, namingStrategy, beanProperty), beanProperty);
+                        if (!beanProperty.isWriteOnly()) {
+                            named.put(getName(config, namingStrategy, beanProperty), beanProperty);
+                        }
                     }
                     for (int i = 0; i < properties.size(); i++) {
                         final BeanPropertyWriter existing = properties.get(i);

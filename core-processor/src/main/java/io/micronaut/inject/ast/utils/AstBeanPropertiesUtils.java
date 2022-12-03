@@ -21,7 +21,7 @@ import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
-import io.micronaut.inject.ast.BeanPropertiesQuery;
+import io.micronaut.inject.ast.PropertyElementQuery;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
@@ -65,7 +65,7 @@ public final class AstBeanPropertiesUtils {
      * @param propertyCreator                  The property creator
      * @return the list of properties
      */
-    public static List<PropertyElement> resolveBeanProperties(BeanPropertiesQuery configuration,
+    public static List<PropertyElement> resolveBeanProperties(PropertyElementQuery configuration,
                                                               ClassElement classElement,
                                                               Supplier<List<MethodElement>> methodsSupplier,
                                                               Supplier<List<FieldElement>> fieldSupplier,
@@ -125,11 +125,22 @@ public final class AstBeanPropertiesUtils {
             resolveReadAccessForField(fieldElement, isAccessor, beanPropertyData);
             resolveWriteAccessForField(fieldElement, isAccessor, beanPropertyData);
         }
+
         if (!props.isEmpty()) {
             List<PropertyElement> beanProperties = new ArrayList<>(props.size());
             for (Map.Entry<String, BeanPropertyData> entry : props.entrySet()) {
                 String propertyName = entry.getKey();
                 BeanPropertyData value = entry.getValue();
+                if (configuration.isIgnoreSettersWithDifferingType() && value.setter != null && value.getter != null) {
+                    // ensure types match
+                    ClassElement getterType = value.getter.getGenericReturnType();
+                    ClassElement setterType = value.setter.getParameters()[0].getGenericType();
+                    if (!getterType.equals(setterType)) {
+                        // getter and setter don't match, remove setter
+                        value.setter = null;
+                        value.type = getterType;
+                    }
+                }
                 // Define the property type based on its writer element
                 if (value.writeAccessKind == BeanProperties.AccessKind.FIELD && !value.field.getType().equals(value.type)) {
                     value.type = value.field.getGenericType();
@@ -199,7 +210,7 @@ public final class AstBeanPropertiesUtils {
         return value.readAccessKind == null && value.writeAccessKind == null;
     }
 
-    private static boolean isExcludedByAnnotations(BeanPropertiesQuery conf, BeanPropertyData value) {
+    private static boolean isExcludedByAnnotations(PropertyElementQuery conf, BeanPropertyData value) {
         if (conf.getExcludedAnnotations().isEmpty()) {
             return false;
         }

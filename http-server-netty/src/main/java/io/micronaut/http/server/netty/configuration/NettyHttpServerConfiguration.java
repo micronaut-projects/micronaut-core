@@ -33,6 +33,7 @@ import io.netty.channel.ChannelOption;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.ssl.ApplicationProtocolNames;
 import jakarta.inject.Inject;
+import jakarta.inject.Named;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -793,6 +794,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      * Configuration for Netty worker.
      */
     @ConfigurationProperties("worker")
+    @Named("netty-server-worker-event-loop")
     public static class Worker extends EventLoopConfig {
         /**
          * Default constructor.
@@ -807,6 +809,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     @ConfigurationProperties(Parent.NAME)
     @Requires(missingProperty = EventLoopGroupConfiguration.EVENT_LOOPS + ".parent")
+    @Named("netty-server-parent-event-loop")
     public static class Parent extends EventLoopConfig {
 
         public static final String NAME = "parent";

@@ -32,7 +32,7 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ArrayableClassElement;
-import io.micronaut.inject.ast.BeanPropertiesQuery;
+import io.micronaut.inject.ast.PropertyElementQuery;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.Element;
@@ -488,8 +488,8 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     public List<PropertyElement> getSyntheticBeanProperties() {
         // Native properties should be composed of field + synthetic getter/setter
         if (nativeProperties == null) {
-            BeanPropertiesQuery configuration = new BeanPropertiesQuery();
-            configuration.setAllowStaticProperties(true);
+            PropertyElementQuery configuration = new PropertyElementQuery();
+            configuration.allowStaticProperties(true);
             Set<String> nativeProps = getPropertyNodes().stream().map(PropertyNode::getName).collect(Collectors.toCollection(LinkedHashSet::new));
             nativeProperties = AstBeanPropertiesUtils.resolveBeanProperties(configuration,
                 this,
@@ -505,9 +505,9 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     }
 
     @Override
-    public List<PropertyElement> getBeanProperties(BeanPropertiesQuery beanPropertiesQuery) {
+    public List<PropertyElement> getBeanProperties(PropertyElementQuery propertyElementQuery) {
         Set<String> nativeProps = getPropertyNodes().stream().map(PropertyNode::getName).collect(Collectors.toCollection(LinkedHashSet::new));
-        return AstBeanPropertiesUtils.resolveBeanProperties(beanPropertiesQuery,
+        return AstBeanPropertiesUtils.resolveBeanProperties(propertyElementQuery,
             this,
             () -> getEnclosedElements(ElementQuery.ALL_METHODS.onlyInstance()),
             () -> getEnclosedElements(ElementQuery.ALL_FIELDS),
@@ -515,13 +515,13 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
             nativeProps,
             methodElement -> Optional.empty(),
             methodElement -> Optional.empty(),
-            value -> mapPropertyElement(nativeProps, value, beanPropertiesQuery, false));
+            value -> mapPropertyElement(nativeProps, value, propertyElementQuery, false));
     }
 
     @Override
     public List<PropertyElement> getBeanProperties() {
         if (properties == null) {
-            properties = getBeanProperties(BeanPropertiesQuery.of(this));
+            properties = getBeanProperties(PropertyElementQuery.of(this));
         }
         return properties;
     }
@@ -529,7 +529,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     @Nullable
     private GroovyPropertyElement mapPropertyElement(Set<String> nativeProps,
                                                      AstBeanPropertiesUtils.BeanPropertyData value,
-                                                     BeanPropertiesQuery conf,
+                                                     PropertyElementQuery conf,
                                                      boolean nativePropertiesOnly) {
         if (value.type == null) {
             // withSomething() builder setter
