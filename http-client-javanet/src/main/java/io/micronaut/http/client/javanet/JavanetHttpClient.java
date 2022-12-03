@@ -115,7 +115,11 @@ public final class JavanetHttpClient extends AbstractJavanetHttpClient implement
         if (base == null) {
             throw new UnsupportedOperationException("Load balancer " + loadBalancer + " not supported");
         }
-        java.net.http.HttpRequest httpRequest = HttpRequestFactory.builder(UriBuilder.of(base).path(contextPath).path(request.getPath()).build(), request).build();
+        java.net.http.HttpRequest httpRequest = HttpRequestFactory.builder(
+            UriBuilder.of(base).path(contextPath).path(request.getPath()).build(),
+            request,
+            conversionService
+        ).build();
 
         CompletableFuture<java.net.http.HttpResponse<byte[]>> completableHttpResponse = java.net.http.HttpClient.newHttpClient().sendAsync(httpRequest, java.net.http.HttpResponse.BodyHandlers.ofByteArray());
         CompletableFuture<HttpResponse<O>> response = completableHttpResponse.thenApply(netResponse -> getConvertedResponse(netResponse, bodyType));

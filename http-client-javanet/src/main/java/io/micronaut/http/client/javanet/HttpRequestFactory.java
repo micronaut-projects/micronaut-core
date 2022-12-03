@@ -33,11 +33,11 @@ public final class HttpRequestFactory {
     }
 
     @NonNull
-    public static <I> HttpRequest.Builder builder(@NonNull URI uri, io.micronaut.http.HttpRequest<I> request) {
+    public static <I> HttpRequest.Builder builder(@NonNull URI uri, io.micronaut.http.HttpRequest<I> request, ConversionService conversionService) {
         HttpRequest.Builder builder = HttpRequest.newBuilder().uri(uri);
         HttpRequest.BodyPublisher bodyPublisher = request
             .getBody()
-            .map(body -> HttpRequest.BodyPublishers.ofByteArray(ConversionService.SHARED.convertRequired(body, byte[].class)))
+            .map(body -> HttpRequest.BodyPublishers.ofByteArray(conversionService.convertRequired(body, byte[].class)))
             .orElseGet(HttpRequest.BodyPublishers::noBody);
         builder = builder.method(request.getMethod().toString(), bodyPublisher);
         return builder;

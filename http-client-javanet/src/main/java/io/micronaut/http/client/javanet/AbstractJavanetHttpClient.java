@@ -117,7 +117,7 @@ abstract sealed class AbstractJavanetHttpClient permits JavanetHttpClient, Javan
             }
         }
         // last chance, try type conversion
-        return ConversionService.SHARED.convert(bytes, ConversionContext.of(type));
+        return conversionService.convert(bytes, ConversionContext.of(type));
     }
 
     public MediaTypeCodecRegistry getMediaTypeCodecRegistry() {

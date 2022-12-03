@@ -64,7 +64,11 @@ public final class JavanetBlockingHttpClient extends AbstractJavanetHttpClient i
         if (base == null) {
             throw new UnsupportedOperationException("Load balancer " + loadBalancer + " not supported");
         }
-        HttpRequest httpRequest = HttpRequestFactory.builder(UriBuilder.of(base).path(contextPath).path(request.getPath()).build(), request).build();
+        HttpRequest httpRequest = HttpRequestFactory.builder(
+            UriBuilder.of(base).path(contextPath).path(request.getPath()).build(),
+            request,
+            conversionService
+        ).build();
         try {
             HttpResponse<byte[]> httpResponse = HttpClient.newHttpClient().send(httpRequest, HttpResponse.BodyHandlers.ofByteArray());
             return getConvertedResponse(httpResponse, bodyType);
