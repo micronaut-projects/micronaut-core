@@ -10,7 +10,7 @@ import io.netty.util.ReferenceCountUtil;
 class BaseRouteCompleter {
     final RoutingInBoundHandler rib;
     final NettyHttpRequest<?> request;
-    volatile boolean needsInput;
+    volatile boolean needsInput = true;
     /**
      * Optional runnable that may be called from other threads (i.e. downstream subscribers) to
      * notify that {@link #needsInput} may have changed.
@@ -26,7 +26,7 @@ class BaseRouteCompleter {
         this.routeMatch = routeMatch;
     }
 
-    final void add(Object message) {
+    final void add(Object message) throws Throwable {
         try {
             if (request.destroyed) {
                 // we don't want this message anymore

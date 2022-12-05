@@ -55,7 +55,7 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor {
      */
     private volatile boolean pleaseDestroy = false;
     /**
-     * {@code true} during {@link #doOnNext}, can't destroy while that's running.
+     * {@code true} during {@link #onData}, can't destroy while that's running.
      */
     private volatile boolean inFlight = false;
     /**
@@ -155,10 +155,6 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor {
                         throw e;
                     }
                 } finally {
-                    if (!anyResults) {
-                        requestInput();
-                    }
-
                     httpContent.release();
                 }
             } else {

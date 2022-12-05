@@ -117,7 +117,6 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor {
         this.jacksonProcessor.onSubscribe(new Subscription() {
             @Override
             public void request(long n) {
-                requestInput();
             }
 
             @Override

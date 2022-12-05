@@ -1,6 +1,5 @@
 package io.micronaut.http.server.netty;
 
-import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.execution.CompletableFutureExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.http.HttpMethod;
@@ -9,11 +8,14 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.context.ServerRequestContext;
+import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.RouteExecutor;
 import io.micronaut.web.router.RouteMatch;
+import io.netty.buffer.ByteBufHolder;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.DecoderResult;
 import io.netty.handler.codec.TooLongFrameException;
+import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,12 +55,13 @@ final class RouteRunner {
             // try to fulfill the argument requirements of the route
             RouteMatch<?> route = rib.requestArgumentSatisfier.fulfillArgumentRequirements(routeMatch, request, false);
             if (rib.shouldReadBody(nettyRequest, route)) {
-                HttpProcessorListener processorListener = new HttpProcessorListener(nettyRequest.isFormOrMultipartData() ?
+                BaseRouteCompleter completer = nettyRequest.isFormOrMultipartData() ?
                     new FormRouteCompleter(rib, nettyRequest, route) :
-                    new BaseRouteCompleter(rib, nettyRequest, route));
-                rib.httpContentProcessorResolver.resolve(nettyRequest, route).asPublisher(nettyRequest)
-                    .subscribe(processorListener);
-                return CompletableFutureExecutionFlow.just(processorListener.completion);
+                    new BaseRouteCompleter(rib, nettyRequest, route);
+                HttpContentProcessor processor = rib.httpContentProcessorResolver.resolve(nettyRequest, route);
+                StreamingDataSubscriber pr = new StreamingDataSubscriber(completer, processor);
+                ((StreamedHttpRequest) nettyRequest.getNativeRequest()).subscribe(pr);
+                return CompletableFutureExecutionFlow.just(pr.completion);
             }
             ctx.read();
             return ExecutionFlow.just(route);
@@ -84,55 +87,114 @@ final class RouteRunner {
             .onComplete((response, throwable) -> rib.writeResponse(ctx, nettyRequest, response, throwable));
     }
 
-    private static class HttpProcessorListener extends CompletionAwareSubscriber<Object> {
-        private Subscription s;
-
-        final BaseRouteCompleter completer;
+    private static class StreamingDataSubscriber implements Subscriber<ByteBufHolder> {
+        private final HttpContentProcessor contentProcessor;
+        private final BaseRouteCompleter completer;
+        private Subscription upstream;
         final CompletableFuture<RouteMatch<?>> completion = new CompletableFuture<>();
 
-        private HttpProcessorListener(BaseRouteCompleter completer) {
+        private volatile boolean upstreamRequested = false;
+        private boolean downstreamDone = false;
+
+        StreamingDataSubscriber(BaseRouteCompleter completer, HttpContentProcessor contentProcessor) {
             this.completer = completer;
+            this.contentProcessor = contentProcessor;
         }
 
         private void checkDemand() {
-            if (completer.needsInput) {
-                s.request(1);
-                completer.needsInput = false;
+            if (completer.needsInput && !upstreamRequested) {
+                upstreamRequested = true;
+                upstream.request(1);
             }
         }
 
         @Override
-        protected void doOnSubscribe(Subscription subscription) {
-            this.s = subscription;
-            subscription.request(1);
+        public void onSubscribe(Subscription s) {
+            if (upstream != null) {
+                throw new IllegalStateException("Only one upstream subscription allowed");
+            }
+            upstream = s;
             completer.checkDemand = this::checkDemand;
-        }
-
-        @Override
-        protected void doOnNext(Object message) {
-            boolean wasExecuted = completer.execute;
-            completer.add(message);
-            if (!wasExecuted && completer.execute) {
-                executeRoute();
-            }
             checkDemand();
         }
 
+        private void sendToCompleter() throws Throwable {
+            while (true) {
+                Object processed = contentProcessor.poll();
+                if (processed == null) {
+                    break;
+                }
+                boolean wasExecuted = completer.execute;
+                completer.add(processed);
+                if (!wasExecuted && completer.execute) {
+                    executeRoute();
+                }
+            }
+        }
+
         @Override
-        protected void doOnError(Throwable t) {
+        public void onNext(ByteBufHolder holder) {
+            upstreamRequested = false;
+            if (downstreamDone) {
+                // previous error
+                holder.release();
+                return;
+            }
+            try {
+                contentProcessor.add(holder);
+                sendToCompleter();
+                checkDemand();
+            } catch (Throwable t) {
+                handleError(t);
+            }
+        }
+
+        @Override
+        public void onError(Throwable t) {
+            if (downstreamDone) {
+                // previous error
+                LOG.warn("Downstream already complete, dropping error", t);
+                return;
+            }
+            handleError(t);
+        }
+
+        private void handleError(Throwable t) {
+            try {
+                upstream.cancel();
+            } catch (Throwable o) {
+                t.addSuppressed(o);
+            }
+            try {
+                contentProcessor.cancel();
+                sendToCompleter();
+            } catch (Throwable o) {
+                t.addSuppressed(o);
+            }
             completer.completeFailure(t);
             // this may drop the exception if the route has already been executed. However, that is
             // only the case if there are publisher parameters, and those will still receive the
             // failure. Hopefully.
             completion.completeExceptionally(t);
+            downstreamDone = true;
         }
 
         @Override
-        protected void doOnComplete() {
-            boolean wasExecuted = completer.execute;
-            completer.completeSuccess();
-            if (!wasExecuted && completer.execute) {
-                executeRoute();
+        public void onComplete() {
+            if (downstreamDone) {
+                // previous error
+                return;
+            }
+            try {
+                contentProcessor.complete();
+                sendToCompleter();
+                boolean wasExecuted = completer.execute;
+                completer.completeSuccess();
+                if (!wasExecuted && completer.execute) {
+                    executeRoute();
+                }
+            } catch (Throwable t) {
+                handleError(t);
             }
         }
 

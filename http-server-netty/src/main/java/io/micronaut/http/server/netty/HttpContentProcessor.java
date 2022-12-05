@@ -40,14 +40,13 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 public abstract class HttpContentProcessor implements Toggleable {
     private final Queue<Object> out = new ArrayDeque<>(1);
-    private boolean needsInput = false;
 
     public abstract void add(ByteBufHolder data) throws Throwable;
 
     public void complete() throws Throwable {
     }
 
-    public void cancel() {
+    public void cancel() throws Throwable {
     }
 
     protected final void offer(Object o) {
@@ -57,19 +56,6 @@ public abstract class HttpContentProcessor implements Toggleable {
     @Nullable
     public final Object poll() {
         return out.poll();
-    }
-
-    protected final void requestInput() {
-        needsInput = true;
-    }
-
-    public final boolean pollNeedsInput() {
-        if (needsInput) {
-            needsInput = false;
-            return true;
-        } else {
-            return false;
-        }
     }
 
     /**
