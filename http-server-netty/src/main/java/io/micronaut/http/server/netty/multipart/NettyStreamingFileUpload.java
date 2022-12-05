@@ -17,8 +17,8 @@ package io.micronaut.http.server.netty.multipart;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.AsyncSingleResultPublisher;
-import io.micronaut.core.util.functional.ThrowingSupplier;
 import io.micronaut.core.naming.NameUtils;
+import io.micronaut.core.util.functional.ThrowingSupplier;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.multipart.MultipartException;
 import io.micronaut.http.multipart.PartData;
@@ -56,13 +56,7 @@ public class NettyStreamingFileUpload implements StreamingFileUpload {
     private final HttpServerConfiguration.MultipartConfiguration configuration;
     private final Flux<PartData> subject;
 
-    /**
-     * @param httpData               The file upload (the data)
-     * @param multipartConfiguration The multipart configuration
-     * @param ioExecutor             The IO executor
-     * @param subject                The subject
-     */
-    public NettyStreamingFileUpload(
+    private NettyStreamingFileUpload(
         io.netty.handler.codec.http.multipart.FileUpload httpData,
         HttpServerConfiguration.MultipartConfiguration multipartConfiguration,
         ExecutorService ioExecutor,
@@ -212,5 +206,20 @@ public class NettyStreamingFileUpload implements StreamingFileUpload {
                             }
                         })
         ).flux();
+    }
+
+    public static class Factory {
+        private final HttpServerConfiguration.MultipartConfiguration multipartConfiguration;
+        private final ExecutorService ioExecutor;
+
+        public Factory(HttpServerConfiguration.MultipartConfiguration multipartConfiguration, ExecutorService ioExecutor) {
+            this.multipartConfiguration = multipartConfiguration;
+            this.ioExecutor = ioExecutor;
+        }
+
+        public NettyStreamingFileUpload create(io.netty.handler.codec.http.multipart.FileUpload httpData,
+                                               Flux<PartData> subject) {
+            return new NettyStreamingFileUpload(httpData, multipartConfiguration, ioExecutor, subject);
+        }
     }
 }

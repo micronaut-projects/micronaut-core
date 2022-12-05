@@ -34,7 +34,6 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.annotation.Body;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.context.ServerRequestContext;
@@ -47,7 +46,6 @@ import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.RouteExecutor;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.http.server.exceptions.InternalServerException;
-import io.micronaut.http.server.multipart.MultipartBody;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandler;
 import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandlerRegistry;
@@ -55,9 +53,7 @@ import io.micronaut.http.server.netty.types.files.NettyStreamedFileCustomizableR
 import io.micronaut.http.server.netty.types.files.NettySystemFileCustomizableResponseType;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
 import io.micronaut.runtime.http.codec.TextPlainCodec;
-import io.micronaut.web.router.MethodBasedRouteMatch;
 import io.micronaut.web.router.RouteInfo;
-import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.resource.StaticResourceResolver;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufOutputStream;
@@ -94,7 +90,6 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.channels.ClosedChannelException;
 import java.nio.file.Paths;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
@@ -248,9 +243,7 @@ final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.microna
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, io.micronaut.http.HttpRequest<?> httpRequest) {
-        RouteRunner routeRunner = new RouteRunner(this, ctx, httpRequest);
-
-        routeRunner.handle();
+        new RouteRunner(this, ctx, httpRequest).handle();
     }
 
     void writeResponse(ChannelHandlerContext ctx,
@@ -282,35 +275,6 @@ final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.microna
                 );
             }
         }
-    }
-
-    boolean shouldReadBody(NettyHttpRequest<?> nettyHttpRequest, RouteMatch<?> routeMatch) {
-        if (!HttpMethod.permitsRequestBody(nettyHttpRequest.getMethod())) {
-            return false;
-        }
-        io.netty.handler.codec.http.HttpRequest nativeRequest = nettyHttpRequest.getNativeRequest();
-        if (!(nativeRequest instanceof StreamedHttpRequest)) {
-            // Illegal state: The request body is required, so at this point we must have a StreamedHttpRequest
-            return false;
-        }
-        if (routeMatch instanceof MethodBasedRouteMatch<?, ?> methodBasedRouteMatch) {
-            if (Arrays.stream(methodBasedRouteMatch.getArguments()).anyMatch(argument -> MultipartBody.class.equals(argument.getType()))) {
-                // MultipartBody will subscribe to the request body in MultipartBodyArgumentBinder
-                return false;
-            }
-            if (Arrays.stream(methodBasedRouteMatch.getArguments()).anyMatch(argument -> HttpRequest.class.equals(argument.getType()))) {
-                // HttpRequest argument in the method
-                return true;
-            }
-        }
-        Optional<Argument<?>> bodyArgument = routeMatch.getBodyArgument()
-            .filter(argument -> argument.getAnnotationMetadata().hasAnnotation(Body.class));
-        if (bodyArgument.isPresent() && !routeMatch.isSatisfied(bodyArgument.get().getName())) {
-            // Body argument in the method
-            return true;
-        }
-        // Might be some body parts
-        return !routeMatch.isExecutable();
     }
 
     @Override

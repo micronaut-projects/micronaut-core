@@ -8,7 +8,6 @@ import io.netty.buffer.ByteBufHolder;
 import io.netty.util.ReferenceCountUtil;
 
 class BaseRouteCompleter {
-    final RoutingInBoundHandler rib;
     final NettyHttpRequest<?> request;
     volatile boolean needsInput = true;
     /**
@@ -20,8 +19,7 @@ class BaseRouteCompleter {
     RouteMatch<?> routeMatch;
     boolean execute = false;
 
-    public BaseRouteCompleter(RoutingInBoundHandler rib, NettyHttpRequest<?> request, RouteMatch<?> routeMatch) {
-        this.rib = rib;
+    public BaseRouteCompleter(NettyHttpRequest<?> request, RouteMatch<?> routeMatch) {
         this.request = request;
         this.routeMatch = routeMatch;
     }

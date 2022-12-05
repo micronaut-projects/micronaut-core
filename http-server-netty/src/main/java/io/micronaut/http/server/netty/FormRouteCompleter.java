@@ -1,6 +1,7 @@
 package io.micronaut.http.server.netty;
 
 import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
@@ -30,13 +31,17 @@ import java.util.function.Supplier;
 final class FormRouteCompleter extends BaseRouteCompleter {
     private static final Logger LOG = LoggerFactory.getLogger(FormRouteCompleter.class);
 
+    private final NettyStreamingFileUpload.Factory fileUploadFactory;
+    private final ConversionService conversionService;
     final boolean alwaysAddContent = request.isFormData();
     final AtomicLong pressureRequested = new AtomicLong();
     final Map<String, Sinks.Many<Object>> subjectsByDataName = new HashMap<>();
     final Collection<Sinks.Many<?>> downstreamSubscribers = new ArrayList<>();
 
-    FormRouteCompleter(RoutingInBoundHandler rib, NettyHttpRequest<?> request, RouteMatch<?> routeMatch) {
-        super(rib, request, routeMatch);
+    FormRouteCompleter(NettyStreamingFileUpload.Factory fileUploadFactory, ConversionService conversionService, NettyHttpRequest<?> request, RouteMatch<?> routeMatch) {
+        super(request, routeMatch);
+        this.fileUploadFactory = fileUploadFactory;
+        this.conversionService = conversionService;
     }
 
     private void request(long n) {
@@ -139,11 +144,7 @@ final class FormRouteCompleter extends BaseRouteCompleter {
                     Sinks.Many<PartData> childSubject = makeDownstreamUnicastProcessor();
                     Flux<PartData> flowable = withFlowControl(childSubject.asFlux(), data);
                     if (streamingFileUpload && data instanceof FileUpload) {
-                        namedSubject.tryEmitNext(new NettyStreamingFileUpload(
-                            (FileUpload) data,
-                            rib.serverConfiguration.getMultipart(),
-                            rib.getIoExecutor(),
-                            flowable));
+                        namedSubject.tryEmitNext(fileUploadFactory.create((FileUpload) data, flowable));
                     } else {
                         namedSubject.tryEmitNext(flowable);
                     }
@@ -176,15 +177,11 @@ final class FormRouteCompleter extends BaseRouteCompleter {
             if (data instanceof FileUpload &&
                 StreamingFileUpload.class.isAssignableFrom(argument.getType())) {
                 if (data.attachment.upload == null) {
-                    data.attachment.upload = new NettyStreamingFileUpload(
-                        (FileUpload) data,
-                        rib.serverConfiguration.getMultipart(),
-                        rib.getIoExecutor(),
-                        (Flux<PartData>) withFlowControl(subject.asFlux(), data));
+                    data.attachment.upload = fileUploadFactory.create((FileUpload) data, (Flux<PartData>) withFlowControl(subject.asFlux(), data));
                 }
             }
 
-            Optional<?> converted = rib.conversionService.convert(part, typeVariable);
+            Optional<?> converted = conversionService.convert(part, typeVariable);
 
             converted.ifPresent(subject::tryEmitNext);
 
