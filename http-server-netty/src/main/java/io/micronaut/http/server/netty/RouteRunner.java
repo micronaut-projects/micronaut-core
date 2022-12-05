@@ -1,5 +1,6 @@
 package io.micronaut.http.server.netty;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.execution.CompletableFutureExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.type.Argument;
@@ -28,7 +29,9 @@ import org.slf4j.LoggerFactory;
 import java.util.Arrays;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicReference;
 
+@Internal
 final class RouteRunner {
     private static final Logger LOG = LoggerFactory.getLogger(RouteRunner.class);
 
@@ -36,13 +39,13 @@ final class RouteRunner {
     private final ChannelHandlerContext ctx;
     private final NettyHttpRequest<?> request;
 
-    RouteRunner(RoutingInBoundHandler rib, ChannelHandlerContext ctx, HttpRequest<?> request) {
+    RouteRunner(RoutingInBoundHandler rib, ChannelHandlerContext ctx, NettyHttpRequest<?> request) {
         this.rib = rib;
         this.ctx = ctx;
-        this.request = (NettyHttpRequest<?>) request;
+        this.request = request;
     }
 
-    void handle() {
+    void handleNormal() {
         ctx.channel().config().setAutoRead(false);
 
         if (LOG.isDebugEnabled()) {
@@ -89,6 +92,11 @@ final class RouteRunner {
             responseFlow = rib.routeExecutor.executeRoute(requestBodyReader, request, rib.multipartEnabled, rib);
         }
         responseFlow
+            .onComplete((response, throwable) -> rib.writeResponse(ctx, request, response, throwable));
+    }
+
+    void handleException(Throwable cause) {
+        rib.routeExecutor.filterPublisher(new AtomicReference<>(request), () -> rib.routeExecutor.onError(cause, request))
             .onComplete((response, throwable) -> rib.writeResponse(ctx, request, response, throwable));
     }
 
