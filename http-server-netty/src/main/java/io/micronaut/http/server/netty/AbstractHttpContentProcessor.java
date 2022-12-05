@@ -21,6 +21,7 @@ import io.micronaut.http.server.HttpServerConfiguration;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.util.ReferenceCountUtil;
 
+import java.util.Collection;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -54,10 +55,10 @@ public abstract class AbstractHttpContentProcessor extends HttpContentProcessor 
      *
      * @param message The message
      */
-    protected abstract void onData(ByteBufHolder message) throws Throwable;
+    protected abstract void onData(ByteBufHolder message, Collection<Object> out) throws Throwable;
 
     @Override
-    public void add(ByteBufHolder message) throws Throwable {
+    public void add(ByteBufHolder message, Collection<Object> out) throws Throwable {
         long receivedLength = this.receivedLength.addAndGet(message.content().readableBytes());
 
         ReferenceCountUtil.touch(message);
@@ -66,7 +67,7 @@ public abstract class AbstractHttpContentProcessor extends HttpContentProcessor 
         } else if (receivedLength > requestMaxSize) {
             fireExceedsLength(receivedLength, requestMaxSize, message);
         } else {
-            onData(message);
+            onData(message, out);
         }
     }
 

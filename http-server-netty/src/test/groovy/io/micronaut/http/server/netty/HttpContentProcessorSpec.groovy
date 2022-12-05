@@ -14,18 +14,13 @@ class HttpContentProcessorSpec extends Specification {
         def out = []
         def processor = new HttpContentProcessor() {
             @Override
-            void add(ByteBufHolder data) {
-                offer(data.content().toString(StandardCharsets.UTF_8))
+            void add(ByteBufHolder data, Collection<Object> o) {
+                o.add(data.content().toString(StandardCharsets.UTF_8))
             }
 
             @Override
-            void complete() {
-                offer("complete HCP")
-            }
-
-            @Override
-            void cancel() {
-                offer("cancel")
+            void complete(Collection<Object> o) {
+                o.add("complete HCP")
             }
         }.asProcessor()
 

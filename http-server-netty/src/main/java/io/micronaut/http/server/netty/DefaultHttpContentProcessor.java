@@ -25,6 +25,7 @@ import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.multipart.HttpData;
 import io.netty.util.ReferenceCountUtil;
 
+import java.util.Collection;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -62,7 +63,7 @@ public class DefaultHttpContentProcessor extends HttpContentProcessor {
     }
 
     @Override
-    public void add(ByteBufHolder message) {
+    public void add(ByteBufHolder message, Collection<Object> out) {
         long receivedLength = this.receivedLength.addAndGet(resolveLength(message));
 
         if (advertisedLength > requestMaxSize) {
@@ -70,7 +71,7 @@ public class DefaultHttpContentProcessor extends HttpContentProcessor {
         } else if (receivedLength > requestMaxSize) {
             fireExceedsLength(receivedLength, requestMaxSize, message);
         } else {
-            offer(message);
+            out.add(message);
         }
     }
 

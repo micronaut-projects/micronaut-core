@@ -34,6 +34,7 @@ import io.netty.handler.codec.http.multipart.InterfaceHttpPostRequestDecoder;
 
 import java.io.IOException;
 import java.nio.charset.Charset;
+import java.util.Collection;
 
 /**
  * <p>Decodes {@link MediaType#MULTIPART_FORM_DATA} in a non-blocking manner.</p>
@@ -89,7 +90,7 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor {
     }
 
     @Override
-    protected void onData(ByteBufHolder message) {
+    protected void onData(ByteBufHolder message, Collection<Object> out) {
         boolean skip;
         synchronized (this) {
             if (destroyed) {
@@ -104,10 +105,7 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor {
             return;
         }
         try {
-            if (message instanceof HttpContent) {
-                HttpContent httpContent = (HttpContent) message;
-                boolean anyResults = false;
-
+            if (message instanceof HttpContent httpContent) {
                 try {
                     InterfaceHttpPostRequestDecoder postRequestDecoder = this.decoder;
                     postRequestDecoder.offer(httpContent);
@@ -116,32 +114,27 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor {
                         InterfaceHttpData data = postRequestDecoder.next();
                         data.touch();
                         switch (data.getHttpDataType()) {
-                            case Attribute:
+                            case Attribute -> {
                                 Attribute attribute = (Attribute) data;
                                 // bodyListHttpData keeps a copy and releases it later
-                                offer(attribute.retain());
-                                anyResults = true;
+                                out.add(attribute.retain());
                                 postRequestDecoder.removeHttpDataFromClean(attribute);
-                                break;
-                            case FileUpload:
+                            }
+                            case FileUpload -> {
                                 FileUpload fileUpload = (FileUpload) data;
                                 if (fileUpload.isCompleted()) {
                                     // bodyListHttpData keeps a copy and releases it later
-                                    offer(fileUpload.retain());
-                                    anyResults = true;
+                                    out.add(fileUpload.retain());
                                     postRequestDecoder.removeHttpDataFromClean(fileUpload);
                                 }
-                                break;
-                            default:
-                                // no-op
+                            }
                         }
                     }
 
                     InterfaceHttpData currentPartialHttpData = postRequestDecoder.currentPartialHttpData();
                     if (currentPartialHttpData instanceof HttpData) {
                         // can't give away ownership of this data yet, so retain it
-                        offer(currentPartialHttpData.retain());
-                        anyResults = true;
+                        out.add(currentPartialHttpData.retain());
                     }
 
                 } catch (HttpPostRequestDecoder.EndOfDataDecoderException e) {
@@ -167,24 +160,24 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor {
     }
 
     @Override
-    public void add(ByteBufHolder message) throws Throwable {
+    public void add(ByteBufHolder message, Collection<Object> out) throws Throwable {
         try {
-            super.add(message);
+            super.add(message, out);
         } catch (Throwable e) {
-            complete();
+            cancel();
             throw e;
         }
     }
 
     @Override
-    public void complete() {
-        pleaseDestroy = true;
-        destroyIfRequested();
+    public void complete(Collection<Object> out) {
+        cancel();
     }
 
     @Override
     public void cancel() {
-        complete();
+        pleaseDestroy = true;
+        destroyIfRequested();
     }
 
     private void destroyIfRequested() {

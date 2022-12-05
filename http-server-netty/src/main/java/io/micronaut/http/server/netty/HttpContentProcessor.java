@@ -16,7 +16,6 @@
 package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.Toggleable;
 import io.micronaut.http.netty.stream.StreamedHttpMessage;
@@ -27,35 +26,48 @@ import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * A reactive streams {@link org.reactivestreams.Processor} that processes incoming {@link ByteBufHolder} and
- * outputs a given type.
+ * This class represents the first step of the HTTP body parsing pipeline. It transforms
+ * {@link ByteBufHolder} instances that come from a
+ * {@link io.micronaut.http.netty.stream.StreamedHttpRequest} into parsed objects, e.g. json nodes
+ * or form data fragments.<br>
+ * Processors are stateful. They can receive repeated calls to {@link #add} with more data,
+ * followed by a call to {@link #complete} to finish up. Both of these methods accept a
+ * {@link Collection} {@code out} parameter that is populated with the processed items.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public abstract class HttpContentProcessor implements Toggleable {
-    private final Queue<Object> out = new ArrayDeque<>(1);
+    /**
+     * Process more data.
+     *
+     * @param data The input data
+     * @param out The collection to add output items to
+     */
+    public abstract void add(ByteBufHolder data, Collection<Object> out) throws Throwable;
 
-    public abstract void add(ByteBufHolder data) throws Throwable;
-
-    public void complete() throws Throwable {
+    /**
+     * Finish processing data.
+     *
+     * @param out The collection to add remaining output items to
+     */
+    public void complete(Collection<Object> out) throws Throwable {
     }
 
+    /**
+     * Cancel processing, clean up any data. After this, there should be no more calls to
+     * {@link #add} and {@link #complete}.
+     */
     public void cancel() throws Throwable {
-    }
-
-    protected final void offer(Object o) {
-        out.add(o);
-    }
-
-    @Nullable
-    public final Object poll() {
-        return out.poll();
     }
 
     /**
@@ -70,10 +82,21 @@ public abstract class HttpContentProcessor implements Toggleable {
     }
 
     @Internal
-    public final Processor<ByteBufHolder, ?> asProcessor() {
+    final Processor<ByteBufHolder, ?> asProcessor() {
         return new ProcessorImpl();
     }
 
+    /**
+     * Subscribe to the {@link StreamedHttpMessage} in the given request, and return a
+     * {@link Publisher} that will produce the processed items.<br>
+     * This exists mostly for compatibility with the old {@link HttpContentProcessor}, which was a
+     * {@link Processor}.
+     *
+     * @param request The request to subscribe to
+     * @return The publisher producing output data
+     * @param <T> The output element type
+     */
+    @SuppressWarnings("unchecked")
     @Internal
     public final <T> Publisher<T> asPublisher(NettyHttpRequest<?> request) {
         StreamedHttpMessage streamed = (StreamedHttpMessage) request.getNativeRequest();
@@ -82,7 +105,13 @@ public abstract class HttpContentProcessor implements Toggleable {
         return (Publisher<T>) processor;
     }
 
+    /**
+     * {@link Subscriber} that processes the incoming bytes, and calls
+     * {@link #notifyContentAvailable} with any new output.
+     */
     private abstract class SubscriberImpl implements Subscriber<ByteBufHolder> {
+        final List<Object> outBuffer = new ArrayList<>(1);
+
         Subscription upstream;
         Throwable failure;
         boolean done;
@@ -97,12 +126,13 @@ public abstract class HttpContentProcessor implements Toggleable {
 
         @Override
         public void onNext(ByteBufHolder holder) {
+            outBuffer.clear();
             try {
-                add(holder);
+                add(holder, outBuffer);
             } catch (Throwable t) {
                 failure = t;
             }
-            notifyContentAvailable();
+            notifyContentAvailable(outBuffer);
         }
 
         @Override
@@ -114,31 +144,38 @@ public abstract class HttpContentProcessor implements Toggleable {
             }
             failure = t;
             done = true;
-            notifyContentAvailable();
+            // cancel does not produce data, but we still need to do this call to process the
+            // failure
+            notifyContentAvailable(Collections.emptyList());
         }
 
         @Override
         public void onComplete() {
+            outBuffer.clear();
             try {
-                complete();
+                complete(outBuffer);
             } catch (Throwable t) {
                 failure = t;
             }
             done = true;
-            notifyContentAvailable();
+            notifyContentAvailable(outBuffer);
         }
 
         final void requestContent() {
             upstream.request(1);
         }
 
-        abstract void notifyContentAvailable();
+        abstract void notifyContentAvailable(Collection<Object> out);
     }
 
+    /**
+     * Extension of {@link SubscriberImpl} that is also a {@link Publisher}. This class is a bit
+     * more complicated because it has to deal with downstream demand, possibly concurrently.
+     */
     private class ProcessorImpl extends SubscriberImpl implements Processor<ByteBufHolder, Object> {
         private static final Object END = new Object();
 
-        // we use this essentially like a lock, but it's *not* reentrant
+        // we use this essentially like a lock, except it's *not* reentrant
         private final Semaphore forwardLock = new Semaphore(1);
         private volatile boolean dirty;
 
@@ -230,16 +267,10 @@ public abstract class HttpContentProcessor implements Toggleable {
         }
 
         @Override
-        void notifyContentAvailable() {
+        void notifyContentAvailable(Collection<Object> out) {
             forwardLock.acquireUninterruptibly();
             try {
-                while (true) {
-                    Object item = poll();
-                    if (item == null) {
-                        break;
-                    }
-                    guardedQueue.add(item);
-                }
+                guardedQueue.addAll(out);
                 if (done) {
                     guardedQueue.add(END);
                 }

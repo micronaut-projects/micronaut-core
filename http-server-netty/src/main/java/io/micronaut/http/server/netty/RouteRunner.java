@@ -26,7 +26,10 @@ import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReference;
@@ -130,6 +133,7 @@ final class RouteRunner {
     }
 
     private static class StreamingDataSubscriber implements Subscriber<ByteBufHolder> {
+        private final List<Object> bufferList = new ArrayList<>(1);
         private final HttpContentProcessor contentProcessor;
         private final BaseRouteCompleter completer;
         private Subscription upstream;
@@ -160,12 +164,8 @@ final class RouteRunner {
             checkDemand();
         }
 
-        private void sendToCompleter() throws Throwable {
-            while (true) {
-                Object processed = contentProcessor.poll();
-                if (processed == null) {
-                    break;
-                }
+        private void sendToCompleter(Collection<Object> out) throws Throwable {
+            for (Object processed : out) {
                 boolean wasExecuted = completer.execute;
                 completer.add(processed);
                 if (!wasExecuted && completer.execute) {
@@ -183,8 +183,9 @@ final class RouteRunner {
                 return;
             }
             try {
-                contentProcessor.add(holder);
-                sendToCompleter();
+                bufferList.clear();
+                contentProcessor.add(holder, bufferList);
+                sendToCompleter(bufferList);
                 checkDemand();
             } catch (Throwable t) {
                 handleError(t);
@@ -209,7 +210,6 @@ final class RouteRunner {
             }
             try {
                 contentProcessor.cancel();
-                sendToCompleter();
             } catch (Throwable o) {
                 t.addSuppressed(o);
             }
@@ -228,8 +228,9 @@ final class RouteRunner {
                 return;
             }
             try {
-                contentProcessor.complete();
-                sendToCompleter();
+                bufferList.clear();
+                contentProcessor.complete(bufferList);
+                sendToCompleter(bufferList);
                 boolean wasExecuted = completer.execute;
                 completer.completeSuccess();
                 if (!wasExecuted && completer.execute) {

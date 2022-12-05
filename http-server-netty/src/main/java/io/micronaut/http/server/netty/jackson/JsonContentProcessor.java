@@ -33,6 +33,7 @@ import io.netty.util.ReferenceCountUtil;
 import org.reactivestreams.Processor;
 import org.reactivestreams.Subscription;
 
+import java.util.Collection;
 import java.util.Optional;
 
 /**
@@ -47,7 +48,7 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor {
 
     private final JsonMapper jsonMapper;
     private Processor<byte[], JsonNode> jacksonProcessor;
-    private boolean inFlight = false;
+    private Collection<Object> out;
     private Throwable failure = null;
 
     /**
@@ -93,15 +94,15 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor {
 
             @Override
             protected void doOnNext(JsonNode message) {
-                if (!inFlight) {
+                if (out == null) {
                     throw new IllegalStateException("Concurrent access not allowed");
                 }
-                offer(message);
+                out.add(message);
             }
 
             @Override
             protected void doOnError(Throwable t) {
-                if (!inFlight) {
+                if (out == null) {
                     throw new IllegalStateException("Concurrent access not allowed");
                 }
                 failure = t;
@@ -109,7 +110,7 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor {
 
             @Override
             protected void doOnComplete() {
-                if (!inFlight) {
+                if (out == null) {
                     throw new IllegalStateException("Concurrent access not allowed");
                 }
             }
@@ -128,19 +129,19 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor {
     }
 
     @Override
-    protected void onData(ByteBufHolder message) throws Throwable {
+    protected void onData(ByteBufHolder message, Collection<Object> out) throws Throwable {
         if (jacksonProcessor == null) {
             resultType(null);
         }
 
-        inFlight = true;
+        this.out = out;
         ByteBuf content = message.content();
         try {
             byte[] bytes = ByteBufUtil.getBytes(content);
             jacksonProcessor.onNext(bytes);
         } finally {
             ReferenceCountUtil.release(content);
-            inFlight = false;
+            this.out = null;
         }
         Throwable f = failure;
         if (f != null) {
@@ -150,14 +151,14 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor {
     }
 
     @Override
-    public void complete() throws Throwable {
+    public void complete(Collection<Object> out) throws Throwable {
         if (jacksonProcessor == null) {
             resultType(null);
         }
 
-        inFlight = true;
+        this.out = out;
         jacksonProcessor.onComplete();
-        inFlight = false;
+        this.out = null;
         Throwable f = failure;
         if (f != null) {
             failure = null;
