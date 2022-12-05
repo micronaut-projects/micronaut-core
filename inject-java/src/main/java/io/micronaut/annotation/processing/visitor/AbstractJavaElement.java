@@ -111,17 +111,17 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
      */
     protected abstract AbstractJavaElement copyThis();
 
+    protected final AbstractJavaElement makeCopy() {
+        AbstractJavaElement element = copyThis();
+        copyValues(element);
+        return element;
+    }
+
     /**
      * @param element the values to be copied to
      */
     protected void copyValues(AbstractJavaElement element) {
         element.presetAnnotationMetadata = presetAnnotationMetadata;
-    }
-
-    protected final AbstractJavaElement makeCopy() {
-        AbstractJavaElement element = copyThis();
-        copyValues(element);
-        return element;
     }
 
     @Override

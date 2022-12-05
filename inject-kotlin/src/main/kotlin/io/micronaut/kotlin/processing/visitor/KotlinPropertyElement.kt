@@ -21,11 +21,11 @@ import com.google.devtools.ksp.symbol.KSNode
 import com.google.devtools.ksp.symbol.KSPropertyDeclaration
 import com.google.devtools.ksp.symbol.Modifier
 import io.micronaut.core.annotation.AnnotationMetadata
-import io.micronaut.core.naming.NameUtils
 import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.ast.MemberElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.PropertyElement
-import java.lang.RuntimeException
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 import java.util.*
 
 class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
@@ -40,8 +40,8 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
     constructor(classElement: ClassElement,
                 type: ClassElement,
                 property: KSPropertyDeclaration,
-                annotationMetadata: AnnotationMetadata,
-                visitorContext: KotlinVisitorContext) : super(property, annotationMetadata, visitorContext) {
+                elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
+                visitorContext: KotlinVisitorContext) : super(property, elementAnnotationMetadataFactory, visitorContext) {
         this.name = property.simpleName.asString()
         this.type = type
         this.classElement = classElement
@@ -50,12 +50,12 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
                 return@map if (method.modifiers.contains(Modifier.PRIVATE)) {
                     null
                 } else {
-                    visitorContext.elementFactory.newMethodElement(classElement, method, type, annotationMetadata)
+                    visitorContext.elementFactory.newMethodElement(classElement, method, type, elementAnnotationMetadataFactory)
                 }
             }
         this.getter = Optional.ofNullable(property.getter)
             .map { method ->
-                return@map visitorContext.elementFactory.newMethodElement(classElement, method, type, annotationMetadata)
+                return@map visitorContext.elementFactory.newMethodElement(classElement, method, type, elementAnnotationMetadataFactory)
             }
         this.abstract = property.isAbstract()
     }
@@ -64,16 +64,16 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
                 name: String,
                 getter: KSFunctionDeclaration,
                 setter: KSFunctionDeclaration?,
-                annotationMetadata: AnnotationMetadata,
-                visitorContext: KotlinVisitorContext) : super(getter, annotationMetadata, visitorContext) {
+                elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
+                visitorContext: KotlinVisitorContext) : super(getter, elementAnnotationMetadataFactory, visitorContext) {
         this.name = name
         this.type = type
         this.classElement = classElement
         this.setter = Optional.ofNullable(setter)
             .map { method ->
-                return@map visitorContext.elementFactory.newMethodElement(classElement, method, annotationMetadata)
+                return@map visitorContext.elementFactory.newMethodElement(classElement, method, elementAnnotationMetadataFactory)
             }
-        this.getter = Optional.of(visitorContext.elementFactory.newMethodElement(classElement, getter, annotationMetadata))
+        this.getter = Optional.of(visitorContext.elementFactory.newMethodElement(classElement, getter, elementAnnotationMetadataFactory))
         this.abstract = getter.isAbstract || setter?.isAbstract == true
     }
 
@@ -91,5 +91,32 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
         return !setter.isPresent || setter.get().isPrivate
     }
 
+    override fun copyThis(): AbstractKotlinElement<KSNode> {
+        if (nativeType is KSPropertyDeclaration) {
+            val property : KSPropertyDeclaration = nativeType as KSPropertyDeclaration
+            return KotlinPropertyElement(
+                classElement,
+                type,
+                property,
+                annotationMetadataFactory,
+                visitorContext
+            )
+        } else {
+            val getter : KSFunctionDeclaration = nativeType as KSFunctionDeclaration
+            return KotlinPropertyElement(
+                classElement,
+                type,
+                name,
+                getter,
+                setter.map { it.nativeType as KSFunctionDeclaration }.orElse(null),
+                annotationMetadataFactory,
+                visitorContext
+            )
+        }
+    }
+
     override fun isAbstract() = abstract
+    override fun withAnnotationMetadata(annotationMetadata: AnnotationMetadata): MemberElement {
+        return super<AbstractKotlinElement>.withAnnotationMetadata(annotationMetadata) as MemberElement
+    }
 }

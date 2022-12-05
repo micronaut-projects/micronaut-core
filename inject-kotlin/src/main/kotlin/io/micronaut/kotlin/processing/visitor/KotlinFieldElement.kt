@@ -20,13 +20,15 @@ import com.google.devtools.ksp.symbol.KSNode
 import com.google.devtools.ksp.symbol.KSPropertyDeclaration
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.ast.Element
 import io.micronaut.inject.ast.FieldElement
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 
 class KotlinFieldElement(declaration: KSPropertyDeclaration,
                          private val declaringType: ClassElement,
-                         annotationMetadata: AnnotationMetadata,
+                         elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
                          visitorContext: KotlinVisitorContext
-) : AbstractKotlinElement<KSPropertyDeclaration>(declaration, annotationMetadata, visitorContext), FieldElement {
+) : AbstractKotlinElement<KSPropertyDeclaration>(declaration, elementAnnotationMetadataFactory, visitorContext), FieldElement {
 
     override fun getName(): String {
         return declaration.simpleName.asString()
@@ -36,7 +38,14 @@ class KotlinFieldElement(declaration: KSPropertyDeclaration,
        return visitorContext.elementFactory.newClassElement(declaration.type.resolve())
     }
 
+    override fun copyThis(): AbstractKotlinElement<KSPropertyDeclaration> {
+        return KotlinFieldElement(declaration, declaringType, annotationMetadataFactory, visitorContext)
+    }
+
     override fun isPrivate(): Boolean = true
+    override fun withAnnotationMetadata(annotationMetadata: AnnotationMetadata): FieldElement {
+        return super<AbstractKotlinElement>.withAnnotationMetadata(annotationMetadata) as FieldElement
+    }
 
     override fun getDeclaringType() = declaringType
 }

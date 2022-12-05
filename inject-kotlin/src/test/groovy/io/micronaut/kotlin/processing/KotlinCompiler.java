@@ -57,7 +57,7 @@ public class KotlinCompiler {
                 new File(kspCompilation.getWorkingDir(), "ksp/classes"),
                 new File(kspCompilation.getWorkingDir(), "ksp/sources/resources"),
                 compilation.getClassesDir()));
-        KspKt.setSymbolProcessorProviders(kspCompilation, Arrays.asList(new TypeElementSymbolProcessorProvider(), new BeanDefinitionProcessorProvider(), new ServiceDescriptionProcessorProvider()));
+        KspKt.setSymbolProcessorProviders(kspCompilation, Arrays.asList(new TypeElementSymbolProcessorProvider(), new BeanDefinitionProcessorProvider()));
 
         result = kspCompilation.compile();
         if (result.getExitCode() != KotlinCompilation.ExitCode.OK) {

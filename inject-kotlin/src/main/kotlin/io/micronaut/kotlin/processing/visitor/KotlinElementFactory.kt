@@ -21,9 +21,11 @@ import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
 import io.micronaut.inject.annotation.MutableAnnotationMetadata
 import io.micronaut.inject.ast.*
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 import io.micronaut.kotlin.processing.isTypeReference
 
-class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): ElementFactory<Any, KSType, KSFunctionDeclaration, KSPropertyDeclaration> {
+class KotlinElementFactory(
+    private val visitorContext: KotlinVisitorContext): ElementFactory<Any, KSType, KSFunctionDeclaration, KSPropertyDeclaration> {
 
     companion object {
         val primitives = mapOf(
@@ -52,34 +54,43 @@ class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): El
     fun newClassElement(
         type: KSType
     ): ClassElement {
-        return newClassElement(type, visitorContext.getAnnotationUtils().getAnnotationMetadata(type.declaration))
+        return newClassElement(type, visitorContext.elementAnnotationMetadataFactory)
     }
 
     fun newClassElement(
         type: KSType,
         resolvedGenerics: Map<String, ClassElement>
     ): ClassElement {
-        return newClassElement(type, visitorContext.getAnnotationUtils().getAnnotationMetadata(type.declaration), resolvedGenerics)
-    }
-
-    override fun newClassElement(type: KSType, annotationMetadata: AnnotationMetadata): ClassElement {
-        return newClassElement(type, annotationMetadata, false)
-    }
-
-    private fun newClassElement(type: KSType, annotationMetadata: AnnotationMetadata, typeVariable: Boolean): ClassElement {
-        return newClassElement(type, annotationMetadata, emptyMap(), !typeVariable)
+        return newClassElement(type, visitorContext.elementAnnotationMetadataFactory, resolvedGenerics)
     }
 
     override fun newClassElement(
         type: KSType,
-        annotationMetadata: AnnotationMetadata,
+        annotationMetadataFactory: ElementAnnotationMetadataFactory
+    ): ClassElement {
+        return newClassElement(
+            type,
+            annotationMetadataFactory,
+            emptyMap(),
+            true
+        )
+    }
+
+    override fun newClassElement(
+        type: KSType,
+        annotationMetadataFactory: ElementAnnotationMetadataFactory,
         resolvedGenerics: Map<String, ClassElement>
     ): ClassElement {
-        return newClassElement(type, annotationMetadata, resolvedGenerics, true)
+        return newClassElement(
+            type,
+            annotationMetadataFactory,
+            resolvedGenerics,
+            true
+        )
     }
 
     fun newClassElement(type: KSType,
-                        annotationMetadata: AnnotationMetadata,
+                        elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
                         resolvedGenerics: Map<String, ClassElement>,
                         allowPrimitive: Boolean): ClassElement {
         val declaration = type.declaration
@@ -90,14 +101,14 @@ class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): El
         }
         if (qualifiedName == "kotlin.Array") {
             val component = type.arguments[0].type!!.resolve()
-            val componentElement = newClassElement(component, annotationMetadata, resolvedGenerics, false)
+            val componentElement = newClassElement(component, elementAnnotationMetadataFactory, resolvedGenerics, false)
             return componentElement.toArray()
         } else if (declaration is KSTypeParameter) {
             val name = declaration.name.asString()
             return if (resolvedGenerics.containsKey(name)) {
                 resolvedGenerics[name]!!
             } else {
-                KotlinGenericPlaceholderElement(declaration, annotationMetadata, visitorContext)
+                KotlinGenericPlaceholderElement(declaration, elementAnnotationMetadataFactory, visitorContext)
             }
         }
         if (allowPrimitive && !type.isMarkedNullable) {
@@ -107,132 +118,121 @@ class KotlinElementFactory(private val visitorContext: KotlinVisitorContext): El
             }
         }
         return if (declaration is KSClassDeclaration && declaration.classKind == ClassKind.ENUM_CLASS) {
-            KotlinEnumElement(type, annotationMetadata, visitorContext)
+            KotlinEnumElement(type, elementAnnotationMetadataFactory, visitorContext)
         } else {
-            KotlinClassElement(type, annotationMetadata, visitorContext, resolvedGenerics)
+            KotlinClassElement(type, elementAnnotationMetadataFactory, visitorContext, resolvedGenerics)
         }
     }
 
-    fun newPropertyElement(declaringClass: ClassElement, propertyDeclaration: KSPropertyDeclaration): PropertyElement {
-        val type = propertyDeclaration.type.resolve()
-        val parents = mutableListOf<KSAnnotated>()
-        if (propertyDeclaration.getter != null) {
-            parents.add(propertyDeclaration.getter!!)
-        }
-        if (propertyDeclaration.setter != null) {
-            parents.add(propertyDeclaration.setter!!)
-        }
-        val annotationMetadata = if (parents.isNotEmpty()) {
-            visitorContext.getAnnotationUtils().getAnnotationMetadata(parents, propertyDeclaration)
-        } else {
-            visitorContext.getAnnotationUtils().getAnnotationMetadata(propertyDeclaration)
-        }
-        return KotlinPropertyElement(
-            declaringClass,
-            newClassElement(
-                type,
-                visitorContext.getAnnotationUtils().getAnnotationMetadata(type.declaration),
-                declaringClass.typeArguments,
-                !propertyDeclaration.isTypeReference()),
-            propertyDeclaration,
-            annotationMetadata,
-            visitorContext
-        )
-    }
-
-    override fun newSourceClassElement(type: KSType, annotationMetadata: AnnotationMetadata): ClassElement {
-        TODO("Not yet implemented")
+    override fun newSourceClassElement(
+        type: KSType,
+        elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory
+    ): ClassElement {
+        return newClassElement(type, elementAnnotationMetadataFactory)
     }
 
     override fun newSourceMethodElement(
-        declaringClass: ClassElement,
+        owningClass: ClassElement,
         method: KSFunctionDeclaration,
-        annotationMetadata: AnnotationMetadata
+        elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory
     ): MethodElement {
         TODO("Not yet implemented")
+        return newMethodElement(
+            owningClass, method, elementAnnotationMetadataFactory
+        )
     }
 
     override fun newMethodElement(
-        declaringClass: ClassElement,
+        owningClass: ClassElement,
         method: KSFunctionDeclaration,
-        annotationMetadata: AnnotationMetadata
-    ): KotlinMethodElement {
-        return newMethodElement(declaringClass, method, annotationMetadata, declaringClass.typeArguments)
+        elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory
+    ): MethodElement {
+        return newMethodElement(owningClass, method, elementAnnotationMetadataFactory, owningClass.typeArguments)
     }
 
     fun newMethodElement(
         declaringClass: ClassElement,
         method: KSFunctionDeclaration,
-        annotationMetadata: AnnotationMetadata,
+        elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
         typeArguments: Map<String, ClassElement>
     ): KotlinMethodElement {
-        val annotationUtils = visitorContext.getAnnotationUtils()
         val returnType = method.returnType!!.resolve()
 
         val allTypeArguments = mutableMapOf<String, ClassElement>()
         allTypeArguments.putAll(typeArguments)
         method.typeParameters.forEach {
-            allTypeArguments[it.name.asString()] = KotlinGenericPlaceholderElement(it, annotationUtils.getAnnotationMetadata(it), visitorContext)
+            allTypeArguments[it.name.asString()] = KotlinGenericPlaceholderElement(it, elementAnnotationMetadataFactory, visitorContext)
         }
 
-        if (returnType.isMarkedNullable && annotationMetadata is MutableAnnotationMetadata) {
-            annotationMetadata.addDeclaredAnnotation(AnnotationUtil.NULLABLE, emptyMap())
-        }
 
-        val returnTypeElement = newClassElement(returnType, annotationUtils.getAnnotationMetadata(returnType.declaration))
-        val genericReturnTypeElement = newClassElement(returnType, annotationUtils.getAnnotationMetadata(returnType.declaration), allTypeArguments)
 
-        return KotlinMethodElement(
+        val returnTypeElement = newClassElement(returnType, elementAnnotationMetadataFactory)
+        val genericReturnTypeElement = newClassElement(returnType, elementAnnotationMetadataFactory, allTypeArguments)
+
+        val kotlinMethodElement = KotlinMethodElement(
             method,
             declaringClass,
             returnTypeElement,
             genericReturnTypeElement,
             method.parameters.map { param ->
-                KotlinParameterElement(newClassElement(param.type.resolve(), allTypeArguments), newClassElement(param.type.resolve()), param, annotationUtils.getAnnotationMetadata(param), visitorContext)
+                KotlinParameterElement(
+                    newClassElement(param.type.resolve(), allTypeArguments),
+                    newClassElement(param.type.resolve()),
+                    param,
+                    elementAnnotationMetadataFactory,
+                    visitorContext
+                )
             },
-            annotationMetadata,
-            visitorContext)
+            elementAnnotationMetadataFactory,
+            visitorContext
+        )
+        if (returnType.isMarkedNullable) {
+            kotlinMethodElement.annotate(AnnotationUtil.NULLABLE)
+        }
+        return kotlinMethodElement
     }
 
     fun newMethodElement(
         declaringClass: ClassElement,
         method: KSPropertyGetter,
         type: ClassElement,
-        annotationMetadata: AnnotationMetadata
+        elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory
     ): MethodElement {
-        return KotlinMethodElement(method, declaringClass, type, annotationMetadata, visitorContext)
+        return KotlinMethodElement(method, declaringClass, type, elementAnnotationMetadataFactory, visitorContext)
     }
 
     fun newMethodElement(
         declaringClass: ClassElement,
         method: KSPropertySetter,
         type: ClassElement,
-        annotationMetadata: AnnotationMetadata
+        elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory
     ): MethodElement {
-        val annotationUtils = visitorContext.getAnnotationUtils()
-        return KotlinMethodElement(method, declaringClass, annotationMetadata, visitorContext, KotlinParameterElement(type, type, method.parameter, AnnotationMetadataHierarchy(annotationMetadata, annotationUtils.getAnnotationMetadata(method.parameter)), visitorContext))
+        return KotlinMethodElement(method, declaringClass, elementAnnotationMetadataFactory, visitorContext, KotlinParameterElement(type, type, method.parameter, elementAnnotationMetadataFactory, visitorContext))
     }
 
     override fun newConstructorElement(
-        declaringClass: ClassElement,
+        owningClass: ClassElement,
         constructor: KSFunctionDeclaration,
-        annotationMetadata: AnnotationMetadata
+        elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory
     ): ConstructorElement {
-        val annotationUtils = visitorContext.getAnnotationUtils()
-        return KotlinConstructorElement(constructor, declaringClass, annotationMetadata, visitorContext, declaringClass, constructor.parameters.map { param ->
-            KotlinParameterElement(newClassElement(param.type.resolve(), declaringClass.typeArguments), newClassElement(param.type.resolve()), param, annotationUtils.getAnnotationMetadata(param), visitorContext)
+        return KotlinConstructorElement(constructor, owningClass, elementAnnotationMetadataFactory, visitorContext, owningClass, constructor.parameters.map { param ->
+            KotlinParameterElement(newClassElement(param.type.resolve(), owningClass.typeArguments), newClassElement(param.type.resolve()), param, elementAnnotationMetadataFactory, visitorContext)
         })
     }
 
     override fun newFieldElement(
-        declaringClass: ClassElement,
+        owningClass: ClassElement,
         field: KSPropertyDeclaration,
-        annotationMetadata: AnnotationMetadata
+        elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory
     ): FieldElement {
-        return KotlinFieldElement(field, declaringClass, annotationMetadata, visitorContext)
+        return KotlinFieldElement(field, owningClass, elementAnnotationMetadataFactory, visitorContext)
     }
 
-    override fun newFieldElement(field: KSPropertyDeclaration, annotationMetadata: AnnotationMetadata): FieldElement {
+    override fun newEnumConstantElement(
+        owningClass: ClassElement?,
+        enumConstant: KSPropertyDeclaration?,
+        elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory?
+    ): EnumConstantElement {
         TODO("Not yet implemented")
     }
 }

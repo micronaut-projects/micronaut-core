@@ -21,7 +21,6 @@ import com.google.devtools.ksp.symbol.KSType
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.order.Ordered
 import io.micronaut.inject.visitor.TypeElementVisitor
-import org.omg.CORBA.Object
 import java.util.*
 
 class LoadedVisitor(val visitor: TypeElementVisitor<*, *>,
@@ -75,8 +74,7 @@ class LoadedVisitor(val visitor: TypeElementVisitor<*, *>,
         if (classAnnotation == "java.lang.Object") {
             return true
         }
-        val annotationMetadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(classDeclaration)
-
+        val annotationMetadata = visitorContext.annotationMetadataBuilder.buildDeclared(classDeclaration)
         return annotationMetadata.hasStereotype(classAnnotation)
     }
 

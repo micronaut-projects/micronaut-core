@@ -15,12 +15,11 @@
  */
 package io.micronaut.kotlin.processing.visitor
 
-import com.google.devtools.ksp.closestClassDeclaration
+import com.google.devtools.ksp.isConstructor
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.symbol.*
-import com.google.devtools.ksp.visitor.KSDefaultVisitor
 import com.google.devtools.ksp.visitor.KSTopDownVisitor
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.annotation.Requires.Sdk
@@ -29,13 +28,10 @@ import io.micronaut.core.annotation.NonNull
 import io.micronaut.core.order.OrderUtil
 import io.micronaut.core.util.StringUtils
 import io.micronaut.core.version.VersionUtils
-import io.micronaut.inject.processing.JavaModelUtils
+import io.micronaut.inject.ast.*
 import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.inject.visitor.VisitorContext
-import io.micronaut.kotlin.processing.isTypeReference
 import java.util.*
-import java.util.function.Predicate
-import java.util.stream.Collectors
 
 class TypeElementSymbolProcessor(private val environment: SymbolProcessorEnvironment): SymbolProcessor {
 
@@ -183,8 +179,6 @@ class TypeElementSymbolProcessor(private val environment: SymbolProcessorEnviron
     private class ElementVisitor(private val loadedVisitor: LoadedVisitor,
     private val classDeclaration: KSClassDeclaration) : KSTopDownVisitor<Any, Any>() {
 
-        val excludes: MutableSet<KSDeclaration> = mutableSetOf()
-
         override fun visitClassDeclaration(classDeclaration: KSClassDeclaration, data: Any): Any {
             if (classDeclaration.qualifiedName!!.asString() == "kotlin.Any") {
                 return data
@@ -194,96 +188,76 @@ class TypeElementSymbolProcessor(private val environment: SymbolProcessorEnviron
             }
             if (classDeclaration == this.classDeclaration) {
                 val visitorContext = loadedVisitor.visitorContext
-                val annotationMetadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(classDeclaration)
                 val classElement = visitorContext.elementFactory.newClassElement(
                     classDeclaration.asStarProjectedType(),
-                    annotationMetadata
+                    visitorContext.elementAnnotationMetadataFactory
                 )
                 loadedVisitor.visitor.visitClass(classElement, visitorContext)
-            }
-            visitDeclaration(classDeclaration, data)
-            visitDeclarationContainer(classDeclaration, data)
-            classDeclaration.superTypes.map {
-                it.resolve().declaration as KSClassDeclaration
-            }.forEach { it.accept(this, data) }
-            return data
-        }
 
-        override fun visitFunctionDeclaration(function: KSFunctionDeclaration, data: Any): Any {
-            val overridee = function.findOverridee()
-            if (overridee != null) {
-                excludes.add(overridee)
-            }
-            if (excludes.contains(function)) {
-                return data
-            }
-            val visitorContext = loadedVisitor.visitorContext
-            var parentDeclaration = function.parentDeclaration
-            while (parentDeclaration !is KSClassDeclaration) {
-                parentDeclaration = parentDeclaration?.parentDeclaration
-            }
-            val classAnnotationMetadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(parentDeclaration)
-            val classElement = visitorContext.elementFactory.newClassElement(parentDeclaration.asStarProjectedType(), classAnnotationMetadata)
-            val annotationMetadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(function)
-            if (loadedVisitor.matches(annotationMetadata)) {
-                val methodElement = visitorContext.elementFactory.newMethodElement(classElement, function, annotationMetadata)
-                loadedVisitor.visitor.visitMethod(methodElement, visitorContext)
+                var properties = classElement.syntheticBeanProperties
+                for (property in properties) {
+                    visitNativeProperty(property)
+                }
+
+                classDeclaration.getAllFunctions()
+                    .filter { it.isConstructor() }
+                    .forEach {
+                        visitConstructor(classElement, it)
+                    }
+
+                val memberElements = classElement.getEnclosedElements(ElementQuery.ALL_FIELD_AND_METHODS)
+                for (memberElement in memberElements) {
+                    when(memberElement) {
+                        is FieldElement -> {
+                            visitField(memberElement)
+                        }
+                        is MethodElement -> {
+                            visitMethod(memberElement)
+                        }
+                    }
+                }
             }
             return data
         }
 
-        override fun visitPropertyDeclaration(property: KSPropertyDeclaration, data: Any): Any {
-            val overridee = property.findOverridee()
-            if (overridee != null) {
-                excludes.add(overridee)
-            }
-            if (excludes.contains(property)) {
-                return data
-            }
+        private fun visitMethod(memberElement: MethodElement) {
+            val visitor = loadedVisitor.visitor
             val visitorContext = loadedVisitor.visitorContext
-            val annotationUtils = visitorContext.getAnnotationUtils()
-            val elementFactory = visitorContext.elementFactory
+            if (loadedVisitor.matches(memberElement)) {
+                visitor.visitMethod(memberElement, visitorContext)
+            }
+        }
 
-            val parentDeclaration = property.closestClassDeclaration()!!
-            val classElement = elementFactory.newClassElement(parentDeclaration.asStarProjectedType())
-            val propertyMetadata = annotationUtils.getAnnotationMetadata(property)
-            if (property.hasBackingField && loadedVisitor.matches(propertyMetadata)) {
-                val fieldElement =
-                    elementFactory.newFieldElement(classElement, property, propertyMetadata)
-                loadedVisitor.visitor.visitField(fieldElement, visitorContext)
+        private fun visitField(memberElement: FieldElement) {
+            val visitor = loadedVisitor.visitor
+            val visitorContext = loadedVisitor.visitorContext
+            if (loadedVisitor.matches(memberElement)) {
+                visitor.visitField(memberElement, visitorContext)
             }
-            val propertyElement = elementFactory.newClassElement(
-                property.type.resolve(),
-                propertyMetadata,
-                classElement.typeArguments,
-                !property.isTypeReference())
-            if (property.getter != null) {
-                val getterMetadata = annotationUtils.getAnnotationMetadata(property.getter!!)
-                if (loadedVisitor.matches(getterMetadata)) {
-                    val methodElement =
-                        elementFactory.newMethodElement(
-                            classElement,
-                            property.getter!!,
-                            propertyElement,
-                            getterMetadata
-                        )
-                    loadedVisitor.visitor.visitMethod(methodElement, visitorContext)
-                }
+        }
+
+        private fun visitConstructor(classElement: ClassElement, ctor: KSFunctionDeclaration) {
+            val visitor = loadedVisitor.visitor
+            val visitorContext = loadedVisitor.visitorContext
+            val ctorElement = visitorContext.elementFactory.newConstructorElement(
+                classElement,
+                ctor,
+                visitorContext.elementAnnotationMetadataFactory
+            )
+            if (loadedVisitor.matches(ctorElement)) {
+                visitor.visitConstructor(ctorElement, visitorContext)
             }
-            if (property.setter != null) {
-                val setterMetadata = annotationUtils.getAnnotationMetadata(property.setter!!)
-                if (loadedVisitor.matches(setterMetadata)) {
-                    val methodElement =
-                        elementFactory.newMethodElement(
-                            classElement,
-                            property.setter!!,
-                            propertyElement,
-                            setterMetadata
-                        )
-                    loadedVisitor.visitor.visitMethod(methodElement, visitorContext)
-                }
+        }
+
+        fun visitNativeProperty(propertyNode : PropertyElement) {
+            val visitor = loadedVisitor.visitor
+            val visitorContext = loadedVisitor.visitorContext
+            if (loadedVisitor.matches(propertyNode)) {
+                propertyNode.field.ifPresent { visitor.visitField(it, visitorContext)}
+                // visit synthetic getter/setter methods
+                propertyNode.writeMethod.ifPresent { visitor.visitMethod(it, visitorContext)}
+                propertyNode.readMethod.ifPresent{ visitor.visitMethod(it, visitorContext)}
             }
-            return data
         }
 
         override fun defaultHandler(node: KSNode, data: Any): Any {

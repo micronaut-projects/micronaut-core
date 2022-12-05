@@ -18,18 +18,38 @@ package io.micronaut.kotlin.processing.visitor
 import com.google.devtools.ksp.symbol.KSValueParameter
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.ParameterElement
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
+import io.micronaut.kotlin.processing.annotation.KotlinElementAnnotationMetadataFactory
 
 class KotlinParameterElement(
     private val genericClassElement: ClassElement,
     private val classElement: ClassElement,
     private val parameter: KSValueParameter,
-    annotationMetadata: AnnotationMetadata,
+    elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
     visitorContext: KotlinVisitorContext
-) : AbstractKotlinElement<KSValueParameter>(parameter, annotationMetadata, visitorContext), ParameterElement {
+) : AbstractKotlinElement<KSValueParameter>(parameter, elementAnnotationMetadataFactory, visitorContext), ParameterElement {
+    override fun copyThis(): AbstractKotlinElement<KSValueParameter> {
+        return KotlinParameterElement(
+            genericClassElement,
+            classElement,
+            parameter,
+            annotationMetadataFactory,
+            visitorContext
+        )
+    }
+
+    override fun getMethodElement(): MethodElement {
+        return super.getMethodElement()
+    }
 
     override fun getName(): String {
         return parameter.name!!.asString()
+    }
+
+    override fun withAnnotationMetadata(annotationMetadata: AnnotationMetadata): ParameterElement {
+        return super<AbstractKotlinElement>.withAnnotationMetadata(annotationMetadata) as ParameterElement
     }
 
     override fun getType(): ClassElement = classElement

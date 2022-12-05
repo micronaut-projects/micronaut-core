@@ -21,17 +21,29 @@ import io.micronaut.inject.ast.ArrayableClassElement
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.Element
 import io.micronaut.inject.ast.GenericPlaceholderElement
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 import java.util.*
 
 class KotlinGenericPlaceholderElement(
-    classType: KSTypeParameter,
-    annotationMetadata: AnnotationMetadata,
+    private val classType: KSTypeParameter,
+    elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
     visitorContext: KotlinVisitorContext,
     private val arrayDimensions: Int = 0
-) : AbstractKotlinElement<KSTypeParameter>(classType, annotationMetadata, visitorContext), ArrayableClassElement, GenericPlaceholderElement {
+) : AbstractKotlinElement<KSTypeParameter>(classType, elementAnnotationMetadataFactory, visitorContext), ArrayableClassElement, GenericPlaceholderElement {
+    override fun copyThis(): AbstractKotlinElement<KSTypeParameter> {
+        return KotlinGenericPlaceholderElement(
+            classType,
+            annotationMetadataFactory,
+            visitorContext,
+            arrayDimensions
+        )
+    }
 
 
     override fun getName(): String = "java.lang.Object"
+    override fun withAnnotationMetadata(annotationMetadata: AnnotationMetadata): ClassElement {
+        return super<AbstractKotlinElement>.withAnnotationMetadata(annotationMetadata) as ClassElement
+    }
 
     override fun isAssignable(type: String?): Boolean = false
 
@@ -40,15 +52,14 @@ class KotlinGenericPlaceholderElement(
     override fun getArrayDimensions(): Int = arrayDimensions
 
     override fun withArrayDimensions(arrayDimensions: Int): ClassElement {
-        return KotlinGenericPlaceholderElement(declaration, annotationMetadata, visitorContext, arrayDimensions)
+        return KotlinGenericPlaceholderElement(declaration, annotationMetadataFactory, visitorContext, arrayDimensions)
     }
 
     override fun getBounds(): MutableList<out ClassElement> {
-        val annotationUtils = visitorContext.getAnnotationUtils()
         val elementFactory = visitorContext.elementFactory
         return declaration.bounds.map {
             val argumentType = it.resolve()
-            elementFactory.newClassElement(argumentType, annotationUtils.getAnnotationMetadata(argumentType.declaration))
+            elementFactory.newClassElement(argumentType, annotationMetadataFactory)
         }.toMutableList()
     }
 
@@ -61,6 +72,6 @@ class KotlinGenericPlaceholderElement(
     }
 
     override fun withNewMetadata(annotationMetadata: AnnotationMetadata): ClassElement {
-        return KotlinGenericPlaceholderElement(declaration, annotationMetadata, visitorContext, arrayDimensions)
+        return KotlinGenericPlaceholderElement(declaration, annotationMetadataFactory, visitorContext, arrayDimensions)
     }
 }

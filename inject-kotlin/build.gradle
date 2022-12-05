@@ -1,20 +1,27 @@
 plugins {
-    id 'java'
+    id "io.micronaut.build.internal.convention-library"
     id "org.jetbrains.kotlin.jvm"
     id "com.google.devtools.ksp" version "1.6.10-1.0.2"
+
+}
+
+micronautBuild {
+    core {
+        usesMicronautTest()
+    }
 }
 
 dependencies {
-    api project(":inject")
-    api project(':aop')
+    api project(":core-processor")
 
-    implementation("com.google.devtools.ksp:symbol-processing-api:1.6.10-1.0.2")
+    implementation("com.google.devtools.ksp:symbol-processing-api:1.8.0-Beta-1.0.8")
     if (!JavaVersion.current().isJava9Compatible()) {
         api files(org.gradle.internal.jvm.Jvm.current().toolsJar)
     }
     kspTest(project)
     kspTest libs.bundles.asm
-    testImplementation("com.github.tschuchortdev:kotlin-compile-testing-ksp:1.4.7")
+    testImplementation("com.github.tschuchortdev:kotlin-compile-testing-ksp:1.4.9")
+    testImplementation project(":jackson-databind")
     testImplementation libs.kotlin.stdlib
     testImplementation libs.managed.jackson.annotations
     testImplementation libs.managed.validation
@@ -23,11 +30,7 @@ dependencies {
     testImplementation project(":validation")
     testImplementation libs.javax.persistence
     testImplementation project(":runtime")
-    testImplementation(libs.managed.neo4j.bolt) {
-        version {
-            require "1.4.5"
-        }
-    }
+    testImplementation(libs.neo4j.bolt)
 }
 
 afterEvaluate {

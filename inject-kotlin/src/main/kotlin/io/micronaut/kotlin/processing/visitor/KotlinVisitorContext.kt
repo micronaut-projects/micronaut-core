@@ -17,25 +17,23 @@ package io.micronaut.kotlin.processing.visitor
 
 import com.google.devtools.ksp.KspExperimental
 import com.google.devtools.ksp.getClassDeclarationByName
-import com.google.devtools.ksp.processing.Dependencies
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.symbol.KSClassDeclaration
-import com.google.devtools.ksp.symbol.KSFile
 import com.google.devtools.ksp.symbol.KSNode
-import io.micronaut.core.annotation.NonNull
 import io.micronaut.core.convert.ArgumentConversionContext
 import io.micronaut.core.convert.value.MutableConvertibleValues
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap
 import io.micronaut.core.util.StringUtils
+import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.Element
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 import io.micronaut.inject.visitor.VisitorContext
-import io.micronaut.inject.writer.ClassGenerationException
 import io.micronaut.inject.writer.GeneratedFile
-import io.micronaut.kotlin.processing.AnnotationUtils
-import io.micronaut.kotlin.processing.KotlinAnnotationMetadataBuilder
+import io.micronaut.kotlin.processing.annotation.KotlinAnnotationMetadataBuilder
 import io.micronaut.kotlin.processing.KotlinOutputVisitor
+import io.micronaut.kotlin.processing.annotation.KotlinElementAnnotationMetadataFactory
 import java.io.*
 import java.net.URI
 import java.nio.file.Files
@@ -46,15 +44,16 @@ class KotlinVisitorContext(private val environment: SymbolProcessorEnvironment,
                            val resolver: Resolver) : VisitorContext {
 
     private val visitorAttributes: MutableConvertibleValues<Any>
-    private val annotationUtil: AnnotationUtils
     private val elementFactory: KotlinElementFactory
     private val outputVisitor = KotlinOutputVisitor(environment)
-
+    val annotationMetadataBuilder: KotlinAnnotationMetadataBuilder
+    private val elementAnnotationMetadataFactory: KotlinElementAnnotationMetadataFactory
 
     init {
         visitorAttributes = MutableConvertibleValuesMap()
-        annotationUtil = AnnotationUtils(environment, resolver)
+        annotationMetadataBuilder = KotlinAnnotationMetadataBuilder(environment, resolver)
         elementFactory = KotlinElementFactory(this)
+        elementAnnotationMetadataFactory = KotlinElementAnnotationMetadataFactory(false, annotationMetadataBuilder)
     }
 
     override fun <T : Any?> get(name: CharSequence?, conversionContext: ArgumentConversionContext<T>?): Optional<T> {
@@ -109,8 +108,6 @@ class KotlinVisitorContext(private val environment: SymbolProcessorEnvironment,
             .toTypedArray()
     }
 
-    fun getAnnotationUtils() = annotationUtil
-
     override fun getServiceEntries(): MutableMap<String, MutableSet<String>> {
         return outputVisitor.serviceEntries
     }
@@ -121,6 +118,10 @@ class KotlinVisitorContext(private val environment: SymbolProcessorEnvironment,
 
     override fun visitServiceDescriptor(type: String, classname: String) {
         outputVisitor.visitServiceDescriptor(type, classname)
+    }
+
+    override fun visitServiceDescriptor(type: String, classname: String, originatingElement: Element) {
+        outputVisitor.visitServiceDescriptor(type, classname, originatingElement)
     }
 
     override fun visitMetaInfFile(path: String, vararg originatingElements: Element): Optional<GeneratedFile> {
@@ -136,6 +137,13 @@ class KotlinVisitorContext(private val environment: SymbolProcessorEnvironment,
     }
 
     override fun getElementFactory(): KotlinElementFactory = elementFactory
+    override fun getElementAnnotationMetadataFactory(): ElementAnnotationMetadataFactory {
+        return elementAnnotationMetadataFactory
+    }
+
+    override fun getAnnotationMetadataBuilder(): AbstractAnnotationMetadataBuilder<*, *> {
+        return annotationMetadataBuilder
+    }
 
     override fun info(message: String, element: Element?) {
         printMessage(message, environment.logger::info, element)

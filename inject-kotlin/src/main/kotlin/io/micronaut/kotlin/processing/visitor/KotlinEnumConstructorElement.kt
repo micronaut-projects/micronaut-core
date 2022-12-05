@@ -44,4 +44,8 @@ class KotlinEnumConstructorElement(private val classElement: ClassElement): Meth
     override fun withNewParameters(vararg newParameters: ParameterElement?): MethodElement {
         throw UnsupportedOperationException("Cannot replace parameters of a kotlin enum static constructor")
     }
+
+    override fun withParameters(vararg newParameters: ParameterElement?): MethodElement {
+        throw UnsupportedOperationException("Cannot replace parameters of a kotlin enum static constructor")
+    }
 }

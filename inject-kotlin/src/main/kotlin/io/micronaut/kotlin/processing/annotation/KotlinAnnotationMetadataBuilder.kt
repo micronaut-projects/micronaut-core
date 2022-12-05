@@ -13,12 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.kotlin.processing
+package io.micronaut.kotlin.processing.annotation
 
-import com.google.devtools.ksp.closestClassDeclaration
 import com.google.devtools.ksp.getClassDeclarationByName
 import com.google.devtools.ksp.getDeclaredProperties
 import com.google.devtools.ksp.processing.Resolver
+import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.symbol.*
 import io.micronaut.core.annotation.AnnotationClassValue
 import io.micronaut.core.annotation.AnnotationUtil
@@ -26,11 +26,13 @@ import io.micronaut.core.value.OptionalValues
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
 import io.micronaut.inject.annotation.MutableAnnotationMetadata
 import io.micronaut.inject.visitor.VisitorContext
+import io.micronaut.kotlin.processing.toClassName
+import io.micronaut.kotlin.processing.visitor.KotlinVisitorContext
 import java.lang.annotation.Inherited
 import java.lang.annotation.RetentionPolicy
 import java.util.*
 
-class KotlinAnnotationMetadataBuilder(private val annotationUtils: AnnotationUtils,
+class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnvironment: SymbolProcessorEnvironment,
                                       private val resolver: Resolver): AbstractAnnotationMetadataBuilder<KSAnnotated, KSAnnotation>() {
 
     companion object {
@@ -48,35 +50,35 @@ class KotlinAnnotationMetadataBuilder(private val annotationUtils: AnnotationUti
         }
     }
 
-    override fun isMethodOrClassElement(element: KSAnnotated): Boolean {
-        return element is KSClassDeclaration || element is KSFunctionDeclaration
-    }
-
-    override fun getDeclaringType(element: KSAnnotated): String {
-        val declaration = when (element) {
-            is KSDeclaration -> { element }
-            is KSValueParameter -> {
-                when (val parent = element.parent) {
-                    is KSPropertyAccessor -> { parent.receiver }
-                    is KSFunctionDeclaration -> { parent }
-                    else -> { null }
-                }
-            }
-            is KSPropertyAccessor -> { element.receiver }
-            else -> { null }
-        }
-
-        if (declaration != null) {
-            val closestClassDeclaration = declaration.closestClassDeclaration()
-            if (closestClassDeclaration != null) {
-                return closestClassDeclaration.qualifiedName!!.asString()
-            }
-        }
-        TODO("Not yet implemented")
-    }
+//    override fun isMethodOrClassElement(element: KSAnnotated): Boolean {
+//        return element is KSClassDeclaration || element is KSFunctionDeclaration
+//    }
+//
+//    override fun getDeclaringType(element: KSAnnotated): String {
+//        val declaration = when (element) {
+//            is KSDeclaration -> { element }
+//            is KSValueParameter -> {
+//                when (val parent = element.parent) {
+//                    is KSPropertyAccessor -> { parent.receiver }
+//                    is KSFunctionDeclaration -> { parent }
+//                    else -> { null }
+//                }
+//            }
+//            is KSPropertyAccessor -> { element.receiver }
+//            else -> { null }
+//        }
+//
+//        if (declaration != null) {
+//            val closestClassDeclaration = declaration.closestClassDeclaration()
+//            if (closestClassDeclaration != null) {
+//                return closestClassDeclaration.qualifiedName!!.asString()
+//            }
+//        }
+//        TODO("Not yet implemented")
+//    }
 
     override fun getTypeForAnnotation(annotationMirror: KSAnnotation): KSClassDeclaration {
-        return KotlinAnnotationMetadataBuilder.getTypeForAnnotation(annotationMirror)
+        return Companion.getTypeForAnnotation(annotationMirror)
     }
 
     override fun hasAnnotation(element: KSAnnotated, annotation: Class<out Annotation>): Boolean {
@@ -96,7 +98,7 @@ class KotlinAnnotationMetadataBuilder(private val annotationUtils: AnnotationUti
     }
 
     override fun getAnnotationTypeName(annotationMirror: KSAnnotation): String {
-        return KotlinAnnotationMetadataBuilder.getAnnotationTypeName(annotationMirror)
+        return Companion.getAnnotationTypeName(annotationMirror)
     }
 
     override fun getElementName(element: KSAnnotated): String {
@@ -284,7 +286,7 @@ class KotlinAnnotationMetadataBuilder(private val annotationUtils: AnnotationUti
     }
 
     override fun createVisitorContext(): VisitorContext {
-        return annotationUtils.newVisitorContext()
+        return KotlinVisitorContext(symbolProcessorEnvironment, resolver)
     }
 
     override fun getRetentionPolicy(annotation: KSAnnotated): RetentionPolicy {

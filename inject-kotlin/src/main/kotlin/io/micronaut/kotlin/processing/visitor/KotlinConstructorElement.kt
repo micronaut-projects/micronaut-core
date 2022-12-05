@@ -20,14 +20,15 @@ import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.ConstructorElement
 import io.micronaut.inject.ast.ParameterElement
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 
 class KotlinConstructorElement(method: KSFunctionDeclaration,
                                declaringType: ClassElement,
-                               annotationMetadata: AnnotationMetadata,
+                               elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
                                visitorContext: KotlinVisitorContext,
                                returnType: ClassElement,
                                parameters: List<ParameterElement>
-): ConstructorElement, KotlinMethodElement(method, declaringType, returnType, returnType, parameters, annotationMetadata, visitorContext) {
+): ConstructorElement, KotlinMethodElement(method, declaringType, returnType, returnType, parameters, elementAnnotationMetadataFactory, visitorContext) {
 
     override fun getName() = "<init>"
 

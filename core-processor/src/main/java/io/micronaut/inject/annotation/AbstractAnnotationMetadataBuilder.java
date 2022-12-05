@@ -144,6 +144,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
 
     }
 
+
     @SuppressWarnings("java:S1872")
     private AnnotationMetadata metadataForError(RuntimeException e) {
         if ("org.eclipse.jdt.internal.compiler.problem.AbortCompilation".equals(e.getClass().getName())) {

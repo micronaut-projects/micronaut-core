@@ -23,6 +23,7 @@ import io.micronaut.inject.ast.GenericPlaceholderElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.ParameterElement
 import io.micronaut.inject.ast.PrimitiveElement
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 import io.micronaut.kotlin.processing.getVisibility
 
 @OptIn(KspExperimental::class)
@@ -41,10 +42,10 @@ open class KotlinMethodElement: AbstractKotlinElement<KSDeclaration>, MethodElem
 
     constructor(method: KSPropertySetter,
                 declaringType: ClassElement,
-                annotationMetadata: AnnotationMetadata,
+                elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
                 visitorContext: KotlinVisitorContext,
                 parameter: ParameterElement
-    ) : super(method.receiver, annotationMetadata, visitorContext) {
+    ) : super(method.receiver, elementAnnotationMetadataFactory, visitorContext) {
         this.name = visitorContext.resolver.getJvmName(method)!!
         this.declaringType = declaringType
         this.parameters = listOf(parameter)
@@ -61,9 +62,9 @@ open class KotlinMethodElement: AbstractKotlinElement<KSDeclaration>, MethodElem
     constructor(method: KSPropertyGetter,
                 declaringType: ClassElement,
                 returnType: ClassElement,
-                annotationMetadata: AnnotationMetadata,
+                elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
                 visitorContext: KotlinVisitorContext,
-    ) : super(method.receiver, annotationMetadata, visitorContext) {
+    ) : super(method.receiver, elementAnnotationMetadataFactory, visitorContext) {
         this.name = visitorContext.resolver.getJvmName(method)!!
         this.declaringType = declaringType
         this.parameters = emptyList()
@@ -81,9 +82,9 @@ open class KotlinMethodElement: AbstractKotlinElement<KSDeclaration>, MethodElem
                 returnType: ClassElement,
                 genericReturnType: ClassElement,
                 parameters: List<ParameterElement>,
-                annotationMetadata: AnnotationMetadata,
+                elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
                 visitorContext: KotlinVisitorContext,
-    ) : super(method, annotationMetadata, visitorContext) {
+    ) : super(method, elementAnnotationMetadataFactory, visitorContext) {
         this.name = visitorContext.resolver.getJvmName(method)!!
         this.declaringType = declaringType
         this.parameters = parameters
@@ -99,7 +100,7 @@ open class KotlinMethodElement: AbstractKotlinElement<KSDeclaration>, MethodElem
     protected constructor(method: KSDeclaration,
                           name: String,
                           declaringType: ClassElement,
-                          annotationMetadata: AnnotationMetadata,
+                          elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
                           visitorContext: KotlinVisitorContext,
                           returnType: ClassElement,
                           genericReturnType: ClassElement,
@@ -109,7 +110,7 @@ open class KotlinMethodElement: AbstractKotlinElement<KSDeclaration>, MethodElem
                           private: Boolean,
                           protected: Boolean,
                           internal: Boolean
-    ) : super(method, annotationMetadata, visitorContext) {
+    ) : super(method, elementAnnotationMetadataFactory, visitorContext) {
         this.name = name
         this.declaringType = declaringType
         this.parameters = parameters
@@ -147,11 +148,27 @@ open class KotlinMethodElement: AbstractKotlinElement<KSDeclaration>, MethodElem
     override fun isPublic(): Boolean = public
 
     override fun isProtected(): Boolean = protected
+    override fun copyThis(): AbstractKotlinElement<KSDeclaration> {
+        return KotlinMethodElement(
+            declaration,
+            name,
+            declaringType,
+            annotationMetadataFactory,
+            visitorContext,
+            returnType,
+            genericReturnType,
+            parameters,
+            abstract,
+            public,
+            private,
+            protected,
+            internal
+        )
+    }
 
     override fun isPrivate(): Boolean = private
-
-    override fun isVisibleInPackage(packageName: String): Boolean {
-        return super.isVisibleInPackage(packageName) || internal
+    override fun withAnnotationMetadata(annotationMetadata: AnnotationMetadata): MethodElement {
+        return super<AbstractKotlinElement>.withAnnotationMetadata(annotationMetadata) as MethodElement
     }
 
     override fun toString(): String {
@@ -164,12 +181,8 @@ open class KotlinMethodElement: AbstractKotlinElement<KSDeclaration>, MethodElem
         } + ")"
     }
 
-    override fun withNewParameters(vararg newParameters: ParameterElement): MethodElement {
-        return KotlinMethodElement(declaration, name, declaringType, annotationMetadata, visitorContext, returnType, genericReturnType, newParameters.toList(), abstract, public, private, protected, internal)
-    }
-
-    override fun withNewMetadata(annotationMetadata: AnnotationMetadata): MethodElement {
-        return KotlinMethodElement(declaration, name, declaringType, annotationMetadata, visitorContext, returnType, genericReturnType, parameters, abstract, public, private, protected, internal)
+    override fun withParameters(vararg newParameters: ParameterElement): MethodElement {
+        return KotlinMethodElement(declaration, name, declaringType, annotationMetadataFactory, visitorContext, returnType, genericReturnType, newParameters.toList(), abstract, public, private, protected, internal)
     }
 
 }

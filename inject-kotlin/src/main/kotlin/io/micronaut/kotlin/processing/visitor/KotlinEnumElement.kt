@@ -20,9 +20,11 @@ import com.google.devtools.ksp.symbol.KSType
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.inject.ast.EnumElement
 import io.micronaut.inject.ast.MethodElement
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 import java.util.*
 
-class KotlinEnumElement(classType: KSType, annotationMetadata: AnnotationMetadata, visitorContext: KotlinVisitorContext): KotlinClassElement(classType, annotationMetadata, visitorContext, emptyMap()), EnumElement {
+class KotlinEnumElement(classType: KSType, elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory, visitorContext: KotlinVisitorContext):
+    KotlinClassElement(classType, elementAnnotationMetadataFactory, visitorContext, emptyMap()), EnumElement {
 
     override fun values(): List<String> {
         return declaration.declarations
@@ -33,6 +35,14 @@ class KotlinEnumElement(classType: KSType, annotationMetadata: AnnotationMetadat
 
     override fun getDefaultConstructor(): Optional<MethodElement> {
         return Optional.empty()
+    }
+
+    override fun copyThis(): KotlinEnumElement {
+        return KotlinEnumElement(
+            classType,
+            annotationMetadataFactory,
+            visitorContext
+        )
     }
 
     override fun getPrimaryConstructor(): Optional<MethodElement> {

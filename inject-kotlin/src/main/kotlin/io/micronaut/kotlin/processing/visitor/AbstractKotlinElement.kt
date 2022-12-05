@@ -22,18 +22,21 @@ import com.google.devtools.ksp.symbol.*
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.core.annotation.AnnotationValueBuilder
-import io.micronaut.core.annotation.NonNull
-import io.micronaut.core.util.ArgumentUtils
-import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
 import io.micronaut.inject.ast.Element
-import io.micronaut.inject.ast.MemberElement
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
+import io.micronaut.inject.ast.annotation.ElementMutableAnnotationMetadataDelegate
+import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate
 import java.util.*
 import java.util.function.Consumer
 import java.util.function.Predicate
 
 abstract class AbstractKotlinElement<T : KSNode>(protected val declaration: T,
-                                     private var annotationMetadata: AnnotationMetadata,
-                                     protected val visitorContext: KotlinVisitorContext) : Element {
+                                     protected  val annotationMetadataFactory: ElementAnnotationMetadataFactory,
+                                     protected val visitorContext: KotlinVisitorContext) : Element, ElementMutableAnnotationMetadataDelegate<Element> {
+
+    protected var presetAnnotationMetadata: AnnotationMetadata? = null
+    private var elementAnnotationMetadata: ElementAnnotationMetadata? = null
 
     override fun getNativeType(): T {
         return declaration
@@ -45,6 +48,40 @@ abstract class AbstractKotlinElement<T : KSNode>(protected val declaration: T,
         } else {
             false
         }
+    }
+
+    protected fun makeCopy(): AbstractKotlinElement<T> {
+        val element: AbstractKotlinElement<T> = copyThis()
+        copyValues(element)
+        return element
+    }
+
+    /**
+     * @return copy of this element
+     */
+    protected abstract fun copyThis(): AbstractKotlinElement<T>
+
+    /**
+     * @param element the values to be copied to
+     */
+    protected open fun copyValues(element: AbstractKotlinElement<T>) {
+        element.presetAnnotationMetadata = presetAnnotationMetadata
+    }
+    override fun withAnnotationMetadata(annotationMetadata: AnnotationMetadata): Element? {
+        val kotlinElement: AbstractKotlinElement<T> = makeCopy()
+        kotlinElement.presetAnnotationMetadata = annotationMetadata
+        return kotlinElement
+    }
+
+    override fun getAnnotationMetadata(): MutableAnnotationMetadataDelegate<*> {
+        if (elementAnnotationMetadata == null) {
+            if (presetAnnotationMetadata == null) {
+                elementAnnotationMetadata = annotationMetadataFactory.build(this)
+            } else {
+                elementAnnotationMetadata = annotationMetadataFactory.build(this, presetAnnotationMetadata)
+            }
+        }
+        return elementAnnotationMetadata!!
     }
 
     override fun isPublic(): Boolean {
@@ -79,6 +116,51 @@ abstract class AbstractKotlinElement<T : KSNode>(protected val declaration: T,
         }
     }
 
+    override fun <T : Annotation?> annotate(
+        annotationType: String?,
+        consumer: Consumer<AnnotationValueBuilder<T>>?
+    ): Element {
+        TODO("Not yet implemented")
+    }
+
+    override fun annotate(annotationType: String?): Element {
+        TODO("Not yet implemented")
+    }
+
+    override fun <T : Annotation?> annotate(
+        annotationType: Class<T>?,
+        consumer: Consumer<AnnotationValueBuilder<T>>?
+    ): Element {
+        TODO("Not yet implemented")
+    }
+
+    override fun <T : Annotation?> annotate(annotationType: Class<T>?): Element? {
+        return super<ElementMutableAnnotationMetadataDelegate>.annotate(annotationType)
+    }
+    override fun <T : Annotation?> annotate(annotationValue: AnnotationValue<T>?): Element {
+        return super<ElementMutableAnnotationMetadataDelegate>.annotate(annotationValue)
+    }
+
+    override fun removeAnnotation(annotationType: String?): Element {
+        return super<ElementMutableAnnotationMetadataDelegate>.removeAnnotation(annotationType)
+    }
+
+    override fun <T : Annotation?> removeAnnotation(annotationType: Class<T>?): Element {
+        return super<ElementMutableAnnotationMetadataDelegate>.removeAnnotation(annotationType)
+    }
+
+    override fun <T : Annotation?> removeAnnotationIf(predicate: Predicate<AnnotationValue<T>>?): Element {
+        return super<ElementMutableAnnotationMetadataDelegate>.removeAnnotationIf(predicate)
+    }
+
+    override fun removeStereotype(annotationType: String?): Element {
+        return super<ElementMutableAnnotationMetadataDelegate>.removeStereotype(annotationType)
+    }
+
+    override fun <T : Annotation?> removeStereotype(annotationType: Class<T>?): Element {
+        return super<ElementMutableAnnotationMetadataDelegate>.removeStereotype(annotationType)
+    }
+
     override fun isPackagePrivate(): Boolean {
         return if (declaration is KSDeclaration) {
             declaration.isJavaPackagePrivate()
@@ -95,84 +177,7 @@ abstract class AbstractKotlinElement<T : KSNode>(protected val declaration: T,
         }
     }
 
-    override fun getAnnotationMetadata(): AnnotationMetadata {
-        return annotationMetadata
-    }
-
-    @NonNull
-    override fun <T : Annotation?> annotate(
-        @NonNull annotationType: String,
-        @NonNull consumer: Consumer<AnnotationValueBuilder<T>?>
-    ): Element? {
-        ArgumentUtils.requireNonNull("annotationType", annotationType)
-        ArgumentUtils.requireNonNull("consumer", consumer)
-        val builder: AnnotationValueBuilder<T> = AnnotationValue.builder(annotationType)
-        consumer.accept(builder)
-        val av = builder.build()
-        val annotationUtils = visitorContext.getAnnotationUtils()
-        this.annotationMetadata = annotationUtils
-            .newAnnotationBuilder()
-            .annotate(annotationMetadata, av)
-        updateMetadataCaches()
+    override fun getReturnInstance(): Element {
         return this
-    }
-
-    override fun <T : Annotation?> annotate(annotationValue: AnnotationValue<T>?): Element? {
-        ArgumentUtils.requireNonNull("annotationValue", annotationValue)
-        val annotationUtils = visitorContext.getAnnotationUtils()
-        this.annotationMetadata = annotationUtils
-            .newAnnotationBuilder()
-            .annotate(annotationMetadata, annotationValue)
-        updateMetadataCaches()
-        return this
-    }
-
-    override fun removeAnnotation(@NonNull annotationType: String): Element? {
-        ArgumentUtils.requireNonNull("annotationType", annotationType)
-        return try {
-            val annotationUtils = visitorContext.getAnnotationUtils()
-            this.annotationMetadata = annotationUtils
-                .newAnnotationBuilder()
-                .removeAnnotation(annotationMetadata, annotationType)
-            this
-        } finally {
-            updateMetadataCaches()
-        }
-    }
-
-    override fun <T : Annotation?> removeAnnotationIf(@NonNull predicate: Predicate<AnnotationValue<T>?>?): Element? {
-        if (predicate != null) {
-            val annotationUtils = visitorContext.getAnnotationUtils()
-            this.annotationMetadata = annotationUtils
-                .newAnnotationBuilder()
-                .removeAnnotationIf(annotationMetadata, predicate)
-            return this
-        }
-        return this
-    }
-
-    override fun removeStereotype(@NonNull annotationType: String): Element? {
-        ArgumentUtils.requireNonNull("annotationType", annotationType)
-        return try {
-            val annotationUtils = visitorContext.getAnnotationUtils()
-            this.annotationMetadata = annotationUtils
-                .newAnnotationBuilder()
-                .removeStereotype(annotationMetadata, annotationType)
-            this
-        } finally {
-            updateMetadataCaches()
-        }
-    }
-
-    private fun updateMetadataCaches() {
-        val declaringTypeName: String = (if (this is MemberElement) {
-            this.declaringType.name
-        } else {
-            this.name
-        }).replace('$', '.')
-        AbstractAnnotationMetadataBuilder.addMutatedMetadata(declaringTypeName, nativeType, annotationMetadata)
-        if (declaration is KSDeclaration) {
-            visitorContext.getAnnotationUtils().invalidateMetadata(declaration)
-        }
     }
 }
