@@ -23,6 +23,7 @@ import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSFile
 import io.micronaut.context.annotation.Context
 import io.micronaut.core.annotation.Generated
+import io.micronaut.inject.processing.BeanDefinitionCreator
 import io.micronaut.inject.processing.BeanDefinitionCreatorFactory
 import io.micronaut.inject.writer.BeanDefinitionReferenceWriter
 import io.micronaut.inject.writer.BeanDefinitionVisitor
@@ -32,6 +33,8 @@ import io.micronaut.kotlin.processing.visitor.KotlinVisitorContext
 import java.io.IOException
 
 class BeanDefinitionProcessor(private val environment: SymbolProcessorEnvironment): SymbolProcessor {
+
+    private val beanDefinitionMap = mutableMapOf<String, BeanDefinitionCreator>()
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
         val visitorContext = KotlinVisitorContext(environment, resolver)
@@ -47,12 +50,21 @@ class BeanDefinitionProcessor(private val environment: SymbolProcessorEnvironmen
                 }
             }
             .toList()
-        val outputVisitor = KotlinOutputVisitor(environment)
-        val processed = HashSet<String>()
+
         for (classDeclaration in elements) {
             val classElement = visitorContext.elementFactory.newClassElement(classDeclaration.asStarProjectedType()) as KotlinClassElement
+            beanDefinitionMap.computeIfAbsent(classElement.name) {
+                BeanDefinitionCreatorFactory.produce(classElement, visitorContext)
+            }
 
-            val beanDefinitionCreator = BeanDefinitionCreatorFactory.produce(classElement, visitorContext)
+        }
+        return emptyList()
+    }
+
+    override fun finish() {
+        val outputVisitor = KotlinOutputVisitor(environment)
+        val processed = HashSet<String>()
+        for (beanDefinitionCreator in beanDefinitionMap.values) {
             for (writer in beanDefinitionCreator.build()) {
                 if (processed.add(writer.beanDefinitionName)) {
                     processBeanDefinitions(writer, outputVisitor, processed)
@@ -61,7 +73,7 @@ class BeanDefinitionProcessor(private val environment: SymbolProcessorEnvironmen
                 }
             }
         }
-        return emptyList()
+        beanDefinitionMap.clear()
     }
 
     private fun processBeanDefinitions(
@@ -85,7 +97,7 @@ class BeanDefinitionProcessor(private val environment: SymbolProcessorEnvironmen
         } catch (e: IOException) {
             // raise a compile error
             val message = e.message
-            error("Unexpected error:" + (message ?: e.javaClass.simpleName))
+            error("Unexpected error ${e.javaClass.simpleName}:" + (message ?: e.javaClass.simpleName))
         }
     }
 

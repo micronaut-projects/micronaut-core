@@ -62,30 +62,14 @@ open class KotlinClassElement(val classType: KSType,
         if (nativeProperties == null) {
             val configuration = BeanPropertiesQuery()
             configuration.isAllowStaticProperties = true
-            val nativeProps: Set<String> = declaration.getAllProperties()
-                .map { it.simpleName.asString() }
-                .toSet()
-            nativeProperties = AstBeanPropertiesUtils.resolveBeanProperties(
-                configuration,
-                this,
-                Supplier {
-                    getEnclosedElements(
-                        ElementQuery.ALL_METHODS.onlyInstance()
-                    )
-                },
-                Supplier {
-                    declaration.getAllProperties().map {
-                        visitorContext.elementFactory
-                            .newFieldElement(this, it, elementAnnotationMetadataFactory)
-                    }.toList()
-                },
-                true,
-                nativeProps,
-                Function { methodElement: MethodElement? -> Optional.empty() },
-                Function { methodElement: MethodElement? -> Optional.empty() },
-                Function { value: AstBeanPropertiesUtils.BeanPropertyData ->
-                    mapToPropertyElement(value)
-                })
+            nativeProperties = declaration.getAllProperties()
+                .map { KotlinPropertyElement(
+                    this,
+                    visitorContext.elementFactory.newClassElement(it.type.resolve(), elementAnnotationMetadataFactory, resolvedGenerics),
+                    it,
+                    elementAnnotationMetadataFactory, visitorContext
+                ) }
+                .toList()
         }
         return nativeProperties!!
     }
@@ -122,11 +106,12 @@ open class KotlinClassElement(val classType: KSType,
         return Collections.unmodifiableList(resolvedProperties)
     }
 
-    override fun getBeanProperties(beanPropertiesQuery: BeanPropertiesQuery?): MutableList<PropertyElement> {
+    override fun getBeanProperties(beanPropertiesQuery: BeanPropertiesQuery): MutableList<PropertyElement> {
         val customReaderPropertyNameResolver =
             Function<MethodElement, Optional<String>> { Optional.empty() }
         val customWriterPropertyNameResolver =
             Function<MethodElement, Optional<String>> { Optional.empty() }
+        val propertyNames = declaration.getAllProperties().map { it.simpleName.asString() }.toSet()
         return AstBeanPropertiesUtils.resolveBeanProperties(beanPropertiesQuery,
             this,
             Supplier {
@@ -139,7 +124,7 @@ open class KotlinClassElement(val classType: KSType,
                     ElementQuery.ALL_FIELDS
                 )
             },
-            false, emptySet(),
+            false, propertyNames,
             customReaderPropertyNameResolver,
             customWriterPropertyNameResolver,
             Function { value: AstBeanPropertiesUtils.BeanPropertyData ->
@@ -154,8 +139,8 @@ open class KotlinClassElement(val classType: KSType,
             this@KotlinClassElement,
             value.type,
             name,
-            (if (value.readAccessKind == null) null else value.getter.nativeType) as KSFunctionDeclaration,
-            (if (value.writeAccessKind == null) null else value.setter.nativeType) as KSFunctionDeclaration?,
+            (if (value.getter != null) null else value.getter.nativeType) as KSFunctionDeclaration,
+            (if (value.setter != null) null else value.setter.nativeType) as KSFunctionDeclaration?,
             elementAnnotationMetadataFactory,
             visitorContext
         )

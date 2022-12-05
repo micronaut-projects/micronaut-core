@@ -21,12 +21,16 @@ import com.google.devtools.ksp.symbol.KSNode
 import com.google.devtools.ksp.symbol.KSPropertyDeclaration
 import com.google.devtools.ksp.symbol.Modifier
 import io.micronaut.core.annotation.AnnotationMetadata
-import io.micronaut.inject.ast.ClassElement
-import io.micronaut.inject.ast.MemberElement
-import io.micronaut.inject.ast.MethodElement
-import io.micronaut.inject.ast.PropertyElement
+import io.micronaut.core.annotation.AnnotationMetadataDelegate
+import io.micronaut.core.annotation.AnnotationValue
+import io.micronaut.core.annotation.AnnotationValueBuilder
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
+import io.micronaut.inject.ast.*
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
+import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate
 import java.util.*
+import java.util.function.Consumer
+import java.util.function.Predicate
 
 class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
 
@@ -35,7 +39,9 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
     private val type: ClassElement
     private val setter: Optional<MethodElement>
     private val getter: Optional<MethodElement>
+    private val field: Optional<FieldElement>
     private val abstract: Boolean
+    private var annotationMetadata: MutableAnnotationMetadataDelegate<*>? = null
 
     constructor(classElement: ClassElement,
                 type: ClassElement,
@@ -58,6 +64,105 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
                 return@map visitorContext.elementFactory.newMethodElement(classElement, method, type, elementAnnotationMetadataFactory)
             }
         this.abstract = property.isAbstract()
+        if (property.hasBackingField) {
+            this.field = Optional.of(visitorContext.elementFactory.newFieldElement(
+                classElement,
+                property,
+                elementAnnotationMetadataFactory
+            ))
+        } else {
+            this.field = Optional.empty()
+        }
+
+        val elements: MutableList<MemberElement> = ArrayList(3)
+        setter.ifPresent { elements.add(it) }
+        getter.ifPresent { elements.add(it) }
+        field.ifPresent { elements.add(it) }
+
+
+        // The instance AnnotationMetadata of each element can change after a modification
+        // Set annotation metadata as actual elements so the changes are reflected
+        // The instance AnnotationMetadata of each element can change after a modification
+        // Set annotation metadata as actual elements so the changes are reflected
+        val propertyAnnotationMetadata: AnnotationMetadata
+        propertyAnnotationMetadata = if (elements.size == 1) {
+            elements.iterator().next()
+        } else {
+            AnnotationMetadataHierarchy(
+                true,
+                *elements.stream().map { e: MemberElement ->
+                    if (e is MethodElement) {
+                        return@map object : AnnotationMetadataDelegate {
+                            override fun getAnnotationMetadata(): AnnotationMetadata {
+                                // Exclude type metadata
+                                return e.getAnnotationMetadata().declaredMetadata
+                            }
+                        }
+                    }
+                    e
+                }.toList().toTypedArray()
+            )
+        }
+        this.annotationMetadata = object : MutableAnnotationMetadataDelegate<Any?> {
+            override fun <T : Annotation?> annotate(annotationValue: AnnotationValue<T>): Element {
+                for (memberElement in elements) {
+                    memberElement.annotate(annotationValue)
+                }
+                return this@KotlinPropertyElement
+            }
+
+            override fun <T : Annotation?> annotate(
+                annotationType: String,
+                consumer: Consumer<AnnotationValueBuilder<T>>
+            ): Element {
+                for (memberElement in elements) {
+                    memberElement.annotate(annotationType, consumer)
+                }
+                return this@KotlinPropertyElement
+            }
+
+            override fun <T : Annotation?> annotate(annotationType: Class<T>): Element {
+                for (memberElement in elements) {
+                    memberElement.annotate(annotationType)
+                }
+                return this@KotlinPropertyElement
+            }
+
+            override fun annotate(annotationType: String): Element {
+                for (memberElement in elements) {
+                    memberElement.annotate(annotationType)
+                }
+                return this@KotlinPropertyElement
+            }
+
+            override fun <T : Annotation?> annotate(
+                annotationType: Class<T>,
+                consumer: Consumer<AnnotationValueBuilder<T>>
+            ): Element {
+                for (memberElement in elements) {
+                    memberElement.annotate(annotationType, consumer)
+                }
+                return this@KotlinPropertyElement
+            }
+
+            override fun removeAnnotation(annotationType: String): Element {
+                for (memberElement in elements) {
+                    memberElement.removeAnnotation(annotationType)
+                }
+                return this@KotlinPropertyElement
+            }
+
+            override fun <T : Annotation?> removeAnnotationIf(predicate: Predicate<AnnotationValue<T>>): Element {
+                for (memberElement in elements) {
+                    memberElement.removeAnnotationIf(predicate)
+                }
+                return this@KotlinPropertyElement
+            }
+
+            override fun getAnnotationMetadata(): AnnotationMetadata {
+                return propertyAnnotationMetadata
+            }
+        }
     }
     constructor(classElement: ClassElement,
                 type: ClassElement,
@@ -75,6 +180,103 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
             }
         this.getter = Optional.of(visitorContext.elementFactory.newMethodElement(classElement, getter, elementAnnotationMetadataFactory))
         this.abstract = getter.isAbstract || setter?.isAbstract == true
+        this.field = Optional.empty()
+        val elements: MutableList<MemberElement> = ArrayList(3)
+        this.setter.ifPresent { elements.add(it) }
+        this.getter.ifPresent { elements.add(it) }
+        field.ifPresent { elements.add(it) }
+
+        // The instance AnnotationMetadata of each element can change after a modification
+        // Set annotation metadata as actual elements so the changes are reflected
+        // The instance AnnotationMetadata of each element can change after a modification
+        // Set annotation metadata as actual elements so the changes are reflected
+        val propertyAnnotationMetadata: AnnotationMetadata
+        propertyAnnotationMetadata = if (elements.size == 1) {
+            elements.iterator().next()
+        } else {
+            AnnotationMetadataHierarchy(
+                true,
+                *elements.stream().map { e: MemberElement ->
+                    if (e is MethodElement) {
+                        return@map object : AnnotationMetadataDelegate {
+                            override fun getAnnotationMetadata(): AnnotationMetadata {
+                                // Exclude type metadata
+                                return e.getAnnotationMetadata().declaredMetadata
+                            }
+                        }
+                    }
+                    e
+                }.toList().toTypedArray()
+            )
+        }
+        this.annotationMetadata = object : MutableAnnotationMetadataDelegate<Any?> {
+            override fun <T : Annotation?> annotate(annotationValue: AnnotationValue<T>): Element {
+                for (memberElement in elements) {
+                    memberElement.annotate(annotationValue)
+                }
+                return this@KotlinPropertyElement
+            }
+
+            override fun <T : Annotation?> annotate(
+                annotationType: String,
+                consumer: Consumer<AnnotationValueBuilder<T>>
+            ): Element {
+                for (memberElement in elements) {
+                    memberElement.annotate(annotationType, consumer)
+                }
+                return this@KotlinPropertyElement
+            }
+
+            override fun <T : Annotation?> annotate(annotationType: Class<T>): Element {
+                for (memberElement in elements) {
+                    memberElement.annotate(annotationType)
+                }
+                return this@KotlinPropertyElement
+            }
+
+            override fun annotate(annotationType: String): Element {
+                for (memberElement in elements) {
+                    memberElement.annotate(annotationType)
+                }
+                return this@KotlinPropertyElement
+            }
+
+            override fun <T : Annotation?> annotate(
+                annotationType: Class<T>,
+                consumer: Consumer<AnnotationValueBuilder<T>>
+            ): Element {
+                for (memberElement in elements) {
+                    memberElement.annotate(annotationType, consumer)
+                }
+                return this@KotlinPropertyElement
+            }
+
+            override fun removeAnnotation(annotationType: String): Element {
+                for (memberElement in elements) {
+                    memberElement.removeAnnotation(annotationType)
+                }
+                return this@KotlinPropertyElement
+            }
+
+            override fun <T : Annotation?> removeAnnotationIf(predicate: Predicate<AnnotationValue<T>>): Element {
+                for (memberElement in elements) {
+                    memberElement.removeAnnotationIf(predicate)
+                }
+                return this@KotlinPropertyElement
+            }
+
+            override fun getAnnotationMetadata(): AnnotationMetadata {
+                return propertyAnnotationMetadata
+            }
+        }
+    }
+
+    override fun getAnnotationMetadata(): MutableAnnotationMetadataDelegate<*> {
+        return this.annotationMetadata!!
+    }
+
+    override fun getField(): Optional<FieldElement> {
+        return this.field
     }
 
     override fun getName(): String = name

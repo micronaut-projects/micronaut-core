@@ -26,6 +26,7 @@ import io.micronaut.kotlin.processing.annotation.KotlinElementAnnotationMetadata
 class KotlinParameterElement(
     private val genericClassElement: ClassElement,
     private val classElement: ClassElement,
+    private val methodElement: MethodElement,
     private val parameter: KSValueParameter,
     elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
     visitorContext: KotlinVisitorContext
@@ -34,6 +35,7 @@ class KotlinParameterElement(
         return KotlinParameterElement(
             genericClassElement,
             classElement,
+            methodElement,
             parameter,
             annotationMetadataFactory,
             visitorContext
@@ -41,7 +43,7 @@ class KotlinParameterElement(
     }
 
     override fun getMethodElement(): MethodElement {
-        return super.getMethodElement()
+        return methodElement
     }
 
     override fun getName(): String {

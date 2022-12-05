@@ -40,15 +40,14 @@ open class KotlinMethodElement: AbstractKotlinElement<KSDeclaration>, MethodElem
     private val protected: Boolean
     private val internal: Boolean
 
-    constructor(method: KSPropertySetter,
+    constructor(propertyType : ClassElement,
+                method: KSPropertySetter,
                 declaringType: ClassElement,
                 elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
-                visitorContext: KotlinVisitorContext,
-                parameter: ParameterElement
+                visitorContext: KotlinVisitorContext
     ) : super(method.receiver, elementAnnotationMetadataFactory, visitorContext) {
         this.name = visitorContext.resolver.getJvmName(method)!!
         this.declaringType = declaringType
-        this.parameters = listOf(parameter)
         this.returnType = PrimitiveElement.VOID
         this.genericReturnType = PrimitiveElement.VOID
         this.abstract = method.receiver.isAbstract()
@@ -57,6 +56,9 @@ open class KotlinMethodElement: AbstractKotlinElement<KSDeclaration>, MethodElem
         this.private = visibility == Visibility.PRIVATE
         this.protected = visibility == Visibility.PROTECTED
         this.internal = visibility == Visibility.INTERNAL
+        this.parameters = listOf(KotlinParameterElement(
+            propertyType, propertyType, this, method.parameter, elementAnnotationMetadataFactory, visitorContext
+        ))
     }
 
     constructor(method: KSPropertyGetter,
@@ -81,13 +83,24 @@ open class KotlinMethodElement: AbstractKotlinElement<KSDeclaration>, MethodElem
                 declaringType: ClassElement,
                 returnType: ClassElement,
                 genericReturnType: ClassElement,
-                parameters: List<ParameterElement>,
                 elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
                 visitorContext: KotlinVisitorContext,
+                typeArguments: Map<String, ClassElement>
     ) : super(method, elementAnnotationMetadataFactory, visitorContext) {
         this.name = visitorContext.resolver.getJvmName(method)!!
         this.declaringType = declaringType
-        this.parameters = parameters
+        this.parameters = method.parameters.map {
+            val t =
+                visitorContext.elementFactory.newClassElement(it.type.resolve(), elementAnnotationMetadataFactory, typeArguments)
+            KotlinParameterElement(
+                t,
+                t,
+                this,
+                it,
+                elementAnnotationMetadataFactory,
+                visitorContext
+            )
+        }
         this.returnType = returnType
         this.genericReturnType = genericReturnType
         this.abstract = method.isAbstract

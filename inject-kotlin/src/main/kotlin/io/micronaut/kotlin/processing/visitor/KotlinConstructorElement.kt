@@ -27,8 +27,8 @@ class KotlinConstructorElement(method: KSFunctionDeclaration,
                                elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
                                visitorContext: KotlinVisitorContext,
                                returnType: ClassElement,
-                               parameters: List<ParameterElement>
-): ConstructorElement, KotlinMethodElement(method, declaringType, returnType, returnType, parameters, elementAnnotationMetadataFactory, visitorContext) {
+                               typeArguments: Map<String, ClassElement>
+): ConstructorElement, KotlinMethodElement(method, declaringType, returnType, returnType, elementAnnotationMetadataFactory, visitorContext, typeArguments) {
 
     override fun getName() = "<init>"
 

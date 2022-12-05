@@ -174,17 +174,9 @@ class KotlinElementFactory(
             declaringClass,
             returnTypeElement,
             genericReturnTypeElement,
-            method.parameters.map { param ->
-                KotlinParameterElement(
-                    newClassElement(param.type.resolve(), allTypeArguments),
-                    newClassElement(param.type.resolve()),
-                    param,
-                    elementAnnotationMetadataFactory,
-                    visitorContext
-                )
-            },
             elementAnnotationMetadataFactory,
-            visitorContext
+            visitorContext,
+            typeArguments
         )
         if (returnType.isMarkedNullable) {
             kotlinMethodElement.annotate(AnnotationUtil.NULLABLE)
@@ -207,7 +199,13 @@ class KotlinElementFactory(
         type: ClassElement,
         elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory
     ): MethodElement {
-        return KotlinMethodElement(method, declaringClass, elementAnnotationMetadataFactory, visitorContext, KotlinParameterElement(type, type, method.parameter, elementAnnotationMetadataFactory, visitorContext))
+        return KotlinMethodElement(
+            type,
+            method,
+            declaringClass,
+            elementAnnotationMetadataFactory,
+            visitorContext
+        )
     }
 
     override fun newConstructorElement(
@@ -215,9 +213,7 @@ class KotlinElementFactory(
         constructor: KSFunctionDeclaration,
         elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory
     ): ConstructorElement {
-        return KotlinConstructorElement(constructor, owningClass, elementAnnotationMetadataFactory, visitorContext, owningClass, constructor.parameters.map { param ->
-            KotlinParameterElement(newClassElement(param.type.resolve(), owningClass.typeArguments), newClassElement(param.type.resolve()), param, elementAnnotationMetadataFactory, visitorContext)
-        })
+        return KotlinConstructorElement(constructor, owningClass, elementAnnotationMetadataFactory, visitorContext, owningClass, emptyMap())
     }
 
     override fun newFieldElement(

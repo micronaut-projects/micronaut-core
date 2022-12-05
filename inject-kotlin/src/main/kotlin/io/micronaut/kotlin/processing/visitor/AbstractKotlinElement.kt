@@ -120,18 +120,18 @@ abstract class AbstractKotlinElement<T : KSNode>(protected val declaration: T,
         annotationType: String?,
         consumer: Consumer<AnnotationValueBuilder<T>>?
     ): Element {
-        TODO("Not yet implemented")
+        return super<ElementMutableAnnotationMetadataDelegate>.annotate(annotationType, consumer)
     }
 
     override fun annotate(annotationType: String?): Element {
-        TODO("Not yet implemented")
+        return super<ElementMutableAnnotationMetadataDelegate>.annotate(annotationType)
     }
 
     override fun <T : Annotation?> annotate(
         annotationType: Class<T>?,
         consumer: Consumer<AnnotationValueBuilder<T>>?
     ): Element {
-        TODO("Not yet implemented")
+        return super<ElementMutableAnnotationMetadataDelegate>.annotate(annotationType, consumer)
     }
 
     override fun <T : Annotation?> annotate(annotationType: Class<T>?): Element? {
