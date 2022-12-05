@@ -18,11 +18,11 @@ package io.micronaut.http.server.netty.jackson;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
-import io.micronaut.core.async.subscriber.TypedSubscriber;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.AbstractHttpContentProcessor;
+import io.micronaut.http.server.netty.HttpContentProcessor;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.json.JsonMapper;
 import io.micronaut.json.tree.JsonNode;
@@ -31,7 +31,6 @@ import io.netty.buffer.ByteBufHolder;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.util.ReferenceCountUtil;
 import org.reactivestreams.Processor;
-import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
 import java.util.Optional;
@@ -44,10 +43,12 @@ import java.util.Optional;
  * @since 1.0
  */
 @Internal
-public class JsonContentProcessor extends AbstractHttpContentProcessor<JsonNode> {
+public class JsonContentProcessor extends AbstractHttpContentProcessor {
 
     private final JsonMapper jsonMapper;
     private Processor<byte[], JsonNode> jacksonProcessor;
+    private boolean inFlight = false;
+    private Throwable failure = null;
 
     /**
      * @param nettyHttpRequest The Netty Http request
@@ -63,24 +64,17 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor<JsonNode>
     }
 
     @Override
-    protected void doOnSubscribe(Subscription subscription, Subscriber<? super JsonNode> subscriber) {
-        if (parentSubscription == null) {
-            return;
-        }
-
+    public HttpContentProcessor resultType(Argument<?> type) {
         boolean streamArray = false;
 
         boolean isJsonStream = nettyHttpRequest.getContentType()
-                .map(mediaType -> mediaType.equals(MediaType.APPLICATION_JSON_STREAM_TYPE))
-                .orElse(false);
+            .map(mediaType -> mediaType.equals(MediaType.APPLICATION_JSON_STREAM_TYPE))
+            .orElse(false);
 
-        if (subscriber instanceof TypedSubscriber) {
-            TypedSubscriber typedSubscriber = (TypedSubscriber) subscriber;
-            Argument typeArgument = typedSubscriber.getTypeArgument();
-
-            Class<?> targetType = typeArgument.getType();
+        if (type != null) {
+            Class<?> targetType = type.getType();
             if (Publishers.isConvertibleToPublisher(targetType) && !Publishers.isSingle(targetType)) {
-                Optional<Argument<?>> genericArgument = typeArgument.getFirstTypeVariable();
+                Optional<Argument<?>> genericArgument = type.getFirstTypeVariable();
                 if (genericArgument.isPresent() && !Iterable.class.isAssignableFrom(genericArgument.get().getType()) && !isJsonStream) {
                     // if the generic argument is not a iterable type them stream the array into the publisher
                     streamArray = true;
@@ -90,75 +84,85 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor<JsonNode>
 
         this.jacksonProcessor = jsonMapper.createReactiveParser(p -> {
         }, streamArray);
-        this.jacksonProcessor.subscribe(new CompletionAwareSubscriber<JsonNode>() {
+        this.jacksonProcessor.subscribe(new CompletionAwareSubscriber<>() {
 
             @Override
             protected void doOnSubscribe(Subscription jsonSubscription) {
-
-                Subscription childSubscription = new Subscription() {
-                    boolean first = true;
-
-                    @Override
-                    public synchronized void request(long n) {
-                        // this is a hack. The first item emitted for arrays is already in the buffer
-                        // and not part of the demand, so we have to demand 1 extra
-                        // find a better way in the future
-                        if (first) {
-                            jsonSubscription.request(n < Long.MAX_VALUE ? n + 1 : n);
-                            parentSubscription.request(n < Long.MAX_VALUE ? n + 1 : n);
-                        } else {
-                            jsonSubscription.request(n);
-                            parentSubscription.request(n);
-                        }
-                    }
-
-                    @Override
-                    public synchronized void cancel() {
-                        jsonSubscription.cancel();
-                        parentSubscription.cancel();
-                    }
-                };
-                subscriber.onSubscribe(childSubscription);
+                jsonSubscription.request(Long.MAX_VALUE);
             }
 
             @Override
             protected void doOnNext(JsonNode message) {
-                subscriber.onNext(message);
+                if (!inFlight) {
+                    throw new IllegalStateException("Concurrent access not allowed");
+                }
+                offer(message);
             }
 
             @Override
             protected void doOnError(Throwable t) {
-                subscriber.onError(t);
+                if (!inFlight) {
+                    throw new IllegalStateException("Concurrent access not allowed");
+                }
+                failure = t;
             }
 
             @Override
             protected void doOnComplete() {
-                subscriber.onComplete();
+                if (!inFlight) {
+                    throw new IllegalStateException("Concurrent access not allowed");
+                }
             }
         });
+        this.jacksonProcessor.onSubscribe(new Subscription() {
+            @Override
+            public void request(long n) {
+                requestInput();
+            }
 
-        jacksonProcessor.onSubscribe(subscription);
+            @Override
+            public void cancel() {
+                // happens on error, ignore
+            }
+        });
+        return this;
     }
 
     @Override
-    protected void onData(ByteBufHolder message) {
+    protected void onData(ByteBufHolder message) throws Throwable {
+        if (jacksonProcessor == null) {
+            resultType(null);
+        }
+
+        inFlight = true;
         ByteBuf content = message.content();
         try {
             byte[] bytes = ByteBufUtil.getBytes(content);
             jacksonProcessor.onNext(bytes);
         } finally {
             ReferenceCountUtil.release(content);
+            inFlight = false;
+        }
+        Throwable f = failure;
+        if (f != null) {
+            failure = null;
+            throw f;
         }
     }
 
     @Override
-    protected void doAfterOnError(Throwable throwable) {
-        jacksonProcessor.onError(throwable);
-    }
+    public void complete() throws Throwable {
+        if (jacksonProcessor == null) {
+            resultType(null);
+        }
 
-    @Override
-    protected void doOnComplete() {
+        inFlight = true;
         jacksonProcessor.onComplete();
-        super.doOnComplete();
+        inFlight = false;
+        Throwable f = failure;
+        if (f != null) {
+            failure = null;
+            throw f;
+        }
     }
 }

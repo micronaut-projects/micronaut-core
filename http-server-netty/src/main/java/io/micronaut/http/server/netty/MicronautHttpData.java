@@ -15,6 +15,7 @@ import io.netty.handler.codec.http.multipart.HttpData;
 import io.netty.handler.codec.http.multipart.HttpDataFactory;
 import io.netty.handler.codec.http.multipart.InterfaceHttpData;
 import io.netty.util.AbstractReferenceCounted;
+import io.netty.util.ReferenceCounted;
 import io.netty.util.ResourceLeakDetector;
 import io.netty.util.ResourceLeakDetectorFactory;
 import io.netty.util.ResourceLeakTracker;
@@ -49,7 +50,7 @@ import java.util.function.Supplier;
  * This class moves data to disk dynamically once the configured threshold is reached.
  */
 @Internal
-public abstract class MicronautHttpData<D extends HttpData> extends AbstractReferenceCounted implements HttpData {
+public abstract sealed class MicronautHttpData<D extends HttpData> extends AbstractReferenceCounted implements HttpData {
     @SuppressWarnings("rawtypes")
     private static final Supplier<ResourceLeakDetector<MicronautHttpData>> LEAK_DETECTOR = SupplierUtil.memoized(() ->
         ResourceLeakDetectorFactory.instance().newResourceLeakDetector(MicronautHttpData.class));
@@ -125,6 +126,7 @@ public abstract class MicronautHttpData<D extends HttpData> extends AbstractRefe
         if (pollIndex == chunks.size() && !completed) {
             chunks.add(new Chunk(size));
         }
+        chunk.retain();
         return chunk;
     }
 
@@ -275,16 +277,7 @@ public abstract class MicronautHttpData<D extends HttpData> extends AbstractRefe
             }
         }
         for (Chunk chunk : chunks) {
-            if (chunk.lock.tryLock()) {
-                try {
-                    if (chunk.buf != null) {
-                        chunk.buf.release();
-                        chunk.buf = null;
-                    }
-                } finally {
-                    chunk.lock.unlock();
-                }
-            }
+            chunk.release();
         }
         if (mmapSegments != null) {
             for (ByteBuf segment : mmapSegments) {
@@ -304,11 +297,14 @@ public abstract class MicronautHttpData<D extends HttpData> extends AbstractRefe
         size = buffer.readableBytes();
     }
 
-    public class Chunk {
+    public class Chunk extends AbstractReferenceCounted {
+        // one reference is kept by the MicronautHttpData.chunks list, and is released on MicronautHttpData.deallocate.
+        // The other reference is created by the user on pollChunk, and released when she calls claim()
+
         private final Lock lock = new ReentrantLock();
         private final long offset;
         @Nullable
-        private ByteBuf buf;
+        private ByteBuf buf; // always has refCnt = 1
 
         private Chunk(long offset) {
             this.offset = offset;
@@ -345,17 +341,36 @@ public abstract class MicronautHttpData<D extends HttpData> extends AbstractRefe
          */
         ByteBuf claim() {
             lock.lock();
-            if (released) {
-                lock.unlock();
-                throw new IllegalStateException("HTTP data already released, can't access chunks anymore");
-            }
             if (buf == null) {
                 return Unpooled.EMPTY_BUFFER;
             }
             ByteBuf b = buf;
             buf = null;
             b.touch();
+            release();
             return b;
+        }
+
+        @Override
+        protected void deallocate() {
+            if (!lock.tryLock()) {
+                // already claimed
+                return;
+            }
+            if (buf != null) {
+                buf.release();
+                buf = null;
+            }
+        }
+
+        @Override
+        public ReferenceCounted touch() {
+            return this;
+        }
+
+        @Override
+        public ReferenceCounted touch(Object hint) {
+            return this;
         }
     }
 
@@ -550,7 +565,7 @@ public abstract class MicronautHttpData<D extends HttpData> extends AbstractRefe
         return (D) super.touch();
     }
 
-    private static class AttributeImpl extends MicronautHttpData<Attribute> implements Attribute {
+    private final static class AttributeImpl extends MicronautHttpData<Attribute> implements Attribute {
         AttributeImpl(Factory factory, String name) {
             super(factory, name);
         }
@@ -572,7 +587,7 @@ public abstract class MicronautHttpData<D extends HttpData> extends AbstractRefe
     }
 
 
-    private static class FileUploadImpl extends MicronautHttpData<FileUpload> implements FileUpload {
+    private static final class FileUploadImpl extends MicronautHttpData<FileUpload> implements FileUpload {
         private final String fileName;
         private final String contentType;
 

@@ -83,9 +83,9 @@ public class CompletableFutureBodyBinder extends DefaultBodyAnnotationBinder<Com
                 CompletableFuture future = new CompletableFuture();
                 Argument<?> targetType = context.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
 
-                HttpContentProcessor<?> processor = httpContentProcessorResolver.resolve(nettyHttpRequest, targetType);
+                HttpContentProcessor processor = httpContentProcessorResolver.resolve(nettyHttpRequest, targetType);
 
-                processor.subscribe(new CompletionAwareSubscriber<Object>() {
+                processor.asPublisher(nettyHttpRequest).subscribe(new CompletionAwareSubscriber<Object>() {
                     @Override
                     protected void doOnSubscribe(Subscription subscription) {
                         subscription.request(1);

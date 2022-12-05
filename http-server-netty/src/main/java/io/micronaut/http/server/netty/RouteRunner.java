@@ -56,7 +56,7 @@ final class RouteRunner {
                 HttpProcessorListener processorListener = new HttpProcessorListener(nettyRequest.isFormOrMultipartData() ?
                     new FormRouteCompleter(rib, nettyRequest, route) :
                     new BaseRouteCompleter(rib, nettyRequest, route));
-                rib.httpContentProcessorResolver.resolve(nettyRequest, route)
+                rib.httpContentProcessorResolver.resolve(nettyRequest, route).asPublisher(nettyRequest)
                     .subscribe(processorListener);
                 return CompletableFutureExecutionFlow.just(processorListener.completion);
             }

@@ -20,8 +20,6 @@ import io.micronaut.context.exceptions.BeanCreationException;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.http.codec.CodecException;
-import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ReferenceCounted;
@@ -38,10 +36,12 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.bind.binders.ContinuationArgumentBinder;
+import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.filter.HttpFilter;
 import io.micronaut.http.filter.ServerFilterChain;
+import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
 import io.micronaut.http.server.exceptions.response.ErrorContext;
@@ -232,7 +232,7 @@ public final class RouteExecutor {
             new AtomicReference<>(httpRequest),
             true,
             true,
-            requestBodyReader.read(routeMatch, httpRequest)
+            () -> requestBodyReader.read(routeMatch, httpRequest)
         );
     }
 
@@ -337,7 +337,7 @@ public final class RouteExecutor {
                 new AtomicReference<>(httpRequest),
                 true,
                 true,
-                requestBodyReader.read(statusRoute.get(), httpRequest)
+                () -> requestBodyReader.read(statusRoute.get(), httpRequest)
             );
         }
         if (httpRequest.getMethod() != HttpMethod.HEAD) {
@@ -387,7 +387,7 @@ public final class RouteExecutor {
             }
             try {
                 AtomicReference<HttpRequest<?>> requestReference = new AtomicReference<>(httpRequest);
-                return executeRoute(requestReference, false, false, ExecutionFlow.just(errorRoute))
+                return executeRoute(requestReference, false, false, () -> ExecutionFlow.just(errorRoute))
                     .<MutableHttpResponse<?>>map(response -> {
                         response.setAttribute(HttpAttributes.EXCEPTION, cause);
                         return response;
@@ -688,7 +688,7 @@ public final class RouteExecutor {
                     new AtomicReference<>(request),
                     false,
                     true,
-                    ExecutionFlow.just(statusRoute)
+                    () -> ExecutionFlow.just(statusRoute)
                 );
             }
         }
@@ -768,9 +768,9 @@ public final class RouteExecutor {
     private ExecutionFlow<MutableHttpResponse<?>> executeRoute(AtomicReference<HttpRequest<?>> requestReference,
                                                                boolean executeFilters,
                                                                boolean useErrorRoute,
-                                                               ExecutionFlow<RouteMatch<?>> routeMatchFlow) {
+                                                               Supplier<ExecutionFlow<RouteMatch<?>>> routeMatchFlow) {
         Supplier<ExecutionFlow<MutableHttpResponse<?>>> responseFlowSupplier = () -> {
-            return routeMatchFlow.flatMap(routeMatch -> {
+            return routeMatchFlow.get().flatMap(routeMatch -> {
                     ExecutorService executorService = findExecutor(routeMatch);
                     Supplier<ExecutionFlow<MutableHttpResponse<?>>> flowSupplier = () -> executeRouteAndConvertBody(routeMatch, requestReference.get());
                     ExecutionFlow<MutableHttpResponse<?>> executeMethodResponseFlow;

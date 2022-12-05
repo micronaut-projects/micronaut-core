@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.server.netty.binders;
 
-import io.micronaut.core.async.subscriber.TypedSubscriber;
+import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.ConversionService;
@@ -78,10 +78,10 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
             if (nativeRequest instanceof StreamedHttpRequest) {
                 Argument<?> targetType = context.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
 
-                HttpContentProcessor<?> processor = httpContentProcessorResolver.resolve(nettyHttpRequest, targetType);
+                HttpContentProcessor processor = httpContentProcessorResolver.resolve(nettyHttpRequest, targetType);
 
                 //noinspection unchecked
-                return () -> Optional.of(subscriber -> processor.subscribe(new TypedSubscriber<Object>((Argument) context.getArgument()) {
+                return () -> Optional.of(subscriber -> processor.resultType(context.getArgument()).asPublisher(nettyHttpRequest).subscribe(new CompletionAwareSubscriber<>() {
 
                     Subscription s;
 
@@ -99,6 +99,7 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
                         if (message instanceof ByteBufHolder) {
                             message = ((ByteBufHolder) message).content();
                             if (message instanceof EmptyByteBuf) {
+                                s.request(1);
                                 return;
                             }
                         }

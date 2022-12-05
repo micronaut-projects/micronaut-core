@@ -10,7 +10,6 @@ import io.micronaut.http.server.netty.multipart.NettyPartData;
 import io.micronaut.http.server.netty.multipart.NettyStreamingFileUpload;
 import io.micronaut.web.router.RouteMatch;
 import io.netty.buffer.ByteBufHolder;
-import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.codec.http.multipart.Attribute;
 import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.handler.codec.http.multipart.HttpData;
@@ -110,6 +109,8 @@ final class FormRouteCompleter extends BaseRouteCompleter {
         if (isPublisher) {
             if (data.attachment == null) {
                 data.attachment = new HttpDataAttachment();
+                // retain exactly once
+                data.retain();
             }
 
             Argument typeVariable;
@@ -235,7 +236,7 @@ final class FormRouteCompleter extends BaseRouteCompleter {
                 //accounting for the previous request
                 request(1);
             }
-            if (routeMatch.isExecutable() || data instanceof LastHttpContent) {
+            if (routeMatch.isExecutable()) {
                 execute = true;
             }
         }

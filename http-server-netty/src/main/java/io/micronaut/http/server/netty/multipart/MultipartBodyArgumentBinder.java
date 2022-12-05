@@ -18,7 +18,7 @@ package io.micronaut.http.server.netty.multipart;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.async.subscriber.TypedSubscriber;
+import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
@@ -82,13 +82,13 @@ public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinde
             NettyHttpRequest nettyHttpRequest = (NettyHttpRequest) source;
             io.netty.handler.codec.http.HttpRequest nativeRequest = nettyHttpRequest.getNativeRequest();
             if (nativeRequest instanceof StreamedHttpRequest) {
-                HttpContentProcessor<?> processor = beanLocator.findBean(HttpContentSubscriberFactory.class,
+                HttpContentProcessor processor = beanLocator.findBean(HttpContentSubscriberFactory.class,
                         new ConsumesMediaTypeQualifier<>(MediaType.MULTIPART_FORM_DATA_TYPE))
                         .map(factory -> factory.build(nettyHttpRequest))
                         .orElse(new DefaultHttpContentProcessor(nettyHttpRequest, httpServerConfiguration.get()));
 
                 //noinspection unchecked
-                return () -> Optional.of(subscriber -> processor.subscribe(new TypedSubscriber<Object>((Argument) context.getArgument()) {
+                return () -> Optional.of(subscriber -> processor.resultType(context.getArgument()).asPublisher(nettyHttpRequest).subscribe(new CompletionAwareSubscriber<>() {
 
                     Subscription s;
                     AtomicLong partsRequested = new AtomicLong(0);

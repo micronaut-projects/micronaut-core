@@ -40,7 +40,7 @@ public interface HttpContentProcessorResolver {
      * @return The content processor
      */
     @NonNull
-    HttpContentProcessor<?> resolve(@NonNull NettyHttpRequest<?> request, @NonNull RouteMatch<?> route);
+    HttpContentProcessor resolve(@NonNull NettyHttpRequest<?> request, @NonNull RouteMatch<?> route);
 
     /**
      * Resolves the processor for the given request and body argument.
@@ -50,7 +50,7 @@ public interface HttpContentProcessorResolver {
      * @return The content processor
      */
     @NonNull
-    HttpContentProcessor<?> resolve(@NonNull NettyHttpRequest<?> request, @NonNull Argument<?> bodyType);
+    HttpContentProcessor resolve(@NonNull NettyHttpRequest<?> request, @NonNull Argument<?> bodyType);
 
     /**
      * Resolves the processor for the given request.
@@ -59,5 +59,5 @@ public interface HttpContentProcessorResolver {
      * @return The content processor
      */
     @NonNull
-    HttpContentProcessor<?> resolve(@NonNull NettyHttpRequest<?> request);
+    HttpContentProcessor resolve(@NonNull NettyHttpRequest<?> request);
 }

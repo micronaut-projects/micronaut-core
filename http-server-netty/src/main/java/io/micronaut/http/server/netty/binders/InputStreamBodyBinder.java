@@ -83,12 +83,12 @@ public class InputStreamBodyBinder implements NonBlockingBodyArgumentBinder<Inpu
                 PipedOutputStream outputStream = new PipedOutputStream();
                 try {
                     PipedInputStream inputStream = new PipedInputStream(outputStream) {
-                        private volatile HttpContentProcessor<ByteBufHolder> processor;
+                        private volatile HttpContentProcessor processor;
 
                         private synchronized void init() {
                             if (processor == null) {
-                                processor = (HttpContentProcessor<ByteBufHolder>) processorResolver.resolve(nettyHttpRequest, context.getArgument());
-                                Flux.from(processor)
+                                processor = processorResolver.resolve(nettyHttpRequest, context.getArgument());
+                                Flux.from(processor.<ByteBufHolder>asPublisher(nettyHttpRequest))
                                         .publishOn(Schedulers.fromExecutor(executorService))
                                         .subscribe(new CompletionAwareSubscriber<ByteBufHolder>() {
 
