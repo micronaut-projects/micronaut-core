@@ -566,7 +566,7 @@ public final class RouteExecutor {
                     throw new IllegalStateException("The FilterChain.proceed(..) method should be invoked exactly once per filter execution. The method has instead been invoked multiple times by an erroneous filter definition.");
                 }
                 if (pos == len) {
-                    return Flux.deferContextual(ctx -> ReactiveExecutionFlow.fromFlow(responseFlowSupplier.apply(ctx)).toPublisher());
+                    return Mono.deferContextual(ctx -> Mono.from(ReactiveExecutionFlow.fromFlow(responseFlowSupplier.apply(ctx)).toPublisher()));
                 }
                 HttpFilter httpFilter = filters.get(pos);
                 requestReference.set(request);
