@@ -373,7 +373,7 @@ open class KotlinClassElement(val classType: KSType,
                 val resolved = superclass.resolve()
                 val declaration = resolved.declaration
                 if (declaration is KSClassDeclaration) {
-                    if (declaration.classKind == ClassKind.CLASS) {
+                    if (declaration.classKind == ClassKind.CLASS && declaration.qualifiedName?.asString() != Any::class.qualifiedName) {
                         return declaration
                     }
                 }
@@ -423,7 +423,9 @@ open class KotlinClassElement(val classType: KSType,
                             !methodNode.isInternal() &&
                             !methodNode.isConstructor() &&
                             // ignore standard lib and synthetic methods
-                            methodNode.origin != Origin.KOTLIN_LIB && methodNode.origin != Origin.SYNTHETIC
+                            methodNode.origin != Origin.KOTLIN_LIB &&
+                            methodNode.origin != Origin.SYNTHETIC &&
+                            methodNode.origin != Origin.JAVA_LIB
                         }
                         .toList()
                     result
@@ -433,7 +435,9 @@ open class KotlinClassElement(val classType: KSType,
                         .filter {
                             !it.isInternal() &&
                             it.hasBackingField &&
-                            it.origin != Origin.KOTLIN_LIB && it.origin != Origin.SYNTHETIC
+                            it.origin != Origin.KOTLIN_LIB &&
+                            it.origin != Origin.SYNTHETIC &&
+                            it.origin != Origin.JAVA_LIB
                         }
                         .toList()
                 }

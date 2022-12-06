@@ -34,9 +34,9 @@ open class MyBean {
 
     @TestAnn2
     open fun test() {
-        
+
     }
-    
+
 }
 
 @Retention
@@ -52,12 +52,12 @@ annotation class TestAnn2
 @InterceptorBean(TestAnn::class)
 class TestInterceptor: Interceptor<Any, Any> {
     var invoked = false
-    
+
     override fun intercept(context: InvocationContext<Any, Any>): Any? {
         invoked = true
         return context.proceed()
     }
-} 
+}
 
 ''')
         def instance = getBean(context, 'annbinding2.MyBean')
@@ -100,12 +100,12 @@ annotation class TestAnn
 @InterceptorBean(TestAnn::class)
 class TestInterceptor: Interceptor<Any, Any> {
     var invoked = false
-    
+
     override fun intercept(context: InvocationContext<Any, Any>): Any? {
         invoked = true
         return context.proceed()
     }
-} 
+}
 
 ''')
         def instance = getBean(context,'mapperbinding.MyBean')
@@ -149,23 +149,23 @@ annotation class TestAnn(val num: Int)
 @TestAnn(num=1)
 class TestInterceptor: Interceptor<Any, Any> {
     var invoked = false
-    
+
     override fun intercept(context: InvocationContext<Any, Any>): Any? {
         invoked = true
         return context.proceed()
     }
-} 
+}
 
 @Singleton
 @TestAnn(num=2)
 class TestInterceptor2: Interceptor<Any, Any> {
     var invoked = false
-    
+
     override fun intercept(context: InvocationContext<Any, Any>): Any? {
         invoked = true
         return context.proceed()
     }
-} 
+}
 
 ''')
         def instance = getBean(context, 'mapperbindingmembers.MyBean')
@@ -216,22 +216,22 @@ annotation class TestAnn2
 @InterceptorBean(TestAnn::class)
 class TestInterceptor: Interceptor<Any, Any> {
     var invoked = false
-    
+
     override fun intercept(context: InvocationContext<Any, Any>): Any? {
         invoked = true
         return context.proceed()
     }
-} 
+}
 
 @InterceptorBean(TestAnn2::class)
 class AnotherInterceptor: Interceptor<Any, Any> {
     var invoked = false
-    
+
     override fun intercept(context: InvocationContext<Any, Any>): Any? {
         invoked = true
         return context.proceed()
     }
-} 
+}
 ''')
         def instance = getBean(context, 'annbinding2.MyBean')
         def interceptor = getBean(context, 'annbinding2.TestInterceptor')
@@ -281,22 +281,22 @@ annotation class TestAnn
 @InterceptorBinding(TestAnn::class)
 class TestInterceptor: Interceptor<Any, Any> {
     var invoked = false
-    
+
     override fun intercept(context: InvocationContext<Any, Any>): Any? {
         invoked = true
         return context.proceed()
     }
-} 
+}
 
 @Singleton
 class AnotherInterceptor: Interceptor<Any, Any> {
     var invoked = false
-    
+
     override fun intercept(context: InvocationContext<Any, Any>): Any? {
         invoked = true
         return context.proceed()
     }
-} 
+}
 ''')
         def instance = getBean(context, 'annbinding1.MyBean')
         def interceptor = getBean(context, 'annbinding1.TestInterceptor')
@@ -379,24 +379,24 @@ open class SlowMissile: Missile {
 @Singleton
 class MissileInterceptor: MethodInterceptor<Any, Any> {
     var intercepted = false
-    
+
     override fun intercept(context: MethodInvocationContext<Any, Any>): Any? {
         intercepted = true
         return context.proceed()
     }
-} 
+}
 
 @Slow
 @Deadly
 @Singleton
 class LockInterceptor: MethodInterceptor<Any, Any> {
     var intercepted = false
-    
+
     override fun intercept(context: MethodInvocationContext<Any, Any>): Any? {
         intercepted = true
         return context.proceed()
     }
-} 
+}
 ''')
         def missileInterceptor = getBean(context, 'multiplebinding.MissileInterceptor')
         def lockInterceptor = getBean(context, 'multiplebinding.LockInterceptor')
@@ -475,23 +475,23 @@ annotation class TestAnn(val num: Int, @get:NonBinding val debug: Boolean = fals
 @TestAnn(num = 1, debug = true)
 class TestInterceptor: Interceptor<Any, Any> {
     var invoked = false
-    
+
     override fun intercept(context: InvocationContext<Any, Any>): Any? {
         invoked = true
         return context.proceed()
     }
-} 
+}
 
 @InterceptorBean(TestAnn::class)
 @TestAnn(num = 2)
 class AnotherInterceptor: Interceptor<Any, Any> {
     var invoked = false
-    
+
     override fun intercept(context: InvocationContext<Any, Any>): Any? {
         invoked = true
         return context.proceed()
     }
-} 
+}
 ''')
         def instance = getBean(context, 'memberbinding.MyBean')
         def interceptor = getBean(context, 'memberbinding.TestInterceptor')
@@ -541,22 +541,22 @@ annotation class TestAnn
 @InterceptorBean(TestAnn::class)
 class TestInterceptor: Interceptor<Any, Any> {
     var invoked = false
-    
+
     override fun intercept(context: InvocationContext<Any, Any>): Any? {
         invoked = true
         return context.proceed()
     }
-} 
+}
 
 @Singleton
 class AnotherInterceptor: Interceptor<Any, Any> {
     var invoked = false
-    
+
     override fun intercept(context: InvocationContext<Any, Any>): Any? {
         invoked = true
         return context.proceed()
     }
-} 
+}
 ''')
         def instance = getBean(context, 'justaround.MyBean')
         def interceptor = getBean(context, 'justaround.TestInterceptor')
@@ -596,7 +596,7 @@ annotation class TestAnn
 
         then:
         Throwable t = thrown()
-        t.message.contains 'Method annotated as executable but is declared private'
+        t.message.contains 'Method defines AOP advice but is declared final'
     }
 
     void 'test byte[] return compile'() {
@@ -700,22 +700,22 @@ annotation class TestAnn2
 @InterceptorBean(TestAnn::class)
 class TestInterceptor: Interceptor<Any, Any> {
     var invoked = false
-    
+
     override fun intercept(context: InvocationContext<Any, Any>): Any? {
         invoked = true
         return context.proceed()
     }
-} 
+}
 
 @InterceptorBean(TestAnn2::class)
 class AnotherInterceptor: Interceptor<Any, Any> {
     var invoked = false
-    
+
     override fun intercept(context: InvocationContext<Any, Any>): Any? {
         invoked = true
         return context.proceed()
     }
-} 
+}
 ''')
         def instance = getBean(context, 'annbinding2.MyBean')
         def interceptor = getBean(context, 'annbinding2.TestInterceptor')
@@ -764,12 +764,12 @@ annotation class TestAnn2
 @InterceptorBean(TestAnn::class, TestAnn2::class)
 class TestInterceptor: Interceptor<Any, Any> {
     var count = 0
-    
+
     override fun intercept(context: InvocationContext<Any, Any>): Any? {
         count++
         return context.proceed()
     }
-} 
+}
 ''')
         def instance = getBean(context, 'annbinding2.MyBean')
         def interceptor = getBean(context, 'annbinding2.TestInterceptor')
@@ -817,12 +817,12 @@ annotation class TestAnn2
 @InterceptorBean(TestAnn::class, TestAnn2::class)
 class TestInterceptor: Interceptor<Any, Any> {
     var count = 0
-    
+
     override fun intercept(context: InvocationContext<Any, Any>): Any? {
         count++
         return context.proceed()
     }
-} 
+}
 ''')
         def instance = getBean(context, 'annbinding2.MyBean')
         def interceptor = getBean(context, 'annbinding2.TestInterceptor')

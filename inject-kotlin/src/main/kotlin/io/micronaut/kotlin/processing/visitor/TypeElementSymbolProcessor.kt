@@ -91,8 +91,10 @@ class TypeElementSymbolProcessor(private val environment: SymbolProcessorEnviron
                         if (!loadedVisitor.matches(typeElement)) {
                             continue
                         }
-                        val className = typeElement.qualifiedName.toString()
-                        typeElement.accept(ElementVisitor(loadedVisitor, typeElement), className)
+                        if (typeElement.classKind != ClassKind.ANNOTATION_CLASS) {
+                            val className = typeElement.qualifiedName.toString()
+                            typeElement.accept(ElementVisitor(loadedVisitor, typeElement), className)
+                        }
                     }
                 }
             }
