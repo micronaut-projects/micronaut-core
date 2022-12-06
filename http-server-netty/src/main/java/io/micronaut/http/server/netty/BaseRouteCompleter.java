@@ -7,6 +7,12 @@ import io.micronaut.web.router.RouteMatch;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.util.ReferenceCountUtil;
 
+/**
+ * This class consumes objects produced by a {@link HttpContentProcessor}. Normally it just adds
+ * the data to the {@link NettyHttpRequest}. For multipart data, there is additional logic in
+ * {@link FormRouteCompleter} that also dynamically binds parameters, though usually this is done
+ * by the {@link io.micronaut.http.server.binding.RequestArgumentSatisfier}.
+ */
 class BaseRouteCompleter {
     final NettyHttpRequest<?> request;
     volatile boolean needsInput = true;
@@ -52,7 +58,7 @@ class BaseRouteCompleter {
         ReferenceCountUtil.release(message);
     }
 
-    void addHolder(ByteBufHolder holder) {
+    protected void addHolder(ByteBufHolder holder) {
         request.addContent(holder);
         needsInput = true;
     }

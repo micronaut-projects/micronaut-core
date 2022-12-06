@@ -66,7 +66,7 @@ final class FormRouteCompleter extends BaseRouteCompleter {
     }
 
     @Override
-    void addHolder(ByteBufHolder holder) {
+    protected void addHolder(ByteBufHolder holder) {
         if (holder instanceof HttpData data) {
             needsInput = pressureRequested.decrementAndGet() > 0;
             addData((MicronautHttpData<?>) data);
