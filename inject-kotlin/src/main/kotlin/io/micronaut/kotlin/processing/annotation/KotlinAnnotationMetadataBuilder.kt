@@ -17,6 +17,7 @@ package io.micronaut.kotlin.processing.annotation
 
 import com.google.devtools.ksp.getClassDeclarationByName
 import com.google.devtools.ksp.getDeclaredProperties
+import com.google.devtools.ksp.isDefault
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.symbol.*
@@ -49,33 +50,6 @@ class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnvironment: Sy
             }
         }
     }
-
-//    override fun isMethodOrClassElement(element: KSAnnotated): Boolean {
-//        return element is KSClassDeclaration || element is KSFunctionDeclaration
-//    }
-//
-//    override fun getDeclaringType(element: KSAnnotated): String {
-//        val declaration = when (element) {
-//            is KSDeclaration -> { element }
-//            is KSValueParameter -> {
-//                when (val parent = element.parent) {
-//                    is KSPropertyAccessor -> { parent.receiver }
-//                    is KSFunctionDeclaration -> { parent }
-//                    else -> { null }
-//                }
-//            }
-//            is KSPropertyAccessor -> { element.receiver }
-//            else -> { null }
-//        }
-//
-//        if (declaration != null) {
-//            val closestClassDeclaration = declaration.closestClassDeclaration()
-//            if (closestClassDeclaration != null) {
-//                return closestClassDeclaration.qualifiedName!!.asString()
-//            }
-//        }
-//        TODO("Not yet implemented")
-//    }
 
     override fun getTypeForAnnotation(annotationMirror: KSAnnotation): KSClassDeclaration {
         return Companion.getTypeForAnnotation(annotationMirror)
@@ -171,15 +145,25 @@ class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnvironment: Sy
     }
 
     override fun isValidationRequired(member: KSAnnotated?): Boolean {
-        TODO("Not yet implemented")
+        if (member != null) {
+            return member.annotations.any {
+                val name = it.annotationType.resolve().declaration.qualifiedName?.asString()
+                if (name != null) {
+                    return name.startsWith("javax.validation") || name.startsWith("jakarta.validation")
+                } else {
+                    return false
+                }
+            }
+        }
+        return false
     }
 
     override fun addError(originatingElement: KSAnnotated, error: String) {
-        TODO("Not yet implemented")
+        symbolProcessorEnvironment.logger.error(error, originatingElement)
     }
 
     override fun addWarning(originatingElement: KSAnnotated, warning: String) {
-        TODO("Not yet implemented")
+        symbolProcessorEnvironment.logger.warn(warning, originatingElement)
     }
 
     override fun readAnnotationValue(
@@ -197,13 +181,33 @@ class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnvironment: Sy
     }
 
     override fun readAnnotationDefaultValues(annotationMirror: KSAnnotation): MutableMap<out KSDeclaration, *> {
-        return mutableMapOf<KSDeclaration, Any>()
+        val defaultArguments = annotationMirror.defaultArguments
+        val declaration = annotationMirror.annotationType.resolve()
+        if (declaration is KSClassDeclaration) {
+            val allProperties = declaration.getAllProperties()
+            val map = mutableMapOf<KSDeclaration, Any>()
+            for (defaultArgument in defaultArguments) {
+                val name = defaultArgument.name
+                val value = defaultArgument.value
+                if (name != null && value != null) {
+                    val dec = allProperties.find { it.simpleName.asString() == name.asString() }
+                    if (dec != null) {
+                        map[dec] = value
+                    }
+                }
+            }
+            return map
+        } else {
+            return mutableMapOf<KSDeclaration, Any>()
+        }
+
     }
 
     override fun readAnnotationDefaultValues(
         annotationName: String,
         annotationType: KSAnnotated
     ): MutableMap<out KSDeclaration, *> {
+        // issue getting default values for an annotation here
         return mutableMapOf<KSDeclaration, Any>()
     }
 
@@ -212,7 +216,7 @@ class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnvironment: Sy
         val declaration = annotationMirror.annotationType.resolve().declaration as KSClassDeclaration
         declaration.getAllProperties().forEach { prop ->
             val argument = annotationMirror.arguments.find { it.name == prop.simpleName }
-            if (argument?.value != null) {
+            if (argument?.value != null && !argument.isDefault()) {
                 map[prop] = argument.value!!
             }
         }

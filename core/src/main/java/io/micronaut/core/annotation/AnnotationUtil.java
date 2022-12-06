@@ -42,6 +42,7 @@ public class AnnotationUtil {
             "javax.annotation.meta.TypeQualifier",
             "javax.annotation.meta.TypeQualifierNickname",
             "kotlin.annotation.Retention",
+            "kotlin.Annotation",
             Inherited.class.getName(),
             SuppressWarnings.class.getName(),
             Override.class.getName(),
