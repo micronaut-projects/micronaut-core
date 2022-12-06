@@ -31,7 +31,12 @@ import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
+import io.micronaut.http.uri.UriBuilder;
+import reactor.core.publisher.Flux;
 
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
@@ -42,6 +47,7 @@ abstract sealed class AbstractJavanetHttpClient permits JavanetHttpClient, Javan
     protected final HttpVersionSelection httpVersion;
     protected final HttpClientConfiguration configuration;
     protected final String contextPath;
+    protected final HttpClient client;
     protected MediaTypeCodecRegistry mediaTypeCodecRegistry;
     protected final RequestBinderRegistry requestBinderRegistry;
     protected final String clientId;
@@ -65,6 +71,9 @@ abstract sealed class AbstractJavanetHttpClient permits JavanetHttpClient, Javan
         this.requestBinderRegistry = requestBinderRegistry;
         this.clientId = clientId;
         this.conversionService = conversionService;
+        this.client = java.net.http.HttpClient.newBuilder()
+            .followRedirects(configuration.isFollowRedirects() ? HttpClient.Redirect.NORMAL : HttpClient.Redirect.NEVER)
+            .build();
     }
 
     protected <O> HttpResponse<O> getConvertedResponse(java.net.http.HttpResponse<byte[]> httpResponse, @NonNull Argument<O> bodyType) {
@@ -126,5 +135,16 @@ abstract sealed class AbstractJavanetHttpClient permits JavanetHttpClient, Javan
 
     public void setMediaTypeCodecRegistry(MediaTypeCodecRegistry mediaTypeCodecRegistry) {
         this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
+    }
+
+    protected <I> Flux<HttpRequest> mapToHttpRequest(io.micronaut.http.HttpRequest<I> request) {
+        return Flux.from(loadBalancer.select())
+            .map(s -> loadBalancer.getContextPath().map(p -> s.resolve(URI.create(p))).orElseGet(s::getURI))
+            .map(uri -> HttpRequestFactory.builder(
+                    UriBuilder.of(uri).path(request.getPath()).build(),
+                    request,
+                    conversionService
+                ).build()
+            );
     }
 }

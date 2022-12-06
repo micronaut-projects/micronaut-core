@@ -70,7 +70,7 @@ public final class JavanetBlockingHttpClient extends AbstractJavanetHttpClient i
             conversionService
         ).build();
         try {
-            HttpResponse<byte[]> httpResponse = HttpClient.newHttpClient().send(httpRequest, HttpResponse.BodyHandlers.ofByteArray());
+            HttpResponse<byte[]> httpResponse = client.send(httpRequest, HttpResponse.BodyHandlers.ofByteArray());
             return getConvertedResponse(httpResponse, bodyType);
         } catch (IOException | InterruptedException e) {
             throw new HttpClientException("error sending request", e);

@@ -15,9 +15,9 @@
  */
 package io.micronaut.http.client.javanet;
 
-import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
@@ -31,17 +31,16 @@ import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.LoadBalancer;
-import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
-import io.micronaut.http.uri.UriBuilder;
 import io.micronaut.json.JsonMapper;
 import io.micronaut.json.codec.JsonMediaTypeCodec;
 import io.micronaut.json.codec.JsonStreamMediaTypeCodec;
 import io.micronaut.runtime.ApplicationConfiguration;
 import org.reactivestreams.Publisher;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.net.URI;
-import java.util.Collections;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -52,11 +51,13 @@ import java.util.concurrent.CompletableFuture;
 @Internal
 public final class JavanetHttpClient extends AbstractJavanetHttpClient implements HttpClient {
 
+    private static final Logger LOG = LoggerFactory.getLogger(JavanetHttpClient.class);
+
     public JavanetHttpClient(
-        LoadBalancer loadBalancer,
+        @Nullable LoadBalancer loadBalancer,
         HttpVersionSelection httpVersion,
-        HttpClientConfiguration configuration,
-        String contextPath,
+        @NonNull HttpClientConfiguration configuration,
+        @Nullable String contextPath,
         MediaTypeCodecRegistry mediaTypeCodecRegistry,
         RequestBinderRegistry orElseGet,
         String clientId,
@@ -111,19 +112,15 @@ public final class JavanetHttpClient extends AbstractJavanetHttpClient implement
 
     @Override
     public <I, O, E> Publisher<HttpResponse<O>> exchange(@NonNull HttpRequest<I> request, @NonNull Argument<O> bodyType, @NonNull Argument<E> errorType) {
-        URI base = (loadBalancer instanceof FixedLoadBalancer fixedLoadBalancer) ? fixedLoadBalancer.getUri() : null;
-        if (base == null) {
-            throw new UnsupportedOperationException("Load balancer " + loadBalancer + " not supported");
-        }
-        java.net.http.HttpRequest httpRequest = HttpRequestFactory.builder(
-            UriBuilder.of(base).path(contextPath).path(request.getPath()).build(),
-            request,
-            conversionService
-        ).build();
-
-        CompletableFuture<java.net.http.HttpResponse<byte[]>> completableHttpResponse = java.net.http.HttpClient.newHttpClient().sendAsync(httpRequest, java.net.http.HttpResponse.BodyHandlers.ofByteArray());
-        CompletableFuture<HttpResponse<O>> response = completableHttpResponse.thenApply(netResponse -> getConvertedResponse(netResponse, bodyType));
-        return Publishers.fromCompletableFuture(response);
+        return mapToHttpRequest(request)
+            .flatMap(httpRequest -> {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Sending HTTP Request: {}", httpRequest);
+                }
+                CompletableFuture<java.net.http.HttpResponse<byte[]>> completableHttpResponse = client.sendAsync(httpRequest, java.net.http.HttpResponse.BodyHandlers.ofByteArray());
+                CompletableFuture<HttpResponse<O>> response = completableHttpResponse.thenApply(netResponse -> getConvertedResponse(netResponse, bodyType));
+                return Publishers.fromCompletableFuture(response);
+            });
     }
 
     @Override

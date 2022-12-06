@@ -91,9 +91,10 @@ class DefaultJavanetHttpClientRegistry implements AutoCloseable,
         @Nullable InjectionPoint<?> injectionPoint,
         @Parameter @Nullable LoadBalancer loadBalancer,
         @Parameter @Nullable HttpClientConfiguration configuration,
-        @Nullable MediaTypeCodecRegistry mediaTypeCodecRegistry
+        @Nullable MediaTypeCodecRegistry mediaTypeCodecRegistry,
+        BeanContext beanContext
     ) {
-        return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, mediaTypeCodecRegistry);
+        return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, mediaTypeCodecRegistry, beanContext);
     }
 
 
@@ -101,7 +102,8 @@ class DefaultJavanetHttpClientRegistry implements AutoCloseable,
         @Nullable InjectionPoint<?> injectionPoint,
         @Nullable LoadBalancer loadBalancer,
         @Nullable HttpClientConfiguration configuration,
-        @Nullable MediaTypeCodecRegistry mediaTypeCodecRegistry
+        @Nullable MediaTypeCodecRegistry mediaTypeCodecRegistry,
+        BeanContext beanContext
         ) {
         if (loadBalancer != null) {
             if (configuration == null) {

@@ -17,6 +17,7 @@ package io.micronaut.http.client.javanet;
 
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.http.HttpHeaders;
 
 import java.net.URI;
 import java.net.http.HttpRequest;
@@ -34,12 +35,15 @@ public final class HttpRequestFactory {
 
     @NonNull
     public static <I> HttpRequest.Builder builder(@NonNull URI uri, io.micronaut.http.HttpRequest<I> request, ConversionService conversionService) {
-        HttpRequest.Builder builder = HttpRequest.newBuilder().uri(uri);
+        final HttpRequest.Builder builder = HttpRequest.newBuilder().uri(uri);
         HttpRequest.BodyPublisher bodyPublisher = request
             .getBody()
             .map(body -> HttpRequest.BodyPublishers.ofByteArray(conversionService.convertRequired(body, byte[].class)))
             .orElseGet(HttpRequest.BodyPublishers::noBody);
-        builder = builder.method(request.getMethod().toString(), bodyPublisher);
+        builder.method(request.getMethod().toString(), bodyPublisher);
+        HttpHeaders headers = request.getHeaders();
+        headers.forEach((name, values) -> values.forEach(value -> builder.header(name, value)));
+        request.getHeaders().forEach((name, values) -> values.forEach(value -> builder.header(name, value)));
         return builder;
     }
 }
