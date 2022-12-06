@@ -409,34 +409,48 @@ open class KotlinClassElement(val classType: KSType,
             result: ElementQuery.Result<*>,
             elementType: Class<*>
         ): List<KSNode> {
-            return if (elementType == MemberElement::class.java) {
-                Stream.concat(
-                    getEnclosedElements(classNode, result, FieldElement::class.java).stream(),
-                    getEnclosedElements(classNode, result, MethodElement::class.java).stream()
-                ).toList()
-            } else if (elementType == MethodElement::class.java) {
-                classNode.getAllFunctions()
-                    .filter { methodNode: KSFunctionDeclaration ->
-                        !methodNode.isInternal()
-                    }
-                    .toList()
-            } else if (elementType == FieldElement::class.java) {
-                classNode.getAllProperties()
-                    .filter {
-                        !it.isInternal() && it.getter == null && it.setter == null
-                    }
-                    .toList()
-            } else if (elementType == ConstructorElement::class.java) {
-                classNode.getConstructors()
-                    .filter { methodNode: KSFunctionDeclaration ->
-                        !methodNode.isInternal()
-                    }
-                    .toList()
-            } else if (elementType == ClassElement::class.java) {
-                // TODO: no inner class support in KSP?
-                emptyList()
-            } else {
-                throw java.lang.IllegalStateException("Unknown result type: $elementType")
+            return when (elementType) {
+                MemberElement::class.java -> {
+                    Stream.concat(
+                        getEnclosedElements(classNode, result, FieldElement::class.java).stream(),
+                        getEnclosedElements(classNode, result, MethodElement::class.java).stream()
+                    ).toList()
+                }
+                MethodElement::class.java -> {
+                    val result = classNode.getAllFunctions()
+                        .filter { methodNode: KSFunctionDeclaration ->
+                            !methodNode.isInternal() &&
+                            !methodNode.isConstructor() &&
+                            // ignore standard lib and synthetic methods
+                            methodNode.origin != Origin.KOTLIN_LIB && methodNode.origin != Origin.SYNTHETIC
+                        }
+                        .toList()
+                    result
+                }
+                FieldElement::class.java -> {
+                    classNode.getAllProperties()
+                        .filter {
+                            !it.isInternal() &&
+                            it.hasBackingField &&
+                            it.origin != Origin.KOTLIN_LIB && it.origin != Origin.SYNTHETIC
+                        }
+                        .toList()
+                }
+                ConstructorElement::class.java -> {
+                    classNode.getConstructors()
+                        .filter { methodNode: KSFunctionDeclaration ->
+                            !methodNode.isInternal()
+                        }
+                        .toList()
+                }
+                ClassElement::class.java -> {
+                    classNode.declarations.filter {
+                        it is KSClassDeclaration
+                    }.toList()
+                }
+                else -> {
+                    throw java.lang.IllegalStateException("Unknown result type: $elementType")
+                }
             }
         }
 
@@ -445,7 +459,7 @@ open class KotlinClassElement(val classType: KSType,
         }
 
         override fun toAstElement(enclosedElement: KSNode): Element {
-            val elementFactory: KotlinElementFactory = visitorContext.getElementFactory()
+            val elementFactory: KotlinElementFactory = visitorContext.elementFactory
             return when (enclosedElement) {
                 is KSFunctionDeclaration -> {
                     if (enclosedElement.isConstructor()) {

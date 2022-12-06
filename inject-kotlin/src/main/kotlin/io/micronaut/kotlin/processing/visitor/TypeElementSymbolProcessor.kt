@@ -16,6 +16,7 @@
 package io.micronaut.kotlin.processing.visitor
 
 import com.google.devtools.ksp.isConstructor
+import com.google.devtools.ksp.isInternal
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
@@ -200,7 +201,7 @@ class TypeElementSymbolProcessor(private val environment: SymbolProcessorEnviron
                 }
 
                 classDeclaration.getAllFunctions()
-                    .filter { it.isConstructor() }
+                    .filter { it.isConstructor() && !it.isInternal() }
                     .forEach {
                         visitConstructor(classElement, it)
                     }
