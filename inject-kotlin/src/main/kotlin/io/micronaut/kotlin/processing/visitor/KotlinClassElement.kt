@@ -28,7 +28,6 @@ import io.micronaut.kotlin.processing.toClassName
 import java.util.*
 import java.util.function.Function
 import java.util.function.Supplier
-import java.util.stream.Collectors
 import java.util.stream.Stream
 
 open class KotlinClassElement(val classType: KSType,
@@ -60,9 +59,10 @@ open class KotlinClassElement(val classType: KSType,
     override fun getSyntheticBeanProperties(): List<PropertyElement> {
         // Native properties should be composed of field + synthetic getter/setter
         if (nativeProperties == null) {
-            val configuration = BeanPropertiesQuery()
-            configuration.isAllowStaticProperties = true
+            val configuration = PropertyElementQuery()
+                .allowStaticProperties(true)
             nativeProperties = declaration.getAllProperties()
+                .filter { !it.isInternal() }
                 .map { KotlinPropertyElement(
                     this,
                     visitorContext.elementFactory.newClassElement(it.type.resolve(), elementAnnotationMetadataFactory, resolvedGenerics),
@@ -101,18 +101,18 @@ open class KotlinClassElement(val classType: KSType,
 
     override fun getBeanProperties(): List<PropertyElement> {
         if (resolvedProperties == null) {
-            resolvedProperties = getBeanProperties(BeanPropertiesQuery.of(this))
+            resolvedProperties = getBeanProperties(PropertyElementQuery.of(this))
         }
         return Collections.unmodifiableList(resolvedProperties)
     }
 
-    override fun getBeanProperties(beanPropertiesQuery: BeanPropertiesQuery): MutableList<PropertyElement> {
+    override fun getBeanProperties(propertyElementQuery: PropertyElementQuery): MutableList<PropertyElement> {
         val customReaderPropertyNameResolver =
             Function<MethodElement, Optional<String>> { Optional.empty() }
         val customWriterPropertyNameResolver =
             Function<MethodElement, Optional<String>> { Optional.empty() }
         val propertyNames = declaration.getAllProperties().map { it.simpleName.asString() }.toSet()
-        return AstBeanPropertiesUtils.resolveBeanProperties(beanPropertiesQuery,
+        return AstBeanPropertiesUtils.resolveBeanProperties(propertyElementQuery,
             this,
             Supplier {
                 getEnclosedElements(
@@ -148,8 +148,8 @@ open class KotlinClassElement(val classType: KSType,
 
     override fun getSimpleName(): String {
         var parentDeclaration = declaration.parentDeclaration
-        if (parentDeclaration == null) {
-            return declaration.simpleName.asString()
+        return if (parentDeclaration == null) {
+            declaration.simpleName.asString()
         } else {
             val builder = StringBuilder(declaration.simpleName.asString())
             while (parentDeclaration != null) {
@@ -157,7 +157,7 @@ open class KotlinClassElement(val classType: KSType,
                     .insert(0, parentDeclaration.simpleName.asString())
                 parentDeclaration = parentDeclaration.parentDeclaration
             }
-            return builder.toString()
+            builder.toString()
         }
     }
 

@@ -18,6 +18,7 @@ package io.micronaut.kotlin.processing.beans
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
+import com.google.devtools.ksp.symbol.ClassKind
 import com.google.devtools.ksp.symbol.KSAnnotated
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSFile
@@ -51,14 +52,29 @@ class BeanDefinitionProcessor(private val environment: SymbolProcessorEnvironmen
             }
             .toList()
 
-        for (classDeclaration in elements) {
-            val classElement = visitorContext.elementFactory.newClassElement(classDeclaration.asStarProjectedType()) as KotlinClassElement
-            beanDefinitionMap.computeIfAbsent(classElement.name) {
-                BeanDefinitionCreatorFactory.produce(classElement, visitorContext)
-            }
-
-        }
+        processClassDeclarations(elements, visitorContext)
         return emptyList()
+    }
+
+    private fun processClassDeclarations(
+        elements: List<KSClassDeclaration>,
+        visitorContext: KotlinVisitorContext
+    ) {
+        for (classDeclaration in elements) {
+            if (classDeclaration.classKind != ClassKind.ANNOTATION_CLASS) {
+                val classElement =
+                    visitorContext.elementFactory.newClassElement(classDeclaration.asStarProjectedType()) as KotlinClassElement
+                val innerClasses =
+                    classDeclaration.declarations.filter { it is KSClassDeclaration }.map { it as KSClassDeclaration }
+                        .toList()
+                if (innerClasses.isNotEmpty()) {
+                    processClassDeclarations(innerClasses, visitorContext)
+                }
+                beanDefinitionMap.computeIfAbsent(classElement.name) {
+                    BeanDefinitionCreatorFactory.produce(classElement, visitorContext)
+                }
+            }
+        }
     }
 
     override fun finish() {

@@ -3,21 +3,26 @@ package io.micronaut.kotlin.processing;
 import com.tschuchort.compiletesting.KotlinCompilation;
 import com.tschuchort.compiletesting.KspKt;
 import com.tschuchort.compiletesting.SourceFile;
+import io.micronaut.aop.internal.InterceptorRegistryBean;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.DefaultApplicationContext;
+import io.micronaut.context.event.ApplicationEventPublisherFactory;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanIntrospector;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
+import io.micronaut.inject.provider.BeanProviderDefinition;
 import io.micronaut.inject.writer.BeanDefinitionReferenceWriter;
 import io.micronaut.inject.writer.BeanDefinitionVisitor;
 import io.micronaut.inject.writer.BeanDefinitionWriter;
 import io.micronaut.kotlin.processing.beans.BeanDefinitionProcessorProvider;
 import io.micronaut.kotlin.processing.visitor.TypeElementSymbolProcessorProvider;
+import kotlin.Pair;
 import org.intellij.lang.annotations.Language;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -27,18 +32,58 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
+import java.util.stream.Stream;
 
 public class KotlinCompiler {
 
     public static URLClassLoader buildClassLoader(String name, @Language("kotlin") String clazz) {
-        return compile(name, clazz).getClassLoader();
+        Pair<Pair<KotlinCompilation, KotlinCompilation.Result>, Pair<KotlinCompilation, KotlinCompilation.Result>> resultPair = compile(name, clazz);
+        return toClassLoader(resultPair);
     }
 
-    public static KotlinCompilation.Result compile(String name, @Language("kotlin") String clazz) {
+    @NotNull
+    private static URLClassLoader toClassLoader(Pair<Pair<KotlinCompilation, KotlinCompilation.Result>, Pair<KotlinCompilation, KotlinCompilation.Result>> resultPair) {
+        try {
+            Pair<KotlinCompilation, KotlinCompilation.Result> sourcesCompilation = resultPair.component1();
+            Pair<KotlinCompilation, KotlinCompilation.Result> kspCompilation = resultPair.component2();
+
+            KotlinCompilation.Result sourcesCompileResult = sourcesCompilation.component2();
+            KotlinCompilation.Result kspCompileResult = kspCompilation.component2();
+            List<URL> classpath = new ArrayList<>();
+            classpath.add(sourcesCompileResult.getOutputDirectory().toURI().toURL());
+            classpath.add(kspCompileResult.getOutputDirectory().toURI().toURL());
+            classpath.addAll(kspCompilation.component1().getClasspaths().stream().flatMap(f -> {
+                try {
+                    return Stream.of(f.toURI().toURL());
+                } catch (MalformedURLException e) {
+                    return Stream.empty();
+                }
+            }).toList());
+            classpath.addAll(sourcesCompilation.component1().getClasspaths().stream().flatMap(f -> {
+                try {
+                    return Stream.of(f.toURI().toURL());
+                } catch (MalformedURLException e) {
+                    return Stream.empty();
+                }
+            }).toList());
+
+            return new URLClassLoader(
+                classpath.toArray(URL[]::new),
+                KotlinCompiler.class.getClassLoader()
+            );
+        } catch (MalformedURLException e) {
+            throw new IllegalStateException(e.getMessage(), e);
+        }
+    }
+
+    public static Pair<Pair<KotlinCompilation, KotlinCompilation.Result>, Pair<KotlinCompilation, KotlinCompilation.Result>> compile(String name, @Language("kotlin") String clazz) {
         KotlinCompilation compilation = new KotlinCompilation();
         compilation.setSources(Collections.singletonList(SourceFile.Companion.kotlin(name + ".kt", clazz, true)));
         compilation.setJvmDefault("all");
@@ -59,12 +104,12 @@ public class KotlinCompiler {
                 compilation.getClassesDir()));
         KspKt.setSymbolProcessorProviders(kspCompilation, Arrays.asList(new TypeElementSymbolProcessorProvider(), new BeanDefinitionProcessorProvider()));
 
-        result = kspCompilation.compile();
-        if (result.getExitCode() != KotlinCompilation.ExitCode.OK) {
-            throw new RuntimeException(result.getMessages());
+        KotlinCompilation.Result kspResult = kspCompilation.compile();
+        if (kspResult.getExitCode() != KotlinCompilation.ExitCode.OK) {
+            throw new RuntimeException(kspResult.getMessages());
         }
 
-        return result;
+        return new Pair<>(new Pair<>(compilation, result), new Pair<>(kspCompilation, kspResult));
     }
 
     public static BeanIntrospection<?> buildBeanIntrospection(String name, @Language("kotlin") String clazz) {
@@ -148,21 +193,28 @@ public class KotlinCompiler {
     }
 
     public static ApplicationContext buildContext(@Language("kotlin") String clazz, boolean includeAllBeans) {
-        KotlinCompilation.Result result = compile("temp", clazz);
-        ClassLoader classLoader = result.getClassLoader();
+        Pair<Pair<KotlinCompilation, KotlinCompilation.Result>, Pair<KotlinCompilation, KotlinCompilation.Result>> pair = compile("temp", clazz);
+        ClassLoader classLoader = toClassLoader(pair);
         return new DefaultApplicationContext(ClassPathResourceLoader.defaultLoader(classLoader),"test") {
-     /*       @Override
+            @Override
             protected List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
-                List<String> beanDefinitionNames = result.getCompiledClassAndResourceFiles()
-                        .stream()
-                        .map(File::getName)
-                        .filter(name -> name.endsWith(BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionReferenceWriter.REF_SUFFIX))
-                        .collect(Collectors.toList());
+                List<String> beanDefinitionNames = pair.component2().component1().
+                    getClasspaths().stream().filter(f -> f.toURI().toString().contains("/ksp/sources/resources"))
+                        .flatMap(dir -> {
+                        File[] files = new File(dir, "META-INF/micronaut/io/micronaut/inject/BeanDefinitionReference").listFiles();
+                        if (files == null) {
+                            return Stream.empty();
+                        }
+                        return Stream.of(files).filter(f -> f.isFile());
+                    }).map(f -> f.getName()).toList();
 
                 List<BeanDefinitionReference> beanDefinitions = new ArrayList<>(beanDefinitionNames.size());
                 for (String name : beanDefinitionNames) {
                     try {
-                        beanDefinitions.add((BeanDefinitionReference) loadDefinition(classLoader, name));
+                        BeanDefinitionReference br = (BeanDefinitionReference) loadDefinition(classLoader, name);
+                        if (br != null) {
+                             beanDefinitions.add(br);
+                        }
                     } catch (NoSuchMethodException | InvocationTargetException | InstantiationException | IllegalAccessException e) {
                     }
                 }
@@ -174,7 +226,7 @@ public class KotlinCompiler {
                     beanDefinitions.add(new ApplicationEventPublisherFactory<>());
                 }
                 return beanDefinitions;
-            }*/
+            }
         }.start();
     }
 
