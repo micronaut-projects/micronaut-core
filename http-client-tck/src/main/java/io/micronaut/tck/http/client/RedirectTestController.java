@@ -26,7 +26,7 @@ import java.net.URI;
 
 @Requires(property = "spec.name", value = "RedirectTest")
 @Controller("/redirect")
-public class RedirectTestController {
+class RedirectTestController {
 
     @Get("/redirect")
     HttpResponse<?> redirect() {

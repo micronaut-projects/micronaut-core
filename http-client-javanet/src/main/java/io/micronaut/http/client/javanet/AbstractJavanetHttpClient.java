@@ -21,6 +21,7 @@ import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
@@ -29,19 +30,21 @@ import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.LoadBalancer;
+import io.micronaut.http.client.ServiceHttpClientConfiguration;
+import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
-import io.micronaut.http.uri.UriBuilder;
 import reactor.core.publisher.Flux;
 
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
-abstract sealed class AbstractJavanetHttpClient permits JavanetHttpClient, JavanetBlockingHttpClient {
+abstract class AbstractJavanetHttpClient {
 
     protected final LoadBalancer loadBalancer;
     protected final HttpVersionSelection httpVersion;
@@ -66,7 +69,14 @@ abstract sealed class AbstractJavanetHttpClient permits JavanetHttpClient, Javan
         this.loadBalancer = loadBalancer;
         this.httpVersion = httpVersion;
         this.configuration = configuration;
-        this.contextPath = contextPath;
+        if (StringUtils.isNotEmpty(contextPath)) {
+            if (contextPath.charAt(0) != '/') {
+                contextPath = '/' + contextPath;
+            }
+            this.contextPath = contextPath;
+        } else {
+            this.contextPath = null;
+        }
         this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
         this.requestBinderRegistry = requestBinderRegistry;
         this.clientId = clientId;
@@ -110,6 +120,10 @@ abstract sealed class AbstractJavanetHttpClient permits JavanetHttpClient, Javan
         };
     }
 
+    protected Object getLoadBalancerDiscriminator() {
+        return null;
+    }
+
     private <T> Optional convertBytes(@Nullable MediaType contentType, byte[] bytes, Argument<T> type) {
         if (mediaTypeCodecRegistry != null && contentType != null) {
             if (CharSequence.class.isAssignableFrom(type.getType())) {
@@ -137,14 +151,41 @@ abstract sealed class AbstractJavanetHttpClient permits JavanetHttpClient, Javan
         this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
     }
 
+    // TODO: Extract from DefaultHttpClient
     protected <I> Flux<HttpRequest> mapToHttpRequest(io.micronaut.http.HttpRequest<I> request) {
-        return Flux.from(loadBalancer.select())
-            .map(s -> loadBalancer.getContextPath().map(p -> s.resolve(URI.create(p))).orElseGet(s::getURI))
-            .map(uri -> HttpRequestFactory.builder(
-                    UriBuilder.of(uri).path(request.getPath()).build(),
-                    request,
-                    conversionService
-                ).build()
-            );
+        return Flux.from(loadBalancer.select(getLoadBalancerDiscriminator()))
+            .map(server -> server.resolve(prependContextPath(request.getUri())))
+            .map(uri -> HttpRequestFactory.builder(uri, request, conversionService).build());
+    }
+
+    /**
+     * @param requestURI The request URI
+     * @return A URI that is prepended with the contextPath, if set
+     */
+    // TODO: Extract from DefaultHttpClient
+    protected URI prependContextPath(URI requestURI) {
+        if (StringUtils.isNotEmpty(contextPath)) {
+            try {
+                return new URI(StringUtils.prependUri(contextPath, requestURI.toString()));
+            } catch (URISyntaxException e) {
+                throw customizeException(new HttpClientException("Failed to construct the request URI", e));
+            }
+        }
+        return requestURI;
+    }
+
+    // TODO: Extract from DefaultHttpClient
+    private <E extends HttpClientException> E customizeException(E exc) {
+        customizeException0(configuration, clientId, exc);
+        return exc;
+    }
+
+    // TODO: Extract from DefaultHttpClient
+    static void customizeException0(HttpClientConfiguration configuration, String informationalServiceId, HttpClientException exc) {
+        if (informationalServiceId != null) {
+            exc.setServiceId(informationalServiceId);
+        } else if (configuration instanceof ServiceHttpClientConfiguration) {
+            exc.setServiceId(((ServiceHttpClientConfiguration) configuration).getServiceId());
+        }
     }
 }

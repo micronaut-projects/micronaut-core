@@ -30,22 +30,7 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
 
-public interface AbstractTck {
-
-    @FunctionalInterface
-    interface TckSpec {
-        void test(EmbeddedServer server, HttpClient client);
-    }
-
-    @FunctionalInterface
-    interface TwoServerTckSpec {
-        void test(EmbeddedServer server, EmbeddedServer otherServer, HttpClient client);
-    }
-
-    @FunctionalInterface
-    interface BlockingTckSpec {
-        void test(EmbeddedServer server, BlockingHttpClient client);
-    }
+interface AbstractTck {
 
     default void runTest(String specName, TckSpec spec) {
         try (
@@ -93,5 +78,56 @@ public interface AbstractTck {
         ) {
             spec.test(server, client.toBlocking());
         }
+    }
+
+    default void runBlockingTest(String specName, TwoServerBlockingTckSpec spec) {
+        try (
+            EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class, Collections.singletonMap("spec.name", specName));
+            EmbeddedServer otherServer = ApplicationContext.run(EmbeddedServer.class, Map.of("spec.name", specName, "redirect.server", true));
+            HttpClient client = server.getApplicationContext().createBean(HttpClient.class, server.getURL())
+        ) {
+            spec.test(server, otherServer, client.toBlocking());
+        }
+    }
+
+    default void runBlockingTest(String specName, String contextPath, BlockingTckSpec spec) {
+        try (
+            EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class, Collections.singletonMap("spec.name", specName));
+            HttpClient client = server.getApplicationContext().createBean(HttpClient.class, new LoadBalancer() {
+                @Override
+                public Publisher<ServiceInstance> select(@Nullable Object discriminator) {
+                    URL url = server.getURL();
+                    return Publishers.just(ServiceInstance.of(url.getHost(), url));
+                }
+
+                @Override
+                public Optional<String> getContextPath() {
+                    return Optional.of(contextPath);
+                }
+            })
+        ) {
+            spec.test(server, client.toBlocking());
+        }
+    }
+
+
+    @FunctionalInterface
+    interface TckSpec {
+        void test(EmbeddedServer server, HttpClient client);
+    }
+
+    @FunctionalInterface
+    interface TwoServerTckSpec {
+        void test(EmbeddedServer server, EmbeddedServer otherServer, HttpClient client);
+    }
+
+    @FunctionalInterface
+    interface BlockingTckSpec {
+        void test(EmbeddedServer server, BlockingHttpClient client);
+    }
+
+    @FunctionalInterface
+    interface TwoServerBlockingTckSpec {
+        void test(EmbeddedServer server, EmbeddedServer otherServer, BlockingHttpClient client);
     }
 }

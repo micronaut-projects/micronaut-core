@@ -49,7 +49,7 @@ import java.util.concurrent.CompletableFuture;
  * @since 4.0.0
  */
 @Internal
-public final class JavanetHttpClient extends AbstractJavanetHttpClient implements HttpClient {
+public class JavanetHttpClient extends AbstractJavanetHttpClient implements HttpClient {
 
     private static final Logger LOG = LoggerFactory.getLogger(JavanetHttpClient.class);
 
@@ -59,11 +59,11 @@ public final class JavanetHttpClient extends AbstractJavanetHttpClient implement
         @NonNull HttpClientConfiguration configuration,
         @Nullable String contextPath,
         MediaTypeCodecRegistry mediaTypeCodecRegistry,
-        RequestBinderRegistry orElseGet,
+        RequestBinderRegistry requestBinderRegistry,
         String clientId,
         ConversionService conversionService
     ) {
-        super(loadBalancer, httpVersion, configuration, contextPath, mediaTypeCodecRegistry, orElseGet, clientId, conversionService);
+        super(loadBalancer, httpVersion, configuration, contextPath, mediaTypeCodecRegistry, requestBinderRegistry, clientId, conversionService);
     }
 
     public JavanetHttpClient(URI uri) {
@@ -115,7 +115,7 @@ public final class JavanetHttpClient extends AbstractJavanetHttpClient implement
         return mapToHttpRequest(request)
             .flatMap(httpRequest -> {
                 if (LOG.isDebugEnabled()) {
-                    LOG.debug("Sending HTTP Request: {}", httpRequest);
+                    LOG.debug("Client {} Sending HTTP Request: {}", clientId, httpRequest);
                 }
                 CompletableFuture<java.net.http.HttpResponse<byte[]>> completableHttpResponse = client.sendAsync(httpRequest, java.net.http.HttpResponse.BodyHandlers.ofByteArray());
                 CompletableFuture<HttpResponse<O>> response = completableHttpResponse.thenApply(netResponse -> getConvertedResponse(netResponse, bodyType));

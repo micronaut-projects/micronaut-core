@@ -26,7 +26,7 @@ import io.micronaut.http.annotation.Produces;
 @Requires(property = "spec.name", value = "RedirectTest")
 @Requires(property = "redirect.server", value = StringUtils.TRUE)
 @Controller("/redirect")
-public class RedirectHostHeaderController {
+class RedirectHostHeaderController {
 
     @Get("/host-header")
     @Produces("text/plain")

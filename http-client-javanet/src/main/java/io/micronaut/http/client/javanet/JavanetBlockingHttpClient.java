@@ -28,6 +28,8 @@ import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.uri.UriBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.URI;
@@ -41,7 +43,9 @@ import java.net.http.HttpResponse;
  * @since 4.0.0
  */
 @Internal
-public final class JavanetBlockingHttpClient extends AbstractJavanetHttpClient implements BlockingHttpClient {
+public class JavanetBlockingHttpClient extends AbstractJavanetHttpClient implements BlockingHttpClient {
+
+    private static final Logger LOG = LoggerFactory.getLogger(JavanetBlockingHttpClient.class);
 
     public JavanetBlockingHttpClient(
         LoadBalancer loadBalancer,
@@ -49,27 +53,22 @@ public final class JavanetBlockingHttpClient extends AbstractJavanetHttpClient i
         HttpClientConfiguration configuration,
         String contextPath,
         MediaTypeCodecRegistry mediaTypeCodecRegistry,
-        RequestBinderRegistry orElseGet,
+        RequestBinderRegistry requestBinderRegistry,
         String clientId,
         ConversionService conversionService
     ) {
-        super(loadBalancer, httpVersion, configuration, contextPath, mediaTypeCodecRegistry, orElseGet, clientId, conversionService);
+        super(loadBalancer, httpVersion, configuration, contextPath, mediaTypeCodecRegistry, requestBinderRegistry, clientId, conversionService);
     }
 
     @Override
     public <I, O, E> io.micronaut.http.HttpResponse<O> exchange(io.micronaut.http.HttpRequest<I> request,
                                               Argument<O> bodyType,
                                               Argument<E> errorType) {
-        URI base = (loadBalancer instanceof FixedLoadBalancer fixedLoadBalancer) ? fixedLoadBalancer.getUri() : null;
-        if (base == null) {
-            throw new UnsupportedOperationException("Load balancer " + loadBalancer + " not supported");
-        }
-        HttpRequest httpRequest = HttpRequestFactory.builder(
-            UriBuilder.of(base).path(contextPath).path(request.getPath()).build(),
-            request,
-            conversionService
-        ).build();
+        var httpRequest = mapToHttpRequest(request).blockFirst();
         try {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Client {} Sending HTTP Request: {}", clientId, httpRequest);
+            }
             HttpResponse<byte[]> httpResponse = client.send(httpRequest, HttpResponse.BodyHandlers.ofByteArray());
             return getConvertedResponse(httpResponse, bodyType);
         } catch (IOException | InterruptedException e) {

@@ -61,6 +61,14 @@ public interface HttpMethodDeleteTest extends AbstractTck {
     }
 
     @Test
+    default void blockingDeleteMethodClientMappingWithStringResponse() {
+        runBlockingTest("HttpMethodDeleteTest", (server, client) -> {
+            HttpMethodDeleteClient httpClient = server.getApplicationContext().getBean(HttpMethodDeleteClient.class);
+            assertEquals("ok", httpClient.response());
+        });
+    }
+
+    @Test
     default void deleteMethodMappingWithStringResponse() {
         runTest("HttpMethodDeleteTest", (server, client) ->
             assertEquals("ok", Flux.from(client.exchange(HttpRequest.DELETE("/delete/string-response"), String.class)).blockFirst().body())
