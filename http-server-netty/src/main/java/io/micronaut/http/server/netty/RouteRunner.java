@@ -99,7 +99,7 @@ final class RouteRunner {
     }
 
     void handleException(Throwable cause) {
-        rib.routeExecutor.filterPublisher(new AtomicReference<>(request), () -> rib.routeExecutor.onError(cause, request))
+        rib.routeExecutor.filterPublisher(new AtomicReference<>(request), filterContext -> rib.routeExecutor.onError(cause, request, filterContext))
             .onComplete((response, throwable) -> rib.writeResponse(ctx, request, response, throwable));
     }
 

@@ -69,6 +69,8 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
+import reactor.util.context.Context;
+import reactor.util.context.ContextView;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
@@ -86,6 +88,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
@@ -205,7 +208,7 @@ public final class RouteExecutor {
             //Check if there is a file for the route before returning route not found
             FileCustomizableResponseType fileCustomizableResponseType = staticResourceResponseFinder.find(httpRequest);
             if (fileCustomizableResponseType != null) {
-                return filterPublisher(new AtomicReference<>(httpRequest), () -> ExecutionFlow.just(HttpResponse.ok(fileCustomizableResponseType)));
+                return filterPublisher(new AtomicReference<>(httpRequest), ctx -> ExecutionFlow.just(HttpResponse.ok(fileCustomizableResponseType)));
             }
             return onRouteMiss(requestBodyReader, httpRequest);
         }
@@ -232,7 +235,8 @@ public final class RouteExecutor {
             new AtomicReference<>(httpRequest),
             true,
             true,
-            () -> requestBodyReader.read(routeMatch, httpRequest)
+            () -> requestBodyReader.read(routeMatch, httpRequest),
+            null
         );
     }
 
@@ -337,7 +341,8 @@ public final class RouteExecutor {
                 new AtomicReference<>(httpRequest),
                 true,
                 true,
-                () -> requestBodyReader.read(statusRoute.get(), httpRequest)
+                () -> requestBodyReader.read(statusRoute.get(), httpRequest),
+                null
             );
         }
         if (httpRequest.getMethod() != HttpMethod.HEAD) {
@@ -349,7 +354,7 @@ public final class RouteExecutor {
             }
         }
         MutableHttpResponse<?> finalDefaultResponse = defaultResponse;
-        return filterPublisher(new AtomicReference<>(httpRequest), () -> ExecutionFlow.just(finalDefaultResponse));
+        return filterPublisher(new AtomicReference<>(httpRequest), ctx -> ExecutionFlow.just(finalDefaultResponse));
     }
 
     private void setRouteAttributes(HttpRequest<?> request, UriRouteMatch<Object, Object> route) {
@@ -357,6 +362,10 @@ public final class RouteExecutor {
         request.setAttribute(HttpAttributes.ROUTE_MATCH, route);
         request.setAttribute(HttpAttributes.ROUTE_INFO, route);
         request.setAttribute(HttpAttributes.URI_TEMPLATE, route.getRoute().getUriMatchTemplate().toString());
+    }
+
+    public ExecutionFlow<MutableHttpResponse<?>> onError(Throwable t, HttpRequest<?> httpRequest) {
+        return onError(t, httpRequest, Context.empty());
     }
 
     /**
@@ -367,7 +376,7 @@ public final class RouteExecutor {
      * @param httpRequest The request that caused the exception
      * @return A response publisher
      */
-    public ExecutionFlow<MutableHttpResponse<?>> onError(Throwable t, HttpRequest<?> httpRequest) {
+    public ExecutionFlow<MutableHttpResponse<?>> onError(Throwable t, HttpRequest<?> httpRequest, ContextView contextView) {
         // find the origination of the route
         Optional<RouteInfo> previousRequestRouteInfo = httpRequest.getAttribute(HttpAttributes.ROUTE_INFO, RouteInfo.class);
         Class<?> declaringType = previousRequestRouteInfo.map(RouteInfo::getDeclaringType).orElse(null);
@@ -387,7 +396,7 @@ public final class RouteExecutor {
             }
             try {
                 AtomicReference<HttpRequest<?>> requestReference = new AtomicReference<>(httpRequest);
-                return executeRoute(requestReference, false, false, () -> ExecutionFlow.just(errorRoute))
+                return executeRoute(requestReference, false, false, () -> ExecutionFlow.just(errorRoute), contextView)
                     .<MutableHttpResponse<?>>map(response -> {
                         response.setAttribute(HttpAttributes.EXCEPTION, cause);
                         return response;
@@ -539,11 +548,11 @@ public final class RouteExecutor {
      * @return A new response publisher that executes server filters
      */
     public ExecutionFlow<MutableHttpResponse<?>> filterPublisher(AtomicReference<HttpRequest<?>> requestReference,
-                                                                 Supplier<ExecutionFlow<MutableHttpResponse<?>>> responseFlowSupplier) {
+                                                                 Function<ContextView, ExecutionFlow<MutableHttpResponse<?>>> responseFlowSupplier) {
         ServerRequestContext.set(requestReference.get());
         List<HttpFilter> httpFilters = router.findFilters(requestReference.get());
         if (httpFilters.isEmpty()) {
-            return responseFlowSupplier.get();
+            return responseFlowSupplier.apply(Context.empty());
         }
         List<HttpFilter> filters = new ArrayList<>(httpFilters);
         AtomicInteger integer = new AtomicInteger();
@@ -557,7 +566,7 @@ public final class RouteExecutor {
                     throw new IllegalStateException("The FilterChain.proceed(..) method should be invoked exactly once per filter execution. The method has instead been invoked multiple times by an erroneous filter definition.");
                 }
                 if (pos == len) {
-                    return ReactiveExecutionFlow.fromFlow(responseFlowSupplier.get()).toPublisher();
+                    return Flux.deferContextual(ctx -> ReactiveExecutionFlow.fromFlow(responseFlowSupplier.apply(ctx)).toPublisher());
                 }
                 HttpFilter httpFilter = filters.get(pos);
                 requestReference.set(request);
@@ -688,7 +697,8 @@ public final class RouteExecutor {
                     new AtomicReference<>(request),
                     false,
                     true,
-                    () -> ExecutionFlow.just(statusRoute)
+                    () -> ExecutionFlow.just(statusRoute),
+                    Context.empty()
                 );
             }
         }
@@ -768,8 +778,9 @@ public final class RouteExecutor {
     private ExecutionFlow<MutableHttpResponse<?>> executeRoute(AtomicReference<HttpRequest<?>> requestReference,
                                                                boolean executeFilters,
                                                                boolean useErrorRoute,
-                                                               Supplier<ExecutionFlow<RouteMatch<?>>> routeMatchFlow) {
-        Supplier<ExecutionFlow<MutableHttpResponse<?>>> responseFlowSupplier = () -> {
+                                                               Supplier<ExecutionFlow<RouteMatch<?>>> routeMatchFlow,
+                                                               ContextView nonFiltersContextView) {
+        Function<ContextView, ExecutionFlow<MutableHttpResponse<?>>> responseFlowSupplier = contextFromFilter -> {
             return routeMatchFlow.get().flatMap(routeMatch -> {
                     ExecutorService executorService = findExecutor(routeMatch);
                     Supplier<ExecutionFlow<MutableHttpResponse<?>>> flowSupplier = () -> executeRouteAndConvertBody(routeMatch, requestReference.get());
@@ -781,7 +792,7 @@ public final class RouteExecutor {
                                     return Mono.from(
                                         ReactiveExecutionFlow.fromFlow(flowSupplier.get()).toPublisher()
                                     );
-                                }))
+                                }).contextWrite(contextFromFilter))
                                 .putInContext(ServerRequestContext.KEY, requestReference.get());
                         } else if (routeMatch.isReactive()) {
                             executeMethodResponseFlow = ReactiveExecutionFlow.async(executorService, flowSupplier)
@@ -796,7 +807,7 @@ public final class RouteExecutor {
                                     return Mono.from(
                                         ReactiveExecutionFlow.fromFlow(flowSupplier.get()).toPublisher()
                                     );
-                                }))
+                                }).contextWrite(contextFromFilter))
                                 .putInContext(ServerRequestContext.KEY, requestReference.get());
                         } else if (routeMatch.isReactive()) {
                             executeMethodResponseFlow = ReactiveExecutionFlow.fromFlow(flowSupplier.get())
@@ -815,7 +826,7 @@ public final class RouteExecutor {
                 });
         };
         if (!executeFilters) {
-            return responseFlowSupplier.get();
+            return responseFlowSupplier.apply(nonFiltersContextView);
         }
         return filterPublisher(requestReference, responseFlowSupplier);
     }
