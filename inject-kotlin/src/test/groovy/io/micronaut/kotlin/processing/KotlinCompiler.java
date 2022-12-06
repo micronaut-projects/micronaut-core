@@ -201,7 +201,7 @@ public class KotlinCompiler {
                 List<String> beanDefinitionNames = pair.component2().component1().
                     getClasspaths().stream().filter(f -> f.toURI().toString().contains("/ksp/sources/resources"))
                         .flatMap(dir -> {
-                        File[] files = new File(dir, "META-INF/micronaut/io/micronaut/inject/BeanDefinitionReference").listFiles();
+                        File[] files = new File(dir, "META-INF/micronaut/io.micronaut.inject.BeanDefinitionReference").listFiles();
                         if (files == null) {
                             return Stream.empty();
                         }

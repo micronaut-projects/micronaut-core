@@ -136,6 +136,26 @@ open class KotlinMethodElement: AbstractKotlinElement<KSDeclaration>, MethodElem
         this.internal = internal
     }
 
+    override fun withNewOwningType(owningType: ClassElement): MethodElement {
+        var newMethod = KotlinMethodElement(
+            declaration,
+            name,
+            owningType,
+            annotationMetadataFactory,
+            visitorContext,
+            returnType,
+            genericReturnType,
+            parameters,
+            abstract,
+            public,
+            private,
+            protected,
+            internal
+        )
+        copyValues(newMethod)
+        return newMethod
+    }
+
     override fun getName(): String {
         return name
     }

@@ -27,7 +27,7 @@ open class ConcreteClass {
     private val anotherClass: AnotherClass?
 
     @Creator
-    internal constructor() {
+    constructor() {
         anotherClass = null
     }
 

@@ -18,14 +18,12 @@ package io.micronaut.kotlin.processing.beans
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
-import com.google.devtools.ksp.symbol.ClassKind
-import com.google.devtools.ksp.symbol.KSAnnotated
-import com.google.devtools.ksp.symbol.KSClassDeclaration
-import com.google.devtools.ksp.symbol.KSFile
+import com.google.devtools.ksp.symbol.*
 import io.micronaut.context.annotation.Context
 import io.micronaut.core.annotation.Generated
 import io.micronaut.inject.processing.BeanDefinitionCreator
 import io.micronaut.inject.processing.BeanDefinitionCreatorFactory
+import io.micronaut.inject.processing.ProcessingException
 import io.micronaut.inject.writer.BeanDefinitionReferenceWriter
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 import io.micronaut.kotlin.processing.KotlinOutputVisitor
@@ -78,18 +76,23 @@ class BeanDefinitionProcessor(private val environment: SymbolProcessorEnvironmen
     }
 
     override fun finish() {
-        val outputVisitor = KotlinOutputVisitor(environment)
-        val processed = HashSet<String>()
-        for (beanDefinitionCreator in beanDefinitionMap.values) {
-            for (writer in beanDefinitionCreator.build()) {
-                if (processed.add(writer.beanDefinitionName)) {
-                    processBeanDefinitions(writer, outputVisitor, processed)
-                } else {
-                    throw IllegalStateException("Already processed: " + writer.beanDefinitionName)
+        try {
+            val outputVisitor = KotlinOutputVisitor(environment)
+            val processed = HashSet<String>()
+            for (beanDefinitionCreator in beanDefinitionMap.values) {
+                for (writer in beanDefinitionCreator.build()) {
+                    if (processed.add(writer.beanDefinitionName)) {
+                        processBeanDefinitions(writer, outputVisitor, processed)
+                    } else {
+                        throw IllegalStateException("Already processed: " + writer.beanDefinitionName)
+                    }
                 }
             }
+        } catch (e: ProcessingException) {
+            environment.logger.error(e.message!!, e.originatingElement as KSNode)
+        } finally {
+            beanDefinitionMap.clear()
         }
-        beanDefinitionMap.clear()
     }
 
     private fun processBeanDefinitions(

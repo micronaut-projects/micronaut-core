@@ -134,13 +134,14 @@ open class KotlinClassElement(val classType: KSType,
             })
     }
 
-    private fun mapToPropertyElement(value: AstBeanPropertiesUtils.BeanPropertyData): KotlinPropertyElement? {
+    private fun mapToPropertyElement(value: AstBeanPropertiesUtils.BeanPropertyData): KotlinPropertyElement {
         return KotlinPropertyElement(
             this@KotlinClassElement,
             value.type,
             name,
-            (if (value.getter != null) null else value.getter.nativeType) as KSFunctionDeclaration,
-            (if (value.setter != null) null else value.setter.nativeType) as KSFunctionDeclaration?,
+            value.field,
+            value.getter,
+            value.setter,
             elementAnnotationMetadataFactory,
             visitorContext
         )

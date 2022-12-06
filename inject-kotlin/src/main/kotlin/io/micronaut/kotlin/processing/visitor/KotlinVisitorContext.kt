@@ -136,6 +136,18 @@ class KotlinVisitorContext(private val environment: SymbolProcessorEnvironment,
         outputVisitor.finish()
     }
 
+    override fun getClassElement(
+        name: String,
+        annotationMetadataFactory: ElementAnnotationMetadataFactory
+    ): Optional<ClassElement> {
+        var declaration = resolver.getClassDeclarationByName(name)
+        if (declaration == null) {
+            declaration = resolver.getClassDeclarationByName(name.replace('$', '.'))
+        }
+        return Optional.ofNullable(declaration?.asStarProjectedType())
+            .map { elementFactory.newClassElement(it, annotationMetadataFactory) }
+    }
+
     override fun getElementFactory(): KotlinElementFactory = elementFactory
     override fun getElementAnnotationMetadataFactory(): ElementAnnotationMetadataFactory {
         return elementAnnotationMetadataFactory

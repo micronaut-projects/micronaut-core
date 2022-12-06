@@ -271,6 +271,130 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
         }
     }
 
+    constructor(classElement: ClassElement,
+                type: ClassElement,
+                name: String,
+                field: FieldElement?,
+                getter: MethodElement?,
+                setter: MethodElement?,
+                elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
+                visitorContext: KotlinVisitorContext) : super(pickDeclaration(type, field, getter, setter), elementAnnotationMetadataFactory, visitorContext) {
+        this.name = name
+        this.type = type
+        this.classElement = classElement
+        this.setter = Optional.ofNullable(setter)
+        this.getter = Optional.ofNullable(getter)
+        this.abstract = getter?.isAbstract == true || setter?.isAbstract == true
+        this.field = Optional.ofNullable(field)
+        val elements: MutableList<MemberElement> = ArrayList(3)
+        this.setter.ifPresent { elements.add(it) }
+        this.getter.ifPresent { elements.add(it) }
+        this.field.ifPresent { elements.add(it) }
+
+        // The instance AnnotationMetadata of each element can change after a modification
+        // Set annotation metadata as actual elements so the changes are reflected
+        // The instance AnnotationMetadata of each element can change after a modification
+        // Set annotation metadata as actual elements so the changes are reflected
+        val propertyAnnotationMetadata: AnnotationMetadata
+        propertyAnnotationMetadata = if (elements.size == 1) {
+            elements.iterator().next()
+        } else {
+            AnnotationMetadataHierarchy(
+                true,
+                *elements.stream().map { e: MemberElement ->
+                    if (e is MethodElement) {
+                        return@map object : AnnotationMetadataDelegate {
+                            override fun getAnnotationMetadata(): AnnotationMetadata {
+                                // Exclude type metadata
+                                return e.getAnnotationMetadata().declaredMetadata
+                            }
+                        }
+                    }
+                    e
+                }.toList().toTypedArray()
+            )
+        }
+        this.annotationMetadata = object : MutableAnnotationMetadataDelegate<Any?> {
+            override fun <T : Annotation?> annotate(annotationValue: AnnotationValue<T>): Element {
+                for (memberElement in elements) {
+                    memberElement.annotate(annotationValue)
+                }
+                return this@KotlinPropertyElement
+            }
+
+            override fun <T : Annotation?> annotate(
+                annotationType: String,
+                consumer: Consumer<AnnotationValueBuilder<T>>
+            ): Element {
+                for (memberElement in elements) {
+                    memberElement.annotate(annotationType, consumer)
+                }
+                return this@KotlinPropertyElement
+            }
+
+            override fun <T : Annotation?> annotate(annotationType: Class<T>): Element {
+                for (memberElement in elements) {
+                    memberElement.annotate(annotationType)
+                }
+                return this@KotlinPropertyElement
+            }
+
+            override fun annotate(annotationType: String): Element {
+                for (memberElement in elements) {
+                    memberElement.annotate(annotationType)
+                }
+                return this@KotlinPropertyElement
+            }
+
+            override fun <T : Annotation?> annotate(
+                annotationType: Class<T>,
+                consumer: Consumer<AnnotationValueBuilder<T>>
+            ): Element {
+                for (memberElement in elements) {
+                    memberElement.annotate(annotationType, consumer)
+                }
+                return this@KotlinPropertyElement
+            }
+
+            override fun removeAnnotation(annotationType: String): Element {
+                for (memberElement in elements) {
+                    memberElement.removeAnnotation(annotationType)
+                }
+                return this@KotlinPropertyElement
+            }
+
+            override fun <T : Annotation?> removeAnnotationIf(predicate: Predicate<AnnotationValue<T>>): Element {
+                for (memberElement in elements) {
+                    memberElement.removeAnnotationIf(predicate)
+                }
+                return this@KotlinPropertyElement
+            }
+
+            override fun getAnnotationMetadata(): AnnotationMetadata {
+                return propertyAnnotationMetadata
+            }
+        }
+    }
+
+    companion object Helper {
+        private fun pickDeclaration(
+            type: ClassElement,
+            field: FieldElement?,
+            getter: MethodElement?,
+            setter: MethodElement?
+        ): KSNode {
+            return if (field?.nativeType != null) {
+                field.nativeType as KSNode
+            } else if (getter?.nativeType != null) {
+                getter.nativeType as KSNode
+            } else if (setter?.nativeType != null) {
+                setter.nativeType as KSNode
+            } else {
+                type.nativeType as KSNode
+            }
+        }
+    }
+
     override fun getAnnotationMetadata(): MutableAnnotationMetadataDelegate<*> {
         return this.annotationMetadata!!
     }

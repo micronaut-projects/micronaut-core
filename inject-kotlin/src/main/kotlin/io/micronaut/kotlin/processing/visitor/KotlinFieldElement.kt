@@ -15,12 +15,9 @@
  */
 package io.micronaut.kotlin.processing.visitor
 
-import com.google.devtools.ksp.closestClassDeclaration
-import com.google.devtools.ksp.symbol.KSNode
 import com.google.devtools.ksp.symbol.KSPropertyDeclaration
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.inject.ast.ClassElement
-import io.micronaut.inject.ast.Element
 import io.micronaut.inject.ast.FieldElement
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 

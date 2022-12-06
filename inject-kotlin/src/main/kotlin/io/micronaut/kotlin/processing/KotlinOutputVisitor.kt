@@ -37,15 +37,11 @@ class KotlinOutputVisitor(private val environment: SymbolProcessorEnvironment): 
     }
 
     override fun visitServiceDescriptor(type: String, classname: String, originatingElement: Element) {
-        val path = "micronaut/$type/$classname"
-        val elements = path.split(File.separator).toMutableList()
-        elements.add(0, "META-INF")
-        val file = elements.removeAt(elements.size - 1)
         environment.codeGenerator.createNewFile(
             getNativeElements(arrayOf(originatingElement)),
-            elements.joinToString("."),
-            file.substringBeforeLast('.'),
-            file.substringAfterLast('.')).use {
+            "META-INF.micronaut",
+            "${type}${File.separator}${classname}",
+            "").use {
             it.bufferedWriter().write("")
         }
     }

@@ -21,7 +21,6 @@ import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.ParameterElement
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
-import io.micronaut.kotlin.processing.annotation.KotlinElementAnnotationMetadataFactory
 
 class KotlinParameterElement(
     private val genericClassElement: ClassElement,

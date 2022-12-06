@@ -178,7 +178,7 @@ class KotlinElementFactory(
             visitorContext,
             typeArguments
         )
-        if (returnType.isMarkedNullable) {
+        if (returnType.isMarkedNullable && !kotlinMethodElement.returnType.isPrimitive) {
             kotlinMethodElement.annotate(AnnotationUtil.NULLABLE)
         }
         return kotlinMethodElement
