@@ -12,7 +12,7 @@ class HttpContentProcessorSpec extends Specification {
     def 'simple forward'() {
         given:
         def out = []
-        def processor = new HttpContentProcessor() {
+        def processor = new HttpContentProcessorAsReactiveProcessor(new HttpContentProcessor() {
             @Override
             void add(ByteBufHolder data, Collection<Object> o) {
                 o.add(data.content().toString(StandardCharsets.UTF_8))
@@ -22,7 +22,7 @@ class HttpContentProcessorSpec extends Specification {
             void complete(Collection<Object> o) {
                 o.add("complete HCP")
             }
-        }.asProcessor()
+        })
 
         when:
         Flux.fromIterable(["1", "2", "3"])

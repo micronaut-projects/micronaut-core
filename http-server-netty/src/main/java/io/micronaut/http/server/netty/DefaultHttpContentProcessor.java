@@ -35,7 +35,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * @since 1.0
  */
 @Internal
-public class DefaultHttpContentProcessor extends HttpContentProcessor {
+public class DefaultHttpContentProcessor implements HttpContentProcessor {
 
     protected final NettyHttpRequest<?> nettyHttpRequest;
     protected final ChannelHandlerContext ctx;

@@ -31,7 +31,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * @since 1.0
  */
 @Internal
-public abstract class AbstractHttpContentProcessor extends HttpContentProcessor {
+public abstract class AbstractHttpContentProcessor implements HttpContentProcessor {
 
     protected final NettyHttpRequest<?> nettyHttpRequest;
     protected final long advertisedLength;

@@ -29,6 +29,7 @@ import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.multipart.MultipartBody;
 import io.micronaut.http.server.netty.DefaultHttpContentProcessor;
 import io.micronaut.http.server.netty.HttpContentProcessor;
+import io.micronaut.http.server.netty.HttpContentProcessorAsReactiveProcessor;
 import io.micronaut.http.server.netty.HttpContentSubscriberFactory;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.NettyHttpServer;
@@ -88,7 +89,7 @@ public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinde
                         .orElse(new DefaultHttpContentProcessor(nettyHttpRequest, httpServerConfiguration.get()));
 
                 //noinspection unchecked
-                return () -> Optional.of(subscriber -> processor.resultType(context.getArgument()).asPublisher(nettyHttpRequest).subscribe(new CompletionAwareSubscriber<>() {
+                return () -> Optional.of(subscriber -> HttpContentProcessorAsReactiveProcessor.asPublisher(processor.resultType(context.getArgument()), nettyHttpRequest).subscribe(new CompletionAwareSubscriber<>() {
 
                     Subscription s;
                     AtomicLong partsRequested = new AtomicLong(0);
