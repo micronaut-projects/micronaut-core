@@ -512,7 +512,9 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                         qualifier = PrimaryQualifier.INSTANCE;
                     }
                     BeanDefinitionDelegate<?> delegate = BeanDefinitionDelegate.create(candidate, (Qualifier<T>) qualifier);
-                    transformedCandidates.add((BeanDefinition<T>) delegate);
+                    if (delegate.isEnabled(this, resolutionContext)) {
+                        transformedCandidates.add((BeanDefinition<T>) delegate);
+                    }
                 }
             }
         }
