@@ -106,7 +106,7 @@ import java.util.regex.Pattern;
 @Internal
 @Sharable
 @SuppressWarnings("FileLength")
-final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.http.HttpRequest<?>> implements RouteExecutor.StaticResourceResponseFinder {
+final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.http.HttpRequest<?>> {
 
     private static final Logger LOG = LoggerFactory.getLogger(RoutingInBoundHandler.class);
     /*
@@ -236,12 +236,12 @@ final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.microna
             ctx.writeAndFlush(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR));
             return;
         }
-        new RouteRunner(this, ctx, nettyHttpRequest).handleException(cause);
+        new NettyRequestLifecycle(this, ctx, nettyHttpRequest).handleException(cause);
     }
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, io.micronaut.http.HttpRequest<?> httpRequest) {
-        new RouteRunner(this, ctx, (NettyHttpRequest<?>) httpRequest).handleNormal();
+        new NettyRequestLifecycle(this, ctx, (NettyHttpRequest<?>) httpRequest).handleNormal();
     }
 
     void writeResponse(ChannelHandlerContext ctx,
@@ -275,7 +275,6 @@ final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.microna
         }
     }
 
-    @Override
     public FileCustomizableResponseType find(HttpRequest<?> httpRequest) {
         Optional<URL> optionalUrl = staticResourceResolver.resolve(httpRequest.getUri().getPath());
         if (optionalUrl.isPresent()) {

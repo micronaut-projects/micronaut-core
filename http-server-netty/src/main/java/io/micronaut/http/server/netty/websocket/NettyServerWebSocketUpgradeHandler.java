@@ -139,7 +139,7 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
 
         AtomicReference<HttpRequest<?>> requestReference = new AtomicReference<>(msg);
 
-        ExecutionFlow<MutableHttpResponse<?>> responseFlow = ExecutionFlow.async(ctx.channel().eventLoop(), () -> routeExecutor.filterPublisher(requestReference, filterContext -> {
+        ExecutionFlow<MutableHttpResponse<?>> responseFlow = ExecutionFlow.async(ctx.channel().eventLoop(), () -> routeExecutor.filterPublisher(requestReference, () -> {
             ExecutionFlow<MutableHttpResponse<?>> response;
             if (optionalRoute.isPresent()) {
                 response = ExecutionFlow.just(proceed);

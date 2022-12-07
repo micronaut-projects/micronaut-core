@@ -1,6 +1,7 @@
 package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.execution.CompletableFutureExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.type.Argument;
@@ -12,9 +13,10 @@ import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
-import io.micronaut.http.server.RouteExecutor;
+import io.micronaut.http.server.RequestLifecycle;
 import io.micronaut.http.server.multipart.MultipartBody;
 import io.micronaut.http.server.netty.multipart.NettyStreamingFileUpload;
+import io.micronaut.http.server.types.files.FileCustomizableResponseType;
 import io.micronaut.web.router.MethodBasedRouteMatch;
 import io.micronaut.web.router.RouteMatch;
 import io.netty.buffer.ByteBufHolder;
@@ -32,83 +34,100 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicReference;
 
 @Internal
-final class RouteRunner {
-    private static final Logger LOG = LoggerFactory.getLogger(RouteRunner.class);
+final class NettyRequestLifecycle extends RequestLifecycle {
+    private static final Logger LOG = LoggerFactory.getLogger(NettyRequestLifecycle.class);
 
     private final RoutingInBoundHandler rib;
     private final ChannelHandlerContext ctx;
-    private final NettyHttpRequest<?> request;
 
-    RouteRunner(RoutingInBoundHandler rib, ChannelHandlerContext ctx, NettyHttpRequest<?> request) {
+    /**
+     * Should only be used where netty-specific stuff is needed, such as reading the body or
+     * writing the response. Otherwise use {@link #request()} which can be updated by filters
+     */
+    private final NettyHttpRequest<?> nettyRequest;
+
+    NettyRequestLifecycle(RoutingInBoundHandler rib, ChannelHandlerContext ctx, NettyHttpRequest<?> request) {
+        super(rib.routeExecutor, request);
         this.rib = rib;
         this.ctx = ctx;
-        this.request = request;
+        this.nettyRequest = request;
+
+        multipartEnabled(rib.multipartEnabled);
     }
 
     void handleNormal() {
+        handleNormal0()
+            .onComplete((response, throwable) -> rib.writeResponse(ctx, nettyRequest, response, throwable));
+    }
+
+    private ExecutionFlow<MutableHttpResponse<?>> handleNormal0() {
         ctx.channel().config().setAutoRead(false);
 
         if (LOG.isDebugEnabled()) {
-            HttpMethod httpMethod = request.getMethod();
-            ServerRequestContext.set(request);
-            LOG.debug("Request {} {}", httpMethod, request.getUri());
+            HttpMethod httpMethod = request().getMethod();
+            ServerRequestContext.set(request());
+            LOG.debug("Request {} {}", httpMethod, request().getUri());
         }
 
-        RouteExecutor.RequestBodyReader requestBodyReader = (routeMatch, hr) -> {
-            // handle decoding failure
-            DecoderResult decoderResult = request.getNativeRequest().decoderResult();
-            if (decoderResult.isFailure()) {
-                return ExecutionFlow.error(decoderResult.cause());
-            }
-            // try to fulfill the argument requirements of the route
-            RouteMatch<?> route = rib.requestArgumentSatisfier.fulfillArgumentRequirements(routeMatch, request, false);
-            if (shouldReadBody(request, route)) {
-                BaseRouteCompleter completer = request.isFormOrMultipartData() ?
-                    new FormRouteCompleter(new NettyStreamingFileUpload.Factory(rib.serverConfiguration.getMultipart(), rib.getIoExecutor()), rib.conversionService, request, route) :
-                    new BaseRouteCompleter(request, route);
-                HttpContentProcessor processor = rib.httpContentProcessorResolver.resolve(request, route);
-                StreamingDataSubscriber pr = new StreamingDataSubscriber(completer, processor);
-                ((StreamedHttpRequest) request.getNativeRequest()).subscribe(pr);
-                return CompletableFutureExecutionFlow.just(pr.completion);
-            }
-            ctx.read();
-            return ExecutionFlow.just(route);
-        };
-
-        ExecutionFlow<MutableHttpResponse<?>> responseFlow;
-
         // handle decoding failure
-        DecoderResult decoderResult = request.getNativeRequest().decoderResult();
+        DecoderResult decoderResult = nettyRequest.getNativeRequest().decoderResult();
         if (decoderResult.isFailure()) {
             Throwable cause = decoderResult.cause();
             HttpStatus status = cause instanceof TooLongFrameException ? HttpStatus.REQUEST_ENTITY_TOO_LARGE : HttpStatus.BAD_REQUEST;
-            responseFlow = rib.routeExecutor.onStatusError(
-                requestBodyReader,
-                request,
+            return onStatusError(
                 HttpResponse.status(status),
                 status.getReason()
             );
-        } else {
-            responseFlow = rib.routeExecutor.executeRoute(requestBodyReader, request, rib.multipartEnabled, rib);
         }
-        responseFlow
-            .onComplete((response, throwable) -> rib.writeResponse(ctx, request, response, throwable));
+
+        return normalFlow();
+    }
+
+    @Nullable
+    @Override
+    protected FileCustomizableResponseType findFile() {
+        return rib.find(request());
+    }
+
+    @Override
+    protected ExecutionFlow<RouteMatch<?>> fulfillArguments(RouteMatch<?> routeMatch) {
+        // handle decoding failure
+        DecoderResult decoderResult = nettyRequest.getNativeRequest().decoderResult();
+        if (decoderResult.isFailure()) {
+            return ExecutionFlow.error(decoderResult.cause());
+        }
+        return super.fulfillArguments(routeMatch).flatMap(this::waitForBody);
+    }
+
+    /**
+     * If necessary (e.g. when there's a {@link Body} parameter), wait for the body to come in.
+     * This method also sometimes fulfills more controller parameters with form data.
+     */
+    private ExecutionFlow<RouteMatch<?>> waitForBody(RouteMatch<?> routeMatch) {
+        if (!shouldReadBody(routeMatch)) {
+            ctx.read();
+            return ExecutionFlow.just(routeMatch);
+        }
+        BaseRouteCompleter completer = nettyRequest.isFormOrMultipartData() ?
+            new FormRouteCompleter(new NettyStreamingFileUpload.Factory(rib.serverConfiguration.getMultipart(), rib.getIoExecutor()), rib.conversionService, nettyRequest, routeMatch) :
+            new BaseRouteCompleter(nettyRequest, routeMatch);
+        HttpContentProcessor processor = rib.httpContentProcessorResolver.resolve(nettyRequest, routeMatch);
+        StreamingDataSubscriber pr = new StreamingDataSubscriber(completer, processor);
+        ((StreamedHttpRequest) nettyRequest.getNativeRequest()).subscribe(pr);
+        return CompletableFutureExecutionFlow.just(pr.completion);
     }
 
     void handleException(Throwable cause) {
-        rib.routeExecutor.filterPublisher(new AtomicReference<>(request), filterContext -> rib.routeExecutor.onError(cause, request, filterContext))
-            .onComplete((response, throwable) -> rib.writeResponse(ctx, request, response, throwable));
+        onError(cause).onComplete((response, throwable) -> rib.writeResponse(ctx, nettyRequest, response, throwable));
     }
 
-    private static boolean shouldReadBody(NettyHttpRequest<?> nettyHttpRequest, RouteMatch<?> routeMatch) {
-        if (!HttpMethod.permitsRequestBody(nettyHttpRequest.getMethod())) {
+    private boolean shouldReadBody(RouteMatch<?> routeMatch) {
+        if (!HttpMethod.permitsRequestBody(request().getMethod())) {
             return false;
         }
-        io.netty.handler.codec.http.HttpRequest nativeRequest = nettyHttpRequest.getNativeRequest();
-        if (!(nativeRequest instanceof StreamedHttpRequest)) {
+        if (!(nettyRequest.getNativeRequest() instanceof StreamedHttpRequest)) {
             // Illegal state: The request body is required, so at this point we must have a StreamedHttpRequest
             return false;
         }
