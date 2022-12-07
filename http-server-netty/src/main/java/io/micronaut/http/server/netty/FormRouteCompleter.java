@@ -194,7 +194,7 @@ final class FormRouteCompleter extends BaseRouteCompleter {
                 StreamingFileUpload.class.isAssignableFrom(argument.getType()) &&
                 data.attachment.upload == null) {
 
-                data.attachment.upload = fileUploadFactory.create(fu, (Flux<PartData>) withFlowControl(subject.asFlux(), data));
+                data.attachment.upload = fileUploadFactory.create(fu, withFlowControl(subject.asFlux(), data));
             }
 
             Optional<?> converted = conversionService.convert(part, typeVariable);
