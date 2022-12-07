@@ -17,6 +17,7 @@ package io.micronaut.http.server.netty.websocket;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpAttributes;
@@ -31,9 +32,11 @@ import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.websocket.WebSocketSessionRepository;
+import io.micronaut.http.server.RequestLifecycle;
 import io.micronaut.http.server.RouteExecutor;
 import io.micronaut.http.server.netty.NettyEmbeddedServices;
 import io.micronaut.http.server.netty.NettyHttpRequest;
+import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteMatch;
 import io.micronaut.websocket.CloseReason;
@@ -63,7 +66,6 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Handles WebSocket upgrade requests.
@@ -127,36 +129,16 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
             .filter(rm -> rm.isAnnotationPresent(OnMessage.class) || rm.isAnnotationPresent(OnOpen.class))
             .findFirst();
 
-        MutableHttpResponse<?> proceed = HttpResponse.ok();
-
-        if (optionalRoute.isPresent()) {
-            UriRouteMatch<Object, Object> rm = optionalRoute.get();
-            msg.setAttribute(HttpAttributes.ROUTE_MATCH, rm);
-            msg.setAttribute(HttpAttributes.ROUTE_INFO, rm);
-            proceed.setAttribute(HttpAttributes.ROUTE_MATCH, rm);
-            proceed.setAttribute(HttpAttributes.ROUTE_INFO, rm);
-        }
-
-        AtomicReference<HttpRequest<?>> requestReference = new AtomicReference<>(msg);
-
-        ExecutionFlow<MutableHttpResponse<?>> responseFlow = ExecutionFlow.async(ctx.channel().eventLoop(), () -> routeExecutor.filterPublisher(requestReference, () -> {
-            ExecutionFlow<MutableHttpResponse<?>> response;
-            if (optionalRoute.isPresent()) {
-                response = ExecutionFlow.just(proceed);
-            } else {
-                response = routeExecutor.onError(new HttpStatusException(HttpStatus.NOT_FOUND, "WebSocket Not Found"), msg);
-            }
-            response.putInContext(ServerRequestContext.KEY, requestReference.get());
-            return response;
-        }));
+        WebsocketRequestLifecycle requestLifecycle = new WebsocketRequestLifecycle(routeExecutor, msg, optionalRoute.orElse(null));
+        ExecutionFlow<MutableHttpResponse<?>> responseFlow = ExecutionFlow.async(ctx.channel().eventLoop(), requestLifecycle::handle);
         responseFlow.onComplete((response, throwable) -> {
             if (response != null) {
-                writeResponse(ctx, msg, proceed, response);
+                writeResponse(ctx, msg, requestLifecycle.shouldProceedNormally, response);
             }
         });
     }
 
-    private void writeResponse(ChannelHandlerContext ctx, NettyHttpRequest<?> msg, MutableHttpResponse<?> proceed, MutableHttpResponse<?> actualResponse) {
+    private void writeResponse(ChannelHandlerContext ctx, NettyHttpRequest<?> msg, boolean shouldProceedNormally, MutableHttpResponse<?> actualResponse) {
         if (cancelUpgrade) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Cancelling websocket upgrade, handler was removed while request was processing");
@@ -164,7 +146,7 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
             return;
         }
 
-        if (actualResponse == proceed) {
+        if (shouldProceedNormally) {
             UriRouteMatch<Object, Object> routeMatch = actualResponse.getAttribute(HttpAttributes.ROUTE_MATCH, UriRouteMatch.class)
                 .orElseThrow(() -> new IllegalStateException("Route match is required!"));
             //Adding new handler to the existing pipeline to handle WebSocket Messages
@@ -274,5 +256,42 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
     public void channelInactive(@NonNull ChannelHandlerContext ctx) throws Exception {
         super.channelInactive(ctx);
         cancelUpgrade = true;
+    }
+
+    private static final class WebsocketRequestLifecycle extends RequestLifecycle {
+        @Nullable
+        private final RouteMatch<?> route;
+
+        boolean shouldProceedNormally;
+
+        WebsocketRequestLifecycle(RouteExecutor routeExecutor, HttpRequest<?> request, @Nullable RouteMatch<?> route) {
+            super(routeExecutor, request);
+            this.route = route;
+        }
+
+        ExecutionFlow<MutableHttpResponse<?>> handle() {
+            MutableHttpResponse<?> proceed = HttpResponse.ok();
+
+            if (route != null) {
+                request().setAttribute(HttpAttributes.ROUTE_MATCH, route);
+                request().setAttribute(HttpAttributes.ROUTE_INFO, route);
+                proceed.setAttribute(HttpAttributes.ROUTE_MATCH, route);
+                proceed.setAttribute(HttpAttributes.ROUTE_INFO, route);
+            }
+
+            ExecutionFlow<MutableHttpResponse<?>> response;
+            if (route != null) {
+                response = runWithFilters(() -> ExecutionFlow.just(proceed));
+            } else {
+                response = onError(new HttpStatusException(HttpStatus.NOT_FOUND, "WebSocket Not Found"))
+                    .putInContext(ServerRequestContext.KEY, request());
+            }
+            return response.map(r -> {
+                if (r == proceed) {
+                    shouldProceedNormally = true;
+                }
+                return r;
+            });
+        }
     }
 }

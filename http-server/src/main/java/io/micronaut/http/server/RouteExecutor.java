@@ -70,7 +70,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
@@ -192,18 +191,6 @@ public final class RouteExecutor {
     }
 
     /**
-     * Creates a response publisher to represent the response after being handled
-     * by any available error route or exception handler.
-     *
-     * @param t           The exception that occurred
-     * @param httpRequest The request that caused the exception
-     * @return A response publisher
-     */
-    public ExecutionFlow<MutableHttpResponse<?>> onError(Throwable t, HttpRequest<?> httpRequest) {
-        return new RequestLifecycle(this, httpRequest).onErrorNoFilter(t);
-    }
-
-    /**
      * Creates a default error response. Should be used when a response could not be retrieved
      * from any other method.
      *
@@ -269,24 +256,6 @@ public final class RouteExecutor {
             defaultResponseMediaType = MediaType.APPLICATION_JSON_TYPE;
         }
         return defaultResponseMediaType;
-    }
-
-    /**
-     * Applies server filters to a request/response.
-     *
-     * @param requestReference     The request reference
-     * @param responseFlowSupplier The deferred response flow
-     * @return A new response publisher that executes server filters
-     * @deprecated Use a {@link RequestLifecycle} instead
-     */
-    @Deprecated
-    public ExecutionFlow<MutableHttpResponse<?>> filterPublisher(AtomicReference<HttpRequest<?>> requestReference,
-                                                                 Supplier<ExecutionFlow<MutableHttpResponse<?>>> responseFlowSupplier) {
-        RequestLifecycle mockLifecycle = new RequestLifecycle(this, requestReference.get());
-        return mockLifecycle.runWithFilters(() -> {
-            requestReference.set(mockLifecycle.request());
-            return responseFlowSupplier.get();
-        });
     }
 
     private MutableHttpResponse<?> newNotFoundError(HttpRequest<?> request) {

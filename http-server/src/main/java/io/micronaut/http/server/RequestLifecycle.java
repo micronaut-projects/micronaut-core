@@ -21,7 +21,6 @@ import io.micronaut.http.server.types.files.FileCustomizableResponseType;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.qualifiers.Qualifiers;
-import io.micronaut.web.router.MethodBasedRouteMatch;
 import io.micronaut.web.router.RouteInfo;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.UriRouteMatch;
@@ -114,12 +113,7 @@ public class RequestLifecycle {
         RouteExecutor.setRouteAttributes(request, routeMatch);
 
         if (LOG.isTraceEnabled()) {
-            String requestPath = request.getUri().getPath();
-            if (routeMatch instanceof MethodBasedRouteMatch) {
-                LOG.trace("Matched route {} - {} to controller {}", request.getMethodName(), requestPath, routeMatch.getDeclaringType());
-            } else {
-                LOG.trace("Matched route {} - {}", request.getMethodName(), requestPath);
-            }
+            LOG.trace("Matched route {} - {} to controller {}", request.getMethodName(), request.getUri().getPath(), routeMatch.getDeclaringType());
         }
         // all ok proceed to try and execute the route
         if (routeMatch.isWebSocketRoute()) {
@@ -166,7 +160,7 @@ public class RequestLifecycle {
             try {
                 return ExecutionFlow.just(errorRoute)
                     .flatMap(routeMatch -> routeExecutor.callRoute(context, routeMatch, request))
-                    .flatMap(response -> handleStatusException(response))
+                    .flatMap(this::handleStatusException)
                     .onErrorResume(u -> createDefaultErrorResponseFlow(request, u))
                     .<MutableHttpResponse<?>>map(response -> {
                         response.setAttribute(HttpAttributes.EXCEPTION, cause);
