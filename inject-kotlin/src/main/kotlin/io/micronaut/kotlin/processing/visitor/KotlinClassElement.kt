@@ -419,13 +419,12 @@ open class KotlinClassElement(val classType: KSType,
                 }
                 MethodElement::class.java -> {
                     val result = classNode.getAllFunctions()
-                        .filter { methodNode: KSFunctionDeclaration ->
-                            !methodNode.isInternal() &&
-                            !methodNode.isConstructor() &&
-                            // ignore standard lib and synthetic methods
-                            methodNode.origin != Origin.KOTLIN_LIB &&
-                            methodNode.origin != Origin.SYNTHETIC &&
-                            methodNode.origin != Origin.JAVA_LIB
+                        .filter { func: KSFunctionDeclaration ->
+                            !func.isInternal() &&
+                            !func.isConstructor() &&
+                            func.origin != Origin.SYNTHETIC &&
+                            // this is a hack but no other way it seems
+                            !listOf("hashCode", "toString", "equals").contains(func.simpleName.asString())
                         }
                         .toList()
                     result
@@ -435,9 +434,7 @@ open class KotlinClassElement(val classType: KSType,
                         .filter {
                             !it.isInternal() &&
                             it.hasBackingField &&
-                            it.origin != Origin.KOTLIN_LIB &&
-                            it.origin != Origin.SYNTHETIC &&
-                            it.origin != Origin.JAVA_LIB
+                            it.origin != Origin.SYNTHETIC
                         }
                         .toList()
                 }

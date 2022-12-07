@@ -90,8 +90,11 @@ open class KotlinMethodElement: AbstractKotlinElement<KSDeclaration>, MethodElem
         this.name = visitorContext.resolver.getJvmName(method)!!
         this.declaringType = declaringType
         this.parameters = method.parameters.map {
-            val t =
-                visitorContext.elementFactory.newClassElement(it.type.resolve(), elementAnnotationMetadataFactory, typeArguments)
+            val t = visitorContext.elementFactory.newClassElement(
+                it.type.resolve(),
+                elementAnnotationMetadataFactory,
+                typeArguments
+            )
             KotlinParameterElement(
                 t,
                 t,

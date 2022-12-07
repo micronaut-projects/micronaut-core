@@ -31,7 +31,6 @@ import static io.micronaut.kotlin.processing.KotlinCompiler.*
 
 class MethodAdapterSpec extends Specification {
 
-    @PendingFeature(reason = "annotation defaults")
     void 'test method adapter with failing requirements is not present'() {
         given:
         def context = buildContext('''
@@ -183,7 +182,7 @@ open class Test {
 
     var invoked = false
         private set
-    
+
     @EventListener
     @Async
     open fun onStartup(event: StartupEvent): CompletableFuture<Boolean> {
