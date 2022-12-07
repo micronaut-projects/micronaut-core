@@ -1,3 +1,18 @@
+/*
+ * Copyright 2017-2022 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.http.server.netty;
 
 import io.micronaut.core.async.publisher.Publishers;
@@ -29,14 +44,15 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 
 final class FormRouteCompleter extends BaseRouteCompleter {
+    static final Argument<PartData> ARGUMENT_PART_DATA = Argument.of(PartData.class);
     private static final Logger LOG = LoggerFactory.getLogger(FormRouteCompleter.class);
 
     private final NettyStreamingFileUpload.Factory fileUploadFactory;
     private final ConversionService conversionService;
-    final boolean alwaysAddContent = request.isFormData();
-    final AtomicLong pressureRequested = new AtomicLong();
-    final Map<String, Sinks.Many<Object>> subjectsByDataName = new HashMap<>();
-    final Collection<Sinks.Many<?>> downstreamSubscribers = new ArrayList<>();
+    private final boolean alwaysAddContent = request.isFormData();
+    private final AtomicLong pressureRequested = new AtomicLong();
+    private final Map<String, Sinks.Many<Object>> subjectsByDataName = new HashMap<>();
+    private final Collection<Sinks.Many<?>> downstreamSubscribers = new ArrayList<>();
 
     FormRouteCompleter(NettyStreamingFileUpload.Factory fileUploadFactory, ConversionService conversionService, NettyHttpRequest<?> request, RouteMatch<?> routeMatch) {
         super(request, routeMatch);
@@ -121,7 +137,7 @@ final class FormRouteCompleter extends BaseRouteCompleter {
             Argument typeVariable;
 
             if (StreamingFileUpload.class.isAssignableFrom(argument.getType())) {
-                typeVariable = RoutingInBoundHandler.ARGUMENT_PART_DATA;
+                typeVariable = ARGUMENT_PART_DATA;
             } else {
                 typeVariable = argument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
             }
@@ -136,7 +152,7 @@ final class FormRouteCompleter extends BaseRouteCompleter {
             if (Publishers.isConvertibleToPublisher(typeVariableType)) {
                 boolean streamingFileUpload = StreamingFileUpload.class.isAssignableFrom(typeVariableType);
                 if (streamingFileUpload) {
-                    typeVariable = RoutingInBoundHandler.ARGUMENT_PART_DATA;
+                    typeVariable = ARGUMENT_PART_DATA;
                 } else {
                     typeVariable = typeVariable.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
                 }

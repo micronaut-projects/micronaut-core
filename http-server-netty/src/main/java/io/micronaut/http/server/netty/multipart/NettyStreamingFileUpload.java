@@ -48,7 +48,7 @@ import java.util.concurrent.ExecutorService;
  * @since 1.0
  */
 @Internal
-public class NettyStreamingFileUpload implements StreamingFileUpload {
+public final class NettyStreamingFileUpload implements StreamingFileUpload {
 
     private static final Logger LOG = LoggerFactory.getLogger(NettyStreamingFileUpload.class);
     private io.netty.handler.codec.http.multipart.FileUpload fileUpload;
@@ -208,7 +208,12 @@ public class NettyStreamingFileUpload implements StreamingFileUpload {
         ).flux();
     }
 
-    public static class Factory {
+    /**
+     * Factory for instances of {@link NettyStreamingFileUpload}. Wraps the fixed requirements that
+     * don't depend on request.
+     */
+    @Internal
+    public static final class Factory {
         private final HttpServerConfiguration.MultipartConfiguration multipartConfiguration;
         private final ExecutorService ioExecutor;
 

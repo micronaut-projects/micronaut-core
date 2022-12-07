@@ -38,7 +38,6 @@ import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.context.event.HttpRequestTerminatedEvent;
-import io.micronaut.http.multipart.PartData;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.netty.stream.JsonSubscriber;
@@ -114,17 +113,16 @@ final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.microna
      */
     private static final Pattern IGNORABLE_ERROR_MESSAGE = Pattern.compile(
         "^.*(?:connection (?:reset|closed|abort|broken)|broken pipe).*$", Pattern.CASE_INSENSITIVE);
-    static final Argument<PartData> ARGUMENT_PART_DATA = Argument.of(PartData.class);
-    private final StaticResourceResolver staticResourceResolver;
+    final StaticResourceResolver staticResourceResolver;
     final NettyHttpServerConfiguration serverConfiguration;
     final HttpContentProcessorResolver httpContentProcessorResolver;
     final RequestArgumentSatisfier requestArgumentSatisfier;
-    private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
-    private final NettyCustomizableResponseTypeHandlerRegistry customizableResponseTypeHandlerRegistry;
-    private final Supplier<ExecutorService> ioExecutorSupplier;
+    final MediaTypeCodecRegistry mediaTypeCodecRegistry;
+    final NettyCustomizableResponseTypeHandlerRegistry customizableResponseTypeHandlerRegistry;
+    final Supplier<ExecutorService> ioExecutorSupplier;
     final boolean multipartEnabled;
-    private ExecutorService ioExecutor;
-    private final ApplicationEventPublisher<HttpRequestTerminatedEvent> terminateEventPublisher;
+    ExecutorService ioExecutor;
+    final ApplicationEventPublisher<HttpRequestTerminatedEvent> terminateEventPublisher;
     final RouteExecutor routeExecutor;
     final ConversionService conversionService;
 

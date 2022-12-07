@@ -1,3 +1,18 @@
+/*
+ * Copyright 2017-2022 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
@@ -48,6 +63,8 @@ import java.util.function.Supplier;
  * this class can release chunks of that data for concurrent access by the user (see
  * {@link #pollChunk()}).<br>
  * This class moves data to disk dynamically once the configured threshold is reached.
+ *
+ * @param <D> This {@link HttpData} type, for {@code return (D) this} on various methods
  */
 @Internal
 public abstract sealed class MicronautHttpData<D extends HttpData> extends AbstractReferenceCounted implements HttpData {
@@ -60,19 +77,23 @@ public abstract sealed class MicronautHttpData<D extends HttpData> extends Abstr
     private static final int MMAP_SEGMENT_SIZE = 1024 * 1024 * 1024;
     private static final int MAX_CHUNK_SIZE = 1024 * 1024 * 1024;
 
-    @Nullable
-    @SuppressWarnings("rawtypes")
-    private final ResourceLeakTracker<MicronautHttpData> tracker = LEAK_DETECTOR.get().track(this);
-
-    protected final Factory factory;
-    private final String name;
+    final Factory factory;
 
     long definedSize = 0;
     Charset charset;
 
-    private final List<Chunk> chunks = new ArrayList<>();
+    /**
+     * Additional data for {@link FormRouteCompleter}.
+     */
+    FormRouteCompleter.HttpDataAttachment attachment;
 
-    private volatile boolean released = false;
+    @Nullable
+    @SuppressWarnings("rawtypes")
+    private final ResourceLeakTracker<MicronautHttpData> tracker = LEAK_DETECTOR.get().track(this);
+
+    private final String name;
+
+    private final List<Chunk> chunks = new ArrayList<>();
 
     private long size = 0;
 
@@ -84,11 +105,6 @@ public abstract sealed class MicronautHttpData<D extends HttpData> extends Abstr
     private boolean completed = false;
 
     private int pollIndex = 0;
-
-    /**
-     * Additional data for {@link FormRouteCompleter}
-     */
-    FormRouteCompleter.HttpDataAttachment attachment;
 
     private MicronautHttpData(Factory factory, String name) {
         this.factory = factory;
@@ -257,7 +273,6 @@ public abstract sealed class MicronautHttpData<D extends HttpData> extends Abstr
         if (tracker != null) {
             tracker.close(this);
         }
-        released = true;
         dealloc0();
     }
 
@@ -295,83 +310,6 @@ public abstract sealed class MicronautHttpData<D extends HttpData> extends Abstr
         chunks.add(ch);
         ch.buf = buffer;
         size = buffer.readableBytes();
-    }
-
-    public class Chunk extends AbstractReferenceCounted {
-        // one reference is kept by the MicronautHttpData.chunks list, and is released on MicronautHttpData.deallocate.
-        // The other reference is created by the user on pollChunk, and released when she calls claim()
-
-        private final Lock lock = new ReentrantLock();
-        private final long offset;
-        @Nullable
-        private ByteBuf buf; // always has refCnt = 1
-
-        private Chunk(long offset) {
-            this.offset = offset;
-        }
-
-        private void loadFromDisk(int length) throws IOException {
-            int firstSegmentIndex = Math.toIntExact(offset / MMAP_SEGMENT_SIZE);
-            int lastSegmentIndex = Math.toIntExact((offset + length - 1) / MMAP_SEGMENT_SIZE);
-
-            int offsetInSegment = Math.toIntExact(offset % MMAP_SEGMENT_SIZE);
-            ByteBuf oldBuf = buf;
-            if (firstSegmentIndex == lastSegmentIndex) {
-                buf = mmapSegment(firstSegmentIndex).retainedSlice(offsetInSegment, Math.toIntExact(length));
-            } else {
-                CompositeByteBuf composite = Unpooled.compositeBuffer(lastSegmentIndex - firstSegmentIndex + 1);
-                composite.addComponent(mmapSegment(firstSegmentIndex).retainedSlice(offsetInSegment, MMAP_SEGMENT_SIZE - offsetInSegment));
-                for (int i = firstSegmentIndex + 1; i < lastSegmentIndex; i++) {
-                    composite.addComponent(mmapSegment(i).retain());
-                }
-                composite.addComponent(mmapSegment(lastSegmentIndex).retainedSlice(0, Math.toIntExact((offset + length) % MMAP_SEGMENT_SIZE)));
-                buf = composite;
-            }
-            if (oldBuf != null) {
-                oldBuf.release();
-            }
-        }
-
-        /**
-         * Get the contents of this chunk as a {@link ByteBuf}. If there are concurrent operations
-         * on this data (e.g. it is being moved to disk), this method may block. Must only be
-         * called once.
-         *
-         * @return The contents of this chunk
-         */
-        ByteBuf claim() {
-            lock.lock();
-            if (buf == null) {
-                return Unpooled.EMPTY_BUFFER;
-            }
-            ByteBuf b = buf;
-            buf = null;
-            b.touch();
-            release();
-            return b;
-        }
-
-        @Override
-        protected void deallocate() {
-            if (!lock.tryLock()) {
-                // already claimed
-                return;
-            }
-            if (buf != null) {
-                buf.release();
-                buf = null;
-            }
-        }
-
-        @Override
-        public ReferenceCounted touch() {
-            return this;
-        }
-
-        @Override
-        public ReferenceCounted touch(Object hint) {
-            return this;
-        }
     }
 
     @Override
@@ -565,7 +503,7 @@ public abstract sealed class MicronautHttpData<D extends HttpData> extends Abstr
         return (D) super.touch();
     }
 
-    private final static class AttributeImpl extends MicronautHttpData<Attribute> implements Attribute {
+    private static final class AttributeImpl extends MicronautHttpData<Attribute> implements Attribute {
         AttributeImpl(Factory factory, String name) {
             super(factory, name);
         }
@@ -585,7 +523,6 @@ public abstract sealed class MicronautHttpData<D extends HttpData> extends Abstr
             return HttpDataType.Attribute;
         }
     }
-
 
     private static final class FileUploadImpl extends MicronautHttpData<FileUpload> implements FileUpload {
         private final String fileName;
@@ -633,6 +570,92 @@ public abstract sealed class MicronautHttpData<D extends HttpData> extends Abstr
         }
     }
 
+    /**
+     * Chunk of bytes from this data object. When this is exposed (returned by
+     * {@link #pollChunk()}), the data is "fixed", there won't be new data added.
+     */
+    public final class Chunk extends AbstractReferenceCounted {
+        // one reference is kept by the MicronautHttpData.chunks list, and is released on MicronautHttpData.deallocate.
+        // The other reference is created by the user on pollChunk, and released when she calls claim()
+
+        private final Lock lock = new ReentrantLock();
+        private final long offset;
+        @Nullable
+        private ByteBuf buf; // always has refCnt = 1
+
+        private Chunk(long offset) {
+            this.offset = offset;
+        }
+
+        private void loadFromDisk(int length) throws IOException {
+            int firstSegmentIndex = Math.toIntExact(offset / MMAP_SEGMENT_SIZE);
+            int lastSegmentIndex = Math.toIntExact((offset + length - 1) / MMAP_SEGMENT_SIZE);
+
+            int offsetInSegment = Math.toIntExact(offset % MMAP_SEGMENT_SIZE);
+            ByteBuf oldBuf = buf;
+            if (firstSegmentIndex == lastSegmentIndex) {
+                buf = mmapSegment(firstSegmentIndex).retainedSlice(offsetInSegment, Math.toIntExact(length));
+            } else {
+                CompositeByteBuf composite = Unpooled.compositeBuffer(lastSegmentIndex - firstSegmentIndex + 1);
+                composite.addComponent(mmapSegment(firstSegmentIndex).retainedSlice(offsetInSegment, MMAP_SEGMENT_SIZE - offsetInSegment));
+                for (int i = firstSegmentIndex + 1; i < lastSegmentIndex; i++) {
+                    composite.addComponent(mmapSegment(i).retain());
+                }
+                composite.addComponent(mmapSegment(lastSegmentIndex).retainedSlice(0, Math.toIntExact((offset + length) % MMAP_SEGMENT_SIZE)));
+                buf = composite;
+            }
+            if (oldBuf != null) {
+                oldBuf.release();
+            }
+        }
+
+        /**
+         * Get the contents of this chunk as a {@link ByteBuf}. If there are concurrent operations
+         * on this data (e.g. it is being moved to disk), this method may block. Must only be
+         * called once.
+         *
+         * @return The contents of this chunk
+         */
+        ByteBuf claim() {
+            lock.lock();
+            if (buf == null) {
+                return Unpooled.EMPTY_BUFFER;
+            }
+            ByteBuf b = buf;
+            buf = null;
+            b.touch();
+            release();
+            return b;
+        }
+
+        @Override
+        protected void deallocate() {
+            if (!lock.tryLock()) {
+                // already claimed
+                return;
+            }
+            if (buf != null) {
+                buf.release();
+                buf = null;
+            }
+        }
+
+        @Override
+        public ReferenceCounted touch() {
+            return this;
+        }
+
+        @Override
+        public ReferenceCounted touch(Object hint) {
+            return this;
+        }
+    }
+
+    /**
+     * Factory for {@link MicronautHttpData} instances. Immutable, only some operations are
+     * supported.
+     */
+    @Internal
     public static final class Factory implements HttpDataFactory {
         private final HttpServerConfiguration.MultipartConfiguration multipartConfiguration;
         private final Charset characterEncoding;

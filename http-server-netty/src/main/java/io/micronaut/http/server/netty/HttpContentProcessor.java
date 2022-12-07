@@ -76,6 +76,7 @@ public abstract class HttpContentProcessor implements Toggleable {
      * does.
      *
      * @param type The type produced by this processor
+     * @return This processor, for chaining
      */
     public HttpContentProcessor resultType(Argument<?> type) {
         return this;

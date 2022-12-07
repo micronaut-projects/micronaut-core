@@ -1,3 +1,18 @@
+/*
+ * Copyright 2017-2022 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.http.server;
 
 import io.micronaut.core.annotation.Nullable;
@@ -69,6 +84,8 @@ public class RequestLifecycle {
 
     /**
      * The request for this lifecycle. This may be changed by filters.
+     *
+     * @return The current request
      */
     protected final HttpRequest<?> request() {
         return request;
@@ -139,7 +156,7 @@ public class RequestLifecycle {
         return runWithFilters(() -> onErrorNoFilter(t));
     }
 
-    ExecutionFlow<MutableHttpResponse<?>> onErrorNoFilter(Throwable t) {
+    final ExecutionFlow<MutableHttpResponse<?>> onErrorNoFilter(Throwable t) {
         // find the origination of the route
         Optional<RouteInfo> previousRequestRouteInfo = request.getAttribute(HttpAttributes.ROUTE_INFO, RouteInfo.class);
         Class<?> declaringType = previousRequestRouteInfo.map(RouteInfo::getDeclaringType).orElse(null);
@@ -304,7 +321,7 @@ public class RequestLifecycle {
         return ExecutionFlow.just(routeExecutor.createDefaultErrorResponse(httpRequest, cause));
     }
 
-    ExecutionFlow<MutableHttpResponse<?>> onRouteMiss(HttpRequest<?> httpRequest) {
+    final ExecutionFlow<MutableHttpResponse<?>> onRouteMiss(HttpRequest<?> httpRequest) {
         HttpMethod httpMethod = httpRequest.getMethod();
         String requestMethodName = httpRequest.getMethodName();
         MediaType contentType = httpRequest.getContentType().orElse(null);

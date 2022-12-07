@@ -54,6 +54,7 @@ public abstract class AbstractHttpContentProcessor extends HttpContentProcessor 
      * Called after verifying the data of the message.
      *
      * @param message The message
+     * @param out The collection to add any produced messages to
      */
     protected abstract void onData(ByteBufHolder message, Collection<Object> out) throws Throwable;
 

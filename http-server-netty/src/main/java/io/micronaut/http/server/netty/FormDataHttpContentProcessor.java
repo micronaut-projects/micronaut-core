@@ -128,6 +128,9 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor {
                                     postRequestDecoder.removeHttpDataFromClean(fileUpload);
                                 }
                             }
+                            default -> {
+                                // ignore
+                            }
                         }
                     }
 

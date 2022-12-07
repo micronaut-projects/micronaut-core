@@ -260,7 +260,7 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
 
     private static final class WebsocketRequestLifecycle extends RequestLifecycle {
         @Nullable
-        private final RouteMatch<?> route;
+        final RouteMatch<?> route;
 
         boolean shouldProceedNormally;
 
