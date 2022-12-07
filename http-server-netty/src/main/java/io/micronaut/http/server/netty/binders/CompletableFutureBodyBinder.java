@@ -26,6 +26,7 @@ import io.micronaut.http.bind.binders.DefaultBodyAnnotationBinder;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.netty.HttpContentProcessor;
+import io.micronaut.http.server.netty.HttpContentProcessorAsReactiveProcessor;
 import io.micronaut.http.server.netty.HttpContentProcessorResolver;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.netty.buffer.ByteBufHolder;
@@ -85,7 +86,7 @@ public class CompletableFutureBodyBinder extends DefaultBodyAnnotationBinder<Com
 
                 HttpContentProcessor processor = httpContentProcessorResolver.resolve(nettyHttpRequest, targetType);
 
-                processor.asPublisher(nettyHttpRequest).subscribe(new CompletionAwareSubscriber<Object>() {
+                HttpContentProcessorAsReactiveProcessor.asPublisher(processor, nettyHttpRequest).subscribe(new CompletionAwareSubscriber<Object>() {
                     @Override
                     protected void doOnSubscribe(Subscription subscription) {
                         subscription.request(1);

@@ -118,17 +118,16 @@ public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinde
                         if (LOG.isTraceEnabled()) {
                             LOG.trace("Server received streaming message for argument [{}]: {}", context.getArgument(), message);
                         }
-                        if (message instanceof HttpData) {
+                        if (message instanceof HttpData data) {
                             // MicronautHttpData does not support .content()
-                            if (((HttpData) message).length() == 0) {
+                            if (data.length() == 0) {
                                 return;
                             }
-                        } else if (message instanceof ByteBufHolder && ((ByteBufHolder) message).content() instanceof EmptyByteBuf) {
+                        } else if (message instanceof ByteBufHolder holder && holder.content() instanceof EmptyByteBuf) {
                             return;
                         }
 
-                        if (message instanceof HttpData) {
-                            HttpData data = (HttpData) message;
+                        if (message instanceof HttpData data) {
                             if (data.isCompleted()) {
                                 partsRequested.decrementAndGet();
                                 if (data instanceof FileUpload) {

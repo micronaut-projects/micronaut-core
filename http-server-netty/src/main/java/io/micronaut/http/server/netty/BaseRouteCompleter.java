@@ -86,14 +86,14 @@ class BaseRouteCompleter {
         if (!execute) {
             // discard parameters that have already been bound
             for (Object toDiscard : routeMatch.getVariableValues().values()) {
-                if (toDiscard instanceof ReferenceCounted) {
-                    ((ReferenceCounted) toDiscard).release();
+                if (toDiscard instanceof ReferenceCounted rc) {
+                    rc.release();
                 }
-                if (toDiscard instanceof io.netty.util.ReferenceCounted) {
-                    ((io.netty.util.ReferenceCounted) toDiscard).release();
+                if (toDiscard instanceof io.netty.util.ReferenceCounted rc) {
+                    rc.release();
                 }
-                if (toDiscard instanceof NettyCompletedFileUpload) {
-                    ((NettyCompletedFileUpload) toDiscard).discard();
+                if (toDiscard instanceof NettyCompletedFileUpload fu) {
+                    fu.discard();
                 }
             }
         }

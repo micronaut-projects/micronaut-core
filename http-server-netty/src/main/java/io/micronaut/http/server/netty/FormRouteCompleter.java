@@ -159,8 +159,8 @@ final class FormRouteCompleter extends BaseRouteCompleter {
                 if (data.attachment.subject == null) {
                     Sinks.Many<PartData> childSubject = makeDownstreamUnicastProcessor();
                     Flux<PartData> flowable = withFlowControl(childSubject.asFlux(), data);
-                    if (streamingFileUpload && data instanceof FileUpload) {
-                        namedSubject.tryEmitNext(fileUploadFactory.create((FileUpload) data, flowable));
+                    if (streamingFileUpload && data instanceof FileUpload fu) {
+                        namedSubject.tryEmitNext(fileUploadFactory.create(fu, flowable));
                     } else {
                         namedSubject.tryEmitNext(flowable);
                     }
@@ -190,11 +190,11 @@ final class FormRouteCompleter extends BaseRouteCompleter {
                 }, chunk::claim);
             }
 
-            if (data instanceof FileUpload &&
-                StreamingFileUpload.class.isAssignableFrom(argument.getType())) {
-                if (data.attachment.upload == null) {
-                    data.attachment.upload = fileUploadFactory.create((FileUpload) data, (Flux<PartData>) withFlowControl(subject.asFlux(), data));
-                }
+            if (data instanceof FileUpload fu &&
+                StreamingFileUpload.class.isAssignableFrom(argument.getType()) &&
+                data.attachment.upload == null) {
+
+                data.attachment.upload = fileUploadFactory.create(fu, (Flux<PartData>) withFlowControl(subject.asFlux(), data));
             }
 
             Optional<?> converted = conversionService.convert(part, typeVariable);
@@ -241,8 +241,8 @@ final class FormRouteCompleter extends BaseRouteCompleter {
                 // we need to release the data here. However, if the route argument is a
                 // ByteBuffer, we need to retain the data until the route is executed. Adding
                 // the data to the request ensures it is cleaned up after the route completes.
-                if (!alwaysAddContent && fulfillParamter instanceof ByteBufHolder) {
-                    request.addContent((ByteBufHolder) fulfillParamter);
+                if (!alwaysAddContent && fulfillParamter instanceof ByteBufHolder holder) {
+                    request.addContent(holder);
                 }
             }
             if (isPublisher && chunkedProcessing) {
