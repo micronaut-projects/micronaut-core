@@ -188,12 +188,9 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
                     return null;
                 }
                 return result;
-            } catch (NoClassDefFoundError | ClassNotFoundException | NoSuchMethodException e) {
-                // Ignore
-            } catch (Exception e) {
-                throw new ServiceLoadingException(e);
+            } catch (NoClassDefFoundError | Exception e) {
+                throw new ServiceLoadingException("Error loading service [" + name + "]: " + e.getMessage(), e);
             }
-            return null;
         });
         collector.collect(values, allowFork);
     }
@@ -367,7 +364,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
             return findAll(condition)
                     .map(ServiceDefinition::load)
                     .filter(s -> predicate == null || predicate.test(s))
-                    .collect(Collectors.toList());
+                    .toList();
         }
     }
 
