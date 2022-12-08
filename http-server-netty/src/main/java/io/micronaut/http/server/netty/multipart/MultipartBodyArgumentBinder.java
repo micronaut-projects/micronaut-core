@@ -18,7 +18,7 @@ package io.micronaut.http.server.netty.multipart;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.async.subscriber.TypedSubscriber;
+import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
@@ -29,6 +29,7 @@ import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.multipart.MultipartBody;
 import io.micronaut.http.server.netty.DefaultHttpContentProcessor;
 import io.micronaut.http.server.netty.HttpContentProcessor;
+import io.micronaut.http.server.netty.HttpContentProcessorAsReactiveProcessor;
 import io.micronaut.http.server.netty.HttpContentSubscriberFactory;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.NettyHttpServer;
@@ -82,13 +83,13 @@ public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinde
             NettyHttpRequest nettyHttpRequest = (NettyHttpRequest) source;
             io.netty.handler.codec.http.HttpRequest nativeRequest = nettyHttpRequest.getNativeRequest();
             if (nativeRequest instanceof StreamedHttpRequest) {
-                HttpContentProcessor<?> processor = beanLocator.findBean(HttpContentSubscriberFactory.class,
+                HttpContentProcessor processor = beanLocator.findBean(HttpContentSubscriberFactory.class,
                         new ConsumesMediaTypeQualifier<>(MediaType.MULTIPART_FORM_DATA_TYPE))
                         .map(factory -> factory.build(nettyHttpRequest))
                         .orElse(new DefaultHttpContentProcessor(nettyHttpRequest, httpServerConfiguration.get()));
 
                 //noinspection unchecked
-                return () -> Optional.of(subscriber -> processor.subscribe(new TypedSubscriber<Object>((Argument) context.getArgument()) {
+                return () -> Optional.of(subscriber -> HttpContentProcessorAsReactiveProcessor.asPublisher(processor.resultType(context.getArgument()), nettyHttpRequest).subscribe(new CompletionAwareSubscriber<>() {
 
                     Subscription s;
                     AtomicLong partsRequested = new AtomicLong(0);
@@ -117,19 +118,21 @@ public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinde
                         if (LOG.isTraceEnabled()) {
                             LOG.trace("Server received streaming message for argument [{}]: {}", context.getArgument(), message);
                         }
-                        if (message instanceof ByteBufHolder && ((ByteBufHolder) message).content() instanceof EmptyByteBuf) {
+                        if (message instanceof HttpData data) {
+                            // MicronautHttpData does not support .content()
+                            if (data.length() == 0) {
+                                return;
+                            }
+                        } else if (message instanceof ByteBufHolder holder && holder.content() instanceof EmptyByteBuf) {
                             return;
                         }
 
-                        if (message instanceof HttpData) {
-                            HttpData data = (HttpData) message;
-                            if (data.isCompleted()) {
-                                partsRequested.decrementAndGet();
-                                if (data instanceof FileUpload) {
-                                    subscriber.onNext(new NettyCompletedFileUpload((FileUpload) data, false));
-                                } else if (data instanceof Attribute) {
-                                    subscriber.onNext(new NettyCompletedAttribute((Attribute) data, false));
-                                }
+                        if (message instanceof HttpData data && data.isCompleted()) {
+                            partsRequested.decrementAndGet();
+                            if (data instanceof FileUpload fu) {
+                                subscriber.onNext(new NettyCompletedFileUpload(fu, false));
+                            } else if (data instanceof Attribute attr) {
+                                subscriber.onNext(new NettyCompletedAttribute(attr, false));
                             }
                         }
 

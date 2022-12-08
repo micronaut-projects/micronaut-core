@@ -25,7 +25,6 @@ import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
-import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
@@ -39,19 +38,15 @@ import io.micronaut.http.bind.binders.ContinuationArgumentBinder;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.exceptions.HttpStatusException;
+import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.filter.FilterRunner;
 import io.micronaut.http.filter.InternalFilter;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
-import io.micronaut.http.server.exceptions.ExceptionHandler;
 import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
-import io.micronaut.http.server.types.files.FileCustomizableResponseType;
-import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanType;
-import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodReference;
-import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.scheduling.executor.ExecutorSelector;
 import io.micronaut.web.router.MethodBasedRouteMatch;
 import io.micronaut.web.router.RouteInfo;
@@ -69,20 +64,14 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
+import reactor.util.context.ContextView;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
@@ -108,11 +97,11 @@ public final class RouteExecutor {
     private static final Pattern IGNORABLE_ERROR_MESSAGE = Pattern.compile(
         "^.*(?:connection (?:reset|closed|abort|broken)|broken pipe).*$", Pattern.CASE_INSENSITIVE);
 
-    private final Router router;
-    private final BeanContext beanContext;
-    private final RequestArgumentSatisfier requestArgumentSatisfier;
-    private final HttpServerConfiguration serverConfiguration;
-    private final ErrorResponseProcessor<?> errorResponseProcessor;
+    final Router router;
+    final BeanContext beanContext;
+    final RequestArgumentSatisfier requestArgumentSatisfier;
+    final HttpServerConfiguration serverConfiguration;
+    final ErrorResponseProcessor<?> errorResponseProcessor;
     private final ExecutorSelector executorSelector;
     private final Optional<CoroutineHelper> coroutineHelper;
 
@@ -177,67 +166,8 @@ public final class RouteExecutor {
         return coroutineHelper;
     }
 
-    @NonNull
-    public ExecutionFlow<MutableHttpResponse<?>> executeRoute(RequestBodyReader requestBodyReader,
-                                                              HttpRequest<?> httpRequest,
-                                                              boolean multipartEnabled,
-                                                              StaticResourceResponseFinder staticResourceResponseFinder) {
-        ServerRequestContext.set(httpRequest);
-
-        MediaType contentType = httpRequest.getContentType().orElse(null);
-        if (!multipartEnabled &&
-            contentType != null &&
-            contentType.equals(MediaType.MULTIPART_FORM_DATA_TYPE)) {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Multipart uploads have been disabled via configuration. Rejected request for URI {}, method {}, and content type {}", httpRequest.getUri(),
-                    httpRequest.getMethodName(), contentType);
-            }
-            return onStatusError(
-                requestBodyReader,
-                httpRequest,
-                HttpResponse.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE),
-                "Content Type [" + contentType + "] not allowed");
-        }
-
-        UriRouteMatch<Object, Object> routeMatch = findRouteMatch(httpRequest);
-        if (routeMatch == null) {
-            //Check if there is a file for the route before returning route not found
-            FileCustomizableResponseType fileCustomizableResponseType = staticResourceResponseFinder.find(httpRequest);
-            if (fileCustomizableResponseType != null) {
-                return buildFilterRunner(httpRequest, req -> ExecutionFlow.just(HttpResponse.ok(fileCustomizableResponseType)))
-                    .run(httpRequest);
-            }
-            return onRouteMiss(requestBodyReader, httpRequest);
-        }
-
-        setRouteAttributes(httpRequest, routeMatch);
-
-        if (LOG.isTraceEnabled()) {
-            String requestPath = httpRequest.getUri().getPath();
-            if (routeMatch instanceof MethodBasedRouteMatch) {
-                LOG.trace("Matched route {} - {} to controller {}", httpRequest.getMethodName(), requestPath, routeMatch.getDeclaringType());
-            } else {
-                LOG.trace("Matched route {} - {}", httpRequest.getMethodName(), requestPath);
-            }
-        }
-        // all ok proceed to try and execute the route
-        if (routeMatch.isWebSocketRoute()) {
-            return onStatusError(
-                requestBodyReader,
-                httpRequest,
-                HttpResponse.status(HttpStatus.BAD_REQUEST),
-                "Not a WebSocket request");
-        }
-        return executeRoute(
-            new AtomicReference<>(httpRequest),
-            true,
-            true,
-            requestBodyReader.read(routeMatch, httpRequest)
-        );
-    }
-
     @Nullable
-    private UriRouteMatch<Object, Object> findRouteMatch(HttpRequest<?> httpRequest) {
+    UriRouteMatch<Object, Object> findRouteMatch(HttpRequest<?> httpRequest) {
         UriRouteMatch<Object, Object> routeMatch = null;
 
         List<UriRouteMatch<Object, Object>> uriRoutes = router.findAllClosest(httpRequest);
@@ -257,211 +187,11 @@ public final class RouteExecutor {
         return routeMatch;
     }
 
-    private ExecutionFlow<MutableHttpResponse<?>> onRouteMiss(RequestBodyReader requestBodyReader,
-                                                              HttpRequest<?> httpRequest) {
-        HttpMethod httpMethod = httpRequest.getMethod();
-        String requestMethodName = httpRequest.getMethodName();
-        MediaType contentType = httpRequest.getContentType().orElse(null);
-
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("No matching route: {} {}", httpMethod, httpRequest.getUri());
-        }
-
-        // if there is no route present try to locate a route that matches a different HTTP method
-        final List<UriRouteMatch<Object, Object>> anyMatchingRoutes = router
-            .findAny(httpRequest.getUri().toString(), httpRequest).toList();
-        final Collection<MediaType> acceptedTypes = httpRequest.accept();
-        final boolean hasAcceptHeader = CollectionUtils.isNotEmpty(acceptedTypes);
-
-        Set<MediaType> acceptableContentTypes = contentType != null ? new HashSet<>(5) : null;
-        Set<String> allowedMethods = new HashSet<>(5);
-        Set<MediaType> produceableContentTypes = hasAcceptHeader ? new HashSet<>(5) : null;
-        for (UriRouteMatch<?, ?> anyRoute : anyMatchingRoutes) {
-            final String routeMethod = anyRoute.getRoute().getHttpMethodName();
-            if (!requestMethodName.equals(routeMethod)) {
-                allowedMethods.add(routeMethod);
-            }
-            if (contentType != null && !anyRoute.doesConsume(contentType)) {
-                acceptableContentTypes.addAll(anyRoute.getRoute().getConsumes());
-            }
-            if (hasAcceptHeader && !anyRoute.doesProduce(acceptedTypes)) {
-                produceableContentTypes.addAll(anyRoute.getRoute().getProduces());
-            }
-        }
-
-        if (CollectionUtils.isNotEmpty(acceptableContentTypes)) {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Content type not allowed for URI {}, method {}, and content type {}", httpRequest.getUri(),
-                    requestMethodName, contentType);
-            }
-            return onStatusError(
-                requestBodyReader,
-                httpRequest,
-                HttpResponse.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE),
-                "Content Type [" + contentType + "] not allowed. Allowed types: " + acceptableContentTypes);
-        }
-        if (CollectionUtils.isNotEmpty(produceableContentTypes)) {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Content type not allowed for URI {}, method {}, and content type {}", httpRequest.getUri(),
-                    requestMethodName, contentType);
-            }
-            return onStatusError(
-                requestBodyReader,
-                httpRequest,
-                HttpResponse.status(HttpStatus.NOT_ACCEPTABLE),
-                "Specified Accept Types " + acceptedTypes + " not supported. Supported types: " + produceableContentTypes);
-        }
-        if (!allowedMethods.isEmpty()) {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Method not allowed for URI {} and method {}", httpRequest.getUri(), requestMethodName);
-            }
-            return onStatusError(
-                requestBodyReader,
-                httpRequest,
-                HttpResponse.notAllowedGeneric(allowedMethods),
-                "Method [" + requestMethodName + "] not allowed for URI [" + httpRequest.getUri() + "]. Allowed methods: " + allowedMethods);
-        }
-        return onStatusError(requestBodyReader,
-            httpRequest,
-            HttpResponse.status(HttpStatus.NOT_FOUND),
-            "Page Not Found");
-    }
-
-    public ExecutionFlow<MutableHttpResponse<?>> onStatusError(RequestBodyReader requestBodyReader,
-                                                               HttpRequest<?> httpRequest,
-                                                               MutableHttpResponse<?> defaultResponse,
-                                                               String message) {
-        Optional<RouteMatch<Object>> statusRoute = router.findStatusRoute(defaultResponse.status(), httpRequest);
-        if (statusRoute.isPresent()) {
-            return executeRoute(
-                new AtomicReference<>(httpRequest),
-                true,
-                true,
-                requestBodyReader.read(statusRoute.get(), httpRequest)
-            );
-        }
-        if (httpRequest.getMethod() != HttpMethod.HEAD) {
-            defaultResponse = errorResponseProcessor.processResponse(ErrorContext.builder(httpRequest)
-                .errorMessage(message)
-                .build(), defaultResponse);
-            if (defaultResponse.getContentType().isEmpty()) {
-                defaultResponse = defaultResponse.contentType(MediaType.APPLICATION_JSON_TYPE);
-            }
-        }
-        MutableHttpResponse<?> finalDefaultResponse = defaultResponse;
-        return buildFilterRunner(httpRequest, req -> ExecutionFlow.just(finalDefaultResponse))
-            .run(httpRequest);
-    }
-
-    private void setRouteAttributes(HttpRequest<?> request, UriRouteMatch<Object, Object> route) {
+    static void setRouteAttributes(HttpRequest<?> request, UriRouteMatch<Object, Object> route) {
         request.setAttribute(HttpAttributes.ROUTE, route.getRoute());
         request.setAttribute(HttpAttributes.ROUTE_MATCH, route);
         request.setAttribute(HttpAttributes.ROUTE_INFO, route);
         request.setAttribute(HttpAttributes.URI_TEMPLATE, route.getRoute().getUriMatchTemplate().toString());
-    }
-
-    /**
-     * Creates a response publisher to represent the response after being handled
-     * by any available error route or exception handler.
-     *
-     * @param t           The exception that occurred
-     * @param httpRequest The request that caused the exception
-     * @return A response publisher
-     */
-    public ExecutionFlow<MutableHttpResponse<?>> onError(Throwable t, HttpRequest<?> httpRequest) {
-        // find the origination of the route
-        Optional<RouteInfo> previousRequestRouteInfo = httpRequest.getAttribute(HttpAttributes.ROUTE_INFO, RouteInfo.class);
-        Class<?> declaringType = previousRequestRouteInfo.map(RouteInfo::getDeclaringType).orElse(null);
-
-        final Throwable cause;
-        // top level exceptions returned by CompletableFutures. These always wrap the real exception thrown.
-        if ((t instanceof CompletionException || t instanceof ExecutionException) && t.getCause() != null) {
-            cause = t.getCause();
-        } else {
-            cause = t;
-        }
-
-        RouteMatch<?> errorRoute = findErrorRoute(cause, declaringType, httpRequest);
-        if (errorRoute != null) {
-            if (serverConfiguration.isLogHandledExceptions()) {
-                logException(cause);
-            }
-            try {
-                AtomicReference<HttpRequest<?>> requestReference = new AtomicReference<>(httpRequest);
-                return executeRoute(requestReference, false, false, ExecutionFlow.just(errorRoute))
-                    .<MutableHttpResponse<?>>map(response -> {
-                        response.setAttribute(HttpAttributes.EXCEPTION, cause);
-                        return response;
-                    })
-                    .onErrorResume(throwable -> createDefaultErrorResponseFlow(requestReference.get(), throwable));
-            } catch (Throwable e) {
-                return createDefaultErrorResponseFlow(httpRequest, e);
-            }
-        } else {
-            Optional<BeanDefinition<ExceptionHandler>> optionalDefinition = beanContext.findBeanDefinition(ExceptionHandler.class, Qualifiers.byTypeArgumentsClosest(cause.getClass(), Object.class));
-            if (optionalDefinition.isPresent()) {
-                BeanDefinition<ExceptionHandler> handlerDefinition = optionalDefinition.get();
-                final Optional<ExecutableMethod<ExceptionHandler, Object>> optionalMethod = handlerDefinition.findPossibleMethods("handle").findFirst();
-                RouteInfo<Object> routeInfo;
-                if (optionalMethod.isPresent()) {
-                    routeInfo = new ExecutableRouteInfo(optionalMethod.get(), true);
-                } else {
-                    routeInfo = new RouteInfo<>() {
-                        @Override
-                        public ReturnType<?> getReturnType() {
-                            return ReturnType.of(Object.class);
-                        }
-
-                        @Override
-                        public Class<?> getDeclaringType() {
-                            return handlerDefinition.getBeanType();
-                        }
-
-                        @Override
-                        public boolean isErrorRoute() {
-                            return true;
-                        }
-
-                        @Override
-                        public List<MediaType> getProduces() {
-                            return MediaType.fromType(getDeclaringType())
-                                .map(Collections::singletonList)
-                                .orElse(Collections.emptyList());
-                        }
-                    };
-                }
-                Supplier<ExecutionFlow<MutableHttpResponse<?>>> responseSupplier = () -> {
-                    ExceptionHandler<Throwable, ?> handler = beanContext.getBean(handlerDefinition);
-                    try {
-                        if (serverConfiguration.isLogHandledExceptions()) {
-                            logException(cause);
-                        }
-                        Object result = handler.handle(httpRequest, cause);
-                        return createResponseForBody(httpRequest, result, routeInfo);
-                    } catch (Throwable e) {
-                        return createDefaultErrorResponseFlow(httpRequest, e);
-                    }
-                };
-                ExecutionFlow<MutableHttpResponse<?>> responseFlow;
-                final ExecutorService executor = findExecutor(routeInfo);
-                if (executor != null) {
-                    responseFlow = ExecutionFlow.async(executor, responseSupplier);
-                } else {
-                    responseFlow = responseSupplier.get();
-                }
-                return responseFlow
-                    .<MutableHttpResponse<?>>map(response -> {
-                        response.setAttribute(HttpAttributes.EXCEPTION, cause);
-                        return response;
-                    })
-                    .onErrorResume(throwable -> createDefaultErrorResponseFlow(httpRequest, throwable));
-            }
-            if (isIgnorable(cause)) {
-                logIgnoredException(cause);
-                return ExecutionFlow.empty();
-            }
-            return createDefaultErrorResponseFlow(httpRequest, cause);
-        }
     }
 
     /**
@@ -532,29 +262,6 @@ public final class RouteExecutor {
         return defaultResponseMediaType;
     }
 
-    public FilterRunner buildFilterRunner(HttpRequest<?> request, InternalFilter.Terminal terminal) {
-        List<InternalFilter> httpFilters = router.findFilters(request);
-        List<InternalFilter> actualFilters = new ArrayList<>(httpFilters.size() + 1);
-        actualFilters.addAll(httpFilters);
-        actualFilters.add(terminal);
-        return new FilterRunner(actualFilters) {
-            @Override
-            protected ExecutionFlow<? extends HttpResponse<?>> processResponse(HttpRequest<?> request, HttpResponse<?> response) {
-                return handleStatusException(request, (MutableHttpResponse<?>) response)
-                    .onErrorResume(throwable -> onError(throwable, request));
-            }
-
-            @Override
-            protected ExecutionFlow<? extends HttpResponse<?>> processFailure(HttpRequest<?> request, Throwable failure) {
-                return onError(failure, request);
-            }
-        };
-    }
-
-    private ExecutionFlow<MutableHttpResponse<?>> createDefaultErrorResponseFlow(HttpRequest<?> httpRequest, Throwable cause) {
-        return ExecutionFlow.just(createDefaultErrorResponse(httpRequest, cause));
-    }
-
     private MutableHttpResponse<?> newNotFoundError(HttpRequest<?> request) {
         MutableHttpResponse<?> response = errorResponseProcessor.processResponse(
             ErrorContext.builder(request)
@@ -570,7 +277,7 @@ public final class RouteExecutor {
         return Mono.fromCallable(() -> newNotFoundError(httpRequest));
     }
 
-    private void logException(Throwable cause) {
+    void logException(Throwable cause) {
         //handling connection reset by peer exceptions
         if (isIgnorable(cause)) {
             logIgnoredException(cause);
@@ -581,18 +288,18 @@ public final class RouteExecutor {
         }
     }
 
-    private boolean isIgnorable(Throwable cause) {
+    static boolean isIgnorable(Throwable cause) {
         String message = cause.getMessage();
         return cause instanceof IOException && message != null && IGNORABLE_ERROR_MESSAGE.matcher(message).matches();
     }
 
-    private void logIgnoredException(Throwable cause) {
+    static void logIgnoredException(Throwable cause) {
         if (LOG.isDebugEnabled()) {
             LOG.debug("Swallowed an IOException caused by client connectivity: " + cause.getMessage(), cause);
         }
     }
 
-    private RouteMatch<?> findErrorRoute(Throwable cause,
+    RouteMatch<?> findErrorRoute(Throwable cause,
                                          Class<?> declaringType,
                                          HttpRequest<?> httpRequest) {
         RouteMatch<?> errorRoute = null;
@@ -650,24 +357,7 @@ public final class RouteExecutor {
         return errorRoute;
     }
 
-    private ExecutionFlow<MutableHttpResponse<?>> handleStatusException(HttpRequest<?> request,
-                                                                        MutableHttpResponse<?> response) {
-        RouteInfo<?> routeInfo = response.getAttribute(HttpAttributes.ROUTE_INFO, RouteInfo.class).orElse(null);
-        if (response.code() >= 400 && routeInfo != null && !routeInfo.isErrorRoute()) {
-            RouteMatch<Object> statusRoute = findStatusRoute(request, response.status(), routeInfo);
-            if (statusRoute != null) {
-                return executeRoute(
-                    new AtomicReference<>(request),
-                    false,
-                    true,
-                    ExecutionFlow.just(statusRoute)
-                );
-            }
-        }
-        return ExecutionFlow.just(response);
-    }
-
-    private RouteMatch<Object> findStatusRoute(HttpRequest<?> incomingRequest, HttpStatus status, RouteInfo<?> finalRoute) {
+    RouteMatch<Object> findStatusRoute(HttpRequest<?> incomingRequest, HttpStatus status, RouteInfo<?> finalRoute) {
         Class<?> declaringType = finalRoute.getDeclaringType();
         // handle re-mapping of errors
         RouteMatch<Object> statusRoute = null;
@@ -679,7 +369,7 @@ public final class RouteExecutor {
         return statusRoute;
     }
 
-    private ExecutorService findExecutor(RouteInfo<?> routeMatch) {
+    ExecutorService findExecutor(RouteInfo<?> routeMatch) {
         // Select the most appropriate Executor
         ExecutorService executor;
         if (routeMatch instanceof MethodReference) {
@@ -737,66 +427,42 @@ public final class RouteExecutor {
         return ExecutionFlow.just(forStatus(routeInfo, defaultHttpStatus).body(body));
     }
 
-    private ExecutionFlow<MutableHttpResponse<?>> executeRoute(AtomicReference<HttpRequest<?>> requestReference,
-                                                               boolean executeFilters,
-                                                               boolean useErrorRoute,
-                                                               ExecutionFlow<RouteMatch<?>> routeMatchFlow) {
-        InternalFilter.Terminal responseFlowSupplier = req -> {
-            requestReference.set(req);
-            return routeMatchFlow.flatMap(routeMatch -> {
-                    ExecutorService executorService = findExecutor(routeMatch);
-                    Supplier<ExecutionFlow<MutableHttpResponse<?>>> flowSupplier = () -> executeRouteAndConvertBody(routeMatch, requestReference.get());
-                    ExecutionFlow<MutableHttpResponse<?>> executeMethodResponseFlow;
-                    if (executorService != null) {
-                        if (routeMatch.isSuspended()) {
-                            executeMethodResponseFlow = ReactiveExecutionFlow.fromPublisher(Mono.deferContextual(contextView -> {
-                                    coroutineHelper.ifPresent(helper -> helper.setupCoroutineContext(requestReference.get(), contextView));
-                                    return Mono.from(
-                                        ReactiveExecutionFlow.fromFlow(flowSupplier.get()).toPublisher()
-                                    );
-                                }))
-                                .putInContext(ServerRequestContext.KEY, requestReference.get());
-                        } else if (routeMatch.isReactive()) {
-                            executeMethodResponseFlow = ReactiveExecutionFlow.async(executorService, flowSupplier)
-                                .putInContext(ServerRequestContext.KEY, requestReference.get());
-                        } else {
-                            executeMethodResponseFlow = ExecutionFlow.async(executorService, flowSupplier);
-                        }
-                    } else {
-                        if (routeMatch.isSuspended()) {
-                            executeMethodResponseFlow = ReactiveExecutionFlow.fromPublisher(Mono.deferContextual(contextView -> {
-                                    coroutineHelper.ifPresent(helper -> helper.setupCoroutineContext(requestReference.get(), contextView));
-                                    return Mono.from(
-                                        ReactiveExecutionFlow.fromFlow(flowSupplier.get()).toPublisher()
-                                    );
-                                }))
-                                .putInContext(ServerRequestContext.KEY, requestReference.get());
-                        } else if (routeMatch.isReactive()) {
-                            executeMethodResponseFlow = ReactiveExecutionFlow.fromFlow(flowSupplier.get())
-                                .putInContext(ServerRequestContext.KEY, requestReference.get());
-                        } else {
-                            executeMethodResponseFlow = flowSupplier.get();
-                        }
-                    }
-                    return executeMethodResponseFlow;
-                }).flatMap(response -> handleStatusException(requestReference.get(), response))
-                .onErrorResume(throwable -> {
-                    if (useErrorRoute) {
-                        return onError(throwable, requestReference.get());
-                    }
-                    return createDefaultErrorResponseFlow(requestReference.get(), throwable);
-                });
-        };
-        if (!executeFilters) {
-            try {
-                //noinspection unchecked
-                return (ExecutionFlow<MutableHttpResponse<?>>) responseFlowSupplier.execute(requestReference.get());
-            } catch (Exception e) {
-                throw new RuntimeException(e);
+    ExecutionFlow<MutableHttpResponse<?>> callRoute(ContextView contextFromFilter, RouteMatch<?> routeMatch, HttpRequest<?> request) {
+        ExecutorService executorService = findExecutor(routeMatch);
+        Supplier<ExecutionFlow<MutableHttpResponse<?>>> flowSupplier = () -> executeRouteAndConvertBody(routeMatch, request);
+        ExecutionFlow<MutableHttpResponse<?>> executeMethodResponseFlow;
+        if (executorService != null) {
+            if (routeMatch.isSuspended()) {
+                executeMethodResponseFlow = ReactiveExecutionFlow.fromPublisher(Mono.deferContextual(contextView -> {
+                        coroutineHelper.ifPresent(helper -> helper.setupCoroutineContext(request, contextView));
+                        return Mono.from(
+                            ReactiveExecutionFlow.fromFlow(flowSupplier.get()).toPublisher()
+                        );
+                    }).contextWrite(contextFromFilter))
+                    .putInContext(ServerRequestContext.KEY, request);
+            } else if (routeMatch.isReactive()) {
+                executeMethodResponseFlow = ReactiveExecutionFlow.async(executorService, flowSupplier)
+                    .putInContext(ServerRequestContext.KEY, request);
+            } else {
+                executeMethodResponseFlow = ExecutionFlow.async(executorService, flowSupplier);
+            }
+        } else {
+            if (routeMatch.isSuspended()) {
+                executeMethodResponseFlow = ReactiveExecutionFlow.fromPublisher(Mono.deferContextual(contextView -> {
+                        coroutineHelper.ifPresent(helper -> helper.setupCoroutineContext(request, contextView));
+                        return Mono.from(
+                            ReactiveExecutionFlow.fromFlow(flowSupplier.get()).toPublisher()
+                        );
+                    }).contextWrite(contextFromFilter))
+                    .putInContext(ServerRequestContext.KEY, request);
+            } else if (routeMatch.isReactive()) {
+                executeMethodResponseFlow = ReactiveExecutionFlow.fromFlow(flowSupplier.get())
+                    .putInContext(ServerRequestContext.KEY, request);
+            } else {
+                executeMethodResponseFlow = flowSupplier.get();
             }
         }
-        return buildFilterRunner(requestReference.get(), responseFlowSupplier)
-            .run(requestReference.get());
+        return executeMethodResponseFlow;
     }
 
     private ExecutionFlow<MutableHttpResponse<?>> executeRouteAndConvertBody(RouteMatch<?> routeMatch, HttpRequest<?> httpRequest) {
@@ -819,7 +485,7 @@ public final class RouteExecutor {
         }
     }
 
-    private ExecutionFlow<MutableHttpResponse<?>> createResponseForBody(HttpRequest<?> request,
+    ExecutionFlow<MutableHttpResponse<?>> createResponseForBody(HttpRequest<?> request,
                                                                         Object body,
                                                                         RouteInfo<?> routeInfo) {
         ExecutionFlow<MutableHttpResponse<?>> outgoingResponse;
@@ -1012,43 +678,8 @@ public final class RouteExecutor {
         return HttpResponse.status(status);
     }
 
-    private <K> ExecutionFlow<K> fromPublisher(Publisher<K> publisher) {
+    static <K> ExecutionFlow<K> fromPublisher(Publisher<K> publisher) {
         return ReactiveExecutionFlow.fromPublisher(publisher);
-    }
-
-
-    /**
-     * The request body reader.
-     */
-    public interface RequestBodyReader {
-
-        /**
-         * Reads the HTTP request body.
-         * TODO: This needs to be refactored for Micronaut 4 to eliminate the need for the route match.
-         *
-         * @param routeMatch The route match
-         * @param httpRequest The http request
-         * @return The execution flow carrying the route match
-         */
-        @NonNull
-        ExecutionFlow<RouteMatch<?>> read(@NonNull RouteMatch<?> routeMatch, @NonNull HttpRequest<?> httpRequest);
-
-    }
-
-    /**
-     * The static resource finder.
-     */
-    public interface StaticResourceResponseFinder {
-
-        /**
-         * Finds a file response based on the request.
-         *
-         * @param httpRequest The request
-         * @return The file response or null if not found.
-         */
-        @Nullable
-        FileCustomizableResponseType find(@NonNull HttpRequest<?> httpRequest);
-
     }
 
 }

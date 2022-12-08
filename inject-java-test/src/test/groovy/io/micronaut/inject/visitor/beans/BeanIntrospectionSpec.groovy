@@ -46,6 +46,39 @@ import java.lang.reflect.Field
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
 
+    void "test mix optional getter with setter"() {
+        given:
+        def introspection = buildBeanIntrospection('mixed.Test', '''
+package mixed;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.core.annotation.Nullable;
+import java.util.Optional;
+
+@Introspected
+class Test {
+    @Nullable
+    private String foo;
+    public Optional<String> getFoo() {
+        return Optional.ofNullable(foo);
+    }
+    public void setFoo(@Nullable String foo) {
+        this.foo = foo;
+    }
+}
+''')
+        when:
+        def test = introspection.instantiate()
+        def prop = introspection.getRequiredProperty("foo", Optional)
+        test.foo = 'value'
+
+        then:'the write method is not considered to match the getter/setter pair'
+        prop.get(test).get() == 'value'
+        prop.type == Optional
+        prop.isReadOnly()
+    }
+
     void "test generics in arrays don't stack overflow"() {
         given:
         def introspection = buildBeanIntrospection('arraygenerics.Test', '''
@@ -158,15 +191,15 @@ class Test {
 ''')
         expect:
             introspection.getPropertyNames().length == 4
-            introspection.getProperty("foo").get().type == String.class
-            introspection.getProperty("lng").get().type == Long.class
-            introspection.getProperty("dbl").get().type == Double.class
-            introspection.getProperty("ingr").get().type == Integer.class
+            introspection.getProperty("foo").get().type == Optional.class
+            introspection.getProperty("lng").get().type == OptionalLong.class
+            introspection.getProperty("dbl").get().type == OptionalDouble.class
+            introspection.getProperty("ingr").get().type == OptionalInt.class
 
-            introspection.getProperty("foo").get().isReadWrite()
-            introspection.getProperty("lng").get().isReadWrite()
-            introspection.getProperty("dbl").get().isReadWrite()
-            introspection.getProperty("ingr").get().isReadWrite()
+            introspection.getProperty("foo").get().isReadOnly()
+            introspection.getProperty("lng").get().isReadOnly()
+            introspection.getProperty("dbl").get().isReadOnly()
+            introspection.getProperty("ingr").get().isReadOnly()
     }
 
     void "test property type is not defined by its not accessible field"() {

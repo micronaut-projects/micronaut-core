@@ -21,12 +21,13 @@ import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.env.BootstrapPropertySourceLocator;
 import io.micronaut.context.env.CachedEnvironment;
+import io.micronaut.context.env.ConfigurationPath;
 import io.micronaut.context.env.DefaultEnvironment;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.exceptions.ConfigurationException;
+import io.micronaut.context.exceptions.DependencyInjectionException;
 import io.micronaut.context.exceptions.NoSuchBeanException;
-import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -53,7 +54,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.function.Predicate;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -222,6 +223,11 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     }
 
     @Override
+    public Collection<List<String>> getPropertyPathMatches(String pathPattern) {
+        return getEnvironment().getPropertyPathMatches(pathPattern);
+    }
+
+    @Override
     protected synchronized void registerConfiguration(BeanConfiguration configuration) {
         if (getEnvironment().isActive(configuration)) {
             super.registerConfiguration(configuration);
@@ -259,18 +265,6 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     }
 
     @Override
-    protected <T> Collection<BeanDefinition<T>> findBeanCandidates(BeanResolutionContext resolutionContext, Argument<T> beanType, BeanDefinition<?> filter, boolean filterProxied) {
-        Collection<BeanDefinition<T>> candidates = super.findBeanCandidates(resolutionContext, beanType, filter, filterProxied);
-        return transformIterables(resolutionContext, candidates, filterProxied);
-    }
-
-    @Override
-    protected <T> Collection<BeanDefinition<T>> findBeanCandidates(BeanResolutionContext resolutionContext, Argument<T> beanType, boolean filterProxied, Predicate<BeanDefinition<T>> predicate) {
-        Collection<BeanDefinition<T>> candidates = super.findBeanCandidates(resolutionContext, beanType, filterProxied, predicate);
-        return transformIterables(resolutionContext, candidates, filterProxied);
-    }
-
-    @Override
     protected <T> NoSuchBeanException newNoSuchBeanException(@Nullable BeanResolutionContext resolutionContext, Argument<T> beanType, Qualifier<T> qualifier, String message) {
         if (message == null) {
             message = super.resolveDisabledBeanMessage(resolutionContext, beanType, qualifier);
@@ -287,7 +281,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         BeanDefinition<T> definition = findAnyBeanDefinition(resolutionContext, beanType);
         if (definition != null && definition.isIterable()) {
             if (definition.hasDeclaredAnnotation(EachProperty.class)) {
-                message = resolveEachPropertyMissingBeanMessage(qualifier, definition);
+                message = resolveEachPropertyMissingBeanMessage(resolutionContext, qualifier, definition);
             } else if (definition.hasDeclaredAnnotation(EachBean.class)) {
                 message = resolveEachBeanMissingMessage(resolutionContext, beanType, qualifier, definition);
             }
@@ -298,11 +292,11 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     @NonNull
     private <T> String resolveEachBeanMissingMessage(BeanResolutionContext resolutionContext, Argument<T> beanType, Qualifier<T> qualifier, BeanDefinition<T> definition) {
         String message;
-        List<BeanDefinition<?>> dependencyChain = calculateDependencyChain(resolutionContext, definition);
+        List<BeanDefinition<?>> dependencyChain = calculateEachBeanChain(resolutionContext, definition);
         StringBuilder messageBuilder = new StringBuilder();
         Argument<?> requiredBeanType = beanType;
         Iterator<BeanDefinition<?>> i = dependencyChain.iterator();
-        String ls = System.getProperty("line.separator");
+        String ls = CachedEnvironment.getProperty("line.separator");
         while (i.hasNext()) {
             messageBuilder.append(ls);
             BeanDefinition<?> beanDefinition = i.next();
@@ -317,7 +311,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
             messageBuilder.append(" which does not exist.");
             if (beanDefinition.hasDeclaredAnnotation(EachProperty.class)) {
                 messageBuilder.append(ls);
-                String propertyMissingMessage = resolveEachPropertyMissingBeanMessage(qualifier, beanDefinition);
+                String propertyMissingMessage = resolveEachPropertyMissingBeanMessage(resolutionContext, qualifier, beanDefinition);
                 messageBuilder.append("* ")
                     .append("[")
                     .append(nextBeanType.getTypeString(true))
@@ -334,7 +328,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
     @Nullable
     private <T> BeanDefinition<T> findAnyBeanDefinition(BeanResolutionContext resolutionContext, Argument<T> beanType) {
-        Collection<BeanDefinition<T>> existing = super.findBeanCandidates(resolutionContext, beanType, true, definition -> !definition.isAbstract());
+        Collection<BeanDefinition<T>> existing = super.findBeanCandidates(resolutionContext, beanType, false, definition -> !definition.isAbstract());
         BeanDefinition<T> definition = null;
         if (existing.size() == 1) {
             definition = existing.iterator().next();
@@ -342,7 +336,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         return definition;
     }
 
-    private <T> List<BeanDefinition<?>> calculateDependencyChain(
+    private <T> List<BeanDefinition<?>> calculateEachBeanChain(
         BeanResolutionContext resolutionContext,
         BeanDefinition<T> definition) {
         Class<?> dependentBean = definition.classValue(EachBean.class).orElse(null);
@@ -359,240 +353,202 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         return chain;
     }
 
-    @NonNull
-    private static String resolveEachPropertyMissingBeanMessage(Qualifier<?> qualifier, BeanDefinition<?> definition) {
-        String prefix = definition.stringValue(EachProperty.class).orElse("");
-        if (qualifier != null) {
-            if (qualifier instanceof Named named) {
-                prefix += "." + named.getName();
-            } else {
-                prefix += "." + "*";
+    private List<BeanDefinition<?>> calculateEachPropertyChain(
+        BeanResolutionContext resolutionContext,
+        BeanDefinition<?> definition) {
+        List<BeanDefinition<?>> chain = new ArrayList<>();
+        while (definition != null) {
+            chain.add(definition);
+            Class<?> declaringClass = definition.getBeanType().getDeclaringClass();
+            if (declaringClass == null) {
+                break;
             }
-        } else {
-            prefix += "." + definition.stringValue(EachProperty.class, "primary").orElse("*");
+            BeanDefinition<?> dependent = findAnyBeanDefinition(resolutionContext, Argument.of(declaringClass));
+            if (dependent == null || !dependent.isConfigurationProperties()) {
+                break;
+            }
+            definition = dependent;
         }
+
+        return chain;
+    }
+
+
+    @NonNull
+    private String resolveEachPropertyMissingBeanMessage(BeanResolutionContext resolutionContext, Qualifier<?> qualifier, BeanDefinition<?> definition) {
+        List<BeanDefinition<?>> chain = calculateEachPropertyChain(resolutionContext, definition);
+        String prefix;
+        if (chain.size() > 1) {
+            Collections.reverse(chain);
+            ConfigurationPath path = ConfigurationPath.of(chain.toArray(BeanDefinition[]::new));
+            prefix = path.path();
+        } else {
+
+            prefix = definition.stringValue(EachProperty.class).orElse("");
+            if (qualifier != null) {
+                if (qualifier instanceof Named named) {
+                    prefix += "." + named.getName();
+                } else {
+                    prefix += "." + "*";
+                }
+            } else {
+                prefix += "." + definition.stringValue(EachProperty.class, "primary").orElse("*");
+            }
+        }
+
 
         return "No configuration entries found under the prefix: [" + prefix + "]. Provide the necessary configuration to resolve this issue.";
     }
 
     @Override
-    protected <T> Collection<BeanDefinition<T>> transformIterables(BeanResolutionContext resolutionContext, Collection<BeanDefinition<T>> candidates, boolean filterProxied) {
-        if (!candidates.isEmpty()) {
-
-            List<BeanDefinition<T>> transformedCandidates = new ArrayList<>();
-            for (BeanDefinition<T> candidate : candidates) {
-                if (candidate.isIterable()) {
-                    if (candidate.hasDeclaredStereotype(EachProperty.class)) {
-                        transformEachPropertyBeanDefinition(resolutionContext, candidate, transformedCandidates);
-                    } else if (candidate.hasDeclaredStereotype(EachBean.class)) {
-                        transformEachBeanBeanDefinition(resolutionContext, candidate, transformedCandidates, filterProxied);
-                    }
-                } else if (candidate.hasStereotype(ConfigurationReader.class)) {
-                    transformConfigurationReaderBeanDefinition(resolutionContext, candidate, transformedCandidates);
-                } else {
-                    transformedCandidates.add(candidate);
-                }
+    protected <T> void collectIterableBeans(BeanResolutionContext resolutionContext, BeanDefinition<T> iterableBean, Set<BeanDefinition<T>> targetSet) {
+        try(BeanResolutionContext rc = newResolutionContext(iterableBean, resolutionContext)) {
+            if (iterableBean.hasDeclaredStereotype(EachProperty.class)) {
+                transformEachPropertyBeanDefinition(rc, iterableBean, targetSet);
+            } else if (iterableBean.hasDeclaredStereotype(EachBean.class)) {
+                transformEachBeanBeanDefinition(rc, iterableBean, targetSet);
+            } else {
+                transformConfigurationReaderBeanDefinition(rc, iterableBean, targetSet);
             }
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Finalized bean definitions candidates: {}", candidates);
-                for (BeanDefinition<?> definition : transformedCandidates) {
-                    LOG.debug("  {} {} {}", definition.getBeanType(), definition.getDeclaredQualifier(), definition);
-                }
-            }
-            return transformedCandidates;
         }
-        return candidates;
     }
 
     private <T> void transformConfigurationReaderBeanDefinition(BeanResolutionContext resolutionContext,
                                                                 BeanDefinition<T> candidate,
-                                                                List<BeanDefinition<T>> transformedCandidates) {
-        final String prefix = candidate.stringValue(ConfigurationReader.class, "prefix").orElse(null);
-        if (prefix != null) {
-            int mapIndex = prefix.indexOf("*");
-            int arrIndex = prefix.indexOf("[*]");
+                                                                Set<BeanDefinition<T>> transformedCandidates) {
+        try {
+            final String prefix = candidate.stringValue(ConfigurationReader.class, "prefix").orElse(null);
+            ConfigurationPath configurationPath = resolutionContext.getConfigurationPath();
+            if (prefix != null) {
 
-            boolean isList = arrIndex > -1;
-            boolean isMap = mapIndex > -1;
-            if (isList || isMap) {
-                int startIndex = isList ? arrIndex : mapIndex;
-                String eachProperty = prefix.substring(0, startIndex);
-                if (eachProperty.endsWith(".")) {
-                    eachProperty = eachProperty.substring(0, eachProperty.length() - 1);
-                }
+                if (configurationPath.isNotEmpty()) {
+                    if (configurationPath.isWithin(prefix)) {
 
-                if (StringUtils.isEmpty(eachProperty)) {
-                    throw new IllegalArgumentException("Blank value specified to @Each property for bean: " + candidate);
-                }
-                if (isList) {
-                    transformConfigurationReaderList(resolutionContext, candidate, prefix, eachProperty, transformedCandidates);
+                        ConfigurationPath newPath = configurationPath.copy();
+                        newPath.pushConfigurationReader(candidate);
+                        newPath.traverseResolvableSegments(getEnvironment(), subPath ->
+                            createAndAddDelegate(resolutionContext, candidate, transformedCandidates, subPath)
+                        );
+                    } else {
+                        ConfigurationPath oldPath = configurationPath;
+                        ConfigurationPath newPath = ConfigurationPath.newPath();
+                        resolutionContext.setConfigurationPath(configurationPath);
+                        try {
+                            newPath.pushConfigurationReader(candidate);
+                            newPath.traverseResolvableSegments(getEnvironment(), subPath ->
+                                createAndAddDelegate(resolutionContext, candidate, transformedCandidates, subPath)
+                            );
+                        } finally {
+                            resolutionContext.setConfigurationPath(oldPath);
+                        }
+                    }
+                } else if (prefix.indexOf('*') == -1) {
+                    // doesn't require outer configuration
+                    transformedCandidates.add(candidate);
                 } else {
-                    transformConfigurationReaderMap(resolutionContext, candidate, prefix, eachProperty, transformedCandidates);
-                }
-                return;
-            }
-        }
-        transformedCandidates.add(candidate);
-    }
+                    // if we have reached here we are likely in a nested a class being resolved directly from the context
+                    // traverse and try reformulate the path
+                    @SuppressWarnings("unchecked")
+                    Class<Object> declaringClass = (Class<Object>) candidate.getBeanType().getDeclaringClass();
+                    if (declaringClass != null) {
+                        Collection<BeanDefinition<Object>> beanCandidates = findBeanCandidates(resolutionContext, Argument.of(declaringClass), null, true);
+                        for (BeanDefinition<Object> beanCandidate : beanCandidates) {
+                            if (beanCandidate instanceof BeanDefinitionDelegate<Object> delegate) {
+                                ConfigurationPath cp = delegate.getConfigurationPath().orElse(configurationPath).copy();
+                                cp.traverseResolvableSegments(getEnvironment(), subPath -> {
+                                    subPath.pushConfigurationReader(candidate);
+                                    if (getEnvironment().containsProperties(subPath.prefix())) {
+                                        createAndAddDelegate(resolutionContext, candidate, transformedCandidates, subPath);
+                                    }
+                                });
+                            } else {
+                                ConfigurationPath cp = configurationPath.copy();
+                                cp.pushConfigurationReader(beanCandidate);
+                                cp.pushConfigurationReader(candidate);
+                                cp.traverseResolvableSegments(getEnvironment(), subPath -> {
+                                    if (getEnvironment().containsProperties(subPath.prefix())) {
+                                        createAndAddDelegate(resolutionContext, candidate, transformedCandidates, subPath);
+                                    }
+                                });
 
-    private <T> void transformConfigurationReaderMap(BeanResolutionContext resolutionContext,
-                                                     BeanDefinition<T> candidate,
-                                                     String prefix,
-                                                     String eachProperty,
-                                                     List<BeanDefinition<T>> transformedCandidates) {
-        Map entries = getProperty(eachProperty, Map.class, Collections.emptyMap());
-        if (!entries.isEmpty()) {
-            for (Object key : entries.keySet()) {
-                BeanDefinitionDelegate<T> delegate = BeanDefinitionDelegate.create(candidate);
-                delegate.put(EachProperty.class.getName(), delegate.getBeanType());
-                delegate.put(Named.class.getName(), key.toString());
-
-                if (delegate.isEnabled(this, resolutionContext) &&
-                        containsProperties(prefix.replace("*", key.toString()))) {
-                    transformedCandidates.add(delegate);
-                }
-            }
-        }
-    }
-
-    private <T> void transformConfigurationReaderList(BeanResolutionContext resolutionContext,
-                                                      BeanDefinition<T> candidate,
-                                                      String prefix,
-                                                      String eachProperty,
-                                                      List<BeanDefinition<T>> transformedCandidates) {
-        List entries = getProperty(eachProperty, List.class, Collections.emptyList());
-        if (!entries.isEmpty()) {
-            for (int i = 0; i < entries.size(); i++) {
-                if (entries.get(i) != null) {
-                    BeanDefinitionDelegate<T> delegate = BeanDefinitionDelegate.create(candidate);
-                    String index = String.valueOf(i);
-                    delegate.put("Array", index);
-                    delegate.put(Named.class.getName(), index);
-
-                    if (delegate.isEnabled(this, resolutionContext) &&
-                            containsProperties(prefix.replace("*", index))) {
-                        transformedCandidates.add(delegate);
+                            }
+                        }
                     }
                 }
             }
+        } catch (IllegalStateException e) {
+            throw new DependencyInjectionException(
+                resolutionContext,
+                e.getMessage(),
+                e
+            );
         }
     }
 
-    private <T> void transformEachBeanBeanDefinition(BeanResolutionContext resolutionContext,
+    private <T> void transformEachBeanBeanDefinition(@NonNull BeanResolutionContext resolutionContext,
                                                      BeanDefinition<T> candidate,
-                                                     List<BeanDefinition<T>> transformedCandidates,
-                                                     boolean filterProxied) {
+                                                     Set<BeanDefinition<T>> transformedCandidates) {
         Class dependentType = candidate.classValue(EachBean.class).orElse(null);
         if (dependentType == null) {
             transformedCandidates.add(candidate);
             return;
         }
 
-        Collection<BeanDefinition> dependentCandidates = findBeanCandidates(resolutionContext, Argument.of(dependentType), filterProxied, null);
+        Collection<BeanDefinition> dependentCandidates = findBeanCandidates(resolutionContext, Argument.of(dependentType), true, null);
 
         if (!dependentCandidates.isEmpty()) {
-            for (BeanDefinition dependentCandidate : dependentCandidates) {
-                Qualifier qualifier;
-                if (dependentCandidate instanceof BeanDefinitionDelegate) {
-                    qualifier = dependentCandidate.resolveDynamicQualifier();
+            for (BeanDefinition<?> dependentCandidate : dependentCandidates) {
+                ConfigurationPath dependentPath = null;
+                if (dependentCandidate instanceof BeanDefinitionDelegate<?> delegate) {
+                    dependentPath = delegate.getConfigurationPath().orElse(null);
+                }
+                if (dependentPath != null) {
+                    createAndAddDelegate(resolutionContext, candidate, transformedCandidates, dependentPath);
                 } else {
-                    qualifier = dependentCandidate.getDeclaredQualifier();
-                }
-                if (qualifier == null && dependentCandidate.isPrimary()) {
-                    // Backwards compatibility, `getDeclaredQualifier` strips @Primary
-                    // This should be removed if @Primary is no longer qualifier
-                    qualifier = PrimaryQualifier.INSTANCE;
-                }
-
-                BeanDefinitionDelegate<?> delegate = BeanDefinitionDelegate.create(candidate, qualifier);
-
-                if (dependentCandidate.isPrimary()) {
-                    delegate.put(BeanDefinitionDelegate.PRIMARY_ATTRIBUTE, true);
-                }
-
-                if (qualifier != null) {
-                    String qualifierKey = AnnotationUtil.QUALIFIER;
-                    Argument<?>[] arguments = candidate.getConstructor().getArguments();
-                    for (Argument<?> argument : arguments) {
-                        Class<?> argumentType = argument.getType();
-                        if (argumentType.equals(dependentType)) {
-                            delegate.put(qualifierKey, Collections.singletonMap(argument, qualifier));
-                            break;
-                        }
+                    Qualifier<?> qualifier = dependentCandidate.getDeclaredQualifier();
+                    if (qualifier == null && dependentCandidate.isPrimary()) {
+                        // Backwards compatibility, `getDeclaredQualifier` strips @Primary
+                        // This should be removed if @Primary is no longer qualifier
+                        qualifier = PrimaryQualifier.INSTANCE;
                     }
-
-                    if (qualifier instanceof Named named) {
-                        delegate.put(Named.class.getName(), named.getName());
-                    }
-                    if (delegate.isEnabled(this, resolutionContext)) {
-                        transformedCandidates.add((BeanDefinition<T>) delegate);
-                    }
+                    BeanDefinitionDelegate<?> delegate = BeanDefinitionDelegate.create(candidate, (Qualifier<T>) qualifier);
+                    transformedCandidates.add((BeanDefinition<T>) delegate);
                 }
             }
         }
     }
 
-    private <T> void transformEachPropertyBeanDefinition(BeanResolutionContext resolutionContext,
+    private <T> void transformEachPropertyBeanDefinition(@NonNull BeanResolutionContext resolutionContext,
                                                          BeanDefinition<T> candidate,
-                                                         List<BeanDefinition<T>> transformedCandidates) {
-        boolean isList = candidate.booleanValue(EachProperty.class, "list").orElse(false);
-        String property = candidate.stringValue(ConfigurationReader.class, ConfigurationReader.PREFIX)
-                .map(prefix ->
-                        //strip the .* or [*]
-                        prefix.substring(0, prefix.length() - (isList ? 3 : 2)))
-                .orElseGet(() -> candidate.stringValue(EachProperty.class).orElse(null));
-        String primaryPrefix = candidate.stringValue(EachProperty.class, "primary").orElse(null);
-        if (StringUtils.isEmpty(property)) {
-            throw new IllegalArgumentException("Blank value specified to @Each property for bean: " + candidate);
-        }
-        if (isList) {
-            transformEachPropertyOfList(resolutionContext, candidate, primaryPrefix, property, transformedCandidates);
-        } else {
-            transformEachPropertyOfMap(resolutionContext, candidate, primaryPrefix, property, transformedCandidates);
-        }
-    }
-
-    private <T> void transformEachPropertyOfMap(BeanResolutionContext resolutionContext,
-                                                BeanDefinition<T> candidate,
-                                                String primaryPrefix,
-                                                String property,
-                                                List<BeanDefinition<T>> transformedCandidates) {
-        for (String key : getEnvironment().getPropertyEntries(property)) {
-            BeanDefinitionDelegate<T> delegate = BeanDefinitionDelegate.create(candidate);
-            if (primaryPrefix != null && primaryPrefix.equals(key)) {
-                delegate.put(BeanDefinitionDelegate.PRIMARY_ATTRIBUTE, true);
+                                                         Set<BeanDefinition<T>> transformedCandidates) {
+        try {
+            ConfigurationPath configurationPath = resolutionContext.getConfigurationPath();
+            configurationPath.pushEachPropertyRoot(candidate);
+            try {
+                ConfigurationPath rootConfig = resolutionContext.getConfigurationPath();
+                rootConfig.traverseResolvableSegments(getEnvironment(), (subPath ->
+                    createAndAddDelegate(resolutionContext, candidate, transformedCandidates, subPath)
+                ));
+            } finally {
+                configurationPath.removeLast();
             }
-            delegate.put(EachProperty.class.getName(), delegate.getBeanType());
-            delegate.put(Named.class.getName(), key);
-
-            if (delegate.isEnabled(this, resolutionContext)) {
-                transformedCandidates.add(delegate);
-            }
+        } catch (IllegalStateException e) {
+            throw new DependencyInjectionException(
+                resolutionContext,
+                e.getMessage(),
+                e
+            );
         }
     }
 
-    private <T> void transformEachPropertyOfList(BeanResolutionContext resolutionContext,
-                                                 BeanDefinition<T> candidate,
-                                                 String primaryPrefix,
-                                                 String property,
-                                                 List<BeanDefinition<T>> transformedCandidates) {
-        List<?> entries = getEnvironment().getProperty(property, List.class, Collections.emptyList());
-        int i = 0;
-        for (Object entry : entries) {
-            if (entry != null) {
-                BeanDefinitionDelegate<T> delegate = BeanDefinitionDelegate.create(candidate);
-                String index = String.valueOf(i);
-                if (primaryPrefix != null && primaryPrefix.equals(index)) {
-                    delegate.put(BeanDefinitionDelegate.PRIMARY_ATTRIBUTE, true);
-                }
-                delegate.put("Array", index);
-                delegate.put(Named.class.getName(), index);
-
-                if (delegate.isEnabled(this, resolutionContext)) {
-                    transformedCandidates.add(delegate);
-                }
-            }
-            i++;
+    private <T> void createAndAddDelegate(BeanResolutionContext resolutionContext, BeanDefinition<T> candidate, Set<BeanDefinition<T>> transformedCandidates, ConfigurationPath path) {
+        BeanDefinitionDelegate<T> delegate = BeanDefinitionDelegate.create(
+            candidate,
+            path.beanQualifier(),
+            path
+        );
+        if (delegate.isEnabled(this, resolutionContext)) {
+            transformedCandidates.add(delegate);
         }
     }
 

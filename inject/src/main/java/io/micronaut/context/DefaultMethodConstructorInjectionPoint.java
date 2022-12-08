@@ -50,6 +50,11 @@ class DefaultMethodConstructorInjectionPoint<T> extends DefaultMethodInjectionPo
     }
 
     @Override
+    public Class<T> getDeclaringBeanType() {
+        return (Class<T>) declaringType;
+    }
+
+    @Override
     public T invoke(Object... args) {
         throw new UnsupportedOperationException("Use MethodInjectionPoint#invoke(..) instead");
     }

@@ -15,7 +15,6 @@
  */
 package io.micronaut.context.visitor;
 
-import io.micronaut.context.BeanProvider;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.EachProperty;
@@ -28,6 +27,7 @@ import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.naming.NameUtils;
+import io.micronaut.core.type.DefaultArgument;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.validation.RequiresValidation;
 import io.micronaut.inject.ast.ClassElement;
@@ -36,7 +36,6 @@ import io.micronaut.inject.configuration.ConfigurationMetadata;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
-import jakarta.inject.Provider;
 
 import java.util.Map;
 
@@ -75,7 +74,7 @@ public class ConfigurationReaderVisitor implements TypeElementVisitor<Configurat
 
         ConfigurationMetadata configurationMetadata = metadataBuilder.visitProperties(classElement);
         if (configurationMetadata != null) {
-            classElement.annotate(ConfigurationReader.class, (builder) -> builder.member(ConfigurationReader.PREFIX, configurationMetadata.getName()));
+            classElement.annotate(ConfigurationReader.class, builder -> builder.member(ConfigurationReader.PREFIX, configurationMetadata.getName()));
         }
 
         if (classElement.isInterface()) {
@@ -107,7 +106,7 @@ public class ConfigurationReaderVisitor implements TypeElementVisitor<Configurat
     }
 
     private static boolean isPropertyParameter(ClassElement genericType, VisitorContext visitorContext) {
-        if (genericType.isOptional() || genericType.isAssignable(BeanProvider.class) || genericType.isAssignable(Provider.class) || genericType.isAssignable(Iterable.class)) {
+        if (genericType.isOptional() || genericType.isContainerType() || isProvider(genericType)) {
             ClassElement finalParameterType = genericType;
             genericType = genericType.getOptionalValueType().or(finalParameterType::getFirstTypeArgument).orElse(genericType);
             // Get the class with type annotations
@@ -119,6 +118,16 @@ public class ConfigurationReaderVisitor implements TypeElementVisitor<Configurat
             }
         }
         return !genericType.hasStereotype(AnnotationUtil.SCOPE) && !genericType.hasStereotype(Bean.class);
+    }
+
+    private static boolean isProvider(ClassElement genericType) {
+        String name = genericType.getName();
+        for (String type : DefaultArgument.PROVIDER_TYPES) {
+            if (name.equals(type)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void visitAbstractMethod(MethodElement method, VisitorContext context) {
@@ -160,11 +169,6 @@ public class ConfigurationReaderVisitor implements TypeElementVisitor<Configurat
                 annBuilder.member("iterable", true);
             }
         });
-    }
-
-    private static boolean isBeanReturnType(MethodElement method) {
-        ClassElement returnType = method.getGenericReturnType();
-        return !returnType.isPrimitive() && returnType.hasStereotype(AnnotationUtil.SCOPE);
     }
 
     private String getPropertyNameForGetter(String methodName) {

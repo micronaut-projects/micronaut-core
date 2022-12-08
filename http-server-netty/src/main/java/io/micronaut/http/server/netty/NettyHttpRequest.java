@@ -414,7 +414,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     @Internal
     public void addContent(ByteBufHolder httpContent) {
         httpContent.touch();
-        if (httpContent instanceof AbstractHttpData || httpContent instanceof MixedAttribute) {
+        if (httpContent instanceof AbstractHttpData || httpContent instanceof MixedAttribute || httpContent instanceof MicronautHttpData<?>) {
             receivedData.computeIfAbsent(new IdentityWrapper(httpContent), key -> {
                 // released in release()
                 httpContent.retain();

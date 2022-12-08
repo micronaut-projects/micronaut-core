@@ -19,6 +19,8 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Nullable;
 
+import java.util.Objects;
+
 /**
  * A {@link ClassElement} of primitive types.
  */
@@ -137,5 +139,22 @@ public final class PrimitiveElement implements ArrayableClassElement {
         return "PrimitiveElement{" + "typeName='" + typeName + '\'' +
             ", arrayDimensions=" + arrayDimensions +
             '}';
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        PrimitiveElement that = (PrimitiveElement) o;
+        return arrayDimensions == that.arrayDimensions && typeName.equals(that.typeName);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(typeName, arrayDimensions);
     }
 }

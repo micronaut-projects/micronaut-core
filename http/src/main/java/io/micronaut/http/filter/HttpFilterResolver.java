@@ -111,7 +111,7 @@ public interface HttpFilterResolver<T extends AnnotationMetadataProvider> {
             @NonNull FT filter,
             @Nullable AnnotationMetadata annotationMetadata,
             @Nullable Set<HttpMethod> methods,
-            @NonNull FilterPatternStyle patternStyle, String...patterns) {
+            @NonNull FilterPatternStyle patternStyle, String... patterns) {
             return new DefaultFilterEntry(
                 new InternalFilter.AroundLegacy(
                     Objects.requireNonNull(filter, "Filter cannot be null"),

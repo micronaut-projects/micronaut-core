@@ -67,6 +67,11 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, Be
     }
 
     @Override
+    default boolean isConfigurationProperties() {
+        return BeanDefinitionReference.super.isConfigurationProperties();
+    }
+
+    @Override
     default BeanDefinition<T> load() {
         return this;
     }

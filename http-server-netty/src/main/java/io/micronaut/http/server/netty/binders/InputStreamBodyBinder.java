@@ -23,6 +23,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.netty.HttpContentProcessor;
+import io.micronaut.http.server.netty.HttpContentProcessorAsReactiveProcessor;
 import io.micronaut.http.server.netty.HttpContentProcessorResolver;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.NettyHttpServer;
@@ -83,12 +84,12 @@ public class InputStreamBodyBinder implements NonBlockingBodyArgumentBinder<Inpu
                 PipedOutputStream outputStream = new PipedOutputStream();
                 try {
                     PipedInputStream inputStream = new PipedInputStream(outputStream) {
-                        private volatile HttpContentProcessor<ByteBufHolder> processor;
+                        private volatile HttpContentProcessor processor;
 
                         private synchronized void init() {
                             if (processor == null) {
-                                processor = (HttpContentProcessor<ByteBufHolder>) processorResolver.resolve(nettyHttpRequest, context.getArgument());
-                                Flux.from(processor)
+                                processor = processorResolver.resolve(nettyHttpRequest, context.getArgument());
+                                Flux.from(HttpContentProcessorAsReactiveProcessor.<ByteBufHolder>asPublisher(processor, nettyHttpRequest))
                                         .publishOn(Schedulers.fromExecutor(executorService))
                                         .subscribe(new CompletionAwareSubscriber<ByteBufHolder>() {
 

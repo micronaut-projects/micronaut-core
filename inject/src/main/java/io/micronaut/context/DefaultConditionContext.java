@@ -173,6 +173,14 @@ class DefaultConditionContext<B extends AnnotationMetadataProvider> implements C
     }
 
     @Override
+    public Collection<List<String>> getPropertyPathMatches(String pathPattern) {
+        if (beanContext instanceof PropertyResolver resolver) {
+            return resolver.getPropertyPathMatches(pathPattern);
+        }
+        return Collections.emptyList();
+    }
+
+    @Override
     public <T> Optional<T> findBean(Argument<T> beanType, Qualifier<T> qualifier) {
         return beanContext.findBean(beanType, qualifier);
     }

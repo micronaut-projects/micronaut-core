@@ -15,6 +15,7 @@
  */
 package io.micronaut.context;
 
+import io.micronaut.context.env.ConfigurationPath;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -168,6 +169,13 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     Path getPath();
 
     /**
+     * @return The configuration path.
+     * @since 4.0.0
+     */
+    @NonNull
+    ConfigurationPath getConfigurationPath();
+
+    /**
      * Store a value within the context.
      *
      * @param key The key
@@ -295,6 +303,14 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     default @Nullable BeanRegistration<?> getAndResetDependentFactoryBean() {
         return null;
     }
+
+    /**
+     * Sets the configuration path.
+     * @param configurationPath The configuration path.
+     * @return The previous path
+     */
+    @Nullable
+    ConfigurationPath setConfigurationPath(@Nullable ConfigurationPath configurationPath);
 
     /**
      * Represents a path taken to resolve a bean definitions dependencies.
