@@ -67,7 +67,7 @@ class ServerFilterSpec extends Specification {
         def response = client.exchange("/order-filter/index", String)
         then:
         response.body() == "foo"
-        filter.events == ['request 3', 'request 2', 'request 1', 'response 1', 'response 2', 'response 3']
+        filter.events == ['request 1', 'request 2', 'request 3', 'response 3', 'response 2', 'response 1']
 
         cleanup:
         server.stop()
