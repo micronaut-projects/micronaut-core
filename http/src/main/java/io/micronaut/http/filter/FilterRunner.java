@@ -21,12 +21,14 @@ import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -58,6 +60,7 @@ public class FilterRunner {
     private SuspensionPoint<HttpResponse<?>> responseSuspensionPoint = new SuspensionPoint<>(-1, null);
     private int index;
     private boolean responseNeedsProcessing = false;
+
     public FilterRunner(List<InternalFilter> filters) {
         this.filters = filters;
     }
@@ -130,35 +133,55 @@ public class FilterRunner {
     }
 
     private boolean workRequestFilter(InternalFilter filter) {
+        Executor executeOn;
+        if (filter instanceof InternalFilter.Async async) {
+            executeOn = async.executor();
+            filter = async.actual();
+        } else {
+            executeOn = null;
+        }
+
         if (filter instanceof InternalFilter.Before<?> before) {
-            return invokeBefore(before);
+            if (executeOn == null) {
+                return invokeBefore(before, null);
+            } else {
+                executeOn.execute(() -> {
+                    if (invokeBefore(before, executeOn)) {
+                        workRequest();
+                    }
+                });
+                return false;
+            }
             // continue with next filter
         } else if (filter instanceof InternalFilter.After<?>) {
             // skip filter, only used for response
             return true;
-        } else if (filter instanceof InternalFilter.Async async) {
-            if (async.actual() instanceof InternalFilter.After<?>) {
-                // skip filter, only used for response
-                return true;
-            }
-            async.executor().execute(() -> {
-                if (workRequestFilter(async.actual())) {
-                    workRequest();
-                }
-            });
-            return false;
         } else if (filter instanceof InternalFilter.AroundLegacy around) {
             FilterChainImpl chainSuspensionPoint = new FilterChainImpl(index - 1, responseSuspensionPoint);
+            chainSuspensionPoint.completeOn = executeOn;
             responseSuspensionPoint = chainSuspensionPoint;
-            try {
-                Publisher<? extends HttpResponse<?>> result = around.bean().doFilter(request, chainSuspensionPoint);
-                result.subscribe(chainSuspensionPoint);
-            } catch (Throwable e) {
-                chainSuspensionPoint.forwardResponse(null, e);
+            if (executeOn == null) {
+                try {
+                    around.bean().doFilter(request, chainSuspensionPoint).subscribe(chainSuspensionPoint);
+                } catch (Throwable e) {
+                    chainSuspensionPoint.forwardResponse(null, e);
+                }
+            } else {
+                executeOn.execute(() -> {
+                    try {
+                        around.bean().doFilter(request, chainSuspensionPoint).subscribe(chainSuspensionPoint);
+                    } catch (Throwable e) {
+                        chainSuspensionPoint.forwardResponse(null, e);
+                    }
+                });
             }
             // suspend
             return false;
         } else if (filter instanceof InternalFilter.TerminalReactive || filter instanceof InternalFilter.Terminal) {
+            if (executeOn != null) {
+                throw new AssertionError("Async terminal filters not supported");
+            }
+
             ExecutionFlow<? extends HttpResponse<?>> terminalFlow;
             if (filter instanceof InternalFilter.Terminal t) {
                 try {
@@ -216,25 +239,33 @@ public class FilterRunner {
                 return;
             }
             InternalFilter filter = filters.get(index);
+
+            Executor executeOn = null;
+            if (filter instanceof InternalFilter.Async async) {
+                executeOn = async.executor();
+                filter = async.actual();
+            }
+
             if (filter instanceof InternalFilter.After<?> after) {
-                if (!invokeAfter(after)) {
+                if (executeOn == null) {
+                    if (!invokeAfter(after)) {
+                        // suspend
+                        return;
+                    }
+                } else {
+                    executeOn.execute(() -> {
+                        if (invokeAfter(after)) {
+                            workResponse();
+                        }
+                    });
                     // suspend
                     return;
                 }
-            } else if (filter instanceof InternalFilter.Async async && async.actual() instanceof InternalFilter.After<?> after) {
-                async.executor().execute(() -> {
-                    if (invokeAfter(after)) {
-                        workResponse();
-                    }
-                });
-                // suspend
-                return;
             }
         }
     }
 
-    private <T> boolean invokeBefore(InternalFilter.Before<T> before) {
-        // todo: handle ExecuteOn
+    private <T> boolean invokeBefore(InternalFilter.Before<T> before, @Nullable Executor completeOn) {
         FilterContinuationImpl<?> passedOnContinuation = null;
         try {
             var oldSuspensionPoint = this.responseSuspensionPoint;
@@ -248,6 +279,9 @@ public class FilterRunner {
             SuspensionPoint<HttpResponse<?>> newSuspensionPoint = this.responseSuspensionPoint;
             if (newSuspensionPoint != oldSuspensionPoint) {
                 passedOnContinuation = (FilterContinuationImpl<?>) newSuspensionPoint;
+                if (completeOn != null) {
+                    passedOnContinuation.completeOn = completeOn;
+                }
             }
             Object returnValue = before.method().invoke(before.bean(), args);
 
@@ -269,7 +303,6 @@ public class FilterRunner {
     }
 
     private <T> boolean invokeAfter(InternalFilter.After<T> after) {
-        // todo: handle ExecuteOn
         try {
             Object[] args = satisfy(after.method().getArguments(), true);
             if (args == SKIP_FILTER) {
@@ -477,6 +510,12 @@ public class FilterRunner {
          * aborted (usually because of an error).
          */
         final AtomicBoolean upstreamGuard = new AtomicBoolean(false);
+        /**
+         * Executor to run any downstream reactive code on. Only used by some implementations, e.g.
+         * it doesn't make sense for a blocking continuation.
+         */
+        @Nullable
+        Executor completeOn = null;
 
         FilterContinuationImpl(int filterIndex, @Nullable SuspensionPoint<HttpResponse<?>> next) {
             super(filterIndex, next);
@@ -499,7 +538,7 @@ public class FilterRunner {
          * Forward a given response from this suspension point. If {@link #proceed} was already
          * called, this waits for the downstream filters to finish.
          */
-        void forwardResponse(HttpResponse<?> response, Throwable failure) {
+        final void forwardResponse(HttpResponse<?> response, Throwable failure) {
             if (downstreamGuard.compareAndSet(false, true)) {
                 // proceed wasn't called, continue directly to response processing
                 // cancel the suspension point, since we don't do more request processing
@@ -554,7 +593,11 @@ public class FilterRunner {
         @SuppressWarnings({"unchecked", "rawtypes"})
         @Override
         protected Publisher<MutableHttpResponse<?>> adapt() {
-            return (Publisher) Mono.fromFuture(this);
+            Mono<HttpResponse<?>> mono = Mono.fromFuture(this);
+            if (completeOn != null) {
+                mono = mono.subscribeOn(Schedulers.fromExecutor(completeOn));
+            }
+            return (Publisher) mono;
         }
 
         @Override
@@ -590,7 +633,11 @@ public class FilterRunner {
 
         @Override
         protected R adapt() {
-            return Publishers.convertPublisher(Mono.fromFuture(this), reactiveType);
+            Mono<HttpResponse<?>> mono = Mono.fromFuture(this);
+            if (completeOn != null) {
+                mono = mono.subscribeOn(Schedulers.fromExecutor(completeOn));
+            }
+            return Publishers.convertPublisher(mono, reactiveType);
         }
     }
 
