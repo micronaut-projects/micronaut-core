@@ -1677,6 +1677,17 @@ public class DefaultBeanContext implements InitializableBeanContext {
     }
 
     /**
+     * The definition to remove.
+     * @param definition The definitino to remove
+     * @param <B> The bean type
+     */
+    @Internal
+    <B> void removeBeanDefinition(RuntimeBeanDefinition<B> definition) {
+        this.beanDefinitionsClasses.remove(definition);
+        purgeCacheForBeanType(definition.getBeanType());
+    }
+
+    /**
      * Get a bean of the given type.
      *
      * @param resolutionContext The bean context resolution
