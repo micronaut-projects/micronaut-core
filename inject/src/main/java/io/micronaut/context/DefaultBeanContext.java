@@ -1663,19 +1663,6 @@ public class DefaultBeanContext implements InitializableBeanContext {
     @NonNull
     public <B> BeanContext registerBeanDefinition(@NonNull RuntimeBeanDefinition<B> definition) {
         Objects.requireNonNull(definition, "Bean definition cannot be null");
-        BeanDefinition<B> existing = findBeanDefinition(definition.getGenericBeanType(), definition.getDeclaredQualifier()).orElse(null);
-        if (existing instanceof RuntimeBeanDefinition<B> runtimeBeanDefinition) {
-            this.beanDefinitionsClasses.remove(runtimeBeanDefinition);
-        }
-        for (Class<?> indexedType : indexedTypes) {
-            if (definition.isCandidateBean(Argument.of(indexedType))) {
-                Collection<BeanDefinitionReference> index = resolveTypeIndex(indexedType);
-                if (existing instanceof RuntimeBeanDefinition<B> runtimeBeanDefinition) {
-                    index.remove(runtimeBeanDefinition);
-                }
-                index.add(definition);
-            }
-        }
         this.beanDefinitionsClasses.add(definition);
         Class<B> beanType = definition.getBeanType();
         purgeCacheForBeanType(beanType);

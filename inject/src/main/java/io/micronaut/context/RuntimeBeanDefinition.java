@@ -185,7 +185,17 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, Be
          * @param qualifier The qualifier
          * @return This builder
          */
+        @NonNull
         Builder<B> qualifier(@Nullable Qualifier<B> qualifier);
+
+        /**
+         * Adds this type as a bean replacement of the given type.
+         * @param otherType The other type
+         * @return This bean builder
+         * @since 4.0.0
+         */
+        @NonNull
+        Builder<B> replaces(@Nullable Class<? extends B> otherType);
 
         /**
          * The qualifier to use.
@@ -193,6 +203,7 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, Be
          * @return This builder
          * @since 3.7.0
          */
+        @NonNull
         default Builder<B> named(@Nullable String name) {
             if (name == null) {
                 qualifier(null);
@@ -207,6 +218,7 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, Be
          * @param scope The scope
          * @return This builder
          */
+        @NonNull
         Builder<B> scope(@Nullable Class<? extends Annotation> scope);
 
         /**
@@ -214,6 +226,7 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, Be
          * @param isSingleton True if it is singleton
          * @return This builder
          */
+        @NonNull
         Builder<B> singleton(boolean isSingleton);
 
         /**
@@ -221,6 +234,7 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, Be
          * @param types The exposed types
          * @return This builder
          */
+        @NonNull
         Builder<B> exposedTypes(Class<?>...types);
 
         /**
@@ -228,6 +242,7 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, Be
          * @param arguments The arguments
          * @return This builder
          */
+        @NonNull
         Builder<B> typeArguments(Argument<?>... arguments);
 
         /**
@@ -236,6 +251,7 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, Be
          * @param arguments The arguments
          * @return This builder
          */
+        @NonNull
         Builder<B> typeArguments(Class<?> implementedType, Argument<?>... arguments);
 
         /**
@@ -243,6 +259,7 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, Be
          * @param annotationMetadata The annotation metadata
          * @return This builder
          */
+        @NonNull
         Builder<B> annotationMetadata(@Nullable AnnotationMetadata annotationMetadata);
 
         /**

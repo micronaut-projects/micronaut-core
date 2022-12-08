@@ -15,21 +15,26 @@
  */
 package io.micronaut.context;
 
+import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.exceptions.BeanInstantiationException;
+import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.naming.Named;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.BeanDefinition;
+import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.qualifiers.PrimaryQualifier;
 import io.micronaut.inject.qualifiers.TypeArgumentQualifier;
 
 import java.lang.annotation.Annotation;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -219,6 +224,7 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
         private Class<?>[] exposedTypes = ReflectionUtils.EMPTY_CLASS_ARRAY;
 
         private Map<Class<?>, List<Argument<?>>> typeArguments;
+        private Class<? extends B> replacesType;
 
         RuntimeBeanBuilder(Argument<B> beanType, Supplier<B> supplier) {
             this.beanType = Objects.requireNonNull(beanType, MSG_BEAN_TYPE_CANNOT_BE_NULL);
@@ -234,6 +240,12 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
                                                 .toArray(Argument[]::new);
                 typeArguments(arguments);
             }
+            return this;
+        }
+
+        @Override
+        public Builder<B> replaces(Class<? extends B> otherType) {
+            this.replacesType = otherType;
             return this;
         }
 
@@ -288,6 +300,24 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
         @Override
         @NonNull
         public RuntimeBeanDefinition<B> build() {
+            if (replacesType != null) {
+                MutableAnnotationMetadata mutableAnnotationMetadata;
+                if (this.annotationMetadata instanceof MutableAnnotationMetadata mm) {
+                    mutableAnnotationMetadata = mm;
+                } else if (this.annotationMetadata == null || this.annotationMetadata == EMPTY_METADATA) {
+                    mutableAnnotationMetadata = new MutableAnnotationMetadata();
+                    this.annotationMetadata = mutableAnnotationMetadata;
+                } else {
+                    throw new IllegalStateException("Previous non-mutable annotation metadata set");
+                }
+
+                Map<CharSequence, Object> values = new HashMap<>(3);
+                values.put(AnnotationMetadata.VALUE_MEMBER, new AnnotationClassValue<>(replacesType));
+                if (qualifier instanceof Named named) {
+                    values.put("named", named.getName());
+                }
+                mutableAnnotationMetadata.addAnnotation(Replaces.class.getName(), values);
+            }
             return new DefaultRuntimeBeanDefinition<>(
                 beanType,
                 supplier,

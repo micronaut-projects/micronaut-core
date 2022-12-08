@@ -17,6 +17,7 @@ package io.micronaut.inject.context
 
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.RuntimeBeanDefinition
 import io.micronaut.context.annotation.Bean
 import io.micronaut.context.annotation.Type
 import io.micronaut.inject.qualifiers.Qualifiers
@@ -33,6 +34,12 @@ class RegisterSingletonSpec extends Specification {
         BeanContext context = BeanContext.run()
 
         when:
+        context.registerBeanDefinition(
+                RuntimeBeanDefinition.builder(Codec, ()-> new OverridingCodec())
+                        .singleton(true)
+                        .replaces(ToBeReplacedCodec)
+                        .build()
+        ) // replaces ToBeReplacedCodec
         context.registerSingleton(Codec, {  } as Codec) // adds a new codec
         context.registerSingleton(Codec, new FooCodec()) // adds another codec
         context.registerSingleton(new BarCodec()) // should be registered with bean type BarCodec
@@ -44,8 +51,9 @@ class RegisterSingletonSpec extends Specification {
         codecs.find { it in FooCodec }
         codecs.find { it in BarCodec }
         codecs.find { it in BazCodec }
-        codecs.find { it in StuffCodec }
+        !codecs.find { it in OverridingCodec }
         codecs.find { it in OtherCodec }
+        codecs.find { it in StuffCodec }
         codecs.find { it in Proxy }
         codecs == context.getBeansOfType(Codec) // second resolve returns the same result
         context.getBeansOfType(FooCodec).size() == 0 // not an exposed type
@@ -123,6 +131,7 @@ class RegisterSingletonSpec extends Specification {
 
     }
 
+    static class OverridingCodec implements Codec {}
     static class FooCodec implements Codec {}
     static class BarCodec implements Codec {}
     static class BazCodec implements Codec {}
@@ -131,4 +140,7 @@ class RegisterSingletonSpec extends Specification {
     static class StuffCodec implements Codec {}
     @Singleton
     static class OtherCodec implements Codec {}
+
+    @Singleton
+    static class ToBeReplacedCodec implements Codec {}
 }
