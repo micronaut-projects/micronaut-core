@@ -124,6 +124,7 @@ managed-netty-transport-native-unix-common = { module = "io.netty:netty-transpor
 managed-reactive-streams = { module = "org.reactivestreams:reactive-streams", version.ref = "managed-reactive-streams" }
 
 managed-reactor = { module = "io.projectreactor:reactor-core", version.ref = "managed-reactor" }
+managed-reactor-test = { module = "io.projectreactor:reactor-test", version.ref = "managed-reactor" }
 
 managed-slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "managed-slf4j" }
 managed-slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "managed-slf4j" }
