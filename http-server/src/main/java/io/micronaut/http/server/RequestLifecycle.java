@@ -266,7 +266,20 @@ public class RequestLifecycle {
             this.request = request;
             return downstream.get();
         });
-        FilterRunner filterRunner = new FilterRunner(filters);
+        FilterRunner filterRunner = new FilterRunner(filters) {
+            @Override
+            protected ExecutionFlow<? extends HttpResponse<?>> processResponse(HttpRequest<?> request, HttpResponse<?> response) {
+                RequestLifecycle.this.request = request;
+                return handleStatusException((MutableHttpResponse<?>) response)
+                    .onErrorResume(throwable -> onErrorNoFilter(throwable));
+            }
+
+            @Override
+            protected ExecutionFlow<? extends HttpResponse<?>> processFailure(HttpRequest<?> request, Throwable failure) {
+                RequestLifecycle.this.request = request;
+                return onErrorNoFilter(failure);
+            }
+        };
         return filterRunner.run(request);
     }
 
