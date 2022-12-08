@@ -166,6 +166,7 @@ import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
+import reactor.util.context.Context;
 
 import java.io.Closeable;
 import java.io.File;
@@ -1243,37 +1244,41 @@ public class DefaultHttpClient implements
             AtomicReference<MutableHttpRequest<?>> requestWrapper,
             Publisher<R> responsePublisher) {
 
-        if (request instanceof MutableHttpRequest) {
-            ((MutableHttpRequest<I>) request).uri(requestURI);
-
-            List<InternalFilter> filters =
-                    filterResolver.resolveFilters(request, clientFilterEntries);
-            if (parentRequest != null) {
-                // todo: migrate to new filter
-                filters.add(
-                    new InternalFilter.AroundLegacy(new ClientServerContextFilter(parentRequest),
-                    new FilterOrder.Fixed(Ordered.HIGHEST_PRECEDENCE)));
-            }
-
-            FilterRunner.sortReverse(filters);
-            filters.add(new InternalFilter.TerminalReactive(responsePublisher));
-
-            FilterRunner runner = new FilterRunner(filters);
-            if (parentRequest != null) {
-                responsePublisher = ServerRequestContext.with(parentRequest, (Supplier<Publisher<R>>) () -> {
-                    try {
-                        return Flux.from(ReactiveExecutionFlow.toPublisher(() -> (ExecutionFlow<R>) runner.run(request)))
-                                .contextWrite(ctx -> ctx.put(ServerRequestContext.KEY, parentRequest));
-                    } catch (Throwable t) {
-                        return Flux.error(t);
-                    }
-                });
-            } else {
-                return ReactiveExecutionFlow.toPublisher(() -> (ExecutionFlow<R>) runner.run(request));
-            }
+        if (!(request instanceof MutableHttpRequest)) {
+            return responsePublisher;
         }
 
-        return responsePublisher;
+        ((MutableHttpRequest<I>) request).uri(requestURI);
+
+        List<InternalFilter> filters =
+                filterResolver.resolveFilters(request, clientFilterEntries);
+        if (parentRequest != null) {
+            // todo: migrate to new filter
+            filters.add(
+                new InternalFilter.AroundLegacy(new ClientServerContextFilter(parentRequest),
+                new FilterOrder.Fixed(Ordered.HIGHEST_PRECEDENCE)));
+        }
+
+        FilterRunner.sortReverse(filters);
+        filters.add(new InternalFilter.TerminalReactive(responsePublisher));
+
+        FilterRunner runner = new FilterRunner(filters);
+        Mono<R> responseMono = Mono.deferContextual(ctx -> {
+            runner.reactorContext(Context.of(ctx));
+            return Mono.from(ReactiveExecutionFlow.fromFlow((ExecutionFlow<R>) runner.run(request)).toPublisher());
+        });
+        if (parentRequest != null) {
+            responseMono = responseMono.contextWrite(c -> {
+                // existing entry takes precedence. The parentRequest is derived from a thread
+                // local, and is more likely to be wrong than any reactive context we are fed.
+                if (c.hasKey(ServerRequestContext.KEY)) {
+                    return c;
+                } else {
+                    return c.put(ServerRequestContext.KEY, parentRequest);
+                }
+            });
+        }
+        return responseMono;
     }
 
     /**

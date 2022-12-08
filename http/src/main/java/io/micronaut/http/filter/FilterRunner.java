@@ -14,7 +14,6 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
@@ -135,7 +134,6 @@ public class FilterRunner {
     }
 
     private void workRequest() {
-        ServerRequestContext.set(request);
         while (true) {
             if (!workRequestFilter(filters.get(index++))) {
                 return;
@@ -226,7 +224,6 @@ public class FilterRunner {
     }
 
     private void workResponse() {
-        ServerRequestContext.set(request);
         while (true) {
             if (responseNeedsProcessing) {
                 responseNeedsProcessing = false;
