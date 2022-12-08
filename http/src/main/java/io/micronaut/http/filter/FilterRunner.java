@@ -678,6 +678,16 @@ public class FilterRunner {
         }
 
         @Override
+        public Publisher<MutableHttpResponse<?>> proceed(HttpRequest<?> request) {
+            // HACK: kotlin coroutine context propagation only supports reactor types (see
+            // ReactorContextInjector). If we want to support our own type, we would need our own
+            // ContextInjector, but that interface is marked as internal.
+            // Another solution could be to PR kotlin to support all CorePublishers in
+            // ReactorContextInjector.
+            return Mono.from(super.proceed(request));
+        }
+
+        @Override
         public void onSubscribe(Subscription s) {
             s.request(Long.MAX_VALUE);
         }
