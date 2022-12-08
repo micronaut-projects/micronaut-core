@@ -112,13 +112,6 @@ final class SingletonScope {
             DefaultBeanContext.BeanKey<T> beanKey = new DefaultBeanContext.BeanKey<>(beanDefinition, beanDefinition.getDeclaredQualifier());
             singletonByArgumentAndQualifier.put(beanKey, registration);
         }
-        if (registration.bean != null && registration.bean.getClass() != beanDefinition.getBeanType()) {
-            // If the actual type differs, allow to inject the actual implementation for cases like:
-            // `MyInterface factoryBean() { new Impl.. }`
-            // This might be something to remove in 4.0
-            DefaultBeanContext.BeanKey<T> concrete = new DefaultBeanContext.BeanKey<>((Class<T>) registration.bean.getClass(), qualifier);
-            singletonByArgumentAndQualifier.put(concrete, registration);
-        }
         return registration;
     }
 

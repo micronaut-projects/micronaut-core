@@ -730,7 +730,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
         BeanDefinition<T> beanDefinition;
         if (inject && running.get()) {
             // Bean cannot be injected before the start of the context
-            beanDefinition = findBeanDefinition(type, qualifier).orElse(null);
+            beanDefinition = findConcreteCandidate(null, Argument.of(type), qualifier, false).orElse(null);
             if (beanDefinition == null) {
                 // Purge cache miss
                 purgeCacheForBeanInstance(singleton);

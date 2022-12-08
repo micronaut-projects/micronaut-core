@@ -17,16 +17,48 @@ package io.micronaut.inject.context
 
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.annotation.Bean
 import io.micronaut.context.annotation.Type
 import io.micronaut.inject.qualifiers.Qualifiers
+import jakarta.inject.Singleton
 import spock.lang.Issue
 import spock.lang.Specification
 
 class RegisterSingletonSpec extends Specification {
 
+    void "test register singleton and exposed type"() {
+        given:
+        BeanContext context = BeanContext.run()
+
+        when:
+        context.registerSingleton(Codec, {  } as Codec) // adds a new codec
+        context.registerSingleton(Codec, new FooCodec()) // overrides above codec since no qualifier
+        context.registerSingleton(new BarCodec()) // should be registered with bean type BarCodec
+        context.registerSingleton(Codec, new BazCodec(), Qualifiers.byName("baz"))
+
+        then:
+        def codecs = context.getBeansOfType(Codec)
+        codecs.size() == 5
+        codecs.find { it in FooCodec }
+        codecs.find { it in BarCodec }
+        codecs.find { it in BazCodec }
+        codecs.find { it in StuffCodec }
+        codecs.find { it in OtherCodec }
+        !codecs.find { it in Closure }
+        context.getBeansOfType(FooCodec).size() == 0 // not an exposed type, should this be correct?
+        context.getBeansOfType(BarCodec).size() == 1 // BarCodec type is exposed
+        context.findBean(FooCodec).isEmpty()
+        context.findBean(StuffCodec).isEmpty()
+        context.findBean(OtherCodec).isPresent()
+
+        cleanup:
+        context.close()
+    }
+
+
     void "test register singleton method"() {
         given:
-        BeanContext context = new DefaultBeanContext().start()
+        BeanContext context = BeanContext.run()
         def b = new B()
 
         when:
@@ -83,4 +115,17 @@ class RegisterSingletonSpec extends Specification {
             this.type = type
         }
     }
+
+    static interface Codec {
+
+    }
+
+    static class FooCodec implements Codec {}
+    static class BarCodec implements Codec {}
+    static class BazCodec implements Codec {}
+    @Singleton
+    @Bean(typed = Codec)
+    static class StuffCodec implements Codec {}
+    @Singleton
+    static class OtherCodec implements Codec {}
 }
