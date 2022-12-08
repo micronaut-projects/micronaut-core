@@ -262,8 +262,9 @@ public class RequestLifecycle {
 
         List<InternalFilter> filters = new ArrayList<>(httpFilters.size() + 1);
         filters.addAll(httpFilters);
-        filters.add((InternalFilter.Terminal) request -> {
+        filters.add((InternalFilter.TerminalWithReactorContext) (request, context) -> {
             this.request = request;
+            this.context = context;
             return downstream.get();
         });
         FilterRunner filterRunner = new FilterRunner(filters) {

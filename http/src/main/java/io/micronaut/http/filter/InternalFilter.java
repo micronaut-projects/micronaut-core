@@ -8,6 +8,7 @@ import io.micronaut.core.util.Toggleable;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import org.reactivestreams.Publisher;
+import reactor.util.context.Context;
 
 import java.util.concurrent.Executor;
 
@@ -70,6 +71,12 @@ public sealed interface InternalFilter {
 
     @Internal
     record TerminalReactive(Publisher<? extends HttpResponse<?>> responsePublisher) implements InternalFilter {}
+
+    @Internal
+    @FunctionalInterface
+    non-sealed interface TerminalWithReactorContext extends InternalFilter {
+        ExecutionFlow<? extends HttpResponse<?>> execute(HttpRequest<?> request, Context context) throws Exception;
+    }
 
     /**
      * Last item in a filter chain, called when all other filters are done. Basically, this runs

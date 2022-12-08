@@ -12,6 +12,7 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.MutableHttpResponse
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
+import reactor.util.context.Context
 import spock.lang.Specification
 
 import java.util.concurrent.CompletableFuture
@@ -77,6 +78,42 @@ class FilterRunnerSpec extends Specification {
 
         where:
         legacy << [true, false]
+    }
+
+    def 'around filter context propagation'(boolean legacy) {
+        given:
+        def events = []
+        List<InternalFilter> filters = [
+                around(legacy) { request, chain ->
+                    return Flux.deferContextual { ctx ->
+                        events.add('context 1: ' + ctx.get('value'))
+                        Flux.from(chain.proceed(request))
+                                .contextWrite { it.put('value', 'around 1') }
+                    }
+                },
+                around(legacy) { request, chain ->
+                    return Flux.deferContextual { ctx ->
+                        events.add('context 2: ' + ctx.get('value'))
+                        Flux.from(chain.proceed(request))
+                            .contextWrite { it.put('value', 'around 2') }
+                    }
+                },
+                (InternalFilter.TerminalWithReactorContext) ((req, ctx) -> {
+                    events.add('terminal: ' + ctx.get('value'))
+                    ExecutionFlow.just(HttpResponse.ok("resp1"))
+                })
+        ]
+
+        when:
+        def runner = new FilterRunner(filters)
+        runner.reactorContext(Context.of('value', 'outer'))
+        def result = await(runner.run(HttpRequest.GET("/req1")))
+        then:
+        result != null
+        events == ["context 1: outer", "context 2: around 1", "terminal: around 2"]
+
+        where:
+        legacy << [false, true]
     }
 
     def 'exception in before'() {

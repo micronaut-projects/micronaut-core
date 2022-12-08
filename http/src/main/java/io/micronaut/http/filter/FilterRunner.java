@@ -1,6 +1,7 @@
 package io.micronaut.http.filter;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.execution.CompletableFutureExecutionFlow;
@@ -20,8 +21,10 @@ import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.CorePublisher;
+import reactor.core.CoreSubscriber;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
+import reactor.util.context.Context;
 
 import java.util.List;
 import java.util.Optional;
@@ -30,6 +33,7 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BiConsumer;
 
 /**
  * @implNote Legacy filters had a strict execution flow: filter1->chain.proceed->filter2->chain.proceed...
@@ -60,6 +64,8 @@ public class FilterRunner {
     private SuspensionPoint<HttpResponse<?>> responseSuspensionPoint = new SuspensionPoint<>(-1, null);
     private int index;
     private boolean responseNeedsProcessing = false;
+
+    private Context reactorContext = Context.empty();
 
     public FilterRunner(List<InternalFilter> filters) {
         this.filters = filters;
@@ -109,6 +115,11 @@ public class FilterRunner {
             });
             return false;
         }
+    }
+
+    public final FilterRunner reactorContext(Context reactorContext) {
+        this.reactorContext = reactorContext;
+        return this;
     }
 
     public final ExecutionFlow<MutableHttpResponse<?>> run(HttpRequest<?> request) {
@@ -177,20 +188,27 @@ public class FilterRunner {
             }
             // suspend
             return false;
-        } else if (filter instanceof InternalFilter.TerminalReactive || filter instanceof InternalFilter.Terminal) {
+        } else if (filter instanceof InternalFilter.TerminalReactive || filter instanceof InternalFilter.Terminal || filter instanceof InternalFilter.TerminalWithReactorContext) {
             if (executeOn != null) {
                 throw new AssertionError("Async terminal filters not supported");
             }
 
             ExecutionFlow<? extends HttpResponse<?>> terminalFlow;
-            if (filter instanceof InternalFilter.Terminal t) {
+            if (filter instanceof InternalFilter.TerminalWithReactorContext t) {
+                try {
+                    terminalFlow = t.execute(request, reactorContext);
+                } catch (Throwable e) {
+                    terminalFlow = ExecutionFlow.error(e);
+                }
+            } else if (filter instanceof InternalFilter.Terminal t) {
                 try {
                     terminalFlow = t.execute(request);
                 } catch (Throwable e) {
                     terminalFlow = ExecutionFlow.error(e);
                 }
             } else {
-                terminalFlow = ReactiveExecutionFlow.fromPublisher(((InternalFilter.TerminalReactive) filter).responsePublisher());
+                terminalFlow = ReactiveExecutionFlow.fromPublisher(Mono.from(((InternalFilter.TerminalReactive) filter).responsePublisher())
+                    .contextWrite(reactorContext));
             }
             // this is almost never available immediately, so don't bother with asDone checks
             terminalFlow.onComplete((resp, fail) -> {
@@ -372,7 +390,8 @@ public class FilterRunner {
         if (Publishers.isConvertibleToPublisher(returnValue)) {
             //noinspection unchecked
             delayedFlow = ReactiveExecutionFlow.fromPublisher(
-                Publishers.convertPublisher(returnValue, Publisher.class));
+                Mono.from(Publishers.convertPublisher(returnValue, Publisher.class))
+                    .contextWrite(reactorContext));
         } else if (returnValue instanceof CompletionStage<?> cs) {
             delayedFlow = CompletableFutureExecutionFlow.just(cs.toCompletableFuture());
         } else {
@@ -521,14 +540,9 @@ public class FilterRunner {
             super(filterIndex, next);
         }
 
-        protected abstract R adapt();
-
-        @Override
-        public R proceed(HttpRequest<?> request) {
-            FilterRunner.this.request = request;
+        final void triggerDownstreamWorkRequest() {
             if (downstreamGuard.compareAndSet(false, true)) {
                 workRequest();
-                return adapt();
             } else {
                 throw new IllegalStateException("Already subscribed to proceed() publisher, or filter method threw an exception and was cancelled");
             }
@@ -576,28 +590,94 @@ public class FilterRunner {
     }
 
     /**
+     * Continuation implementation that yields a reactive type.<br>
+     * This class implements a bunch of interfaces that it would otherwise have to create lambdas
+     * for.
+     *
+     * @param <R> The reactive type to return (e.g. Publisher, Mono, Flux...)
+     */
+    private class ReactiveContinuationImpl<R> extends FilterContinuationImpl<R> implements CorePublisher<HttpResponse<?>>, Subscription, BiConsumer<HttpResponse<?>, Throwable> {
+        private final Class<R> reactiveType;
+        private Subscriber<? super HttpResponse<?>> subscriber = null;
+        private boolean addedListener = false;
+
+        ReactiveContinuationImpl(int filterIndex, @Nullable SuspensionPoint<HttpResponse<?>> next, Class<R> reactiveType) {
+            super(filterIndex, next);
+            this.reactiveType = reactiveType;
+        }
+
+        @Override
+        public R proceed(HttpRequest<?> request) {
+            FilterRunner.this.request = request;
+            return Publishers.convertPublisher(this, reactiveType);
+        }
+
+        @Override
+        public void subscribe(CoreSubscriber<? super HttpResponse<?>> subscriber) {
+            subscribe((Subscriber<? super HttpResponse<?>>) subscriber);
+        }
+
+        @Override
+        public void subscribe(Subscriber<? super HttpResponse<?>> s) {
+            if (this.subscriber != null) {
+                throw new IllegalStateException("Only one subscriber allowed");
+            }
+            this.subscriber = s;
+
+            if (s instanceof CoreSubscriber<?> cs) {
+                FilterRunner.this.reactorContext = cs.currentContext();
+            }
+
+            triggerDownstreamWorkRequest();
+            s.onSubscribe(this);
+        }
+
+        @Override
+        public void request(long n) {
+            if (n > 0 && !addedListener) {
+                addedListener = true;
+                if (completeOn == null) {
+                    whenComplete(this);
+                } else {
+                    whenCompleteAsync(this, completeOn);
+                }
+            }
+        }
+
+        @Override
+        public void cancel() {
+            // ignored
+        }
+
+        @Override
+        public void accept(HttpResponse<?> httpResponse, Throwable throwable) {
+            try {
+                if (throwable == null) {
+                    subscriber.onNext(httpResponse);
+                    subscriber.onComplete();
+                } else {
+                    subscriber.onError(throwable);
+                }
+            } catch (Throwable t) {
+                LOG.warn("Subscriber threw exception", t);
+            }
+        }
+    }
+
+    /**
      * {@link FilterContinuationImpl} that is adapted for legacy filters: Implements
      * {@link FilterChain}, and also implements the {@link Subscriber} that will subscribe to the
      * {@link HttpFilter#doFilter} return value.
      */
-    private class FilterChainImpl extends FilterContinuationImpl<Publisher<MutableHttpResponse<?>>> implements ClientFilterChain, ServerFilterChain, Subscriber<HttpResponse<?>> {
+    private class FilterChainImpl extends ReactiveContinuationImpl<Publisher<MutableHttpResponse<?>>> implements ClientFilterChain, ServerFilterChain, CoreSubscriber<HttpResponse<?>> {
         FilterChainImpl(int filterIndex, @Nullable SuspensionPoint<HttpResponse<?>> next) {
-            super(filterIndex, next);
+            //noinspection unchecked,rawtypes
+            super(filterIndex, next, (Class) Publisher.class);
         }
 
         @Override
         public Publisher<? extends HttpResponse<?>> proceed(MutableHttpRequest<?> request) {
             return proceed((HttpRequest<?>) request);
-        }
-
-        @SuppressWarnings({"unchecked", "rawtypes"})
-        @Override
-        protected Publisher<MutableHttpResponse<?>> adapt() {
-            Mono<HttpResponse<?>> mono = Mono.fromFuture(this);
-            if (completeOn != null) {
-                mono = mono.subscribeOn(Schedulers.fromExecutor(completeOn));
-            }
-            return (Publisher) mono;
         }
 
         @Override
@@ -621,23 +701,11 @@ public class FilterRunner {
                 forwardResponse(response, new IllegalStateException("Publisher did not return response"));
             }
         }
-    }
 
-    private class ReactiveContinuationImpl<R> extends FilterContinuationImpl<R> {
-        private final Class<R> reactiveType;
-
-        ReactiveContinuationImpl(int filterIndex, @Nullable SuspensionPoint<HttpResponse<?>> next, Class<R> reactiveType) {
-            super(filterIndex, next);
-            this.reactiveType = reactiveType;
-        }
-
+        @NonNull
         @Override
-        protected R adapt() {
-            Mono<HttpResponse<?>> mono = Mono.fromFuture(this);
-            if (completeOn != null) {
-                mono = mono.subscribeOn(Schedulers.fromExecutor(completeOn));
-            }
-            return Publishers.convertPublisher(mono, reactiveType);
+        public Context currentContext() {
+            return reactorContext;
         }
     }
 
@@ -647,7 +715,10 @@ public class FilterRunner {
         }
 
         @Override
-        protected HttpResponse<?> adapt() {
+        public HttpResponse<?> proceed(HttpRequest<?> request) {
+            FilterRunner.this.request = request;
+            triggerDownstreamWorkRequest();
+
             boolean interrupted = false;
             while (true) {
                 try {
