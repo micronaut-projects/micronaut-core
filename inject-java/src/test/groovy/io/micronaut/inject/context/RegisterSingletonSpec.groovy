@@ -21,6 +21,7 @@ import io.micronaut.context.RuntimeBeanDefinition
 import io.micronaut.context.annotation.Bean
 import io.micronaut.context.annotation.Type
 import io.micronaut.inject.qualifiers.Qualifiers
+import jakarta.inject.Named
 import jakarta.inject.Singleton
 import spock.lang.Issue
 import spock.lang.Specification
@@ -37,6 +38,7 @@ class RegisterSingletonSpec extends Specification {
         context.registerBeanDefinition(
                 RuntimeBeanDefinition.builder(Codec, ()-> new OverridingCodec())
                         .singleton(true)
+                        .qualifier(Qualifiers.byName("foo"))
                         .replaces(ToBeReplacedCodec)
                         .build()
         ) // replaces ToBeReplacedCodec
@@ -47,11 +49,12 @@ class RegisterSingletonSpec extends Specification {
 
         then:
         def codecs = context.getBeansOfType(Codec)
-        codecs.size() == 6
+        codecs.size() == 7
         codecs.find { it in FooCodec }
         codecs.find { it in BarCodec }
         codecs.find { it in BazCodec }
-        !codecs.find { it in OverridingCodec }
+        !codecs.find { it in ToBeReplacedCodec }
+        codecs.find { it in OverridingCodec }
         codecs.find { it in OtherCodec }
         codecs.find { it in StuffCodec }
         codecs.find { it in Proxy }
@@ -142,5 +145,6 @@ class RegisterSingletonSpec extends Specification {
     static class OtherCodec implements Codec {}
 
     @Singleton
+    @Named("foo")
     static class ToBeReplacedCodec implements Codec {}
 }
