@@ -758,14 +758,6 @@ public class DefaultBeanContext implements InitializableBeanContext {
             );
             singletonScope.registerSingletonBean(registration, qualifier);
             registerBeanDefinition(runtimeBeanDefinition);
-
-            for (Class<?> indexedType : indexedTypes) {
-                if (indexedType == type || indexedType.isAssignableFrom(type)) {
-                    final Collection<BeanDefinitionReference> indexed = resolveTypeIndex(indexedType);
-                    indexed.add(runtimeBeanDefinition);
-                    break;
-                }
-            }
         }
         return this;
     }
@@ -1663,8 +1655,15 @@ public class DefaultBeanContext implements InitializableBeanContext {
     @NonNull
     public <B> BeanContext registerBeanDefinition(@NonNull RuntimeBeanDefinition<B> definition) {
         Objects.requireNonNull(definition, "Bean definition cannot be null");
-        this.beanDefinitionsClasses.add(definition);
         Class<B> beanType = definition.getBeanType();
+        this.beanDefinitionsClasses.add(definition);
+        for (Class<?> indexedType : indexedTypes) {
+            if (indexedType == beanType || indexedType.isAssignableFrom(beanType)) {
+                final Collection<BeanDefinitionReference> indexed = resolveTypeIndex(indexedType);
+                indexed.add(definition);
+                break;
+            }
+        }
         purgeCacheForBeanType(beanType);
         return this;
     }
@@ -1683,6 +1682,14 @@ public class DefaultBeanContext implements InitializableBeanContext {
      */
     @Internal
     <B> void removeBeanDefinition(RuntimeBeanDefinition<B> definition) {
+        Class<B> beanType = definition.getBeanType();
+        for (Class<?> indexedType : indexedTypes) {
+            if (indexedType == beanType || indexedType.isAssignableFrom(beanType)) {
+                final Collection<BeanDefinitionReference> indexed = resolveTypeIndex(indexedType);
+                indexed.remove(definition);
+                break;
+            }
+        }
         this.beanDefinitionsClasses.remove(definition);
         purgeCacheForBeanType(definition.getBeanType());
     }
