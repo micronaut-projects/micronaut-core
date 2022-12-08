@@ -1,42 +1,29 @@
 package io.micronaut.http.client.netty
 
 import ch.qos.logback.classic.Level
-import ch.qos.logback.classic.Logger
+import org.slf4j.Logger
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.AppenderBase
-import io.micronaut.context.ApplicationContext
+import io.micronaut.http.util.HttpHeadersUtil
 import io.netty.handler.codec.http.DefaultHttpHeaders
 import org.slf4j.LoggerFactory
 import spock.lang.Specification
 
 import java.util.concurrent.BlockingQueue
 import java.util.concurrent.LinkedBlockingQueue
-import java.util.concurrent.TimeUnit
 
 class DefaultClientHeaderMaskTest extends Specification {
-
-    def "check masking works for #value"() {
-        given:
-        def ctx = ApplicationContext.run()
-        def client = ctx.createBean(DefaultHttpClient, "http://localhost:8080")
-
-        expect:
-        client.mask(value) == expected
-
-        cleanup:
-        ctx.close()
-
-        where:
-        value       | expected
-        null        | null
-        "foo"       | "*MASKED*"
-        "Tim Yates" | "*MASKED*"
-    }
 
     def "check mask detects common security headers"() {
         given:
         MemoryAppender appender = new MemoryAppender()
-        Logger logger = (Logger) LoggerFactory.getLogger(DefaultHttpClient.class)
+        Logger log = LoggerFactory.getLogger(DefaultHttpClient.class)
+
+        expect:
+        log instanceof ch.qos.logback.classic.Logger
+
+        when:
+        ch.qos.logback.classic.Logger logger = (ch.qos.logback.classic.Logger) log
         logger.addAppender(appender)
         logger.setLevel(Level.TRACE)
         appender.start()
@@ -52,14 +39,11 @@ class DefaultClientHeaderMaskTest extends Specification {
         headers.add("X-Forwarded-For", "fred")
         headers.add("Credential", "foo")
         headers.add("Signature", "bar probably secret")
-        def ctx = ApplicationContext.run()
-        def client = ctx.createBean(DefaultHttpClient, "http://localhost:8080")
 
-        when:
-        client.traceHeaders(headers)
+        HttpHeadersUtil.trace(log, headers.names(), headers::getAll)
 
         then:
-        appender.events.size() == 10
+        appender.events.size() == headers.size()
         appender.events.join("\n") == """Authorization: *MASKED*
             |Proxy-Authorization: *MASKED*
             |Cookie: baz
@@ -72,7 +56,6 @@ class DefaultClientHeaderMaskTest extends Specification {
             |Signature: *MASKED*""".stripMargin()
 
         cleanup:
-        ctx.close()
         appender.stop()
     }
 
