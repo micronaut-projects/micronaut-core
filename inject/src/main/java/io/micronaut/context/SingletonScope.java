@@ -390,17 +390,12 @@ final class SingletonScope {
             if (beanDefinition.getBeanType() != that.beanDefinition.getBeanType()) {
                 return false;
             }
-            Qualifier<?> qualifier = beanDefinition.getDeclaredQualifier();
-            Qualifier<?> thatQualifier = that.beanDefinition.getDeclaredQualifier();
-            if (qualifier == thatQualifier) {
-                return true;
-            }
-            return qualifier != null && qualifier.equals(thatQualifier);
+            return beanDefinition.getBeanDefinitionName().equals(that.beanDefinition.getBeanDefinitionName());
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(beanDefinition.getBeanType(), beanDefinition.getDeclaredQualifier());
+            return Objects.hash(beanDefinition.getBeanDefinitionName());
         }
     }
 

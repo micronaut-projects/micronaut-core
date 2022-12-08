@@ -24,6 +24,8 @@ import jakarta.inject.Singleton
 import spock.lang.Issue
 import spock.lang.Specification
 
+import java.lang.reflect.Proxy
+
 class RegisterSingletonSpec extends Specification {
 
     void "test register singleton and exposed type"() {
@@ -38,13 +40,13 @@ class RegisterSingletonSpec extends Specification {
 
         then:
         def codecs = context.getBeansOfType(Codec)
-        codecs.size() == 5
+        codecs.size() == 6
         codecs.find { it in FooCodec }
         codecs.find { it in BarCodec }
         codecs.find { it in BazCodec }
         codecs.find { it in StuffCodec }
         codecs.find { it in OtherCodec }
-        !codecs.find { it in Closure }
+        codecs.find { it in Proxy }
         context.getBeansOfType(FooCodec).size() == 0 // not an exposed type, should this be correct?
         context.getBeansOfType(BarCodec).size() == 1 // BarCodec type is exposed
         context.findBean(FooCodec).isEmpty()
