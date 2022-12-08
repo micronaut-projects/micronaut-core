@@ -34,7 +34,7 @@ class RegisterSingletonSpec extends Specification {
 
         when:
         context.registerSingleton(Codec, {  } as Codec) // adds a new codec
-        context.registerSingleton(Codec, new FooCodec()) // overrides above codec since no qualifier
+        context.registerSingleton(Codec, new FooCodec()) // adds another codec
         context.registerSingleton(new BarCodec()) // should be registered with bean type BarCodec
         context.registerSingleton(Codec, new BazCodec(), Qualifiers.byName("baz"))
 
@@ -47,11 +47,12 @@ class RegisterSingletonSpec extends Specification {
         codecs.find { it in StuffCodec }
         codecs.find { it in OtherCodec }
         codecs.find { it in Proxy }
-        context.getBeansOfType(FooCodec).size() == 0 // not an exposed type, should this be correct?
+        codecs == context.getBeansOfType(Codec) // second resolve returns the same result
+        context.getBeansOfType(FooCodec).size() == 0 // not an exposed type
         context.getBeansOfType(BarCodec).size() == 1 // BarCodec type is exposed
-        context.findBean(FooCodec).isEmpty()
-        context.findBean(StuffCodec).isEmpty()
-        context.findBean(OtherCodec).isPresent()
+        context.findBean(FooCodec).isEmpty() // not an exposed type
+        context.findBean(StuffCodec).isEmpty() // not an exposed type
+        context.findBean(OtherCodec).isPresent() // an exposed type
 
         cleanup:
         context.close()
