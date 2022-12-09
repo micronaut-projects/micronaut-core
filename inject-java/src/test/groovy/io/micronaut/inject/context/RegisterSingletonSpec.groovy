@@ -20,6 +20,7 @@ import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.RuntimeBeanDefinition
 import io.micronaut.context.annotation.Bean
 import io.micronaut.context.annotation.Type
+import io.micronaut.core.type.Argument
 import io.micronaut.inject.qualifiers.Qualifiers
 import jakarta.inject.Named
 import jakarta.inject.Singleton
@@ -29,6 +30,20 @@ import spock.lang.Specification
 import java.lang.reflect.Proxy
 
 class RegisterSingletonSpec extends Specification {
+
+    void "test register singleton with generic types"() {
+        given:
+        BeanContext context = BeanContext.run()
+
+        when:
+        context.registerSingleton(new TestReporter())
+
+        then:
+        context.containsBean(Argument.of(Reporter, Span))
+
+        cleanup:
+        context.close()
+    }
 
     void "test register singleton and exposed type"() {
         given:
@@ -147,4 +162,8 @@ class RegisterSingletonSpec extends Specification {
     @Singleton
     @Named("foo")
     static class ToBeReplacedCodec implements Codec {}
+
+    static interface Reporter<B> {}
+    static class Span {}
+    static class TestReporter implements Reporter<Span> {}
 }

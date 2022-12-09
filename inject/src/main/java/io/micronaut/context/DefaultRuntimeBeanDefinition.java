@@ -62,7 +62,7 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
     private final boolean isSingleton;
     private final Class<? extends Annotation> scope;
     private final Class<?>[] exposedTypes;
-    private final Map<Class<?>, List<Argument<?>>> typeArguments;
+    private Map<Class<?>, List<Argument<?>>> typeArguments;
 
     DefaultRuntimeBeanDefinition(
         @NonNull Argument<T> beanType,
@@ -98,7 +98,14 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
                 return args;
             }
         }
-        return RuntimeBeanDefinition.super.getTypeArguments(type);
+        List<Argument<?>> list = RuntimeBeanDefinition.super.getTypeArguments(type);
+        if (CollectionUtils.isNotEmpty(list)) {
+            synchronized (this.beanType) {
+                typeArguments = new HashMap<>(3);
+                typeArguments.put(type, list);
+            }
+        }
+        return list;
     }
 
     @Override
