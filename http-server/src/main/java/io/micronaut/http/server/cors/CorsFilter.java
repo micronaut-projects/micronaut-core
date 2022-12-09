@@ -104,8 +104,9 @@ public class CorsFilter implements HttpServerFilter {
                 CorsOriginConfiguration config = optionalConfig.get();
 
                 if (CorsUtil.isPreflightRequest(request)) {
-                    Optional<HttpMethod> result = headers.getFirst(ACCESS_CONTROL_REQUEST_METHOD, CONVERSION_CONTEXT_HTTP_METHOD);
-                    setAllowMethods(result.get(), response);
+                    headers.getFirst(ACCESS_CONTROL_REQUEST_METHOD, CONVERSION_CONTEXT_HTTP_METHOD)
+                        .ifPresent(result -> setAllowMethods(result, response));
+
                     Optional<List<String>> allowedHeaders = headers.get(ACCESS_CONTROL_REQUEST_HEADERS, ConversionContext.LIST_OF_STRING);
                     allowedHeaders.ifPresent(val ->
                         setAllowHeaders(val, response)
