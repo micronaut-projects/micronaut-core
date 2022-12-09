@@ -118,8 +118,7 @@ public class CorsFilter implements HttpServerFilter {
      * @deprecated Not used any more.
      */
     @Deprecated
-    @NonNull
-    protected Optional<MutableHttpResponse<?>> handleRequest(@NonNull HttpRequest<?> request) {
+    protected Optional<MutableHttpResponse<?>> handleRequest(HttpRequest request) {
         return Optional.empty();
     }
 
