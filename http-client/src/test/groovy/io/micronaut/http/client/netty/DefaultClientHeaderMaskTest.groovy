@@ -2,7 +2,13 @@ package io.micronaut.http.client.netty
 
 import ch.qos.logback.classic.Level
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
+import io.micronaut.http.HttpRequest
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.HttpClient
+import io.micronaut.runtime.server.EmbeddedServer
+import jakarta.inject.Singleton
 import org.slf4j.Logger
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.AppenderBase
@@ -17,8 +23,9 @@ class DefaultClientHeaderMaskTest extends Specification {
 
     def "check mask detects common security headers"() {
         given:
-        ApplicationContext ctx = ApplicationContext.run()
-        HttpClient client = ctx.createBean(HttpClient, "http://localhost:8080")
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ["spec.name": "DefaultClientHeaderMaskTest"])
+        ApplicationContext ctx = server.applicationContext
+        HttpClient client = ctx.createBean(HttpClient, server.URL)
 
         expect:
         client instanceof DefaultHttpClient
@@ -48,15 +55,15 @@ class DefaultClientHeaderMaskTest extends Specification {
         httpHeaders.add("Credential", "foo")
         httpHeaders.add("Signature", "bar probably secret")
 
-        def request = Mock(io.micronaut.http.HttpRequest)
-        def nettyRequest = Stub(io.netty.handler.codec.http.HttpRequest) {
-            headers() >> httpHeaders
-        }
-        ((io.micronaut.http.client.netty.DefaultHttpClient) client).traceRequest(request, nettyRequest)
+        def response = client.toBlocking().exchange(HttpRequest.GET("/masking").headers {headers ->
+            httpHeaders.each { entry ->
+                headers.add(entry.key, entry.value)
+            }
+        }, String)
 
         then:
-        appender.events.size() == httpHeaders.size()
-        appender.events.join("\n") == """Authorization: *MASKED*
+        response.body() == "ok"
+        appender.events.join("\n").contains("""Authorization: *MASKED*
             |Proxy-Authorization: *MASKED*
             |Cookie: baz
             |Set-Cookie: qux
@@ -65,11 +72,21 @@ class DefaultClientHeaderMaskTest extends Specification {
             |X-Forwarded-Host: quuz
             |X-Real-IP: waldo
             |Credential: *MASKED*
-            |Signature: *MASKED*""".stripMargin()
+            |Signature: *MASKED*""".stripMargin())
 
         cleanup:
         appender.stop()
         ctx.close()
+    }
+
+    @Requires(property = "spec.name", value = "DefaultClientHeaderMaskTest")
+    @Controller("/masking")
+    @Singleton
+    static class MaskedController {
+        @Get
+        String get() {
+            "ok"
+        }
     }
 
     static class MemoryAppender extends AppenderBase<ILoggingEvent> {
