@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.server.cors;
 
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
@@ -31,11 +33,15 @@ import io.micronaut.http.filter.HttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
 import io.micronaut.http.filter.ServerFilterPhase;
 import io.micronaut.http.server.HttpServerConfiguration;
+import io.micronaut.http.server.util.HttpHostResolver;
+import jakarta.inject.Inject;
+import org.jetbrains.annotations.NotNull;
 import org.reactivestreams.Publisher;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -43,6 +49,7 @@ import java.util.stream.Collectors;
 
 import static io.micronaut.http.HttpAttributes.AVAILABLE_HTTP_METHODS;
 import static io.micronaut.http.HttpHeaders.*;
+import static io.micronaut.http.annotation.Filter.MATCH_ALL_PATTERN;
 
 /**
  * Responsible for handling CORS requests and responses.
@@ -51,12 +58,13 @@ import static io.micronaut.http.HttpHeaders.*;
  * @author Graeme Rocher
  * @since 1.0
  */
-@Filter("/**")
+@Filter(MATCH_ALL_PATTERN)
 public class CorsFilter implements HttpServerFilter {
-
+    private static final Logger LOG = LoggerFactory.getLogger(CorsFilter.class);
     private static final ArgumentConversionContext<HttpMethod> CONVERSION_CONTEXT_HTTP_METHOD = ImmutableArgumentConversionContext.of(HttpMethod.class);
 
     protected final HttpServerConfiguration.CorsConfiguration corsConfiguration;
+
 
     /**
      * @param corsConfiguration The {@link CorsOriginConfiguration} instance
@@ -67,19 +75,23 @@ public class CorsFilter implements HttpServerFilter {
 
     @Override
     public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
-        boolean originHeaderPresent = request.getHeaders().getOrigin().isPresent();
-        if (originHeaderPresent) {
-            MutableHttpResponse<?> response = handleRequest(request).orElse(null);
-            if (response != null) {
-                return Publishers.just(response);
-            } else {
-                return Publishers.then(chain.proceed(request), mutableHttpResponse -> {
-                    handleResponse(request, mutableHttpResponse);
-                });
-            }
-        } else {
+        String origin = request.getHeaders().getOrigin().orElse(null);
+        if (origin == null) {
+            LOG.trace("Http Header " + HttpHeaders.ORIGIN + " not present. Proceeding with the request.");
             return chain.proceed(request);
         }
+        CorsOriginConfiguration corsOriginConfiguration = getConfiguration(origin).orElse(null);
+        if (corsOriginConfiguration != null) {
+            if (CorsUtil.isPreflightRequest(request)) {
+                return handlePreflightRequest(request, chain, corsOriginConfiguration);
+            }
+            if (!validateMethodToMatch(request, corsOriginConfiguration).isPresent()) {
+                return forbidden();
+            }
+            return Publishers.then(chain.proceed(request), resp -> decorateResponseWithHeaders(request, resp, corsOriginConfiguration));
+        }
+        LOG.trace("CORS configuration not found for {} origin", origin);
+        return chain.proceed(request);
     }
 
     @Override
@@ -92,35 +104,10 @@ public class CorsFilter implements HttpServerFilter {
      *
      * @param request  The {@link HttpRequest} object
      * @param response The {@link MutableHttpResponse} object
+     * @deprecated not used
      */
+    @Deprecated
     protected void handleResponse(HttpRequest<?> request, MutableHttpResponse<?> response) {
-        HttpHeaders headers = request.getHeaders();
-        Optional<String> originHeader = headers.getOrigin();
-        originHeader.ifPresent(requestOrigin -> {
-
-            Optional<CorsOriginConfiguration> optionalConfig = getConfiguration(requestOrigin);
-
-            if (optionalConfig.isPresent()) {
-                CorsOriginConfiguration config = optionalConfig.get();
-
-                if (CorsUtil.isPreflightRequest(request)) {
-                    headers.getFirst(ACCESS_CONTROL_REQUEST_METHOD, CONVERSION_CONTEXT_HTTP_METHOD)
-                        .ifPresent(result -> setAllowMethods(result, response));
-
-                    Optional<List<String>> allowedHeaders = headers.get(ACCESS_CONTROL_REQUEST_HEADERS, ConversionContext.LIST_OF_STRING);
-                    allowedHeaders.ifPresent(val ->
-                        setAllowHeaders(val, response)
-                    );
-
-                    setMaxAge(config.getMaxAge(), response);
-                }
-
-                setOrigin(requestOrigin, response);
-                setVary(response);
-                setExposeHeaders(config.getExposedHeaders(), response);
-                setAllowCredentials(config, response);
-            }
-        });
     }
 
     /**
@@ -128,54 +115,22 @@ public class CorsFilter implements HttpServerFilter {
      *
      * @param request The {@link HttpRequest} object
      * @return An optional {@link MutableHttpResponse}. The request should proceed normally if empty
+     * @deprecated Not used any more.
      */
-    protected Optional<MutableHttpResponse<?>> handleRequest(HttpRequest request) {
-        HttpHeaders headers = request.getHeaders();
-        Optional<String> originHeader = headers.getOrigin();
-        if (originHeader.isPresent()) {
-
-            String requestOrigin = originHeader.get();
-            boolean preflight = CorsUtil.isPreflightRequest(request);
-
-            Optional<CorsOriginConfiguration> optionalConfig = getConfiguration(requestOrigin);
-
-            if (optionalConfig.isPresent()) {
-                CorsOriginConfiguration config = optionalConfig.get();
-
-                HttpMethod requestMethod = request.getMethod();
-
-                List<HttpMethod> allowedMethods = config.getAllowedMethods();
-                HttpMethod methodToMatch = preflight ? headers.getFirst(ACCESS_CONTROL_REQUEST_METHOD, CONVERSION_CONTEXT_HTTP_METHOD).orElse(requestMethod) : requestMethod;
-
-                if (!isAnyMethod(allowedMethods)) {
-                    if (allowedMethods.stream().noneMatch(method -> method.equals(methodToMatch))) {
-                        return Optional.of(HttpResponse.status(HttpStatus.FORBIDDEN));
-                    }
-                }
-
-                Optional<? extends ArrayList<HttpMethod>> availableHttpMethods = (Optional<? extends ArrayList<HttpMethod>>) request.getAttribute(AVAILABLE_HTTP_METHODS, new ArrayList<HttpMethod>().getClass());
-
-                if (preflight && availableHttpMethods.isPresent() && availableHttpMethods.get().stream().anyMatch(method -> method.equals(methodToMatch))) {
-                    Optional<List<String>> accessControlHeaders = headers.get(ACCESS_CONTROL_REQUEST_HEADERS, ConversionContext.LIST_OF_STRING);
-
-                    List<String> allowedHeaders = config.getAllowedHeaders();
-
-                    if (!isAny(allowedHeaders) && accessControlHeaders.isPresent()) {
-                        if (!accessControlHeaders.get().stream()
-                            .allMatch(header -> allowedHeaders.stream()
-                                .anyMatch(allowedHeader -> allowedHeader.equalsIgnoreCase(header.trim())))) {
-                            return Optional.of(HttpResponse.status(HttpStatus.FORBIDDEN));
-                        }
-                    }
-
-                    MutableHttpResponse<Object> ok = HttpResponse.ok();
-                    handleResponse(request, ok);
-                    return Optional.of(ok);
-                }
-            }
-        }
-
+    @Deprecated
+    @NonNull
+    protected Optional<MutableHttpResponse<?>> handleRequest(@NonNull HttpRequest<?> request) {
         return Optional.empty();
+    }
+
+    @NonNull
+    private Optional<HttpMethod> validateMethodToMatch(@NonNull HttpRequest<?> request,
+                                                       @NonNull CorsOriginConfiguration config) {
+        HttpMethod methodToMatch = methodToMatch(request);
+        if (!methodAllowed(config, methodToMatch)) {
+            return Optional.empty();
+        }
+        return Optional.of(methodToMatch);
     }
 
     /**
@@ -214,15 +169,17 @@ public class CorsFilter implements HttpServerFilter {
      * @param origin   The origin
      * @param response The {@link MutableHttpResponse} object
      */
-    protected void setOrigin(String origin, MutableHttpResponse response) {
-        response.header(ACCESS_CONTROL_ALLOW_ORIGIN, origin);
+    protected void setOrigin(@Nullable String origin, @NonNull MutableHttpResponse<?> response) {
+        if (origin != null) {
+            response.header(ACCESS_CONTROL_ALLOW_ORIGIN, origin);
+        }
     }
 
     /**
      * @param method   The {@link HttpMethod} object
      * @param response The {@link MutableHttpResponse} object
      */
-    protected void setAllowMethods(HttpMethod method, MutableHttpResponse response) {
+    protected void setAllowMethods(HttpMethod method, MutableHttpResponse<?> response) {
         response.header(ACCESS_CONTROL_ALLOW_METHODS, method);
     }
 
@@ -230,7 +187,7 @@ public class CorsFilter implements HttpServerFilter {
      * @param optionalAllowHeaders A list with optional allow headers
      * @param response             The {@link MutableHttpResponse} object
      */
-    protected void setAllowHeaders(List<?> optionalAllowHeaders, MutableHttpResponse response) {
+    protected void setAllowHeaders(List<?> optionalAllowHeaders, MutableHttpResponse<?> response) {
         List<String> allowHeaders = optionalAllowHeaders.stream().map(Object::toString).collect(Collectors.toList());
         if (corsConfiguration.isSingleHeader()) {
             String headerValue = String.join(",", allowHeaders);
@@ -249,38 +206,28 @@ public class CorsFilter implements HttpServerFilter {
      * @param maxAge   The max age
      * @param response The {@link MutableHttpResponse} object
      */
-    protected void setMaxAge(long maxAge, MutableHttpResponse response) {
+    protected void setMaxAge(long maxAge, MutableHttpResponse<?> response) {
         if (maxAge > -1) {
             response.header(ACCESS_CONTROL_MAX_AGE, Long.toString(maxAge));
         }
     }
 
-    private Optional<CorsOriginConfiguration> getConfiguration(String requestOrigin) {
-        Map<String, CorsOriginConfiguration> corsConfigurations = corsConfiguration.getConfigurations();
-        for (Map.Entry<String, CorsOriginConfiguration> config : corsConfigurations.entrySet()) {
-            List<String> allowedOrigins = config.getValue().getAllowedOrigins();
-            if (!allowedOrigins.isEmpty()) {
-                boolean matches = false;
-                if (isAny(allowedOrigins)) {
-                    matches = true;
-                }
-                if (!matches) {
-                    matches = allowedOrigins.stream().anyMatch(origin -> {
-                        if (origin.equals(requestOrigin)) {
-                            return true;
-                        }
-                        Pattern p = Pattern.compile(origin);
-                        Matcher m = p.matcher(requestOrigin);
-                        return m.matches();
-                    });
-                }
+    @NonNull
+    private Optional<CorsOriginConfiguration> getConfiguration(@NonNull String requestOrigin) {
+        return corsConfiguration.getConfigurations().values().stream()
+            .filter(config -> {
+                List<String> allowedOrigins = config.getAllowedOrigins();
+                return !allowedOrigins.isEmpty() && (isAny(allowedOrigins) || allowedOrigins.stream().anyMatch(origin -> matchesOrigin(origin, requestOrigin)));
+            }).findFirst();
+    }
 
-                if (matches) {
-                    return Optional.of(config.getValue());
-                }
-            }
+    private boolean matchesOrigin(@NonNull String origin, @NonNull String requestOrigin) {
+        if (origin.equals(requestOrigin)) {
+            return true;
         }
-        return Optional.empty();
+        Pattern p = Pattern.compile(origin);
+        Matcher m = p.matcher(requestOrigin);
+        return m.matches();
     }
 
     private boolean isAny(List<String> values) {
@@ -289,5 +236,97 @@ public class CorsFilter implements HttpServerFilter {
 
     private boolean isAnyMethod(List<HttpMethod> allowedMethods) {
         return allowedMethods == CorsOriginConfiguration.ANY_METHOD;
+    }
+
+    private boolean methodAllowed(@NonNull CorsOriginConfiguration config,
+                                  @NonNull HttpMethod methodToMatch) {
+        List<HttpMethod> allowedMethods = config.getAllowedMethods();
+        return isAnyMethod(allowedMethods) || allowedMethods.stream().anyMatch(method -> method.equals(methodToMatch));
+    }
+
+    @NonNull
+    private HttpMethod methodToMatch(@NonNull HttpRequest<?> request) {
+        HttpMethod requestMethod = request.getMethod();
+        return CorsUtil.isPreflightRequest(request) ? request.getHeaders().getFirst(ACCESS_CONTROL_REQUEST_METHOD, CONVERSION_CONTEXT_HTTP_METHOD).orElse(requestMethod) : requestMethod;
+    }
+
+    private boolean hasAllowedHeaders(@NonNull HttpRequest<?> request, @NonNull CorsOriginConfiguration config) {
+        Optional<List<String>> accessControlHeaders = request.getHeaders().get(ACCESS_CONTROL_REQUEST_HEADERS, ConversionContext.LIST_OF_STRING);
+        List<String> allowedHeaders = config.getAllowedHeaders();
+        return isAny(allowedHeaders) || (
+            accessControlHeaders.isPresent() &&
+                accessControlHeaders.get().stream().allMatch(header -> allowedHeaders.stream().anyMatch(allowedHeader -> allowedHeader.equalsIgnoreCase(header.trim())))
+        );
+    }
+
+    @NotNull
+    private static Publisher<MutableHttpResponse<?>> forbidden() {
+        return Publishers.just(HttpResponse.status(HttpStatus.FORBIDDEN));
+    }
+
+    @NonNull
+    private void decorateResponseWithHeadersForPreflightRequest(@NonNull HttpRequest<?> request,
+                                                                @NonNull MutableHttpResponse<?> response,
+                                                                @NonNull CorsOriginConfiguration config) {
+        HttpHeaders headers = request.getHeaders();
+        headers.getFirst(ACCESS_CONTROL_REQUEST_METHOD, CONVERSION_CONTEXT_HTTP_METHOD)
+            .ifPresent(methods -> setAllowMethods(methods, response));
+        headers.get(ACCESS_CONTROL_REQUEST_HEADERS, ConversionContext.LIST_OF_STRING)
+            .ifPresent(val -> setAllowHeaders(val, response));
+        setMaxAge(config.getMaxAge(), response);
+    }
+
+    @NonNull
+    private void decorateResponseWithHeaders(@NonNull HttpRequest<?> request,
+                                             @NonNull MutableHttpResponse<?> response,
+                                             @NonNull CorsOriginConfiguration config) {
+        HttpHeaders headers = request.getHeaders();
+        setOrigin(headers.getOrigin().orElse(null), response);
+        setVary(response);
+        setExposeHeaders(config.getExposedHeaders(), response);
+        setAllowCredentials(config, response);
+    }
+
+    @NonNull
+    private Publisher<MutableHttpResponse<?>> handlePreflightRequest(@NonNull HttpRequest<?> request,
+                                                                     @NonNull ServerFilterChain chain,
+                                                                     @NonNull CorsOriginConfiguration corsOriginConfiguration) {
+        Optional<HttpStatus> statusOptional = validatePreflightRequest(request, corsOriginConfiguration);
+        if (statusOptional.isPresent()) {
+            HttpStatus status = statusOptional.get();
+            if (status.getCode() >= 400) {
+                return Publishers.just(HttpResponse.status(status));
+            }
+            MutableHttpResponse<?> resp = HttpResponse.status(status);
+            decorateResponseWithHeadersForPreflightRequest(request, resp, corsOriginConfiguration);
+            decorateResponseWithHeaders(request, resp, corsOriginConfiguration);
+            return Publishers.just(resp);
+        }
+        return Publishers.then(chain.proceed(request), resp -> {
+            decorateResponseWithHeadersForPreflightRequest(request, resp, corsOriginConfiguration);
+            decorateResponseWithHeaders(request, resp, corsOriginConfiguration);
+        });
+    }
+
+
+    @NonNull
+    private Optional<HttpStatus> validatePreflightRequest(@NonNull HttpRequest<?> request,
+                                                          @NonNull CorsOriginConfiguration config) {
+        Optional<HttpMethod> methodToMatchOptional = validateMethodToMatch(request, config);
+        if (!methodToMatchOptional.isPresent()) {
+            return Optional.of(HttpStatus.FORBIDDEN);
+        }
+        HttpMethod methodToMatch = methodToMatchOptional.get();
+
+        Optional<? extends ArrayList<HttpMethod>> availableHttpMethods = (Optional<? extends ArrayList<HttpMethod>>) request.getAttribute(AVAILABLE_HTTP_METHODS, new ArrayList<HttpMethod>().getClass());
+        if (CorsUtil.isPreflightRequest(request) &&
+            availableHttpMethods.isPresent() &&
+            availableHttpMethods.get().stream().anyMatch(method -> method.equals(methodToMatch))) {
+            if (!hasAllowedHeaders(request, config)) {
+                return Optional.of(HttpStatus.FORBIDDEN);
+            }
+            return Optional.of(HttpStatus.OK);
+        }
+        return Optional.empty();
     }
 }
