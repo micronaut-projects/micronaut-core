@@ -33,8 +33,6 @@ import io.micronaut.http.filter.HttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
 import io.micronaut.http.filter.ServerFilterPhase;
 import io.micronaut.http.server.HttpServerConfiguration;
-import io.micronaut.http.server.util.HttpHostResolver;
-import jakarta.inject.Inject;
 import org.jetbrains.annotations.NotNull;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
@@ -64,7 +62,6 @@ public class CorsFilter implements HttpServerFilter {
     private static final ArgumentConversionContext<HttpMethod> CONVERSION_CONTEXT_HTTP_METHOD = ImmutableArgumentConversionContext.of(HttpMethod.class);
 
     protected final HttpServerConfiguration.CorsConfiguration corsConfiguration;
-
 
     /**
      * @param corsConfiguration The {@link CorsOriginConfiguration} instance
@@ -306,7 +303,6 @@ public class CorsFilter implements HttpServerFilter {
             decorateResponseWithHeaders(request, resp, corsOriginConfiguration);
         });
     }
-
 
     @NonNull
     private Optional<HttpStatus> validatePreflightRequest(@NonNull HttpRequest<?> request,
