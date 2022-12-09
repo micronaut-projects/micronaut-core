@@ -43,22 +43,17 @@ class DefaultClientHeaderMaskTest extends Specification {
         logger.setLevel(Level.TRACE)
         appender.start()
 
-        DefaultHttpHeaders httpHeaders = new DefaultHttpHeaders()
-        httpHeaders.add("Authorization", "Bearer foo")
-        httpHeaders.add("Proxy-Authorization", "AWS4-HMAC-SHA256 bar")
-        httpHeaders.add("Cookie", "baz")
-        httpHeaders.add("Set-Cookie", "qux")
-        httpHeaders.add("X-Forwarded-For", "quux")
-        httpHeaders.add("X-Forwarded-Host", "quuz")
-        httpHeaders.add("X-Real-IP", "waldo")
-        httpHeaders.add("X-Forwarded-For", "fred")
-        httpHeaders.add("Credential", "foo")
-        httpHeaders.add("Signature", "bar probably secret")
-
         def response = client.toBlocking().exchange(HttpRequest.GET("/masking").headers {headers ->
-            httpHeaders.each { entry ->
-                headers.add(entry.key, entry.value)
-            }
+            headers.add("Authorization", "Bearer foo")
+            headers.add("Proxy-Authorization", "AWS4-HMAC-SHA256 bar")
+            headers.add("Cookie", "baz")
+            headers.add("Set-Cookie", "qux")
+            headers.add("X-Forwarded-For", "quux")
+            headers.add("X-Forwarded-Host", "quuz")
+            headers.add("X-Real-IP", "waldo")
+            headers.add("X-Forwarded-For", "fred")
+            headers.add("Credential", "foo")
+            headers.add("Signature", "bar probably secret")
         }, String)
 
         then:
