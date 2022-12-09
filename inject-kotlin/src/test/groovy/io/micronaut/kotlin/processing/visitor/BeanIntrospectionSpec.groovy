@@ -597,7 +597,7 @@ interface GenBase<T> {
 
         then:
         def e = thrown(UnsupportedOperationException)
-        e.message =='Cannot mutate property [name] that is not mutable via a setter method or constructor argument for type: test.Foo'
+        e.message =='Cannot mutate property [name] that is not mutable via a setter method, field or constructor argument for type: test.Foo'
     }
 
     void "test bean introspection with property of generic superclass"() {
