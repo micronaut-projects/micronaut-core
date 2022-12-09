@@ -15,6 +15,7 @@
  */
 package io.micronaut.kotlin.processing.visitor
 
+import com.google.devtools.ksp.closestClassDeclaration
 import com.google.devtools.ksp.symbol.KSTypeParameter
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.inject.ast.ArrayableClassElement
@@ -25,14 +26,14 @@ import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 import java.util.*
 
 class KotlinGenericPlaceholderElement(
-    private val classType: KSTypeParameter,
+    private val parameter: KSTypeParameter,
     elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
     visitorContext: KotlinVisitorContext,
     private val arrayDimensions: Int = 0
-) : AbstractKotlinElement<KSTypeParameter>(classType, elementAnnotationMetadataFactory, visitorContext), ArrayableClassElement, GenericPlaceholderElement {
-    override fun copyThis(): AbstractKotlinElement<KSTypeParameter> {
+) : KotlinClassElement(parameter, elementAnnotationMetadataFactory, visitorContext, emptyMap(), arrayDimensions, true), ArrayableClassElement, GenericPlaceholderElement {
+    override fun copyThis(): KotlinGenericPlaceholderElement {
         return KotlinGenericPlaceholderElement(
-            classType,
+            parameter,
             annotationMetadataFactory,
             visitorContext,
             arrayDimensions
@@ -41,7 +42,7 @@ class KotlinGenericPlaceholderElement(
 
 
     override fun getName(): String {
-        val bounds = classType.bounds.firstOrNull()
+        val bounds = parameter.bounds.firstOrNull()
         if (bounds != null) {
             val name = bounds.resolve().declaration.qualifiedName?.asString()
             if (name != null) {
@@ -52,36 +53,38 @@ class KotlinGenericPlaceholderElement(
     }
 
     override fun withAnnotationMetadata(annotationMetadata: AnnotationMetadata): ClassElement {
-        return super<AbstractKotlinElement>.withAnnotationMetadata(annotationMetadata) as ClassElement
+        return super<KotlinClassElement>.withAnnotationMetadata(annotationMetadata) as ClassElement
     }
-
-    override fun isAssignable(type: String?): Boolean = false
 
     override fun isArray(): Boolean = arrayDimensions > 0
 
     override fun getArrayDimensions(): Int = arrayDimensions
 
     override fun withArrayDimensions(arrayDimensions: Int): ClassElement {
-        return KotlinGenericPlaceholderElement(declaration, annotationMetadataFactory, visitorContext, arrayDimensions)
+        return KotlinGenericPlaceholderElement(parameter, annotationMetadataFactory, visitorContext, arrayDimensions)
     }
 
     override fun getBounds(): MutableList<out ClassElement> {
         val elementFactory = visitorContext.elementFactory
-        return declaration.bounds.map {
+        return parameter.bounds.map {
             val argumentType = it.resolve()
             elementFactory.newClassElement(argumentType, annotationMetadataFactory)
         }.toMutableList()
     }
 
     override fun getVariableName(): String {
-        return classType.simpleName.asString()
+        return parameter.simpleName.asString()
     }
 
     override fun getDeclaringElement(): Optional<Element> {
-        return Optional.empty()
+        val classDeclaration = parameter.closestClassDeclaration()
+        return Optional.ofNullable(classDeclaration).map {
+            visitorContext.elementFactory.newClassElement(
+                classDeclaration!!.asStarProjectedType(),
+                visitorContext.elementAnnotationMetadataFactory,
+                resolvedGenerics
+            )
+        }
     }
 
-    override fun withNewMetadata(annotationMetadata: AnnotationMetadata): ClassElement {
-        return KotlinGenericPlaceholderElement(declaration, annotationMetadataFactory, visitorContext, arrayDimensions)
-    }
 }

@@ -26,17 +26,37 @@ import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 import io.micronaut.inject.ast.utils.AstBeanPropertiesUtils
 import io.micronaut.inject.ast.utils.EnclosedElementsQuery
 import io.micronaut.kotlin.processing.toClassName
+import java.lang.IllegalArgumentException
 import java.util.*
 import java.util.function.Function
-import java.util.function.Supplier
 import java.util.stream.Stream
 
-open class KotlinClassElement(val classType: KSType,
+open class KotlinClassElement(protected val classType: KSType,
+                              protected val classDeclaration: KSClassDeclaration,
+                              private val annotationInfo: KSAnnotated,
                               private val elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
                               visitorContext: KotlinVisitorContext,
-                              private val resolvedGenerics: Map<String, ClassElement>,
+                              protected val resolvedGenerics: Map<String, ClassElement>,
                               private val arrayDimensions: Int = 0,
-                              private val typeVariable: Boolean = false): AbstractKotlinElement<KSClassDeclaration>(classType.declaration as KSClassDeclaration, elementAnnotationMetadataFactory, visitorContext), ArrayableClassElement {
+                              private val typeVariable: Boolean = false): AbstractKotlinElement<KSAnnotated>(annotationInfo, elementAnnotationMetadataFactory, visitorContext), ArrayableClassElement {
+
+    constructor(
+        ref: KSAnnotated,
+        elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
+        visitorContext: KotlinVisitorContext,
+        resolvedGenerics: Map<String, ClassElement>,
+        arrayDimensions: Int = 0,
+        typeVariable: Boolean = false
+    ) : this(getType(ref), getDeclaration(ref), ref, elementAnnotationMetadataFactory, visitorContext, resolvedGenerics, arrayDimensions, typeVariable)
+
+    constructor(
+        type: KSType,
+        elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
+        visitorContext: KotlinVisitorContext,
+        resolvedGenerics: Map<String, ClassElement>,
+        arrayDimensions: Int = 0,
+        typeVariable: Boolean = false
+    ) : this(type, type.declaration as KSClassDeclaration, type.declaration as KSClassDeclaration, elementAnnotationMetadataFactory, visitorContext, resolvedGenerics, arrayDimensions, typeVariable)
 
     val outerType: KSType?
     private var resolvedProperties : List<PropertyElement>? = null
@@ -44,26 +64,72 @@ open class KotlinClassElement(val classType: KSType,
     private var nativeProperties  : List<PropertyElement>? = null
 
     init {
-        val outerDecl = declaration.parentDeclaration as? KSClassDeclaration
-        outerType = outerDecl?.asType(classType.arguments.subList(declaration.typeParameters.size, classType.arguments.size))
+        val outerDecl = classDeclaration.parentDeclaration as? KSClassDeclaration
+        outerType = outerDecl?.asType(classType.arguments.subList(classDeclaration.typeParameters.size, classType.arguments.size))
+    }
+
+    companion object Helper {
+        fun getType(ref: KSAnnotated) : KSType {
+            if (ref is KSType) {
+                return ref
+            } else if (ref is KSTypeReference) {
+                return ref.resolve()
+            } else if (ref is KSTypeParameter) {
+                return ref.bounds.first().resolve()
+            } else if (ref is KSClassDeclaration) {
+                return ref.asStarProjectedType()
+            } else if (ref is KSTypeArgument) {
+                val ksType = ref.type?.resolve()
+                if (ksType != null) {
+                    return ksType
+                } else {
+                    throw IllegalArgumentException("Unresolvable type argument $ref")
+                }
+            } else if (ref is KSTypeAlias) {
+                return ref.type.resolve()
+            } else {
+                throw IllegalArgumentException("Not a type $ref")
+            }
+        }
+
+        fun getDeclaration(ref: KSAnnotated) : KSClassDeclaration {
+            if (ref is KSType) {
+                return ref.declaration as KSClassDeclaration
+            } else if (ref is KSTypeReference) {
+                return ref.resolve().declaration as KSClassDeclaration
+            } else if (ref is KSTypeParameter) {
+                return ref.bounds.first().resolve().declaration as KSClassDeclaration
+            } else if (ref is KSClassDeclaration) {
+                return ref
+            } else if (ref is KSTypeArgument) {
+                val ksType = ref.type?.resolve()
+                if (ksType != null) {
+                    return ksType.declaration as KSClassDeclaration
+                } else {
+                    throw IllegalArgumentException("Unresolvable type argument $ref")
+                }
+            } else if (ref is KSTypeAlias) {
+                return ref.type.resolve().declaration as KSClassDeclaration
+            } else {
+                throw IllegalArgumentException("Not a type $ref")
+            }
+        }
     }
 
     @OptIn(KspExperimental::class)
     override fun getName(): String {
-        return visitorContext.resolver.mapKotlinNameToJava(declaration.qualifiedName!!)?.asString() ?: declaration.toClassName()
+        return visitorContext.resolver.mapKotlinNameToJava(classDeclaration.qualifiedName!!)?.asString() ?: classDeclaration.toClassName()
     }
 
     override fun getPackageName(): String {
-        return declaration.packageName.asString()
+        return classDeclaration.packageName.asString()
     }
 
     override fun getSyntheticBeanProperties(): List<PropertyElement> {
         // Native properties should be composed of field + synthetic getter/setter
         if (nativeProperties == null) {
-            val configuration = PropertyElementQuery()
-                .allowStaticProperties(true)
-            nativeProperties = declaration.getAllProperties()
-                .filter { !it.isInternal() }
+            nativeProperties = classDeclaration.getAllProperties()
+                .filter { !it.isInternal() && !it.isPrivate() }
                 .map { KotlinPropertyElement(
                     this,
                     visitorContext.elementFactory.newClassElement(it.type.resolve(), elementAnnotationMetadataFactory, resolvedGenerics),
@@ -119,7 +185,7 @@ open class KotlinClassElement(val classType: KSType,
             return mutableListOf()
         }
 
-        val allProperties = declaration.getAllProperties()
+        val allProperties = classDeclaration.getAllProperties()
             .filter { !it.isInternal() }
             .filter { !propertyElementQuery.excludes.contains(it.simpleName.asString()) }
             .filter { propertyElementQuery.includes.isEmpty() || propertyElementQuery.includes.contains(it.simpleName.asString()) }
@@ -180,23 +246,6 @@ open class KotlinClassElement(val classType: KSType,
         return kotlinPropertyElements
     }
 
-    private fun toKotlinFieldElements(
-        allProperties: Sequence<KSPropertyDeclaration>,
-        propertyElementQuery: PropertyElementQuery
-    ): Sequence<KotlinFieldElement> {
-        val kotlinPropertyElements = allProperties.map {
-            KotlinFieldElement(
-                it,
-                this,
-                elementAnnotationMetadataFactory, visitorContext
-            )
-        }.filter { prop ->
-            val excludedAnnotations = propertyElementQuery.excludedAnnotations
-            excludedAnnotations.isEmpty() || !excludedAnnotations.any { prop.hasAnnotation(it) }
-        }
-        return kotlinPropertyElements
-    }
-
     private fun mapToPropertyElement(value: AstBeanPropertiesUtils.BeanPropertyData): KotlinPropertyElement {
         return KotlinPropertyElement(
             this@KotlinClassElement,
@@ -211,11 +260,11 @@ open class KotlinClassElement(val classType: KSType,
     }
 
     override fun getSimpleName(): String {
-        var parentDeclaration = declaration.parentDeclaration
+        var parentDeclaration = classDeclaration.parentDeclaration
         return if (parentDeclaration == null) {
-            declaration.simpleName.asString()
+            classDeclaration.simpleName.asString()
         } else {
-            val builder = StringBuilder(declaration.simpleName.asString())
+            val builder = StringBuilder(classDeclaration.simpleName.asString())
             while (parentDeclaration != null) {
                 builder.insert(0, '$')
                     .insert(0, parentDeclaration.simpleName.asString())
@@ -226,7 +275,7 @@ open class KotlinClassElement(val classType: KSType,
     }
 
     override fun getSuperType(): Optional<ClassElement> {
-        val superType = declaration.superTypes.firstOrNull {
+        val superType = classDeclaration.superTypes.firstOrNull {
             val declaration = it.resolve().declaration
             declaration is KSClassDeclaration && declaration.classKind != ClassKind.INTERFACE
         }
@@ -237,7 +286,7 @@ open class KotlinClassElement(val classType: KSType,
     }
 
     override fun getInterfaces(): Collection<ClassElement> {
-        return declaration.superTypes.map { it.resolve() }.filter {
+        return classDeclaration.superTypes.map { it.resolve() }.filter {
             val declaration = it.declaration
             declaration is KSClassDeclaration && declaration.classKind == ClassKind.INTERFACE
         }.map {
@@ -246,7 +295,7 @@ open class KotlinClassElement(val classType: KSType,
     }
 
     override fun isInterface(): Boolean {
-        return declaration.classKind == ClassKind.INTERFACE
+        return classDeclaration.classKind == ClassKind.INTERFACE
     }
 
     override fun isTypeVariable(): Boolean = typeVariable
@@ -279,16 +328,13 @@ open class KotlinClassElement(val classType: KSType,
         return super.isAssignable(type)
     }
 
-    override fun copyThis(): AbstractKotlinElement<KSClassDeclaration> {
+    override fun copyThis(): KotlinClassElement {
         return KotlinClassElement(
-            classType,
-            elementAnnotationMetadataFactory,
-            visitorContext, resolvedGenerics, arrayDimensions, typeVariable
-        )
+            classType, classDeclaration, annotationInfo, elementAnnotationMetadataFactory, visitorContext, resolvedGenerics)
     }
 
     override fun isAbstract(): Boolean {
-        return declaration.isAbstract()
+        return classDeclaration.isAbstract()
     }
 
     override fun withAnnotationMetadata(annotationMetadata: AnnotationMetadata): ClassElement {
@@ -304,7 +350,7 @@ open class KotlinClassElement(val classType: KSType,
     }
 
     override fun withArrayDimensions(arrayDimensions: Int): ClassElement {
-        return KotlinClassElement(classType, elementAnnotationMetadataFactory, visitorContext, resolvedGenerics, arrayDimensions)
+        return KotlinClassElement(classType, classDeclaration, annotationInfo, elementAnnotationMetadataFactory, visitorContext, resolvedGenerics, arrayDimensions, typeVariable)
     }
 
     override fun isInner(): Boolean {
@@ -321,12 +367,11 @@ open class KotlinClassElement(val classType: KSType,
             }
         } else {
             classType.arguments.forEachIndexed { i, argument ->
-                val typeReference = argument.type!!
-                val type = typeReference.resolve()
                 val typeElement = elementFactory.newClassElement(
-                    type,
+                    argument,
                     annotationMetadataFactory,
-                    resolvedGenerics
+                    resolvedGenerics,
+                    false
                 )
                 typeArguments[typeParameters[i].name.asString()] = typeElement
             }
@@ -335,7 +380,7 @@ open class KotlinClassElement(val classType: KSType,
     }
 
     override fun getTypeArguments(type: String): Map<String, ClassElement> {
-        return allTypeArguments.getOrElse(type, { emptyMap() })
+        return allTypeArguments.getOrElse(type) { emptyMap() }
     }
 
     override fun getAllTypeArguments(): Map<String, Map<String, ClassElement>> {
@@ -397,10 +442,6 @@ open class KotlinClassElement(val classType: KSType,
         }
         return enclosedElementsQuery.getEnclosedElements<T>(classElementToInspect, query)
 
-    }
-
-    override fun withNewMetadata(annotationMetadata: AnnotationMetadata): ClassElement {
-        return KotlinClassElement(classType, elementAnnotationMetadataFactory, visitorContext, resolvedGenerics, arrayDimensions, typeVariable)
     }
 
     private inner class KotlinEnclosedElementsQuery :

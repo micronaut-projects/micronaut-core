@@ -27,7 +27,7 @@ import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 import io.micronaut.kotlin.processing.getVisibility
 
 @OptIn(KspExperimental::class)
-open class KotlinMethodElement: AbstractKotlinElement<KSDeclaration>, MethodElement {
+open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElement {
 
     private val name: String
     private val declaringType: ClassElement
@@ -45,7 +45,7 @@ open class KotlinMethodElement: AbstractKotlinElement<KSDeclaration>, MethodElem
                 declaringType: ClassElement,
                 elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
                 visitorContext: KotlinVisitorContext
-    ) : super(method.receiver, elementAnnotationMetadataFactory, visitorContext) {
+    ) : super(method, elementAnnotationMetadataFactory, visitorContext) {
         this.name = visitorContext.resolver.getJvmName(method)!!
         this.declaringType = declaringType
         this.returnType = PrimitiveElement.VOID
@@ -66,7 +66,7 @@ open class KotlinMethodElement: AbstractKotlinElement<KSDeclaration>, MethodElem
                 returnType: ClassElement,
                 elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
                 visitorContext: KotlinVisitorContext,
-    ) : super(method.receiver, elementAnnotationMetadataFactory, visitorContext) {
+    ) : super(method, elementAnnotationMetadataFactory, visitorContext) {
         this.name = visitorContext.resolver.getJvmName(method)!!
         this.declaringType = declaringType
         this.parameters = emptyList()
@@ -113,7 +113,7 @@ open class KotlinMethodElement: AbstractKotlinElement<KSDeclaration>, MethodElem
         this.internal = method.isInternal()
     }
 
-    protected constructor(method: KSDeclaration,
+    protected constructor(method: KSAnnotated,
                           name: String,
                           declaringType: ClassElement,
                           elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
@@ -184,7 +184,7 @@ open class KotlinMethodElement: AbstractKotlinElement<KSDeclaration>, MethodElem
     override fun isPublic(): Boolean = public
 
     override fun isProtected(): Boolean = protected
-    override fun copyThis(): AbstractKotlinElement<KSDeclaration> {
+    override fun copyThis(): KotlinMethodElement {
         return KotlinMethodElement(
             declaration,
             name,

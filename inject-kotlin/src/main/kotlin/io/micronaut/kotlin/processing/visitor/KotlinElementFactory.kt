@@ -16,13 +16,9 @@
 package io.micronaut.kotlin.processing.visitor
 
 import com.google.devtools.ksp.symbol.*
-import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationUtil
-import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
-import io.micronaut.inject.annotation.MutableAnnotationMetadata
 import io.micronaut.inject.ast.*
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
-import io.micronaut.kotlin.processing.isTypeReference
 
 class KotlinElementFactory(
     private val visitorContext: KotlinVisitorContext): ElementFactory<Any, KSType, KSFunctionDeclaration, KSPropertyDeclaration> {
@@ -87,6 +83,43 @@ class KotlinElementFactory(
             resolvedGenerics,
             true
         )
+    }
+
+    fun newClassElement(annotated: KSAnnotated,
+                        elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
+                        resolvedGenerics: Map<String, ClassElement>,
+                        allowPrimitive: Boolean): ClassElement {
+        val type = KotlinClassElement.getType(annotated)
+        val declaration = type.declaration
+        val qualifiedName = declaration.qualifiedName!!.asString()
+        val hasNoAnnotations = !annotated.annotations.iterator().hasNext()
+        var element = primitiveArrays[qualifiedName]
+        if (hasNoAnnotations && element != null) {
+            return element
+        }
+        if (qualifiedName == "kotlin.Array") {
+            val component = type.arguments[0].type!!.resolve()
+            val componentElement = newClassElement(component, elementAnnotationMetadataFactory, resolvedGenerics, false)
+            return componentElement.toArray()
+        } else if (declaration is KSTypeParameter) {
+            val name = declaration.name.asString()
+            return if (resolvedGenerics.containsKey(name)) {
+                resolvedGenerics[name]!!
+            } else {
+                KotlinGenericPlaceholderElement(declaration, elementAnnotationMetadataFactory, visitorContext)
+            }
+        }
+        if (allowPrimitive && !type.isMarkedNullable) {
+            element = primitives[qualifiedName]
+            if (hasNoAnnotations && element != null ) {
+                return element
+            }
+        }
+        return if (declaration is KSClassDeclaration && declaration.classKind == ClassKind.ENUM_CLASS) {
+            KotlinEnumElement(type, elementAnnotationMetadataFactory, visitorContext)
+        } else {
+            KotlinClassElement(annotated, elementAnnotationMetadataFactory, visitorContext, resolvedGenerics)
+        }
     }
 
     fun newClassElement(type: KSType,

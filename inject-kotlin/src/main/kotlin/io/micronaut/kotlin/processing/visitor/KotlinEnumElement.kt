@@ -17,17 +17,16 @@ package io.micronaut.kotlin.processing.visitor
 
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSType
-import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.inject.ast.EnumElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 import java.util.*
 
-class KotlinEnumElement(classType: KSType, elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory, visitorContext: KotlinVisitorContext):
-    KotlinClassElement(classType, elementAnnotationMetadataFactory, visitorContext, emptyMap()), EnumElement {
+class KotlinEnumElement(private val type: KSType, elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory, visitorContext: KotlinVisitorContext):
+    KotlinClassElement(type, elementAnnotationMetadataFactory, visitorContext, emptyMap()), EnumElement {
 
     override fun values(): List<String> {
-        return declaration.declarations
+        return classDeclaration.declarations
             .filterIsInstance<KSClassDeclaration>()
             .map { decl -> decl.simpleName.asString() }
             .toList()
@@ -39,7 +38,7 @@ class KotlinEnumElement(classType: KSType, elementAnnotationMetadataFactory: Ele
 
     override fun copyThis(): KotlinEnumElement {
         return KotlinEnumElement(
-            classType,
+            type,
             annotationMetadataFactory,
             visitorContext
         )

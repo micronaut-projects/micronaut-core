@@ -427,6 +427,7 @@ data class Foo(val value: List<@Min(10) Long>)
 
         then:
         property != null
+        genericTypeArg.type == Long
         genericTypeArg.annotationMetadata.hasStereotype(Constraint)
         genericTypeArg.annotationMetadata.hasAnnotation(Min)
         genericTypeArg.annotationMetadata.intValue(Min).getAsInt() == 10
