@@ -95,8 +95,9 @@ class KotlinElementFactory(
                         allowPrimitive: Boolean): ClassElement {
         val declaration = type.declaration
         val qualifiedName = declaration.qualifiedName!!.asString()
+        val hasNoAnnotations = !type.annotations.iterator().hasNext()
         var element = primitiveArrays[qualifiedName]
-        if (element != null) {
+        if (hasNoAnnotations && element != null) {
             return element
         }
         if (qualifiedName == "kotlin.Array") {
@@ -113,7 +114,7 @@ class KotlinElementFactory(
         }
         if (allowPrimitive && !type.isMarkedNullable) {
             element = primitives[qualifiedName]
-            if (element != null) {
+            if (hasNoAnnotations && element != null ) {
                 return element
             }
         }

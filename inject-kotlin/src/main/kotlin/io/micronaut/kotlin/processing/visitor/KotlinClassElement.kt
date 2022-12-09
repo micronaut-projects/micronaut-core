@@ -17,6 +17,7 @@ package io.micronaut.kotlin.processing.visitor
 
 import com.google.devtools.ksp.*
 import com.google.devtools.ksp.symbol.*
+import io.micronaut.context.annotation.BeanProperties
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.Creator
 import io.micronaut.core.annotation.NonNull
@@ -103,7 +104,7 @@ open class KotlinClassElement(val classType: KSType,
         if (resolvedProperties == null) {
             resolvedProperties = getBeanProperties(PropertyElementQuery.of(this))
         }
-        return Collections.unmodifiableList(resolvedProperties)
+        return Collections.unmodifiableList(resolvedProperties!!)
     }
 
     override fun getBeanProperties(propertyElementQuery: PropertyElementQuery): MutableList<PropertyElement> {
@@ -111,34 +112,96 @@ open class KotlinClassElement(val classType: KSType,
             Function<MethodElement, Optional<String>> { Optional.empty() }
         val customWriterPropertyNameResolver =
             Function<MethodElement, Optional<String>> { Optional.empty() }
-        val propertyNames = declaration.getAllProperties().map { it.simpleName.asString() }.toSet()
-        return AstBeanPropertiesUtils.resolveBeanProperties(propertyElementQuery,
+        val accessKinds = propertyElementQuery.accessKinds
+        val fieldAccess = accessKinds.contains(BeanProperties.AccessKind.FIELD) && !propertyElementQuery.accessKinds.contains(BeanProperties.AccessKind.METHOD)
+        if (fieldAccess) {
+            // all kotlin fields are private
+            return mutableListOf()
+        }
+
+        val allProperties = declaration.getAllProperties()
+            .filter { !it.isInternal() }
+            .filter { !propertyElementQuery.excludes.contains(it.simpleName.asString()) }
+            .filter { propertyElementQuery.includes.isEmpty() || propertyElementQuery.includes.contains(it.simpleName.asString()) }
+            .filter {
+                val visibility = propertyElementQuery.visibility
+                if (visibility == BeanProperties.Visibility.PUBLIC) {
+                    it.isPublic()
+                } else {
+                    !it.isPrivate()
+                }
+            }
+        val propertyNames = allProperties.map { it.simpleName.asString() }.toSet()
+
+        val resolvedProperties : MutableList<PropertyElement> = mutableListOf()
+        val methodProperties = AstBeanPropertiesUtils.resolveBeanProperties(propertyElementQuery,
             this,
-            Supplier {
+            {
                 getEnclosedElements(
                     ElementQuery.ALL_METHODS
                 )
             },
-            Supplier {
-                getEnclosedElements(
-                    ElementQuery.ALL_FIELDS
-                )
+            {
+                emptyList()
             },
             false, propertyNames,
             customReaderPropertyNameResolver,
             customWriterPropertyNameResolver,
-            Function { value: AstBeanPropertiesUtils.BeanPropertyData ->
+            { value: AstBeanPropertiesUtils.BeanPropertyData ->
                 this.mapToPropertyElement(
                     value
                 )
             })
+        resolvedProperties.addAll(methodProperties)
+        val kotlinPropertyElements = toKotlinProperties(allProperties, propertyElementQuery)
+        resolvedProperties.addAll(kotlinPropertyElements)
+        return resolvedProperties
+    }
+
+    private fun toKotlinProperties(
+        allProperties: Sequence<KSPropertyDeclaration>,
+        propertyElementQuery: PropertyElementQuery
+    ): Sequence<KotlinPropertyElement> {
+        val kotlinPropertyElements = allProperties.map {
+            KotlinPropertyElement(
+                this,
+                visitorContext.elementFactory.newClassElement(
+                    it.type.resolve(),
+                    elementAnnotationMetadataFactory,
+                    resolvedGenerics
+                ),
+                it,
+                elementAnnotationMetadataFactory, visitorContext
+            )
+        }.filter { prop ->
+            val excludedAnnotations = propertyElementQuery.excludedAnnotations
+            excludedAnnotations.isEmpty() || !excludedAnnotations.any { prop.hasAnnotation(it) }
+        }
+        return kotlinPropertyElements
+    }
+
+    private fun toKotlinFieldElements(
+        allProperties: Sequence<KSPropertyDeclaration>,
+        propertyElementQuery: PropertyElementQuery
+    ): Sequence<KotlinFieldElement> {
+        val kotlinPropertyElements = allProperties.map {
+            KotlinFieldElement(
+                it,
+                this,
+                elementAnnotationMetadataFactory, visitorContext
+            )
+        }.filter { prop ->
+            val excludedAnnotations = propertyElementQuery.excludedAnnotations
+            excludedAnnotations.isEmpty() || !excludedAnnotations.any { prop.hasAnnotation(it) }
+        }
+        return kotlinPropertyElements
     }
 
     private fun mapToPropertyElement(value: AstBeanPropertiesUtils.BeanPropertyData): KotlinPropertyElement {
         return KotlinPropertyElement(
             this@KotlinClassElement,
             value.type,
-            name,
+            value.propertyName,
             value.field,
             value.getter,
             value.setter,

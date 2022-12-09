@@ -59,7 +59,7 @@ class Test
 package arraygenerics
 
 import io.micronaut.core.annotation.Introspected
-import io.micronaut.context.annotation.Executable 
+import io.micronaut.context.annotation.Executable
 
 @Introspected
 class Test<T : CharSequence> {
@@ -67,12 +67,13 @@ class Test<T : CharSequence> {
     lateinit var array: Array<T>
     lateinit var starArray: Array<*>
     lateinit var stringArray: Array<String>
-    
+
     @Executable
     fun myMethod(): Array<T> = array
 }
 ''')
         expect:
+        introspection.beanProperties.size() == 3
         introspection.getRequiredProperty("array", CharSequence[].class).type == CharSequence[].class
         introspection.getRequiredProperty("starArray", Object[].class).type == Object[].class
         introspection.getRequiredProperty("stringArray", String[].class).type == String[].class
@@ -217,7 +218,7 @@ class MethodTest : SuperType(), SomeInt {
     override fun invokeMe(str: String): String {
         return str
     }
-    
+
     @Executable
     fun invokePrim(i: Int): Int {
         return i
@@ -230,7 +231,7 @@ open class SuperType {
     fun superMethod(str: String): String {
         return str
     }
-    
+
     @Executable
     open fun invokeMe(str: String): String {
         return str
@@ -241,7 +242,7 @@ interface SomeInt {
 
     @Executable
     fun ok() = true
-    
+
     fun getName() = "ok"
 }
 ''')
@@ -279,12 +280,12 @@ import java.util.Locale
 
 @io.micronaut.core.annotation.Introspected(withPrefix = "alter")
 class CopyMe(val another: String) {
-    
+
     fun alterAnother(another: String): CopyMe {
         return if (another == this.another) {
             this
         } else {
-            CopyMe(another.uppercase(Locale.getDefault()))   
+            CopyMe(another.uppercase(Locale.getDefault()))
         }
     }
 }
@@ -370,9 +371,9 @@ package test
 
 @io.micronaut.core.annotation.Introspected
 data class Foo(val x: Int, val y: Int) {
-    
+
     constructor(x: Int) : this(x, 20)
-    
+
     constructor() : this(20, 20)
 }
 ''')
@@ -396,7 +397,7 @@ data class Foo(val x: Int, val y: Int) {
 
     @Creator
     constructor(x: Int) : this(x, 20)
-    
+
     constructor() : this(20, 20)
 }
 ''')
@@ -610,7 +611,7 @@ class Foo: GenBase<String>() {
 
 abstract class GenBase<T> {
     abstract fun getName(): T
-    
+
     fun getOther(): T {
         return "other" as T
     }
@@ -873,7 +874,7 @@ class Book {
     constructor(title: String, author: String) : this(title) {
         this.author = author
     }
-    
+
     @Creator
     constructor(title: String) {
         this.title = title
@@ -976,18 +977,18 @@ import com.fasterxml.jackson.annotation.*
 class Test {
     private var name: String? = null
     var age: Int = 0
-    
+
     @JsonCreator
     constructor(@JsonProperty("name") name: String) {
         this.name = name
     }
-    
+
     constructor(age: Int) {
         this.age = age
     }
-    
+
     fun getName(): String? = name
-    
+
     fun setName(n: String): Test {
         this.name = n
         return this
@@ -1034,7 +1035,7 @@ import java.util.*
 @Introspected
 class Test {
     private var name: String? = null
-    
+
     fun getName(): String? = name
     fun setName(n: String): Test {
         this.name = n
@@ -1084,11 +1085,11 @@ import java.util.*
 class Test {
 
     private var status: Status? = null
-    
+
     fun setStatus(status: Status) {
         this.status = status
     }
-    
+
     fun getStatus(): Status? {
         return this.status
     }
@@ -1136,19 +1137,19 @@ class Test(
     @Id
     @GeneratedValue
     var id: Long? = null
-    
+
     @Version
     var version: Long? = null
-    
+
     private var primitiveArray: Array<Int>? = null
-    
+
     private var v: Long? = null
-    
+
     @Version
     fun getAnotherVersion(): Long? {
         return v;
     }
-    
+
     fun setAnotherVersion(v: Long) {
         this.v = v
     }
@@ -1212,12 +1213,12 @@ class Test {
     @Id
     @GeneratedValue
     var id: Long? = null
-    
+
     @Version
     var version: Long? = null
-    
+
     var name: String? = null
-    
+
     @Size(max=100)
     var age: Int? = null
 }
@@ -1340,10 +1341,10 @@ import javax.validation.constraints.Size
 class Test: ParentBean() {
     val readOnly: String = "test"
     var name: String? = null
-    
+
     @Size(max=100)
     var age: Int = 0
-    
+
     var list: List<Number>? = null
     var stringArray: Array<String>? = null
     var primitiveArray: Array<Int>? = null
@@ -1558,7 +1559,7 @@ class Test private constructor(val name: String) {
         fun forName(): Test {
             return Test("default")
         }
-        
+
         @Creator
         fun forName(name: String): Test {
             return Test(name)
@@ -1915,7 +1916,7 @@ import io.micronaut.core.annotation.Introspected
 abstract class Test {
     var name: String? = null
     var author: String? = null
-    
+
     fun getAge(): Int = 0
 }
 """)
@@ -2056,7 +2057,7 @@ class Test
 @JsonClassDescription
 public interface MyInterface {
     fun getName(): String
-    
+
     @Executable
     fun name(): String = getName()
 }
@@ -2090,7 +2091,7 @@ class Test
 
 interface MyInterface {
     @Executable
-    fun name(): String    
+    fun name(): String
 }
 
 class MyImpl: MyInterface {

@@ -40,7 +40,17 @@ class KotlinGenericPlaceholderElement(
     }
 
 
-    override fun getName(): String = "java.lang.Object"
+    override fun getName(): String {
+        val bounds = classType.bounds.firstOrNull()
+        if (bounds != null) {
+            val name = bounds.resolve().declaration.qualifiedName?.asString()
+            if (name != null) {
+                return name
+            }
+        }
+        return "java.lang.Object"
+    }
+
     override fun withAnnotationMetadata(annotationMetadata: AnnotationMetadata): ClassElement {
         return super<AbstractKotlinElement>.withAnnotationMetadata(annotationMetadata) as ClassElement
     }
@@ -64,7 +74,7 @@ class KotlinGenericPlaceholderElement(
     }
 
     override fun getVariableName(): String {
-        return declaration.name.asString()
+        return classType.simpleName.asString()
     }
 
     override fun getDeclaringElement(): Optional<Element> {
