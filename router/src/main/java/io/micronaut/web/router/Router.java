@@ -20,7 +20,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
-import io.micronaut.http.filter.InternalFilter;
+import io.micronaut.http.filter.GenericHttpFilter;
 
 import java.net.URI;
 import java.util.List;
@@ -239,7 +239,7 @@ public interface Router {
      * @param request The request
      * @return A new filtered publisher
      */
-    @NonNull List<InternalFilter> findFilters(
+    @NonNull List<GenericHttpFilter> findFilters(
             @NonNull HttpRequest<?> request
     );
 

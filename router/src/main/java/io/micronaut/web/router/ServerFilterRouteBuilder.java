@@ -18,7 +18,7 @@ import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.http.context.ServerContextPathProvider;
 import io.micronaut.http.filter.FilterOrder;
 import io.micronaut.http.filter.FilterPatternStyle;
-import io.micronaut.http.filter.InternalFilter;
+import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.qualifiers.Qualifiers;
@@ -67,20 +67,20 @@ public class ServerFilterRouteBuilder extends DefaultRouteBuilder implements Exe
         if (method.isAnnotationPresent(RequestFilter.class)) {
             FilterMetadata methodLevel = metadata(method, RequestFilter.class);
             FilterMetadata combined = combineMetadata(beanLevel, methodLevel);
-            FilterRoute filter = addFilter(() -> withAsync(combined, new InternalFilter.Before<>(beanContext.getBean(beanDefinition), method, combined.order)), method);
+            FilterRoute filter = addFilter(() -> withAsync(combined, new GenericHttpFilter.Before<>(beanContext.getBean(beanDefinition), method, combined.order)), method);
             applyMetadata(filter, combined);
         }
         if (method.isAnnotationPresent(ResponseFilter.class)) {
             FilterMetadata methodLevel = metadata(method, ResponseFilter.class);
             FilterMetadata combined = combineMetadata(beanLevel, methodLevel);
-            FilterRoute filter = addFilter(() -> withAsync(combined, new InternalFilter.After<>(beanContext.getBean(beanDefinition), method, combined.order)), method);
+            FilterRoute filter = addFilter(() -> withAsync(combined, new GenericHttpFilter.After<>(beanContext.getBean(beanDefinition), method, combined.order)), method);
             applyMetadata(filter, combined);
         }
     }
 
-    private InternalFilter withAsync(FilterMetadata metadata, InternalFilter filter) {
+    private GenericHttpFilter withAsync(FilterMetadata metadata, GenericHttpFilter filter) {
         if (metadata.executeOn != null) {
-            return new InternalFilter.Async(filter, beanContext.getBean(Executor.class, Qualifiers.byName(metadata.executeOn)));
+            return new GenericHttpFilter.Async(filter, beanContext.getBean(Executor.class, Qualifiers.byName(metadata.executeOn)));
         } else {
             return filter;
         }

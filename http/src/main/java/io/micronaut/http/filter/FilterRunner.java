@@ -55,7 +55,7 @@ public class FilterRunner {
 
     private static final Object[] SKIP_FILTER = new Object[0];
 
-    private final List<InternalFilter> filters;
+    private final List<GenericHttpFilter> filters;
 
     private HttpRequest<?> request;
     private HttpResponse<?> response;
@@ -66,22 +66,22 @@ public class FilterRunner {
 
     private Context reactorContext = Context.empty();
 
-    public FilterRunner(List<InternalFilter> filters) {
+    public FilterRunner(List<GenericHttpFilter> filters) {
         this.filters = filters;
     }
 
-    private static void checkOrdered(List<InternalFilter> filters) {
+    private static void checkOrdered(List<GenericHttpFilter> filters) {
         if (!filters.stream().allMatch(f -> f instanceof Ordered)) {
             throw new IllegalStateException("Some filters cannot be ordered: " + filters);
         }
     }
 
-    public static void sort(List<InternalFilter> filters) {
+    public static void sort(List<GenericHttpFilter> filters) {
         checkOrdered(filters);
         OrderUtil.sort(filters);
     }
 
-    public static void sortReverse(List<InternalFilter> filters) {
+    public static void sortReverse(List<GenericHttpFilter> filters) {
         checkOrdered(filters);
         OrderUtil.reverseSort(filters);
     }
@@ -141,16 +141,16 @@ public class FilterRunner {
         }
     }
 
-    private boolean workRequestFilter(InternalFilter filter) {
+    private boolean workRequestFilter(GenericHttpFilter filter) {
         Executor executeOn;
-        if (filter instanceof InternalFilter.Async async) {
+        if (filter instanceof GenericHttpFilter.Async async) {
             executeOn = async.executor();
             filter = async.actual();
         } else {
             executeOn = null;
         }
 
-        if (filter instanceof InternalFilter.Before<?> before) {
+        if (filter instanceof GenericHttpFilter.Before<?> before) {
             if (executeOn == null) {
                 return invokeBefore(before, null);
             } else {
@@ -162,10 +162,10 @@ public class FilterRunner {
                 return false;
             }
             // continue with next filter
-        } else if (filter instanceof InternalFilter.After<?>) {
+        } else if (filter instanceof GenericHttpFilter.After<?>) {
             // skip filter, only used for response
             return true;
-        } else if (filter instanceof InternalFilter.AroundLegacy around) {
+        } else if (filter instanceof GenericHttpFilter.AroundLegacy around) {
             FilterChainImpl chainSuspensionPoint = new FilterChainImpl(index - 1, responseSuspensionPoint);
             chainSuspensionPoint.completeOn = executeOn;
             responseSuspensionPoint = chainSuspensionPoint;
@@ -186,26 +186,26 @@ public class FilterRunner {
             }
             // suspend
             return false;
-        } else if (filter instanceof InternalFilter.TerminalReactive || filter instanceof InternalFilter.Terminal || filter instanceof InternalFilter.TerminalWithReactorContext) {
+        } else if (filter instanceof GenericHttpFilter.TerminalReactive || filter instanceof GenericHttpFilter.Terminal || filter instanceof GenericHttpFilter.TerminalWithReactorContext) {
             if (executeOn != null) {
                 throw new AssertionError("Async terminal filters not supported");
             }
 
             ExecutionFlow<? extends HttpResponse<?>> terminalFlow;
-            if (filter instanceof InternalFilter.TerminalWithReactorContext t) {
+            if (filter instanceof GenericHttpFilter.TerminalWithReactorContext t) {
                 try {
                     terminalFlow = t.execute(request, reactorContext);
                 } catch (Throwable e) {
                     terminalFlow = ExecutionFlow.error(e);
                 }
-            } else if (filter instanceof InternalFilter.Terminal t) {
+            } else if (filter instanceof GenericHttpFilter.Terminal t) {
                 try {
                     terminalFlow = t.execute(request);
                 } catch (Throwable e) {
                     terminalFlow = ExecutionFlow.error(e);
                 }
             } else {
-                terminalFlow = ReactiveExecutionFlow.fromPublisher(Mono.from(((InternalFilter.TerminalReactive) filter).responsePublisher())
+                terminalFlow = ReactiveExecutionFlow.fromPublisher(Mono.from(((GenericHttpFilter.TerminalReactive) filter).responsePublisher())
                     .contextWrite(reactorContext));
             }
             // this is almost never available immediately, so don't bother with asDone checks
@@ -253,15 +253,15 @@ public class FilterRunner {
                 }
                 return;
             }
-            InternalFilter filter = filters.get(index);
+            GenericHttpFilter filter = filters.get(index);
 
             Executor executeOn = null;
-            if (filter instanceof InternalFilter.Async async) {
+            if (filter instanceof GenericHttpFilter.Async async) {
                 executeOn = async.executor();
                 filter = async.actual();
             }
 
-            if (filter instanceof InternalFilter.After<?> after) {
+            if (filter instanceof GenericHttpFilter.After<?> after) {
                 if (executeOn == null) {
                     if (!invokeAfter(after)) {
                         // suspend
@@ -280,7 +280,7 @@ public class FilterRunner {
         }
     }
 
-    private <T> boolean invokeBefore(InternalFilter.Before<T> before, @Nullable Executor completeOn) {
+    private <T> boolean invokeBefore(GenericHttpFilter.Before<T> before, @Nullable Executor completeOn) {
         FilterContinuationImpl<?> passedOnContinuation = null;
         try {
             var oldSuspensionPoint = this.responseSuspensionPoint;
@@ -317,7 +317,7 @@ public class FilterRunner {
         }
     }
 
-    private <T> boolean invokeAfter(InternalFilter.After<T> after) {
+    private <T> boolean invokeAfter(GenericHttpFilter.After<T> after) {
         try {
             Object[] args = satisfy(after.method().getArguments(), true);
             if (args == SKIP_FILTER) {

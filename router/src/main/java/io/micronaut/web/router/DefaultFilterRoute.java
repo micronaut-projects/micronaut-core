@@ -23,7 +23,7 @@ import io.micronaut.core.util.PathMatcher;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.filter.FilterPatternStyle;
-import io.micronaut.http.filter.InternalFilter;
+import io.micronaut.http.filter.GenericHttpFilter;
 
 import java.net.URI;
 import java.util.ArrayList;
@@ -44,14 +44,14 @@ import java.util.function.Supplier;
 class DefaultFilterRoute implements FilterRoute {
 
     private final List<String> patterns = new ArrayList<>(1);
-    private final Supplier<InternalFilter> filterSupplier;
+    private final Supplier<GenericHttpFilter> filterSupplier;
     private final AnnotationMetadataResolver annotationMetadataResolver;
     private Set<HttpMethod> httpMethods;
     private FilterPatternStyle patternStyle;
-    private volatile InternalFilter filter;
+    private volatile GenericHttpFilter filter;
     private AnnotationMetadata annotationMetadata;
 
-    DefaultFilterRoute(Supplier<InternalFilter> filter, AnnotationMetadataResolver annotationMetadataResolver) {
+    DefaultFilterRoute(Supplier<GenericHttpFilter> filter, AnnotationMetadataResolver annotationMetadataResolver) {
         Objects.requireNonNull(filter, "HttpFilter argument is required");
         this.filterSupplier = filter;
         this.annotationMetadataResolver = annotationMetadataResolver;
@@ -62,7 +62,7 @@ class DefaultFilterRoute implements FilterRoute {
      * @param filter A {@link Supplier} for an HTTP filter
      * @param annotationMetadataResolver The annotation metadata resolver
      */
-    DefaultFilterRoute(String pattern, Supplier<InternalFilter> filter, AnnotationMetadataResolver annotationMetadataResolver) {
+    DefaultFilterRoute(String pattern, Supplier<GenericHttpFilter> filter, AnnotationMetadataResolver annotationMetadataResolver) {
         this(filter, annotationMetadataResolver);
         Objects.requireNonNull(pattern, "Pattern argument is required");
         this.patterns.add(pattern);
@@ -72,7 +72,7 @@ class DefaultFilterRoute implements FilterRoute {
      * @param pattern A pattern
      * @param filter A {@link Supplier} for an HTTP filter
      */
-    DefaultFilterRoute(String pattern, Supplier<InternalFilter> filter) {
+    DefaultFilterRoute(String pattern, Supplier<GenericHttpFilter> filter) {
        this(pattern, filter, AnnotationMetadataResolver.DEFAULT);
     }
 
@@ -93,8 +93,8 @@ class DefaultFilterRoute implements FilterRoute {
     }
 
     @Override
-    public InternalFilter getFilter() {
-        InternalFilter filter = this.filter;
+    public GenericHttpFilter getFilter() {
+        GenericHttpFilter filter = this.filter;
         if (filter == null) {
             synchronized (this) { // double check
                 filter = this.filter;
@@ -125,7 +125,7 @@ class DefaultFilterRoute implements FilterRoute {
     }
 
     @Override
-    public Optional<InternalFilter> match(HttpMethod method, URI uri) {
+    public Optional<GenericHttpFilter> match(HttpMethod method, URI uri) {
         if (httpMethods != null && !httpMethods.contains(method)) {
             return Optional.empty();
         }
@@ -133,8 +133,8 @@ class DefaultFilterRoute implements FilterRoute {
         PathMatcher matcher = getPatternStyle().getPathMatcher();
         for (String pattern : patterns) {
             if (matcher.matches(pattern, uriStr)) {
-                InternalFilter filter = getFilter();
-                if (filter instanceof InternalFilter.AroundLegacy al && !al.isEnabled()) {
+                GenericHttpFilter filter = getFilter();
+                if (filter instanceof GenericHttpFilter.AroundLegacy al && !al.isEnabled()) {
                     return Optional.empty();
                 }
                 return Optional.of(filter);

@@ -21,8 +21,8 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.http.filter.FilterOrder;
+import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.http.filter.HttpFilter;
-import io.micronaut.http.filter.InternalFilter;
 import io.micronaut.inject.BeanDefinition;
 
 /**
@@ -43,7 +43,7 @@ class BeanDefinitionFilterRoute extends DefaultFilterRoute {
      * @param definition The definition
      */
     BeanDefinitionFilterRoute(String pattern, BeanLocator beanLocator, BeanDefinition<? extends HttpFilter> definition) {
-        super(pattern, () -> new InternalFilter.AroundLegacy(
+        super(pattern, () -> new GenericHttpFilter.AroundLegacy(
             beanLocator.getBean(definition),
             new FilterOrder.Dynamic(OrderUtil.getOrder(definition))));
         this.definition = definition;

@@ -34,8 +34,8 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Status;
+import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.http.filter.HttpFilter;
-import io.micronaut.http.filter.InternalFilter;
 import io.micronaut.http.uri.UriMatchInfo;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.inject.BeanDefinition;
@@ -143,7 +143,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         return route;
     }
 
-    FilterRoute addFilter(Supplier<InternalFilter> internalFilter, AnnotationMetadata annotationMetadata) {
+    FilterRoute addFilter(Supplier<GenericHttpFilter> internalFilter, AnnotationMetadata annotationMetadata) {
         FilterRoute fr = new DefaultFilterRoute(internalFilter, AnnotationMetadataResolver.DEFAULT) {
             @Override
             public AnnotationMetadata getAnnotationMetadata() {

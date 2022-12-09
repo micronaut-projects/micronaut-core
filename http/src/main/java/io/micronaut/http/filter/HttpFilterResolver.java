@@ -54,7 +54,7 @@ public interface HttpFilterResolver<T extends AnnotationMetadataProvider> {
      * @param filterEntries the filter entries
      * @return The list of filters
      */
-    List<InternalFilter> resolveFilters(HttpRequest<?> request, List<FilterEntry> filterEntries);
+    List<GenericHttpFilter> resolveFilters(HttpRequest<?> request, List<FilterEntry> filterEntries);
 
     /**
      * A resolved filter entry.
@@ -63,7 +63,8 @@ public interface HttpFilterResolver<T extends AnnotationMetadataProvider> {
         /**
          * @return The filter
          */
-        @NonNull InternalFilter getFilter();
+        @NonNull
+        GenericHttpFilter getFilter();
 
         /**
          * @return The filter methods.
@@ -113,7 +114,7 @@ public interface HttpFilterResolver<T extends AnnotationMetadataProvider> {
             @Nullable Set<HttpMethod> methods,
             @NonNull FilterPatternStyle patternStyle, String... patterns) {
             return new DefaultFilterEntry(
-                new InternalFilter.AroundLegacy(
+                new GenericHttpFilter.AroundLegacy(
                     Objects.requireNonNull(filter, "Filter cannot be null"),
                     new FilterOrder.Dynamic(OrderUtil.getOrder(annotationMetadata))),
                 annotationMetadata != null ? annotationMetadata : AnnotationMetadata.EMPTY_METADATA,

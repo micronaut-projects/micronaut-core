@@ -28,7 +28,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.filter.FilterRunner;
-import io.micronaut.http.filter.InternalFilter;
+import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
 import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
@@ -258,11 +258,11 @@ public class RequestLifecycle {
      */
     protected final ExecutionFlow<MutableHttpResponse<?>> runWithFilters(Supplier<ExecutionFlow<MutableHttpResponse<?>>> downstream) {
         ServerRequestContext.set(request);
-        List<InternalFilter> httpFilters = routeExecutor.router.findFilters(request);
+        List<GenericHttpFilter> httpFilters = routeExecutor.router.findFilters(request);
 
-        List<InternalFilter> filters = new ArrayList<>(httpFilters.size() + 1);
+        List<GenericHttpFilter> filters = new ArrayList<>(httpFilters.size() + 1);
         filters.addAll(httpFilters);
-        filters.add((InternalFilter.TerminalWithReactorContext) (request, context) -> {
+        filters.add((GenericHttpFilter.TerminalWithReactorContext) (request, context) -> {
             this.request = request;
             this.context = context;
             return downstream.get();

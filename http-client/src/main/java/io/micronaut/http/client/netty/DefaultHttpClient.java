@@ -76,10 +76,10 @@ import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.filter.FilterOrder;
 import io.micronaut.http.filter.FilterRunner;
+import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.http.filter.HttpClientFilter;
 import io.micronaut.http.filter.HttpClientFilterResolver;
 import io.micronaut.http.filter.HttpFilterResolver;
-import io.micronaut.http.filter.InternalFilter;
 import io.micronaut.http.multipart.MultipartException;
 import io.micronaut.http.netty.AbstractNettyHttpRequest;
 import io.micronaut.http.netty.NettyHttpHeaders;
@@ -1250,17 +1250,17 @@ public class DefaultHttpClient implements
 
         ((MutableHttpRequest<I>) request).uri(requestURI);
 
-        List<InternalFilter> filters =
+        List<GenericHttpFilter> filters =
                 filterResolver.resolveFilters(request, clientFilterEntries);
         if (parentRequest != null) {
             // todo: migrate to new filter
             filters.add(
-                new InternalFilter.AroundLegacy(new ClientServerContextFilter(parentRequest),
+                new GenericHttpFilter.AroundLegacy(new ClientServerContextFilter(parentRequest),
                 new FilterOrder.Fixed(Ordered.HIGHEST_PRECEDENCE)));
         }
 
         FilterRunner.sortReverse(filters);
-        filters.add(new InternalFilter.TerminalReactive(responsePublisher));
+        filters.add(new GenericHttpFilter.TerminalReactive(responsePublisher));
 
         FilterRunner runner = new FilterRunner(filters);
         Mono<R> responseMono = Mono.deferContextual(ctx -> {

@@ -20,7 +20,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
-import io.micronaut.http.filter.InternalFilter;
+import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRoute;
@@ -159,7 +159,7 @@ public class FilteredRouter implements Router {
 
     @NonNull
     @Override
-    public List<InternalFilter> findFilters(@NonNull HttpRequest<?> request) {
+    public List<GenericHttpFilter> findFilters(@NonNull HttpRequest<?> request) {
         return router.findFilters(request);
     }
 

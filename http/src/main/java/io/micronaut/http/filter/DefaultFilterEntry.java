@@ -32,7 +32,7 @@ import java.util.Set;
  * @since 2.0
  */
 final class DefaultFilterEntry implements HttpFilterResolver.FilterEntry {
-    private final InternalFilter httpFilter;
+    private final GenericHttpFilter httpFilter;
     private final AnnotationMetadata annotationMetadata;
     private final Set<HttpMethod> filterMethods;
     private final String[] patterns;
@@ -49,7 +49,7 @@ final class DefaultFilterEntry implements HttpFilterResolver.FilterEntry {
      * @param patterns THe patterns
      */
     DefaultFilterEntry(
-            InternalFilter filter,
+            GenericHttpFilter filter,
             AnnotationMetadata annotationMetadata,
             Set<HttpMethod> httpMethods,
             FilterPatternStyle patternStyle,
@@ -70,7 +70,7 @@ final class DefaultFilterEntry implements HttpFilterResolver.FilterEntry {
     }
 
     @Override
-    public InternalFilter getFilter() {
+    public GenericHttpFilter getFilter() {
         return httpFilter;
     }
 
