@@ -213,15 +213,10 @@ public final class NettyStreamingFileUpload implements StreamingFileUpload {
      * don't depend on request.
      */
     @Internal
-    public static final class Factory {
-        private final HttpServerConfiguration.MultipartConfiguration multipartConfiguration;
-        private final ExecutorService ioExecutor;
-
-        public Factory(HttpServerConfiguration.MultipartConfiguration multipartConfiguration, ExecutorService ioExecutor) {
-            this.multipartConfiguration = multipartConfiguration;
-            this.ioExecutor = ioExecutor;
-        }
-
+    public record Factory(
+        HttpServerConfiguration.MultipartConfiguration multipartConfiguration,
+        ExecutorService ioExecutor
+    ) {
         public NettyStreamingFileUpload create(io.netty.handler.codec.http.multipart.FileUpload httpData,
                                                Flux<PartData> subject) {
             return new NettyStreamingFileUpload(httpData, multipartConfiguration, ioExecutor, subject);

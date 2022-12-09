@@ -82,13 +82,8 @@ public class NettyPartData implements PartData {
      */
     @Override
     public ByteBuffer getByteBuffer() throws IOException {
-        ByteBuf byteBuf = getByteBuf();
-        try {
-            // todo: should return a copy
-            return byteBuf.nioBuffer();
-        } finally {
-            byteBuf.release();
-        }
+        // we need to copy the buffer, so this is as good as it gets
+        return ByteBuffer.wrap(getBytes());
     }
 
     /**

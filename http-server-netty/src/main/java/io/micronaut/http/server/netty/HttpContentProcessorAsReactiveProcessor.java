@@ -38,7 +38,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * @author Jonas Konrad
  */
 @Internal
-public class HttpContentProcessorAsReactiveProcessor extends HttpContentProcessorAsReactiveSubscriber implements Processor<ByteBufHolder, Object> {
+public final class HttpContentProcessorAsReactiveProcessor extends HttpContentProcessorAsReactiveSubscriber implements Processor<ByteBufHolder, Object> {
     private static final Object END = new Object();
 
     // we use this essentially like a lock, except it's *not* reentrant

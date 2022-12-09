@@ -84,10 +84,12 @@ public class NettyCompletedFileUpload implements CompletedFileUpload {
      */
     @Override
     public InputStream getInputStream() throws IOException {
-        InputStream s = ((MicronautHttpData<?>) fileUpload).toStream();
-        fileUpload.release(); // it's retained by toStream, and released by InputStream.close
-        closeTracker(); // discard won't be called
-        return s;
+        try {
+            return ((MicronautHttpData<?>) fileUpload).toStream();
+        } finally {
+            fileUpload.release(); // it's retained by toStream, and released by InputStream.close
+            closeTracker(); // discard won't be called
+        }
     }
 
     /**

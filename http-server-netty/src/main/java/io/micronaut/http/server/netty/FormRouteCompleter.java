@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.reflect.ClassUtils;
@@ -43,6 +44,14 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 
+/**
+ * Extension of {@link BaseRouteCompleter} that handles incoming multipart data and binds
+ * parameters (e.g. {@link io.micronaut.http.annotation.Part}).
+ *
+ * @since 4.0.0
+ * @author Jonas Konrad
+ */
+@Internal
 final class FormRouteCompleter extends BaseRouteCompleter {
     static final Argument<PartData> ARGUMENT_PART_DATA = Argument.of(PartData.class);
     private static final Logger LOG = LoggerFactory.getLogger(FormRouteCompleter.class);

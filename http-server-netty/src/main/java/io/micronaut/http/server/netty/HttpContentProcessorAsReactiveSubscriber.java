@@ -95,5 +95,10 @@ abstract class HttpContentProcessorAsReactiveSubscriber implements Subscriber<By
         upstream.request(1);
     }
 
+    /**
+     * Called when new data is available, when there is an error, or when we are {@link #done}.
+     *
+     * @param out The new data, may be empty
+     */
     abstract void notifyContentAvailable(Collection<Object> out);
 }
