@@ -730,7 +730,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
         BeanDefinition<T> beanDefinition;
         if (inject && running.get()) {
             // Bean cannot be injected before the start of the context
-            beanDefinition = findBeanDefinition(type, qualifier).orElse(null);
+            beanDefinition = findConcreteCandidate(null, Argument.of(type), qualifier, false).orElse(null);
             if (beanDefinition == null) {
                 // Purge cache miss
                 purgeCacheForBeanInstance(singleton);
@@ -758,14 +758,6 @@ public class DefaultBeanContext implements InitializableBeanContext {
             );
             singletonScope.registerSingletonBean(registration, qualifier);
             registerBeanDefinition(runtimeBeanDefinition);
-
-            for (Class<?> indexedType : indexedTypes) {
-                if (indexedType == type || indexedType.isAssignableFrom(type)) {
-                    final Collection<BeanDefinitionReference> indexed = resolveTypeIndex(indexedType);
-                    indexed.add(runtimeBeanDefinition);
-                    break;
-                }
-            }
         }
         return this;
     }
@@ -1663,21 +1655,15 @@ public class DefaultBeanContext implements InitializableBeanContext {
     @NonNull
     public <B> BeanContext registerBeanDefinition(@NonNull RuntimeBeanDefinition<B> definition) {
         Objects.requireNonNull(definition, "Bean definition cannot be null");
-        BeanDefinition<B> existing = findBeanDefinition(definition.getGenericBeanType(), definition.getDeclaredQualifier()).orElse(null);
-        if (existing instanceof RuntimeBeanDefinition<B> runtimeBeanDefinition) {
-            this.beanDefinitionsClasses.remove(runtimeBeanDefinition);
-        }
+        Class<B> beanType = definition.getBeanType();
+        this.beanDefinitionsClasses.add(definition);
         for (Class<?> indexedType : indexedTypes) {
-            if (definition.isCandidateBean(Argument.of(indexedType))) {
-                Collection<BeanDefinitionReference> index = resolveTypeIndex(indexedType);
-                if (existing instanceof RuntimeBeanDefinition<B> runtimeBeanDefinition) {
-                    index.remove(runtimeBeanDefinition);
-                }
-                index.add(definition);
+            if (indexedType == beanType || indexedType.isAssignableFrom(beanType)) {
+                final Collection<BeanDefinitionReference> indexed = resolveTypeIndex(indexedType);
+                indexed.add(definition);
+                break;
             }
         }
-        this.beanDefinitionsClasses.add(definition);
-        Class<B> beanType = definition.getBeanType();
         purgeCacheForBeanType(beanType);
         return this;
     }
@@ -1687,6 +1673,25 @@ public class DefaultBeanContext implements InitializableBeanContext {
         beanConcreteCandidateCache.entrySet().removeIf(entry -> entry.getKey().beanType.isAssignableFrom(beanType));
         singletonBeanRegistrations.entrySet().removeIf(entry -> entry.getKey().beanType.isAssignableFrom(beanType));
         containsBeanCache.entrySet().removeIf(entry -> entry.getKey().beanType.isAssignableFrom(beanType));
+    }
+
+    /**
+     * The definition to remove.
+     * @param definition The definition to remove
+     * @param <B> The bean type
+     */
+    @Internal
+    <B> void removeBeanDefinition(RuntimeBeanDefinition<B> definition) {
+        Class<B> beanType = definition.getBeanType();
+        for (Class<?> indexedType : indexedTypes) {
+            if (indexedType == beanType || indexedType.isAssignableFrom(beanType)) {
+                final Collection<BeanDefinitionReference> indexed = resolveTypeIndex(indexedType);
+                indexed.remove(definition);
+                break;
+            }
+        }
+        this.beanDefinitionsClasses.remove(definition);
+        purgeCacheForBeanType(definition.getBeanType());
     }
 
     /**

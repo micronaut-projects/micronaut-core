@@ -13,6 +13,23 @@ The `micronaut-runtime` module has been split into separate modules depending on
 
 In addition, since `micronaut-retry` is now optional declarative clients annotated with ann:http.client.annotation.Client[] no longer invoke fallbacks by default. To restore the previous behaviour add `micronaut-retry` to your classpath and annotate any declarative clients with ann:retry.annotation.Recoverable[].
 
+==== Calling `registerSingleton(bean)` no longer overrides existing beans
+
+If you call `registerSingleton(bean)` on the api:context.BeanContext[] this will no longer override existing beans if the type and qualifier match, instead two beans will now exist which may lead to a api:context.exceptions.NonUniqueBeanException[].
+
+If you require replacing an existing bean you must formalize the replacement using the api:context.RuntimeBeanDefinition[] API, for example:
+
+[source,java]
+----
+context.registerBeanDefinition(
+    RuntimeBeanDefinition.builder(Codec.class, ()-> new OverridingCodec())
+            .singleton(true)
+            // the type of the bean to replace
+            .replaces(ToBeReplacedCodec.class)
+            .build()
+);
+----
+
 ==== WebSocket No Longer Required
 
 The `micronaut-websocket` API is no longer a required dependency of the HTTP server. If you are using annotations such as ann:websocket.annotation.ServerWebSocket[] you should add the `micronaut-websocket` dependency to your application classpath:
