@@ -34,6 +34,7 @@ import io.micronaut.inject.qualifiers.TypeArgumentQualifier;
 
 import java.lang.annotation.Annotation;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -89,23 +90,30 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
 
     @Override
     public List<Argument<?>> getTypeArguments(Class<?> type) {
-        if (type == getBeanType()) {
+        Class<T> bt = getBeanType();
+        if (type == bt) {
             return getTypeArguments();
         }
-        if (typeArguments != null) {
-            List<Argument<?>> args = typeArguments.get(type);
-            if (args != null) {
-                return args;
+        if (type != null && type.isAssignableFrom(bt)) {
+            if (typeArguments != null) {
+                List<Argument<?>> args = typeArguments.get(type);
+                if (args != null) {
+                    return args;
+                }
             }
-        }
-        List<Argument<?>> list = RuntimeBeanDefinition.super.getTypeArguments(type);
-        if (CollectionUtils.isNotEmpty(list)) {
-            synchronized (this.beanType) {
-                typeArguments = new HashMap<>(3);
+            List<Argument<?>> list = RuntimeBeanDefinition.super.getTypeArguments(type);
+            if (CollectionUtils.isNotEmpty(list)) {
+                if (typeArguments == null) {
+                    synchronized (this.beanType) {
+                        typeArguments = new LinkedHashMap<>(3);
+                    }
+                }
                 typeArguments.put(type, list);
             }
+            return list;
+        } else {
+            return Collections.emptyList();
         }
-        return list;
     }
 
     @Override
