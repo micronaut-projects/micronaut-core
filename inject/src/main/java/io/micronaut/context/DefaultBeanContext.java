@@ -1677,7 +1677,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
     /**
      * The definition to remove.
-     * @param definition The definitino to remove
+     * @param definition The definition to remove
      * @param <B> The bean type
      */
     @Internal
