@@ -211,6 +211,9 @@ public final class NettyStreamingFileUpload implements StreamingFileUpload {
     /**
      * Factory for instances of {@link NettyStreamingFileUpload}. Wraps the fixed requirements that
      * don't depend on request.
+     *
+     * @param ioExecutor The IO executor
+     * @param multipartConfiguration The multipart configuration
      */
     @Internal
     public record Factory(
