@@ -144,9 +144,9 @@ public final class NettyConvertersSpi implements TypeConverterRegistrar {
                     return Optional.empty();
                 }
 
-                // converter does not claim the input object, so we need to retain it here. it's
-                // released by NettyCompletedFileUpload.get*
-                return Optional.of(new NettyCompletedFileUpload(object.retain()));
+                // unlike NettyCompletedAttribute, NettyCompletedFileUpload does a `retain` on
+                // construct, so we don't need one here
+                return Optional.of(new NettyCompletedFileUpload(object));
             } catch (Exception e) {
                 context.reject(e);
                 return Optional.empty();
