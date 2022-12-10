@@ -168,7 +168,7 @@ public final class RouteExecutor {
 
         List<UriRouteMatch<Object, Object>> uriRoutes = router.findAllClosest(httpRequest);
         if (uriRoutes.size() > 1) {
-            throw new DuplicateRouteException(httpRequest.getUri().getPath(), uriRoutes);
+            throw new DuplicateRouteException(httpRequest.getPath(), uriRoutes);
         } else if (uriRoutes.size() == 1) {
             routeMatch = uriRoutes.get(0);
         }
