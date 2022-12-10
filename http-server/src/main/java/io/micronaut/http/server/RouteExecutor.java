@@ -174,7 +174,7 @@ public final class RouteExecutor {
         }
 
         if (routeMatch == null && httpRequest.getMethod().equals(HttpMethod.OPTIONS)) {
-            List<UriRouteMatch<Object, Object>> anyUriRoutes = router.findAny(httpRequest.getUri().toString(), httpRequest).toList();
+            List<UriRouteMatch<Object, Object>> anyUriRoutes = router.findAny(httpRequest.getPath(), httpRequest).toList();
             if (!anyUriRoutes.isEmpty()) {
                 setRouteAttributes(httpRequest, anyUriRoutes.get(0));
                 httpRequest.setAttribute(AVAILABLE_HTTP_METHODS, anyUriRoutes.stream().map(UriRouteMatch::getHttpMethod).toList());
