@@ -7,7 +7,10 @@ dependencies {
     api project(":aop")
     api libs.asm.tree
     api libs.bundles.asm
-    api 'com.github.javaparser:javaparser-symbol-solver-core:3.24.7'
+    api(libs.managed.java.parser.core) {
+        exclude group:'org.javassist', module:'javassist'
+        exclude group:'com.google.guava', module:'guava'
+    }
 
     compileOnly libs.kotlin.stdlib.jdk8
     compileOnly libs.managed.validation

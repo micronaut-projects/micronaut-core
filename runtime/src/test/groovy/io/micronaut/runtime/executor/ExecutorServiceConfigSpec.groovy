@@ -58,7 +58,7 @@ class ExecutorServiceConfigSpec extends Specification {
         executorServices.size() == expectedExecutorCount
 
         when:
-        ThreadPoolExecutor poolExecutor = ctx.getBean(ThreadPoolExecutor, Qualifiers.byName("one"))
+        ThreadPoolExecutor poolExecutor = (ThreadPoolExecutor) ctx.getBean(ExecutorService, Qualifiers.byName("one"))
         ExecutorService forkJoinPool = ctx.getBean(ExecutorService, Qualifiers.byName("two"))
 
         then:
@@ -111,7 +111,7 @@ class ExecutorServiceConfigSpec extends Specification {
 
         when:
         Collection<ExecutorService> executorServices = ctx.getBeansOfType(ExecutorService.class)
-        ThreadPoolExecutor poolExecutor = ctx.getBean(ThreadPoolExecutor, Qualifiers.byName("one"))
+        ThreadPoolExecutor poolExecutor = (ThreadPoolExecutor) ctx.getBean(ExecutorService, Qualifiers.byName("one"))
         ExecutorService forkJoinPool = ctx.getBean(ExecutorService, Qualifiers.byName("two"))
 
         then:

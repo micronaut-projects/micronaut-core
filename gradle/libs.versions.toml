@@ -43,6 +43,7 @@ logbook-netty = "2.14.0"
 log4j = "2.19.0"
 micronaut-aws = "3.9.2"
 micronaut-groovy = "4.0.0-SNAPSHOT"
+micronaut-session = "1.0.0-SNAPSHOT"
 micronaut-sql = "4.7.2"
 micronaut-test = "4.0.0-SNAPSHOT"
 micronaut-serde = "2.0.0-SNAPSHOT"
@@ -80,7 +81,6 @@ micronaut-docs = "2.0.0"
 
 [libraries]
 # Libraries prefixed with bom- are BOM files
-
 test-boms-micronaut-aws = { module = "io.micronaut.aws:micronaut-aws-bom", version.ref = "micronaut-aws" }
 test-boms-micronaut-sql = { module = "io.micronaut.sql:micronaut-sql-bom", version.ref = "micronaut-sql" }
 test-boms-micronaut-tracing = { module = "io.micronaut.tracing:micronaut-tracing-bom", version.ref = "micronaut-tracing" }
@@ -110,7 +110,7 @@ managed-jackson-module-afterburner = { module = "com.fasterxml.jackson.module:ja
 managed-jackson-module-kotlin = { module = "com.fasterxml.jackson.module:jackson-module-kotlin", version.ref = "managed-jackson" }
 managed-jackson-module-parameterNames = { module = "com.fasterxml.jackson.module:jackson-module-parameter-names", version.ref = "managed-jackson" }
 managed-ksp = { module = "com.google.devtools.ksp:symbol-processing-api", version.ref = "managed-ksp" }
-
+managed-java-parser-core = { module = "com.github.javaparser:javaparser-symbol-solver-core", version.ref = "managed-java-parser-core" }
 managed-methvin-directoryWatcher = { module = "io.methvin:directory-watcher", version.ref = "managed-methvin-directory-watcher" }
 
 managed-netty-buffer = { module = "io.netty:netty-buffer", version.ref = "managed-netty" }
@@ -125,6 +125,7 @@ managed-netty-transport-native-unix-common = { module = "io.netty:netty-transpor
 managed-reactive-streams = { module = "org.reactivestreams:reactive-streams", version.ref = "managed-reactive-streams" }
 
 managed-reactor = { module = "io.projectreactor:reactor-core", version.ref = "managed-reactor" }
+managed-reactor-test = { module = "io.projectreactor:reactor-test", version.ref = "managed-reactor" }
 
 managed-slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "managed-slf4j" }
 managed-slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "managed-slf4j" }
@@ -215,6 +216,7 @@ logbook-netty = { module = "org.zalando:logbook-netty", version.ref = "logbook-n
 micronaut-docs = { module = "io.micronaut.docs:micronaut-docs-asciidoc-config-props", version.ref = "micronaut-docs" }
 micronaut-runtime-groovy = { module = "io.micronaut.groovy:micronaut-runtime-groovy", version.ref = "micronaut-groovy" }
 micronaut-serde-jackson = { module = "io.micronaut.serde:micronaut-serde-jackson", version.ref = "micronaut-serde" }
+micronaut-session = { module = "io.micronaut.session:micronaut-session", version.ref = "micronaut-session" }
 micronaut-test-bom = { module = "io.micronaut.test:micronaut-test-bom", version.ref = "micronaut-test" }
 micronaut-test-core = { module = "io.micronaut.test:micronaut-test-core", version.ref = "micronaut-test" }
 micronaut-test-junit5 = { module = "io.micronaut.test:micronaut-test-junit5", version.ref = "micronaut-test" }

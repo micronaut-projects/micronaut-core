@@ -38,6 +38,8 @@ public abstract class DefaultMicronautCoreExtension implements MicronautCoreExte
         dep.exclude(module("micronaut-runtime"));
         dep.exclude(module("micronaut-inject"));
         dep.exclude(module("micronaut-bom"));
+        dep.exclude(module("micronaut-core-bom"));
+        dep.exclude(module("micronaut-platform"));
     }
 
     @Override
