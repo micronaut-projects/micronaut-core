@@ -14,13 +14,13 @@ micronautBuild {
 dependencies {
     api project(":core-processor")
 
-    implementation("com.google.devtools.ksp:symbol-processing-api:1.8.0-Beta-1.0.8")
+    implementation(libs.managed.ksp)
     if (!JavaVersion.current().isJava9Compatible()) {
         api files(org.gradle.internal.jvm.Jvm.current().toolsJar)
     }
 //    kspTest(project)
-    testImplementation("com.github.tschuchortdev:kotlin-compile-testing-ksp:1.4.9")
     testImplementation project(":jackson-databind")
+    testImplementation project(":inject-kotlin-test")
     testImplementation libs.kotlin.stdlib
     testImplementation libs.managed.jackson.annotations
     testImplementation libs.managed.validation

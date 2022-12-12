@@ -8,7 +8,7 @@ import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanFactory
 import io.micronaut.inject.ValidatedBeanDefinition
 import spock.lang.Specification
-import static io.micronaut.kotlin.processing.KotlinCompiler.*
+import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class ImmutableConfigurationPropertiesSpec extends Specification {
 
@@ -78,7 +78,7 @@ import io.micronaut.context.annotation.*
 
 @ConfigurationProperties("foo.bar")
 class MyConfig @ConfigurationInject constructor(@javax.validation.constraints.NotBlank val host: String, val serverPort: Int) {
- 
+
     @ConfigurationProperties("baz")
     class ChildConfig @ConfigurationInject constructor(val stuff: String)
 }
@@ -154,7 +154,7 @@ class MyConfig {
         private set
     var serverPort: Int = 0
         private set
-    
+
     @ConfigurationInject
     fun init(host: String, serverPort: Int) {
        this.host = host

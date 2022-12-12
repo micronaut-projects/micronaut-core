@@ -4,7 +4,7 @@ import io.micronaut.inject.BeanDefinition
 import spock.lang.PendingFeature
 import spock.lang.Specification
 
-import static io.micronaut.kotlin.processing.KotlinCompiler.*
+import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class InheritedExecutableSpec extends Specification {
 

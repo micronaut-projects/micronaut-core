@@ -27,7 +27,7 @@ import spock.lang.Specification
 
 import java.nio.charset.StandardCharsets
 
-import static io.micronaut.kotlin.processing.KotlinCompiler.*
+import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class MethodAdapterSpec extends Specification {
 

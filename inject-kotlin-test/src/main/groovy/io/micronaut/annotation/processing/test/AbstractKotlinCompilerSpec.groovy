@@ -15,27 +15,18 @@
  */
 package io.micronaut.annotation.processing.test
 
-import io.micronaut.aop.internal.InterceptorRegistryBean
+
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.Qualifier
-import io.micronaut.context.event.ApplicationEventPublisherFactory
 import io.micronaut.core.beans.BeanIntrospection
-import io.micronaut.core.io.scan.ClassPathResourceLoader
 import io.micronaut.core.naming.NameUtils
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.BeanDefinitionReference
-import io.micronaut.inject.provider.BeanProviderDefinition
-import io.micronaut.inject.provider.JakartaProviderBeanDefinition
 import org.intellij.lang.annotations.Language
 import spock.lang.Specification
 
-import java.util.stream.Collectors
-
 class AbstractKotlinCompilerSpec extends Specification {
     protected ClassLoader buildClassLoader(String className, @Language("kotlin") String cls) {
-        def result = KotlinCompileHelper.INSTANCE.run(className, cls)
-        result.classLoader
+        KotlinCompiler.buildClassLoader(className, cls)
     }
 
     /**
@@ -58,24 +49,16 @@ class AbstractKotlinCompilerSpec extends Specification {
      * @return the introspection if it is correct
      */
     protected ApplicationContext buildContext(String className, @Language("kotlin") String cls, boolean includeAllBeans = false) {
-        def result = KotlinCompileHelper.INSTANCE.run(className, cls)
-        ClassLoader classLoader = result.classLoader
+        KotlinCompiler.buildContext(cls, includeAllBeans)
+    }
 
-        return new DefaultApplicationContext(ClassPathResourceLoader.defaultLoader(classLoader), "test") {
-            @Override
-            protected List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
-                // we want only the definitions we just compiled
-                def stream = result.fileNames.stream()
-                        .filter(s -> s.endsWith('$Definition$Reference.class'))
-                        .map(n -> classLoader.loadClass(n.substring(0, n.size() - 6).replace('/', '.')).newInstance())
-                return stream.collect(Collectors.toList()) + (includeAllBeans ? super.resolveBeanDefinitionReferences() : [
-                        new InterceptorRegistryBean(),
-                        new BeanProviderDefinition(),
-                        new JakartaProviderBeanDefinition(),
-                        new ApplicationEventPublisherFactory<>()
-                ])
-            }
-        }.start()
+    /**
+     * Build and return a {@link io.micronaut.core.beans.BeanIntrospection} for the given class name and class data.
+     *
+     * @return the introspection if it is correct
+     */
+    protected ApplicationContext buildContext(@Language("kotlin") String cls, boolean includeAllBeans = false) {
+        KotlinCompiler.buildContext(cls, includeAllBeans)
     }
 
     Object getBean(ApplicationContext context, String className, Qualifier qualifier = null) {
@@ -83,15 +66,6 @@ class AbstractKotlinCompilerSpec extends Specification {
     }
 
     protected BeanDefinition buildBeanDefinition(String className, @Language("kotlin") String cls) {
-        def beanDefName= '$' + NameUtils.getSimpleName(className) + '$Definition'
-        def packageName = NameUtils.getPackageName(className)
-        String beanFullName = "${packageName}.${beanDefName}"
-
-        ClassLoader classLoader = buildClassLoader(className, cls)
-        try {
-            return (BeanDefinition)classLoader.loadClass(beanFullName).newInstance()
-        } catch (ClassNotFoundException e) {
-            return null
-        }
+        KotlinCompiler.buildBeanDefinition(className, cls)
     }
 }

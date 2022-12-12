@@ -10,7 +10,7 @@ import io.micronaut.inject.BeanFactory
 import io.micronaut.kotlin.processing.beans.configuration.Engine
 import spock.lang.Specification
 
-import static io.micronaut.kotlin.processing.KotlinCompiler.*
+import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 
 class ConfigPropertiesParseSpec extends Specification {
@@ -26,7 +26,7 @@ import io.micronaut.context.annotation.ConfigurationProperties
 class MyConfig {
 
     var host: String? = null
-    
+
     @ConfigurationProperties("baz")
     class ChildConfig: ParentConfig() {
         internal var stuff: String? = null
@@ -61,11 +61,11 @@ import io.micronaut.context.annotation.ConfigurationProperties
 @ConfigurationProperties("foo.bar")
 class MyConfig {
     var host: String? = null
-    
+
     @ConfigurationProperties("baz")
     class ChildConfig {
         var stuff: String? = null
-    
+
         @ConfigurationProperties("more")
         class MoreConfig {
             var stuff: String? = null
@@ -145,7 +145,7 @@ open class MyProperties {
     open val protectedFinal = true
     private val anotherField = false
     private var internalField = "unconfigured"
-    
+
     fun setSetterTest(s: String) {
         this.internalField = s
     }
@@ -192,13 +192,13 @@ import io.micronaut.context.annotation.ConfigurationProperties
 
 @ConfigurationProperties("foo")
 class MyProperties: Parent() {
-  
+
     open var fieldTest: String = "unconfigured"
     private val privateFinal = true
     open val protectedFinal = true
     private val anotherField = false
     private var internalField = "unconfigured"
-    
+
     fun setSetterTest(s: String) {
         this.internalField = s
     }
@@ -425,7 +425,7 @@ class EntityProperties {
     fun init() {
         println("prop = \$prop")
     }
-    
+
     var prop: String? = null
 }
 """)

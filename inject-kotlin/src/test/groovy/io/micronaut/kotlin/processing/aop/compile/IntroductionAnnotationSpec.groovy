@@ -12,7 +12,7 @@ import spock.lang.Specification
 import javax.validation.constraints.Min
 import javax.validation.constraints.NotBlank
 
-import static io.micronaut.kotlin.processing.KotlinCompiler.*
+import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class IntroductionAnnotationSpec extends Specification {
 
@@ -56,11 +56,11 @@ import io.micronaut.kotlin.processing.aop.simple.Mutating
 abstract class MyBean {
 
     abstract fun test()
-    
+
     fun test2(): String {
         return "good"
     }
-    
+
     @Mutating("arg")
     open fun test3(arg: String): String {
         return arg
@@ -103,7 +103,7 @@ import javax.validation.constraints.NotBlank
 interface MyInterface{
     @Executable
     fun save(@NotBlank name: String, @Min(1L) age: Int)
-    
+
     @Executable
     fun saveTwo(@Min(1L) name: String)
 }

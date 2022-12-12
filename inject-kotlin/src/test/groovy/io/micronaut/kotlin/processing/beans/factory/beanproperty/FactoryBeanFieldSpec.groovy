@@ -3,7 +3,7 @@ package io.micronaut.kotlin.processing.beans.factory.beanproperty
 import spock.lang.Specification
 import spock.lang.Unroll
 
-import static io.micronaut.kotlin.processing.KotlinCompiler.*
+import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class FactoryBeanFieldSpec extends Specification {
 
@@ -108,7 +108,7 @@ class MyBean(@Named("totals") val totals: ${primitiveType}Array) {
     lateinit var totalsFromProperty: ${primitiveType}Array
 
     var totalsFromMethod: ${primitiveType}Array? = null
-    
+
     @Inject
     fun setTotals(@Named("totals") totals: ${primitiveType}Array) {
         this.totalsFromMethod = totals
@@ -154,7 +154,7 @@ class MyBean(@Named("totals") val totals: Array<${primitiveType}Array>) {
     lateinit var totalsFromProperty: Array<${primitiveType}Array>
 
     var totalsFromMethod: Array<${primitiveType}Array>? = null
-    
+
     @Inject
     fun setTotals(@Named("totals") totals: Array<${primitiveType}Array>) {
         this.totalsFromMethod = totals
@@ -200,7 +200,7 @@ class MyBean(@Named("total") val total: ${primitiveType}) {
     var totalFromProperty: ${primitiveType} = 0${primitiveType == 'Double' ? '.0' : (primitiveType == 'Float' ? 'F': '')}
 
     var totalFromMethod: ${primitiveType}? = null
-    
+
     @Inject
     fun setTotals(@Named("total") total: ${primitiveType}) {
         this.totalFromMethod = total

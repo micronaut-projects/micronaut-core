@@ -4,7 +4,7 @@ import io.micronaut.aop.Intercepted
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 import spock.lang.Specification
 
-import static io.micronaut.kotlin.processing.KotlinCompiler.*
+import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class IntroductionInnerInterfaceSpec extends Specification {
 
@@ -20,7 +20,7 @@ import io.micronaut.kotlin.processing.aop.introduction.Stub
 @Singleton
 class Test {
 
-    @Stub    
+    @Stub
     interface InnerIntroduction
 }
 ''')

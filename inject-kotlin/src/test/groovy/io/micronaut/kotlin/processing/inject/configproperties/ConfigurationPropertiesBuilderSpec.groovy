@@ -6,7 +6,7 @@ import io.micronaut.inject.BeanFactory
 import org.neo4j.driver.v1.Config
 import spock.lang.PendingFeature
 import spock.lang.Specification
-import static io.micronaut.kotlin.processing.KotlinCompiler.*
+import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class ConfigurationPropertiesBuilderSpec extends Specification {
 
@@ -19,7 +19,7 @@ import io.micronaut.context.annotation.*;
 
 @ConfigurationProperties("test")
 class MyProperties {
-    
+
     @ConfigurationBuilder(factoryMethod="build")
     var test: Test? = null
 }
@@ -27,7 +27,7 @@ class MyProperties {
 class Test private constructor() {
 
     var foo: String? = null
-    
+
     companion object {
         @JvmStatic
         fun build(): Test {
@@ -57,7 +57,7 @@ import io.micronaut.context.annotation.*;
 
 @ConfigurationProperties("test")
 class MyProperties {
-    
+
     @ConfigurationBuilder(factoryMethod="build", includes=["foo"])
     var test: Test? = null
 }
@@ -66,7 +66,7 @@ class Test private constructor() {
 
     var foo: String? = null
     var bar: String? = null
-    
+
     companion object {
         @JvmStatic
         fun build(): Test {
@@ -98,13 +98,13 @@ import io.micronaut.context.annotation.*
 
 @ConfigurationProperties("test")
 class MyProperties {
-    
+
     @ConfigurationBuilder
     var test = Test()
 }
 
 class Test {
-    fun setFoo(s: String) { 
+    fun setFoo(s: String) {
         throw NoSuchMethodError("setFoo")
     }
 }
@@ -127,7 +127,7 @@ import io.micronaut.context.annotation.*
 
 @ConfigurationProperties("test")
 class MyProperties {
-    
+
     @ConfigurationBuilder
     var test = Test()
 }
@@ -173,9 +173,9 @@ import org.neo4j.driver.v1.*
 @ConfigurationProperties("neo4j.test")
 class Neo4jProperties {
     protected var uri: java.net.URI? = null
-    
+
     @ConfigurationBuilder(
-        prefixes=["with"], 
+        prefixes=["with"],
         allowZeroArgs=true
     )
     var options: Config.ConfigBuilder = Config.build()
@@ -219,9 +219,9 @@ import org.neo4j.driver.v1.*
 @ConfigurationProperties("neo4j.test")
 class Neo4jProperties {
     protected var uri: java.net.URI? = null
-    
+
     @ConfigurationBuilder(
-        prefixes=["with"], 
+        prefixes=["with"],
         allowZeroArgs=true,
         configurationPrefix="options"
     )
@@ -265,9 +265,9 @@ import org.neo4j.driver.v1.*
 @ConfigurationProperties("neo4j.test")
 class Neo4jProperties {
     protected var uri: java.net.URI? = null
-    
+
     @ConfigurationBuilder(
-        prefixes=["with"], 
+        prefixes=["with"],
         allowZeroArgs=true,
         value="options"
     )
@@ -358,13 +358,13 @@ import org.neo4j.driver.v1.*
 @ConfigurationProperties("neo4j.test")
 class Neo4jProperties {
     protected var uri: java.net.URI? = null
-    
+
     @ConfigurationBuilder(
-        prefixes=["with"], 
+        prefixes=["with"],
         allowZeroArgs=true
     )
     var options: Config.ConfigBuilder = Config.build()
-        
+
 }
 ''')
         then:
@@ -399,13 +399,13 @@ import org.neo4j.driver.v1.*
 
 @ConfigurationProperties("neo4j.test")
 class Neo4jProperties {
-    
+
     @ConfigurationBuilder(
-        prefixes=["with"], 
+        prefixes=["with"],
         allowZeroArgs=true
     )
     val options: Config.ConfigBuilder = Config.build()
-        
+
 }
 ''')
         BeanFactory factory = beanDefinition

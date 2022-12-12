@@ -5,7 +5,7 @@ import io.micronaut.context.event.ApplicationEventListener
 import io.micronaut.context.event.StartupEvent
 import spock.lang.Specification
 
-import static io.micronaut.kotlin.processing.KotlinCompiler.*
+import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class MappedIntroductionOnConcreteClassSpec extends Specification {
 

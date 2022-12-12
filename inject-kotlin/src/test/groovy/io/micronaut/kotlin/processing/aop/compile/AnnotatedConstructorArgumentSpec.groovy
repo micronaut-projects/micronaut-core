@@ -25,7 +25,7 @@ import io.micronaut.inject.BeanFactory
 import io.micronaut.inject.writer.BeanDefinitionWriter
 import spock.lang.Specification
 
-import static io.micronaut.kotlin.processing.KotlinCompiler.*
+import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class AnnotatedConstructorArgumentSpec extends Specification {
 
@@ -40,7 +40,7 @@ import io.micronaut.context.annotation.Value
 @Mutating("someVal")
 @jakarta.inject.Singleton
 open class MyBean(@Value("\\${foo.bar}") val myValue: String) {
-  
+
     open fun someMethod(someVal: String): String = "$myValue $someVal"
 
     internal open fun someMethodPackagePrivateMethod(someVal: String): String = "$myValue $someVal"
@@ -81,7 +81,7 @@ import io.micronaut.context.annotation.Value
 
 @jakarta.inject.Singleton
 open class MyBean(@Value("\\${foo.bar}") val myValue: String) {
-    
+
     @Mutating("someVal")
     open fun someMethod(someVal: String): String = "$myValue $someVal"
 

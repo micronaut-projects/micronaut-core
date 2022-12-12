@@ -8,7 +8,7 @@ import io.micronaut.inject.BeanFactory
 import io.micronaut.inject.ValidatedBeanDefinition
 import io.micronaut.runtime.context.env.ConfigurationAdvice
 import spock.lang.Specification
-import static io.micronaut.kotlin.processing.KotlinCompiler.*
+import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class InterfaceConfigurationPropertiesSpec extends Specification {
 
@@ -24,7 +24,7 @@ import io.micronaut.context.annotation.*
 interface MyConfig {
     @javax.validation.constraints.NotBlank
     fun getHost(): String?
-    
+
     @javax.validation.constraints.Min(10L)
     fun getServerPort(): Int
 }
@@ -115,7 +115,7 @@ import io.micronaut.context.annotation.*
 
 @ConfigurationProperties("bar")
 interface MyConfig: ParentConfig {
-    
+
     @Executable
     @javax.validation.constraints.Min(10L)
     fun getServerPort(): Int
@@ -164,12 +164,12 @@ interface MyConfig {
     @Executable
     @javax.validation.constraints.NotBlank
     fun getHost(): String?
-    
+
     @Executable
     @javax.validation.constraints.Min(10L)
     fun getServerPort(): Int
 
-    @ConfigurationProperties("child")    
+    @ConfigurationProperties("child")
     interface ChildConfig {
         @Executable
         fun getURL(): URL?
@@ -205,15 +205,15 @@ interface MyConfig {
     @javax.validation.constraints.NotBlank
     @Executable
     fun getHost(): String
-    
+
     @javax.validation.constraints.Min(10L)
     @Executable
     fun getServerPort(): Int
-    
+
     @Executable
     fun getChild(): ChildConfig
 
-    @ConfigurationProperties("child")    
+    @ConfigurationProperties("child")
     interface ChildConfig {
         @Executable
         fun getURL(): URL?
@@ -250,7 +250,7 @@ import io.micronaut.context.annotation.*
 interface MyConfig {
     @javax.validation.constraints.NotBlank
     fun junk(s: String): String
-    
+
     @javax.validation.constraints.Min(10L)
     fun getServerPort(): Int
 }

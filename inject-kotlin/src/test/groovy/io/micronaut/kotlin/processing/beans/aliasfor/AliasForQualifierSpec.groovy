@@ -15,9 +15,10 @@
  */
 package io.micronaut.kotlin.processing.beans.aliasfor
 
+import io.micronaut.annotation.processing.test.KotlinCompiler
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.kotlin.processing.KotlinCompiler
+
 import spock.lang.Specification
 
 class AliasForQualifierSpec extends Specification {

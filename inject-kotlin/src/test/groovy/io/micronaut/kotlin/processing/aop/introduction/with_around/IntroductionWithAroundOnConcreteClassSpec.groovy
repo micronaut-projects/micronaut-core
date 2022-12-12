@@ -8,7 +8,7 @@ import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Unroll
 
-import static io.micronaut.kotlin.processing.KotlinCompiler.*
+import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class IntroductionWithAroundOnConcreteClassSpec extends Specification {
 

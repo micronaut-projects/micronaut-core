@@ -1,4 +1,4 @@
-package io.micronaut.kotlin.processing;
+package io.micronaut.annotation.processing.test;
 
 import com.tschuchort.compiletesting.KotlinCompilation;
 import com.tschuchort.compiletesting.KspKt;

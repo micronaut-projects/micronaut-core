@@ -440,7 +440,7 @@ open class KotlinClassElement(protected val classType: KSType,
         } else {
             this
         }
-        return enclosedElementsQuery.getEnclosedElements<T>(classElementToInspect, query)
+        return enclosedElementsQuery.getEnclosedElements(classElementToInspect, query)
 
     }
 
@@ -522,7 +522,7 @@ open class KotlinClassElement(protected val classType: KSType,
                     ).toList()
                 }
                 MethodElement::class.java -> {
-                    val result = classNode.getAllFunctions()
+                    val result = classNode.getDeclaredFunctions()
                         .filter { func: KSFunctionDeclaration ->
                             !func.isInternal() &&
                             !func.isConstructor() &&
@@ -534,7 +534,7 @@ open class KotlinClassElement(protected val classType: KSType,
                     result
                 }
                 FieldElement::class.java -> {
-                    classNode.getAllProperties()
+                    classNode.getDeclaredProperties()
                         .filter {
                             !it.isInternal() &&
                             it.hasBackingField &&

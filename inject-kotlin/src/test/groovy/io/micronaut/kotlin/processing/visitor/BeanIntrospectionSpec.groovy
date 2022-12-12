@@ -16,10 +16,9 @@ import io.micronaut.core.reflect.exception.InstantiationException
 import io.micronaut.core.type.Argument
 import io.micronaut.inject.ExecutableMethod
 import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
-import io.micronaut.kotlin.processing.KotlinCompiler
+
 import io.micronaut.kotlin.processing.elementapi.SomeEnum
 import io.micronaut.kotlin.processing.elementapi.TestClass
-import spock.lang.Ignore
 import spock.lang.Specification
 
 import javax.persistence.Column
@@ -31,8 +30,6 @@ import javax.validation.constraints.Min
 import javax.validation.constraints.NotBlank
 import javax.validation.constraints.Size
 import java.lang.reflect.Field
-
-import static io.micronaut.kotlin.processing.KotlinCompiler.*
 
 class BeanIntrospectionSpec extends Specification {
 
@@ -623,6 +620,7 @@ abstract class GenBase<T> {
 
         def beanProperties = introspection.beanProperties.toList()
         then:
+        beanProperties.size() == 2
         beanProperties[0].type == String
         beanProperties[1].type == String
         introspection.getRequiredProperty("name", String)

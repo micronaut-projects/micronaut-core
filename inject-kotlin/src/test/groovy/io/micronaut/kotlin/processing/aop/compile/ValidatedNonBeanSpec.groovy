@@ -2,7 +2,7 @@ package io.micronaut.kotlin.processing.aop.compile
 
 import io.micronaut.inject.BeanDefinition
 import spock.lang.Specification
-import static io.micronaut.kotlin.processing.KotlinCompiler.*
+import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class ValidatedNonBeanSpec extends Specification {
 

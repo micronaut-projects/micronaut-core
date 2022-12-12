@@ -8,7 +8,7 @@ import org.objectweb.asm.Opcodes
 import spock.lang.Issue
 import spock.lang.Specification
 
-import static io.micronaut.kotlin.processing.KotlinCompiler.*
+import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class GeneratedAnnotationSpec extends Specification {
 

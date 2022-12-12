@@ -6,7 +6,7 @@ import io.micronaut.inject.BeanFactory
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 import spock.lang.Specification
 
-import static io.micronaut.kotlin.processing.KotlinCompiler.*
+import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class AbstractClassIntroductionSpec extends Specification {
 
@@ -20,8 +20,8 @@ import io.micronaut.kotlin.processing.aop.introduction.Stub
 @Stub
 @jakarta.inject.Singleton
 abstract class AbstractBean {
-    abstract fun isAbstract(): String 
-    
+    abstract fun isAbstract(): String
+
     fun nonAbstract(): String = "good"
 }
 ''')

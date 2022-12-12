@@ -36,6 +36,7 @@ jcache = "1.1.1"
 junit5 = "5.9.1"
 kotlin = "1.7.20"
 kotlin-coroutines = "1.6.4"
+ksp-testing = "1.4.9"
 ktor = "1.6.8"
 managed-logback = "1.4.5"
 logbook-netty = "2.14.0"
@@ -74,6 +75,7 @@ managed-reactor = "3.4.24"
 managed-slf4j = "2.0.4"
 managed-snakeyaml = "1.33"
 managed-validation = "2.0.1.Final"
+managed-ksp = "1.8.0-Beta-1.0.8"
 micronaut-docs = "2.0.0"
 
 [libraries]
@@ -107,6 +109,7 @@ managed-jackson-datatype-jsr310 = { module = "com.fasterxml.jackson.datatype:jac
 managed-jackson-module-afterburner = { module = "com.fasterxml.jackson.module:jackson-module-afterburner", version.ref = "managed-jackson" }
 managed-jackson-module-kotlin = { module = "com.fasterxml.jackson.module:jackson-module-kotlin", version.ref = "managed-jackson" }
 managed-jackson-module-parameterNames = { module = "com.fasterxml.jackson.module:jackson-module-parameter-names", version.ref = "managed-jackson" }
+managed-ksp = { module = "com.google.devtools.ksp:symbol-processing-api", version.ref = "managed-ksp" }
 
 managed-methvin-directoryWatcher = { module = "io.methvin:directory-watcher", version.ref = "managed-methvin-directory-watcher" }
 
@@ -202,6 +205,8 @@ kotlinx-coroutines-reactive = { module = "org.jetbrains.kotlinx:kotlinx-coroutin
 kotlinx-coroutines-rx2 = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-rx2", version.ref = "kotlin-coroutines" }
 kotlinx-coroutines-slf4j = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-slf4j", version.ref = "kotlin-coroutines" }
 kotlinx-coroutines-reactor = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-reactor", version.ref = "kotlin-coroutines" }
+
+ksp-testing = { module = "com.github.tschuchortdev:kotlin-compile-testing-ksp", version.ref = "ksp-testing" }
 
 log4j = { module = "org.apache.logging.log4j:log4j-core", version.ref = "log4j" }
 

@@ -301,7 +301,7 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
                                                 PropertyElement propertyElement,
                                                 MethodElement writeElement) {
         makeInterceptedForValidationIfNeeded(writeElement);
-        if (visitInjectAndLifecycleMethod(visitor, writeElement)) {
+        if (visitInjectAndLifecycleMethod(visitor, propertyElement, writeElement)) {
             makeInterceptedForValidationIfNeeded(writeElement);
             return true;
         } else if (!writeElement.isStatic() && getElementAnnotationMetadata(writeElement).hasStereotype(AnnotationUtil.QUALIFIER)) {
@@ -324,17 +324,17 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
      * @return true if processed
      */
     protected boolean visitMethod(BeanDefinitionVisitor visitor, MethodElement methodElement) {
-        if (visitInjectAndLifecycleMethod(visitor, methodElement)) {
+        if (visitInjectAndLifecycleMethod(visitor, null, methodElement)) {
             return true;
         }
         return visitAopAndExecutableMethod(visitor, methodElement);
     }
 
     @NextMajorVersion("Require @ReflectiveAccess for private methods in Micronaut 4")
-    private boolean visitInjectAndLifecycleMethod(BeanDefinitionVisitor visitor, MethodElement methodElement) {
+    private boolean visitInjectAndLifecycleMethod(BeanDefinitionVisitor visitor, @Nullable PropertyElement propertyElement, MethodElement methodElement) {
         // All the cases above are using executable methods
         boolean claimed = false;
-        if (methodElement.hasDeclaredAnnotation(AnnotationUtil.POST_CONSTRUCT)) {
+        if (methodElement.hasDeclaredAnnotation(AnnotationUtil.POST_CONSTRUCT) || (propertyElement != null && propertyElement.hasDeclaredAnnotation(AnnotationUtil.POST_CONSTRUCT))) {
             staticMethodCheck(methodElement);
             // TODO: Require @ReflectiveAccess for private methods in Micronaut 4
             visitor.visitPostConstructMethod(
@@ -344,7 +344,7 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
                 visitorContext);
             claimed = true;
         }
-        if (methodElement.hasDeclaredAnnotation(AnnotationUtil.PRE_DESTROY)) {
+        if (methodElement.hasDeclaredAnnotation(AnnotationUtil.PRE_DESTROY) || (propertyElement != null && propertyElement.hasDeclaredAnnotation(AnnotationUtil.PRE_DESTROY))) {
             staticMethodCheck(methodElement);
             // TODO: Require @ReflectiveAccess for private methods in Micronaut 4
             visitor.visitPreDestroyMethod(
@@ -358,7 +358,7 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
         if (claimed) {
             return true;
         }
-        if (!methodElement.isStatic() && isInjectPointMethod(methodElement)) {
+        if (!methodElement.isStatic() && isInjectPointMethod(propertyElement, methodElement)) {
             staticMethodCheck(methodElement);
             // TODO: Require @ReflectiveAccess for private methods in Micronaut 4
             visitMethodInjectionPoint(visitor, methodElement);
@@ -457,11 +457,12 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
     /**
      * Is inject point method?
      *
-     * @param memberElement The method
+     * @param propertyElement
+     * @param memberElement   The method
      * @return true if it is
      */
-    protected boolean isInjectPointMethod(MemberElement memberElement) {
-        return memberElement.hasDeclaredStereotype(AnnotationUtil.INJECT);
+    protected boolean isInjectPointMethod(PropertyElement propertyElement, MemberElement memberElement) {
+        return memberElement.hasDeclaredStereotype(AnnotationUtil.INJECT) || (propertyElement != null && propertyElement.hasDeclaredAnnotation(AnnotationUtil.INJECT));
     }
 
     private void staticMethodCheck(MethodElement methodElement) {

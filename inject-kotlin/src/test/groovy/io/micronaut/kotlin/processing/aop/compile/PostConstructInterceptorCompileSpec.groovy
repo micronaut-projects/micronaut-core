@@ -5,7 +5,7 @@ import io.micronaut.context.ApplicationContext
 import spock.lang.PendingFeature
 import spock.lang.Specification
 import spock.lang.Unroll
-import static io.micronaut.kotlin.processing.KotlinCompiler.*
+import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class PostConstructInterceptorCompileSpec extends Specification {
 
@@ -25,7 +25,7 @@ import jakarta.annotation.PostConstruct
 open class MyBean(env: io.micronaut.context.env.Environment) {
 
     @Inject lateinit var env: io.micronaut.context.env.Environment
-    
+
     var invoked = 0
 
     open fun test() {
@@ -62,7 +62,7 @@ annotation class TestAnn
 @InterceptorBean(TestAnn::class)
 class TestInterceptor: MethodInterceptor<Any, Any> {
     var invoked = 0
-    
+
     override fun intercept(context: MethodInvocationContext<Any, Any>): Any? {
         invoked++
         return context.proceed()
@@ -73,7 +73,7 @@ class TestInterceptor: MethodInterceptor<Any, Any> {
 @InterceptorBinding(value=TestAnn::class, kind=InterceptorKind.POST_CONSTRUCT)
 class PostConstructTestInterceptor: MethodInterceptor<Any, Any> {
     var invoked = 0
-    
+
     override fun intercept(context: MethodInvocationContext<Any, Any>): Any? {
         invoked++
         return context.proceed()
@@ -84,7 +84,7 @@ class PostConstructTestInterceptor: MethodInterceptor<Any, Any> {
 @InterceptorBinding(value=TestAnn::class, kind=InterceptorKind.PRE_DESTROY)
 class PreDestroyTestInterceptor: MethodInterceptor<Any, Any> {
     var invoked = 0
-    
+
     override fun intercept(context: MethodInvocationContext<Any, Any>): Any? {
         invoked++
         return context.proceed()
@@ -98,7 +98,7 @@ class AnotherInterceptor: Interceptor<Any, Any> {
         invoked++
         return context.proceed()
     }
-} 
+}
 """)
         when:
         def interceptor = getBean(context, 'annbinding1.TestInterceptor')
@@ -171,7 +171,7 @@ import jakarta.annotation.PostConstruct
 open class MyBean(env: io.micronaut.context.env.Environment) {
 
     @Inject lateinit var env: io.micronaut.context.env.Environment
-    
+
     var invoked = 0
 
     open fun test() {
@@ -206,7 +206,7 @@ annotation class TestAnn
 @InterceptorBean(TestAnn::class)
 class TestInterceptor: MethodInterceptor<Any, Any> {
     var invoked = 0
-    
+
     override fun intercept(context: MethodInvocationContext<Any, Any>): Any? {
         invoked++
         return context.proceed()
@@ -217,7 +217,7 @@ class TestInterceptor: MethodInterceptor<Any, Any> {
 @InterceptorBinding(value=TestAnn::class, kind=InterceptorKind.POST_CONSTRUCT)
 class PostConstructTestInterceptor: MethodInterceptor<Any, Any> {
     var invoked = 0
-    
+
     override fun intercept(context: MethodInvocationContext<Any, Any>): Any? {
         invoked++
         return context.proceed()
@@ -228,7 +228,7 @@ class PostConstructTestInterceptor: MethodInterceptor<Any, Any> {
 @InterceptorBinding(value=TestAnn::class, kind=InterceptorKind.PRE_DESTROY)
 class PreDestroyTestInterceptor: MethodInterceptor<Any, Any> {
     var invoked = 0
-    
+
     override fun intercept(context: MethodInvocationContext<Any, Any>): Any? {
         invoked++
         return context.proceed()
@@ -242,7 +242,7 @@ class AnotherInterceptor: Interceptor<Any, Any> {
         invoked++
         return context.proceed()
     }
-} 
+}
 """)
         when:
         def interceptor = getBean(context, 'annbinding1.TestInterceptor')

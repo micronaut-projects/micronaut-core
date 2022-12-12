@@ -24,7 +24,7 @@ import io.micronaut.inject.ExecutionHandle
 import io.micronaut.inject.MethodExecutionHandle
 import spock.lang.Specification
 
-import static io.micronaut.kotlin.processing.KotlinCompiler.*
+import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class ExecutableSpec extends Specification {
 
@@ -42,11 +42,11 @@ class MyBean {
     fun methodOne(@jakarta.inject.Named("foo") one: String): String {
         return "good"
     }
-    
+
     fun methodTwo(one: String, two: String): String {
         return "good"
     }
-    
+
     fun methodZero(): String {
         return "good"
     }

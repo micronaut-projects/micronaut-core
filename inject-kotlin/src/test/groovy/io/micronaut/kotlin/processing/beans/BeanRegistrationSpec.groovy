@@ -3,7 +3,7 @@ package io.micronaut.kotlin.processing.beans
 import io.micronaut.context.BeanRegistration
 import spock.lang.Specification
 
-import static io.micronaut.kotlin.processing.KotlinCompiler.*
+import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class BeanRegistrationSpec extends Specification {
 
@@ -23,13 +23,13 @@ class Test(val registrations: Collection<BeanRegistration<Foo>>, val primaryBean
 
     @Inject
     lateinit var fieldRegistrations: Collection<BeanRegistration<Foo>>
-    
+
     @Inject
     lateinit var fieldArrayRegistrations: Array<BeanRegistration<Foo>>
-    
+
     @Inject
     lateinit var methodRegistrations: List<BeanRegistration<Foo>>
-     
+
     @Named("two")
     @Inject
     lateinit var secondaryBean: BeanRegistration<Foo>

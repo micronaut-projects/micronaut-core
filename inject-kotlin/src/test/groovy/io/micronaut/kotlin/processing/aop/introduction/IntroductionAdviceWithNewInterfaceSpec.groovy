@@ -7,7 +7,7 @@ import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanFactory
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 import spock.lang.Specification
-import static io.micronaut.kotlin.processing.KotlinCompiler.*
+import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class IntroductionAdviceWithNewInterfaceSpec extends Specification {
 
@@ -106,8 +106,8 @@ import io.micronaut.context.annotation.*
 interface MyBean  {
 
     @Executable
-    fun getBar(): String 
-    
+    fun getBar(): String
+
     @Executable
     fun getFoo() = "good"
 }
@@ -156,11 +156,11 @@ open class Generic
 
 class Specific: Generic()
 
-interface GenericInterface {   
+interface GenericInterface {
     fun getObject(): Generic
 }
 
-interface SpecificInterface {    
+interface SpecificInterface {
     fun getObject(): Specific
 }
 ''')

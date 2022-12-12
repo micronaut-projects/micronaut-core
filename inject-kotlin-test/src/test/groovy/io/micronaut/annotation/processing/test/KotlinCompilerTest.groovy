@@ -28,7 +28,7 @@ import io.micronaut.core.annotation.Introspected
 
 @Introspected
 class Test {
-    val a: String
+    val a: String = "test"
 }
 ''')
         expect:
@@ -105,6 +105,6 @@ class Test(
 }
 ''')
         expect:
-        introspection.propertyNames.toList() == ['id', 'name', 'getSurname', 'isDeleted', 'isImportant', 'corrected', 'upgraded', 'isMyBool', 'isMyBool2', 'myBool3', 'myBool4', 'myBool5']
+        introspection.propertyNames as Set == ['id', 'name', 'getSurname', 'isDeleted', 'isImportant', 'corrected', 'upgraded', 'isMyBool', 'isMyBool2', 'myBool3', 'myBool4', 'myBool5'] as Set
     }
 }

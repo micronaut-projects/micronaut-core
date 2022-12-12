@@ -19,7 +19,7 @@ import io.micronaut.inject.BeanDefinition
 import spock.lang.Issue
 import spock.lang.Specification
 
-import static io.micronaut.kotlin.processing.KotlinCompiler.*
+import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class ExecutableBeanSpec extends Specification {
 
@@ -66,10 +66,10 @@ class MyBean: Parent() {
 open class Parent {
     protected fun protectedMethod() {
     }
-    
+
     internal fun packagePrivateMethod() {
     }
-    
+
     private fun privateMethod() {
     }
 }
@@ -116,7 +116,7 @@ class MyBean  {
     @RepeatableExecutable("a")
     @RepeatableExecutable("b")
     fun run() {
-        
+
     }
 }
 ''')

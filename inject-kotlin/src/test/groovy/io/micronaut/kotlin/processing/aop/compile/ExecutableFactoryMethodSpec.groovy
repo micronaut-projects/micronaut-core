@@ -4,7 +4,7 @@ import io.micronaut.inject.BeanDefinition
 import reactor.core.publisher.Flux
 import spock.lang.Specification
 
-import static io.micronaut.kotlin.processing.KotlinCompiler.*
+import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class ExecutableFactoryMethodSpec extends Specification {
 
@@ -19,8 +19,8 @@ import jakarta.inject.Singleton
 interface SomeInterface {
 
     fun goDog(): String
-    
-    fun go(): String { 
+
+    fun go(): String {
         return "go"
     }
 }
@@ -36,7 +36,7 @@ class MyFactory {
 }
 
 class MyClass: SomeInterface {
-    
+
     override fun goDog(): String{
         return "go"
     }

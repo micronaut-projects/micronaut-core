@@ -5,7 +5,7 @@ import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
 import spock.lang.Specification
 import spock.lang.Unroll
-import static io.micronaut.kotlin.processing.KotlinCompiler.*
+import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class InterfaceIntroductionAdviceSpec extends Specification {
 

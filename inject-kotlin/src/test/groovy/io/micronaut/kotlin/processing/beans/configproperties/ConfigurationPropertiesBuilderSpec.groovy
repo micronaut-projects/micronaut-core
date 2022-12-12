@@ -8,7 +8,7 @@ import org.neo4j.driver.v1.Config
 import spock.lang.PendingFeature
 import spock.lang.Specification
 
-import static io.micronaut.kotlin.processing.KotlinCompiler.*
+import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class ConfigurationPropertiesBuilderSpec extends Specification {
 
@@ -21,15 +21,15 @@ import io.micronaut.context.annotation.*
 
 @ConfigurationProperties("test")
 class MyProperties {
-    
+
     @ConfigurationBuilder(factoryMethod="build")
     var test: Test? = null
 }
 
 class Test private constructor() {
-        
+
     var foo: String? = null
-        
+
     companion object {
         @JvmStatic fun build(): Test {
             return Test()
@@ -64,10 +64,10 @@ class MyProperties {
 }
 
 class Test private constructor() {
-        
+
     var foo: String? = null
     var bar: String? = null
-        
+
     companion object {
         @JvmStatic fun build(): Test {
             return Test()
@@ -104,35 +104,35 @@ class MyProperties {
 }
 
 class Test private constructor() {
-        
+
     private var foo: String? = null
-    
+
     fun getFoo() = foo
-    
+
     fun setFoo(foo: String): Test {
         this.foo = foo
         return this
     }
-    
+
     private var bar: Int = 0
-    
+
     fun getBar() = bar
-    
+
     fun setBar(bar: Int): Test {
         this.bar = bar
         return this
     }
-    
+
     private var baz: Long? = null
-    
+
     fun getBaz() = baz
-    
+
     @Deprecated("do not use")
     fun setBaz(baz: Long): Test {
         this.baz = baz
         return this
     }
-        
+
     companion object {
         @JvmStatic fun build(): Test {
             return Test()
@@ -400,52 +400,52 @@ package test
 import io.micronaut.context.annotation.*
 import io.micronaut.kotlin.processing.beans.configproperties.AnnWithClass
 
-@ConfigurationProperties("pool")    
-class PoolConfig { 
-    
+@ConfigurationProperties("pool")
+class PoolConfig {
+
     @ConfigurationBuilder(prefixes = [""])
     var builder: ConnectionPool.Builder = DefaultConnectionPool.builder()
-    
+
 }
 
 interface ConnectionPool {
-    
+
     interface Builder {
         fun maxConcurrency(maxConcurrency: Int?): Builder
         fun foo(foo: Foo): Builder
         fun build(): ConnectionPool
     }
-    
+
     fun getMaxConcurrency(): Int?
 }
 
 class DefaultConnectionPool(private val maxConcurrency: Int?): ConnectionPool {
-  
+
     companion object {
         @JvmStatic
         fun builder(): ConnectionPool.Builder {
             return DefaultBuilder()
         }
     }
-    
+
     override fun getMaxConcurrency(): Int? = maxConcurrency
 
     private class DefaultBuilder: ConnectionPool.Builder {
-    
+
         private var maxConcurrency: Int? = null
-    
+
         override fun maxConcurrency(maxConcurrency: Int?): ConnectionPool.Builder{
             this.maxConcurrency = maxConcurrency
             return this
         }
-        
+
         override fun foo(foo: Foo): ConnectionPool.Builder {
             return this
         }
 
         override fun build(): ConnectionPool{
             return DefaultConnectionPool(maxConcurrency)
-        }      
+        }
     }
 }
 

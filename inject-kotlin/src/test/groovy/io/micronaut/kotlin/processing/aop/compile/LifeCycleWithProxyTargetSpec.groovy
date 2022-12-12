@@ -6,7 +6,7 @@ import io.micronaut.inject.BeanFactory
 import io.micronaut.inject.writer.BeanDefinitionWriter
 import spock.lang.Specification
 
-import static io.micronaut.kotlin.processing.KotlinCompiler.*
+import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class LifeCycleWithProxyTargetSpec extends Specification {
 
@@ -22,20 +22,20 @@ import io.micronaut.core.convert.ConversionService
 @jakarta.inject.Singleton
 open class MyBean {
 
-    @jakarta.inject.Inject 
+    @jakarta.inject.Inject
     lateinit var conversionService: ConversionService<*>
-    
+
     var count = 0
-    
+
     open fun someMethod(): String {
         return "good"
     }
-    
+
     @jakarta.annotation.PostConstruct
     fun created() {
         count++
     }
-    
+
     @javax.annotation.PreDestroy
     fun destroyed() {
         count--
@@ -76,21 +76,21 @@ import io.micronaut.core.convert.ConversionService
 @jakarta.inject.Singleton
 open class MyBean {
 
-    @jakarta.inject.Inject 
+    @jakarta.inject.Inject
     lateinit var conversionService: ConversionService<*>
-    
+
     var count = 0
-    
+
     @Mutating("someVal")
     open fun someMethod(): String {
         return "good"
     }
-    
+
     @jakarta.annotation.PostConstruct
     fun created() {
         count++
     }
-    
+
     @javax.annotation.PreDestroy
     fun destroyed() {
         count--
@@ -117,21 +117,21 @@ import io.micronaut.core.convert.ConversionService
 @jakarta.inject.Singleton
 open class MyBean {
 
-    @jakarta.inject.Inject 
+    @jakarta.inject.Inject
     lateinit var conversionService: ConversionService<*>
-    
+
     var count = 0
-    
+
     @jakarta.annotation.PostConstruct
     fun created() {
         count++
     }
-    
+
     @javax.annotation.PreDestroy
     fun destroyed() {
         count--
     }
-    
+
     @Mutating("someVal")
     open fun someMethod(): String {
         return "good"

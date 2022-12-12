@@ -6,7 +6,7 @@ import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.PendingFeature
 import spock.lang.Specification
 
-import static io.micronaut.kotlin.processing.KotlinCompiler.*
+import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class BeanDefinitionSpec extends Specification {
 
@@ -106,9 +106,9 @@ class Test {
     }
 }
 
-interface X 
+interface X
 
-open class Y: X 
+open class Y: X
 ''')
 
         then:
@@ -152,7 +152,7 @@ class Test {
     }
 }
 
-interface X 
+interface X
 
 class Y: X
 ''')
@@ -321,10 +321,10 @@ class TestBean
 package test
 
 class TestBean {
-    
+
     @jakarta.inject.Singleton
     class TestBeanInner {
-        
+
     }
 }
 ''')
@@ -339,10 +339,10 @@ class TestBean {
 package test
 
 class TestBean {
-    
+
     @jakarta.inject.Singleton
     inner class TestBeanInner {
-        
+
     }
 }
 ''')

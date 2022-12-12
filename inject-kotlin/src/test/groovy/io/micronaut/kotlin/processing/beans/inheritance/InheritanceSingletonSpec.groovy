@@ -3,7 +3,7 @@ package io.micronaut.kotlin.processing.beans.inheritance
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Specification
 
-import static io.micronaut.kotlin.processing.KotlinCompiler.*
+import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class InheritanceSingletonSpec extends Specification {
 

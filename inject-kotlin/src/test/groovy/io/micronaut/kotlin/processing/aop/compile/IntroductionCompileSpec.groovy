@@ -4,7 +4,7 @@ import io.micronaut.aop.Intercepted
 import io.micronaut.context.ApplicationContext
 import spock.lang.Specification
 
-import static io.micronaut.kotlin.processing.KotlinCompiler.*
+import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class IntroductionCompileSpec extends Specification {
 
@@ -17,7 +17,7 @@ import io.micronaut.aop.*
 import jakarta.inject.Singleton
 
 @TestAnn
-interface MyBean {   
+interface MyBean {
     fun test(): Int
 }
 
@@ -33,7 +33,7 @@ class StubIntroduction: Interceptor<Any, Any> {
         invoked++
         return 10
     }
-} 
+}
 ''')
         def instance = getBean(context, 'introductiontest.MyBean')
         def interceptor = getBean(context, 'introductiontest.StubIntroduction')

@@ -1,11 +1,8 @@
 package io.micronaut.kotlin.processing.beans
 
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.kotlin.processing.KotlinCompiler
+
 import spock.lang.Specification
-
-import static io.micronaut.kotlin.processing.KotlinCompiler.*
-
 
 class SingletonSpec extends Specification {
 
@@ -42,11 +39,11 @@ import jakarta.inject.Singleton
 
 @Factory
 class Test {
-    
+
     @Singleton
     @Bean
     val one = Foo("one")
-    
+
 }
 
 class Foo(val name: String)
@@ -68,7 +65,7 @@ import io.micronaut.context.annotation.Factory
 import jakarta.inject.Singleton
 
 @Factory
-class Test {      
+class Test {
     @Singleton
     fun one() = Foo("one")
 }

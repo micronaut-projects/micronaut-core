@@ -6,7 +6,7 @@ import io.micronaut.inject.BeanFactory
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 import spock.lang.Specification
 
-import static io.micronaut.kotlin.processing.KotlinCompiler.*
+import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class IntroductionInnerInterfaceSpec extends Specification {
 
@@ -25,8 +25,8 @@ import jakarta.inject.Singleton
 @Introduction(interfaces = [ObservableUI.Inner::class])
 @Retention
 annotation class ObservableUI {
-    
-    interface Inner {   
+
+    interface Inner {
         fun hello(): String
     }
 }

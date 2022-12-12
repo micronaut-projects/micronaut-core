@@ -6,7 +6,7 @@ import io.micronaut.inject.BeanFactory
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 import spock.lang.Specification
 
-import static io.micronaut.kotlin.processing.KotlinCompiler.*
+import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class IntroductionWithAroundSpec extends Specification {
 
@@ -25,7 +25,7 @@ import jakarta.inject.Singleton
 abstract class MyBean {
     abstract fun save(@NotBlank name: String, @Min(1L) age: Int)
     abstract fun saveTwo(@Min(1L) name: String)
-    
+
     @Mutating("name")
     open fun myConcrete(name: String): String {
         return name

@@ -7,7 +7,7 @@ import spock.lang.PendingFeature
 import spock.lang.Specification
 import spock.lang.Unroll
 
-import static io.micronaut.kotlin.processing.KotlinCompiler.*
+import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class AroundConstructCompileSpec extends Specification {
 
@@ -22,7 +22,7 @@ import jakarta.inject.Singleton
 @Singleton
 @TestAnn2
 class MyBean @TestAnn(num=1) constructor() {
- 
+
 }
 
 @Retention
@@ -48,7 +48,7 @@ class TestInterceptor: ConstructorInterceptor<Any> {
         invoked = true
         return context.proceed()
     }
-} 
+}
 
 @Singleton
 @TestAnn(num=2)
@@ -116,7 +116,7 @@ class Interceptor1: ConstructorInterceptor<Any> {
         intercepted = true
         return context.proceed()
     }
-} 
+}
 
 @Singleton
 @FooCtorBinding
@@ -127,7 +127,7 @@ class Interceptor2: ConstructorInterceptor<Any> {
         intercepted = true
         return context.proceed()
     }
-} 
+}
 """)
         when:
         def i1 = getBean(context, 'ctorbinding.Interceptor1')
@@ -185,7 +185,7 @@ class Interceptor1: ConstructorInterceptor<Any> {
         intercepted = true
         return context.proceed()
     }
-} 
+}
 
 @Singleton
 @FooCtorBinding
@@ -196,7 +196,7 @@ class Interceptor2: ConstructorInterceptor<Any> {
         intercepted = true
         return context.proceed()
     }
-} 
+}
 """)
         when:
         def i1 = getBean(context, 'ctorbinding.Interceptor1')
@@ -253,7 +253,7 @@ class Interceptor1: ConstructorInterceptor<Any> {
         intercepted = true
         return context.proceed()
     }
-} 
+}
 
 @Singleton
 @FooCtorBinding
@@ -264,7 +264,7 @@ class Interceptor2: ConstructorInterceptor<Any> {
         intercepted = true
         return context.proceed()
     }
-} 
+}
 """)
         when:
         def i1 = getBean(context, 'ctorbinding.Interceptor1')
@@ -297,7 +297,7 @@ import jakarta.inject.Singleton
 @Singleton
 @TestAnn
 open class MyBean(private val env: io.micronaut.context.env.Environment) {
-    
+
     open fun test() {
     }
 }
@@ -350,7 +350,7 @@ class TypeSpecificConstructInterceptor: ConstructorInterceptor<MyBean> {
 @InterceptorBinding(TestAnn::class)
 class TestInterceptor: MethodInterceptor<Any, Any> {
     var invoked = false
-    
+
     override fun intercept(context: MethodInvocationContext<Any, Any>): Any? {
         invoked = true
         return context.proceed()
@@ -360,7 +360,7 @@ class TestInterceptor: MethodInterceptor<Any, Any> {
 @Singleton
 class AnotherInterceptor: Interceptor<Any, Any> {
     var invoked = false
-    
+
     override fun intercept(context: InvocationContext<Any, Any>): Any? {
         invoked = true
         return context.proceed()
@@ -436,7 +436,7 @@ import jakarta.inject.Singleton
 @Singleton
 @TestAnn
 open class MyBean(private val env: io.micronaut.context.env.Environment) {
-    
+
     open fun test() {
     }
 }
@@ -475,7 +475,7 @@ class TestConstructInterceptor: ConstructorInterceptor<Any> {
 @InterceptorBinding(TestAnn::class)
 class TestInterceptor: MethodInterceptor<Any, Any> {
     var invoked = false
-    
+
     override fun intercept(context: MethodInvocationContext<Any, Any>): Any? {
         invoked = true
         return context.proceed()
@@ -485,7 +485,7 @@ class TestInterceptor: MethodInterceptor<Any, Any> {
 @Singleton
 class AnotherInterceptor: Interceptor<Any, Any> {
     var invoked = false
-    
+
     override fun intercept(context: InvocationContext<Any, Any>): Any? {
         invoked = true
         return context.proceed()
@@ -625,7 +625,7 @@ class InterceptorFactory {
 
     @InterceptorBean(TestAnn::class)
     fun aroundIntercept(): ConstructorInterceptor<Any> {
-        return ConstructorInterceptor { context -> 
+        return ConstructorInterceptor { context ->
             this.aroundConstructInvoked = true
             context.proceed()
         }
@@ -687,7 +687,7 @@ class TestConstructInterceptor: ConstructorInterceptor<Any> {
 @InterceptorBinding(TestAnn::class)
 class TestInterceptor: MethodInterceptor<Any, Any> {
     var invoked = false
-    
+
     override fun intercept(context: MethodInvocationContext<Any, Any>): Any? {
         invoked = true
         return "good"
@@ -697,7 +697,7 @@ class TestInterceptor: MethodInterceptor<Any, Any> {
 @Singleton
 class AnotherInterceptor: Interceptor<Any, Any> {
     var invoked = false
-    
+
     override fun intercept(context: InvocationContext<Any, Any>): Any? {
         invoked = true
         return context.proceed()

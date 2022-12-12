@@ -7,7 +7,7 @@ import io.micronaut.inject.BeanFactory
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 import spock.lang.Specification
 
-import static io.micronaut.kotlin.processing.KotlinCompiler.*
+import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class IntroductionGenericTypesSpec extends Specification {
 
@@ -23,7 +23,7 @@ import java.net.URL
 interface MyInterface<T: URL> {
 
     fun getURL(): T
-    
+
     fun getURLs(): List<T>
 }
 
@@ -59,19 +59,19 @@ import java.net.URL
 interface MyInterface<T: Person> {
 
     fun getPeopleSingle(): reactor.core.publisher.Mono<List<T>>
-    
+
     fun getPerson(): T
-    
+
     fun getPeople(): List<T>
-    
+
     fun save(person: T)
-    
+
     fun saveAll(person: List<T>)
-    
+
     fun getPeopleArray(): Array<T>
-    
+
     fun getPeopleListArray(): List<Array<T>>
-    
+
     fun <V: URL> getPeopleMap(): Map<T,V>
 }
 
