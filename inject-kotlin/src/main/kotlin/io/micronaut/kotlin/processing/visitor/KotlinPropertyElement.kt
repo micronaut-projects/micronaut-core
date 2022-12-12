@@ -404,6 +404,9 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
     }
 
     override fun getName(): String = name
+    override fun getModifiers(): MutableSet<ElementModifier> {
+        return super<AbstractKotlinElement>.getModifiers()
+    }
 
     override fun getType(): ClassElement = type
 

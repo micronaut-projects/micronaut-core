@@ -1,5 +1,8 @@
 package io.micronaut.annotation.processing.test;
 
+import com.google.devtools.ksp.processing.SymbolProcessor;
+import com.google.devtools.ksp.processing.SymbolProcessorEnvironment;
+import com.google.devtools.ksp.symbol.KSClassDeclaration;
 import com.tschuchort.compiletesting.KotlinCompilation;
 import com.tschuchort.compiletesting.KspKt;
 import com.tschuchort.compiletesting.SourceFile;
@@ -14,11 +17,14 @@ import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
+import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.provider.BeanProviderDefinition;
 import io.micronaut.inject.writer.BeanDefinitionReferenceWriter;
 import io.micronaut.inject.writer.BeanDefinitionVisitor;
 import io.micronaut.inject.writer.BeanDefinitionWriter;
 import io.micronaut.kotlin.processing.beans.BeanDefinitionProcessorProvider;
+import io.micronaut.kotlin.processing.visitor.KotlinVisitorContext;
+import io.micronaut.kotlin.processing.visitor.TypeElementSymbolProcessor;
 import io.micronaut.kotlin.processing.visitor.TypeElementSymbolProcessorProvider;
 import kotlin.Pair;
 import org.intellij.lang.annotations.Language;
@@ -44,7 +50,7 @@ import java.util.stream.Stream;
 public class KotlinCompiler {
 
     public static URLClassLoader buildClassLoader(String name, @Language("kotlin") String clazz) {
-        Pair<Pair<KotlinCompilation, KotlinCompilation.Result>, Pair<KotlinCompilation, KotlinCompilation.Result>> resultPair = compile(name, clazz);
+        Pair<Pair<KotlinCompilation, KotlinCompilation.Result>, Pair<KotlinCompilation, KotlinCompilation.Result>> resultPair = compile(name, clazz, new ArrayList<>());
         return toClassLoader(resultPair);
     }
 
@@ -83,7 +89,7 @@ public class KotlinCompiler {
         }
     }
 
-    public static Pair<Pair<KotlinCompilation, KotlinCompilation.Result>, Pair<KotlinCompilation, KotlinCompilation.Result>> compile(String name, @Language("kotlin") String clazz) {
+    public static Pair<Pair<KotlinCompilation, KotlinCompilation.Result>, Pair<KotlinCompilation, KotlinCompilation.Result>> compile(String name, @Language("kotlin") String clazz, List<ClassElement> classElements) {
         KotlinCompilation compilation = new KotlinCompilation();
         compilation.setSources(Collections.singletonList(SourceFile.Companion.kotlin(name + ".kt", clazz, true)));
         compilation.setJvmDefault("all");
@@ -102,7 +108,21 @@ public class KotlinCompiler {
                 new File(kspCompilation.getWorkingDir(), "ksp/classes"),
                 new File(kspCompilation.getWorkingDir(), "ksp/sources/resources"),
                 compilation.getClassesDir()));
-        KspKt.setSymbolProcessorProviders(kspCompilation, Arrays.asList(new TypeElementSymbolProcessorProvider(), new BeanDefinitionProcessorProvider()));
+        KspKt.setSymbolProcessorProviders(kspCompilation, Arrays.asList(new TypeElementSymbolProcessorProvider() {
+            @NotNull
+            @Override
+            public SymbolProcessor create(@NotNull SymbolProcessorEnvironment environment) {
+                return new TypeElementSymbolProcessor(environment) {
+                    @NotNull
+                    @Override
+                    public ClassElement newClassElement(@NotNull KotlinVisitorContext visitorContext, @NotNull KSClassDeclaration classDeclaration) {
+                        ClassElement classElement = super.newClassElement(visitorContext, classDeclaration);
+                        classElements.add(classElement);
+                        return classElement;
+                    }
+                };
+            }
+        }, new BeanDefinitionProcessorProvider()));
 
         KotlinCompilation.Result kspResult = kspCompilation.compile();
         if (kspResult.getExitCode() != KotlinCompilation.ExitCode.OK) {
@@ -193,7 +213,7 @@ public class KotlinCompiler {
     }
 
     public static ApplicationContext buildContext(@Language("kotlin") String clazz, boolean includeAllBeans) {
-        Pair<Pair<KotlinCompilation, KotlinCompilation.Result>, Pair<KotlinCompilation, KotlinCompilation.Result>> pair = compile("temp", clazz);
+        Pair<Pair<KotlinCompilation, KotlinCompilation.Result>, Pair<KotlinCompilation, KotlinCompilation.Result>> pair = compile("temp", clazz, new ArrayList<>());
         ClassLoader classLoader = toClassLoader(pair);
         return new DefaultApplicationContext(ClassPathResourceLoader.defaultLoader(classLoader),"test") {
             @Override

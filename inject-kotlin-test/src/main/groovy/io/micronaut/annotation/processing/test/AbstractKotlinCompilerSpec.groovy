@@ -18,11 +18,17 @@ package io.micronaut.annotation.processing.test
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.Qualifier
+import io.micronaut.core.annotation.Experimental
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.naming.NameUtils
 import io.micronaut.inject.BeanDefinition
+import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.ast.GenericPlaceholderElement
+import io.micronaut.inject.ast.WildcardElement
 import org.intellij.lang.annotations.Language
 import spock.lang.Specification
+
+import java.util.stream.Collectors
 
 class AbstractKotlinCompilerSpec extends Specification {
     protected ClassLoader buildClassLoader(String className, @Language("kotlin") String cls) {
@@ -61,11 +67,75 @@ class AbstractKotlinCompilerSpec extends Specification {
         KotlinCompiler.buildContext(cls, includeAllBeans)
     }
 
+    /**
+     * Builds a class element for the given source code.
+     * @param cls The source
+     * @return The class element
+     */
+    ClassElement buildClassElement(String className, @Language("kotlin") String cls) {
+        List<ClassElement> elements = []
+        KotlinCompiler.compile(className, cls, elements)
+        return elements.find { it.name == className }
+    }
+
     Object getBean(ApplicationContext context, String className, Qualifier qualifier = null) {
         context.getBean(context.classLoader.loadClass(className), qualifier)
     }
 
+    /**
+     * Gets a bean definition from the context for the given class name
+     * @param context The context
+     * @param className The class name
+     * @return The bean instance
+     */
+    BeanDefinition<?> getBeanDefinition(ApplicationContext context, String className, Qualifier qualifier = null) {
+        context.getBeanDefinition(context.classLoader.loadClass(className), qualifier)
+    }
+
     protected BeanDefinition buildBeanDefinition(String className, @Language("kotlin") String cls) {
         KotlinCompiler.buildBeanDefinition(className, cls)
+    }
+
+    /**
+     * Create a rough source signature of the given ClassElement, using {@link io.micronaut.inject.ast.ClassElement#getBoundGenericTypes()}.
+     * Can be used to test that {@link io.micronaut.inject.ast.ClassElement#getBoundGenericTypes()} returns the right types in the right
+     * context.
+     *
+     * @param classElement The class element to reconstruct
+     * @param typeVarsAsDeclarations Whether type variables should be represented as declarations
+     * @return a String representing the type signature.
+     */
+    @Experimental
+    protected static String reconstructTypeSignature(ClassElement classElement, boolean typeVarsAsDeclarations = false) {
+        if (classElement.isArray()) {
+            return "Array<" + reconstructTypeSignature(classElement.fromArray()) + ">"
+        } else if (classElement.isGenericPlaceholder()) {
+            def freeVar = (GenericPlaceholderElement) classElement
+            def name = freeVar.variableName
+            if (typeVarsAsDeclarations) {
+                def bounds = freeVar.bounds
+                if (reconstructTypeSignature(bounds[0]) != 'Object') {
+                    name += bounds.stream().map(AbstractKotlinCompilerSpec::reconstructTypeSignature).collect(Collectors.joining(" & ", " out ", ""))
+                }
+            }
+            return name
+        } else if (classElement.isWildcard()) {
+            def we = (WildcardElement) classElement
+            if (!we.lowerBounds.isEmpty()) {
+                return we.lowerBounds.stream().map(AbstractKotlinCompilerSpec::reconstructTypeSignature).collect(Collectors.joining(" | ", "in ", ""))
+            } else if (we.upperBounds.size() == 1 && reconstructTypeSignature(we.upperBounds.get(0)) == "Object") {
+                return "*"
+            } else {
+                return we.upperBounds.stream().map(AbstractKotlinCompilerSpec::reconstructTypeSignature).collect(Collectors.joining(" & ", "out ", ""))
+            }
+        } else {
+            def boundTypeArguments = classElement.getBoundGenericTypes()
+            if (boundTypeArguments.isEmpty()) {
+                return classElement.getSimpleName()
+            } else {
+                return classElement.getSimpleName() +
+                        boundTypeArguments.stream().map(AbstractKotlinCompilerSpec::reconstructTypeSignature).collect(Collectors.joining(", ", "<", ">"))
+            }
+        }
     }
 }

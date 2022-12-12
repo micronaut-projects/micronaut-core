@@ -51,8 +51,10 @@ public interface ElementFactory<E, C extends E, M extends E, F extends E> {
      * @param resolvedGenerics          The resolved generics
      * @return The class element
      * @since 4.0.0
+     * @deprecated no longer used
      */
     @NonNull
+    @Deprecated
     ClassElement newClassElement(@NonNull C type,
                                  @NonNull ElementAnnotationMetadataFactory annotationMetadataFactory,
                                  @NonNull Map<String, ClassElement> resolvedGenerics);

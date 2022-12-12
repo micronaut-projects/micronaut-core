@@ -18,6 +18,7 @@ package io.micronaut.kotlin.processing.visitor
 import com.google.devtools.ksp.symbol.KSPropertyDeclaration
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.ast.ElementModifier
 import io.micronaut.inject.ast.FieldElement
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 
@@ -35,6 +36,10 @@ class KotlinFieldElement(declaration: KSPropertyDeclaration,
        return visitorContext.elementFactory.newClassElement(declaration.type.resolve())
     }
 
+    override fun getGenericType(): ClassElement {
+        return super.getGenericType()
+    }
+
     override fun copyThis(): AbstractKotlinElement<KSPropertyDeclaration> {
         return KotlinFieldElement(declaration, declaringType, annotationMetadataFactory, visitorContext)
     }
@@ -45,4 +50,8 @@ class KotlinFieldElement(declaration: KSPropertyDeclaration,
     }
 
     override fun getDeclaringType() = declaringType
+
+    override fun getModifiers(): MutableSet<ElementModifier> {
+        return super<AbstractKotlinElement>.getModifiers()
+    }
 }

@@ -24,13 +24,14 @@ import io.micronaut.inject.ast.Element
 import io.micronaut.inject.ast.GenericPlaceholderElement
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 import java.util.*
+import java.util.function.Function
 
 class KotlinGenericPlaceholderElement(
     private val parameter: KSTypeParameter,
     elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
     visitorContext: KotlinVisitorContext,
     private val arrayDimensions: Int = 0
-) : KotlinClassElement(parameter, elementAnnotationMetadataFactory, visitorContext, emptyMap(), arrayDimensions, true), ArrayableClassElement, GenericPlaceholderElement {
+) : KotlinClassElement(parameter, elementAnnotationMetadataFactory, visitorContext, arrayDimensions, true), ArrayableClassElement, GenericPlaceholderElement {
     override fun copyThis(): KotlinGenericPlaceholderElement {
         return KotlinGenericPlaceholderElement(
             parameter,
@@ -39,7 +40,6 @@ class KotlinGenericPlaceholderElement(
             arrayDimensions
         )
     }
-
 
     override fun getName(): String {
         val bounds = parameter.bounds.firstOrNull()
@@ -66,10 +66,15 @@ class KotlinGenericPlaceholderElement(
 
     override fun getBounds(): MutableList<out ClassElement> {
         val elementFactory = visitorContext.elementFactory
-        return parameter.bounds.map {
+        val resolved = parameter.bounds.map {
             val argumentType = it.resolve()
             elementFactory.newClassElement(argumentType, annotationMetadataFactory)
         }.toMutableList()
+        return if (resolved.isEmpty()) {
+            mutableListOf(visitorContext.anyElement)
+        } else {
+            resolved
+        }
     }
 
     override fun getVariableName(): String {
@@ -81,10 +86,7 @@ class KotlinGenericPlaceholderElement(
         return Optional.ofNullable(classDeclaration).map {
             visitorContext.elementFactory.newClassElement(
                 classDeclaration!!.asStarProjectedType(),
-                visitorContext.elementAnnotationMetadataFactory,
-                resolvedGenerics
-            )
+                visitorContext.elementAnnotationMetadataFactory)
         }
     }
-
 }

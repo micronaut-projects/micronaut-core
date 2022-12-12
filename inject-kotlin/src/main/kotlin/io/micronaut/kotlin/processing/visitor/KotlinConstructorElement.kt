@@ -19,6 +19,7 @@ import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.ConstructorElement
+import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.ParameterElement
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 
@@ -26,9 +27,11 @@ class KotlinConstructorElement(method: KSFunctionDeclaration,
                                declaringType: ClassElement,
                                elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
                                visitorContext: KotlinVisitorContext,
-                               returnType: ClassElement,
-                               typeArguments: Map<String, ClassElement>
-): ConstructorElement, KotlinMethodElement(method, declaringType, returnType, returnType, elementAnnotationMetadataFactory, visitorContext, typeArguments) {
+                               returnType: ClassElement
+): ConstructorElement, KotlinMethodElement(method, declaringType, returnType, returnType, elementAnnotationMetadataFactory, visitorContext) {
+    override fun overrides(overridden: MethodElement): Boolean {
+        return false
+    }
 
     override fun getName() = "<init>"
 

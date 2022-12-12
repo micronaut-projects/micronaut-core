@@ -104,8 +104,7 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
             return Arrays.stream(exceptions)
                 .map(cn -> getGenericElement(cn, visitorContext.getElementFactory().newClassElement(
                     cn,
-                    elementAnnotationMetadataFactory,
-                    Collections.emptyMap()
+                    elementAnnotationMetadataFactory
                 ))).toArray(ClassElement[]::new);
         }
         return ClassElement.ZERO_CLASS_ELEMENTS;

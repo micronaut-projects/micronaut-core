@@ -34,7 +34,7 @@ import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.inject.visitor.VisitorContext
 import java.util.*
 
-class TypeElementSymbolProcessor(private val environment: SymbolProcessorEnvironment): SymbolProcessor {
+open class TypeElementSymbolProcessor(private val environment: SymbolProcessorEnvironment): SymbolProcessor {
 
     private lateinit var loadedVisitors: MutableList<LoadedVisitor>
     private lateinit var typeElementVisitors: Collection<TypeElementVisitor<*, *>>
@@ -43,6 +43,14 @@ class TypeElementSymbolProcessor(private val environment: SymbolProcessorEnviron
     companion object {
         private val SERVICE_LOADER = io.micronaut.core.io.service.SoftServiceLoader.load(TypeElementVisitor::class.java)
     }
+
+    open fun newClassElement(
+        visitorContext: KotlinVisitorContext,
+        classDeclaration: KSClassDeclaration
+    ) = visitorContext.elementFactory.newClassElement(
+        classDeclaration.asStarProjectedType(),
+        visitorContext.elementAnnotationMetadataFactory
+    )
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
         // set supported options as system properties to keep compatibility
@@ -179,7 +187,7 @@ class TypeElementSymbolProcessor(private val environment: SymbolProcessorEnviron
         return typeElementVisitors.values
     }
 
-    private class ElementVisitor(private val loadedVisitor: LoadedVisitor,
+    private inner class ElementVisitor(private val loadedVisitor: LoadedVisitor,
     private val classDeclaration: KSClassDeclaration) : KSTopDownVisitor<Any, Any>() {
 
         override fun visitClassDeclaration(classDeclaration: KSClassDeclaration, data: Any): Any {
@@ -191,10 +199,7 @@ class TypeElementSymbolProcessor(private val environment: SymbolProcessorEnviron
             }
             if (classDeclaration == this.classDeclaration) {
                 val visitorContext = loadedVisitor.visitorContext
-                val classElement = visitorContext.elementFactory.newClassElement(
-                    classDeclaration.asStarProjectedType(),
-                    visitorContext.elementAnnotationMetadataFactory
-                )
+                val classElement = newClassElement(visitorContext, classDeclaration)
                 loadedVisitor.visitor.visitClass(classElement, visitorContext)
 
                 var properties = classElement.syntheticBeanProperties

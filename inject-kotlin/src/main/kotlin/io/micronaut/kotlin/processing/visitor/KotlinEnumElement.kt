@@ -23,7 +23,7 @@ import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 import java.util.*
 
 class KotlinEnumElement(private val type: KSType, elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory, visitorContext: KotlinVisitorContext):
-    KotlinClassElement(type, elementAnnotationMetadataFactory, visitorContext, emptyMap()), EnumElement {
+    KotlinClassElement(type, elementAnnotationMetadataFactory, visitorContext), EnumElement {
 
     override fun values(): List<String> {
         return classDeclaration.declarations

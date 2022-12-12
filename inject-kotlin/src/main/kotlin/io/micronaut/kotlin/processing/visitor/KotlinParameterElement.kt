@@ -23,16 +23,14 @@ import io.micronaut.inject.ast.ParameterElement
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 
 class KotlinParameterElement(
-    private val genericClassElement: ClassElement,
     private val classElement: ClassElement,
-    private val methodElement: MethodElement,
+    private val methodElement: KotlinMethodElement,
     private val parameter: KSValueParameter,
     elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
     visitorContext: KotlinVisitorContext
 ) : AbstractKotlinElement<KSValueParameter>(parameter, elementAnnotationMetadataFactory, visitorContext), ParameterElement {
     override fun copyThis(): AbstractKotlinElement<KSValueParameter> {
         return KotlinParameterElement(
-            genericClassElement,
             classElement,
             methodElement,
             parameter,
@@ -55,7 +53,7 @@ class KotlinParameterElement(
 
     override fun getType(): ClassElement = classElement
 
-    override fun getGenericType(): ClassElement = genericClassElement
+    override fun getGenericType(): ClassElement = type
 
     override fun getArrayDimensions(): Int = classElement.arrayDimensions
 }

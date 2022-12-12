@@ -48,12 +48,14 @@ class KotlinVisitorContext(private val environment: SymbolProcessorEnvironment,
     private val outputVisitor = KotlinOutputVisitor(environment)
     val annotationMetadataBuilder: KotlinAnnotationMetadataBuilder
     private val elementAnnotationMetadataFactory: KotlinElementAnnotationMetadataFactory
+    val anyElement : ClassElement
 
     init {
         visitorAttributes = MutableConvertibleValuesMap()
         annotationMetadataBuilder = KotlinAnnotationMetadataBuilder(environment, resolver)
         elementFactory = KotlinElementFactory(this)
         elementAnnotationMetadataFactory = KotlinElementAnnotationMetadataFactory(false, annotationMetadataBuilder)
+        anyElement = elementFactory.newClassElement(resolver.builtIns.anyType)
     }
 
     override fun <T : Any?> get(name: CharSequence?, conversionContext: ArgumentConversionContext<T>?): Optional<T> {

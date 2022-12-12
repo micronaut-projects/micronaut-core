@@ -18,13 +18,10 @@ package io.micronaut.kotlin.processing.visitor
 import com.google.devtools.ksp.*
 import com.google.devtools.ksp.symbol.*
 import io.micronaut.core.annotation.AnnotationMetadata
-import io.micronaut.inject.ast.ClassElement
-import io.micronaut.inject.ast.GenericPlaceholderElement
-import io.micronaut.inject.ast.MethodElement
-import io.micronaut.inject.ast.ParameterElement
-import io.micronaut.inject.ast.PrimitiveElement
+import io.micronaut.inject.ast.*
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 import io.micronaut.kotlin.processing.getVisibility
+import java.util.*
 
 @OptIn(KspExperimental::class)
 open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElement {
@@ -57,7 +54,7 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
         this.protected = visibility == Visibility.PROTECTED
         this.internal = visibility == Visibility.INTERNAL
         this.parameters = listOf(KotlinParameterElement(
-            propertyType, propertyType, this, method.parameter, elementAnnotationMetadataFactory, visitorContext
+            propertyType, this, method.parameter, elementAnnotationMetadataFactory, visitorContext
         ))
     }
 
@@ -84,19 +81,15 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
                 returnType: ClassElement,
                 genericReturnType: ClassElement,
                 elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
-                visitorContext: KotlinVisitorContext,
-                typeArguments: Map<String, ClassElement>
+                visitorContext: KotlinVisitorContext
     ) : super(method, elementAnnotationMetadataFactory, visitorContext) {
         this.name = visitorContext.resolver.getJvmName(method)!!
         this.declaringType = declaringType
         this.parameters = method.parameters.map {
             val t = visitorContext.elementFactory.newClassElement(
                 it.type.resolve(),
-                elementAnnotationMetadataFactory,
-                typeArguments
-            )
+                elementAnnotationMetadataFactory)
             KotlinParameterElement(
-                t,
                 t,
                 this,
                 it,
@@ -139,8 +132,45 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
         this.internal = internal
     }
 
+    override fun getModifiers(): MutableSet<ElementModifier> {
+        return super<AbstractKotlinElement>.getModifiers()
+    }
+
+    override fun getDeclaredTypeVariables(): MutableList<out GenericPlaceholderElement> {
+        val nativeType = nativeType
+        return if (nativeType is KSDeclaration) {
+            nativeType.typeParameters.map {
+                KotlinGenericPlaceholderElement(it, annotationMetadataFactory, visitorContext)
+            }.toMutableList()
+        } else {
+            super.getDeclaredTypeVariables()
+        }
+    }
+
+    override fun isSuspend(): Boolean {
+        val nativeType = nativeType
+        return if (nativeType is KSModifierListOwner) {
+            nativeType.modifiers.contains(Modifier.SUSPEND)
+        } else {
+            false
+        }
+    }
+
+    override fun getSuspendParameters(): Array<ParameterElement> {
+        // TODO: suspend
+        return super.getSuspendParameters()
+    }
+
+    override fun overrides(overridden: MethodElement): Boolean {
+        val nativeType = nativeType
+        if (nativeType is KSFunctionDeclaration) {
+            return overridden == nativeType.findOverridee()
+        }
+        return false
+    }
+
     override fun withNewOwningType(owningType: ClassElement): MethodElement {
-        var newMethod = KotlinMethodElement(
+        val newMethod = KotlinMethodElement(
             declaration,
             name,
             owningType,
@@ -221,4 +251,7 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
         return KotlinMethodElement(declaration, name, declaringType, annotationMetadataFactory, visitorContext, returnType, genericReturnType, newParameters.toList(), abstract, public, private, protected, internal)
     }
 
+    override fun getThrownTypes(): Array<ClassElement> {
+        return emptyArray() // Kotlin doesn't support throws declarations
+    }
 }

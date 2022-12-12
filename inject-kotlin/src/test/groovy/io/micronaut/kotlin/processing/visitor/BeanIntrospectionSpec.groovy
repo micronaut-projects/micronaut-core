@@ -2,6 +2,7 @@ package io.micronaut.kotlin.processing.visitor
 
 import com.fasterxml.jackson.annotation.JsonClassDescription
 import com.fasterxml.jackson.annotation.JsonProperty
+import io.micronaut.annotation.processing.test.AbstractKotlinCompilerSpec
 import io.micronaut.context.annotation.Executable
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.beans.BeanIntrospection
@@ -31,7 +32,7 @@ import javax.validation.constraints.NotBlank
 import javax.validation.constraints.Size
 import java.lang.reflect.Field
 
-class BeanIntrospectionSpec extends Specification {
+class BeanIntrospectionSpec extends AbstractKotlinCompilerSpec {
 
     void "test basic introspection"() {
         when:

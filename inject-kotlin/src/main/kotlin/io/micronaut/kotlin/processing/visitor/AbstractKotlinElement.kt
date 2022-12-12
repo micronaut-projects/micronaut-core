@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.kotlin.processing.visitor;
+package io.micronaut.kotlin.processing.visitor
 
 import com.google.devtools.ksp.getVisibility
 import com.google.devtools.ksp.isJavaPackagePrivate
@@ -23,6 +23,7 @@ import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.core.annotation.AnnotationValueBuilder
 import io.micronaut.inject.ast.Element
+import io.micronaut.inject.ast.ElementModifier
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 import io.micronaut.inject.ast.annotation.ElementMutableAnnotationMetadataDelegate
@@ -116,6 +117,24 @@ abstract class AbstractKotlinElement<T : KSNode>(protected val declaration: T,
         }
     }
 
+    override fun getModifiers(): MutableSet<ElementModifier> {
+        if (declaration is KSModifierListOwner) {
+            return declaration.modifiers.mapNotNull {
+                when (it) {
+                    Modifier.FINAL -> ElementModifier.FINAL
+                    Modifier.PRIVATE, Modifier.INTERNAL -> ElementModifier.PRIVATE
+                    Modifier.PROTECTED -> ElementModifier.PROTECTED
+                    Modifier.ABSTRACT -> ElementModifier.ABSTRACT
+                    Modifier.JAVA_STATIC -> ElementModifier.STATIC
+                    Modifier.PUBLIC -> ElementModifier.PUBLIC
+                    Modifier.JAVA_TRANSIENT -> ElementModifier.TRANSIENT
+                    else -> null
+                }
+            }.toMutableSet()
+        }
+        return super.getModifiers()
+    }
+
     override fun <T : Annotation?> annotate(
         annotationType: String?,
         consumer: Consumer<AnnotationValueBuilder<T>>?
@@ -180,4 +199,5 @@ abstract class AbstractKotlinElement<T : KSNode>(protected val declaration: T,
     override fun getReturnInstance(): Element {
         return this
     }
+
 }

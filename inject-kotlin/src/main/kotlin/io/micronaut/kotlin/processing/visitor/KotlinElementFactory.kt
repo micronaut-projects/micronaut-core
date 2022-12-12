@@ -53,13 +53,6 @@ class KotlinElementFactory(
         return newClassElement(type, visitorContext.elementAnnotationMetadataFactory)
     }
 
-    fun newClassElement(
-        type: KSType,
-        resolvedGenerics: Map<String, ClassElement>
-    ): ClassElement {
-        return newClassElement(type, visitorContext.elementAnnotationMetadataFactory, resolvedGenerics)
-    }
-
     override fun newClassElement(
         type: KSType,
         annotationMetadataFactory: ElementAnnotationMetadataFactory
@@ -67,7 +60,6 @@ class KotlinElementFactory(
         return newClassElement(
             type,
             annotationMetadataFactory,
-            emptyMap(),
             true
         )
     }
@@ -80,16 +72,14 @@ class KotlinElementFactory(
         return newClassElement(
             type,
             annotationMetadataFactory,
-            resolvedGenerics,
             true
         )
     }
 
     fun newClassElement(annotated: KSAnnotated,
                         elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
-                        resolvedGenerics: Map<String, ClassElement>,
                         allowPrimitive: Boolean): ClassElement {
-        val type = KotlinClassElement.getType(annotated)
+        val type = KotlinClassElement.getType(annotated, visitorContext)
         val declaration = type.declaration
         val qualifiedName = declaration.qualifiedName!!.asString()
         val hasNoAnnotations = !annotated.annotations.iterator().hasNext()
@@ -99,15 +89,10 @@ class KotlinElementFactory(
         }
         if (qualifiedName == "kotlin.Array") {
             val component = type.arguments[0].type!!.resolve()
-            val componentElement = newClassElement(component, elementAnnotationMetadataFactory, resolvedGenerics, false)
+            val componentElement = newClassElement(component, elementAnnotationMetadataFactory, false)
             return componentElement.toArray()
         } else if (declaration is KSTypeParameter) {
-            val name = declaration.name.asString()
-            return if (resolvedGenerics.containsKey(name)) {
-                resolvedGenerics[name]!!
-            } else {
-                KotlinGenericPlaceholderElement(declaration, elementAnnotationMetadataFactory, visitorContext)
-            }
+            KotlinGenericPlaceholderElement(declaration, elementAnnotationMetadataFactory, visitorContext)
         }
         if (allowPrimitive && !type.isMarkedNullable) {
             element = primitives[qualifiedName]
@@ -118,13 +103,12 @@ class KotlinElementFactory(
         return if (declaration is KSClassDeclaration && declaration.classKind == ClassKind.ENUM_CLASS) {
             KotlinEnumElement(type, elementAnnotationMetadataFactory, visitorContext)
         } else {
-            KotlinClassElement(annotated, elementAnnotationMetadataFactory, visitorContext, resolvedGenerics)
+            KotlinClassElement(annotated, elementAnnotationMetadataFactory, visitorContext)
         }
     }
 
     fun newClassElement(type: KSType,
                         elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
-                        resolvedGenerics: Map<String, ClassElement>,
                         allowPrimitive: Boolean): ClassElement {
         val declaration = type.declaration
         val qualifiedName = declaration.qualifiedName!!.asString()
@@ -135,15 +119,10 @@ class KotlinElementFactory(
         }
         if (qualifiedName == "kotlin.Array") {
             val component = type.arguments[0].type!!.resolve()
-            val componentElement = newClassElement(component, elementAnnotationMetadataFactory, resolvedGenerics, false)
+            val componentElement = newClassElement(component, elementAnnotationMetadataFactory, false)
             return componentElement.toArray()
         } else if (declaration is KSTypeParameter) {
-            val name = declaration.name.asString()
-            return if (resolvedGenerics.containsKey(name)) {
-                resolvedGenerics[name]!!
-            } else {
-                KotlinGenericPlaceholderElement(declaration, elementAnnotationMetadataFactory, visitorContext)
-            }
+            return KotlinGenericPlaceholderElement(declaration, elementAnnotationMetadataFactory, visitorContext)
         }
         if (allowPrimitive && !type.isMarkedNullable) {
             element = primitives[qualifiedName]
@@ -154,7 +133,7 @@ class KotlinElementFactory(
         return if (declaration is KSClassDeclaration && declaration.classKind == ClassKind.ENUM_CLASS) {
             KotlinEnumElement(type, elementAnnotationMetadataFactory, visitorContext)
         } else {
-            KotlinClassElement(type, elementAnnotationMetadataFactory, visitorContext, resolvedGenerics)
+            KotlinClassElement(type, elementAnnotationMetadataFactory, visitorContext)
         }
     }
 
@@ -192,16 +171,8 @@ class KotlinElementFactory(
     ): KotlinMethodElement {
         val returnType = method.returnType!!.resolve()
 
-        val allTypeArguments = mutableMapOf<String, ClassElement>()
-        allTypeArguments.putAll(typeArguments)
-        method.typeParameters.forEach {
-            allTypeArguments[it.name.asString()] = KotlinGenericPlaceholderElement(it, elementAnnotationMetadataFactory, visitorContext)
-        }
-
-
-
         val returnTypeElement = newClassElement(returnType, elementAnnotationMetadataFactory)
-        val genericReturnTypeElement = newClassElement(returnType, elementAnnotationMetadataFactory, allTypeArguments)
+        val genericReturnTypeElement = newClassElement(returnType, elementAnnotationMetadataFactory)
 
         val kotlinMethodElement = KotlinMethodElement(
             method,
@@ -209,8 +180,7 @@ class KotlinElementFactory(
             returnTypeElement,
             genericReturnTypeElement,
             elementAnnotationMetadataFactory,
-            visitorContext,
-            typeArguments
+            visitorContext
         )
         if (returnType.isMarkedNullable && !kotlinMethodElement.returnType.isPrimitive) {
             kotlinMethodElement.annotate(AnnotationUtil.NULLABLE)
@@ -247,7 +217,7 @@ class KotlinElementFactory(
         constructor: KSFunctionDeclaration,
         elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory
     ): ConstructorElement {
-        return KotlinConstructorElement(constructor, owningClass, elementAnnotationMetadataFactory, visitorContext, owningClass, emptyMap())
+        return KotlinConstructorElement(constructor, owningClass, elementAnnotationMetadataFactory, visitorContext, owningClass)
     }
 
     override fun newFieldElement(
