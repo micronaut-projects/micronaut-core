@@ -157,8 +157,15 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
     override fun overrides(overridden: MethodElement): Boolean {
         val nativeType = nativeType
         if (nativeType is KSFunctionDeclaration) {
-            return overridden == nativeType.findOverridee()
+            return overridden.nativeType == nativeType.findOverridee()
+        } else if (nativeType is KSPropertySetter && overridden.nativeType is KSPropertySetter) {
+            return (overridden.nativeType as KSPropertySetter).receiver == nativeType.receiver.findOverridee()
         }
+        return false
+    }
+
+    override fun hides(memberElement: MemberElement?): Boolean {
+        // not sure how to implement this correctly for Kotlin
         return false
     }
 
@@ -245,4 +252,5 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
     override fun getThrownTypes(): Array<ClassElement> {
         return emptyArray() // Kotlin doesn't support throws declarations
     }
+
 }

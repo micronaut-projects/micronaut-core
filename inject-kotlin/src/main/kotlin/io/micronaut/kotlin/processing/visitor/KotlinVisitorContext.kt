@@ -40,7 +40,7 @@ import java.nio.file.Files
 import java.util.*
 import java.util.function.BiConsumer
 
-class KotlinVisitorContext(private val environment: SymbolProcessorEnvironment,
+open class KotlinVisitorContext(private val environment: SymbolProcessorEnvironment,
                            val resolver: Resolver) : VisitorContext {
 
     private val visitorAttributes: MutableConvertibleValues<Any>

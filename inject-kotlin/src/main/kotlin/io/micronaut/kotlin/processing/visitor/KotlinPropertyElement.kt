@@ -295,7 +295,7 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
         // Set annotation metadata as actual elements so the changes are reflected
         val propertyAnnotationMetadata: AnnotationMetadata
         propertyAnnotationMetadata = if (elements.size == 1) {
-            elements.iterator().next()
+            elements.iterator().next().declaredMetadata
         } else {
             AnnotationMetadataHierarchy(
                 true,

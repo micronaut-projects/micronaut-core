@@ -17,10 +17,7 @@ package io.micronaut.kotlin.processing.visitor
 
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import io.micronaut.core.annotation.AnnotationMetadata
-import io.micronaut.inject.ast.ClassElement
-import io.micronaut.inject.ast.ConstructorElement
-import io.micronaut.inject.ast.MethodElement
-import io.micronaut.inject.ast.ParameterElement
+import io.micronaut.inject.ast.*
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 
 class KotlinConstructorElement(method: KSFunctionDeclaration,
@@ -30,6 +27,10 @@ class KotlinConstructorElement(method: KSFunctionDeclaration,
                                returnType: ClassElement
 ): ConstructorElement, KotlinMethodElement(method, declaringType, returnType, elementAnnotationMetadataFactory, visitorContext) {
     override fun overrides(overridden: MethodElement): Boolean {
+        return false
+    }
+
+    override fun hides(memberElement: MemberElement?): Boolean {
         return false
     }
 

@@ -741,7 +741,12 @@ open class KotlinClassElement(protected val classType: KSType,
         }
 
         override fun excludeClass(classNode: KSClassDeclaration): Boolean {
-            return classNode.qualifiedName.toString() == Any::class.java.name || classNode.qualifiedName.toString() == Enum::class.java.name
+            val t = classNode.asStarProjectedType()
+            val builtIns = visitorContext.resolver.builtIns
+            return t == builtIns.anyType ||
+                    t == builtIns.nothingType ||
+                    t == builtIns.unitType ||
+                    classNode.qualifiedName.toString() == Enum::class.java.name
         }
 
         override fun toAstElement(enclosedElement: KSNode): Element {
@@ -785,6 +790,5 @@ open class KotlinClassElement(protected val classType: KSType,
                 else -> throw ProcessingException(this@KotlinClassElement, "Unknown element: $enclosedElement")
             }
         }
-
     }
 }

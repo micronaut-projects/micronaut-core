@@ -87,10 +87,12 @@ abstract class AbstractKotlinElement<T : KSNode>(protected val declaration: T,
 
     override fun getAnnotationMetadata(): MutableAnnotationMetadataDelegate<*> {
         if (elementAnnotationMetadata == null) {
+
+            val factory = annotationMetadataFactory
             if (presetAnnotationMetadata == null) {
-                elementAnnotationMetadata = annotationMetadataFactory.build(this)
+                elementAnnotationMetadata = factory.build(this)
             } else {
-                elementAnnotationMetadata = annotationMetadataFactory.build(this, presetAnnotationMetadata)
+                elementAnnotationMetadata = factory.build(this, presetAnnotationMetadata)
             }
         }
         return elementAnnotationMetadata!!
@@ -259,5 +261,9 @@ abstract class AbstractKotlinElement<T : KSNode>(protected val declaration: T,
 
     override fun hashCode(): Int {
         return declaration.hashCode()
+    }
+
+    override fun toString(): String {
+        return getDescription(false)
     }
 }

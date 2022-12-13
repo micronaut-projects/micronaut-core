@@ -24,6 +24,7 @@ import io.micronaut.core.annotation.Generated
 import io.micronaut.inject.processing.BeanDefinitionCreator
 import io.micronaut.inject.processing.BeanDefinitionCreatorFactory
 import io.micronaut.inject.processing.ProcessingException
+import io.micronaut.inject.visitor.VisitorConfiguration
 import io.micronaut.inject.writer.BeanDefinitionReferenceWriter
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 import io.micronaut.kotlin.processing.KotlinOutputVisitor
@@ -36,7 +37,15 @@ class BeanDefinitionProcessor(private val environment: SymbolProcessorEnvironmen
     private val beanDefinitionMap = mutableMapOf<String, BeanDefinitionCreator>()
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
-        val visitorContext = KotlinVisitorContext(environment, resolver)
+        val visitorContext = object : KotlinVisitorContext(environment, resolver) {
+            override fun getConfiguration(): VisitorConfiguration {
+                return object : VisitorConfiguration {
+                    override fun includeTypeLevelAnnotationsInGenericArguments(): Boolean {
+                        return false
+                    }
+                }
+            }
+        }
 
         val elements = resolver.getAllFiles()
             .flatMap { file: KSFile ->

@@ -1333,7 +1333,7 @@ class Test
 
         then:"The reference is valid"
         reference != null
-        reference.getBeanType() == IntrospectedTypeElementVisitor
+        reference.getBeanType() == MappedSuperClassIntrospectionMapper
     }
 
     void "test write bean introspection data"() {

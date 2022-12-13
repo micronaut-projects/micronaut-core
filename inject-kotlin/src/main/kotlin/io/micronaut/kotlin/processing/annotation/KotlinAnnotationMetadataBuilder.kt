@@ -17,6 +17,7 @@ package io.micronaut.kotlin.processing.annotation
 
 import com.google.devtools.ksp.getClassDeclarationByName
 import com.google.devtools.ksp.getDeclaredProperties
+import com.google.devtools.ksp.isConstructor
 import com.google.devtools.ksp.isDefault
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
@@ -114,14 +115,17 @@ class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnvironment: Sy
             hierarchy.reverse()
             return hierarchy
         } else if (element is KSFunctionDeclaration) {
-            val hierarchy = mutableListOf<KSAnnotated>()
-            hierarchy.add(element)
-            var overidden = element.findOverridee()
-            while (overidden != null) {
-                hierarchy.add(overidden)
-                overidden = (overidden as KSFunctionDeclaration).findOverridee()
+            return if (element.isConstructor()) {
+                mutableListOf(element)
+            } else {
+                val hierarchy = mutableListOf<KSAnnotated>(element)
+                var overidden = element.findOverridee()
+                while (overidden != null) {
+                    hierarchy.add(overidden)
+                    overidden = (overidden as KSFunctionDeclaration).findOverridee()
+                }
+                hierarchy
             }
-            return hierarchy
         } else {
             return mutableListOf(element)
         }
@@ -341,9 +345,14 @@ class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnvironment: Sy
 
     private fun populateTypeHierarchy(element: KSClassDeclaration, hierarchy: MutableList<KSAnnotated>) {
         element.superTypes.forEach {
-            val declaration = it.resolve().declaration
-            hierarchy.add(declaration)
-            populateTypeHierarchy(declaration as KSClassDeclaration, hierarchy)
+            val t = it.resolve()
+            if (t != resolver.builtIns.anyType) {
+                val declaration = t.declaration
+                if (!hierarchy.contains(declaration)) {
+                    hierarchy.add(declaration)
+                    populateTypeHierarchy(declaration as KSClassDeclaration, hierarchy)
+                }
+            }
         }
     }
 
