@@ -153,11 +153,12 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
     }
 
     private void build(BeanDefinitionVisitor visitor) {
-        Set<FieldElement> processedFields = new HashSet<>();
+        Set<MemberElement> processedFields = new HashSet<>();
         ElementQuery<MemberElement> memberQuery = ElementQuery.ALL_FIELD_AND_METHODS.includeHiddenElements();
         if (processAsProperties()) {
             memberQuery = memberQuery.excludePropertyElements();
             for (PropertyElement propertyElement : classElement.getBeanProperties()) {
+                propertyElement.getField().ifPresent(processedFields::add);
                 visitPropertyInternal(visitor, propertyElement);
             }
         } else {
