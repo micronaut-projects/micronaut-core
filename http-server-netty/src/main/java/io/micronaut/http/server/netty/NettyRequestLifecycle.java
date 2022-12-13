@@ -59,7 +59,7 @@ final class NettyRequestLifecycle extends RequestLifecycle {
 
     /**
      * Should only be used where netty-specific stuff is needed, such as reading the body or
-     * writing the response. Otherwise use {@link #request()} which can be updated by filters
+     * writing the response. Otherwise, use {@link #request()} which can be updated by filters
      */
     private final NettyHttpRequest<?> nettyRequest;
 
@@ -73,11 +73,6 @@ final class NettyRequestLifecycle extends RequestLifecycle {
     }
 
     void handleNormal() {
-        handleNormal0()
-            .onComplete((response, throwable) -> rib.writeResponse(ctx, nettyRequest, response, throwable));
-    }
-
-    private ExecutionFlow<MutableHttpResponse<?>> handleNormal0() {
         ctx.channel().config().setAutoRead(false);
 
         if (LOG.isDebugEnabled()) {
@@ -86,18 +81,22 @@ final class NettyRequestLifecycle extends RequestLifecycle {
             LOG.debug("Request {} {}", httpMethod, request().getUri());
         }
 
+        ExecutionFlow<MutableHttpResponse<?>> result;
+
         // handle decoding failure
         DecoderResult decoderResult = nettyRequest.getNativeRequest().decoderResult();
         if (decoderResult.isFailure()) {
             Throwable cause = decoderResult.cause();
             HttpStatus status = cause instanceof TooLongFrameException ? HttpStatus.REQUEST_ENTITY_TOO_LARGE : HttpStatus.BAD_REQUEST;
-            return onStatusError(
+            result = onStatusError(
                 HttpResponse.status(status),
                 status.getReason()
             );
+        } else {
+            result = normalFlow();
         }
 
-        return normalFlow();
+        result.onComplete((response, throwable) -> rib.writeResponse(ctx, nettyRequest, response, throwable));
     }
 
     @Nullable
