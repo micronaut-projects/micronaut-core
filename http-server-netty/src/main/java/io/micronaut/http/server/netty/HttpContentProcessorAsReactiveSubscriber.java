@@ -19,6 +19,8 @@ import io.micronaut.core.annotation.Internal;
 import io.netty.buffer.ByteBufHolder;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -34,6 +36,8 @@ import java.util.List;
  */
 @Internal
 abstract class HttpContentProcessorAsReactiveSubscriber implements Subscriber<ByteBufHolder> {
+    private static final Logger LOG = LoggerFactory.getLogger(HttpContentProcessorAsReactiveSubscriber.class);
+
     final HttpContentProcessor processor;
 
     final List<Object> outBuffer = new ArrayList<>(1);
@@ -56,17 +60,32 @@ abstract class HttpContentProcessorAsReactiveSubscriber implements Subscriber<By
 
     @Override
     public void onNext(ByteBufHolder holder) {
+        if (done) {
+            // can happen if there was a previous processing error
+            holder.release();
+            return;
+        }
+
         outBuffer.clear();
         try {
             processor.add(holder, outBuffer);
         } catch (Throwable t) {
-            failure = t;
+            upstream.cancel();
+            onError(t);
+            // onError calls notifyContentAvailable
+            return;
         }
         notifyContentAvailable(outBuffer);
     }
 
     @Override
     public void onError(Throwable t) {
+        if (done) {
+            // can happen if there was a previous processing error
+            LOG.warn("Dropped upstream error", t);
+            return;
+        }
+
         try {
             processor.cancel();
         } catch (Throwable other) {
@@ -81,6 +100,11 @@ abstract class HttpContentProcessorAsReactiveSubscriber implements Subscriber<By
 
     @Override
     public void onComplete() {
+        if (done) {
+            // can happen if there was a previous processing error
+            return;
+        }
+
         outBuffer.clear();
         try {
             processor.complete(outBuffer);
