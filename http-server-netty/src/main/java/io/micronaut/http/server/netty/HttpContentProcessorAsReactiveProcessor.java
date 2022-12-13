@@ -34,7 +34,8 @@ import java.util.List;
  */
 @Internal
 public final class HttpContentProcessorAsReactiveProcessor {
-    private HttpContentProcessorAsReactiveProcessor() {}
+    private HttpContentProcessorAsReactiveProcessor() {
+    }
 
     /**
      * Subscribe to the {@link StreamedHttpMessage} in the given request, and return a
