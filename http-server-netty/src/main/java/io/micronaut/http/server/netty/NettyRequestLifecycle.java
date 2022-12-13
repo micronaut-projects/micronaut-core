@@ -31,6 +31,8 @@ import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.RequestLifecycle;
 import io.micronaut.http.server.multipart.MultipartBody;
 import io.micronaut.http.server.netty.multipart.NettyStreamingFileUpload;
+import io.micronaut.http.server.netty.types.files.NettyStreamedFileCustomizableResponseType;
+import io.micronaut.http.server.netty.types.files.NettySystemFileCustomizableResponseType;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
 import io.micronaut.web.router.MethodBasedRouteMatch;
 import io.micronaut.web.router.RouteMatch;
@@ -43,6 +45,10 @@ import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -102,7 +108,22 @@ final class NettyRequestLifecycle extends RequestLifecycle {
     @Nullable
     @Override
     protected FileCustomizableResponseType findFile() {
-        return rib.find(request());
+        Optional<URL> optionalUrl = rib.staticResourceResolver.resolve(request().getUri().getPath());
+        if (optionalUrl.isPresent()) {
+            try {
+                URL url = optionalUrl.get();
+                if (url.getProtocol().equals("file")) {
+                    File file = Paths.get(url.toURI()).toFile();
+                    if (file.exists() && !file.isDirectory() && file.canRead()) {
+                        return new NettySystemFileCustomizableResponseType(file);
+                    }
+                }
+                return new NettyStreamedFileCustomizableResponseType(url);
+            } catch (URISyntaxException e) {
+                //no-op
+            }
+        }
+        return null;
     }
 
     @Override
