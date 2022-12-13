@@ -41,13 +41,31 @@ import java.lang.reflect.InvocationTargetException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Stream;
 
 public class KotlinCompiler {
+    static KotlinCompilation KOTLIN_COMPILATION = new KotlinCompilation();
+    static KotlinCompilation KSP_COMPILATION = new KotlinCompilation();
+
+    static {
+
+        KOTLIN_COMPILATION.setJvmDefault("all");
+        KOTLIN_COMPILATION.setInheritClassPath(true);
+
+        KSP_COMPILATION.setJavacArguments(Collections.singletonList("-Xopt-in=kotlin.RequiresOptIn"));
+        KSP_COMPILATION.setInheritClassPath(true);
+        KSP_COMPILATION.setClasspaths(Arrays.asList(
+            new File(KSP_COMPILATION.getWorkingDir(), "ksp/classes"),
+            new File(KSP_COMPILATION.getWorkingDir(), "ksp/sources/resources"),
+            KOTLIN_COMPILATION.getClassesDir()));
+    }
 
     public static URLClassLoader buildClassLoader(String name, @Language("kotlin") String clazz) {
         Pair<Pair<KotlinCompilation, KotlinCompilation.Result>, Pair<KotlinCompilation, KotlinCompilation.Result>> resultPair = compile(name, clazz, new ArrayList<>());
@@ -90,46 +108,27 @@ public class KotlinCompiler {
     }
 
     public static Pair<Pair<KotlinCompilation, KotlinCompilation.Result>, Pair<KotlinCompilation, KotlinCompilation.Result>> compile(String name, @Language("kotlin") String clazz, List<ClassElement> classElements) {
-        KotlinCompilation compilation = new KotlinCompilation();
-        compilation.setSources(Collections.singletonList(SourceFile.Companion.kotlin(name + ".kt", clazz, true)));
-        compilation.setJvmDefault("all");
-        compilation.setInheritClassPath(true);
-
-        KotlinCompilation.Result result = compilation.compile();
+        try {
+            Files.deleteIfExists(KOTLIN_COMPILATION.getWorkingDir().toPath());
+        } catch (IOException e) {
+            // ignore
+        }
+        KOTLIN_COMPILATION.setSources(Collections.singletonList(SourceFile.Companion.kotlin(name + ".kt", clazz, true)));
+        KotlinCompilation.Result result = KOTLIN_COMPILATION.compile();
         if (result.getExitCode() != KotlinCompilation.ExitCode.OK) {
             throw new RuntimeException(result.getMessages());
         }
 
-        KotlinCompilation kspCompilation = new KotlinCompilation();
-        kspCompilation.setJavacArguments(Collections.singletonList("-Xopt-in=kotlin.RequiresOptIn"));
-        kspCompilation.setSources(compilation.getSources());
-        kspCompilation.setInheritClassPath(true);
-        kspCompilation.setClasspaths(Arrays.asList(
-                new File(kspCompilation.getWorkingDir(), "ksp/classes"),
-                new File(kspCompilation.getWorkingDir(), "ksp/sources/resources"),
-                compilation.getClassesDir()));
-        KspKt.setSymbolProcessorProviders(kspCompilation, Arrays.asList(new TypeElementSymbolProcessorProvider() {
-            @NotNull
-            @Override
-            public SymbolProcessor create(@NotNull SymbolProcessorEnvironment environment) {
-                return new TypeElementSymbolProcessor(environment) {
-                    @NotNull
-                    @Override
-                    public ClassElement newClassElement(@NotNull KotlinVisitorContext visitorContext, @NotNull KSClassDeclaration classDeclaration) {
-                        ClassElement classElement = super.newClassElement(visitorContext, classDeclaration);
-                        classElements.add(classElement);
-                        return classElement;
-                    }
-                };
-            }
-        }, new BeanDefinitionProcessorProvider()));
-
-        KotlinCompilation.Result kspResult = kspCompilation.compile();
+        KSP_COMPILATION.setSources(KOTLIN_COMPILATION.getSources());
+        ClassElementTypeElementSymbolProcessorProvider classElementTypeElementSymbolProcessorProvider = new ClassElementTypeElementSymbolProcessorProvider();
+        KspKt.setSymbolProcessorProviders(KSP_COMPILATION, Arrays.asList(classElementTypeElementSymbolProcessorProvider, new BeanDefinitionProcessorProvider()));
+        KotlinCompilation.Result kspResult = KSP_COMPILATION.compile();
+        classElements.addAll(classElementTypeElementSymbolProcessorProvider.classElements);
         if (kspResult.getExitCode() != KotlinCompilation.ExitCode.OK) {
             throw new RuntimeException(kspResult.getMessages());
         }
 
-        return new Pair<>(new Pair<>(compilation, result), new Pair<>(kspCompilation, kspResult));
+        return new Pair<>(new Pair<>(KOTLIN_COMPILATION, result), new Pair<>(KSP_COMPILATION, kspResult));
     }
 
     public static BeanIntrospection<?> buildBeanIntrospection(String name, @Language("kotlin") String clazz) {
@@ -262,6 +261,24 @@ public class KotlinCompiler {
             return constructor.newInstance();
         } catch (ClassNotFoundException e) {
             return null;
+        }
+    }
+
+    private static class ClassElementTypeElementSymbolProcessorProvider extends TypeElementSymbolProcessorProvider {
+        Set<ClassElement> classElements = new HashSet<>();
+
+        @NotNull
+        @Override
+        public SymbolProcessor create(@NotNull SymbolProcessorEnvironment environment) {
+            return new TypeElementSymbolProcessor(environment) {
+                @NotNull
+                @Override
+                public ClassElement newClassElement(@NotNull KotlinVisitorContext visitorContext, @NotNull KSClassDeclaration classDeclaration) {
+                    ClassElement classElement = super.newClassElement(visitorContext, classDeclaration);
+                    classElements.add(classElement);
+                    return classElement;
+                }
+            };
         }
     }
 }

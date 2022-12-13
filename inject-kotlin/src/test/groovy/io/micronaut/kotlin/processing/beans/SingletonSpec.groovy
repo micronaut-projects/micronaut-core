@@ -1,10 +1,11 @@
 package io.micronaut.kotlin.processing.beans
 
+import io.micronaut.annotation.processing.test.AbstractKotlinCompilerSpec
 import io.micronaut.inject.BeanDefinition
 
 import spock.lang.Specification
 
-class SingletonSpec extends Specification {
+class SingletonSpec extends AbstractKotlinCompilerSpec {
 
     void "test simple singleton bean"() {
         when:

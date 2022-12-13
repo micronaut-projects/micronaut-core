@@ -25,6 +25,7 @@ import io.micronaut.inject.ast.*
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 import io.micronaut.inject.ast.utils.AstBeanPropertiesUtils
 import io.micronaut.inject.ast.utils.EnclosedElementsQuery
+import io.micronaut.inject.processing.ProcessingException
 import io.micronaut.kotlin.processing.getBinaryName
 import java.util.*
 import java.util.function.Function
@@ -772,7 +773,13 @@ open class KotlinClassElement(protected val classType: KSType,
                     elementAnnotationMetadataFactory
                 )
 
-                else -> throw IllegalStateException("Unknown element: $enclosedElement")
+                is KSClassDeclaration -> elementFactory.newClassElement(
+                    enclosedElement,
+                    elementAnnotationMetadataFactory,
+                    false
+                )
+
+                else -> throw ProcessingException(this@KotlinClassElement, "Unknown element: $enclosedElement")
             }
         }
 

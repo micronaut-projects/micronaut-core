@@ -218,18 +218,32 @@ abstract class AbstractKotlinElement<T : KSNode>(protected val declaration: T,
         visitorContext: KotlinVisitorContext
     ): ClassElement {
         var resolvedType = type
-        if (parent is KSDeclaration && type is GenericPlaceholderElement && owningClass is KotlinClassElement) {
-            val variableName = type.variableName
-            val genericTypeInfo = owningClass.getGenericTypeInfo()
-            val boundInfo = genericTypeInfo[parent.getBinaryName(visitorContext.resolver)]
-            if (boundInfo != null) {
-                val ksType = boundInfo[variableName]
-                if (ksType != null) {
-                    resolvedType = visitorContext.elementFactory.newClassElement(
-                        ksType,
-                        visitorContext.elementAnnotationMetadataFactory,
-                        false
-                    )
+        if (parent is KSDeclaration && owningClass is KotlinClassElement) {
+            if (type is GenericPlaceholderElement) {
+
+                val variableName = type.variableName
+                val genericTypeInfo = owningClass.getGenericTypeInfo()
+                val boundInfo = genericTypeInfo[parent.getBinaryName(visitorContext.resolver)]
+                if (boundInfo != null) {
+                    val ksType = boundInfo[variableName]
+                    if (ksType != null) {
+                        resolvedType = visitorContext.elementFactory.newClassElement(
+                            ksType,
+                            visitorContext.elementAnnotationMetadataFactory,
+                            false
+                        )
+                        if (type.isArray) {
+                            resolvedType = resolvedType.toArray()
+                        }
+                    }
+                }
+            } else if (type.declaredGenericPlaceholders.isNotEmpty()) {
+                resolvedType = type.foldBoundGenericTypes {
+                    if (it is GenericPlaceholderElement) {
+                        resolveGeneric(parent, it, owningClass, visitorContext)
+                    } else {
+                        it
+                    }
                 }
             }
         }

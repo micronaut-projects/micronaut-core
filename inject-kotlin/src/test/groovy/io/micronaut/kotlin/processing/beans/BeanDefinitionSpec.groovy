@@ -254,7 +254,6 @@ annotation class MockBean(
         definition.getAnnotationNameByStereotype(AnnotationUtil.QUALIFIER).get() == AnnotationUtil.NAMED
     }
 
-    @PendingFeature(reason = "annotation defaults")
     void 'test qualifier annotation'() {
         given:
         def definition = buildBeanDefinition('test.Test', '''
