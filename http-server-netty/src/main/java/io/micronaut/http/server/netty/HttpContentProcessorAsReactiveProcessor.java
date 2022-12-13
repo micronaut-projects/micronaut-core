@@ -17,7 +17,6 @@ package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.netty.stream.StreamedHttpMessage;
-import org.reactivestreams.Processor;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 
@@ -35,11 +34,13 @@ import java.util.List;
  */
 @Internal
 public final class HttpContentProcessorAsReactiveProcessor {
+    private HttpContentProcessorAsReactiveProcessor() {}
+
     /**
      * Subscribe to the {@link StreamedHttpMessage} in the given request, and return a
      * {@link Publisher} that will produce the processed items.<br>
      * This exists mostly for compatibility with the old {@link HttpContentProcessor}, which was a
-     * {@link Processor}.
+     * {@link org.reactivestreams.Processor}.
      *
      * @param processor The content processor to use
      * @param request The request to subscribe to
