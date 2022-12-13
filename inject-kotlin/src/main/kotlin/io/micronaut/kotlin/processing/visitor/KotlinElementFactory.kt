@@ -172,13 +172,11 @@ class KotlinElementFactory(
         val returnType = method.returnType!!.resolve()
 
         val returnTypeElement = newClassElement(returnType, elementAnnotationMetadataFactory)
-        val genericReturnTypeElement = newClassElement(returnType, elementAnnotationMetadataFactory)
 
         val kotlinMethodElement = KotlinMethodElement(
             method,
             declaringClass,
             returnTypeElement,
-            genericReturnTypeElement,
             elementAnnotationMetadataFactory,
             visitorContext
         )

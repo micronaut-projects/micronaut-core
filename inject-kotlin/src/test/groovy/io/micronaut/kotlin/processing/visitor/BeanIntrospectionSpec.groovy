@@ -511,6 +511,7 @@ class Test
         def clazz = classLoader.loadClass('test.$Test$IntrospectionRef0')
         BeanIntrospectionReference reference = clazz.newInstance()
         String className = "io.micronaut.kotlin.processing.elementapi.OuterBean\$InnerBean"
+        def innerType = classLoader.loadClass(className)
 
         then:"The reference is valid"
         reference != null
@@ -524,11 +525,18 @@ class Test
         i.propertyNames[0] == 'name'
 
         when:
+        innerType.newInstance()
+
+        then:
+        noExceptionThrown()
+
+        when:
         def o = i.instantiate()
 
         then:
         noExceptionThrown()
         o.class.name == className
+        innerType.isInstance(o)
     }
 
     void "test create bean introspection for external inner interface"() {

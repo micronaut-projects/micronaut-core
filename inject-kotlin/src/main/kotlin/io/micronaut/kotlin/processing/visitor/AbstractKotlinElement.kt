@@ -22,12 +22,15 @@ import com.google.devtools.ksp.symbol.*
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.core.annotation.AnnotationValueBuilder
+import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.Element
 import io.micronaut.inject.ast.ElementModifier
+import io.micronaut.inject.ast.GenericPlaceholderElement
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 import io.micronaut.inject.ast.annotation.ElementMutableAnnotationMetadataDelegate
 import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate
+import io.micronaut.kotlin.processing.getBinaryName
 import java.util.*
 import java.util.function.Consumer
 import java.util.function.Predicate
@@ -46,6 +49,14 @@ abstract class AbstractKotlinElement<T : KSNode>(protected val declaration: T,
     override fun isProtected(): Boolean {
         return if (declaration is KSDeclaration) {
             declaration.getVisibility() == Visibility.PROTECTED
+        } else {
+            false
+        }
+    }
+
+    override fun isStatic(): Boolean {
+        return if (declaration is KSDeclaration) {
+            declaration.modifiers.contains(Modifier.JAVA_STATIC)
         } else {
             false
         }
@@ -198,6 +209,31 @@ abstract class AbstractKotlinElement<T : KSNode>(protected val declaration: T,
 
     override fun getReturnInstance(): Element {
         return this
+    }
+
+    protected fun resolveGeneric(
+        parent: KSNode?,
+        type: ClassElement,
+        owningClass: ClassElement,
+        visitorContext: KotlinVisitorContext
+    ): ClassElement {
+        var resolvedType = type
+        if (parent is KSDeclaration && type is GenericPlaceholderElement && owningClass is KotlinClassElement) {
+            val variableName = type.variableName
+            val genericTypeInfo = owningClass.getGenericTypeInfo()
+            val boundInfo = genericTypeInfo[parent.getBinaryName(visitorContext.resolver)]
+            if (boundInfo != null) {
+                val ksType = boundInfo[variableName]
+                if (ksType != null) {
+                    resolvedType = visitorContext.elementFactory.newClassElement(
+                        ksType,
+                        visitorContext.elementAnnotationMetadataFactory,
+                        false
+                    )
+                }
+            }
+        }
+        return resolvedType
     }
 
 }

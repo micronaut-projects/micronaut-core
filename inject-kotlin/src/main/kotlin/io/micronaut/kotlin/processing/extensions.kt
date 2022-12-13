@@ -15,21 +15,27 @@
  */
 package io.micronaut.kotlin.processing
 
-import com.google.devtools.ksp.getVisibility
-import com.google.devtools.ksp.isLocal
+import com.google.devtools.ksp.KspExperimental
+import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.symbol.*
 import java.lang.StringBuilder
 
-fun KSClassDeclaration.toClassName(): String {
-    val className = StringBuilder(packageName.asString())
-    val hierarchy = mutableListOf(this)
-    var parentDeclaration = parentDeclaration
-    while (parentDeclaration is KSClassDeclaration) {
-        hierarchy.add(0, parentDeclaration)
-        parentDeclaration = parentDeclaration.parentDeclaration
+@OptIn(KspExperimental::class)
+fun KSDeclaration.getBinaryName(resolver: Resolver): String {
+    val binaryName = resolver.mapKotlinNameToJava(this.qualifiedName!!)?.asString()
+    return if (binaryName != null) {
+        binaryName
+    } else {
+        val className = StringBuilder(packageName.asString())
+        val hierarchy = mutableListOf(this)
+        var parentDeclaration = parentDeclaration
+        while (parentDeclaration is KSClassDeclaration) {
+            hierarchy.add(0, parentDeclaration)
+            parentDeclaration = parentDeclaration.parentDeclaration
+        }
+        hierarchy.joinTo(className, "$", ".")
+        className.toString()
     }
-    hierarchy.joinTo(className, "$", ".")
-    return className.toString()
 }
 
 fun KSPropertyDeclaration.isTypeReference(): Boolean {

@@ -28,7 +28,7 @@ class KotlinConstructorElement(method: KSFunctionDeclaration,
                                elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
                                visitorContext: KotlinVisitorContext,
                                returnType: ClassElement
-): ConstructorElement, KotlinMethodElement(method, declaringType, returnType, returnType, elementAnnotationMetadataFactory, visitorContext) {
+): ConstructorElement, KotlinMethodElement(method, declaringType, returnType, elementAnnotationMetadataFactory, visitorContext) {
     override fun overrides(overridden: MethodElement): Boolean {
         return false
     }

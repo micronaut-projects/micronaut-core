@@ -37,7 +37,7 @@ class KotlinFieldElement(declaration: KSPropertyDeclaration,
     }
 
     override fun getGenericType(): ClassElement {
-        return super.getGenericType()
+        return resolveGeneric(declaration.parent, type, declaringType, visitorContext)
     }
 
     override fun copyThis(): AbstractKotlinElement<KSPropertyDeclaration> {

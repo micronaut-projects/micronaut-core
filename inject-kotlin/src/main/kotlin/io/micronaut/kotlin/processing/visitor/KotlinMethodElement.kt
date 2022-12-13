@@ -30,7 +30,6 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
     private val declaringType: ClassElement
     private val parameters: List<ParameterElement>
     private val returnType: ClassElement
-    private val genericReturnType: ClassElement
     private val abstract: Boolean
     private val public: Boolean
     private val private: Boolean
@@ -46,7 +45,6 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
         this.name = visitorContext.resolver.getJvmName(method)!!
         this.declaringType = declaringType
         this.returnType = PrimitiveElement.VOID
-        this.genericReturnType = PrimitiveElement.VOID
         this.abstract = method.receiver.isAbstract()
         val visibility = method.getVisibility()
         this.public = visibility == Visibility.PUBLIC
@@ -68,7 +66,6 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
         this.declaringType = declaringType
         this.parameters = emptyList()
         this.returnType = returnType
-        this.genericReturnType = returnType
         this.abstract = method.receiver.isAbstract()
         this.public = method.receiver.isPublic()
         this.private = method.receiver.isPrivate()
@@ -79,7 +76,6 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
     constructor(method: KSFunctionDeclaration,
                 declaringType: ClassElement,
                 returnType: ClassElement,
-                genericReturnType: ClassElement,
                 elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
                 visitorContext: KotlinVisitorContext
     ) : super(method, elementAnnotationMetadataFactory, visitorContext) {
@@ -98,7 +94,6 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
             )
         }
         this.returnType = returnType
-        this.genericReturnType = genericReturnType
         this.abstract = method.isAbstract
         this.public = method.isPublic()
         this.private = method.isPrivate()
@@ -112,7 +107,6 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
                           elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
                           visitorContext: KotlinVisitorContext,
                           returnType: ClassElement,
-                          genericReturnType: ClassElement,
                           parameters: List<ParameterElement>,
                           abstract: Boolean,
                           public: Boolean,
@@ -124,7 +118,6 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
         this.declaringType = declaringType
         this.parameters = parameters
         this.returnType = returnType
-        this.genericReturnType = genericReturnType
         this.abstract = abstract
         this.public = public
         this.private = private
@@ -173,11 +166,10 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
         val newMethod = KotlinMethodElement(
             declaration,
             name,
-            owningType,
+            owningType as KotlinClassElement,
             annotationMetadataFactory,
             visitorContext,
             returnType,
-            genericReturnType,
             parameters,
             abstract,
             public,
@@ -202,7 +194,7 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
     }
 
     override fun getGenericReturnType(): ClassElement {
-        return genericReturnType
+        return resolveGeneric(declaration.parent, returnType, declaringType, visitorContext)
     }
 
     override fun getParameters(): Array<ParameterElement> {
@@ -222,7 +214,6 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
             annotationMetadataFactory,
             visitorContext,
             returnType,
-            genericReturnType,
             parameters,
             abstract,
             public,
@@ -248,7 +239,7 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
     }
 
     override fun withParameters(vararg newParameters: ParameterElement): MethodElement {
-        return KotlinMethodElement(declaration, name, declaringType, annotationMetadataFactory, visitorContext, returnType, genericReturnType, newParameters.toList(), abstract, public, private, protected, internal)
+        return KotlinMethodElement(declaration, name, declaringType, annotationMetadataFactory, visitorContext, returnType, newParameters.toList(), abstract, public, private, protected, internal)
     }
 
     override fun getThrownTypes(): Array<ClassElement> {

@@ -16,10 +16,7 @@
 package io.micronaut.kotlin.processing.visitor
 
 import com.google.devtools.ksp.isAbstract
-import com.google.devtools.ksp.symbol.KSFunctionDeclaration
-import com.google.devtools.ksp.symbol.KSNode
-import com.google.devtools.ksp.symbol.KSPropertyDeclaration
-import com.google.devtools.ksp.symbol.Modifier
+import com.google.devtools.ksp.symbol.*
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationMetadataDelegate
 import io.micronaut.core.annotation.AnnotationValue
@@ -28,6 +25,7 @@ import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
 import io.micronaut.inject.ast.*
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate
+import io.micronaut.kotlin.processing.getBinaryName
 import java.util.*
 import java.util.function.Consumer
 import java.util.function.Predicate
@@ -393,6 +391,10 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
                 type.nativeType as KSNode
             }
         }
+    }
+
+    override fun getGenericType(): ClassElement {
+        return resolveGeneric(declaration.parent, getType(), classElement, visitorContext)
     }
 
     override fun getAnnotationMetadata(): MutableAnnotationMetadataDelegate<*> {

@@ -27,7 +27,7 @@ import io.micronaut.core.value.OptionalValues
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
 import io.micronaut.inject.annotation.MutableAnnotationMetadata
 import io.micronaut.inject.visitor.VisitorContext
-import io.micronaut.kotlin.processing.toClassName
+import io.micronaut.kotlin.processing.getBinaryName
 import io.micronaut.kotlin.processing.visitor.KotlinVisitorContext
 import java.lang.annotation.Inherited
 import java.lang.annotation.RetentionPolicy
@@ -272,7 +272,7 @@ class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnvironment: Sy
             val value = repeatable.arguments.find { it.name?.asString() == "value" }?.value
             if (value != null) {
                 val declaration = (value as KSType).declaration as KSClassDeclaration
-                return declaration.toClassName()
+                return declaration.getBinaryName(resolver)
             }
         }
         return null
@@ -360,7 +360,7 @@ class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnvironment: Sy
                 if (declaration.classKind == ClassKind.CLASS ||
                     declaration.classKind == ClassKind.INTERFACE ||
                     declaration.classKind == ClassKind.ANNOTATION_CLASS) {
-                    return AnnotationClassValue<Any>(declaration.toClassName())
+                    return AnnotationClassValue<Any>(declaration.getBinaryName(resolver))
                 }
             }
         }
