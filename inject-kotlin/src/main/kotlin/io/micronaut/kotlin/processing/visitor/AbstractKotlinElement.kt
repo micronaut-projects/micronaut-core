@@ -250,4 +250,14 @@ abstract class AbstractKotlinElement<T : KSNode>(protected val declaration: T,
         return resolvedType
     }
 
+    override fun equals(other: Any?): Boolean {
+        if (other is AbstractKotlinElement<*>) {
+            return declaration == other.declaration
+        }
+        return false
+    }
+
+    override fun hashCode(): Int {
+        return declaration.hashCode()
+    }
 }

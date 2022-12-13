@@ -161,24 +161,27 @@ open class KotlinClassElement(protected val classType: KSType,
         val staticCreators: MutableList<MethodElement> = mutableListOf()
         staticCreators.addAll(super.getAccessibleStaticCreators())
         return staticCreators.ifEmpty {
-            visitorContext.getClassElement("$name\$Companion", elementAnnotationMetadataFactory)
-                .filter { it.isStatic }
-                .flatMap { typeElement: ClassElement ->
-                    typeElement.getEnclosedElements(
-                        ElementQuery.ALL_METHODS
-                            .annotated { annotationMetadata: AnnotationMetadata ->
-                                annotationMetadata.hasStereotype(
-                                    Creator::class.java
-                                )
-                            }
-                    ).stream().findFirst()
-                }
-                .filter { method: MethodElement -> !method.isPrivate && method.returnType == this }
-                .map { o: MethodElement ->
-                    mutableListOf(
-                        o
-                    )
-                }.orElse(mutableListOf())
+            val companion = classDeclaration.declarations.filter {
+                it is KSClassDeclaration && it.classKind == ClassKind.OBJECT && it.simpleName.asString() == "Companion"
+            }.map { it as KSClassDeclaration }
+             .map { visitorContext.elementFactory.newClassElement(it, elementAnnotationMetadataFactory, false) }
+             .firstOrNull()
+
+            if (companion != null) {
+                return companion.getEnclosedElements(
+                    ElementQuery.ALL_METHODS
+                        .annotated { it.hasStereotype(
+                            Creator::class.java
+                        )}
+                        .modifiers { it.isEmpty() || it.contains(ElementModifier.PUBLIC) }
+                        .filter { method ->
+                            method.returnType.isAssignable(this)
+                        }
+                )
+
+            } else {
+                return mutableListOf()
+            }
         }
     }
 
