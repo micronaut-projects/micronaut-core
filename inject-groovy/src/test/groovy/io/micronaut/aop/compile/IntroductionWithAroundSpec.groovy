@@ -3,7 +3,7 @@ package io.micronaut.aop.compile
 import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.BeanFactory
+import io.micronaut.inject.InstantiatableBeanDefinition
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 
 class IntroductionWithAroundSpec extends AbstractBeanDefinitionSpec {
@@ -24,7 +24,7 @@ import jakarta.inject.Singleton;
 abstract class MyBean {
     abstract void save(@NotBlank String name, @Min(1L) int age);
     abstract void saveTwo(@Min(1L) String name);
-    
+
     @io.micronaut.aop.interceptors.Mutating("name")
     public String myConcrete(String name) {
         return name;
@@ -38,7 +38,7 @@ abstract class MyBean {
 
         when:
         ApplicationContext context = ApplicationContext.run()
-        def instance = ((BeanFactory) beanDefinition).build(context, beanDefinition)
+        def instance = ((InstantiatableBeanDefinition) beanDefinition).instantiate(context)
 
         then:
         instance.myConcrete("test") == 'changed'

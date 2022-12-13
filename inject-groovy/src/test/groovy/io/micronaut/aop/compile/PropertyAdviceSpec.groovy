@@ -3,7 +3,7 @@ package io.micronaut.aop.compile
 import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.BeanFactory
+import io.micronaut.inject.InstantiatableBeanDefinition
 import io.micronaut.inject.writer.BeanDefinitionWriter
 
 class PropertyAdviceSpec extends AbstractBeanDefinitionSpec {
@@ -21,7 +21,7 @@ import javax.inject.Singleton;
 @javax.inject.Singleton
 class MyPropertyBean {
     String name
-    
+
     void test(String name) {}
 }
 
@@ -32,7 +32,7 @@ class MyPropertyBean {
 
         when:
         ApplicationContext context = ApplicationContext.run()
-        def instance = ((BeanFactory) beanDefinition).build(context, beanDefinition)
+        def instance = ((InstantiatableBeanDefinition) beanDefinition).instantiate(context)
         instance.setName("test")
 
         then:

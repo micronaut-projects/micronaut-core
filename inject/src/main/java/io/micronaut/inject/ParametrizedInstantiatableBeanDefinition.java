@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2022 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,46 +18,41 @@ package io.micronaut.inject;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.exceptions.BeanInstantiationException;
-import io.micronaut.core.annotation.NextMajorVersion;
 import io.micronaut.core.type.Argument;
 
 import java.util.Map;
 
 /**
- * A {@link BeanFactory} that requires additional (possibly user supplied) parameters in order construct a bean.
+ * <p>An type of {@link BeanDefinition} that can build a new instance, construction requires additional (possibly user supplied) parameters in order construct a bean</p>
  *
- * @param <T> The type
- * @author Graeme Rocher
- * @since 1.0
+ * @param <T> The bean type
+ * @author Denis Stepanov
+ * @since 4.0
  */
-@Deprecated(since = "4")
-@NextMajorVersion("Should be removed after Micronaut 4 Milestone 1")
-public interface ParametrizedBeanFactory<T> extends BeanFactory<T> {
+public interface ParametrizedInstantiatableBeanDefinition<T> extends InstantiatableBeanDefinition<T> {
 
     /**
      * @return The arguments required to construct this bean
      */
-    Argument<?>[] getRequiredArguments();
+    Argument<Object>[] getRequiredArguments();
 
     /**
-     * Variation of the {@link #build(BeanContext, BeanDefinition)} method that allows passing the values necessary for
+     * Variation of the {@link #instantiate(BeanContext)} method that allows passing the values necessary for
      * successful bean construction.
      *
      * @param resolutionContext      The {@link BeanResolutionContext}
      * @param context                The {@link BeanContext}
-     * @param definition             The {@link BeanDefinition}
      * @param requiredArgumentValues The required arguments values. The keys should match the names of the arguments
      *                               returned by {@link #getRequiredArguments()}
      * @return The instantiated bean
      * @throws BeanInstantiationException If the bean cannot be instantiated for the arguments supplied
      */
-    T build(BeanResolutionContext resolutionContext,
-            BeanContext context,
-            BeanDefinition<T> definition,
-            Map<String, Object> requiredArgumentValues) throws BeanInstantiationException;
+    T instantiate(BeanResolutionContext resolutionContext,
+                  BeanContext context,
+                  Map<String, Object> requiredArgumentValues) throws BeanInstantiationException;
 
     @Override
-    default T build(BeanResolutionContext resolutionContext, BeanContext context, BeanDefinition<T> definition) throws BeanInstantiationException {
-        throw new BeanInstantiationException(definition, "Cannot instantiate parametrized bean with no arguments");
+    default T instantiate(BeanResolutionContext resolutionContext, BeanContext context) throws BeanInstantiationException {
+        throw new BeanInstantiationException(this, "Cannot instantiate parametrized bean with no arguments");
     }
 }

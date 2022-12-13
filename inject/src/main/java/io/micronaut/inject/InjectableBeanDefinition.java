@@ -1,0 +1,52 @@
+/*
+ * Copyright 2017-2022 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.micronaut.inject;
+
+import io.micronaut.context.BeanContext;
+import io.micronaut.context.BeanResolutionContext;
+import io.micronaut.context.DefaultBeanResolutionContext;
+
+/**
+ * <p>An type of {@link BeanDefinition} that supports post initialization bean dependencies injection.</p>
+ *
+ * @param <T> The bean type
+ * @author Denis Stepanov
+ * @since 4.0
+ */
+public interface InjectableBeanDefinition<T> extends BeanDefinition<T> {
+
+    /**
+     * Inject the given bean with the context.
+     *
+     * @param context The context
+     * @param bean    The bean
+     * @return The injected bean
+     */
+    default T inject(BeanContext context, T bean) {
+        return inject(new DefaultBeanResolutionContext(context, this), context, bean);
+    }
+
+    /**
+     * Inject the given bean with the context.
+     *
+     * @param resolutionContext the resolution context
+     * @param context           The context
+     * @param bean              The bean
+     * @return The injected bean
+     */
+    T inject(BeanResolutionContext resolutionContext, BeanContext context, T bean);
+
+}

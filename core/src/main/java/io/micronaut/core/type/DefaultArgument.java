@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.ObjectUtils;
 
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
@@ -256,12 +257,12 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
 
     @Override
     public int typeHashCode() {
-        return Objects.hash(type, typeParameters);
+        return ObjectUtils.hash(type, typeParameters);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(type, getName(), typeParameters);
+        return ObjectUtils.hash(type, getName(), typeParameters);
     }
 
     private static Map<String, Argument<?>> initializeTypeParameters(Argument<?>[] genericTypes) {

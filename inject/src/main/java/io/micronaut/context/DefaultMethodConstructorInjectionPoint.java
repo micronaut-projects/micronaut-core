@@ -54,8 +54,4 @@ class DefaultMethodConstructorInjectionPoint<T> extends DefaultMethodInjectionPo
         return (Class<T>) declaringType;
     }
 
-    @Override
-    public T invoke(Object... args) {
-        throw new UnsupportedOperationException("Use MethodInjectionPoint#invoke(..) instead");
-    }
 }
