@@ -23,15 +23,19 @@ import io.micronaut.inject.ast.ParameterElement
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 
 class KotlinParameterElement(
-    private val classElement: ClassElement,
+    private val parameterType: ClassElement,
     private val methodElement: KotlinMethodElement,
     private val parameter: KSValueParameter,
     elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
     visitorContext: KotlinVisitorContext
 ) : AbstractKotlinElement<KSValueParameter>(parameter, elementAnnotationMetadataFactory, visitorContext), ParameterElement {
+    private val internalName : String by lazy {
+        parameter.name!!.asString()
+    }
+
     override fun copyThis(): AbstractKotlinElement<KSValueParameter> {
         return KotlinParameterElement(
-            classElement,
+            parameterType,
             methodElement,
             parameter,
             annotationMetadataFactory,
@@ -44,16 +48,35 @@ class KotlinParameterElement(
     }
 
     override fun getName(): String {
-        return parameter.name!!.asString()
+        return internalName
     }
 
     override fun withAnnotationMetadata(annotationMetadata: AnnotationMetadata): ParameterElement {
         return super<AbstractKotlinElement>.withAnnotationMetadata(annotationMetadata) as ParameterElement
     }
 
-    override fun getType(): ClassElement = classElement
+    override fun getType(): ClassElement = parameterType
 
     override fun getGenericType(): ClassElement = type
 
-    override fun getArrayDimensions(): Int = classElement.arrayDimensions
+    override fun getArrayDimensions(): Int = parameterType.arrayDimensions
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+
+        other as KotlinParameterElement
+
+        if (parameterType != other.parameterType) return false
+        if (internalName != other.internalName) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = 31 * parameterType.hashCode()
+        result = 31 * result + internalName.hashCode()
+        return result
+    }
+
+
 }

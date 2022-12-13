@@ -56,18 +56,43 @@ open class KotlinClassElement(protected val classType: KSType,
         typeVariable: Boolean = false
     ) : this(type, type.declaration as KSClassDeclaration, type.declaration as KSClassDeclaration, elementAnnotationMetadataFactory, visitorContext, arrayDimensions, typeVariable)
 
-    val outerType: KSType?
-    private var resolvedProperties : List<PropertyElement>? = null
+    val outerType: KSType? by lazy {
+        val outerDecl = classDeclaration.parentDeclaration as? KSClassDeclaration
+        outerDecl?.asType(classType.arguments.subList(classDeclaration.typeParameters.size, classType.arguments.size))
+    }
+
+    private val resolvedProperties : List<PropertyElement> by lazy {
+        getBeanProperties(PropertyElementQuery.of(this))
+    }
     private val enclosedElementsQuery = KotlinEnclosedElementsQuery()
-    private var nativeProperties  : List<PropertyElement>? = null
-    private var genericTypeInfo: Map<String, Map<String, KSType>>? = null
+    private val nativeProperties  : List<PropertyElement> by lazy {
+        classDeclaration.getAllProperties()
+            .filter { !it.isInternal() && !it.isPrivate() }
+            .map { KotlinPropertyElement(
+                this,
+                visitorContext.elementFactory.newClassElement(it.type.resolve(), elementAnnotationMetadataFactory),
+                it,
+                elementAnnotationMetadataFactory, visitorContext
+            ) }
+            .toList()
+    }
+    private val internalGenerics : Map<String, Map<String, KSType>> by lazy {
+        val boundMirrors : Map<String, KSType> = getBoundTypeMirrors()
+        val data = mutableMapOf<String, Map<String, KSType>>()
+        if (boundMirrors.isNotEmpty()) {
+            data[this.name] = boundMirrors
+        }
+        val classDeclaration = classDeclaration
+        populateGenericInfo(classDeclaration, data, boundMirrors)
+        data
+    }
+    private val internalCanonicalName : String by lazy {
+        classDeclaration.qualifiedName!!.asString()
+    }
+
     private var overrideBoundGenericTypes: MutableList<out ClassElement>? = null
     private var resolvedTypeArguments : MutableMap<String, ClassElement>? = null
 
-    init {
-        val outerDecl = classDeclaration.parentDeclaration as? KSClassDeclaration
-        outerType = outerDecl?.asType(classType.arguments.subList(classDeclaration.typeParameters.size, classType.arguments.size))
-    }
 
     companion object Helper {
         fun getType(ref: KSAnnotated, visitorContext: KotlinVisitorContext) : KSType {
@@ -134,7 +159,7 @@ open class KotlinClassElement(protected val classType: KSType,
     }
 
     override fun getCanonicalName(): String {
-        return classDeclaration.qualifiedName!!.asString()
+        return internalCanonicalName
     }
 
     override fun getPackageName(): String {
@@ -142,19 +167,7 @@ open class KotlinClassElement(protected val classType: KSType,
     }
 
     override fun getSyntheticBeanProperties(): List<PropertyElement> {
-        // Native properties should be composed of field + synthetic getter/setter
-        if (nativeProperties == null) {
-            nativeProperties = classDeclaration.getAllProperties()
-                .filter { !it.isInternal() && !it.isPrivate() }
-                .map { KotlinPropertyElement(
-                    this,
-                    visitorContext.elementFactory.newClassElement(it.type.resolve(), elementAnnotationMetadataFactory),
-                    it,
-                    elementAnnotationMetadataFactory, visitorContext
-                ) }
-                .toList()
-        }
-        return nativeProperties!!
+        return nativeProperties
     }
 
     override fun getAccessibleStaticCreators(): MutableList<MethodElement> {
@@ -186,10 +199,7 @@ open class KotlinClassElement(protected val classType: KSType,
     }
 
     override fun getBeanProperties(): List<PropertyElement> {
-        if (resolvedProperties == null) {
-            resolvedProperties = getBeanProperties(PropertyElementQuery.of(this))
-        }
-        return Collections.unmodifiableList(resolvedProperties!!)
+        return resolvedProperties
     }
 
     override fun getDeclaredGenericPlaceholders(): MutableList<out GenericPlaceholderElement> {
@@ -230,17 +240,7 @@ open class KotlinClassElement(protected val classType: KSType,
     }
 
     fun getGenericTypeInfo() : Map<String, Map<String, KSType>> {
-        if (this.genericTypeInfo == null) {
-            val boundMirrors : Map<String, KSType> = getBoundTypeMirrors()
-            val data = mutableMapOf<String, Map<String, KSType>>()
-            if (boundMirrors.isNotEmpty()) {
-                data[this.name] = boundMirrors
-            }
-            val classDeclaration = classDeclaration
-            populateGenericInfo(classDeclaration, data, boundMirrors)
-            this.genericTypeInfo = data
-        }
-        return this.genericTypeInfo!!
+        return this.internalGenerics
     }
 
     private fun populateGenericInfo(
@@ -495,7 +495,7 @@ open class KotlinClassElement(protected val classType: KSType,
 
     override fun copyThis(): KotlinClassElement {
         val copy = KotlinClassElement(
-            classType, classDeclaration, annotationInfo, elementAnnotationMetadataFactory, visitorContext
+            classType, classDeclaration, annotationInfo, elementAnnotationMetadataFactory, visitorContext, arrayDimensions, typeVariable
         )
         copy.resolvedTypeArguments = resolvedTypeArguments
         return copy
@@ -622,6 +622,28 @@ open class KotlinClassElement(protected val classType: KSType,
         }
         return enclosedElementsQuery.getEnclosedElements(classElementToInspect, query)
 
+    }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+
+        other as KotlinClassElement
+
+        if (arrayDimensions != other.arrayDimensions) return false
+        if (typeVariable != other.typeVariable) return false
+        if (internalCanonicalName != other.internalCanonicalName) return false
+        if (overrideBoundGenericTypes != other.overrideBoundGenericTypes) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = arrayDimensions
+        result = 31 * result + typeVariable.hashCode()
+        result = 31 * result + internalCanonicalName.hashCode()
+        result = 31 * result + (overrideBoundGenericTypes?.hashCode() ?: 0)
+        return result
     }
 
     private inner class KotlinEnclosedElementsQuery :
@@ -791,4 +813,6 @@ open class KotlinClassElement(protected val classType: KSType,
             }
         }
     }
+
+
 }

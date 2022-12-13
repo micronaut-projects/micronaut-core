@@ -253,4 +253,26 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
         return emptyArray() // Kotlin doesn't support throws declarations
     }
 
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+        other as KotlinMethodElement
+
+        if (name != other.name) return false
+        if (declaringType != other.declaringType) return false
+        if (parameters != other.parameters) return false
+        if (returnType != other.returnType) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = 31 * name.hashCode()
+        result = 31 * result + declaringType.hashCode()
+        result = 31 * result + parameters.hashCode()
+        result = 31 * result + returnType.hashCode()
+        return result
+    }
+
+
 }

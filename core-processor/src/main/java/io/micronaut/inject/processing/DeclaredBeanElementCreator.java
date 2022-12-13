@@ -228,7 +228,7 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
         Optional<FieldElement> field = propertyElement.getField();
         if (!claimed && field.isPresent()) {
             FieldElement writeElement = field.get();
-            claimed = visitField(visitor, writeElement);
+            claimed |= visitField(visitor, writeElement);
         }
         return claimed;
     }

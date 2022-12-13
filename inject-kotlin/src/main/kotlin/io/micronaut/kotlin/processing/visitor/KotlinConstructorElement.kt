@@ -37,4 +37,5 @@ class KotlinConstructorElement(method: KSFunctionDeclaration,
     override fun getName() = "<init>"
 
     override fun getReturnType(): ClassElement = declaringType
+
 }

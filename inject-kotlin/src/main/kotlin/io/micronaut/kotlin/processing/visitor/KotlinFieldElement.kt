@@ -28,16 +28,29 @@ class KotlinFieldElement(declaration: KSPropertyDeclaration,
                          visitorContext: KotlinVisitorContext
 ) : AbstractKotlinElement<KSPropertyDeclaration>(declaration, elementAnnotationMetadataFactory, visitorContext), FieldElement {
 
-    override fun getName(): String {
-        return declaration.simpleName.asString()
+    private val internalName = declaration.simpleName.asString()
+    private val internalType : ClassElement by lazy {
+        visitorContext.elementFactory.newClassElement(declaration.type.resolve())
+    }
+
+    private val internalGenericType : ClassElement by lazy {
+        resolveGeneric(declaration.parent, type, declaringType, visitorContext)
+    }
+
+    override fun isPublic(): Boolean {
+        return false // all Kotlin fields are private
     }
 
     override fun getType(): ClassElement {
-       return visitorContext.elementFactory.newClassElement(declaration.type.resolve())
+        return internalType
+    }
+
+    override fun getName(): String {
+        return internalName
     }
 
     override fun getGenericType(): ClassElement {
-        return resolveGeneric(declaration.parent, type, declaringType, visitorContext)
+        return internalGenericType
     }
 
     override fun copyThis(): AbstractKotlinElement<KSPropertyDeclaration> {
@@ -45,6 +58,7 @@ class KotlinFieldElement(declaration: KSPropertyDeclaration,
     }
 
     override fun isPrivate(): Boolean = true
+
     override fun withAnnotationMetadata(annotationMetadata: AnnotationMetadata): FieldElement {
         return super<AbstractKotlinElement>.withAnnotationMetadata(annotationMetadata) as FieldElement
     }
@@ -53,5 +67,25 @@ class KotlinFieldElement(declaration: KSPropertyDeclaration,
 
     override fun getModifiers(): MutableSet<ElementModifier> {
         return super<AbstractKotlinElement>.getModifiers()
+    }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+
+        other as KotlinFieldElement
+
+        if (declaringType != other.declaringType) return false
+        if (internalName != other.internalName) return false
+        if (internalType != other.internalType) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = 31 + declaringType.hashCode()
+        result = 31 * result + internalName.hashCode()
+        result = 31 * result + internalType.hashCode()
+        return result
     }
 }

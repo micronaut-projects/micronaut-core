@@ -83,16 +83,16 @@ final class FactoryBeanElementCreator extends DeclaredBeanElementCreator {
 
     @Override
     protected boolean visitPropertyReadElement(BeanDefinitionVisitor visitor, PropertyElement propertyElement, MemberElement readElement) {
-        if (readElement.hasDeclaredStereotype(Bean.class.getName())) {
+        if (propertyElement.hasDeclaredStereotype(Bean.class.getName())) {
             ClassElement beanType;
             if (readElement instanceof MethodElement methodElement) {
                 beanType = methodElement.getGenericReturnType();
             } else if (readElement instanceof FieldElement fieldElement) {
                 beanType = fieldElement.getGenericType();
             } else {
-                throw new IllegalStateException();
+                beanType = propertyElement.getGenericType();
             }
-            visitBeanFactoryElement(visitor, beanType, readElement);
+            visitBeanFactoryElement(visitor, beanType, propertyElement);
             return true;
         }
         return super.visitPropertyReadElement(visitor, propertyElement, readElement);
@@ -107,7 +107,10 @@ final class FactoryBeanElementCreator extends DeclaredBeanElementCreator {
         return super.visitPropertyWriteElement(visitor, propertyElement, writeElement);
     }
 
-    void visitBeanFactoryElement(BeanDefinitionVisitor visitor, ClassElement producedType, MemberElement producingElement) {
+    void visitBeanFactoryElement(
+        BeanDefinitionVisitor visitor,
+        ClassElement producedType,
+        MemberElement producingElement) {
         if (producedType.isPrimitive()) {
             BeanDefinitionWriter producedBeanDefinitionWriter = new BeanDefinitionWriter(producingElement,
                 OriginatingElements.of(producingElement),
@@ -186,8 +189,20 @@ final class FactoryBeanElementCreator extends DeclaredBeanElementCreator {
             producedType.annotate(ConfigurationReader.class, builder -> builder.member(ConfigurationReader.PREFIX, ConfigurationUtils.getRequiredTypePath(producedType)));
         }
 
-        if (producingElement instanceof MethodElement) {
-            producedBeanDefinitionWriter.visitBeanFactoryMethod(classElement, (MethodElement) producingElement);
+        if (producingElement instanceof PropertyElement propertyElement) {
+            MethodElement readMethod = propertyElement.getReadMethod().orElse(null);
+            if (readMethod != null) {
+                producedBeanDefinitionWriter.visitBeanFactoryMethod(classElement, readMethod);
+            } else {
+                FieldElement fieldElement = propertyElement.getField().orElse(null);
+                if (fieldElement != null && fieldElement.isAccessible()) {
+                    producedBeanDefinitionWriter.visitBeanFactoryField(classElement, fieldElement);
+                } else {
+                    throw new ProcessingException(producingElement, "A property element that defines the @Bean annotation must have an accessible getter or field");
+                }
+            }
+        } else if (producingElement instanceof MethodElement methodElement) {
+            producedBeanDefinitionWriter.visitBeanFactoryMethod(classElement, methodElement);
         } else {
             producedBeanDefinitionWriter.visitBeanFactoryField(classElement, (FieldElement) producingElement);
         }
