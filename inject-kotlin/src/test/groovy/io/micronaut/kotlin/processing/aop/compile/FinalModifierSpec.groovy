@@ -216,7 +216,7 @@ open class MyBean(@Value("\\${foo.bar}") private val myValue: String) {
 ''')
         then:
         def e = thrown(RuntimeException)
-        e.message.contains 'Public method inherits AOP advice but is declared final. Change the method to be non-final in order for AOP advice to be applied'
+        e.message.contains 'Public method inherits AOP advice but is declared final.'
     }
 
     void "test final modifier on method with AOP advice on method doesn't compile"() {

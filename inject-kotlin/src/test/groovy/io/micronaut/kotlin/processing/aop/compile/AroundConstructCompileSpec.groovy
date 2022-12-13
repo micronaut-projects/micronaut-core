@@ -649,7 +649,6 @@ class InterceptorFactory {
         context.close()
     }
 
-    @PendingFeature(reason = "annotation defaults")
     void 'test around construct with introduction advice'() {
         given:
         ApplicationContext context = buildContext("""

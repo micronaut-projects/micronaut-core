@@ -255,7 +255,6 @@ class AnotherInterceptor: Interceptor<Any, Any> {
         context.close()
     }
 
-    @PendingFeature(reason = "annotation defaults")
     void 'test annotation with just interceptor binding'() {
         given:
         ApplicationContext context = buildContext('''
@@ -802,6 +801,11 @@ open class MyBean {
     @TestAnn2
     open fun test2() {
     }
+
+    @TestAnn
+    @TestAnn2
+    open fun testBoth() {
+    }
 }
 
 @Retention
@@ -831,13 +835,19 @@ class TestInterceptor: Interceptor<Any, Any> {
         instance.test()
 
         then:
-        interceptor.count == 1
+        interceptor.count == 0
 
         when:
         instance.test2()
 
         then:
-        interceptor.count == 2
+        interceptor.count == 0
+
+        when:
+        instance.testBoth()
+
+        then:
+        interceptor.count == 1
 
         cleanup:
         context.close()
@@ -893,7 +903,7 @@ open class Test {
         return CovariantClass(name.toString())
     }
 }
-''')
+''', true)
         def instance = getBean(context, 'test.Test')
 
         expect:
