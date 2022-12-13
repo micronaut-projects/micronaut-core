@@ -34,12 +34,9 @@ import io.micronaut.http.server.netty.HttpContentSubscriberFactory;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.NettyHttpServer;
 import io.micronaut.web.router.qualifier.ConsumesMediaTypeQualifier;
-import io.netty.buffer.ByteBufHolder;
-import io.netty.buffer.EmptyByteBuf;
 import io.netty.handler.codec.http.multipart.Attribute;
 import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.handler.codec.http.multipart.HttpData;
-import io.netty.util.ReferenceCountUtil;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -89,7 +86,7 @@ public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinde
                         .orElse(new DefaultHttpContentProcessor(nettyHttpRequest, httpServerConfiguration.get()));
 
                 //noinspection unchecked
-                return () -> Optional.of(subscriber -> HttpContentProcessorAsReactiveProcessor.asPublisher(processor.resultType(context.getArgument()), nettyHttpRequest).subscribe(new CompletionAwareSubscriber<>() {
+                return () -> Optional.of(subscriber -> HttpContentProcessorAsReactiveProcessor.<HttpData>asPublisher(processor.resultType(context.getArgument()), nettyHttpRequest).subscribe(new CompletionAwareSubscriber<>() {
 
                     Subscription s;
                     AtomicLong partsRequested = new AtomicLong(0);
@@ -114,29 +111,25 @@ public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinde
                     }
 
                     @Override
-                    protected void doOnNext(Object message) {
+                    protected void doOnNext(HttpData message) {
                         if (LOG.isTraceEnabled()) {
                             LOG.trace("Server received streaming message for argument [{}]: {}", context.getArgument(), message);
                         }
-                        if (message instanceof HttpData data) {
-                            // MicronautHttpData does not support .content()
-                            if (data.length() == 0) {
-                                return;
-                            }
-                        } else if (message instanceof ByteBufHolder holder && holder.content() instanceof EmptyByteBuf) {
+                        // MicronautHttpData does not support .content()
+                        if (message.length() == 0) {
                             return;
                         }
 
-                        if (message instanceof HttpData data && data.isCompleted()) {
+                        if (message.isCompleted()) {
                             partsRequested.decrementAndGet();
-                            if (data instanceof FileUpload fu) {
+                            if (message instanceof FileUpload fu) {
                                 subscriber.onNext(new NettyCompletedFileUpload(fu, false));
-                            } else if (data instanceof Attribute attr) {
+                            } else if (message instanceof Attribute attr) {
                                 subscriber.onNext(new NettyCompletedAttribute(attr, false));
                             }
                         }
 
-                        ReferenceCountUtil.release(message);
+                        message.release();
 
                         if (partsRequested.get() > 0) {
                             s.request(1);
