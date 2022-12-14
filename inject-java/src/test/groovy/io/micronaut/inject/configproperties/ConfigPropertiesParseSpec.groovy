@@ -13,7 +13,29 @@ import io.micronaut.inject.BeanFactory
 import io.micronaut.inject.configuration.Engine
 import spock.lang.Issue
 
+import java.time.Duration
+
 class ConfigPropertiesParseSpec extends AbstractTypeElementSpec {
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/8480")
+    void "test configuration properties inheritance for compiled classes - inherited props"() {
+        when:
+        def context = buildContext('''
+package test;
+
+import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.http.server.HttpServerConfiguration;
+
+@ConfigurationProperties("netty")
+class NettyHttpServerConfiguration extends
+ HttpServerConfiguration {
+}
+''')
+        def config = getBean(context, "test.NettyHttpServerConfiguration")
+
+        then:
+        config.idleTimeout == Duration.ofSeconds(2)
+    }
 
     @Issue("https://github.com/micronaut-projects/micronaut-core/issues/8480")
     void "test configuration properties inheritance for compiled classes"() {
@@ -76,7 +98,11 @@ class MyConfig {
 
     @Override
     protected void configureContext(ApplicationContextBuilder contextBuilder) {
-        contextBuilder.properties('foo.bar.host':'bar', "micronaut.session.http.test.write-mode": "test")
+        contextBuilder.properties(
+                'foo.bar.host':'bar',
+                "micronaut.session.http.test.write-mode": "test",
+                "micronaut.server.idle-timeout": "2s"
+        )
     }
 
     void "test inner class paths - pojo inheritance"() {

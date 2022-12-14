@@ -35,6 +35,7 @@ dependencies {
     }
     testImplementation libs.micrometer.core
     testImplementation(libs.micronaut.session)
+    testImplementation(project(":http-server"))
     testImplementation project(":validation")
     testImplementation project(":jackson-databind")
     testImplementation libs.junit.jupiter.api

@@ -19,6 +19,7 @@ import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
 
@@ -34,11 +35,15 @@ import java.util.Optional;
 @Internal
 public final class ConfigurationUtils {
 
-    private static final String PREFIX_CALCULATED = "prefixCalculated";
+    private static final String EACH_PROPERTY_LIST_SUFFIX = "[*]";
+    private static final String EACH_PROPERTY_MAP_SUFFIX = ".*";
+
+    private ConfigurationUtils() {
+    }
 
     public static String buildPropertyPath(ClassElement owningType, ClassElement declaringType, String propertyName) {
         String typePath;
-        if (declaringType.hasAnnotation(ConfigurationReader.class)) {
+        if (declaringType.hasStereotype(ConfigurationReader.class)) {
             typePath = getRequiredTypePath(declaringType);
         } else {
             typePath = getRequiredTypePath(owningType);
@@ -54,20 +59,17 @@ public final class ConfigurationUtils {
         if (!classElement.hasStereotype(ConfigurationReader.class)) {
             return Optional.empty();
         }
-        if (classElement.booleanValue(ConfigurationReader.class, PREFIX_CALCULATED).orElse(false)) {
+        if (classElement.isTrue(ConfigurationReader.class, ConfigurationReader.PREFIX_CALCULATED)) {
             return classElement.stringValue(ConfigurationReader.class, ConfigurationReader.PREFIX);
         }
         String path = getPath(classElement);
         path = prependSuperclasses(classElement, path);
-        Optional<ClassElement> inner = classElement.getEnclosingType();
-        if (classElement.isInner() && inner.isPresent()) {
-            ClassElement enclosingType = inner.get();
-            String parentPrefix = getTypePath(enclosingType).orElse("");
-            path = combinePaths(parentPrefix, path);
-        }
-
+        path = prependInners(classElement, path);
         String finalPath = path;
-        classElement.annotate(ConfigurationReader.class, builder -> builder.member(ConfigurationReader.PREFIX, finalPath).member(PREFIX_CALCULATED, true));
+        classElement.annotate(ConfigurationReader.class, builder ->
+            builder.member(ConfigurationReader.PREFIX, finalPath)
+                   .member(ConfigurationReader.PREFIX_CALCULATED, true)
+        );
         return Optional.of(path);
     }
 
@@ -95,12 +97,7 @@ public final class ConfigurationUtils {
             prefix = prefixOptional.orElse(null);
         }
         if (annotationMetadata.hasDeclaredAnnotation(EachProperty.class)) {
-            Objects.requireNonNull(prefix);
-            if (annotationMetadata.booleanValue(EachProperty.class, "list").orElse(false)) {
-                return prefix + "[*]";
-            } else {
-                return prefix + ".*";
-            }
+            return computeIterablePrefix(annotationMetadata, prefix);
         }
         if (prefix == null) {
             return "";
@@ -108,26 +105,72 @@ public final class ConfigurationUtils {
         return prefix;
     }
 
+    @NonNull
+    private static String computeIterablePrefix(AnnotationMetadata annotationMetadata, String prefix) {
+        Objects.requireNonNull(prefix);
+        if (annotationMetadata.booleanValue(EachProperty.class, "list").orElse(false)) {
+            if (!prefix.endsWith(EACH_PROPERTY_LIST_SUFFIX)) {
+                return prefix + EACH_PROPERTY_LIST_SUFFIX;
+            } else {
+                return prefix;
+            }
+        } else {
+            if (!prefix.endsWith(EACH_PROPERTY_MAP_SUFFIX)) {
+                return prefix + EACH_PROPERTY_MAP_SUFFIX;
+            } else {
+                return prefix;
+            }
+        }
+    }
+
+    private static String prependInners(ClassElement classElement, String path) {
+        Optional<ClassElement> inner = classElement.getEnclosingType();
+        while (classElement.isInner() && inner.isPresent()) {
+            ClassElement enclosingType = inner.get();
+            if (enclosingType.isTrue(ConfigurationReader.class, ConfigurationReader.PREFIX_CALCULATED)) {
+                String parentPrefix = enclosingType.stringValue(ConfigurationReader.class, ConfigurationReader.PREFIX).orElse("");
+                path = combinePaths(parentPrefix, path);
+                break;
+            } else {
+                String parentPrefix = getPath(enclosingType);
+                path = combinePaths(parentPrefix, path);
+            }
+            inner = enclosingType.getEnclosingType();
+        }
+        return path;
+    }
+
     private static String prependSuperclasses(ClassElement declaringType, String path) {
         if (declaringType.isInterface()) {
-            ClassElement superInterface = resolveSuperInterface(declaringType);
-            while (superInterface != null) {
-                Optional<String> parentConfig = getTypePath(superInterface);
-                if (parentConfig.isPresent()) {
-                    path = combinePaths(parentConfig.get(), path);
-                }
-                superInterface = resolveSuperInterface(superInterface);
-            }
+            path = prependInterfaces(declaringType, path);
         } else {
             Optional<ClassElement> optionalSuperType = declaringType.getSuperType();
             while (optionalSuperType.isPresent()) {
                 ClassElement superType = optionalSuperType.get();
-                Optional<String> parentConfig = getTypePath(superType);
-                if (parentConfig.isPresent()) {
-                    path = combinePaths(parentConfig.get(), path);
+                if (superType.isTrue(ConfigurationReader.class, ConfigurationReader.PREFIX_CALCULATED)) {
+                    String parentPrefix = superType.stringValue(ConfigurationReader.class, ConfigurationReader.PREFIX).orElse("");
+                    path = combinePaths(parentPrefix, path);
+                    break;
+                } else {
+                    String parentConfig = getPath(superType);
+                    if (StringUtils.isNotEmpty(parentConfig)) {
+                        path = combinePaths(parentConfig, path);
+                    }
+                    optionalSuperType = superType.getSuperType();
                 }
-                optionalSuperType = superType.getSuperType();
             }
+        }
+        return path;
+    }
+
+    private static String prependInterfaces(ClassElement declaringType, String path) {
+        ClassElement superInterface = resolveSuperInterface(declaringType);
+        while (superInterface != null) {
+            String parentConfig = getPath(superInterface);
+            if (StringUtils.isNotEmpty(parentConfig)) {
+                path = combinePaths(parentConfig, path);
+            }
+            superInterface = resolveSuperInterface(superInterface);
         }
         return path;
     }
