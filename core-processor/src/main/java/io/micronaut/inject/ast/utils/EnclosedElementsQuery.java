@@ -19,8 +19,10 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
+import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementModifier;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
@@ -30,7 +32,6 @@ import io.micronaut.inject.ast.MethodElement;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -51,7 +52,7 @@ import java.util.function.Predicate;
 @Internal
 public abstract class EnclosedElementsQuery<C, N> {
 
-    private final Map<N, io.micronaut.inject.ast.Element> elementsCache = new HashMap<>();
+    private final Map<N, Element> elementsCache = new ConcurrentLinkedHashMap.Builder<N, Element>().maximumWeightedCapacity(200).build();
 
     /**
      * Return the elements that match the given query.

@@ -15,6 +15,7 @@
  */
 package io.micronaut.kotlin.processing.visitor
 
+import com.google.devtools.ksp.KspExperimental
 import com.google.devtools.ksp.getVisibility
 import com.google.devtools.ksp.isJavaPackagePrivate
 import com.google.devtools.ksp.isOpen
@@ -130,9 +131,11 @@ abstract class AbstractKotlinElement<T : KSNode>(protected val declaration: T,
         }
     }
 
+    @OptIn(KspExperimental::class)
     override fun getModifiers(): MutableSet<ElementModifier> {
-        if (declaration is KSModifierListOwner) {
-            return declaration.modifiers.mapNotNull {
+        if (declaration is KSDeclaration) {
+            val javaModifiers = visitorContext.resolver.effectiveJavaModifiers(declaration)
+            return javaModifiers.mapNotNull {
                 when (it) {
                     Modifier.FINAL -> ElementModifier.FINAL
                     Modifier.PRIVATE, Modifier.INTERNAL -> ElementModifier.PRIVATE

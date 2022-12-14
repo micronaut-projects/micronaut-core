@@ -31,6 +31,7 @@ import jakarta.inject.Singleton
 
 @Singleton
 open class MyBean {
+    val name : String = "test"
 
     @TestAnn2
     open fun test() {
@@ -46,6 +47,62 @@ annotation class TestAnn
 
 @Retention
 @Target(AnnotationTarget.FUNCTION)
+@TestAnn
+annotation class TestAnn2
+
+@InterceptorBean(TestAnn::class)
+class TestInterceptor: Interceptor<Any, Any> {
+    var invoked = false
+
+    override fun intercept(context: InvocationContext<Any, Any>): Any? {
+        invoked = true
+        return context.proceed()
+    }
+}
+
+''')
+        def instance = getBean(context, 'annbinding2.MyBean')
+        def interceptor = getBean(context, 'annbinding2.TestInterceptor')
+
+        when:
+        instance.test()
+
+        then:"the interceptor was invoked"
+        instance instanceof Intercepted
+        interceptor.invoked
+
+        cleanup:
+        context.close()
+    }
+
+    void 'test stereotype type level interceptor matching'() {
+        given:
+        ApplicationContext context = buildContext('''
+package annbinding2
+
+import io.micronaut.aop.Around
+import io.micronaut.aop.InterceptorBean
+import io.micronaut.aop.Interceptor
+import io.micronaut.aop.InvocationContext
+import jakarta.inject.Singleton
+
+@Singleton
+@TestAnn2
+open class MyBean {
+    val name : String = "test"
+    open fun test() {
+
+    }
+
+}
+
+@Retention
+@Target(AnnotationTarget.FUNCTION, AnnotationTarget.ANNOTATION_CLASS)
+@Around
+annotation class TestAnn
+
+@Retention
+@Target(AnnotationTarget.CLASS)
 @TestAnn
 annotation class TestAnn2
 

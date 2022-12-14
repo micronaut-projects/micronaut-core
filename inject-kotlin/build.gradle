@@ -53,5 +53,7 @@ tasks.named("test") {
 //    testLogging {
 //        showStandardStreams = true
 //    }
+    forkEvery = 30
+    maxParallelForks = 4
 }
 

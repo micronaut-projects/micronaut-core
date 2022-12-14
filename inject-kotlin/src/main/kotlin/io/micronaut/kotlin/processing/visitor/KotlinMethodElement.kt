@@ -27,7 +27,18 @@ import java.util.*
 open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElement {
 
     private val name: String
-    private val declaringType: ClassElement
+    private val owningType: ClassElement
+    private val internalDeclaringType: ClassElement by lazy {
+        val parent = declaration.parent
+        if (parent is KSClassDeclaration) {
+            visitorContext.elementFactory.newClassElement(
+                parent.asStarProjectedType()
+            )
+        } else {
+            // shouldn't happen
+            visitorContext.anyElement
+        }
+    }
     private val parameters: List<ParameterElement>
     private val returnType: ClassElement
     private val abstract: Boolean
@@ -38,12 +49,12 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
 
     constructor(propertyType : ClassElement,
                 method: KSPropertySetter,
-                declaringType: ClassElement,
+                owningType: ClassElement,
                 elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
                 visitorContext: KotlinVisitorContext
     ) : super(method, elementAnnotationMetadataFactory, visitorContext) {
         this.name = visitorContext.resolver.getJvmName(method)!!
-        this.declaringType = declaringType
+        this.owningType = owningType
         this.returnType = PrimitiveElement.VOID
         this.abstract = method.receiver.isAbstract()
         val visibility = method.getVisibility()
@@ -57,13 +68,13 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
     }
 
     constructor(method: KSPropertyGetter,
-                declaringType: ClassElement,
+                owningType: ClassElement,
                 returnType: ClassElement,
                 elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
                 visitorContext: KotlinVisitorContext,
     ) : super(method, elementAnnotationMetadataFactory, visitorContext) {
         this.name = visitorContext.resolver.getJvmName(method)!!
-        this.declaringType = declaringType
+        this.owningType = owningType
         this.parameters = emptyList()
         this.returnType = returnType
         this.abstract = method.receiver.isAbstract()
@@ -74,13 +85,13 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
     }
 
     constructor(method: KSFunctionDeclaration,
-                declaringType: ClassElement,
+                owningType: ClassElement,
                 returnType: ClassElement,
                 elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
                 visitorContext: KotlinVisitorContext
     ) : super(method, elementAnnotationMetadataFactory, visitorContext) {
         this.name = visitorContext.resolver.getJvmName(method)!!
-        this.declaringType = declaringType
+        this.owningType = owningType
         this.parameters = method.parameters.map {
             val t = visitorContext.elementFactory.newClassElement(
                 it.type.resolve(),
@@ -103,7 +114,7 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
 
     protected constructor(method: KSAnnotated,
                           name: String,
-                          declaringType: ClassElement,
+                          owningType: ClassElement,
                           elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
                           visitorContext: KotlinVisitorContext,
                           returnType: ClassElement,
@@ -115,7 +126,7 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
                           internal: Boolean
     ) : super(method, elementAnnotationMetadataFactory, visitorContext) {
         this.name = name
-        this.declaringType = declaringType
+        this.owningType = owningType
         this.parameters = parameters
         this.returnType = returnType
         this.abstract = abstract
@@ -123,6 +134,18 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
         this.private = private
         this.protected = protected
         this.internal = internal
+    }
+
+    override fun getOwningType(): ClassElement {
+        return owningType
+    }
+
+    override fun isFinal(): Boolean {
+        return if (declaration is KSPropertyGetter || declaration is KSPropertySetter) {
+            true
+        } else  {
+            super<AbstractKotlinElement>.isFinal()
+        }
     }
 
     override fun getModifiers(): MutableSet<ElementModifier> {
@@ -156,7 +179,9 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
 
     override fun overrides(overridden: MethodElement): Boolean {
         val nativeType = nativeType
-        if (nativeType is KSFunctionDeclaration) {
+        if (nativeType == overridden.nativeType) {
+            return false
+        } else if (nativeType is KSFunctionDeclaration) {
             return overridden.nativeType == nativeType.findOverridee()
         } else if (nativeType is KSPropertySetter && overridden.nativeType is KSPropertySetter) {
             return (overridden.nativeType as KSPropertySetter).receiver == nativeType.receiver.findOverridee()
@@ -193,7 +218,7 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
     }
 
     override fun getDeclaringType(): ClassElement {
-        return declaringType
+        return internalDeclaringType
     }
 
     override fun getReturnType(): ClassElement {
@@ -201,7 +226,7 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
     }
 
     override fun getGenericReturnType(): ClassElement {
-        return resolveGeneric(declaration.parent, returnType, declaringType, visitorContext)
+        return resolveGeneric(declaration.parent, returnType, owningType, visitorContext)
     }
 
     override fun getParameters(): Array<ParameterElement> {
@@ -217,7 +242,7 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
         return KotlinMethodElement(
             declaration,
             name,
-            declaringType,
+            owningType,
             annotationMetadataFactory,
             visitorContext,
             returnType,
@@ -246,7 +271,7 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
     }
 
     override fun withParameters(vararg newParameters: ParameterElement): MethodElement {
-        return KotlinMethodElement(declaration, name, declaringType, annotationMetadataFactory, visitorContext, returnType, newParameters.toList(), abstract, public, private, protected, internal)
+        return KotlinMethodElement(declaration, name, owningType, annotationMetadataFactory, visitorContext, returnType, newParameters.toList(), abstract, public, private, protected, internal)
     }
 
     override fun getThrownTypes(): Array<ClassElement> {
@@ -259,7 +284,7 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
         other as KotlinMethodElement
 
         if (name != other.name) return false
-        if (declaringType != other.declaringType) return false
+        if (owningType != other.owningType) return false
         if (parameters != other.parameters) return false
         if (returnType != other.returnType) return false
 
@@ -268,7 +293,7 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
 
     override fun hashCode(): Int {
         var result = 31 * name.hashCode()
-        result = 31 * result + declaringType.hashCode()
+        result = 31 * result + owningType.hashCode()
         result = 31 * result + parameters.hashCode()
         result = 31 * result + returnType.hashCode()
         return result
