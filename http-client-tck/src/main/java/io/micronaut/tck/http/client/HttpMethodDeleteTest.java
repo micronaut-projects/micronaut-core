@@ -31,25 +31,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 public interface HttpMethodDeleteTest extends AbstractTck {
 
     @Test
-    default void blockingDeleteMethodMapping() {
-        runBlockingTest("HttpMethodDeleteTest", (server, client) -> {
-            assertDoesNotThrow(() -> client.exchange(HttpRequest.DELETE("/delete")));
-            assertEquals(HttpStatus.NO_CONTENT, client.exchange(HttpRequest.DELETE("/delete")).getStatus());
-        });
-    }
-
-    @Test
     default void deleteMethodMapping() {
         runTest("HttpMethodDeleteTest", (server, client) ->
             assertEquals(HttpStatus.NO_CONTENT, Flux.from(client.exchange(HttpRequest.DELETE("/delete"))).blockFirst().getStatus())
         );
-    }
-
-    @Test
-    default void blockingDeleteMethodMappingWithStringResponse() {
-        runBlockingTest("HttpMethodDeleteTest", (server, client) ->
-            assertEquals("ok", client.exchange(HttpRequest.DELETE("/delete/string-response"), String.class).body())
-        );
+        runBlockingTest("HttpMethodDeleteTest", (server, client) -> {
+            assertDoesNotThrow(() -> client.exchange(HttpRequest.DELETE("/delete")));
+            assertEquals(HttpStatus.NO_CONTENT, client.exchange(HttpRequest.DELETE("/delete")).getStatus());
+        });
     }
 
     @Test
@@ -61,26 +50,13 @@ public interface HttpMethodDeleteTest extends AbstractTck {
     }
 
     @Test
-    default void blockingDeleteMethodClientMappingWithStringResponse() {
-        runBlockingTest("HttpMethodDeleteTest", (server, client) -> {
-            HttpMethodDeleteClient httpClient = server.getApplicationContext().getBean(HttpMethodDeleteClient.class);
-            assertEquals("ok", httpClient.response());
-        });
-    }
-
-    @Test
     default void deleteMethodMappingWithStringResponse() {
         runTest("HttpMethodDeleteTest", (server, client) ->
             assertEquals("ok", Flux.from(client.exchange(HttpRequest.DELETE("/delete/string-response"), String.class)).blockFirst().body())
         );
-    }
-
-    @Test
-    default void blockingDeleteMethodMappingWithObjectResponse() {
-        runBlockingTest("HttpMethodDeleteTest", (server, client) -> {
-            assertEquals(new HttpMethodDeleteTestController.Person("Tim", 49), client.exchange(HttpRequest.DELETE("/delete/object-response"), HttpMethodDeleteTestController.Person.class).body());
-            assertEquals("{\"name\":\"Tim\",\"age\":49}", client.exchange(HttpRequest.DELETE("/delete/object-response"), String.class).body());
-        });
+        runBlockingTest("HttpMethodDeleteTest", (server, client) ->
+            assertEquals("ok", client.exchange(HttpRequest.DELETE("/delete/string-response"), String.class).body())
+        );
     }
 
     @Test
@@ -88,6 +64,10 @@ public interface HttpMethodDeleteTest extends AbstractTck {
         runTest("HttpMethodDeleteTest", (server, client) -> {
             assertEquals(new HttpMethodDeleteTestController.Person("Tim", 49), Flux.from(client.exchange(HttpRequest.DELETE("/delete/object-response"), HttpMethodDeleteTestController.Person.class)).blockFirst().body());
             assertEquals("{\"name\":\"Tim\",\"age\":49}", Flux.from(client.exchange(HttpRequest.DELETE("/delete/object-response"), String.class)).blockFirst().body());
+        });
+        runBlockingTest("HttpMethodDeleteTest", (server, client) -> {
+            assertEquals(new HttpMethodDeleteTestController.Person("Tim", 49), client.exchange(HttpRequest.DELETE("/delete/object-response"), HttpMethodDeleteTestController.Person.class).body());
+            assertEquals("{\"name\":\"Tim\",\"age\":49}", client.exchange(HttpRequest.DELETE("/delete/object-response"), String.class).body());
         });
     }
 }
