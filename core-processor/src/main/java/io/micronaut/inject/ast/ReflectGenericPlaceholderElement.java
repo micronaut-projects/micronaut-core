@@ -49,11 +49,6 @@ final class ReflectGenericPlaceholderElement
     }
 
     @Override
-    public boolean isArray() {
-        return arrayDimensions > 0;
-    }
-
-    @Override
     public int getArrayDimensions() {
         return arrayDimensions;
     }

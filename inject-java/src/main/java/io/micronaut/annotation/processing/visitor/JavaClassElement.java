@@ -233,7 +233,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     @Override
     public Map<String, ClassElement> getTypeArguments(@NonNull String type) {
         if (StringUtils.isNotEmpty(type)) {
-            Map<String, Map<String, TypeMirror>> data = getGenericTypeInfo();
+            Map<String, Map<String, TypeMirror>> data = visitorContext.getGenericUtils().buildGenericTypeArgumentElementInfo(classElement, null, getBoundTypeMirrors());
             Map<String, TypeMirror> forType = data.get(type);
             if (forType != null) {
                 Map<String, ClassElement> typeArgs = new LinkedHashMap<>(forType.size());
@@ -282,8 +282,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                             parameterizedClassElement(
                                 superclass,
                                 visitorContext,
-                                getGenericTypeInfo())
-                        );
+                                visitorContext.getGenericUtils().buildGenericTypeArgumentElementInfo(classElement, null, getBoundTypeMirrors())));
                     }
                     return Optional.of(
                         new JavaClassElement(
@@ -794,7 +793,12 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     @Override
     public Map<String, Map<String, ClassElement>> getAllTypeArguments() {
         Map<String, TypeMirror> typeArguments = getBoundTypeMirrors();
-        Map<String, Map<String, TypeMirror>> info = getGenericTypeInfo();
+        Map<String, Map<String, TypeMirror>> info = visitorContext.getGenericUtils()
+            .buildGenericTypeArgumentElementInfo(
+                classElement,
+                null,
+                typeArguments
+            );
         Map<String, Map<String, ClassElement>> result = new LinkedHashMap<>(info.size());
         info.forEach((name, generics) -> {
             Map<String, ClassElement> resolved = new LinkedHashMap<>(generics.size());

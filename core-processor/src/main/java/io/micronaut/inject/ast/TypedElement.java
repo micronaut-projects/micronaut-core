@@ -52,7 +52,7 @@ public interface TypedElement extends Element {
      * @return True if it is
      */
     default boolean isPrimitive() {
-        return getType().isPrimitive();
+        return false;
     }
 
     /**
@@ -60,7 +60,7 @@ public interface TypedElement extends Element {
      * @return True if it is.
      */
     default boolean isArray() {
-        return getType().isArray();
+        return getArrayDimensions() != 0;
     }
 
     /**
@@ -69,6 +69,6 @@ public interface TypedElement extends Element {
      * @return The number of dimensions
      */
     default int getArrayDimensions() {
-        return getType().getArrayDimensions();
+        return 0;
     }
 }

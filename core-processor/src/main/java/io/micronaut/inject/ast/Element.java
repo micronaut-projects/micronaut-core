@@ -72,16 +72,12 @@ public interface Element extends MutableAnnotationMetadataDelegate<Element>, Ann
     /**
      * @return True if the element is protected.
      */
-    default boolean isProtected() {
-        return getModifiers().contains(ElementModifier.PROTECTED);
-    }
+    boolean isProtected();
 
     /**
      * @return True if the element is public.
      */
-    default boolean isPublic() {
-        return getModifiers().contains(ElementModifier.PUBLIC);
-    }
+    boolean isPublic();
 
     /**
      * Returns the native underlying type. This API is extended by all of the inject language implementations.
@@ -112,14 +108,14 @@ public interface Element extends MutableAnnotationMetadataDelegate<Element>, Ann
      * @return True if the element is abstract.
      */
     default boolean isAbstract() {
-        return getModifiers().contains(ElementModifier.ABSTRACT);
+        return false;
     }
 
     /**
      * @return True if the element is static.
      */
     default boolean isStatic() {
-        return getModifiers().contains(ElementModifier.STATIC);
+        return false;
     }
 
     /**
@@ -140,7 +136,7 @@ public interface Element extends MutableAnnotationMetadataDelegate<Element>, Ann
      * @return True if the element is final.
      */
     default boolean isFinal() {
-        return getModifiers().contains(ElementModifier.FINAL);
+        return false;
     }
 
     @NonNull

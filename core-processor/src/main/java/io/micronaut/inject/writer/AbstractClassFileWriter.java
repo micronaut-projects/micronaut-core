@@ -26,7 +26,6 @@ import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.annotation.AnnotationMetadataWriter;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
@@ -628,24 +627,14 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
 
         // 3rd argument: The annotation metadata
         if (hasAnnotations) {
-            if (annotationMetadata instanceof DefaultAnnotationMetadata) {
-                AnnotationMetadataWriter.instantiateNewMetadata(
-                        owningType,
-                        declaringClassWriter,
-                        generatorAdapter,
-                        (DefaultAnnotationMetadata) annotationMetadata,
-                        defaults,
-                        loadTypeMethods
-                );
-            } else if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
-                AnnotationMetadataWriter.instantiateNewMetadataHierarchy(
-                        owningType,
-                        declaringClassWriter,
-                        generatorAdapter,
-                        (AnnotationMetadataHierarchy) annotationMetadata,
-                        defaults,
-                        loadTypeMethods);
-            }
+            AnnotationMetadataWriter.instantiateNewMetadata(
+                    owningType,
+                    declaringClassWriter,
+                    generatorAdapter,
+                    (DefaultAnnotationMetadata) annotationMetadata,
+                    defaults,
+                    loadTypeMethods
+            );
         } else {
             generatorAdapter.visitInsn(ACONST_NULL);
         }

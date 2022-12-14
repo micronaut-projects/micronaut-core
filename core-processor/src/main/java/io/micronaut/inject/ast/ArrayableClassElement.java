@@ -22,7 +22,6 @@ import io.micronaut.core.annotation.Internal;
  */
 @Internal
 public interface ArrayableClassElement extends ClassElement {
-
     @Override
     default ClassElement toArray() {
         return withArrayDimensions(getArrayDimensions() + 1);

@@ -18,13 +18,11 @@ package io.micronaut.inject.processing;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.TypedElement;
 import org.objectweb.asm.Type;
 
 import javax.lang.model.element.*;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -285,24 +283,14 @@ public class JavaModelUtils {
             if (nativeType instanceof Class<?> t) {
                 return Type.getType(t);
             } else {
-                boolean isArray = type.isArray();
-                int arrayDimensions = type.getArrayDimensions();
-                if (classElement instanceof GenericPlaceholderElement) {
-                    List<? extends ClassElement> bounds = ((GenericPlaceholderElement) classElement).getBounds();
-                    if (bounds.size() > 0) {
-                        type = bounds.get(0);
-                        isArray = classElement.isArray();
-                        arrayDimensions = classElement.getArrayDimensions();
-                    }
-                }
                 String internalName = type.getType().getName().replace('.', '/');
                 if (internalName.isEmpty()) {
                     return Type.getType(Object.class);
                 }
-                if (isArray) {
+                if (type.isArray()) {
                     StringBuilder name = new StringBuilder(internalName);
                     name.insert(0, "L");
-                    for (int i = 0; i < arrayDimensions; i++) {
+                    for (int i = 0; i < type.getArrayDimensions(); i++) {
                         name.insert(0, "[");
                     }
                     name.append(";");

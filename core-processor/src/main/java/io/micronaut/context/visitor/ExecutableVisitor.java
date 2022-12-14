@@ -41,7 +41,7 @@ public class ExecutableVisitor implements TypeElementVisitor<Object, Executable>
     @Override
     public void visitMethod(MethodElement element, VisitorContext context) {
         for (ParameterElement parameter : element.getParameters()) {
-            if (parameter.isPrimitive() && parameter.isNullable() && !parameter.isArray()) {
+            if (parameter.getType().isPrimitive() && parameter.isNullable()) {
                 context.warn("@Nullable on primitive types will allow the method to be executed at runtime with null values, causing an exception", parameter);
             }
         }

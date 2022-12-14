@@ -43,6 +43,21 @@ class ReflectParameterElement implements ParameterElement {
         this.name = name;
     }
 
+    @Override
+    public boolean isPrimitive() {
+        return classElement.isPrimitive();
+    }
+
+    @Override
+    public boolean isArray() {
+        return classElement.isArray();
+    }
+
+    @Override
+    public int getArrayDimensions() {
+        return classElement.getArrayDimensions();
+    }
+
     @NonNull
     @Override
     public ClassElement getType() {

@@ -94,6 +94,16 @@ class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnvironment: Sy
     override fun postProcess(annotationMetadata: MutableAnnotationMetadata, element: KSAnnotated) {
         if (element is KSValueParameter && element.type.resolve().isMarkedNullable) {
             annotationMetadata.addDeclaredAnnotation(AnnotationUtil.NULLABLE, emptyMap())
+        } else if (element is KSFunctionDeclaration) {
+            val markedNullable = element.returnType?.resolve()?.isMarkedNullable
+            if (markedNullable != null && markedNullable) {
+                annotationMetadata.addDeclaredAnnotation(AnnotationUtil.NULLABLE, emptyMap())
+            }
+        } else if (element is KSPropertyDeclaration) {
+            val markedNullable = element.type.resolve().isMarkedNullable
+            if (markedNullable) {
+                annotationMetadata.addDeclaredAnnotation(AnnotationUtil.NULLABLE, emptyMap())
+            }
         }
     }
 
