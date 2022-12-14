@@ -134,6 +134,7 @@ public final class ConfigurationUtils {
             } else {
                 String parentPrefix = getPath(enclosingType);
                 path = combinePaths(parentPrefix, path);
+                path = prependSuperclasses(enclosingType, path);
             }
             inner = enclosingType.getEnclosingType();
         }
