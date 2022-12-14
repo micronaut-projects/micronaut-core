@@ -63,7 +63,7 @@ public class JavanetHttpClient extends AbstractJavanetHttpClient implements Http
         String clientId,
         ConversionService conversionService
     ) {
-        super(loadBalancer, httpVersion, configuration, contextPath, mediaTypeCodecRegistry, requestBinderRegistry, clientId, conversionService);
+        super(LOG, loadBalancer, httpVersion, configuration, contextPath, mediaTypeCodecRegistry, requestBinderRegistry, clientId, conversionService);
     }
 
     public JavanetHttpClient(URI uri) {
@@ -112,10 +112,13 @@ public class JavanetHttpClient extends AbstractJavanetHttpClient implements Http
 
     @Override
     public <I, O, E> Publisher<HttpResponse<O>> exchange(@NonNull HttpRequest<I> request, @NonNull Argument<O> bodyType, @NonNull Argument<E> errorType) {
-        return mapToHttpRequest(request)
+        return mapToHttpRequest(request, bodyType)
             .flatMap(httpRequest -> {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Client {} Sending HTTP Request: {}", clientId, httpRequest);
+                }
+                if (LOG.isTraceEnabled()) {
+                    httpRequest.headers().map().forEach((k, v) -> LOG.trace("Client {} Sending HTTP Request Header: {}={}", clientId, k, v));
                 }
                 CompletableFuture<java.net.http.HttpResponse<byte[]>> completableHttpResponse = client.sendAsync(httpRequest, java.net.http.HttpResponse.BodyHandlers.ofByteArray());
                 CompletableFuture<HttpResponse<O>> response = completableHttpResponse.thenApply(netResponse -> getConvertedResponse(netResponse, bodyType));

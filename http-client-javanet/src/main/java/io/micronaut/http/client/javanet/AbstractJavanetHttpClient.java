@@ -34,6 +34,7 @@ import io.micronaut.http.client.ServiceHttpClientConfiguration;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
+import org.slf4j.Logger;
 import reactor.core.publisher.Flux;
 
 import java.net.URI;
@@ -46,6 +47,7 @@ import java.util.Optional;
 
 abstract class AbstractJavanetHttpClient {
 
+    private final Logger log;
     protected final LoadBalancer loadBalancer;
     protected final HttpVersionSelection httpVersion;
     protected final HttpClientConfiguration configuration;
@@ -57,6 +59,7 @@ abstract class AbstractJavanetHttpClient {
     protected final ConversionService conversionService;
 
     protected AbstractJavanetHttpClient(
+        Logger log,
         LoadBalancer loadBalancer,
         HttpVersionSelection httpVersion,
         HttpClientConfiguration configuration,
@@ -66,6 +69,7 @@ abstract class AbstractJavanetHttpClient {
         String clientId,
         ConversionService conversionService
     ) {
+        this.log = log;
         this.loadBalancer = loadBalancer;
         this.httpVersion = httpVersion;
         this.configuration = configuration;
@@ -82,6 +86,7 @@ abstract class AbstractJavanetHttpClient {
         this.clientId = clientId;
         this.conversionService = conversionService;
         this.client = java.net.http.HttpClient.newBuilder()
+            .version(HttpClient.Version.HTTP_1_1)
             .followRedirects(configuration.isFollowRedirects() ? HttpClient.Redirect.NORMAL : HttpClient.Redirect.NEVER)
             .build();
     }
@@ -152,10 +157,10 @@ abstract class AbstractJavanetHttpClient {
     }
 
     // TODO: Extract from DefaultHttpClient
-    protected <I> Flux<HttpRequest> mapToHttpRequest(io.micronaut.http.HttpRequest<I> request) {
+    protected <I> Flux<HttpRequest> mapToHttpRequest(io.micronaut.http.HttpRequest<I> request, Argument<?> bodyType) {
         return Flux.from(loadBalancer.select(getLoadBalancerDiscriminator()))
             .map(server -> server.resolve(prependContextPath(request.getUri())))
-            .map(uri -> HttpRequestFactory.builder(uri, request, conversionService).build());
+            .map(uri -> HttpRequestFactory.builder(uri, request, conversionService, bodyType, mediaTypeCodecRegistry).build());
     }
 
     /**

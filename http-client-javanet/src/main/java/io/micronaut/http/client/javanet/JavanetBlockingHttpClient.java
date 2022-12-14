@@ -57,14 +57,14 @@ public class JavanetBlockingHttpClient extends AbstractJavanetHttpClient impleme
         String clientId,
         ConversionService conversionService
     ) {
-        super(loadBalancer, httpVersion, configuration, contextPath, mediaTypeCodecRegistry, requestBinderRegistry, clientId, conversionService);
+        super(LOG, loadBalancer, httpVersion, configuration, contextPath, mediaTypeCodecRegistry, requestBinderRegistry, clientId, conversionService);
     }
 
     @Override
     public <I, O, E> io.micronaut.http.HttpResponse<O> exchange(io.micronaut.http.HttpRequest<I> request,
                                               Argument<O> bodyType,
                                               Argument<E> errorType) {
-        var httpRequest = mapToHttpRequest(request).blockFirst();
+        var httpRequest = mapToHttpRequest(request, bodyType).blockFirst();
         try {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Client {} Sending HTTP Request: {}", clientId, httpRequest);
