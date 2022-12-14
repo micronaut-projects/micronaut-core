@@ -11,8 +11,37 @@ import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanFactory
 import io.micronaut.inject.configuration.Engine
+import spock.lang.Issue
 
 class ConfigPropertiesParseSpec extends AbstractTypeElementSpec {
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/8480")
+    void "test configuration properties inheritance for compiled classes"() {
+        when:
+        def context = buildContext('''
+package test;
+
+import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.session.http.HttpSessionConfiguration;
+
+@ConfigurationProperties("test")
+class RedisHttpSessionConfiguration extends
+ HttpSessionConfiguration {
+    private String writeMode;
+
+    public void setWriteMode(String writeMode) {
+        this.writeMode = writeMode;
+    }
+    public String getWriteMode() {
+        return writeMode;
+    }
+}
+''')
+        def config = getBean(context, "test.RedisHttpSessionConfiguration")
+
+        then:
+        config.writeMode == 'test'
+    }
 
     void "test configuration properties with mixed getters/setters"() {
         when:
@@ -47,7 +76,7 @@ class MyConfig {
 
     @Override
     protected void configureContext(ApplicationContextBuilder contextBuilder) {
-        contextBuilder.properties('foo.bar.host':'bar')
+        contextBuilder.properties('foo.bar.host':'bar', "micronaut.session.http.test.write-mode": "test")
     }
 
     void "test inner class paths - pojo inheritance"() {

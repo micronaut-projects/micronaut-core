@@ -47,14 +47,14 @@ public final class ConfigurationUtils {
     }
 
     public static String getRequiredTypePath(ClassElement classElement) {
-        return getTypePath(classElement).orElseThrow(() -> new IllegalStateException("Prefix is required for " + classElement));
+        return getTypePath(classElement, true).orElseThrow(() -> new IllegalStateException("Prefix is required for " + classElement));
     }
 
-    public static Optional<String> getTypePath(ClassElement classElement) {
+    public static Optional<String> getTypePath(ClassElement classElement, boolean allowPrecalc) {
         if (!classElement.hasStereotype(ConfigurationReader.class)) {
             return Optional.empty();
         }
-        if (classElement.booleanValue(ConfigurationReader.class, PREFIX_CALCULATED).orElse(false)) {
+        if (allowPrecalc && classElement.booleanValue(ConfigurationReader.class, PREFIX_CALCULATED).orElse(false)) {
             return classElement.stringValue(ConfigurationReader.class, ConfigurationReader.PREFIX);
         }
         String path = getPath(classElement);
@@ -62,12 +62,14 @@ public final class ConfigurationUtils {
         Optional<ClassElement> inner = classElement.getEnclosingType();
         if (classElement.isInner() && inner.isPresent()) {
             ClassElement enclosingType = inner.get();
-            String parentPrefix = getTypePath(enclosingType).orElse("");
+            String parentPrefix = getTypePath(enclosingType, false).orElse("");
             path = combinePaths(parentPrefix, path);
         }
 
         String finalPath = path;
-        classElement.annotate(ConfigurationReader.class, builder -> builder.member(ConfigurationReader.PREFIX, finalPath).member(PREFIX_CALCULATED, true));
+        classElement
+            .annotate(ConfigurationReader.class, builder -> builder.member(ConfigurationReader.PREFIX, finalPath)
+            .member(PREFIX_CALCULATED, true));
         return Optional.of(path);
     }
 
@@ -112,9 +114,9 @@ public final class ConfigurationUtils {
         if (declaringType.isInterface()) {
             ClassElement superInterface = resolveSuperInterface(declaringType);
             while (superInterface != null) {
-                Optional<String> parentConfig = getTypePath(superInterface);
-                if (parentConfig.isPresent()) {
-                    path = combinePaths(parentConfig.get(), path);
+                String parentConfig = getPath(superInterface);
+                if (StringUtils.isNotEmpty(parentConfig)) {
+                    path = combinePaths(parentConfig, path);
                 }
                 superInterface = resolveSuperInterface(superInterface);
             }
@@ -122,9 +124,9 @@ public final class ConfigurationUtils {
             Optional<ClassElement> optionalSuperType = declaringType.getSuperType();
             while (optionalSuperType.isPresent()) {
                 ClassElement superType = optionalSuperType.get();
-                Optional<String> parentConfig = getTypePath(superType);
-                if (parentConfig.isPresent()) {
-                    path = combinePaths(parentConfig.get(), path);
+                String parentConfig = getPath(superType);
+                if (StringUtils.isNotEmpty(parentConfig)) {
+                    path = combinePaths(parentConfig, path);
                 }
                 optionalSuperType = superType.getSuperType();
             }
