@@ -21,63 +21,43 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
-import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.Writable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ReferenceCounted;
-import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
-import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.annotation.Body;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.context.event.HttpRequestTerminatedEvent;
-import io.micronaut.http.multipart.PartData;
-import io.micronaut.http.multipart.StreamingFileUpload;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.netty.stream.JsonSubscriber;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
-import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.server.RouteExecutor;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.http.server.exceptions.InternalServerException;
-import io.micronaut.http.server.multipart.MultipartBody;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
-import io.micronaut.http.server.netty.multipart.NettyCompletedFileUpload;
-import io.micronaut.http.server.netty.multipart.NettyPartData;
-import io.micronaut.http.server.netty.multipart.NettyStreamingFileUpload;
 import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandler;
 import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandlerRegistry;
-import io.micronaut.http.server.netty.types.files.NettyStreamedFileCustomizableResponseType;
-import io.micronaut.http.server.netty.types.files.NettySystemFileCustomizableResponseType;
-import io.micronaut.http.server.types.files.FileCustomizableResponseType;
 import io.micronaut.runtime.http.codec.TextPlainCodec;
-import io.micronaut.web.router.MethodBasedRouteMatch;
 import io.micronaut.web.router.RouteInfo;
-import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.resource.StaticResourceResolver;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufHolder;
 import io.netty.buffer.ByteBufOutputStream;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandler.Sharable;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
-import io.netty.handler.codec.DecoderResult;
-import io.netty.handler.codec.TooLongFrameException;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.DefaultHttpContent;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
@@ -86,15 +66,10 @@ import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
-import io.netty.handler.codec.http.LastHttpContent;
-import io.netty.handler.codec.http.multipart.Attribute;
-import io.netty.handler.codec.http.multipart.FileUpload;
-import io.netty.handler.codec.http.multipart.HttpData;
 import io.netty.handler.codec.http2.Http2Error;
 import io.netty.handler.codec.http2.Http2Exception;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
-import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 import org.reactivestreams.Publisher;
@@ -103,30 +78,14 @@ import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
-import reactor.core.publisher.MonoSink;
-import reactor.core.publisher.Sinks;
 
 import javax.net.ssl.SSLException;
-import java.io.File;
 import java.io.IOException;
-import java.net.URISyntaxException;
-import java.net.URL;
 import java.nio.channels.ClosedChannelException;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
-import java.util.function.LongConsumer;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
@@ -139,7 +98,7 @@ import java.util.regex.Pattern;
 @Internal
 @Sharable
 @SuppressWarnings("FileLength")
-final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.http.HttpRequest<?>> implements RouteExecutor.StaticResourceResponseFinder {
+final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.http.HttpRequest<?>> {
 
     private static final Logger LOG = LoggerFactory.getLogger(RoutingInBoundHandler.class);
     /*
@@ -147,19 +106,18 @@ final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.microna
      */
     private static final Pattern IGNORABLE_ERROR_MESSAGE = Pattern.compile(
         "^.*(?:connection (?:reset|closed|abort|broken)|broken pipe).*$", Pattern.CASE_INSENSITIVE);
-    private static final Argument<PartData> ARGUMENT_PART_DATA = Argument.of(PartData.class);
-    private final StaticResourceResolver staticResourceResolver;
-    private final NettyHttpServerConfiguration serverConfiguration;
-    private final HttpContentProcessorResolver httpContentProcessorResolver;
-    private final RequestArgumentSatisfier requestArgumentSatisfier;
-    private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
-    private final NettyCustomizableResponseTypeHandlerRegistry customizableResponseTypeHandlerRegistry;
-    private final Supplier<ExecutorService> ioExecutorSupplier;
-    private final boolean multipartEnabled;
-    private ExecutorService ioExecutor;
-    private final ApplicationEventPublisher<HttpRequestTerminatedEvent> terminateEventPublisher;
-    private final RouteExecutor routeExecutor;
-    private final ConversionService conversionService;
+    final StaticResourceResolver staticResourceResolver;
+    final NettyHttpServerConfiguration serverConfiguration;
+    final HttpContentProcessorResolver httpContentProcessorResolver;
+    final RequestArgumentSatisfier requestArgumentSatisfier;
+    final MediaTypeCodecRegistry mediaTypeCodecRegistry;
+    final NettyCustomizableResponseTypeHandlerRegistry customizableResponseTypeHandlerRegistry;
+    final Supplier<ExecutorService> ioExecutorSupplier;
+    final boolean multipartEnabled;
+    ExecutorService ioExecutor;
+    final ApplicationEventPublisher<HttpRequestTerminatedEvent> terminateEventPublisher;
+    final RouteExecutor routeExecutor;
+    final ConversionService conversionService;
 
     /**
      * @param customizableResponseTypeHandlerRegistry The customizable response type handler registry
@@ -269,63 +227,15 @@ final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.microna
             ctx.writeAndFlush(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR));
             return;
         }
-        routeExecutor.filterPublisher(new AtomicReference<>(nettyHttpRequest), () -> routeExecutor.onError(cause, nettyHttpRequest))
-            .onComplete((response, throwable) -> writeResponse(ctx, nettyHttpRequest, response, throwable));
+        new NettyRequestLifecycle(this, ctx, nettyHttpRequest).handleException(cause);
     }
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, io.micronaut.http.HttpRequest<?> httpRequest) {
-        NettyHttpRequest<?> nettyHttpRequest = (NettyHttpRequest<?>) httpRequest;
-
-        ctx.channel().config().setAutoRead(false);
-
-        if (LOG.isDebugEnabled()) {
-            HttpMethod httpMethod = httpRequest.getMethod();
-            ServerRequestContext.set(httpRequest);
-            LOG.debug("Request {} {}", httpMethod, httpRequest.getUri());
-        }
-
-        io.netty.handler.codec.http.HttpRequest nativeRequest = nettyHttpRequest.getNativeRequest();
-
-        RouteExecutor.RequestBodyReader requestBodyReader = (routeMatch, hr) -> {
-            // handle decoding failure
-            DecoderResult decoderResult = nativeRequest.decoderResult();
-            if (decoderResult.isFailure()) {
-                return ExecutionFlow.error(decoderResult.cause());
-            }
-            // try to fulfill the argument requirements of the route
-            RouteMatch<?> route = requestArgumentSatisfier.fulfillArgumentRequirements(routeMatch, httpRequest, false);
-            if (shouldReadBody(nettyHttpRequest, route)) {
-                return ReactiveExecutionFlow.fromPublisher(
-                    Mono.create(emitter -> httpContentProcessorResolver.resolve(nettyHttpRequest, route)
-                        .subscribe(buildSubscriber(nettyHttpRequest, route, emitter))
-                    ));
-            }
-            ctx.read();
-            return ExecutionFlow.just(route);
-        };
-
-        ExecutionFlow<MutableHttpResponse<?>> responseFlow;
-
-        // handle decoding failure
-        DecoderResult decoderResult = nativeRequest.decoderResult();
-        if (decoderResult.isFailure()) {
-            Throwable cause = decoderResult.cause();
-            HttpStatus status = cause instanceof TooLongFrameException ? HttpStatus.REQUEST_ENTITY_TOO_LARGE : HttpStatus.BAD_REQUEST;
-            responseFlow = routeExecutor.onStatusError(
-                requestBodyReader,
-                httpRequest,
-                HttpResponse.status(status),
-                status.getReason()
-            );
-        } else {
-            responseFlow = routeExecutor.executeRoute(requestBodyReader, httpRequest, multipartEnabled, this);
-        }
-        responseFlow
-            .onComplete((response, throwable) -> writeResponse(ctx, nettyHttpRequest, response, throwable));
+        new NettyRequestLifecycle(this, ctx, (NettyHttpRequest<?>) httpRequest).handleNormal();
     }
 
-    private void writeResponse(ChannelHandlerContext ctx,
+    void writeResponse(ChannelHandlerContext ctx,
                                NettyHttpRequest<?> nettyHttpRequest,
                                MutableHttpResponse<?> response,
                                Throwable throwable) {
@@ -356,387 +266,7 @@ final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.microna
         }
     }
 
-    private boolean shouldReadBody(NettyHttpRequest<?> nettyHttpRequest, RouteMatch<?> routeMatch) {
-        if (!HttpMethod.permitsRequestBody(nettyHttpRequest.getMethod())) {
-            return false;
-        }
-        io.netty.handler.codec.http.HttpRequest nativeRequest = nettyHttpRequest.getNativeRequest();
-        if (!(nativeRequest instanceof StreamedHttpRequest)) {
-            // Illegal state: The request body is required, so at this point we must have a StreamedHttpRequest
-            return false;
-        }
-        if (routeMatch instanceof MethodBasedRouteMatch<?, ?> methodBasedRouteMatch) {
-            if (Arrays.stream(methodBasedRouteMatch.getArguments()).anyMatch(argument -> MultipartBody.class.equals(argument.getType()))) {
-                // MultipartBody will subscribe to the request body in MultipartBodyArgumentBinder
-                return false;
-            }
-            if (Arrays.stream(methodBasedRouteMatch.getArguments()).anyMatch(argument -> HttpRequest.class.equals(argument.getType()))) {
-                // HttpRequest argument in the method
-                return true;
-            }
-        }
-        Optional<Argument<?>> bodyArgument = routeMatch.getBodyArgument()
-            .filter(argument -> argument.getAnnotationMetadata().hasAnnotation(Body.class));
-        if (bodyArgument.isPresent() && !routeMatch.isSatisfied(bodyArgument.get().getName())) {
-            // Body argument in the method
-            return true;
-        }
-        // Might be some body parts
-        return !routeMatch.isExecutable();
-    }
-
-    @Override
-    public FileCustomizableResponseType find(HttpRequest<?> httpRequest) {
-        Optional<URL> optionalUrl = staticResourceResolver.resolve(httpRequest.getUri().getPath());
-        if (optionalUrl.isPresent()) {
-            try {
-                URL url = optionalUrl.get();
-                if (url.getProtocol().equals("file")) {
-                    File file = Paths.get(url.toURI()).toFile();
-                    if (file.exists() && !file.isDirectory() && file.canRead()) {
-                        return new NettySystemFileCustomizableResponseType(file);
-                    }
-                }
-                return new NettyStreamedFileCustomizableResponseType(url);
-            } catch (URISyntaxException e) {
-                //no-op
-            }
-        }
-        return null;
-    }
-
-    private Subscriber<Object> buildSubscriber(NettyHttpRequest<?> request,
-                                               RouteMatch<?> finalRoute,
-                                               MonoSink<RouteMatch<?>> emitter) {
-        boolean isFormData = request.isFormOrMultipartData();
-        if (isFormData) {
-            return new CompletionAwareSubscriber<Object>() {
-                final boolean alwaysAddContent = request.isFormData();
-                RouteMatch<?> routeMatch = finalRoute;
-                final AtomicBoolean executed = new AtomicBoolean(false);
-                final AtomicLong pressureRequested = new AtomicLong(0);
-                final ConcurrentHashMap<String, Sinks.Many<Object>> subjectsByDataName = new ConcurrentHashMap<>();
-                final Collection<Sinks.Many<Object>> downstreamSubscribers = Collections.synchronizedList(new ArrayList<>());
-                final ConcurrentHashMap<IdentityWrapper, HttpDataReference> dataReferences = new ConcurrentHashMap<>();
-                Subscription s;
-                final LongConsumer onRequest = num -> pressureRequested.updateAndGet(p -> {
-                    long newVal = p - num;
-                    if (newVal < 0) {
-                        s.request(num - p);
-                        return 0;
-                    } else {
-                        return newVal;
-                    }
-                });
-
-                Flux processFlowable(Sinks.Many<Object> many, HttpDataReference dataReference, boolean controlsFlow) {
-                    Flux flux = many.asFlux();
-                    if (controlsFlow) {
-                        flux = flux.doOnRequest(onRequest);
-                    }
-                    return flux
-                        .doAfterTerminate(() -> {
-                            if (controlsFlow) {
-                                dataReference.destroy();
-                            }
-                        });
-                }
-
-                @Override
-                protected void doOnSubscribe(Subscription subscription) {
-                    this.s = subscription;
-                    subscription.request(1);
-                }
-
-                @Override
-                protected void doOnNext(Object message) {
-                    try {
-                        doOnNext0(message);
-
-                        // now, a pseudo try-finally with addSuppressed.
-                    } catch (Throwable t) {
-                        try {
-                            ReferenceCountUtil.release(message);
-                        } catch (Throwable u) {
-                            t.addSuppressed(u);
-                        }
-                        throw t;
-                    }
-
-                    // the upstream processor gives us ownership of the message, so we need to release it.
-                    ReferenceCountUtil.release(message);
-                }
-
-                private void doOnNext0(Object message) {
-                    if (request.destroyed) {
-                        // we don't want this message anymore
-                        return;
-                    }
-
-                    boolean wasExecuted = this.executed.get();
-                    if (message instanceof ByteBufHolder) {
-                        if (message instanceof HttpData data) {
-
-                            if (LOG.isTraceEnabled()) {
-                                LOG.trace("Received HTTP Data for request [{}]: {}", request, message);
-                            }
-
-                            String name = data.getName();
-                            Optional<Argument<?>> requiredInput = routeMatch.getRequiredInput(name);
-
-                            if (requiredInput.isPresent()) {
-                                Argument<?> argument = requiredInput.get();
-                                Supplier<Object> value;
-                                boolean isPublisher = Publishers.isConvertibleToPublisher(argument.getType());
-                                boolean chunkedProcessing = false;
-
-                                if (isPublisher) {
-                                    HttpDataReference dataReference = dataReferences.computeIfAbsent(new IdentityWrapper(data), key -> new HttpDataReference(data));
-                                    Argument typeVariable;
-
-                                    if (StreamingFileUpload.class.isAssignableFrom(argument.getType())) {
-                                        typeVariable = ARGUMENT_PART_DATA;
-                                    } else {
-                                        typeVariable = argument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
-                                    }
-                                    Class<?> typeVariableType = typeVariable.getType();
-
-                                    Sinks.Many<Object> namedSubject = subjectsByDataName.computeIfAbsent(name, key -> makeDownstreamUnicastProcessor());
-
-                                    chunkedProcessing = PartData.class.equals(typeVariableType) ||
-                                        Publishers.isConvertibleToPublisher(typeVariableType) ||
-                                        ClassUtils.isJavaLangType(typeVariableType);
-
-                                    if (Publishers.isConvertibleToPublisher(typeVariableType)) {
-                                        boolean streamingFileUpload = StreamingFileUpload.class.isAssignableFrom(typeVariableType);
-                                        if (streamingFileUpload) {
-                                            typeVariable = ARGUMENT_PART_DATA;
-                                        } else {
-                                            typeVariable = typeVariable.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
-                                        }
-                                        dataReference.subject.getAndUpdate(subject -> {
-                                            if (subject == null) {
-                                                Sinks.Many<Object> childSubject = makeDownstreamUnicastProcessor();
-                                                Flux flowable = processFlowable(childSubject, dataReference, true);
-                                                if (streamingFileUpload && data instanceof FileUpload) {
-                                                    namedSubject.tryEmitNext(new NettyStreamingFileUpload(
-                                                        (FileUpload) data,
-                                                        serverConfiguration.getMultipart(),
-                                                        getIoExecutor(),
-                                                        (Flux<PartData>) flowable));
-                                                } else {
-                                                    namedSubject.tryEmitNext(flowable);
-                                                }
-
-                                                return childSubject;
-                                            }
-                                            return subject;
-                                        });
-                                    }
-
-                                    Sinks.Many<Object> subject;
-
-                                    final Sinks.Many<Object> ds = dataReference.subject.get();
-                                    if (ds != null) {
-                                        subject = ds;
-                                    } else {
-                                        subject = namedSubject;
-                                    }
-
-                                    Object part = data;
-
-                                    if (chunkedProcessing) {
-                                        HttpDataReference.Component component;
-                                        try {
-                                            component = dataReference.addComponent();
-                                            if (component == null) {
-                                                s.request(1);
-                                                return;
-                                            }
-                                        } catch (IOException e) {
-                                            subject.tryEmitError(e);
-                                            s.cancel();
-                                            return;
-                                        }
-                                        part = new NettyPartData(dataReference, component);
-                                    }
-
-                                    if (data instanceof FileUpload &&
-                                        StreamingFileUpload.class.isAssignableFrom(argument.getType())) {
-                                        dataReference.upload.getAndUpdate(upload -> {
-                                            if (upload == null) {
-                                                return new NettyStreamingFileUpload(
-                                                    (FileUpload) data,
-                                                    serverConfiguration.getMultipart(),
-                                                    getIoExecutor(),
-                                                    (Flux<PartData>) processFlowable(subject, dataReference, true));
-                                            }
-                                            return upload;
-                                        });
-                                    }
-
-                                    Optional<?> converted = conversionService.convert(part, typeVariable);
-
-                                    converted.ifPresent(subject::tryEmitNext);
-
-                                    if (data.isCompleted() && chunkedProcessing) {
-                                        subject.tryEmitComplete();
-                                    }
-
-                                    value = () -> {
-                                        StreamingFileUpload upload = dataReference.upload.get();
-                                        if (upload != null) {
-                                            return upload;
-                                        } else {
-                                            return processFlowable(namedSubject, dataReference, dataReference.subject.get() == null);
-                                        }
-                                    };
-
-                                } else {
-                                    if (data instanceof Attribute && !data.isCompleted()) {
-                                        request.addContent(data);
-                                        s.request(1);
-                                        return;
-                                    } else {
-                                        value = () -> {
-                                            if (data.refCnt() > 0) {
-                                                return data;
-                                            } else {
-                                                return null;
-                                            }
-                                        };
-                                    }
-                                }
-
-                                if (!wasExecuted) {
-                                    String argumentName = argument.getName();
-                                    if (!routeMatch.isSatisfied(argumentName)) {
-                                        Object fulfillParamter = value.get();
-                                        routeMatch = routeMatch.fulfill(Collections.singletonMap(argumentName, fulfillParamter));
-                                        // we need to release the data here. However, if the route argument is a
-                                        // ByteBuffer, we need to retain the data until the route is executed. Adding
-                                        // the data to the request ensures it is cleaned up after the route completes.
-                                        if (!alwaysAddContent && fulfillParamter instanceof ByteBufHolder) {
-                                            request.addContent((ByteBufHolder) fulfillParamter);
-                                        }
-                                    }
-                                    if (isPublisher && chunkedProcessing) {
-                                        //accounting for the previous request
-                                        pressureRequested.incrementAndGet();
-                                    }
-                                    if (routeMatch.isExecutable() || message instanceof LastHttpContent) {
-                                        executeRoute();
-                                        wasExecuted = true;
-                                    }
-                                }
-
-                                if (alwaysAddContent && !request.destroyed) {
-                                    request.addContent(data);
-                                }
-
-                                if (!wasExecuted || !chunkedProcessing) {
-                                    s.request(1);
-                                }
-
-                            } else {
-                                request.addContent(data);
-                                s.request(1);
-                            }
-                        } else {
-                            request.addContent((ByteBufHolder) message);
-                            s.request(1);
-                        }
-                    } else {
-                        ((NettyHttpRequest) request).setBody(message);
-                        s.request(1);
-                    }
-                }
-
-                @Override
-                protected void doOnError(Throwable t) {
-                    s.cancel();
-                    if (executed.compareAndSet(false, true)) {
-                        // discard parameters that have already been bound
-                        for (Object toDiscard : routeMatch.getVariableValues().values()) {
-                            if (toDiscard instanceof ReferenceCounted) {
-                                ((ReferenceCounted) toDiscard).release();
-                            }
-                            if (toDiscard instanceof io.netty.util.ReferenceCounted) {
-                                ((io.netty.util.ReferenceCounted) toDiscard).release();
-                            }
-                            if (toDiscard instanceof NettyCompletedFileUpload) {
-                                ((NettyCompletedFileUpload) toDiscard).discard();
-                            }
-                        }
-                    }
-                    for (Sinks.Many<Object> subject : downstreamSubscribers) {
-                        subject.tryEmitError(t);
-                    }
-                    emitter.error(t);
-                }
-
-                @Override
-                protected void doOnComplete() {
-                    for (Sinks.Many<Object> subject : downstreamSubscribers) {
-                        // subjects will ignore the onComplete if they're already done
-                        subject.tryEmitComplete();
-                    }
-                    executeRoute();
-                }
-
-                private Sinks.Many<Object> makeDownstreamUnicastProcessor() {
-                    Sinks.Many<Object> processor = Sinks.many().unicast().onBackpressureBuffer();
-                    downstreamSubscribers.add(processor);
-                    return processor;
-                }
-
-                private void executeRoute() {
-                    if (executed.compareAndSet(false, true)) {
-                        emitter.success(routeMatch);
-                    }
-                }
-            };
-        } else {
-            return new CompletionAwareSubscriber<Object>() {
-                private Subscription s;
-                private AtomicBoolean executed = new AtomicBoolean(false);
-
-                @Override
-                protected void doOnSubscribe(Subscription subscription) {
-                    this.s = subscription;
-                    subscription.request(1);
-                }
-
-                @Override
-                protected void doOnNext(Object message) {
-                    if (message instanceof ByteBufHolder) {
-                        request.addContent((ByteBufHolder) message);
-                        s.request(1);
-                    } else {
-                        ((NettyHttpRequest) request).setBody(message);
-                        s.request(1);
-                    }
-                    ReferenceCountUtil.release(message);
-                }
-
-                @Override
-                protected void doOnError(Throwable t) {
-                    s.cancel();
-                    emitter.error(t);
-                }
-
-                @Override
-                protected void doOnComplete() {
-                    if (executed.compareAndSet(false, true)) {
-                        emitter.success(finalRoute);
-                    }
-                }
-            };
-        }
-
-    }
-
-    private ExecutorService getIoExecutor() {
+    ExecutorService getIoExecutor() {
         ExecutorService executor = this.ioExecutor;
         if (executor == null) {
             synchronized (this) { // double check

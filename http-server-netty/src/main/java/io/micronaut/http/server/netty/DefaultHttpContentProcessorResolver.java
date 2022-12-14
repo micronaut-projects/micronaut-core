@@ -71,7 +71,7 @@ class DefaultHttpContentProcessorResolver implements HttpContentProcessorResolve
 
     @Override
     @NonNull
-    public HttpContentProcessor<?> resolve(@NonNull NettyHttpRequest<?> request, @NonNull RouteMatch<?> route) {
+    public HttpContentProcessor resolve(@NonNull NettyHttpRequest<?> request, @NonNull RouteMatch<?> route) {
         Argument<?> bodyType = route.getBodyArgument()
                 /*
                 The getBodyArgument() method returns arguments for functions where it is
@@ -102,7 +102,7 @@ class DefaultHttpContentProcessorResolver implements HttpContentProcessorResolve
 
     @Override
     @NonNull
-    public HttpContentProcessor<?> resolve(@NonNull NettyHttpRequest<?> request, @NonNull Argument<?> bodyType) {
+    public HttpContentProcessor resolve(@NonNull NettyHttpRequest<?> request, @NonNull Argument<?> bodyType) {
         if (bodyType.getType() == HttpRequest.class) {
             bodyType = bodyType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
         }
@@ -112,11 +112,11 @@ class DefaultHttpContentProcessorResolver implements HttpContentProcessorResolve
 
     @Override
     @NonNull
-    public HttpContentProcessor<?> resolve(@NonNull NettyHttpRequest<?> request) {
+    public HttpContentProcessor resolve(@NonNull NettyHttpRequest<?> request) {
         return resolve(request, false);
     }
 
-    private HttpContentProcessor<?> resolve(NettyHttpRequest<?> request, boolean rawBodyType) {
+    private HttpContentProcessor resolve(NettyHttpRequest<?> request, boolean rawBodyType) {
         Supplier<DefaultHttpContentProcessor> defaultHttpContentProcessor = () -> new DefaultHttpContentProcessor(request, getServerConfiguration());
 
         if (rawBodyType) {
