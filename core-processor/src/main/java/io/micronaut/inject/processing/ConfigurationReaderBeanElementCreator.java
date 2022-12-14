@@ -159,6 +159,9 @@ final class ConfigurationReaderBeanElementCreator extends DeclaredBeanElementCre
     protected boolean visitProperty(BeanDefinitionVisitor visitor, PropertyElement propertyElement) {
         Optional<MethodElement> readMethod = propertyElement.getReadMethod();
         Optional<FieldElement> field = propertyElement.getField();
+        if (propertyElement.hasAnnotation(ANN_REQUIRES_VALIDATION)) {
+            visitor.setValidated(true);
+        }
         if (propertyElement.hasStereotype(ConfigurationBuilder.class)) {
             // Exclude / ignore shouldn't affect builders
             if (readMethod.isPresent()) {
