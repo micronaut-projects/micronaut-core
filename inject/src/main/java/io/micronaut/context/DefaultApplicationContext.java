@@ -255,7 +255,13 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                         .qualifier(PrimaryQualifier.INSTANCE);
 
         //noinspection resource
-        registerBeanDefinition(definition.build());
+
+        RuntimeBeanDefinition<? extends Environment> beanDefinition = definition.build();
+        BeanDefinition<? extends Environment> existing = findBeanDefinition(beanDefinition.getBeanType()).orElse(null);
+        if (existing instanceof RuntimeBeanDefinition<?> runtimeBeanDefinition) {
+            removeBeanDefinition(runtimeBeanDefinition);
+        }
+        registerBeanDefinition(beanDefinition);
     }
 
     @Override
@@ -512,7 +518,9 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                         qualifier = PrimaryQualifier.INSTANCE;
                     }
                     BeanDefinitionDelegate<?> delegate = BeanDefinitionDelegate.create(candidate, (Qualifier<T>) qualifier);
-                    transformedCandidates.add((BeanDefinition<T>) delegate);
+                    if (delegate.isEnabled(this, resolutionContext)) {
+                        transformedCandidates.add((BeanDefinition<T>) delegate);
+                    }
                 }
             }
         }

@@ -193,6 +193,9 @@ class InvocationStackSpec extends Specification {
             if (className.startsWith("org.codehaus.groovy") || className.startsWith("org.apache.groovy")) {
                 return true // Spock
             }
+            if (className == "reactor.core.publisher.MonoDeferContextual" || className == "reactor.core.publisher.Mono") {
+                return true // added for reactive filters
+            }
             return false
         }
 

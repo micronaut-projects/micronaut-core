@@ -20,15 +20,14 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.multipart.CompletedFileUpload;
+import io.micronaut.http.server.netty.MicronautHttpData;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.util.ResourceLeakDetector;
 import io.netty.util.ResourceLeakDetectorFactory;
 import io.netty.util.ResourceLeakTracker;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
@@ -85,20 +84,11 @@ public class NettyCompletedFileUpload implements CompletedFileUpload {
      */
     @Override
     public InputStream getInputStream() throws IOException {
-        if (fileUpload.isInMemory()) {
-            ByteBuf byteBuf = fileUpload.getByteBuf();
-            if (byteBuf == null) {
-                throw new IOException("The input stream has already been released");
-            }
-            closeTracker();
-            return new ByteBufInputStream(byteBuf, controlRelease);
-        } else {
-            File file = fileUpload.getFile();
-            if (file == null) {
-                throw new IOException("The input stream has already been released");
-            }
-            closeTracker();
-            return new NettyFileUploadInputStream(fileUpload, controlRelease);
+        try {
+            return ((MicronautHttpData<?>) fileUpload).toStream();
+        } finally {
+            fileUpload.release(); // it's retained by toStream, and released by InputStream.close
+            closeTracker(); // discard won't be called
         }
     }
 
