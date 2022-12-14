@@ -18,6 +18,8 @@ dependencies {
     testImplementation project(":runtime")
     api libs.blaze.persistence.core
     implementation libs.managed.ksp
+    implementation libs.managed.ksp.api
+    implementation libs.kotlin.compiler.embeddable
     implementation libs.kotlin.stdlib
 }
 

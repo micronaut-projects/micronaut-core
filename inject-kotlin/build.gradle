@@ -14,7 +14,7 @@ micronautBuild {
 dependencies {
     api project(":core-processor")
 
-    implementation(libs.managed.ksp)
+    implementation(libs.managed.ksp.api)
     if (!JavaVersion.current().isJava9Compatible()) {
         api files(org.gradle.internal.jvm.Jvm.current().toolsJar)
     }
