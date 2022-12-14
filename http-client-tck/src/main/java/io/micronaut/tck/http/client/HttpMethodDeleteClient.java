@@ -31,5 +31,5 @@ public interface HttpMethodDeleteClient {
     String response();
 
     @Delete("/object-response")
-    HttpMethodDeleteTestController.Person person();
+    Person person();
 }

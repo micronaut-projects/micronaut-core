@@ -62,11 +62,11 @@ public interface HttpMethodDeleteTest extends AbstractTck {
     @Test
     default void deleteMethodMappingWithObjectResponse() {
         runTest("HttpMethodDeleteTest", (server, client) -> {
-            assertEquals(new HttpMethodDeleteTestController.Person("Tim", 49), Flux.from(client.exchange(HttpRequest.DELETE("/delete/object-response"), HttpMethodDeleteTestController.Person.class)).blockFirst().body());
+            assertEquals(new Person("Tim", 49), Flux.from(client.exchange(HttpRequest.DELETE("/delete/object-response"), Person.class)).blockFirst().body());
             assertEquals("{\"name\":\"Tim\",\"age\":49}", Flux.from(client.exchange(HttpRequest.DELETE("/delete/object-response"), String.class)).blockFirst().body());
         });
         runBlockingTest("HttpMethodDeleteTest", (server, client) -> {
-            assertEquals(new HttpMethodDeleteTestController.Person("Tim", 49), client.exchange(HttpRequest.DELETE("/delete/object-response"), HttpMethodDeleteTestController.Person.class).body());
+            assertEquals(new Person("Tim", 49), client.exchange(HttpRequest.DELETE("/delete/object-response"), Person.class).body());
             assertEquals("{\"name\":\"Tim\",\"age\":49}", client.exchange(HttpRequest.DELETE("/delete/object-response"), String.class).body());
         });
     }

@@ -16,16 +16,20 @@
 package io.micronaut.tck.http.client;
 
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.http.annotation.Consumes;
-import io.micronaut.http.annotation.Get;
-import io.micronaut.http.client.annotation.Client;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Post;
 
-@SuppressWarnings("checkstyle:MissingJavadocType")
-@Requires(property = "spec.name", value = "RedirectTest")
-@Client("/redirect")
-public interface RedirectClient {
+@Requires(property = "spec.name", value = "HttpMethodPostTest")
+@Controller("/post")
+class HttpMethodPostTestController {
 
-    @Get("/redirect")
-    @Consumes({"text/plain", "application/json"})
-    String redirect();
+    @Post()
+    String response() {
+        return "ok";
+    }
+
+    @Post("/object-body")
+    String person(Person person) {
+        return person.getName() + ":" + person.getAge();
+    }
 }

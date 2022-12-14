@@ -16,14 +16,10 @@
 package io.micronaut.tck.http.client;
 
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.core.annotation.Introspected;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Delete;
 import io.micronaut.http.annotation.Status;
-
-import java.util.Objects;
 
 @Requires(property = "spec.name", value = "HttpMethodDeleteTest")
 @Controller("/delete")
@@ -42,44 +38,5 @@ class HttpMethodDeleteTestController {
     @Delete("/object-response")
     Person person() {
         return new Person("Tim", 49);
-    }
-
-    @Introspected
-    static class Person {
-
-        @NonNull
-        private final String name;
-
-        private final int age;
-
-        Person(String name, int age) {
-            this.name = name;
-            this.age = age;
-        }
-
-        public String getName() {
-            return name;
-        }
-
-        public int getAge() {
-            return age;
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) {
-                return true;
-            }
-            if (o == null || getClass() != o.getClass()) {
-                return false;
-            }
-            Person person = (Person) o;
-            return age == person.age && Objects.equals(name, person.name);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(name, age);
-        }
     }
 }
