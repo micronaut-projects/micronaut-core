@@ -105,7 +105,7 @@ public class HealthMonitorTask {
             public void onNext(HealthResult healthResult) {
                 HealthStatus status = healthResult.getStatus();
                 if (LOG.isDebugEnabled()) {
-                    LOG.debug("Health monitor check failed with status {}", status);
+                    LOG.debug("Health monitor check with status {}", status);
                 }
                 currentHealthStatus.update(status);
             }
