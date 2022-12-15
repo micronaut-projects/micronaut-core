@@ -143,6 +143,18 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
         return owningType
     }
 
+    override fun isSynthetic(): Boolean {
+        return if (declaration is KSPropertyGetter || declaration is KSPropertySetter) {
+            return true
+        } else {
+            if (declaration is KSFunctionDeclaration) {
+                return declaration.functionKind != FunctionKind.MEMBER && declaration.functionKind != FunctionKind.STATIC
+            } else {
+                return false
+            }
+        }
+    }
+
     override fun isFinal(): Boolean {
         return if (declaration is KSPropertyGetter || declaration is KSPropertySetter) {
             true
