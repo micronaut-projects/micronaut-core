@@ -19,7 +19,6 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.functional.ThrowingSupplier;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.multipart.PartData;
-import io.micronaut.http.server.netty.HttpDataReference;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.ByteBufUtil;
@@ -41,14 +40,6 @@ public class NettyPartData implements PartData {
 
     private final Supplier<Optional<MediaType>> mediaTypeSupplier;
     private final ThrowingSupplier<ByteBuf, IOException> byteBufSupplier;
-
-    /**
-     * @param httpData   The data reference
-     * @param component  The component reference
-     */
-    public NettyPartData(HttpDataReference httpData, HttpDataReference.Component component) {
-        this(httpData::getContentType, component::getByteBuf);
-    }
 
     /**
      * @param mediaTypeSupplier The content type supplier
@@ -91,12 +82,8 @@ public class NettyPartData implements PartData {
      */
     @Override
     public ByteBuffer getByteBuffer() throws IOException {
-        ByteBuf byteBuf = getByteBuf();
-        try {
-            return byteBuf.nioBuffer();
-        } finally {
-            byteBuf.release();
-        }
+        // we need to copy the buffer, so this is as good as it gets
+        return ByteBuffer.wrap(getBytes());
     }
 
     /**
