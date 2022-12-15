@@ -1,7 +1,16 @@
 package io.micronaut.http.filter;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.order.Ordered;
 
+/**
+ * Different filter order heuristics, derived from annotations or {@link Ordered#getOrder() a
+ * bean method}.
+ *
+ * @since 4.0.0
+ * @author Jonas Konrad
+ */
+@Internal
 public sealed interface FilterOrder {
     /**
      * Compute the order value for the given bean.

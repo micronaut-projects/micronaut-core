@@ -3,8 +3,14 @@ package io.micronaut.http.annotation;
 import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.core.annotation.EntryPoint;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.HttpMethod;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.MutableHttpRequest;
+import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.filter.FilterPatternStyle;
+import org.reactivestreams.Publisher;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -14,12 +20,41 @@ import java.lang.annotation.Target;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
+/**
+ * Method annotation for a request filter. A response filter is called after a request has been
+ * sent and the response received. Possible parameter types are:
+ *
+ * <ul>
+ *     <li>{@link HttpRequest} or {@link MutableHttpRequest}, to access the request</li>
+ *     <li>{@link HttpResponse} or {@link MutableHttpResponse}, to access the response</li>
+ *     <li>A {@link Throwable} type, to handle an error. If there is an error in the downstream
+ *     filters, it is processed by the upstream response filters. Any response filter that does not
+ *     declare a {@link Throwable} parameter of a matching type is skipped. If instead there is no
+ *     downstream error, those response filters <i>with</i> a {@link Throwable} parameter are
+ *     skipped, unless the parameter is {@link io.micronaut.core.annotation.Nullable}. <b>Note that
+ *     for server filter execution, exceptions are transformed into non-exceptional responses with
+ *     an error status code, between each filter.</b></li>
+ * </ul>
+ *
+ * The return value may be:
+ *
+ * <ul>
+ *     <li>{@code void} to immediately continue execution</li>
+ *     <li>An updated {@link HttpResponse}</li>
+ *     <li>A {@link Publisher} (or other reactive type) that produces any of these return types, to
+ *     delay further execution</li>
+ * </ul>
+ *
+ * @since 4.0.0
+ * @author Jonas Konrad
+ */
 @Documented
 @Retention(RUNTIME)
 @Target({ElementType.METHOD})
 @Inherited
 @Executable
 @EntryPoint
+@Experimental
 public @interface ResponseFilter {
     /**
      * Pattern used to match all requests.

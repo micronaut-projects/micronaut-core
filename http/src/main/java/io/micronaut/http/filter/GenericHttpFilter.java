@@ -17,6 +17,9 @@ import java.util.concurrent.Executor;
  * can pass around instances of these filters, the different implementations are internal only.
  * Only the framework should construct or call instances of this interface. The exception is the
  * {@link Terminal terminal filter}.
+ *
+ * @since 4.0.0
+ * @author Jonas Konrad
  */
 public sealed interface GenericHttpFilter {
     /**

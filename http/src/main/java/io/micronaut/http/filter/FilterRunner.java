@@ -48,6 +48,9 @@ import java.util.function.BiConsumer;
  * filter returns a reactive flow instead of an immediate value. When suspension happens, the loop
  * exits early, and {@link #workRequest()} (or {@link #workResponse()}) will be called again on
  * unsuspend (e.g. when the reactive flow completes).
+ *
+ * @since 4.0.0
+ * @author Jonas Konrad
  */
 @Internal
 public class FilterRunner {

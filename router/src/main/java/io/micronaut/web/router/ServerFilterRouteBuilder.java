@@ -4,6 +4,7 @@ import io.micronaut.context.BeanContext;
 import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.Order;
 import io.micronaut.core.convert.ConversionService;
@@ -32,7 +33,14 @@ import java.util.Objects;
 import java.util.OptionalInt;
 import java.util.concurrent.Executor;
 
+/**
+ * {@link RouteBuilder} for {@link ServerFilter}s.
+ *
+ * @since 4.0.0
+ * @author Jonas Konrad
+ */
 @Singleton
+@Experimental
 public class ServerFilterRouteBuilder extends DefaultRouteBuilder implements ExecutableMethodProcessor<ServerFilter> {
     private final BeanContext beanContext;
     private final ServerContextPathProvider contextPathProvider;
