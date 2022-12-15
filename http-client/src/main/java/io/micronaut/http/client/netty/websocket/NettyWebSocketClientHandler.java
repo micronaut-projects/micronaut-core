@@ -16,7 +16,6 @@
 package io.micronaut.http.client.netty.websocket;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.bind.BoundExecutable;
 import io.micronaut.core.bind.DefaultExecutableBinder;
 import io.micronaut.core.bind.ExecutableBinder;
@@ -24,26 +23,22 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.MutableHttpRequest;
-import io.micronaut.http.bind.DefaultRequestBinderRegistry;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.netty.websocket.AbstractNettyWebSocketHandler;
 import io.micronaut.http.netty.websocket.NettyWebSocketSession;
 import io.micronaut.http.uri.UriMatchInfo;
 import io.micronaut.http.uri.UriMatchTemplate;
-import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.websocket.CloseReason;
 import io.micronaut.websocket.WebSocketPongMessage;
 import io.micronaut.websocket.annotation.ClientWebSocket;
 import io.micronaut.websocket.bind.WebSocketState;
-import io.micronaut.websocket.bind.WebSocketStateBinderRegistry;
 import io.micronaut.websocket.context.WebSocketBean;
 import io.micronaut.websocket.exceptions.WebSocketClientException;
 import io.micronaut.websocket.exceptions.WebSocketSessionException;
 import io.micronaut.websocket.interceptor.WebSocketSessionAware;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame;
@@ -52,14 +47,12 @@ import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
-import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 
 import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * Handler for WebSocket clients.
@@ -78,9 +71,7 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
     private final Sinks.One<T> completion = Sinks.one();
     private final UriMatchInfo matchInfo;
     private final MediaTypeCodecRegistry codecRegistry;
-    private ChannelPromise handshakeFuture;
     private NettyWebSocketSession clientSession;
-    private final WebSocketStateBinderRegistry webSocketStateBinderRegistry;
     private FullHttpResponse handshakeResponse;
     private Argument<?> clientBodyArgument;
     private Argument<?> clientPongArgument;
@@ -106,12 +97,9 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
         this.codecRegistry = mediaTypeCodecRegistry;
         this.handshaker = handshaker;
         this.genericWebSocketBean = webSocketBean;
-        this.webSocketStateBinderRegistry = new WebSocketStateBinderRegistry(requestBinderRegistry != null ? requestBinderRegistry : new DefaultRequestBinderRegistry(conversionService), conversionService);
         String clientPath = webSocketBean.getBeanDefinition().stringValue(ClientWebSocket.class).orElse("");
         UriMatchTemplate matchTemplate = UriMatchTemplate.of(clientPath);
         this.matchInfo = matchTemplate.match(request.getPath()).orElse(null);
-
-        callOpenMethod(null);
     }
 
     @Override
@@ -143,18 +131,13 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
     }
 
     @Override
-    public void handlerAdded(final ChannelHandlerContext ctx) {
-        handshakeFuture = ctx.newPromise();
-    }
-
-    @Override
     public void channelActive(final ChannelHandlerContext ctx) {
         handshaker.handshake(ctx.channel()).addListener(future -> {
             if (future.isSuccess()) {
                 ctx.channel().config().setAutoRead(true);
                 ctx.read();
             } else {
-                handshakeFuture.tryFailure(future.cause());
+                completion.tryEmitError(future.cause());
             }
         });
     }
@@ -178,7 +161,6 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
                 }
                 return;
             }
-            handshakeFuture.setSuccess();
 
             this.clientSession = createWebSocketSession(ctx);
 
@@ -187,7 +169,6 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
             if (targetBean instanceof WebSocketSessionAware) {
                 ((WebSocketSessionAware) targetBean).setWebSocketSession(clientSession);
             }
-
 
             ExecutableBinder<WebSocketState> binder = new DefaultExecutableBinder<>();
             BoundExecutable<?, ?> bound = binder.tryBind(messageHandler.getExecutableMethod(), webSocketBinder, new WebSocketState(clientSession, originatingRequest));
@@ -228,37 +209,11 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
                 }
             }
 
-            Optional<? extends MethodExecutionHandle<?, ?>> opt = webSocketBean.openMethod();
-            if (opt.isPresent()) {
-                MethodExecutionHandle<?, ?> openMethod = opt.get();
-
-                WebSocketState webSocketState = new WebSocketState(clientSession, originatingRequest);
-                try {
-                    BoundExecutable openMethodBound = binder.bind(openMethod.getExecutableMethod(), webSocketStateBinderRegistry, webSocketState);
-                    Object target = openMethod.getTarget();
-                    Object result = openMethodBound.invoke(target);
-
-                    if (Publishers.isConvertibleToPublisher(result)) {
-                        Publisher<?> reactiveSequence = Publishers.convertPublisher(result, Publisher.class);
-                        Flux.from(reactiveSequence).subscribe(
-                                o -> { },
-                                error -> completion.tryEmitError(new WebSocketSessionException("Error opening WebSocket client session: " + error.getMessage(), error)),
-                                () -> {
-                                    completion.tryEmitValue(targetBean);
-                                }
-                        );
-                    } else {
-                        completion.tryEmitValue(targetBean);
-                    }
-                } catch (Throwable e) {
-                    completion.tryEmitError(new WebSocketClientException("Error opening WebSocket client session: " + e.getMessage(), e));
-                    if (getSession().isOpen()) {
-                        getSession().close(CloseReason.INTERNAL_ERROR);
-                    }
-                }
-            } else {
-                completion.tryEmitValue(targetBean);
-            }
+            Flux.from(callOpenMethod(ctx)).subscribe(
+                o -> { },
+                error -> completion.tryEmitError(new WebSocketSessionException("Error opening WebSocket client session: " + error.getMessage(), error)),
+                () -> completion.tryEmitValue(targetBean)
+            );
             return;
         }
 
@@ -267,8 +222,6 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
         } else {
             ctx.fireChannelRead(msg);
         }
-
-
     }
 
     @Override
@@ -296,14 +249,20 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
 
     @Override
     public void exceptionCaught(final ChannelHandlerContext ctx, final Throwable cause) {
-        if (!handshakeFuture.isDone()) {
-            handshakeFuture.setFailure(cause);
-        }
-
+        completion.tryEmitError(cause);
         super.exceptionCaught(ctx, cause);
     }
 
     public final Mono<T> getHandshakeCompletedMono() {
         return completion.asMono();
+    }
+
+    @Override
+    protected void handleCloseReason(ChannelHandlerContext ctx, CloseReason cr, boolean writeCloseReason) {
+        if (!handshaker.isHandshakeComplete()) {
+            completion.tryEmitError(new WebSocketClientException("Error opening WebSocket client session: " + cr.getReason()));
+            return;
+        }
+        super.handleCloseReason(ctx, cr, writeCloseReason);
     }
 }

@@ -299,11 +299,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             request.setAttribute(HttpAttributes.INVOCATION_CONTEXT, context);
             // Set the URI template used to make the request for tracing purposes
             request.setAttribute(HttpAttributes.URI_TEMPLATE, resolveTemplate(annotationMetadata, uriTemplate.toString()));
-            String serviceId = getClientId(annotationMetadata);
             Argument<?> errorType = annotationMetadata.classValue(Client.class, "errorType")
                     .map((Function<Class, Argument>) Argument::of).orElse(HttpClient.DEFAULT_ERROR_TYPE);
-            request.setAttribute(HttpAttributes.SERVICE_ID, serviceId);
-
 
             final MediaType[] acceptTypes;
             Collection<MediaType> accept = request.accept();
@@ -426,7 +423,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         Class<?> argumentType = reactiveValueArgument.getType();
         if (Void.class == argumentType || returnType.isVoid()) {
             request.getHeaders().remove(HttpHeaders.ACCEPT);
-            return httpClient.exchange(request, Argument.VOID, errorType);
+            return httpClient.retrieve(request, Argument.VOID, errorType);
         } else {
             if (HttpResponse.class.isAssignableFrom(argumentType)) {
                 return httpClient.exchange(request, reactiveValueArgument, errorType);

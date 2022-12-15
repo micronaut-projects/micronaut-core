@@ -8,6 +8,7 @@ import io.micronaut.core.convert.value.ConvertibleMultiValues;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @JsonNaming(PropertyNamingStrategies.UpperCamelCaseStrategy.class)
 @Introspected
@@ -28,5 +29,18 @@ public class HTTPCheck {
         } else {
             this.headers = ConvertibleMultiValues.of(headers);
         }
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        HTTPCheck httpCheck = (HTTPCheck) o;
+        return headers.equals(httpCheck.headers);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(headers);
     }
 }
