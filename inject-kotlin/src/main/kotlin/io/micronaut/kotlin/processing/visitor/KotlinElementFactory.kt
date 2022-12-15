@@ -15,6 +15,7 @@
  */
 package io.micronaut.kotlin.processing.visitor
 
+import com.google.devtools.ksp.getJavaClassByName
 import com.google.devtools.ksp.processing.KSBuiltIns
 import com.google.devtools.ksp.symbol.*
 import io.micronaut.core.annotation.AnnotationUtil
@@ -113,9 +114,6 @@ class KotlinElementFactory(
     fun newClassElement(type: KSType,
                         elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
                         allowPrimitive: Boolean): ClassElement {
-        if (type == builtIns.anyType) {
-            return visitorContext.anyElement
-        }
         val declaration = type.declaration
         val qualifiedName = declaration.qualifiedName!!.asString()
         val hasNoAnnotations = !type.annotations.iterator().hasNext()

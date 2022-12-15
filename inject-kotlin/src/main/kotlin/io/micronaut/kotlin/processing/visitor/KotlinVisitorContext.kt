@@ -17,6 +17,7 @@ package io.micronaut.kotlin.processing.visitor
 
 import com.google.devtools.ksp.KspExperimental
 import com.google.devtools.ksp.getClassDeclarationByName
+import com.google.devtools.ksp.getJavaClassByName
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.symbol.KSClassDeclaration
@@ -40,26 +41,21 @@ import java.nio.file.Files
 import java.util.*
 import java.util.function.BiConsumer
 
+@OptIn(KspExperimental::class)
 open class KotlinVisitorContext(private val environment: SymbolProcessorEnvironment,
-                           val resolver: Resolver) : VisitorContext {
+                                val resolver: Resolver) : VisitorContext {
 
     private val visitorAttributes: MutableConvertibleValues<Any>
     private val elementFactory: KotlinElementFactory
     private val outputVisitor = KotlinOutputVisitor(environment)
     val annotationMetadataBuilder: KotlinAnnotationMetadataBuilder
     private val elementAnnotationMetadataFactory: KotlinElementAnnotationMetadataFactory
-    val anyElement : ClassElement
 
     init {
         visitorAttributes = MutableConvertibleValuesMap()
         annotationMetadataBuilder = KotlinAnnotationMetadataBuilder(environment, resolver)
         elementFactory = KotlinElementFactory(this)
         elementAnnotationMetadataFactory = KotlinElementAnnotationMetadataFactory(false, annotationMetadataBuilder)
-        anyElement = KotlinClassElement(
-            resolver.builtIns.anyType,
-            elementAnnotationMetadataFactory,
-            this
-        )
     }
 
     override fun <T : Any?> get(name: CharSequence?, conversionContext: ArgumentConversionContext<T>?): Optional<T> {

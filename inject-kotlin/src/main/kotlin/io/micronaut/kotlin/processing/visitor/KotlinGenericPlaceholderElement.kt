@@ -23,8 +23,8 @@ import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.Element
 import io.micronaut.inject.ast.GenericPlaceholderElement
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
+import io.micronaut.kotlin.processing.getBinaryName
 import java.util.*
-import java.util.function.Function
 
 class KotlinGenericPlaceholderElement(
     private val parameter: KSTypeParameter,
@@ -44,10 +44,7 @@ class KotlinGenericPlaceholderElement(
     override fun getName(): String {
         val bounds = parameter.bounds.firstOrNull()
         if (bounds != null) {
-            val name = bounds.resolve().declaration.qualifiedName?.asString()
-            if (name != null) {
-                return name
-            }
+            return bounds.resolve().declaration.getBinaryName(visitorContext.resolver)
         }
         return "java.lang.Object"
     }
@@ -71,7 +68,7 @@ class KotlinGenericPlaceholderElement(
             elementFactory.newClassElement(argumentType, annotationMetadataFactory)
         }.toMutableList()
         return if (resolved.isEmpty()) {
-            mutableListOf(visitorContext.anyElement)
+            mutableListOf(visitorContext.getClassElement(Object::class.java.name).get())
         } else {
             resolved
         }

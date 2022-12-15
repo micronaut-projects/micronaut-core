@@ -39,7 +39,7 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
             )
         } else {
             // shouldn't happen
-            visitorContext.anyElement
+            visitorContext.getClassElement(Object::class.java.name).get()
         }
     }
     private val parameters: List<ParameterElement>

@@ -128,12 +128,7 @@ open class KotlinClassElement(val kotlinType: KSType,
             } else if (ref is KSClassDeclaration) {
                 return ref
             } else if (ref is KSTypeArgument) {
-                val ksType = ref.type?.resolve()
-                if (ksType?.declaration is KSClassDeclaration) {
-                    return ksType.declaration as KSClassDeclaration
-                } else {
-                    return visitorContext.anyElement.nativeType as KSClassDeclaration
-                }
+                return resolveDeclaration(ref.type?.resolve()?.declaration, visitorContext)
             } else if (ref is KSTypeAlias) {
                 val declaration = ref.type.resolve().declaration
                 return resolveDeclaration(declaration, visitorContext)
@@ -142,6 +137,7 @@ open class KotlinClassElement(val kotlinType: KSType,
             }
         }
 
+        @OptIn(KspExperimental::class)
         private fun resolveDeclaration(
             declaration: KSDeclaration?,
             visitorContext: KotlinVisitorContext
@@ -149,13 +145,20 @@ open class KotlinClassElement(val kotlinType: KSType,
             return if (declaration is KSClassDeclaration) {
                 declaration
             } else {
-                visitorContext.anyElement.nativeType as KSClassDeclaration
+                visitorContext.resolver.getJavaClassByName(Object::class.java.name)!!
             }
         }
     }
 
+    @OptIn(KspExperimental::class)
     override fun getName(): String {
-        return classDeclaration.getBinaryName(visitorContext.resolver)
+        val binaryName = classDeclaration.getBinaryName(visitorContext.resolver)
+        if (binaryName == Any::class.qualifiedName) {
+            return "java.lang.Object"
+        } else if (binaryName == Any::class.qualifiedName) {
+            return "java.lang.Object"
+        }
+        return binaryName
     }
 
     override fun getCanonicalName(): String {
