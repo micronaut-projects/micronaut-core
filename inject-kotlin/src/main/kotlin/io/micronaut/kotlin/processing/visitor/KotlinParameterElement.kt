@@ -33,6 +33,14 @@ class KotlinParameterElement(
         parameter.name!!.asString()
     }
 
+    override fun isPrimitive(): Boolean {
+        return parameterType.isPrimitive
+    }
+
+    override fun isArray(): Boolean {
+        return parameterType.isArray
+    }
+
     override fun copyThis(): AbstractKotlinElement<KSValueParameter> {
         return KotlinParameterElement(
             parameterType,

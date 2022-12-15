@@ -29,7 +29,10 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
     private val name: String
     private val owningType: ClassElement
     private val internalDeclaringType: ClassElement by lazy {
-        val parent = declaration.parent
+        var parent = declaration.parent
+        if (parent is KSPropertyDeclaration) {
+            parent = parent.parent
+        }
         if (parent is KSClassDeclaration) {
             visitorContext.elementFactory.newClassElement(
                 parent.asStarProjectedType()

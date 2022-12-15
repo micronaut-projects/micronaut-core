@@ -32,7 +32,7 @@ import java.util.function.Function
 import java.util.stream.Stream
 import kotlin.collections.LinkedHashMap
 
-open class KotlinClassElement(protected val classType: KSType,
+open class KotlinClassElement(val kotlinType: KSType,
                               protected val classDeclaration: KSClassDeclaration,
                               private val annotationInfo: KSAnnotated,
                               protected val elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
@@ -58,7 +58,7 @@ open class KotlinClassElement(protected val classType: KSType,
 
     val outerType: KSType? by lazy {
         val outerDecl = classDeclaration.parentDeclaration as? KSClassDeclaration
-        outerDecl?.asType(classType.arguments.subList(classDeclaration.typeParameters.size, classType.arguments.size))
+        outerDecl?.asType(kotlinType.arguments.subList(classDeclaration.typeParameters.size, kotlinType.arguments.size))
     }
 
     private val resolvedProperties : List<PropertyElement> by lazy {
@@ -166,6 +166,14 @@ open class KotlinClassElement(protected val classType: KSType,
         return classDeclaration.packageName.asString()
     }
 
+    override fun isDeclaredNullable(): Boolean {
+        return kotlinType.isMarkedNullable
+    }
+
+    override fun isNullable(): Boolean {
+        return kotlinType.isMarkedNullable
+    }
+
     override fun getSyntheticBeanProperties(): List<PropertyElement> {
         return nativeProperties
     }
@@ -203,7 +211,7 @@ open class KotlinClassElement(protected val classType: KSType,
     }
 
     override fun getDeclaredGenericPlaceholders(): MutableList<out GenericPlaceholderElement> {
-        return classType.declaration.typeParameters.map {
+        return kotlinType.declaration.typeParameters.map {
             KotlinGenericPlaceholderElement(it, annotationMetadataFactory, visitorContext)
         }.toMutableList()
     }
@@ -216,7 +224,7 @@ open class KotlinClassElement(protected val classType: KSType,
 
     override fun getBoundGenericTypes(): MutableList<out ClassElement> {
         if (overrideBoundGenericTypes == null) {
-            val arguments = classType.arguments
+            val arguments = kotlinType.arguments
             if (arguments.isEmpty()) {
                 return mutableListOf()
             } else {
@@ -295,7 +303,7 @@ open class KotlinClassElement(protected val classType: KSType,
     }
 
     private fun getBoundTypeMirrors(): Map<String, KSType> {
-        val typeParameters: List<KSTypeArgument> = classType.arguments
+        val typeParameters: List<KSTypeArgument> = kotlinType.arguments
         val parameterIterator = classDeclaration.typeParameters.iterator()
         val tpi = typeParameters.iterator()
         val map: MutableMap<String, KSType> = LinkedHashMap()
@@ -469,7 +477,7 @@ open class KotlinClassElement(protected val classType: KSType,
     override fun isAssignable(type: String): Boolean {
         var ksType = visitorContext.resolver.getClassDeclarationByName(type)?.asStarProjectedType()
         if (ksType != null) {
-            if (ksType.isAssignableFrom(classType)) {
+            if (ksType.isAssignableFrom(kotlinType)) {
                 return true
             }
             val kotlinName = visitorContext.resolver.mapJavaNameToKotlin(
@@ -477,25 +485,25 @@ open class KotlinClassElement(protected val classType: KSType,
             if (kotlinName != null) {
                 ksType = visitorContext.resolver.getKotlinClassByName(kotlinName)?.asStarProjectedType()
                 if (ksType != null) {
-                    if (classType.starProjection().isAssignableFrom(ksType)) {
+                    if (kotlinType.starProjection().isAssignableFrom(ksType)) {
                         return true
                     }
                 }
             }
         }
-        return ksType?.isAssignableFrom(classType) ?: false
+        return ksType?.isAssignableFrom(kotlinType) ?: false
     }
 
     override fun isAssignable(type: ClassElement): Boolean {
         if (type is KotlinClassElement) {
-            return type.classType.isAssignableFrom(classType)
+            return type.kotlinType.isAssignableFrom(kotlinType)
         }
         return super.isAssignable(type)
     }
 
     override fun copyThis(): KotlinClassElement {
         val copy = KotlinClassElement(
-            classType, classDeclaration, annotationInfo, elementAnnotationMetadataFactory, visitorContext, arrayDimensions, typeVariable
+            kotlinType, classDeclaration, annotationInfo, elementAnnotationMetadataFactory, visitorContext, arrayDimensions, typeVariable
         )
         copy.resolvedTypeArguments = resolvedTypeArguments
         return copy
@@ -524,7 +532,7 @@ open class KotlinClassElement(protected val classType: KSType,
     }
 
     override fun withArrayDimensions(arrayDimensions: Int): ClassElement {
-        return KotlinClassElement(classType, classDeclaration, annotationInfo, elementAnnotationMetadataFactory, visitorContext, arrayDimensions, typeVariable)
+        return KotlinClassElement(kotlinType, classDeclaration, annotationInfo, elementAnnotationMetadataFactory, visitorContext, arrayDimensions, typeVariable)
     }
 
     override fun isInner(): Boolean {
@@ -565,13 +573,13 @@ open class KotlinClassElement(protected val classType: KSType,
         if (resolvedTypeArguments == null) {
             val typeArguments = mutableMapOf<String, ClassElement>()
             val elementFactory = visitorContext.elementFactory
-            val typeParameters = classType.declaration.typeParameters
-            if (classType.arguments.isEmpty()) {
+            val typeParameters = kotlinType.declaration.typeParameters
+            if (kotlinType.arguments.isEmpty()) {
                 typeParameters.forEach {
                     typeArguments[it.name.asString()] = KotlinGenericPlaceholderElement(it, annotationMetadataFactory, visitorContext)
                 }
             } else {
-                classType.arguments.forEachIndexed { i, argument ->
+                kotlinType.arguments.forEachIndexed { i, argument ->
                     val typeElement = elementFactory.newClassElement(
                         argument,
                         annotationMetadataFactory,

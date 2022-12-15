@@ -18,7 +18,7 @@ dependencies {
     if (!JavaVersion.current().isJava9Compatible()) {
         api files(org.gradle.internal.jvm.Jvm.current().toolsJar)
     }
-    kspTest(project)
+//    kspTest(project)
     testImplementation project(":jackson-databind")
     testImplementation project(":inject-kotlin-test")
     testImplementation libs.kotlin.stdlib

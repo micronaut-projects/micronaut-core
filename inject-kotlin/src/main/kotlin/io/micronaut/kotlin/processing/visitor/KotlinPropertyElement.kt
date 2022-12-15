@@ -451,6 +451,26 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
         return super<AbstractKotlinElement>.withAnnotationMetadata(annotationMetadata) as MemberElement
     }
 
+    override fun isPrimitive(): Boolean {
+        return type.isPrimitive
+    }
+
+    override fun isArray(): Boolean {
+        return type.isArray
+    }
+
+    override fun getArrayDimensions(): Int {
+        return type.arrayDimensions
+    }
+
+    override fun isDeclaredNullable(): Boolean {
+        return type is KotlinClassElement && type.kotlinType.isMarkedNullable
+    }
+
+    override fun isNullable(): Boolean {
+        return type is KotlinClassElement && type.kotlinType.isMarkedNullable
+    }
+
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (javaClass != other?.javaClass) return false

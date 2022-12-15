@@ -55,7 +55,11 @@ open class KotlinVisitorContext(private val environment: SymbolProcessorEnvironm
         annotationMetadataBuilder = KotlinAnnotationMetadataBuilder(environment, resolver)
         elementFactory = KotlinElementFactory(this)
         elementAnnotationMetadataFactory = KotlinElementAnnotationMetadataFactory(false, annotationMetadataBuilder)
-        anyElement = elementFactory.newClassElement(resolver.builtIns.anyType)
+        anyElement = KotlinClassElement(
+            resolver.builtIns.anyType,
+            elementAnnotationMetadataFactory,
+            this
+        )
     }
 
     override fun <T : Any?> get(name: CharSequence?, conversionContext: ArgumentConversionContext<T>?): Optional<T> {

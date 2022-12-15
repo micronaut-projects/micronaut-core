@@ -53,6 +53,18 @@ class KotlinFieldElement(declaration: KSPropertyDeclaration,
         return internalGenericType
     }
 
+    override fun isPrimitive(): Boolean {
+        return type.isPrimitive
+    }
+
+    override fun isArray(): Boolean {
+        return type.isArray
+    }
+
+    override fun getArrayDimensions(): Int {
+        return type.arrayDimensions
+    }
+
     override fun copyThis(): AbstractKotlinElement<KSPropertyDeclaration> {
         return KotlinFieldElement(declaration, declaringType, annotationMetadataFactory, visitorContext)
     }
