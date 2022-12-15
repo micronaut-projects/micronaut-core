@@ -33,6 +33,7 @@ import io.micronaut.jackson.JacksonConfiguration
 import io.micronaut.jackson.modules.testcase.EmailTemplate
 import io.micronaut.jackson.modules.testcase.Notification
 import io.micronaut.jackson.modules.testclasses.HTTPCheck
+import io.micronaut.jackson.modules.testclasses.InstanceInfo
 import io.micronaut.jackson.modules.wrappers.BooleanWrapper
 import io.micronaut.jackson.modules.wrappers.DoubleWrapper
 import io.micronaut.jackson.modules.wrappers.IntWrapper
@@ -121,6 +122,31 @@ class BeanIntrospectionModuleSpec extends Specification {
         check == read
 
     }
+
+    void "test serialize/deserialize wrap/unwrap -* constructors & JsonRootName"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run(
+                'jackson.deserialization.UNWRAP_ROOT_VALUE': true,
+                'jackson.serialization.WRAP_ROOT_VALUE': true
+        )
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        when:
+        InstanceInfo check = new InstanceInfo("test")
+
+        def result = objectMapper.writeValueAsString(check)
+
+        then:
+        result == '{"instance":{"hostName":"test"}}'
+
+        when:
+        def read = objectMapper.readValue(result, InstanceInfo)
+
+        then:
+        check == read
+
+    }
+
 
     void "test serialize/deserialize convertible values"() {
         given:
