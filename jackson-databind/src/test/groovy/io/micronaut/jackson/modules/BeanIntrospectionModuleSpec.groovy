@@ -43,6 +43,56 @@ import java.time.LocalDateTime
 
 class BeanIntrospectionModuleSpec extends Specification {
 
+    void "test serialize/deserialize wrap/unwrap - simple"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run(
+                'jackson.deserialization.UNWRAP_ROOT_VALUE': true,
+                'jackson.serialization.WRAP_ROOT_VALUE': true
+        )
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        when:
+        Author author = new Author(name:"Bob")
+
+        def result = objectMapper.writeValueAsString(author)
+
+        then:
+        result == '{"Author":{"name":"Bob"}}'
+
+        when:
+        def read = objectMapper.readValue(result, Author)
+
+        then:
+        author == read
+
+    }
+
+    void "test serialize/deserialize wrap/unwrap - complex"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run(
+                'jackson.deserialization.UNWRAP_ROOT_VALUE': true,
+                'jackson.serialization.WRAP_ROOT_VALUE': true
+        )
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        when:
+        HTTPCheck check = new HTTPCheck(headers:[
+                Accept:['application/json', 'application/xml']
+        ] )
+
+        def result = objectMapper.writeValueAsString(check)
+
+        then:
+        result == '{"HTTPCheck":{"Header":{"Accept":[{"String":"application/json"},{"String":"application/xml"}]}}}'
+
+        when:
+        def read = objectMapper.readValue(result, HTTPCheck)
+
+        then:
+        check == read
+
+    }
+
     void "test serialize/deserialize convertible values"() {
         given:
         ApplicationContext ctx = ApplicationContext.run()
@@ -622,6 +672,7 @@ class BeanIntrospectionModuleSpec extends Specification {
     }
 
     @Introspected
+    @EqualsAndHashCode
     static class Author {
         String name
     }
