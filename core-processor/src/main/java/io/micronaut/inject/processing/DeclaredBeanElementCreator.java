@@ -268,7 +268,11 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
     protected boolean visitPropertyReadElement(BeanDefinitionVisitor visitor,
                                                PropertyElement propertyElement,
                                                MethodElement readElement) {
-        return visitAopAndExecutableMethod(visitor, readElement);
+        if (!readElement.isSynthetic()) {
+            return visitAopAndExecutableMethod(visitor, readElement);
+        } else {
+            return false;
+        }
     }
 
     /**
@@ -313,7 +317,11 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
             visitMethodInjectionPoint(visitor, writeElement);
             return true;
         }
-        return visitAopAndExecutableMethod(visitor, writeElement);
+        if (!writeElement.isSynthetic()) {
+            return visitAopAndExecutableMethod(visitor, writeElement);
+        } else {
+            return false;
+        }
     }
 
     /**

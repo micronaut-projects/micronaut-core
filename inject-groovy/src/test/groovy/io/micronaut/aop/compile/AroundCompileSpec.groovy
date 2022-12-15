@@ -67,6 +67,86 @@ class TestInterceptor implements Interceptor {
 
     }
 
+    void 'test type level interceptor matching'() {
+        given:
+        ApplicationContext context = buildContext('''
+package annbinding2;
+
+import java.lang.annotation.*;
+import io.micronaut.aop.*;
+import jakarta.inject.*;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import io.micronaut.aop.simple.*;
+
+@Singleton
+@TestAnn2
+class MyBean {
+    String name = "foo"
+
+    void test() {
+
+    }
+}
+
+@Retention(RUNTIME)
+@Target([ElementType.METHOD, ElementType.TYPE])
+@Around
+@interface TestAnn {
+}
+
+@Retention(RUNTIME)
+@Target([ElementType.METHOD, ElementType.TYPE])
+@Around
+@interface TestAnn2 {
+}
+
+@InterceptorBean(TestAnn.class)
+class TestInterceptor implements Interceptor {
+    boolean invoked = false;
+    @Override
+    public Object intercept(InvocationContext context) {
+        invoked = true;
+        return context.proceed();
+    }
+}
+
+@InterceptorBean(TestAnn2.class)
+class AnotherInterceptor implements Interceptor {
+    boolean invoked = false;
+    @Override
+    public Object intercept(InvocationContext context) {
+        invoked = true;
+        return context.proceed();
+    }
+}
+''')
+        def instance = getBean(context, 'annbinding2.MyBean')
+        def interceptor = getBean(context, 'annbinding2.TestInterceptor')
+        def anotherInterceptor = getBean(context, 'annbinding2.AnotherInterceptor')
+
+        when:
+        String name = instance.name
+
+        then:"AOP not invoked for native properties"
+        name == 'foo'
+        instance instanceof Intercepted
+        !interceptor.invoked
+        !anotherInterceptor.invoked
+
+
+        when:
+        instance.test()
+
+        then:"the interceptor was invoked"
+        !interceptor.invoked
+        anotherInterceptor.invoked
+
+
+
+        cleanup:
+        context.close()
+    }
+
     void 'test method level interceptor matching'() {
         given:
         ApplicationContext context = buildContext('''
