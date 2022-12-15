@@ -72,7 +72,7 @@ class BeanIntrospectionModuleSpec extends Specification {
 
     }
 
-    void "test serialize/deserialize wrap/unwrap - complex"() {
+    void "test serialize/deserialize wrap/unwrap -* complex"() {
         given:
         ApplicationContext ctx = ApplicationContext.run(
                 'jackson.deserialization.UNWRAP_ROOT_VALUE': true,
@@ -92,6 +92,30 @@ class BeanIntrospectionModuleSpec extends Specification {
 
         when:
         def read = objectMapper.readValue(result, HTTPCheck)
+
+        then:
+        check == read
+
+    }
+
+    void "test serialize/deserialize wrap/unwrap -* constructors"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run(
+                'jackson.deserialization.UNWRAP_ROOT_VALUE': true,
+                'jackson.serialization.WRAP_ROOT_VALUE': true
+        )
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        when:
+        IntrospectionCreator check = new IntrospectionCreator("test")
+
+        def result = objectMapper.writeValueAsString(check)
+
+        then:
+        result == '{"IntrospectionCreator":{"label":"TEST"}}'
+
+        when:
+        def read = objectMapper.readValue(result, IntrospectionCreator)
 
         then:
         check == read
@@ -906,6 +930,7 @@ class BeanIntrospectionModuleSpec extends Specification {
     }
 
     @Introspected
+    @EqualsAndHashCode
     static class IntrospectionCreator {
         private final String name
 
