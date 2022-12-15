@@ -89,11 +89,16 @@ package test;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.session.http.HttpSessionConfiguration;
+import java.net.URI;
+import java.util.Optional;
+import java.util.List;
 
 @ConfigurationProperties("test")
 class RedisHttpSessionConfiguration extends
  HttpSessionConfiguration {
     private String writeMode;
+    private URI uri;
+    private List<URI> uris;
 
     public void setWriteMode(String writeMode) {
         this.writeMode = writeMode;
@@ -101,12 +106,30 @@ class RedisHttpSessionConfiguration extends
     public String getWriteMode() {
         return writeMode;
     }
+
+    public Optional<URI> getUri() {
+        return Optional.ofNullable(uri);
+    }
+    public void setUri(String uri) {
+        this.uri = URI.create(uri);
+    }
+
+    public List<URI> getUris() {
+        return uris;
+    }
+
+    public void setUris(URI... uris) {
+        this.uris = List.of(uris);
+    }
 }
 ''')
         def config = getBean(context, "test.RedisHttpSessionConfiguration")
 
         then:
         config.writeMode == 'test'
+        config.uri.isPresent()
+        config.uri.get() == URI.create('http://localhost:9999')
+        config.uris == List.of(URI.create('http://localhost:9999'))
     }
 
     void "test configuration properties with mixed getters/setters"() {
@@ -145,6 +168,8 @@ class MyConfig {
         contextBuilder.properties(
                 'foo.bar.host':'bar',
                 "micronaut.session.http.test.write-mode": "test",
+                "micronaut.session.http.test.uri": "http://localhost:9999",
+                "micronaut.session.http.test.uris": "http://localhost:9999",
                 "micronaut.server.idle-timeout": "2s",
                 "micronaut.server.netty.parent.io-ratio": "10",
                 "micronaut.server.netty.parent.threads": "5",
