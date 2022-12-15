@@ -23,6 +23,7 @@ import io.micronaut.core.execution.ImperativeExecutionFlow;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
+import reactor.core.Fuseable;
 import reactor.core.publisher.Mono;
 
 import java.util.Map;
@@ -115,7 +116,13 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
     @Nullable
     @Override
     public ImperativeExecutionFlow<Object> asDone() {
-        // not supported
+        if (value instanceof Fuseable.ScalarCallable<?> callable) {
+            try {
+                return (ImperativeExecutionFlow<Object>) ExecutionFlow.<Object>just(callable.call());
+            } catch (Exception e) {
+                return (ImperativeExecutionFlow<Object>) ExecutionFlow.error(e);
+            }
+        }
         return null;
     }
 
