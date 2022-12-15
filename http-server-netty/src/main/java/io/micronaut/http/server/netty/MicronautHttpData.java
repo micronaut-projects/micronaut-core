@@ -142,6 +142,9 @@ public abstract sealed class MicronautHttpData<D extends HttpData> extends Abstr
         if (pollIndex == chunks.size() && !completed) {
             chunks.add(new Chunk(size));
         }
+        // ownership of the chunk is shared: One release call from our deallocate(), one release
+        // call by the caller of pollChunk(). Usually this retain corresponds to the release in
+        // Chunk.claim
         chunk.retain();
         return chunk;
     }
@@ -740,7 +743,7 @@ public abstract sealed class MicronautHttpData<D extends HttpData> extends Abstr
         }
     }
 
-    private class StreamImpl extends InputStream {
+    private final class StreamImpl extends InputStream {
         ByteBuf buf = Unpooled.EMPTY_BUFFER;
 
         @Override

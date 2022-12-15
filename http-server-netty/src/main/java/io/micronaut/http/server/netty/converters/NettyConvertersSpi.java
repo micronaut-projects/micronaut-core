@@ -144,6 +144,8 @@ public final class NettyConvertersSpi implements TypeConverterRegistrar {
                     return Optional.empty();
                 }
 
+                // unlike NettyCompletedAttribute, NettyCompletedFileUpload does a `retain` on
+                // construct, so we don't need one here
                 return Optional.of(new NettyCompletedFileUpload(object));
             } catch (Exception e) {
                 context.reject(e);

@@ -48,9 +48,6 @@ import io.micronaut.http.server.exceptions.InternalServerException;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandler;
 import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandlerRegistry;
-import io.micronaut.http.server.netty.types.files.NettyStreamedFileCustomizableResponseType;
-import io.micronaut.http.server.netty.types.files.NettySystemFileCustomizableResponseType;
-import io.micronaut.http.server.types.files.FileCustomizableResponseType;
 import io.micronaut.runtime.http.codec.TextPlainCodec;
 import io.micronaut.web.router.RouteInfo;
 import io.micronaut.web.router.resource.StaticResourceResolver;
@@ -83,12 +80,8 @@ import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 
 import javax.net.ssl.SSLException;
-import java.io.File;
 import java.io.IOException;
-import java.net.URISyntaxException;
-import java.net.URL;
 import java.nio.channels.ClosedChannelException;
-import java.nio.file.Paths;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
@@ -273,25 +266,6 @@ final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.microna
                 );
             }
         }
-    }
-
-    public FileCustomizableResponseType find(HttpRequest<?> httpRequest) {
-        Optional<URL> optionalUrl = staticResourceResolver.resolve(httpRequest.getUri().getPath());
-        if (optionalUrl.isPresent()) {
-            try {
-                URL url = optionalUrl.get();
-                if (url.getProtocol().equals("file")) {
-                    File file = Paths.get(url.toURI()).toFile();
-                    if (file.exists() && !file.isDirectory() && file.canRead()) {
-                        return new NettySystemFileCustomizableResponseType(file);
-                    }
-                }
-                return new NettyStreamedFileCustomizableResponseType(url);
-            } catch (URISyntaxException e) {
-                //no-op
-            }
-        }
-        return null;
     }
 
     ExecutorService getIoExecutor() {

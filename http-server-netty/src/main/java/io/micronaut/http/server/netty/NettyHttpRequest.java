@@ -62,9 +62,7 @@ import io.netty.handler.codec.http.EmptyHttpHeaders;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import io.netty.handler.codec.http.cookie.ClientCookieEncoder;
-import io.netty.handler.codec.http.multipart.AbstractHttpData;
 import io.netty.handler.codec.http.multipart.HttpData;
-import io.netty.handler.codec.http.multipart.MixedAttribute;
 import io.netty.handler.codec.http2.DefaultHttp2PushPromiseFrame;
 import io.netty.handler.codec.http2.Http2ConnectionHandler;
 import io.netty.handler.codec.http2.Http2FrameCodec;
@@ -414,7 +412,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     @Internal
     public void addContent(ByteBufHolder httpContent) {
         httpContent.touch();
-        if (httpContent instanceof AbstractHttpData || httpContent instanceof MixedAttribute || httpContent instanceof MicronautHttpData<?>) {
+        if (httpContent instanceof MicronautHttpData<?>) {
             receivedData.computeIfAbsent(new IdentityWrapper(httpContent), key -> {
                 // released in release()
                 httpContent.retain();

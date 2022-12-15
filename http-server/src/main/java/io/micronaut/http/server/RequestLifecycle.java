@@ -313,7 +313,7 @@ public class RequestLifecycle {
 
         // if there is no route present try to locate a route that matches a different HTTP method
         final List<UriRouteMatch<Object, Object>> anyMatchingRoutes = routeExecutor.router
-            .findAny(httpRequest.getUri().toString(), httpRequest).toList();
+            .findAny(httpRequest.getPath(), httpRequest).toList();
         final Collection<MediaType> acceptedTypes = httpRequest.accept();
         final boolean hasAcceptHeader = CollectionUtils.isNotEmpty(acceptedTypes);
 

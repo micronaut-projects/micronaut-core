@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.http.server.netty.multipart.NettyCompletedFileUpload;
@@ -27,7 +28,11 @@ import io.netty.util.ReferenceCountUtil;
  * the data to the {@link NettyHttpRequest}. For multipart data, there is additional logic in
  * {@link FormRouteCompleter} that also dynamically binds parameters, though usually this is done
  * by the {@link io.micronaut.http.server.binding.RequestArgumentSatisfier}.
+ *
+ * @since 4.0.0
+ * @author Jonas Konrad
  */
+@Internal
 class BaseRouteCompleter {
     final NettyHttpRequest<?> request;
     volatile boolean needsInput = true;
@@ -49,6 +54,7 @@ class BaseRouteCompleter {
         try {
             if (request.destroyed) {
                 // we don't want this message anymore
+                ReferenceCountUtil.release(message);
                 return;
             }
 

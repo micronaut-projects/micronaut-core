@@ -168,13 +168,13 @@ public final class RouteExecutor {
 
         List<UriRouteMatch<Object, Object>> uriRoutes = router.findAllClosest(httpRequest);
         if (uriRoutes.size() > 1) {
-            throw new DuplicateRouteException(httpRequest.getUri().getPath(), uriRoutes);
+            throw new DuplicateRouteException(httpRequest.getPath(), uriRoutes);
         } else if (uriRoutes.size() == 1) {
             routeMatch = uriRoutes.get(0);
         }
 
         if (routeMatch == null && httpRequest.getMethod().equals(HttpMethod.OPTIONS)) {
-            List<UriRouteMatch<Object, Object>> anyUriRoutes = router.findAny(httpRequest.getUri().toString(), httpRequest).toList();
+            List<UriRouteMatch<Object, Object>> anyUriRoutes = router.findAny(httpRequest.getPath(), httpRequest).toList();
             if (!anyUriRoutes.isEmpty()) {
                 setRouteAttributes(httpRequest, anyUriRoutes.get(0));
                 httpRequest.setAttribute(AVAILABLE_HTTP_METHODS, anyUriRoutes.stream().map(UriRouteMatch::getHttpMethod).toList());
