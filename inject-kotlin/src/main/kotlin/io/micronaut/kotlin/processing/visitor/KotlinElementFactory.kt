@@ -15,6 +15,7 @@
  */
 package io.micronaut.kotlin.processing.visitor
 
+import com.google.devtools.ksp.processing.KSBuiltIns
 import com.google.devtools.ksp.symbol.*
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.inject.ast.*
@@ -22,6 +23,8 @@ import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 
 class KotlinElementFactory(
     private val visitorContext: KotlinVisitorContext): ElementFactory<Any, KSType, KSFunctionDeclaration, KSPropertyDeclaration> {
+
+    private val builtIns : KSBuiltIns = visitorContext.resolver.builtIns
 
     companion object {
         val primitives = mapOf(
@@ -110,6 +113,9 @@ class KotlinElementFactory(
     fun newClassElement(type: KSType,
                         elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
                         allowPrimitive: Boolean): ClassElement {
+        if (type == builtIns.anyType) {
+            return visitorContext.anyElement
+        }
         val declaration = type.declaration
         val qualifiedName = declaration.qualifiedName!!.asString()
         val hasNoAnnotations = !type.annotations.iterator().hasNext()
