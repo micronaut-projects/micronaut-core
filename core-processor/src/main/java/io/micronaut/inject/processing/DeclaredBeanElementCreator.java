@@ -158,9 +158,7 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
         ElementQuery<MemberElement> memberQuery = ElementQuery.ALL_FIELD_AND_METHODS.includeHiddenElements();
         if (processAsProperties()) {
             memberQuery = memberQuery.excludePropertyElements();
-            PropertyElementQuery query = new PropertyElementQuery()
-                    .ignoreSettersWithDifferingType(false);
-            for (PropertyElement propertyElement : classElement.getBeanProperties(query)) {
+            for (PropertyElement propertyElement : classElement.getBeanProperties()) {
                 visitPropertyInternal(visitor, propertyElement);
             }
         } else {
