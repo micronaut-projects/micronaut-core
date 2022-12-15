@@ -33,10 +33,15 @@ import io.micronaut.jackson.JacksonConfiguration
 import io.micronaut.jackson.modules.testcase.EmailTemplate
 import io.micronaut.jackson.modules.testcase.Notification
 import io.micronaut.jackson.modules.testclasses.HTTPCheck
-import io.micronaut.jackson.modules.wrappers.*
+import io.micronaut.jackson.modules.wrappers.BooleanWrapper
+import io.micronaut.jackson.modules.wrappers.DoubleWrapper
+import io.micronaut.jackson.modules.wrappers.IntWrapper
+import io.micronaut.jackson.modules.wrappers.IntegerWrapper
+import io.micronaut.jackson.modules.wrappers.LongWrapper
+import io.micronaut.jackson.modules.wrappers.StringWrapper
 import spock.lang.Issue
-import spock.lang.Unroll
 import spock.lang.Specification
+import spock.lang.Unroll
 
 import java.beans.ConstructorProperties
 import java.time.LocalDateTime
@@ -83,7 +88,7 @@ class BeanIntrospectionModuleSpec extends Specification {
         def result = objectMapper.writeValueAsString(check)
 
         then:
-        result == '{"HTTPCheck":{"Header":{"Accept":[{"String":"application/json"},{"String":"application/xml"}]}}}'
+        result == '{"HTTPCheck":{"Header":{"Accept":["application/json","application/xml"]}}}'
 
         when:
         def read = objectMapper.readValue(result, HTTPCheck)
