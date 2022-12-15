@@ -12,6 +12,17 @@ micronautBuild {
     }
 }
 
+repositories {
+    mavenLocal()
+    mavenCentral()
+    maven {
+        url "https://s01.oss.sonatype.org/content/repositories/snapshots/"
+        mavenContent {
+            snapshotsOnly()
+        }
+    }
+}
+
 dependencies {
     api libs.kotlin.stdlib
     api libs.kotlin.reflect
@@ -39,7 +50,7 @@ dependencies {
     testImplementation libs.jcache
     testImplementation project(':validation')
     testImplementation project(":http-client")
-    testImplementation project(":session")
+    testImplementation(libs.micronaut.session)
     testImplementation project(":jackson-databind")
     testImplementation libs.managed.groovy.templates
 

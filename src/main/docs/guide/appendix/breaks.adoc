@@ -13,6 +13,23 @@ The `micronaut-runtime` module has been split into separate modules depending on
 
 In addition, since `micronaut-retry` is now optional declarative clients annotated with ann:http.client.annotation.Client[] no longer invoke fallbacks by default. To restore the previous behaviour add `micronaut-retry` to your classpath and annotate any declarative clients with ann:retry.annotation.Recoverable[].
 
+==== Calling `registerSingleton(bean)` no longer overrides existing beans
+
+If you call `registerSingleton(bean)` on the api:context.BeanContext[] this will no longer override existing beans if the type and qualifier match, instead two beans will now exist which may lead to a api:context.exceptions.NonUniqueBeanException[].
+
+If you require replacing an existing bean you must formalize the replacement using the api:context.RuntimeBeanDefinition[] API, for example:
+
+[source,java]
+----
+context.registerBeanDefinition(
+    RuntimeBeanDefinition.builder(Codec.class, ()-> new OverridingCodec())
+            .singleton(true)
+            // the type of the bean to replace
+            .replaces(ToBeReplacedCodec.class)
+            .build()
+);
+----
+
 ==== WebSocket No Longer Required
 
 The `micronaut-websocket` API is no longer a required dependency of the HTTP server. If you are using annotations such as ann:websocket.annotation.ServerWebSocket[] you should add the `micronaut-websocket` dependency to your application classpath:
@@ -23,19 +40,26 @@ dependency::micronaut-websocket[]
 
 The instrumentation features for Reactor have been moved to the `micronaut-reactor` module. If you require instrumentation of reactive code paths (for distributed tracing for example) you should make sure your application depends on `micronaut-reactor`:
 
-dependency::micronaut-reactor[groupId="io.micronaut.reactor"]
+dependency:micronaut-reactor[groupId="io.micronaut.reactor"]
+
+==== Session Support Moved to Session Module
+
+The Session handling features have been moved to a new `micronaut-session` module.
+If you require session support, you should make your application depend on
+
+dependency:micronaut-session[groupId="io.micronaut.session"]
 
 ==== Kotlin Flow Support Moved to Kotlin Module
 
 Support for the Kotlin `Flow` type has been moved to the `micronaut-kotlin` module. If your application uses Kotlin `Flow` you should ensure the `micronaut-kotlin-runtime` module is on your application classpath:
 
-dependency::micronaut-kotlin-runtime[groupId="io.micronaut.kotlin"]
+dependency:micronaut-kotlin-runtime[groupId="io.micronaut.kotlin"]
 
 ==== Compilation Time API Split into new module
 
 In order to keep the runtime small all types and interfaces that are used at compilation time only (like the `io.micronaut.inject.ast` API) have been moved into a separate module:
 
-dependency::micronaut-core-processor[]
+dependency:micronaut-core-processor[]
 
 If you are using types and interfaces from this module you should take care to split the compilation time and runtime logic of your module into separate modules.
 

@@ -133,7 +133,7 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
         ExecutionFlow<MutableHttpResponse<?>> responseFlow = ExecutionFlow.async(ctx.channel().eventLoop(), requestLifecycle::handle);
         responseFlow.onComplete((response, throwable) -> {
             if (response != null) {
-                writeResponse(ctx, msg, requestLifecycle.shouldProceedNormally, (MutableHttpResponse<?>) response);
+                writeResponse(ctx, msg, requestLifecycle.shouldProceedNormally, response);
             }
         });
     }

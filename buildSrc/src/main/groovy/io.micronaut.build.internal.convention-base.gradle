@@ -62,7 +62,11 @@ configurations.all {
     resolutionStrategy.dependencySubstitution {
         rootProject.subprojects.each {
             if (!it.name.startsWith('test-')) {
-                substitute module("io.micronaut:micronaut-${it.name}") using project(":${it.name}") because "we want to test with what we're building"
+                if (it.name.contains('bom')) {
+                    substitute platform(module("io.micronaut:micronaut-${it.name}")) using platform(project(":${it.name}")) because "we want to test with what we're building"
+                } else {
+                    substitute module("io.micronaut:micronaut-${it.name}") using project(":${it.name}") because "we want to test with what we're building"
+                }
             }
         }
     }
