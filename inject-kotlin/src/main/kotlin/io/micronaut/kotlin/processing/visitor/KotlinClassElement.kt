@@ -152,13 +152,7 @@ open class KotlinClassElement(val kotlinType: KSType,
 
     @OptIn(KspExperimental::class)
     override fun getName(): String {
-        val binaryName = classDeclaration.getBinaryName(visitorContext.resolver)
-        if (binaryName == Any::class.qualifiedName) {
-            return "java.lang.Object"
-        } else if (binaryName == Any::class.qualifiedName) {
-            return "java.lang.Object"
-        }
-        return binaryName
+        return classDeclaration.getBinaryName(visitorContext.resolver)
     }
 
     override fun getCanonicalName(): String {

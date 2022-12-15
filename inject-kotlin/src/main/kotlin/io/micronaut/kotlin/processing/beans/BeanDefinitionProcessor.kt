@@ -72,7 +72,10 @@ class BeanDefinitionProcessor(private val environment: SymbolProcessorEnvironmen
                 val classElement =
                     visitorContext.elementFactory.newClassElement(classDeclaration.asStarProjectedType()) as KotlinClassElement
                 val innerClasses =
-                    classDeclaration.declarations.filter { it is KSClassDeclaration }.map { it as KSClassDeclaration }
+                    classDeclaration.declarations
+                        .filter { it is KSClassDeclaration }
+                        .map { it as KSClassDeclaration }
+                        .filter { !it.modifiers.contains(Modifier.INNER) }
                         .toList()
                 if (innerClasses.isNotEmpty()) {
                     processClassDeclarations(innerClasses, visitorContext)
