@@ -25,8 +25,6 @@ import io.micronaut.function.LocalFunctionRegistry;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
-import io.micronaut.inject.qualifiers.PrimaryQualifier;
-import io.micronaut.inject.qualifiers.Qualifiers;
 
 import java.io.IOException;
 import java.util.Collections;
