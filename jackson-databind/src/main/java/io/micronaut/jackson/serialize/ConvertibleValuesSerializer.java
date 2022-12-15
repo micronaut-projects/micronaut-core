@@ -47,7 +47,7 @@ public class ConvertibleValuesSerializer extends JsonSerializer<ConvertibleValue
             Object v = entry.getValue();
             if (v != null) {
                 gen.writeFieldName(fieldName);
-                gen.writeObject(v);
+                serializers.defaultSerializeValue(v, gen);
             }
         }
         gen.writeEndObject();
