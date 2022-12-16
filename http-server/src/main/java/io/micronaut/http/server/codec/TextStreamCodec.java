@@ -53,6 +53,7 @@ import java.util.List;
 @Singleton
 @Internal
 @BootstrapContextCompatible
+@Requires(bean = ByteBufferFactory.class)
 public class TextStreamCodec implements MediaTypeCodec {
 
     public static final String CONFIGURATION_QUALIFIER = "text-stream";
