@@ -595,7 +595,7 @@ class FilterRunnerSpec extends Specification {
                 before([Argument.of(HttpRequest<?>), Argument.of(FilterContinuation, HttpResponse)]) { request, chain ->
                     assert request == req1
                     events.add("before")
-                    def resp = chain.proceed(req2)
+                    def resp = chain.request(req2).proceed()
                     assert resp == resp1
                     events.add("after")
                     return resp2
@@ -634,7 +634,14 @@ class FilterRunnerSpec extends Specification {
                     new FilterOrder.Fixed(0)
             )
         } else {
-            return before([Argument.of(HttpRequest<?>), Argument.of(FilterContinuation, Publisher)], closure)
+            return before([Argument.of(HttpRequest<?>), Argument.of(FilterContinuation, Publisher)]) { request, continuation ->
+                closure(request, new ServerFilterChain() {
+                    @Override
+                    Publisher<MutableHttpResponse<?>> proceed(HttpRequest<?> r) {
+                        return continuation.request(r).proceed()
+                    }
+                })
+            }
         }
     }
 

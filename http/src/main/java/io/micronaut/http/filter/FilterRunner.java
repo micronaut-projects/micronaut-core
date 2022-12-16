@@ -589,6 +589,12 @@ public class FilterRunner {
             super(filterIndex, next);
         }
 
+        @Override
+        public FilterContinuation<R> request(HttpRequest<?> request) {
+            FilterRunner.this.request = request;
+            return this;
+        }
+
         final void triggerDownstreamWorkRequest() {
             if (downstreamGuard.compareAndSet(false, true)) {
                 workRequest();
@@ -656,8 +662,7 @@ public class FilterRunner {
         }
 
         @Override
-        public R proceed(HttpRequest<?> request) {
-            FilterRunner.this.request = request;
+        public R proceed() {
             return Publishers.convertPublisher(this, reactiveType);
         }
 
@@ -732,12 +737,18 @@ public class FilterRunner {
 
         @Override
         public Publisher<MutableHttpResponse<?>> proceed(HttpRequest<?> request) {
+            request(request);
+            return proceed();
+        }
+
+        @Override
+        public Publisher<MutableHttpResponse<?>> proceed() {
             // HACK: kotlin coroutine context propagation only supports reactor types (see
             // ReactorContextInjector). If we want to support our own type, we would need our own
             // ContextInjector, but that interface is marked as internal.
             // Another solution could be to PR kotlin to support all CorePublishers in
             // ReactorContextInjector.
-            return Mono.from(super.proceed(request));
+            return Mono.from(super.proceed());
         }
 
         @SuppressWarnings("NullableProblems")
@@ -780,8 +791,7 @@ public class FilterRunner {
         }
 
         @Override
-        public HttpResponse<?> proceed(HttpRequest<?> request) {
-            FilterRunner.this.request = request;
+        public HttpResponse<?> proceed() {
             triggerDownstreamWorkRequest();
 
             boolean interrupted = false;
