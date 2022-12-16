@@ -44,6 +44,7 @@ public @interface ConfigurationReader {
      * The base prefix name.
      */
     String BASE_PREFIX = "basePrefix";
+    String PREFIX_CALCULATED = "prefixCalculated";
 
     /**
      * The prefix to use when resolving properties. The prefix should be defined in kebab case. Example: my-app.foo.
