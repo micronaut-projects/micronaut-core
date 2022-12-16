@@ -3,7 +3,6 @@ package io.micronaut.http.filter;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.order.Ordered;
-import io.micronaut.core.type.Executable;
 import io.micronaut.core.util.Toggleable;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -18,52 +17,17 @@ import java.util.concurrent.Executor;
  * Only the framework should construct or call instances of this interface. The exception is the
  * {@link Terminal terminal filter}.
  *
- * @since 4.0.0
  * @author Jonas Konrad
+ * @since 4.0.0
  */
-public sealed interface GenericHttpFilter {
-    /**
-     * Method annotated with {@link io.micronaut.http.annotation.RequestFilter}. Contrary to the
-     * name, such a method may also accept a {@link FilterContinuation} that will also intercept
-     * the response.
-     *
-     * @param bean The filter bean
-     * @param method The filter method
-     * @param order The filter order
-     * @param <T> The filter bean type
-     */
-    @Internal
-    record Before<T>(
-        T bean,
-        Executable<T, ?> method,
-        FilterOrder order
-    ) implements GenericHttpFilter, Ordered {
-        @Override
-        public int getOrder() {
-            return order.getOrder(bean);
-        }
-    }
-
-    /**
-     * Method annotated with {@link io.micronaut.http.annotation.ResponseFilter}.
-     *
-     * @param bean The filter bean
-     * @param method The filter method
-     * @param order The filter order
-     * @param <T> The filter bean type
-     */
-    @Internal
-    record After<T>(
-        T bean,
-        Executable<T, ?> method,
-        FilterOrder order
-    ) implements GenericHttpFilter, Ordered {
-        @Override
-        public int getOrder() {
-            return order.getOrder(bean);
-        }
-    }
-
+public sealed interface GenericHttpFilter
+    permits
+    FilterRunner.FilterMethod,
+    GenericHttpFilter.AroundLegacy,
+    GenericHttpFilter.Async,
+    GenericHttpFilter.Terminal,
+    GenericHttpFilter.TerminalReactive,
+    GenericHttpFilter.TerminalWithReactorContext {
     /**
      * Wrapper around a filter that signifies the filter should be run asynchronously on the given
      * executor. Usually from an {@link io.micronaut.scheduling.annotation.ExecuteOn} annotation.

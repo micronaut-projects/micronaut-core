@@ -146,7 +146,7 @@ class ServerFilterSpec extends Specification {
         @RequestFilter
         void request(HttpRequest<?> request, FilterContinuation<HttpResponse<?>> continuation) {
             events.add("request " + request.uri)
-            def response = continuation.proceed(request)
+            def response = continuation.proceed()
             events.add("response " + request.uri + " " + response.status)
         }
     }

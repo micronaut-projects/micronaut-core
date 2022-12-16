@@ -10,11 +10,13 @@ import io.micronaut.core.execution.ImperativeExecutionFlow;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.type.Executable;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
+import io.micronaut.inject.ExecutableMethod;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -33,6 +35,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
+import java.util.function.Predicate;
 
 /**
  * @implNote Legacy filters had a strict execution flow: filter1->chain.proceed->filter2->chain.proceed...
@@ -184,7 +187,11 @@ public class FilterRunner {
             executeOn = null;
         }
 
-        if (filter instanceof GenericHttpFilter.Before<?> before) {
+        if (filter instanceof FilterMethod<?> before) {
+            if (before.isResponseFilter) {
+                // skip filter, only used for response
+                return true;
+            }
             if (executeOn == null) {
                 // possibly continue with next filter
                 return invokeBefore(before, null);
@@ -196,9 +203,6 @@ public class FilterRunner {
                 });
                 return false;
             }
-        } else if (filter instanceof GenericHttpFilter.After<?>) {
-            // skip filter, only used for response
-            return true;
         } else if (filter instanceof GenericHttpFilter.AroundLegacy around) {
             FilterChainImpl chainSuspensionPoint = new FilterChainImpl(index - 1, responseSuspensionPoint);
             chainSuspensionPoint.completeOn = executeOn;
@@ -297,7 +301,7 @@ public class FilterRunner {
                 filter = async.actual();
             }
 
-            if (filter instanceof GenericHttpFilter.After<?> after) {
+            if (filter instanceof FilterMethod<?> after && after.isResponseFilter) {
                 if (executeOn == null) {
                     if (!invokeAfter(after)) {
                         // suspend
@@ -316,27 +320,22 @@ public class FilterRunner {
         }
     }
 
-    private <T> boolean invokeBefore(GenericHttpFilter.Before<T> before, @Nullable Executor completeOn) {
+    private <T> boolean invokeBefore(FilterMethod<T> before, @Nullable Executor completeOn) {
         FilterContinuationImpl<?> passedOnContinuation = null;
         try {
-            var oldSuspensionPoint = this.responseSuspensionPoint;
-            Object[] args = satisfy(before.method().getArguments(), false);
-            if (args == SKIP_FILTER) {
-                // we don't technically need to reset this, but I can guarantee I will forget this
-                // if satisfy() ever changes to return SKIP_FILTER for request handlers too
-                this.responseSuspensionPoint = oldSuspensionPoint;
+            if (before.filterCondition != null && !before.filterCondition.test(this)) {
                 return true;
             }
-            SuspensionPoint newSuspensionPoint = this.responseSuspensionPoint;
-            if (newSuspensionPoint != oldSuspensionPoint) {
-                passedOnContinuation = (FilterContinuationImpl<?>) newSuspensionPoint;
+            Object[] args = bindArgs(before);
+            if (before.passedOnContinuationArgIndex != -1) {
+                passedOnContinuation = (FilterContinuationImpl<?>) args[before.passedOnContinuationArgIndex];
                 if (completeOn != null) {
                     passedOnContinuation.completeOn = completeOn;
                 }
             }
-            Object returnValue = before.method().invoke(before.bean(), args);
+            Object returnValue = before.method.invoke(before.bean, args);
 
-            boolean proceed = handleFilterReturn(returnValue, true, passedOnContinuation);
+            boolean proceed = before.returnHandler.handle(this, returnValue, passedOnContinuation);
             if (passedOnContinuation != null && proceed) {
                 throw new AssertionError("handleFilterReturn should never return true if there is a continuation");
             }
@@ -353,14 +352,13 @@ public class FilterRunner {
         }
     }
 
-    private <T> boolean invokeAfter(GenericHttpFilter.After<T> after) {
+    private <T> boolean invokeAfter(FilterMethod<T> after) {
         try {
-            Object[] args = satisfy(after.method().getArguments(), true);
-            if (args == SKIP_FILTER) {
+            if (after.filterCondition != null && !after.filterCondition.test(this)) {
                 return true;
             }
-            Object returnValue = after.method().invoke(after.bean(), args);
-            return handleFilterReturn(returnValue, true, null);
+            Object returnValue = after.method.invoke(after.bean, bindArgs(after));
+            return after.returnHandler.handle(this, returnValue, null);
         } catch (Throwable e) {
             failure = e;
             responseNeedsProcessing = true;
@@ -368,163 +366,260 @@ public class FilterRunner {
         return true;
     }
 
-    /**
-     * @param requestFilter        Whether this is a request filter
-     * @param passedOnContinuation If this is a request filter, this parameter can contain the
-     *                             continuation we passed on to the filter.
-     * @return {@code true} if we can continue with the next filter, {@code false} if we should
-     * suspend
-     */
-    private boolean handleFilterReturn(Object returnValue, boolean requestFilter, FilterContinuationImpl<?> passedOnContinuation) throws Throwable {
-        if (returnValue instanceof Optional<?> opt) {
-            returnValue = opt.orElse(null);
+    private Object[] bindArgs(FilterMethod<?> filterMethod) {
+        Object[] args = new Object[filterMethod.argBinders.length];
+        for (int i = 0; i < args.length; i++) {
+            args[i] = filterMethod.argBinders[i].bind(this);
         }
-        if (returnValue == null) {
-            if (passedOnContinuation != null) {
-                // use response/failure from other filters
-                passedOnContinuation.forwardResponse(response, failure);
-                return false;
-            } else {
-                return true;
-            }
-        }
-        if (requestFilter) {
-            if (returnValue instanceof HttpRequest<?> req) {
-                if (passedOnContinuation != null) {
-                    throw new IllegalStateException("Filter method that accepts a continuation cannot return an HttpRequest");
-                }
-                this.request = req;
-                return true;
-            } else if (returnValue instanceof HttpResponse<?> resp) {
-                if (passedOnContinuation != null) {
-                    passedOnContinuation.forwardResponse(resp, null);
-                } else {
-                    // cancel request pipeline, move immediately to response handling
-                    this.response = resp;
-                    this.failure = null;
-                    this.responseNeedsProcessing = true;
-                    workResponse();
-                }
-                return false;
-            }
-        } else {
-            if (passedOnContinuation != null) {
-                throw new AssertionError();
-            }
-            if (returnValue instanceof HttpResponse<?> resp) {
-                // cancel request pipeline, move immediately to response handling
-                this.response = resp;
-                this.failure = null;
-                this.responseNeedsProcessing = true;
-                return true;
-            }
-        }
-        ExecutionFlow<?> delayedFlow;
-        if (Publishers.isConvertibleToPublisher(returnValue)) {
-            //noinspection unchecked
-            delayedFlow = ReactiveExecutionFlow.fromPublisher(
-                Mono.from(Publishers.convertPublisher(returnValue, Publisher.class))
-                    .contextWrite(reactorContext));
-        } else if (returnValue instanceof CompletionStage<?> cs) {
-            delayedFlow = CompletableFutureExecutionFlow.just(cs.toCompletableFuture());
-        } else {
-            throw new UnsupportedOperationException("Unsupported filter return type " + returnValue.getClass().getName());
-        }
-        ImperativeExecutionFlow<?> doneFlow = delayedFlow.asComplete();
-        if (doneFlow != null) {
-            if (doneFlow.getError() != null) {
-                throw doneFlow.getError();
-            }
-            return handleFilterReturn(doneFlow.getValue(), requestFilter, passedOnContinuation);
-        } else {
-            // suspend until flow completes
-            delayedFlow.onComplete((v, e) -> {
-                if (e == null) {
-                    try {
-                        if (handleFilterReturn(v, requestFilter, passedOnContinuation)) {
-                            if (requestFilter) {
-                                workRequest();
-                            } else {
-                                workResponse();
-                            }
-                        }
-                        return;
-                    } catch (Throwable t) {
-                        e = t;
-                    }
-                }
-                if (passedOnContinuation == null) {
-                    failure = e;
-                    responseNeedsProcessing = true;
-                    workResponse();
-                } else {
-                    passedOnContinuation.forwardResponse(null, e);
-                }
-            });
-            return false;
-        }
+        return args;
     }
 
-    private Object[] satisfy(
-        Argument<?>[] arguments,
-        boolean hasResponse
-    ) throws Exception {
-        Object[] fulfilled = new Object[arguments.length];
-        // if there is a failure, only filters that can actually handle it should be called
-        boolean skipBecauseUnhandledFailure = failure != null;
-        boolean hasContinuation = false;
+    @Internal
+    public static <T> FilterMethod<T> prepareFilterMethod(T bean, ExecutableMethod<T, ?> method, boolean isResponseFilter, FilterOrder order) {
+        Argument<?>[] arguments = method.getArguments();
+        FilterArgBinder[] fulfilled = new FilterArgBinder[arguments.length];
+        Predicate<FilterRunner> filterConditionAlwaysTrue = runner -> true;
+        Predicate<FilterRunner> filterCondition = filterConditionAlwaysTrue;
+        boolean skipOnError = isResponseFilter;
+
+        int passedOnContinuationArgIndex = -1;
         for (int i = 0; i < arguments.length; i++) {
             Argument<?> argument = arguments[i];
             if (argument.getType().isAssignableFrom(MutableHttpRequest.class)) {
-                fulfilled[i] = request;
+                fulfilled[i] = runner -> runner.request;
             } else if (argument.getType().isAssignableFrom(MutableHttpResponse.class)) {
-                if (!hasResponse) {
+                if (!isResponseFilter) {
                     throw new IllegalStateException("Filter is called before the response is known, can't have a response argument");
                 }
-                fulfilled[i] = response;
+                fulfilled[i] = runner -> runner.response;
             } else if (Throwable.class.isAssignableFrom(argument.getType())) {
-                if (!hasResponse) {
+                if (!isResponseFilter) {
                     throw new IllegalStateException("Request filters cannot handle exceptions");
                 }
-                if (failure != null && argument.isInstance(failure)) {
-                    fulfilled[i] = failure;
-                } else if (argument.isNullable()) {
-                    fulfilled[i] = null;
+                if (!argument.isNullable()) {
+                    filterCondition = filterCondition.and(runner -> runner.failure != null && argument.isInstance(runner.failure));
+                    fulfilled[i] = runner -> runner.failure;
                 } else {
-                    // can't fulfill this argument
-                    return SKIP_FILTER;
+                    fulfilled[i] = runner -> {
+                        if (runner.failure != null && argument.isInstance(runner.failure)) {
+                            return runner.failure;
+                        } else {
+                            return null;
+                        }
+                    };
                 }
-                skipBecauseUnhandledFailure = false;
+                skipOnError = false;
             } else if (argument.getType() == FilterContinuation.class) {
-                if (hasResponse) {
+                if (isResponseFilter) {
                     throw new IllegalStateException("Response filters cannot use filter continuations");
                 }
-                if (hasContinuation) {
+                if (passedOnContinuationArgIndex != -1) {
                     throw new IllegalStateException("Only one continuation per filter is allowed");
                 }
                 Argument<?> continuationReturnType = argument.getFirstTypeVariable().orElseThrow(() -> new IllegalStateException("Continuations must specify generic type"));
-                SuspensionPoint oldSuspensionPoint = this.responseSuspensionPoint;
-                int ourIndex = this.index - 1;
-                SuspensionPoint newSuspensionPoint;
-                if (Publishers.isConvertibleToPublisher(continuationReturnType.getType())) {
-                    newSuspensionPoint = new ReactiveContinuationImpl<>(ourIndex, oldSuspensionPoint, continuationReturnType.getType());
+                if (continuationReturnType.isReactive() && continuationReturnType.getWrappedType().isAssignableFrom(MutableHttpResponse.class)) {
+                    fulfilled[i] = runner -> {
+                        SuspensionPoint newSuspensionPoint = runner.new ReactiveContinuationImpl<>(
+                            runner.index - 1,
+                            runner.responseSuspensionPoint,
+                            continuationReturnType.getType()
+                        );
+                        // invokeBefore will detect the new suspension point and handle it accordingly
+                        runner.responseSuspensionPoint = newSuspensionPoint;
+                        return newSuspensionPoint;
+                    };
                 } else if (continuationReturnType.getType().isAssignableFrom(MutableHttpResponse.class)) {
-                    newSuspensionPoint = new BlockingContinuationImpl(ourIndex, oldSuspensionPoint);
+                    fulfilled[i] = runner -> {
+                        SuspensionPoint newSuspensionPoint = runner.new BlockingContinuationImpl(
+                            runner.index - 1,
+                            runner.responseSuspensionPoint
+                        );
+                        // invokeBefore will detect the new suspension point and handle it accordingly
+                        runner.responseSuspensionPoint = newSuspensionPoint;
+                        return newSuspensionPoint;
+                    };
                 } else {
                     throw new IllegalStateException("Unsupported continuation type: " + continuationReturnType);
                 }
-                // invokeBefore will detect the new suspension point and handle it accordingly
-                this.responseSuspensionPoint = newSuspensionPoint;
-                fulfilled[i] = newSuspensionPoint;
-                hasContinuation = true;
+                passedOnContinuationArgIndex = i;
+
             } else {
                 throw new IllegalStateException("Unsupported filter argument type: " + argument);
             }
         }
-        if (skipBecauseUnhandledFailure) {
-            return SKIP_FILTER;
+        if (skipOnError) {
+            filterCondition = filterCondition.and(r -> r.failure == null);
         }
-        return fulfilled;
+        if (filterCondition == filterConditionAlwaysTrue) {
+            filterCondition = null;
+        }
+        return new FilterMethod<>(
+            order,
+            bean,
+            method,
+            isResponseFilter,
+            fulfilled,
+            filterCondition,
+            passedOnContinuationArgIndex,
+            prepareReturnHandler(method.getReturnType().asArgument(), isResponseFilter, passedOnContinuationArgIndex != -1)
+        );
+    }
+
+    private static FilterReturnHandler prepareReturnHandler(Argument<?> type, boolean isResponseFilter, boolean hasContinuation) {
+        if (type.isOptional()) {
+            FilterReturnHandler next = prepareReturnHandler(type.getWrappedType(), isResponseFilter, hasContinuation);
+            return (r, o, c) -> next.handle(r, ((Optional<?>) o).orElse(null), c);
+        }
+        if (type.isVoid()) {
+            if (hasContinuation) {
+                return (r, o, c) -> {
+                    // use response/failure from other filters
+                    c.forwardResponse(r.response, r.failure);
+                    return false;
+                };
+            } else {
+                return (r, o, c) -> true;
+            }
+        }
+        if (!isResponseFilter) {
+            if (type.getType() == HttpRequest.class || type.getType() == MutableHttpRequest.class) {
+                if (hasContinuation) {
+                    throw new IllegalStateException("Filter method that accepts a continuation cannot return an HttpRequest");
+                }
+                return (r, o, c) -> {
+                    r.request = (HttpRequest<?>) o;
+                    return true;
+                };
+            } else if (type.getType() == HttpResponse.class || type.getType() == MutableHttpResponse.class) {
+                if (hasContinuation) {
+                    return (r, o, c) -> {
+                        c.forwardResponse((HttpResponse<?>) o, null);
+                        return false;
+                    };
+                } else {
+                    return (r, o, c) -> {
+                        // cancel request pipeline, move immediately to response handling
+                        r.response = (HttpResponse<?>) o;
+                        r.failure = null;
+                        r.responseNeedsProcessing = true;
+                        r.workResponse();
+                        return false;
+                    };
+                }
+            }
+        } else {
+            if (hasContinuation) {
+                throw new AssertionError();
+            }
+            if (type.getType() == HttpResponse.class || type.getType() == MutableHttpResponse.class) {
+                return (r, o, c) -> {
+                    // cancel request pipeline, move immediately to response handling
+                    r.response = (HttpResponse<?>) o;
+                    r.failure = null;
+                    r.responseNeedsProcessing = true;
+                    return true;
+                };
+            }
+        }
+        if (type.isReactive()) {
+            var next = prepareReturnHandler(type.getWrappedType(), isResponseFilter, hasContinuation);
+            return new DelayedFilterReturnHandler(isResponseFilter, next) {
+                @Override
+                protected ExecutionFlow<?> toFlow(FilterRunner runner, Object o) {
+                    //noinspection unchecked
+                    return ReactiveExecutionFlow.fromPublisher(
+                        Mono.from(Publishers.convertPublisher(o, Publisher.class))
+                            .contextWrite(runner.reactorContext));
+                }
+            };
+        } else if (type.isAsync()) {
+            var next = prepareReturnHandler(type.getWrappedType(), isResponseFilter, hasContinuation);
+            return new DelayedFilterReturnHandler(isResponseFilter, next) {
+                @Override
+                protected ExecutionFlow<?> toFlow(FilterRunner runner, Object o) {
+                    //noinspection unchecked
+                    return CompletableFutureExecutionFlow.just(((CompletionStage<Object>) o).toCompletableFuture());
+                }
+            };
+        } else {
+            throw new UnsupportedOperationException("Unsupported filter return type " + type.getType().getName());
+        }
+
+    }
+
+    record FilterMethod<T>(
+        FilterOrder order,
+        T bean,
+        Executable<T, ?> method,
+        boolean isResponseFilter,
+        FilterArgBinder[] argBinders,
+        @Nullable
+        Predicate<FilterRunner> filterCondition,
+        int passedOnContinuationArgIndex,
+        FilterReturnHandler returnHandler
+    ) implements GenericHttpFilter, Ordered {
+        @Override
+        public int getOrder() {
+            return order.getOrder(bean);
+        }
+    }
+
+    private interface FilterArgBinder {
+        Object bind(FilterRunner runner);
+    }
+
+    private interface FilterReturnHandler {
+        boolean handle(FilterRunner runner, Object o, FilterContinuationImpl<?> passedOnContinuation) throws Throwable;
+    }
+
+    private static abstract class DelayedFilterReturnHandler implements FilterReturnHandler {
+        final boolean isResponseFilter;
+        final FilterReturnHandler next;
+
+        private DelayedFilterReturnHandler(boolean isResponseFilter, FilterReturnHandler next) {
+            this.isResponseFilter = isResponseFilter;
+            this.next = next;
+        }
+
+        protected abstract ExecutionFlow<?> toFlow(FilterRunner runner, Object o);
+
+        @Override
+        public boolean handle(FilterRunner runner, Object o, FilterContinuationImpl<?> passedOnContinuation) throws Throwable {
+            ExecutionFlow<?> delayedFlow = toFlow(runner, o);
+            ImperativeExecutionFlow<?> doneFlow = delayedFlow.asComplete();
+            if (doneFlow != null) {
+                if (doneFlow.getError() != null) {
+                    throw doneFlow.getError();
+                }
+                return next.handle(runner, doneFlow.getValue(), passedOnContinuation);
+            } else {
+                // suspend until flow completes
+                delayedFlow.onComplete((v, e) -> {
+                    if (e == null) {
+                        try {
+                            if (next.handle(runner, v, passedOnContinuation)) {
+                                if (isResponseFilter) {
+                                    runner.workResponse();
+                                } else {
+                                    runner.workRequest();
+                                }
+                            }
+                            return;
+                        } catch (Throwable t) {
+                            e = t;
+                        }
+                    }
+                    if (passedOnContinuation == null) {
+                        runner.failure = e;
+                        runner.responseNeedsProcessing = true;
+                        runner.workResponse();
+                    } else {
+                        passedOnContinuation.forwardResponse(null, e);
+                    }
+                });
+                return false;
+            }
+        }
     }
 
     /**

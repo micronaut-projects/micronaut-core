@@ -19,6 +19,7 @@ import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.http.context.ServerContextPathProvider;
 import io.micronaut.http.filter.FilterOrder;
 import io.micronaut.http.filter.FilterPatternStyle;
+import io.micronaut.http.filter.FilterRunner;
 import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
@@ -75,13 +76,13 @@ public class ServerFilterRouteBuilder extends DefaultRouteBuilder implements Exe
         if (method.isAnnotationPresent(RequestFilter.class)) {
             FilterMetadata methodLevel = metadata(method, RequestFilter.class);
             FilterMetadata combined = combineMetadata(beanLevel, methodLevel);
-            FilterRoute filter = addFilter(() -> withAsync(combined, new GenericHttpFilter.Before<>(beanContext.getBean(beanDefinition), method, combined.order)), method);
+            FilterRoute filter = addFilter(() -> withAsync(combined, FilterRunner.prepareFilterMethod(beanContext.getBean(beanDefinition), method, false, combined.order)), method);
             applyMetadata(filter, combined);
         }
         if (method.isAnnotationPresent(ResponseFilter.class)) {
             FilterMetadata methodLevel = metadata(method, ResponseFilter.class);
             FilterMetadata combined = combineMetadata(beanLevel, methodLevel);
-            FilterRoute filter = addFilter(() -> withAsync(combined, new GenericHttpFilter.After<>(beanContext.getBean(beanDefinition), method, combined.order)), method);
+            FilterRoute filter = addFilter(() -> withAsync(combined, FilterRunner.prepareFilterMethod(beanContext.getBean(beanDefinition), method, true, combined.order)), method);
             applyMetadata(filter, combined);
         }
     }

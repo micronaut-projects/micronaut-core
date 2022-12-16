@@ -5,16 +5,18 @@ import io.micronaut.core.execution.CompletableFutureExecutionFlow
 import io.micronaut.core.execution.ExecutionFlow
 import io.micronaut.core.execution.ImperativeExecutionFlow
 import io.micronaut.core.type.Argument
-import io.micronaut.core.type.Executable
+import io.micronaut.core.type.ReturnType
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MutableHttpResponse
+import io.micronaut.inject.ExecutableMethod
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import reactor.util.context.Context
 import spock.lang.Specification
 
+import java.lang.reflect.Method
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executors
@@ -25,11 +27,11 @@ class FilterRunnerSpec extends Specification {
         given:
         def events = []
         List<GenericHttpFilter> filters = [
-                after { req, resp ->
+                after(ReturnType.of(void)) { req, resp ->
                     events.add("after")
                     null
                 },
-                before { req ->
+                before(ReturnType.of(void)) { req ->
                     events.add("before")
                     null
                 },
@@ -121,7 +123,7 @@ class FilterRunnerSpec extends Specification {
         def events = []
         def testExc = new Exception("Test exception")
         List<GenericHttpFilter> filters = [
-                before { throw testExc },
+                before(ReturnType.of(void)) { throw testExc },
                 (GenericHttpFilter.Terminal) (req -> {
                     events.add("terminal")
                     ExecutionFlow.just(HttpResponse.ok())
@@ -141,7 +143,7 @@ class FilterRunnerSpec extends Specification {
         def events = []
         def testExc = new Exception("Test exception")
         List<GenericHttpFilter> filters = [
-                after { req, resp -> throw testExc },
+                after(ReturnType.of(void)) { req, resp -> throw testExc },
                 (GenericHttpFilter.Terminal) (req -> {
                     events.add("terminal")
                     ExecutionFlow.just(HttpResponse.ok())
@@ -324,7 +326,7 @@ class FilterRunnerSpec extends Specification {
         def req1 = HttpRequest.GET("/req1")
         def req2 = HttpRequest.GET("/req2")
         List<GenericHttpFilter> filters = [
-                before { req ->
+                before(ReturnType.of(HttpRequest)) { req ->
                     assert req == req1
                     events.add("before")
                     req2
@@ -346,7 +348,7 @@ class FilterRunnerSpec extends Specification {
         given:
         def events = []
         List<GenericHttpFilter> filters = [
-                before {
+                before(ReturnType.of(HttpResponse)) {
                     events.add("before")
                     HttpResponse.ok()
                 },
@@ -368,7 +370,7 @@ class FilterRunnerSpec extends Specification {
         def req1 = HttpRequest.GET("/req1")
         def req2 = HttpRequest.GET("/req2")
         List<GenericHttpFilter> filters = [
-                before { req ->
+                before(ReturnType.of(Flux, Argument.of(HttpRequest))) { req ->
                     assert req == req1
                     events.add("before")
                     Flux.just(req2)
@@ -392,7 +394,7 @@ class FilterRunnerSpec extends Specification {
         def req1 = HttpRequest.GET("/req1")
         def req2 = HttpRequest.GET("/req2")
         List<GenericHttpFilter> filters = [
-                before { req ->
+                before(ReturnType.of(CompletableFuture, Argument.of(HttpRequest))) { req ->
                     assert req == req1
                     events.add("before")
                     CompletableFuture.completedFuture(req2)
@@ -414,7 +416,7 @@ class FilterRunnerSpec extends Specification {
         given:
         def events = []
         List<GenericHttpFilter> filters = [
-                before {
+                before(ReturnType.of(Flux, Argument.of(HttpResponse))) {
                     events.add("before")
                     Flux.just(HttpResponse.ok())
                 },
@@ -436,7 +438,7 @@ class FilterRunnerSpec extends Specification {
         def resp1 = HttpResponse.ok("resp1")
         def resp2 = HttpResponse.ok("resp2")
         List<GenericHttpFilter> filters = [
-                after { HttpResponse<?> resp ->
+                after(ReturnType.of(HttpResponse)) { HttpResponse<?> resp ->
                     assert resp == resp1
                     events.add("after")
                     resp2
@@ -460,7 +462,7 @@ class FilterRunnerSpec extends Specification {
         def resp1 = HttpResponse.ok("resp1")
         def resp2 = HttpResponse.ok("resp2")
         List<GenericHttpFilter> filters = [
-                after { HttpResponse<?> resp ->
+                after(ReturnType.of(Flux, Argument.of(HttpResponse))) { HttpResponse<?> resp ->
                     assert resp == resp1
                     events.add("after")
                     Flux.just(resp2)
@@ -483,7 +485,7 @@ class FilterRunnerSpec extends Specification {
         def events = []
         def testExc = new Exception("Test exception")
         List<GenericHttpFilter> filters = [
-                after {
+                after(ReturnType.of(void)) {
                     events.add("after")
                     null
                 },
@@ -507,7 +509,7 @@ class FilterRunnerSpec extends Specification {
         def testExc = new Exception("Test exception")
         def resp1 = HttpResponse.ok("resp1")
         List<GenericHttpFilter> filters = [
-                after { Exception exc ->
+                after(ReturnType.of(HttpResponse)) { Exception exc ->
                     assert exc == testExc
                     events.add("after")
                     resp1
@@ -530,7 +532,7 @@ class FilterRunnerSpec extends Specification {
         def events = []
         def testExc = new Exception("Test exception")
         List<GenericHttpFilter> filters = [
-                after { RuntimeException exc ->
+                after(ReturnType.of(void)) { RuntimeException exc ->
                     events.add("after")
                     null
                 },
@@ -553,7 +555,7 @@ class FilterRunnerSpec extends Specification {
         def events = []
         def testExc = new Exception("Test exception")
         List<GenericHttpFilter> filters = [
-                new GenericHttpFilter.Async(before {
+                new GenericHttpFilter.Async(before(ReturnType.of(void)) {
                     events.add("before " + Thread.currentThread().name)
                     null
                 }, Executors.newCachedThreadPool(new ThreadFactory() {
@@ -562,7 +564,7 @@ class FilterRunnerSpec extends Specification {
                         return new Thread(r, "thread-before")
                     }
                 })),
-                new GenericHttpFilter.Async(after {
+                new GenericHttpFilter.Async(after(ReturnType.of(void)) {
                     events.add("after " + Thread.currentThread().name)
                     null
                 }, Executors.newCachedThreadPool(new ThreadFactory() {
@@ -592,7 +594,7 @@ class FilterRunnerSpec extends Specification {
         def resp1 = HttpResponse.ok("resp1")
         def resp2 = HttpResponse.ok("resp2")
         List<GenericHttpFilter> filters = [
-                before([Argument.of(HttpRequest<?>), Argument.of(FilterContinuation, HttpResponse)]) { request, chain ->
+                before(ReturnType.of(HttpResponse), [Argument.of(HttpRequest<?>), Argument.of(FilterContinuation, HttpResponse)]) { request, chain ->
                     assert request == req1
                     events.add("before")
                     def resp = chain.request(req2).proceed()
@@ -614,12 +616,12 @@ class FilterRunnerSpec extends Specification {
         events == ["before", "terminal", "after"]
     }
 
-    private def after(List<Argument> arguments = closure.parameterTypes.collect { Argument.of(it) }, Closure<?> closure) {
-        return new GenericHttpFilter.After<>(null, new LambdaExecutable(closure, arguments.toArray(new Argument[0])), new FilterOrder.Fixed(0))
+    private def after(ReturnType returnType, List<Argument> arguments = closure.parameterTypes.collect { Argument.of(it) }, Closure<?> closure) {
+        return FilterRunner.prepareFilterMethod(null, new LambdaExecutable(closure, arguments.toArray(new Argument[0]), returnType), true, new FilterOrder.Fixed(0))
     }
 
-    private def before(List<Argument> arguments = closure.parameterTypes.collect { Argument.of(it) }, Closure<?> closure) {
-        return new GenericHttpFilter.Before<>(null, new LambdaExecutable(closure, arguments.toArray(new Argument[0])), new FilterOrder.Fixed(0))
+    private def before(ReturnType returnType, List<Argument> arguments = closure.parameterTypes.collect { Argument.of(it) }, Closure<?> closure) {
+        return FilterRunner.prepareFilterMethod(null, new LambdaExecutable(closure, arguments.toArray(new Argument[0]), returnType), false, new FilterOrder.Fixed(0))
     }
 
     private def around(boolean legacy, Closure<Publisher<MutableHttpResponse<?>>> closure) {
@@ -634,7 +636,7 @@ class FilterRunnerSpec extends Specification {
                     new FilterOrder.Fixed(0)
             )
         } else {
-            return before([Argument.of(HttpRequest<?>), Argument.of(FilterContinuation, Publisher)]) { request, continuation ->
+            return before(ReturnType.of(Publisher, Argument.of(HttpResponse)), [Argument.of(HttpRequest<?>), Argument.of(FilterContinuation, Publisher)]) { request, continuation ->
                 closure(request, new ServerFilterChain() {
                     @Override
                     Publisher<MutableHttpResponse<?>> proceed(HttpRequest<?> r) {
@@ -663,13 +665,15 @@ class FilterRunnerSpec extends Specification {
         return CompletableFutureExecutionFlow.just(future).asComplete()
     }
 
-    private static class LambdaExecutable implements Executable<Object, Object> {
+    private static class LambdaExecutable implements ExecutableMethod<Object, Object> {
         private final Closure<?> closure
-        private final Argument<?>[] arguments;
+        private final Argument<?>[] arguments
+        private final ReturnType<?> returnType
 
-        LambdaExecutable(Closure<?> closure, Argument<?>[] arguments) {
+        LambdaExecutable(Closure<?> closure, Argument<?>[] arguments, ReturnType<?> returnType) {
             this.closure = closure
             this.arguments = arguments
+            this.returnType = returnType
         }
 
         @Override
@@ -678,8 +682,23 @@ class FilterRunnerSpec extends Specification {
         }
 
         @Override
+        String getMethodName() {
+            throw new UnsupportedOperationException()
+        }
+
+        @Override
         Argument<?>[] getArguments() {
-            return arguments;
+            return arguments
+        }
+
+        @Override
+        Method getTargetMethod() {
+            throw new UnsupportedOperationException()
+        }
+
+        @Override
+        ReturnType<Object> getReturnType() {
+            return returnType
         }
 
         @Override
