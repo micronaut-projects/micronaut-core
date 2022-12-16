@@ -180,7 +180,7 @@ open class KotlinClassElement(val kotlinType: KSType,
         staticCreators.addAll(super.getAccessibleStaticCreators())
         return staticCreators.ifEmpty {
             val companion = classDeclaration.declarations.filter {
-                it is KSClassDeclaration && it.classKind == ClassKind.OBJECT && it.simpleName.asString() == "Companion"
+                it is KSClassDeclaration && it.isCompanionObject
             }.map { it as KSClassDeclaration }
              .map { visitorContext.elementFactory.newClassElement(it, elementAnnotationMetadataFactory, false) }
              .firstOrNull()
@@ -446,8 +446,13 @@ open class KotlinClassElement(val kotlinType: KSType,
 
     override fun getSuperType(): Optional<ClassElement> {
         val superType = classDeclaration.superTypes.firstOrNull {
-            val declaration = it.resolve().declaration
-            declaration is KSClassDeclaration && declaration.classKind != ClassKind.INTERFACE
+            val resolved = it.resolve()
+            if (resolved == visitorContext.resolver.builtIns.anyType) {
+                false
+            } else {
+                val declaration = resolved.declaration
+                declaration is KSClassDeclaration && declaration.classKind != ClassKind.INTERFACE
+            }
         }
         return Optional.ofNullable(superType)
             .map {
@@ -456,7 +461,11 @@ open class KotlinClassElement(val kotlinType: KSType,
     }
 
     override fun getInterfaces(): Collection<ClassElement> {
-        return classDeclaration.superTypes.map { it.resolve() }.filter {
+        return classDeclaration.superTypes.map { it.resolve() }
+        .filter {
+            it != visitorContext.resolver.builtIns.anyType
+        }
+        .filter {
             val declaration = it.declaration
             declaration is KSClassDeclaration && declaration.classKind == ClassKind.INTERFACE
         }.map {

@@ -134,6 +134,7 @@ interface Three
             assert constructorElements[0].parameters.size() == 3
             assert classElement.superType.isPresent()
             assert classElement.superType.get().simpleName == 'Parent'
+            assert !classElement.superType.get().getSuperType().isPresent()
             assert propertyElements.size() == 7
             assert propMap.size() == 7
             assert synthPropMap.size() == 6
