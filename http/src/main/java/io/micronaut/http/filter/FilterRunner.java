@@ -104,7 +104,7 @@ public class FilterRunner {
         } else {
             flow = processFailure(request, failure);
         }
-        ImperativeExecutionFlow<? extends HttpResponse<?>> done = flow.asDone();
+        ImperativeExecutionFlow<? extends HttpResponse<?>> done = flow.asComplete();
         if (done != null) {
             failure = done.getError();
             response = done.getValue();
@@ -397,7 +397,7 @@ public class FilterRunner {
         } else {
             throw new UnsupportedOperationException("Unsupported filter return type " + returnValue.getClass().getName());
         }
-        ImperativeExecutionFlow<?> doneFlow = delayedFlow.asDone();
+        ImperativeExecutionFlow<?> doneFlow = delayedFlow.asComplete();
         if (doneFlow != null) {
             if (doneFlow.getError() != null) {
                 throw doneFlow.getError();

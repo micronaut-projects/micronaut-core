@@ -157,7 +157,7 @@ public interface ExecutionFlow<T> {
      * support this operation
      */
     @Nullable
-    ImperativeExecutionFlow<T> asDone();
+    ImperativeExecutionFlow<T> asComplete();
 
     /**
      * Converts the existing flow into the completable future.

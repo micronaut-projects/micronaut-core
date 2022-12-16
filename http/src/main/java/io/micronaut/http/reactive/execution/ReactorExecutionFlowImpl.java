@@ -115,7 +115,7 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
 
     @Nullable
     @Override
-    public ImperativeExecutionFlow<Object> asDone() {
+    public ImperativeExecutionFlow<Object> asComplete() {
         if (value instanceof Fuseable.ScalarCallable<?> callable) {
             try {
                 return (ImperativeExecutionFlow<Object>) ExecutionFlow.<Object>just(callable.call());

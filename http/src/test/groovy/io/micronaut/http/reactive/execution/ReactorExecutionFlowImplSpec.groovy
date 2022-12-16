@@ -68,7 +68,7 @@ class ReactorExecutionFlowImplSpec extends Specification {
         def flow = ReactiveExecutionFlow.fromPublisher(publisher)
 
         when:
-        def done = flow.asDone()
+        def done = flow.asComplete()
         then:
         done != null
         done.value == 'foo'
@@ -86,7 +86,7 @@ class ReactorExecutionFlowImplSpec extends Specification {
         def flow = ReactiveExecutionFlow.fromPublisher(publisher)
 
         when:
-        def done = flow.asDone()
+        def done = flow.asComplete()
         then:
         done == null
 
