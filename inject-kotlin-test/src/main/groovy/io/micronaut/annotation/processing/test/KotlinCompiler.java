@@ -45,9 +45,8 @@ import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
+import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 public class KotlinCompiler {
@@ -68,7 +67,8 @@ public class KotlinCompiler {
     }
 
     public static URLClassLoader buildClassLoader(String name, @Language("kotlin") String clazz) {
-        Pair<Pair<KotlinCompilation, KotlinCompilation.Result>, Pair<KotlinCompilation, KotlinCompilation.Result>> resultPair = compile(name, clazz, new ArrayList<>());
+        Pair<Pair<KotlinCompilation, KotlinCompilation.Result>, Pair<KotlinCompilation, KotlinCompilation.Result>> resultPair = compile(name, clazz, classElement -> {
+        });
         return toClassLoader(resultPair);
     }
 
@@ -107,7 +107,7 @@ public class KotlinCompiler {
         }
     }
 
-    public static Pair<Pair<KotlinCompilation, KotlinCompilation.Result>, Pair<KotlinCompilation, KotlinCompilation.Result>> compile(String name, @Language("kotlin") String clazz, List<ClassElement> classElements) {
+    public static Pair<Pair<KotlinCompilation, KotlinCompilation.Result>, Pair<KotlinCompilation, KotlinCompilation.Result>> compile(String name, @Language("kotlin") String clazz, Consumer<ClassElement> classElements) {
         try {
             Files.deleteIfExists(KOTLIN_COMPILATION.getWorkingDir().toPath());
         } catch (IOException e) {
@@ -120,10 +120,9 @@ public class KotlinCompiler {
         }
 
         KSP_COMPILATION.setSources(KOTLIN_COMPILATION.getSources());
-        ClassElementTypeElementSymbolProcessorProvider classElementTypeElementSymbolProcessorProvider = new ClassElementTypeElementSymbolProcessorProvider();
+        ClassElementTypeElementSymbolProcessorProvider classElementTypeElementSymbolProcessorProvider = new ClassElementTypeElementSymbolProcessorProvider(classElements);
         KspKt.setSymbolProcessorProviders(KSP_COMPILATION, Arrays.asList(classElementTypeElementSymbolProcessorProvider, new BeanDefinitionProcessorProvider()));
         KotlinCompilation.Result kspResult = KSP_COMPILATION.compile();
-        classElements.addAll(classElementTypeElementSymbolProcessorProvider.classElements);
         if (kspResult.getExitCode() != KotlinCompilation.ExitCode.OK) {
             throw new RuntimeException(kspResult.getMessages());
         }
@@ -212,7 +211,8 @@ public class KotlinCompiler {
     }
 
     public static ApplicationContext buildContext(@Language("kotlin") String clazz, boolean includeAllBeans) {
-        Pair<Pair<KotlinCompilation, KotlinCompilation.Result>, Pair<KotlinCompilation, KotlinCompilation.Result>> pair = compile("temp", clazz, new ArrayList<>());
+        Pair<Pair<KotlinCompilation, KotlinCompilation.Result>, Pair<KotlinCompilation, KotlinCompilation.Result>> pair = compile("temp", clazz, classElement -> {
+        });
         ClassLoader classLoader = toClassLoader(pair);
         return new DefaultApplicationContext(ClassPathResourceLoader.defaultLoader(classLoader),"test") {
             @Override
@@ -265,7 +265,11 @@ public class KotlinCompiler {
     }
 
     private static class ClassElementTypeElementSymbolProcessorProvider extends TypeElementSymbolProcessorProvider {
-        Set<ClassElement> classElements = new HashSet<>();
+        Consumer<ClassElement> classElements;
+
+        public ClassElementTypeElementSymbolProcessorProvider(Consumer<ClassElement> classElements) {
+            this.classElements = classElements;
+        }
 
         @NotNull
         @Override
@@ -275,7 +279,7 @@ public class KotlinCompiler {
                 @Override
                 public ClassElement newClassElement(@NotNull KotlinVisitorContext visitorContext, @NotNull KSClassDeclaration classDeclaration) {
                     ClassElement classElement = super.newClassElement(visitorContext, classDeclaration);
-                    classElements.add(classElement);
+                    classElements.accept(classElement);
                     return classElement;
                 }
             };

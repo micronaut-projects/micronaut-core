@@ -299,7 +299,7 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
         other as KotlinMethodElement
 
         if (name != other.name) return false
-        if (owningType != other.owningType) return false
+        if (declaringType != other.declaringType) return false
         if (parameters != other.parameters) return false
         if (returnType != other.returnType) return false
 
@@ -308,7 +308,7 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
 
     override fun hashCode(): Int {
         var result = 31 * name.hashCode()
-        result = 31 * result + owningType.hashCode()
+        result = 31 * result + declaringType.hashCode()
         result = 31 * result + parameters.hashCode()
         result = 31 * result + returnType.hashCode()
         return result

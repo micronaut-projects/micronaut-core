@@ -19,6 +19,7 @@ package io.micronaut.annotation.processing.test
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.Qualifier
 import io.micronaut.core.annotation.Experimental
+import io.micronaut.core.annotation.NonNull
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.naming.NameUtils
 import io.micronaut.inject.BeanDefinition
@@ -28,6 +29,7 @@ import io.micronaut.inject.ast.WildcardElement
 import org.intellij.lang.annotations.Language
 import spock.lang.Specification
 
+import java.util.function.Consumer
 import java.util.stream.Collectors
 
 class AbstractKotlinCompilerSpec extends Specification {
@@ -74,8 +76,26 @@ class AbstractKotlinCompilerSpec extends Specification {
      */
     ClassElement buildClassElement(String className, @Language("kotlin") String cls) {
         List<ClassElement> elements = []
-        KotlinCompiler.compile(className, cls, elements)
+        KotlinCompiler.compile(className, cls,  {
+            elements.add(it)
+        })
         return elements.find { it.name == className }
+    }
+
+    /**
+     * Builds a class element for the given source code.
+     * @param cls The source
+     * @return The class element
+     */
+    boolean buildClassElement(String className, @Language("kotlin") String cls, @NonNull Consumer<ClassElement> processor) {
+        boolean invoked = false
+        KotlinCompiler.compile(className, cls) {
+            if (it.name == className) {
+                processor.accept(it)
+                invoked = true
+            }
+        }
+        return true
     }
 
     Object getBean(ApplicationContext context, String className, Qualifier qualifier = null) {

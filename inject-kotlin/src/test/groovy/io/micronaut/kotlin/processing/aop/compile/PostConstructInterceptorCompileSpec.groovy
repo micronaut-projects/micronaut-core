@@ -9,7 +9,6 @@ import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class PostConstructInterceptorCompileSpec extends Specification {
 
-    @PendingFeature(reason = "annotation defaults")
     @Unroll
     void 'test post construct with around interception - proxyTarget = #proxyTarget'() {
         given:
@@ -156,7 +155,6 @@ class AnotherInterceptor: Interceptor<Any, Any> {
         proxyTarget << [true, false]
     }
 
-    @PendingFeature(reason = "annotation defaults")
     void 'test post construct & pre destroy without around interception'() {
         given:
         ApplicationContext context = buildContext("""
