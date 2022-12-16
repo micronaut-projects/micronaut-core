@@ -83,7 +83,7 @@ final class CompletableFutureExecutionFlowImpl implements CompletableFutureExecu
 
     @Nullable
     @Override
-    public ImperativeExecutionFlow<Object> asComplete() {
+    public ImperativeExecutionFlow<Object> tryComplete() {
         if (stage.isDone()) {
             try {
                 return new ImperativeExecutionFlowImpl(stage.getNow(null), null);

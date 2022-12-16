@@ -42,7 +42,7 @@ class FilterRunnerSpec extends Specification {
         ]
 
         when:
-        def result = new FilterRunner(filters).run(HttpRequest.GET("/")).asComplete().value
+        def result = new FilterRunner(filters).run(HttpRequest.GET("/")).tryComplete().value
         then:
         result.status() == HttpStatus.OK
         events == ["before", "terminal", "after"]
@@ -662,7 +662,7 @@ class FilterRunnerSpec extends Specification {
         } catch (ExecutionException e) {
             throw e.cause
         }
-        return CompletableFutureExecutionFlow.just(future).asComplete()
+        return CompletableFutureExecutionFlow.just(future).tryComplete()
     }
 
     private static class LambdaExecutable implements ExecutableMethod<Object, Object> {

@@ -123,7 +123,7 @@ public class FilterRunner {
         } else {
             flow = processFailure(request, failure);
         }
-        ImperativeExecutionFlow<? extends HttpResponse<?>> done = flow.asComplete();
+        ImperativeExecutionFlow<? extends HttpResponse<?>> done = flow.tryComplete();
         if (done != null) {
             failure = done.getError();
             response = done.getValue();
@@ -586,7 +586,7 @@ public class FilterRunner {
         @Override
         public boolean handle(FilterRunner runner, Object o, FilterContinuationImpl<?> passedOnContinuation) throws Throwable {
             ExecutionFlow<?> delayedFlow = toFlow(runner, o);
-            ImperativeExecutionFlow<?> doneFlow = delayedFlow.asComplete();
+            ImperativeExecutionFlow<?> doneFlow = delayedFlow.tryComplete();
             if (doneFlow != null) {
                 if (doneFlow.getError() != null) {
                     throw doneFlow.getError();

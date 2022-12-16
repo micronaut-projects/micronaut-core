@@ -51,7 +51,7 @@ public interface ImperativeExecutionFlow<T> extends ExecutionFlow<T> {
 
     @NonNull
     @Override
-    default ImperativeExecutionFlow<T> asComplete() {
+    default ImperativeExecutionFlow<T> tryComplete() {
         return this;
     }
 }
