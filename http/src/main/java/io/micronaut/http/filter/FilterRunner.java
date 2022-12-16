@@ -63,7 +63,7 @@ public class FilterRunner {
     private HttpRequest<?> request;
     private HttpResponse<?> response;
     private Throwable failure;
-    private SuspensionPoint<HttpResponse<?>> responseSuspensionPoint = new SuspensionPoint<>(-1, null);
+    private SuspensionPoint responseSuspensionPoint = new SuspensionPoint(-1, null);
     private int index;
     private boolean responseNeedsProcessing = false;
 
@@ -89,10 +89,26 @@ public class FilterRunner {
         OrderUtil.reverseSort(filters);
     }
 
+    /**
+     * Transform a response, e.g. by replacing an error response with an exception. Called before
+     * every filter.
+     *
+     * @param request  The current request
+     * @param response The current response
+     * @return A flow that will be passed on to the next filter
+     */
     protected ExecutionFlow<? extends HttpResponse<?>> processResponse(HttpRequest<?> request, HttpResponse<?> response) {
         return ExecutionFlow.just(response);
     }
 
+    /**
+     * Transform a failure, e.g. by replacing an exception with an error response. Called before
+     * every filter.
+     *
+     * @param request  The current request
+     * @param failure  The failure
+     * @return A flow that will be passed on to the next filter
+     */
     protected ExecutionFlow<? extends HttpResponse<?>> processFailure(HttpRequest<?> request, Throwable failure) {
         return ExecutionFlow.error(failure);
     }
@@ -119,11 +135,26 @@ public class FilterRunner {
         }
     }
 
+    /**
+     * Set the initial reactor context. This is passed on to every filter that requests a reactive
+     * type, and, if applicable, to the
+     * {@link io.micronaut.http.filter.GenericHttpFilter.TerminalWithReactorContext terminal}.
+     *
+     * @param reactorContext The reactor context, may be updated by filters
+     * @return This filter runner, for chaining
+     */
     public final FilterRunner reactorContext(Context reactorContext) {
         this.reactorContext = reactorContext;
         return this;
     }
 
+    /**
+     * Execute the filters for the given request. May only be called once
+     *
+     * @param request The request
+     * @return The flow that completes after all filters and the terminal operation, with the final
+     * response
+     */
     public final ExecutionFlow<MutableHttpResponse<?>> run(HttpRequest<?> request) {
         if (this.request != null) {
             throw new IllegalStateException("Can only process one request");
@@ -155,6 +186,7 @@ public class FilterRunner {
 
         if (filter instanceof GenericHttpFilter.Before<?> before) {
             if (executeOn == null) {
+                // possibly continue with next filter
                 return invokeBefore(before, null);
             } else {
                 executeOn.execute(() -> {
@@ -164,7 +196,6 @@ public class FilterRunner {
                 });
                 return false;
             }
-            // continue with next filter
         } else if (filter instanceof GenericHttpFilter.After<?>) {
             // skip filter, only used for response
             return true;
@@ -238,8 +269,10 @@ public class FilterRunner {
 
             index--;
 
+            // if there is a suspension point for this filter, notify the suspension point instead.
+            // we don't need to execute this filter again, it already got called for the request.
             if (responseSuspensionPoint.filterIndex == index) {
-                SuspensionPoint<HttpResponse<?>> suspensionPoint = responseSuspensionPoint;
+                SuspensionPoint suspensionPoint = responseSuspensionPoint;
                 responseSuspensionPoint = suspensionPoint.next;
                 boolean completed;
                 if (failure == null) {
@@ -294,7 +327,7 @@ public class FilterRunner {
                 this.responseSuspensionPoint = oldSuspensionPoint;
                 return true;
             }
-            SuspensionPoint<HttpResponse<?>> newSuspensionPoint = this.responseSuspensionPoint;
+            SuspensionPoint newSuspensionPoint = this.responseSuspensionPoint;
             if (newSuspensionPoint != oldSuspensionPoint) {
                 passedOnContinuation = (FilterContinuationImpl<?>) newSuspensionPoint;
                 if (completeOn != null) {
@@ -470,9 +503,9 @@ public class FilterRunner {
                     throw new IllegalStateException("Only one continuation per filter is allowed");
                 }
                 Argument<?> continuationReturnType = argument.getFirstTypeVariable().orElseThrow(() -> new IllegalStateException("Continuations must specify generic type"));
-                SuspensionPoint<HttpResponse<?>> oldSuspensionPoint = this.responseSuspensionPoint;
+                SuspensionPoint oldSuspensionPoint = this.responseSuspensionPoint;
                 int ourIndex = this.index - 1;
-                SuspensionPoint<HttpResponse<?>> newSuspensionPoint;
+                SuspensionPoint newSuspensionPoint;
                 if (Publishers.isConvertibleToPublisher(continuationReturnType.getType())) {
                     newSuspensionPoint = new ReactiveContinuationImpl<>(ourIndex, oldSuspensionPoint, continuationReturnType.getType());
                 } else if (continuationReturnType.getType().isAssignableFrom(MutableHttpResponse.class)) {
@@ -494,12 +527,28 @@ public class FilterRunner {
         return fulfilled;
     }
 
-    private static class SuspensionPoint<T> extends CompletableFuture<T> {
+    /**
+     * Some filters are called for the request <i>and</i> the response (e.g. legacy, or "around"
+     * filters), and need to carry state between the two. To achieve this, they are called once for
+     * the request, where they register a SuspensionPoint. The SuspensionPoint is then completed
+     * when the filter is reached for response processing. The filter has a listener on the
+     * SuspensionPoint and handles further processing.<br>
+     * There is also a special suspension point with filter index -1 which manages the flow
+     * returned by {@link #run(HttpRequest)}.
+     */
+    private static class SuspensionPoint extends CompletableFuture<HttpResponse<?>> {
+        /**
+         * The index of the filter this suspension point is associated with.
+         */
         final int filterIndex;
+        /**
+         * The next suspension point after this one. The invariant is that
+         * {@code this.filterIndex > next.filterIndex}.
+         */
         @Nullable
-        final SuspensionPoint<T> next;
+        final SuspensionPoint next;
 
-        SuspensionPoint(int filterIndex, @Nullable SuspensionPoint<T> next) {
+        SuspensionPoint(int filterIndex, @Nullable SuspensionPoint next) {
             this.filterIndex = filterIndex;
             this.next = next;
         }
@@ -516,7 +565,7 @@ public class FilterRunner {
      * events actually continues working the {@link FilterRunner}, any events that follow are
      * discarded (logged or throw an exception).
      */
-    private abstract class FilterContinuationImpl<R> extends SuspensionPoint<HttpResponse<?>> implements FilterContinuation<R> {
+    private abstract class FilterContinuationImpl<R> extends SuspensionPoint implements FilterContinuation<R> {
         /**
          * This flag guards <i>downstream</i> execution, i.e. the call to {@link #workRequest()}
          * that runs downstream filters. Only the thread that claims this guard may run
@@ -536,7 +585,7 @@ public class FilterRunner {
         @Nullable
         Executor completeOn = null;
 
-        FilterContinuationImpl(int filterIndex, @Nullable SuspensionPoint<HttpResponse<?>> next) {
+        FilterContinuationImpl(int filterIndex, @Nullable SuspensionPoint next) {
             super(filterIndex, next);
         }
 
@@ -601,7 +650,7 @@ public class FilterRunner {
         private Subscriber<? super HttpResponse<?>> subscriber = null;
         private boolean addedListener = false;
 
-        ReactiveContinuationImpl(int filterIndex, @Nullable SuspensionPoint<HttpResponse<?>> next, Class<R> reactiveType) {
+        ReactiveContinuationImpl(int filterIndex, @Nullable SuspensionPoint next, Class<R> reactiveType) {
             super(filterIndex, next);
             this.reactiveType = reactiveType;
         }
@@ -612,8 +661,9 @@ public class FilterRunner {
             return Publishers.convertPublisher(this, reactiveType);
         }
 
+        @SuppressWarnings("NullableProblems")
         @Override
-        public void subscribe(CoreSubscriber<? super HttpResponse<?>> subscriber) {
+        public void subscribe(@NonNull CoreSubscriber<? super HttpResponse<?>> subscriber) {
             subscribe((Subscriber<? super HttpResponse<?>>) subscriber);
         }
 
@@ -670,7 +720,7 @@ public class FilterRunner {
      * {@link HttpFilter#doFilter} return value.
      */
     private class FilterChainImpl extends ReactiveContinuationImpl<Publisher<MutableHttpResponse<?>>> implements ClientFilterChain, ServerFilterChain, CoreSubscriber<HttpResponse<?>> {
-        FilterChainImpl(int filterIndex, @Nullable SuspensionPoint<HttpResponse<?>> next) {
+        FilterChainImpl(int filterIndex, @Nullable SuspensionPoint next) {
             //noinspection unchecked,rawtypes
             super(filterIndex, next, (Class) Publisher.class);
         }
@@ -690,8 +740,9 @@ public class FilterRunner {
             return Mono.from(super.proceed(request));
         }
 
+        @SuppressWarnings("NullableProblems")
         @Override
-        public void onSubscribe(Subscription s) {
+        public void onSubscribe(@NonNull Subscription s) {
             s.request(Long.MAX_VALUE);
         }
 
@@ -712,6 +763,7 @@ public class FilterRunner {
             }
         }
 
+        @SuppressWarnings("NullableProblems")
         @NonNull
         @Override
         public Context currentContext() {
@@ -719,8 +771,11 @@ public class FilterRunner {
         }
     }
 
+    /**
+     * Implementation of {@link FilterContinuation} for blocking calls.
+     */
     private class BlockingContinuationImpl extends FilterContinuationImpl<HttpResponse<?>> {
-        BlockingContinuationImpl(int filterIndex, @Nullable SuspensionPoint<HttpResponse<?>> next) {
+        BlockingContinuationImpl(int filterIndex, @Nullable SuspensionPoint next) {
             super(filterIndex, next);
         }
 
