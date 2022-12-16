@@ -464,6 +464,16 @@ open class KotlinClassElement(val kotlinType: KSType,
         }.toList()
     }
 
+    override fun isStatic(): Boolean {
+        return if (isInner) {
+            // inner classes in Kotlin are by default static unless
+            // the 'inner' keyword is used
+            !classDeclaration.modifiers.contains(Modifier.INNER)
+        } else {
+            super<AbstractKotlinElement>.isStatic()
+        }
+    }
+
     override fun isInterface(): Boolean {
         return classDeclaration.classKind == ClassKind.INTERFACE
     }

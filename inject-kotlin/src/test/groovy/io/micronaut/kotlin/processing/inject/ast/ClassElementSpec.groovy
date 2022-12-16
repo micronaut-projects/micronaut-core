@@ -19,7 +19,7 @@ class Test(
     val publicConstructorReadOnly : String,
     private val privateConstructorReadOnly : String,
     protected val protectedConstructorReadOnly : Boolean
-) : Parent() {
+) : Parent(), One, Two {
 
     val publicReadOnlyProp : Boolean = true
     protected val protectedReadOnlyProp : Boolean? = true
@@ -27,6 +27,7 @@ class Test(
     var publicReadWriteProp : Boolean = true
     protected var protectedReadWriteProp : String? = "ok"
     private var privateReadWriteProp : String = "ok"
+    private var conventionProp : String = "ok"
 
     private fun privateFunc(name : String) : String {
         return "ok"
@@ -47,9 +48,32 @@ class Test(
     suspend fun suspendFunc(name : String) : String {
         return "ok"
     }
+
+    fun getConventionProp() : String {
+        return conventionProp
+    }
+
+    fun setConventionProp(name : String) {
+        this.conventionProp = name
+    }
+
+
+    companion object Helper {
+        fun publicStatic() : String {
+            return "ok"
+        }
+
+        private fun privateStatic() : String {
+            return "ok"
+        }
+    }
+
+    inner class InnerClass1
+
+    class InnerClass2
 }
 
-open class Parent {
+open class Parent : Three {
     open fun publicFunc(name : String) : String {
         return "ok"
     }
@@ -57,9 +81,21 @@ open class Parent {
     fun parentFunc() : Boolean {
         return true
     }
+
+    companion object ParentHelper {
+        fun publicStatic() : String {
+            return "ok"
+        }
+    }
 }
+
+interface One
+interface Two
+interface Three
 ''') { ClassElement classElement ->
             List<ConstructorElement> constructorElements = classElement.getEnclosedElements(ElementQuery.CONSTRUCTORS)
+            List<ClassElement> allInnerClasses = classElement.getEnclosedElements(ElementQuery.ALL_INNER_CLASSES)
+            List<ClassElement> declaredInnerClasses = classElement.getEnclosedElements(ElementQuery.ALL_INNER_CLASSES.onlyDeclared())
             List<PropertyElement> propertyElements = classElement.getBeanProperties()
             List<PropertyElement> syntheticProperties = classElement.getSyntheticBeanProperties()
             List<MethodElement> methodElements = classElement.getEnclosedElements(ElementQuery.ALL_METHODS)
@@ -74,10 +110,20 @@ open class Parent {
             Map<String, PropertyElement> propMap = propertyElements.collectEntries {
                 [it.name, it]
             }
+            Map<String, PropertyElement> synthPropMap = syntheticProperties.collectEntries {
+                [it.name, it]
+            }
+            Map<String, ClassElement> declaredInnerMap = declaredInnerClasses.collectEntries {
+                [it.simpleName, it]
+            }
+            Map<String, ClassElement> innerMap = allInnerClasses.collectEntries {
+                [it.simpleName, it]
+            }
 
             def overridden = includeOverridden.find { it.declaringType.simpleName == 'Parent' && it.name == 'publicFunc' }
 
             assert classElement != null
+            assert classElement.interfaces*.simpleName as Set == ['One', "Two"] as Set
             assert methodElements != null
             assert !classElement.isAbstract()
             assert classElement.name == 'ast.test.Test'
@@ -88,12 +134,22 @@ open class Parent {
             assert constructorElements[0].parameters.size() == 3
             assert classElement.superType.isPresent()
             assert classElement.superType.get().simpleName == 'Parent'
-            assert propertyElements.size() == 6
-            assert propMap.size() == 6
-            assert methodElements.size() == 6
-            assert includeOverridden.size() == 7
-            assert declaredMethodElements.size() == 5
-            assert propMap.keySet() == ['publicReadOnlyProp', 'protectedReadOnlyProp', 'publicReadWriteProp', 'protectedReadWriteProp', 'publicConstructorReadOnly', 'protectedConstructorReadOnly'] as Set
+            assert propertyElements.size() == 7
+            assert propMap.size() == 7
+            assert synthPropMap.size() == 6
+            assert methodElements.size() == 8
+            assert includeOverridden.size() == 9
+            assert declaredMethodElements.size() == 7
+            assert propMap.keySet() == ['conventionProp', 'publicReadOnlyProp', 'protectedReadOnlyProp', 'publicReadWriteProp', 'protectedReadWriteProp', 'publicConstructorReadOnly', 'protectedConstructorReadOnly'] as Set
+            assert synthPropMap.keySet() == ['publicReadOnlyProp', 'protectedReadOnlyProp', 'publicReadWriteProp', 'protectedReadWriteProp', 'publicConstructorReadOnly', 'protectedConstructorReadOnly'] as Set
+            // inner classes
+            assert allInnerClasses.size() == 4
+            assert declaredInnerClasses.size() == 3
+            assert !declaredInnerMap['Test$InnerClass1'].isStatic()
+            assert declaredInnerMap['Test$InnerClass2'].isStatic()
+            assert declaredInnerMap['Test$InnerClass1'].isPublic()
+            assert declaredInnerMap['Test$InnerClass2'].isPublic()
+
             // read-only public
             assert propMap['publicReadOnlyProp'].isReadOnly()
             assert !propMap['publicReadOnlyProp'].isWriteOnly()
@@ -109,9 +165,18 @@ open class Parent {
             assert propMap['publicReadWriteProp'].readMethod.get().isSynthetic()
             assert propMap['publicReadWriteProp'].writeMethod.isPresent()
             assert propMap['publicReadWriteProp'].writeMethod.get().isSynthetic()
+            // convention prop
+            assert !propMap['conventionProp'].isReadOnly()
+            assert !propMap['conventionProp'].isWriteOnly()
+            assert propMap['conventionProp'].isPublic()
+            assert propMap['conventionProp'].readMethod.isPresent()
+            assert !propMap['conventionProp'].readMethod.get().isSynthetic()
+            assert propMap['conventionProp'].writeMethod.isPresent()
+            assert !propMap['conventionProp'].writeMethod.get().isSynthetic()
+
             // methods
-            assert methodMap.keySet() == ['publicFunc',  'parentFunc', 'openFunc', 'privateFunc', 'protectedFunc', 'suspendFunc'] as Set
-            assert declaredMethodMap.keySet()  == ['publicFunc', 'openFunc', 'privateFunc', 'protectedFunc', 'suspendFunc'] as Set
+            assert methodMap.keySet() == ['publicFunc',  'parentFunc', 'openFunc', 'privateFunc', 'protectedFunc', 'suspendFunc', 'getConventionProp', 'setConventionProp'] as Set
+            assert declaredMethodMap.keySet()  == ['publicFunc', 'openFunc', 'privateFunc', 'protectedFunc', 'suspendFunc', 'getConventionProp', 'setConventionProp'] as Set
             assert methodMap['suspendFunc'].isSuspend()
             assert !methodMap['openFunc'].isFinal()
             assert !methodMap['publicFunc'].isPackagePrivate()
