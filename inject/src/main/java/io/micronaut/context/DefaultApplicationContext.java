@@ -423,7 +423,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                                                                 BeanDefinition<T> candidate,
                                                                 Set<BeanDefinition<T>> transformedCandidates) {
         try {
-            final String prefix = candidate.stringValue(ConfigurationReader.class, "prefix").orElse(null);
+            final String prefix = candidate.stringValue(ConfigurationReader.class, ConfigurationReader.PREFIX).orElse(null);
             ConfigurationPath configurationPath = resolutionContext.getConfigurationPath();
             if (prefix != null) {
 

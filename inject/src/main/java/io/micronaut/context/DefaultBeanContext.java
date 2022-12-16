@@ -1045,26 +1045,32 @@ public class DefaultBeanContext implements InitializableBeanContext {
         Objects.requireNonNull(instance, "Instance cannot be null");
 
         Collection<BeanDefinition> candidates = findBeanCandidatesForInstance(instance);
+        BeanDefinition<T> beanDefinition;
         if (candidates.size() == 1) {
-            BeanDefinition<T> beanDefinition = candidates.iterator().next();
+            beanDefinition = candidates.iterator().next();
+        } else if (!candidates.isEmpty()) {
+            Argument t = Argument.of(instance.getClass());
+            beanDefinition = lastChanceResolve(t, null, true, (Collection) candidates);
+        } else {
+            beanDefinition = null;
+        }
+
+        if (beanDefinition != null && !(beanDefinition instanceof RuntimeBeanDefinition<T>)) {
             try (BeanResolutionContext resolutionContext = newResolutionContext(beanDefinition, null)) {
                 final BeanKey<T> beanKey = new BeanKey<>(beanDefinition.getBeanType(), null);
                 resolutionContext.addInFlightBean(
-                        beanKey,
-                        new BeanRegistration<>(beanKey, beanDefinition, instance)
+                    beanKey,
+                    new BeanRegistration<>(beanKey, beanDefinition, instance)
                 );
                 doInject(
-                        resolutionContext,
-                        instance,
-                        beanDefinition
+                    resolutionContext,
+                    instance,
+                    beanDefinition
                 );
             }
-
-        } else if (!candidates.isEmpty()) {
-            final Iterator iterator = candidates.iterator();
-            throw new NonUniqueBeanException(instance.getClass(), iterator);
         }
         return instance;
+
     }
 
     @NonNull
