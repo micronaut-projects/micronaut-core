@@ -50,12 +50,12 @@ public class ConvertibleMultiValuesSerializer extends JsonSerializer<Convertible
             if (len > 0) {
                 gen.writeFieldName(fieldName);
                 if (len == 1) {
-                    gen.writeObject(v.get(0));
+                    serializers.defaultSerializeValue(v.get(0), gen);
                 } else {
                     gen.writeStartArray();
 
                     for (Object o : v) {
-                        gen.writeObject(o);
+                        serializers.defaultSerializeValue(o, gen);
                     }
                     gen.writeEndArray();
                 }

@@ -26,6 +26,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -142,6 +143,23 @@ public class ConvertibleMultiValuesMap<V> implements ConvertibleMultiValues<V>, 
      */
     protected Map<CharSequence, List<V>> wrapValues(Map<CharSequence, List<V>> values) {
         return Collections.unmodifiableMap(values);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        ConvertibleMultiValuesMap<?> that = (ConvertibleMultiValuesMap<?>) o;
+        return values.equals(that.values);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(values);
     }
 
     @Override
