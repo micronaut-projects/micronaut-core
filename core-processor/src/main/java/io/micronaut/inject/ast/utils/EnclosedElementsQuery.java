@@ -189,7 +189,7 @@ public abstract class EnclosedElementsQuery<C, N> {
             Set<io.micronaut.inject.ast.Element> addedFromClassElements = new LinkedHashSet<>();
             classElements:
             for (N element : classElements) {
-                io.micronaut.inject.ast.Element newElement = elementsCache.computeIfAbsent(element, this::toAstElement);
+                io.micronaut.inject.ast.Element newElement = elementsCache.computeIfAbsent(getCacheKey(element), this::toAstElement);
                 for (Iterator<io.micronaut.inject.ast.Element> iterator = elements.iterator(); iterator.hasNext(); ) {
                     io.micronaut.inject.ast.Element existingElement = iterator.next();
                     if (newElement.equals(existingElement)) {
@@ -207,6 +207,15 @@ public abstract class EnclosedElementsQuery<C, N> {
             elements.addAll(addedFromClassElements);
         }
         return elements;
+    }
+
+    /**
+     * get the cache key.
+     * @param element The element
+     * @return The cache key
+     */
+    protected N getCacheKey(N element) {
+        return element;
     }
 
     private void collectHierarchy(C classNode,

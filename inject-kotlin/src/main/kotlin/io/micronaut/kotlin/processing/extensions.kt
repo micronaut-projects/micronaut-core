@@ -19,6 +19,9 @@ import com.google.devtools.ksp.KspExperimental
 import com.google.devtools.ksp.getJavaClassByName
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.symbol.*
+import io.micronaut.inject.ast.Element
+import io.micronaut.kotlin.processing.visitor.AbstractKotlinElement
+import io.micronaut.kotlin.processing.visitor.KSAnnotatedReference
 import io.micronaut.kotlin.processing.visitor.KSFunctionReference
 import io.micronaut.kotlin.processing.visitor.KotlinVisitorContext
 import java.lang.StringBuilder
@@ -38,6 +41,22 @@ fun KSDeclaration.getBinaryName(resolver: Resolver): String {
         }
         hierarchy.joinTo(className, "$", ".")
         className.toString()
+    }
+}
+
+fun KSNode.unwrap() : KSNode {
+    return if (this is KSAnnotatedReference) {
+        this.node
+    } else {
+        this
+    }
+}
+
+fun Element.kspNode() : Any {
+    return if (this is AbstractKotlinElement<*>) {
+        this.nativeType.unwrap()
+    } else {
+        this.nativeType
     }
 }
 

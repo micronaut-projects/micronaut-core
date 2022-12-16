@@ -32,6 +32,7 @@ import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 import io.micronaut.inject.ast.annotation.ElementMutableAnnotationMetadataDelegate
 import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate
 import io.micronaut.kotlin.processing.getBinaryName
+import io.micronaut.kotlin.processing.unwrap
 import java.util.*
 import java.util.function.Consumer
 import java.util.function.Predicate
@@ -133,8 +134,9 @@ abstract class AbstractKotlinElement<T : KSNode>(protected val declaration: T,
 
     @OptIn(KspExperimental::class)
     override fun getModifiers(): MutableSet<ElementModifier> {
-        if (declaration is KSDeclaration) {
-            val javaModifiers = visitorContext.resolver.effectiveJavaModifiers(declaration)
+        val dec = declaration.unwrap()
+        if (dec is KSDeclaration) {
+            val javaModifiers = visitorContext.resolver.effectiveJavaModifiers(dec)
             return javaModifiers.mapNotNull {
                 when (it) {
                     Modifier.FINAL -> ElementModifier.FINAL
@@ -265,13 +267,13 @@ abstract class AbstractKotlinElement<T : KSNode>(protected val declaration: T,
 
         other as AbstractKotlinElement<*>
 
-        if (declaration != other.declaration) return false
+        if (nativeType != other.nativeType) return false
 
         return true
     }
 
     override fun hashCode(): Int {
-        return declaration.hashCode()
+        return nativeType.hashCode()
     }
 
 

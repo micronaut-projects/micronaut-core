@@ -25,7 +25,6 @@ import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
 import io.micronaut.inject.ast.*
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate
-import io.micronaut.kotlin.processing.getBinaryName
 import java.util.*
 import java.util.function.Consumer
 import java.util.function.Predicate
@@ -45,7 +44,7 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
                 type: ClassElement,
                 property: KSPropertyDeclaration,
                 elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
-                visitorContext: KotlinVisitorContext) : super(KSPropertyReference(property, visitorContext), elementAnnotationMetadataFactory, visitorContext) {
+                visitorContext: KotlinVisitorContext) : super(KSPropertyReference(property), elementAnnotationMetadataFactory, visitorContext) {
         this.name = property.simpleName.asString()
         this.type = type
         this.classElement = classElement
@@ -471,23 +470,4 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
         return type is KotlinClassElement && type.kotlinType.isMarkedNullable
     }
 
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (javaClass != other?.javaClass) return false
-
-        other as KotlinPropertyElement
-
-        if (name != other.name) return false
-        if (classElement != other.classElement) return false
-        if (type != other.type) return false
-
-        return true
-    }
-
-    override fun hashCode(): Int {
-        var result = 31 + name.hashCode()
-        result = 31 * result + classElement.hashCode()
-        result = 31 * result + type.hashCode()
-        return result
-    }
 }

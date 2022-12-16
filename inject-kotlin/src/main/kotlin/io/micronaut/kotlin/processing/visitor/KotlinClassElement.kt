@@ -57,6 +57,7 @@ open class KotlinClassElement(val kotlinType: KSType,
         typeVariable: Boolean = false
     ) : this(type, type.declaration as KSClassDeclaration, type.declaration as KSClassDeclaration, elementAnnotationMetadataFactory, visitorContext, arrayDimensions, typeVariable)
 
+
     val outerType: KSType? by lazy {
         val outerDecl = classDeclaration.parentDeclaration as? KSClassDeclaration
         outerDecl?.asType(kotlinType.arguments.subList(classDeclaration.typeParameters.size, kotlinType.arguments.size))
@@ -94,6 +95,10 @@ open class KotlinClassElement(val kotlinType: KSType,
     private var overrideBoundGenericTypes: MutableList<out ClassElement>? = null
     private var resolvedTypeArguments : MutableMap<String, ClassElement>? = null
 
+    private val nt : KSAnnotated =  if (annotationInfo is KSTypeArgument) annotationInfo else KSClassReference(classDeclaration)
+    override fun getNativeType(): KSAnnotated {
+        return nt
+    }
 
     companion object Helper {
         fun getType(ref: KSAnnotated, visitorContext: KotlinVisitorContext) : KSType {
@@ -661,6 +666,18 @@ open class KotlinClassElement(val kotlinType: KSType,
             return emptySet()
         }
 
+        override fun getCacheKey(element: KSNode): KSNode {
+            return when(element) {
+                is KSFunctionDeclaration -> KSFunctionReference(element)
+                is KSPropertyDeclaration -> KSPropertyReference(element)
+                is KSClassDeclaration -> KSClassReference(element)
+                is KSValueParameter -> KSValueParameterReference(element)
+                is KSPropertyGetter -> KSPropertyGetterReference(element)
+                is KSPropertySetter -> KSPropertySetterReference(element)
+                else -> element
+            }
+        }
+
         override fun getSuperClass(classNode: KSClassDeclaration): KSClassDeclaration? {
             val superTypes = classNode.superTypes
             for (superclass in superTypes) {
@@ -760,19 +777,23 @@ open class KotlinClassElement(val kotlinType: KSType,
         }
 
         override fun toAstElement(enclosedElement: KSNode): Element {
+            var ee = enclosedElement
+            if (ee is KSAnnotatedReference) {
+                ee = ee.node
+            }
             val elementFactory: KotlinElementFactory = visitorContext.elementFactory
-            return when (enclosedElement) {
+            return when (ee) {
                 is KSFunctionDeclaration -> {
-                    if (enclosedElement.isConstructor()) {
+                    if (ee.isConstructor()) {
                         return elementFactory.newConstructorElement(
                             this@KotlinClassElement,
-                            enclosedElement,
+                            ee,
                             elementAnnotationMetadataFactory
                         )
                     } else {
                         return elementFactory.newMethodElement(
                             this@KotlinClassElement,
-                            enclosedElement,
+                            ee,
                             elementAnnotationMetadataFactory
                         )
                     }
@@ -781,23 +802,23 @@ open class KotlinClassElement(val kotlinType: KSType,
                 is KSPropertyDeclaration -> {
                     return elementFactory.newFieldElement(
                         this@KotlinClassElement,
-                        enclosedElement,
+                        ee,
                         elementAnnotationMetadataFactory
                     )
                 }
 
                 is KSType -> elementFactory.newClassElement(
-                    enclosedElement,
+                    ee,
                     elementAnnotationMetadataFactory
                 )
 
                 is KSClassDeclaration -> elementFactory.newClassElement(
-                    enclosedElement,
+                    ee,
                     elementAnnotationMetadataFactory,
                     false
                 )
 
-                else -> throw ProcessingException(this@KotlinClassElement, "Unknown element: $enclosedElement")
+                else -> throw ProcessingException(this@KotlinClassElement, "Unknown element: $ee")
             }
         }
     }

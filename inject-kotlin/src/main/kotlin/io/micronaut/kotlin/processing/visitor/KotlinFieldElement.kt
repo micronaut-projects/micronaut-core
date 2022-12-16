@@ -26,7 +26,7 @@ class KotlinFieldElement(declaration: KSPropertyDeclaration,
                          private val declaringType: ClassElement,
                          elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
                          visitorContext: KotlinVisitorContext
-) : AbstractKotlinElement<KSPropertyDeclaration>(KSPropertyReference(declaration, visitorContext), elementAnnotationMetadataFactory, visitorContext), FieldElement {
+) : AbstractKotlinElement<KSPropertyDeclaration>(KSPropertyReference(declaration), elementAnnotationMetadataFactory, visitorContext), FieldElement {
 
     private val internalName = declaration.simpleName.asString()
     private val internalType : ClassElement by lazy {

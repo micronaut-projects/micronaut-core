@@ -28,7 +28,7 @@ class KotlinParameterElement(
     private val parameter: KSValueParameter,
     elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
     visitorContext: KotlinVisitorContext
-) : AbstractKotlinElement<KSValueParameter>(KSValueParameterReference(parameter, visitorContext), elementAnnotationMetadataFactory, visitorContext), ParameterElement {
+) : AbstractKotlinElement<KSValueParameter>(KSValueParameterReference(parameter), elementAnnotationMetadataFactory, visitorContext), ParameterElement {
     private val internalName : String by lazy {
         parameter.name!!.asString()
     }

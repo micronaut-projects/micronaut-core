@@ -2384,6 +2384,13 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         public int hashCode() {
             return hashCode;
         }
+
+        @Override
+        public String toString() {
+            return "MetadataKey{" +
+                "elements=" + Arrays.toString(elements) +
+                '}';
+        }
     }
 
     private interface TriConsumer<T, U, V> {
