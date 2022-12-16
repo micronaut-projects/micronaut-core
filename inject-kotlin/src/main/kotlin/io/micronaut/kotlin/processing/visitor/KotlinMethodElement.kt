@@ -55,7 +55,7 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
                 owningType: ClassElement,
                 elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
                 visitorContext: KotlinVisitorContext
-    ) : super(method, elementAnnotationMetadataFactory, visitorContext) {
+    ) : super(KSPropertySetterReference(method, visitorContext), elementAnnotationMetadataFactory, visitorContext) {
         this.name = visitorContext.resolver.getJvmName(method)!!
         this.owningType = owningType
         this.returnType = PrimitiveElement.VOID
@@ -75,7 +75,7 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
                 returnType: ClassElement,
                 elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
                 visitorContext: KotlinVisitorContext,
-    ) : super(method, elementAnnotationMetadataFactory, visitorContext) {
+    ) : super(KSPropertyGetterReference(method, visitorContext), elementAnnotationMetadataFactory, visitorContext) {
         this.name = visitorContext.resolver.getJvmName(method)!!
         this.owningType = owningType
         this.parameters = emptyList()
@@ -92,7 +92,7 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
                 returnType: ClassElement,
                 elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
                 visitorContext: KotlinVisitorContext
-    ) : super(method, elementAnnotationMetadataFactory, visitorContext) {
+    ) : super(KSFunctionReference(method, visitorContext), elementAnnotationMetadataFactory, visitorContext) {
         this.name = visitorContext.resolver.getJvmName(method)!!
         this.owningType = owningType
         this.parameters = method.parameters.map {

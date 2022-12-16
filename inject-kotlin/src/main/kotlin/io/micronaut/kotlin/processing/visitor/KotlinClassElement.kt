@@ -27,6 +27,7 @@ import io.micronaut.inject.ast.utils.AstBeanPropertiesUtils
 import io.micronaut.inject.ast.utils.EnclosedElementsQuery
 import io.micronaut.inject.processing.ProcessingException
 import io.micronaut.kotlin.processing.getBinaryName
+import io.micronaut.kotlin.processing.getClassDeclaration
 import java.util.*
 import java.util.function.Function
 import java.util.stream.Stream
@@ -46,7 +47,7 @@ open class KotlinClassElement(val kotlinType: KSType,
         visitorContext: KotlinVisitorContext,
         arrayDimensions: Int = 0,
         typeVariable: Boolean = false
-    ) : this(getType(ref, visitorContext), getDeclaration(ref, visitorContext), ref, elementAnnotationMetadataFactory, visitorContext, arrayDimensions, typeVariable)
+    ) : this(getType(ref, visitorContext), ref.getClassDeclaration(visitorContext), ref, elementAnnotationMetadataFactory, visitorContext, arrayDimensions, typeVariable)
 
     constructor(
         type: KSType,
@@ -118,36 +119,8 @@ open class KotlinClassElement(val kotlinType: KSType,
             }
         }
 
-        fun getDeclaration(ref: KSAnnotated, visitorContext: KotlinVisitorContext) : KSClassDeclaration {
-            if (ref is KSType) {
-                return ref.declaration as KSClassDeclaration
-            } else if (ref is KSTypeReference) {
-                return resolveDeclaration(ref.resolve().declaration, visitorContext)
-            } else if (ref is KSTypeParameter) {
-                return resolveDeclaration(ref.bounds.firstOrNull()?.resolve()?.declaration, visitorContext)
-            } else if (ref is KSClassDeclaration) {
-                return ref
-            } else if (ref is KSTypeArgument) {
-                return resolveDeclaration(ref.type?.resolve()?.declaration, visitorContext)
-            } else if (ref is KSTypeAlias) {
-                val declaration = ref.type.resolve().declaration
-                return resolveDeclaration(declaration, visitorContext)
-            } else {
-                throw IllegalArgumentException("Not a type $ref")
-            }
-        }
 
-        @OptIn(KspExperimental::class)
-        private fun resolveDeclaration(
-            declaration: KSDeclaration?,
-            visitorContext: KotlinVisitorContext
-        ): KSClassDeclaration {
-            return if (declaration is KSClassDeclaration) {
-                declaration
-            } else {
-                visitorContext.resolver.getJavaClassByName(Object::class.java.name)!!
-            }
-        }
+
     }
 
     @OptIn(KspExperimental::class)

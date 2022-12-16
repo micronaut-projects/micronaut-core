@@ -45,7 +45,7 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
                 type: ClassElement,
                 property: KSPropertyDeclaration,
                 elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
-                visitorContext: KotlinVisitorContext) : super(property, elementAnnotationMetadataFactory, visitorContext) {
+                visitorContext: KotlinVisitorContext) : super(KSPropertyReference(property, visitorContext), elementAnnotationMetadataFactory, visitorContext) {
         this.name = property.simpleName.asString()
         this.type = type
         this.classElement = classElement

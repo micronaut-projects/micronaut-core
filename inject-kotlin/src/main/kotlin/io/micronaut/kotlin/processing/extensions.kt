@@ -16,8 +16,11 @@
 package io.micronaut.kotlin.processing
 
 import com.google.devtools.ksp.KspExperimental
+import com.google.devtools.ksp.getJavaClassByName
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.symbol.*
+import io.micronaut.kotlin.processing.visitor.KSFunctionReference
+import io.micronaut.kotlin.processing.visitor.KotlinVisitorContext
 import java.lang.StringBuilder
 
 @OptIn(KspExperimental::class)
@@ -58,5 +61,48 @@ fun KSPropertySetter.getVisibility(): Visibility {
         this.modifiers.contains(Modifier.INTERNAL) -> Visibility.INTERNAL
         else -> if (this.origin != Origin.JAVA && this.origin != Origin.JAVA_LIB)
             Visibility.PUBLIC else Visibility.JAVA_PACKAGE
+    }
+}
+
+@OptIn(KspExperimental::class)
+fun KSAnnotated.getClassDeclaration(visitorContext: KotlinVisitorContext) : KSClassDeclaration {
+    when (this) {
+        is KSType -> {
+            return this.declaration.getClassDeclaration(visitorContext)
+        }
+        is KSClassDeclaration -> {
+            return this
+        }
+        is KSTypeReference -> {
+            return this.resolve().declaration.getClassDeclaration(visitorContext)
+        }
+        is KSTypeParameter -> {
+            return resolveDeclaration(
+                this.bounds.firstOrNull()?.resolve()?.declaration,
+                visitorContext
+            )
+        }
+        is KSTypeArgument -> {
+            return resolveDeclaration(this.type?.resolve()?.declaration, visitorContext)
+        }
+        is KSTypeAlias -> {
+            val declaration = this.type.resolve().declaration
+            return declaration.getClassDeclaration(visitorContext)
+        }
+        else -> {
+            return visitorContext.resolver.getJavaClassByName(Object::class.java.name)!!
+        }
+    }
+}
+
+@OptIn(KspExperimental::class)
+private fun resolveDeclaration(
+    declaration: KSDeclaration?,
+    visitorContext: KotlinVisitorContext
+): KSClassDeclaration {
+    return if (declaration is KSClassDeclaration) {
+        declaration
+    } else {
+        visitorContext.resolver.getJavaClassByName(Object::class.java.name)!!
     }
 }

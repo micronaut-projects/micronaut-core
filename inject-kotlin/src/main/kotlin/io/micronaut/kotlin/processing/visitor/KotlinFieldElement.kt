@@ -26,7 +26,7 @@ class KotlinFieldElement(declaration: KSPropertyDeclaration,
                          private val declaringType: ClassElement,
                          elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
                          visitorContext: KotlinVisitorContext
-) : AbstractKotlinElement<KSPropertyDeclaration>(declaration, elementAnnotationMetadataFactory, visitorContext), FieldElement {
+) : AbstractKotlinElement<KSPropertyDeclaration>(KSPropertyReference(declaration, visitorContext), elementAnnotationMetadataFactory, visitorContext), FieldElement {
 
     private val internalName = declaration.simpleName.asString()
     private val internalType : ClassElement by lazy {
@@ -79,25 +79,5 @@ class KotlinFieldElement(declaration: KSPropertyDeclaration,
 
     override fun getModifiers(): MutableSet<ElementModifier> {
         return super<AbstractKotlinElement>.getModifiers()
-    }
-
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (javaClass != other?.javaClass) return false
-
-        other as KotlinFieldElement
-
-        if (declaringType != other.declaringType) return false
-        if (internalName != other.internalName) return false
-        if (internalType != other.internalType) return false
-
-        return true
-    }
-
-    override fun hashCode(): Int {
-        var result = 31 + declaringType.hashCode()
-        result = 31 * result + internalName.hashCode()
-        result = 31 * result + internalType.hashCode()
-        return result
     }
 }

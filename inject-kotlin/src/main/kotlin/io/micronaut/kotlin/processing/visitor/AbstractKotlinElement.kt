@@ -258,4 +258,21 @@ abstract class AbstractKotlinElement<T : KSNode>(protected val declaration: T,
     override fun toString(): String {
         return getDescription(false)
     }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+
+        other as AbstractKotlinElement<*>
+
+        if (declaration != other.declaration) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        return declaration.hashCode()
+    }
+
+
 }
