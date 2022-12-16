@@ -21,9 +21,6 @@ jobs:
       matrix:
         java: ['17']
         graalvm: ['latest', 'dev']
-        include:
-          - graalvm: 'latest'
-            java: '11'
     steps:
        # https://github.com/actions/virtual-environments/issues/709
       - name: Free disk space
@@ -45,7 +42,10 @@ jobs:
           version: ${{ matrix.graalvm }}
           java-version: ${{ matrix.java }}
           components: 'native-image'
+      - name: Setup Gradle
+        uses: gradle/gradle-build-action@v2.3.3
       - name: Build with Gradle
+        id: gradle
         run: |
           if ./gradlew tasks --no-daemon --all | grep -w "testNativeImage"
           then
@@ -59,9 +59,21 @@ jobs:
            GRADLE_ENTERPRISE_CACHE_USERNAME: ${{ secrets.GRADLE_ENTERPRISE_CACHE_USERNAME }}
            GRADLE_ENTERPRISE_CACHE_PASSWORD: ${{ secrets.GRADLE_ENTERPRISE_CACHE_PASSWORD }}
            PREDICTIVE_TEST_SELECTION: "${{ github.event_name == 'pull_request' && 'true' || 'false' }}"
+      - name: Add build scan URL as PR comment
+        uses: actions/github-script@v5
+        if: github.event_name == 'pull_request' && failure()
+        with:
+          github-token: ${{secrets.GITHUB_TOKEN}}
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '❌ ${{ github.workflow }} ${{ matrix.java }} ${{ matrix.graalvm }} failed: ${{ steps.gradle.outputs.build-scan-url }}'
+            })
       - name: Publish Test Report
         if: always()
-        uses: mikepenz/action-junit-report@v3.5.2
+        uses: mikepenz/action-junit-report@v3.6.2
         with:
           check_name: GraalVM CE CI / Test Report (Java ${{ matrix.java }})
           report_paths: '**/build/test-results/test/TEST-*.xml'
