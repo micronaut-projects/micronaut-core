@@ -89,21 +89,17 @@ public final class ConfigurationUtils {
             if (prefixOptional.isEmpty()) {
                 prefix = basePrefixOptional.get();
             } else {
-                prefix = prefixOptional.map(p -> basePrefixOptional.get() + "." + p).orElse(null);
+                prefix = prefixOptional.map(p -> basePrefixOptional.get() + "." + p).orElse("");
             }
         } else {
-            prefix = prefixOptional.orElse(null);
+            prefix = prefixOptional.orElse("");
         }
         if (annotationMetadata.hasDeclaredAnnotation(EachProperty.class)) {
-            Objects.requireNonNull(prefix);
             if (annotationMetadata.booleanValue(EachProperty.class, "list").orElse(false)) {
                 return prefix + "[*]";
             } else {
                 return prefix + ".*";
             }
-        }
-        if (prefix == null) {
-            return "";
         }
         return prefix;
     }

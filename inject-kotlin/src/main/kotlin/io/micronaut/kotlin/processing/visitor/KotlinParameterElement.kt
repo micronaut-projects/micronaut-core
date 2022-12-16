@@ -28,7 +28,7 @@ class KotlinParameterElement(
     private val parameter: KSValueParameter,
     elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
     visitorContext: KotlinVisitorContext
-) : AbstractKotlinElement<KSValueParameter>(parameter, elementAnnotationMetadataFactory, visitorContext), ParameterElement {
+) : AbstractKotlinElement<KSValueParameter>(KSValueParameterReference(parameter), elementAnnotationMetadataFactory, visitorContext), ParameterElement {
     private val internalName : String by lazy {
         parameter.name!!.asString()
     }
@@ -68,23 +68,5 @@ class KotlinParameterElement(
     override fun getGenericType(): ClassElement = type
 
     override fun getArrayDimensions(): Int = parameterType.arrayDimensions
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (javaClass != other?.javaClass) return false
-
-        other as KotlinParameterElement
-
-        if (parameterType != other.parameterType) return false
-        if (internalName != other.internalName) return false
-
-        return true
-    }
-
-    override fun hashCode(): Int {
-        var result = 31 * parameterType.hashCode()
-        result = 31 * result + internalName.hashCode()
-        return result
-    }
-
 
 }

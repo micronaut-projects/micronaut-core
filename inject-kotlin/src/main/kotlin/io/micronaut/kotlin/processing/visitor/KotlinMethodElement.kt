@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.inject.ast.*
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 import io.micronaut.kotlin.processing.getVisibility
+import io.micronaut.kotlin.processing.kspNode
 import java.util.*
 
 @OptIn(KspExperimental::class)
@@ -55,7 +56,7 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
                 owningType: ClassElement,
                 elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
                 visitorContext: KotlinVisitorContext
-    ) : super(method, elementAnnotationMetadataFactory, visitorContext) {
+    ) : super(KSPropertySetterReference(method), elementAnnotationMetadataFactory, visitorContext) {
         this.name = visitorContext.resolver.getJvmName(method)!!
         this.owningType = owningType
         this.returnType = PrimitiveElement.VOID
@@ -75,7 +76,7 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
                 returnType: ClassElement,
                 elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
                 visitorContext: KotlinVisitorContext,
-    ) : super(method, elementAnnotationMetadataFactory, visitorContext) {
+    ) : super(KSPropertyGetterReference(method), elementAnnotationMetadataFactory, visitorContext) {
         this.name = visitorContext.resolver.getJvmName(method)!!
         this.owningType = owningType
         this.parameters = emptyList()
@@ -92,7 +93,7 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
                 returnType: ClassElement,
                 elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
                 visitorContext: KotlinVisitorContext
-    ) : super(method, elementAnnotationMetadataFactory, visitorContext) {
+    ) : super(KSFunctionReference(method), elementAnnotationMetadataFactory, visitorContext) {
         this.name = visitorContext.resolver.getJvmName(method)!!
         this.owningType = owningType
         this.parameters = method.parameters.map {
@@ -168,7 +169,7 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
     }
 
     override fun getDeclaredTypeVariables(): MutableList<out GenericPlaceholderElement> {
-        val nativeType = nativeType
+        val nativeType = kspNode()
         return if (nativeType is KSDeclaration) {
             nativeType.typeParameters.map {
                 KotlinGenericPlaceholderElement(it, annotationMetadataFactory, visitorContext)
@@ -193,13 +194,14 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
     }
 
     override fun overrides(overridden: MethodElement): Boolean {
-        val nativeType = nativeType
-        if (nativeType == overridden.nativeType) {
+        val nativeType = kspNode()
+        val overriddenNativeType = overridden.kspNode()
+        if (nativeType == overriddenNativeType) {
             return false
         } else if (nativeType is KSFunctionDeclaration) {
-            return overridden.nativeType == nativeType.findOverridee()
-        } else if (nativeType is KSPropertySetter && overridden.nativeType is KSPropertySetter) {
-            return (overridden.nativeType as KSPropertySetter).receiver == nativeType.receiver.findOverridee()
+            return overriddenNativeType == nativeType.findOverridee()
+        } else if (nativeType is KSPropertySetter && overriddenNativeType is KSPropertySetter) {
+            return overriddenNativeType.receiver == nativeType.receiver.findOverridee()
         }
         return false
     }
@@ -292,27 +294,5 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
     override fun getThrownTypes(): Array<ClassElement> {
         return emptyArray() // Kotlin doesn't support throws declarations
     }
-
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (javaClass != other?.javaClass) return false
-        other as KotlinMethodElement
-
-        if (name != other.name) return false
-        if (declaringType != other.declaringType) return false
-        if (parameters != other.parameters) return false
-        if (returnType != other.returnType) return false
-
-        return true
-    }
-
-    override fun hashCode(): Int {
-        var result = 31 * name.hashCode()
-        result = 31 * result + declaringType.hashCode()
-        result = 31 * result + parameters.hashCode()
-        result = 31 * result + returnType.hashCode()
-        return result
-    }
-
 
 }

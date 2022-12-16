@@ -27,7 +27,7 @@ open class ParentConfigProperties {
 
     protected var nationality: String? = null
 
-    @ConfigurationBuilder(value = "engine", prefixes = ["with"])
+//    @ConfigurationBuilder(value = "engine", prefixes = ["with"]) FIXME
     val builder = Engine.builder()
 
 }

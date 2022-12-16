@@ -27,6 +27,7 @@ import io.micronaut.inject.ast.utils.AstBeanPropertiesUtils
 import io.micronaut.inject.ast.utils.EnclosedElementsQuery
 import io.micronaut.inject.processing.ProcessingException
 import io.micronaut.kotlin.processing.getBinaryName
+import io.micronaut.kotlin.processing.getClassDeclaration
 import java.util.*
 import java.util.function.Function
 import java.util.stream.Stream
@@ -46,7 +47,7 @@ open class KotlinClassElement(val kotlinType: KSType,
         visitorContext: KotlinVisitorContext,
         arrayDimensions: Int = 0,
         typeVariable: Boolean = false
-    ) : this(getType(ref, visitorContext), getDeclaration(ref, visitorContext), ref, elementAnnotationMetadataFactory, visitorContext, arrayDimensions, typeVariable)
+    ) : this(getType(ref, visitorContext), ref.getClassDeclaration(visitorContext), ref, elementAnnotationMetadataFactory, visitorContext, arrayDimensions, typeVariable)
 
     constructor(
         type: KSType,
@@ -55,6 +56,7 @@ open class KotlinClassElement(val kotlinType: KSType,
         arrayDimensions: Int = 0,
         typeVariable: Boolean = false
     ) : this(type, type.declaration as KSClassDeclaration, type.declaration as KSClassDeclaration, elementAnnotationMetadataFactory, visitorContext, arrayDimensions, typeVariable)
+
 
     val outerType: KSType? by lazy {
         val outerDecl = classDeclaration.parentDeclaration as? KSClassDeclaration
@@ -93,6 +95,10 @@ open class KotlinClassElement(val kotlinType: KSType,
     private var overrideBoundGenericTypes: MutableList<out ClassElement>? = null
     private var resolvedTypeArguments : MutableMap<String, ClassElement>? = null
 
+    private val nt : KSAnnotated =  if (annotationInfo is KSTypeArgument) annotationInfo else KSClassReference(classDeclaration)
+    override fun getNativeType(): KSAnnotated {
+        return nt
+    }
 
     companion object Helper {
         fun getType(ref: KSAnnotated, visitorContext: KotlinVisitorContext) : KSType {
@@ -118,36 +124,8 @@ open class KotlinClassElement(val kotlinType: KSType,
             }
         }
 
-        fun getDeclaration(ref: KSAnnotated, visitorContext: KotlinVisitorContext) : KSClassDeclaration {
-            if (ref is KSType) {
-                return ref.declaration as KSClassDeclaration
-            } else if (ref is KSTypeReference) {
-                return resolveDeclaration(ref.resolve().declaration, visitorContext)
-            } else if (ref is KSTypeParameter) {
-                return resolveDeclaration(ref.bounds.firstOrNull()?.resolve()?.declaration, visitorContext)
-            } else if (ref is KSClassDeclaration) {
-                return ref
-            } else if (ref is KSTypeArgument) {
-                return resolveDeclaration(ref.type?.resolve()?.declaration, visitorContext)
-            } else if (ref is KSTypeAlias) {
-                val declaration = ref.type.resolve().declaration
-                return resolveDeclaration(declaration, visitorContext)
-            } else {
-                throw IllegalArgumentException("Not a type $ref")
-            }
-        }
 
-        @OptIn(KspExperimental::class)
-        private fun resolveDeclaration(
-            declaration: KSDeclaration?,
-            visitorContext: KotlinVisitorContext
-        ): KSClassDeclaration {
-            return if (declaration is KSClassDeclaration) {
-                declaration
-            } else {
-                visitorContext.resolver.getJavaClassByName(Object::class.java.name)!!
-            }
-        }
+
     }
 
     @OptIn(KspExperimental::class)
@@ -697,6 +675,18 @@ open class KotlinClassElement(val kotlinType: KSType,
             return emptySet()
         }
 
+        override fun getCacheKey(element: KSNode): KSNode {
+            return when(element) {
+                is KSFunctionDeclaration -> KSFunctionReference(element)
+                is KSPropertyDeclaration -> KSPropertyReference(element)
+                is KSClassDeclaration -> KSClassReference(element)
+                is KSValueParameter -> KSValueParameterReference(element)
+                is KSPropertyGetter -> KSPropertyGetterReference(element)
+                is KSPropertySetter -> KSPropertySetterReference(element)
+                else -> element
+            }
+        }
+
         override fun getSuperClass(classNode: KSClassDeclaration): KSClassDeclaration? {
             val superTypes = classNode.superTypes
             for (superclass in superTypes) {
@@ -796,19 +786,23 @@ open class KotlinClassElement(val kotlinType: KSType,
         }
 
         override fun toAstElement(enclosedElement: KSNode): Element {
+            var ee = enclosedElement
+            if (ee is KSAnnotatedReference) {
+                ee = ee.node
+            }
             val elementFactory: KotlinElementFactory = visitorContext.elementFactory
-            return when (enclosedElement) {
+            return when (ee) {
                 is KSFunctionDeclaration -> {
-                    if (enclosedElement.isConstructor()) {
+                    if (ee.isConstructor()) {
                         return elementFactory.newConstructorElement(
                             this@KotlinClassElement,
-                            enclosedElement,
+                            ee,
                             elementAnnotationMetadataFactory
                         )
                     } else {
                         return elementFactory.newMethodElement(
                             this@KotlinClassElement,
-                            enclosedElement,
+                            ee,
                             elementAnnotationMetadataFactory
                         )
                     }
@@ -817,23 +811,23 @@ open class KotlinClassElement(val kotlinType: KSType,
                 is KSPropertyDeclaration -> {
                     return elementFactory.newFieldElement(
                         this@KotlinClassElement,
-                        enclosedElement,
+                        ee,
                         elementAnnotationMetadataFactory
                     )
                 }
 
                 is KSType -> elementFactory.newClassElement(
-                    enclosedElement,
+                    ee,
                     elementAnnotationMetadataFactory
                 )
 
                 is KSClassDeclaration -> elementFactory.newClassElement(
-                    enclosedElement,
+                    ee,
                     elementAnnotationMetadataFactory,
                     false
                 )
 
-                else -> throw ProcessingException(this@KotlinClassElement, "Unknown element: $enclosedElement")
+                else -> throw ProcessingException(this@KotlinClassElement, "Unknown element: $ee")
             }
         }
     }
