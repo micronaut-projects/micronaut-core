@@ -53,8 +53,8 @@ tasks.named("test") {
 //    testLogging {
 //        showStandardStreams = true
 //    }
-    maxHeapSize("2G")
-    forkEvery = 20
+    maxHeapSize("1G")
+    forkEvery = 40
     maxParallelForks = 2
 }
 
