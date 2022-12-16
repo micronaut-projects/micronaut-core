@@ -21,6 +21,7 @@ import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.symbol.*
 import io.micronaut.context.annotation.Context
 import io.micronaut.core.annotation.Generated
+import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
 import io.micronaut.inject.processing.BeanDefinitionCreator
 import io.micronaut.inject.processing.BeanDefinitionCreatorFactory
 import io.micronaut.inject.processing.ProcessingException
@@ -103,6 +104,7 @@ class BeanDefinitionProcessor(private val environment: SymbolProcessorEnvironmen
         } catch (e: ProcessingException) {
             environment.logger.error(e.message!!, e.originatingElement as KSNode)
         } finally {
+            AbstractAnnotationMetadataBuilder.clearMutated()
             beanDefinitionMap.clear()
         }
     }
