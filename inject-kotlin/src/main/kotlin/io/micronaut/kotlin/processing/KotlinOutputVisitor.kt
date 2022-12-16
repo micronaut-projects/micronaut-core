@@ -15,12 +15,14 @@
  */
 package io.micronaut.kotlin.processing
 
+import com.google.devtools.ksp.containingFile
 import com.google.devtools.ksp.processing.Dependencies
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.symbol.KSFile
 import io.micronaut.inject.ast.Element
 import io.micronaut.inject.writer.AbstractClassWriterOutputVisitor
 import io.micronaut.inject.writer.GeneratedFile
+import io.micronaut.kotlin.processing.visitor.AbstractKotlinElement
 import io.micronaut.kotlin.processing.visitor.KotlinVisitorContext
 import java.io.File
 import java.io.OutputStream
@@ -67,11 +69,13 @@ class KotlinOutputVisitor(private val environment: SymbolProcessorEnvironment): 
     private fun getNativeElements(originatingElements: Array<out Element>): Dependencies {
         val originatingFiles: MutableList<KSFile> = ArrayList(originatingElements.size)
         for (originatingElement in originatingElements) {
-            val nativeType = originatingElement.nativeType
-            if (nativeType is KSFile) {
-                originatingFiles.add(nativeType)
+            if (originatingElement is AbstractKotlinElement<*>) {
+                val nativeType = originatingElement.nativeType.unwrap().containingFile
+                if (nativeType is KSFile) {
+                    originatingFiles.add(nativeType)
+                }
             }
         }
-        return Dependencies(false, *originatingFiles.toTypedArray())
+        return Dependencies(aggregating = false, sources = originatingFiles.toTypedArray())
     }
 }
