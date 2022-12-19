@@ -1054,6 +1054,7 @@ class TransactionalEventInterceptor implements Interceptor {
         count++;
         return context.proceed();
     }
+
 }
 ''')
         when:
