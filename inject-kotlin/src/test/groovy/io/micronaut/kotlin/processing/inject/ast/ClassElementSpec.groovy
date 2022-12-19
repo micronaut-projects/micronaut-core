@@ -219,7 +219,7 @@ class Test(
     }
 }
 
-open abstract class Parent<T : CharSequence>(val parentConstructorProp : T) : AbstractList<T>() {
+open abstract class Parent<T : CharSequence>(val parentConstructorProp : T) : AbstractMutableList<T>() {
 
     var parentProp : T = parentConstructorProp
     private var conventionProp : T = parentConstructorProp
@@ -227,7 +227,15 @@ open abstract class Parent<T : CharSequence>(val parentConstructorProp : T) : Ab
     fun getConventionProp() : T {
         return conventionProp
     }
-
+    override fun add(index: Int, element: T){
+        TODO("Not yet implemented")
+    }
+    override fun removeAt(index: Int): T{
+        TODO("Not yet implemented")
+    }
+    override fun set(index: Int, element: T): T{
+        TODO("Not yet implemented")
+    }
     fun setConventionProp(name : T) {
         this.conventionProp = name
     }
@@ -250,28 +258,30 @@ interface Two
 interface Three
 ''') { ClassElement classElement ->
             List<ConstructorElement> constructorElements = classElement.getEnclosedElements(ElementQuery.CONSTRUCTORS)
-            List<ClassElement> declaredInnerClasses = classElement.getEnclosedElements(ElementQuery.ALL_INNER_CLASSES.onlyDeclared())
             List<PropertyElement> propertyElements = classElement.getBeanProperties()
             List<PropertyElement> syntheticProperties = classElement.getSyntheticBeanProperties()
             List<MethodElement> methodElements = classElement.getEnclosedElements(ElementQuery.ALL_METHODS)
-            List<MethodElement> declaredMethodElements = classElement.getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared())
             Map<String, MethodElement> methodMap = methodElements.collectEntries {
                 [it.name, it]
             }
             Map<String, PropertyElement> propMap = propertyElements.collectEntries {
                 [it.name, it]
             }
-            Map<String, PropertyElement> synthPropMap = syntheticProperties.collectEntries {
-                [it.name, it]
-            }
 
-            assert methodMap['add'].parameters[0].genericType.simpleName == 'String'
-            assert methodMap['add'].parameters[0].type.simpleName == 'Object'
-            assert methodMap['iterator'].parameters[0].type.firstTypeArgument.get().simpleName == 'Object'
-            assert methodMap['iterator'].parameters[0].genericType.firstTypeArgument.get().simpleName == 'String'
-            assert propMap['conventionProp'].type.simpleName == 'CharSequence'
+            assert methodMap['add'].parameters[1].genericType.simpleName == 'String'
+            assert methodMap['add'].parameters[1].type.simpleName == 'Object'
+            assert methodMap['iterator'].returnType.firstTypeArgument.get().simpleName == 'CharSequence' // why?
+            assert methodMap['iterator'].genericReturnType.firstTypeArgument.get().simpleName == 'String'
+            assert methodMap['stream'].returnType.firstTypeArgument.get().simpleName == 'Object'
+            assert methodMap['stream'].genericReturnType.firstTypeArgument.get().simpleName == 'String'
+            assert propMap['conventionProp'].type.simpleName == 'String'
             assert propMap['conventionProp'].genericType.simpleName == 'String'
-            assert propMap['parentConstructorProp'].type.simpleName == 'CharSequence'
+            assert propMap['conventionProp'].genericType.simpleName == 'String'
+            assert propMap['conventionProp'].readMethod.get().returnType.simpleName == 'CharSequence'
+            assert propMap['conventionProp'].readMethod.get().genericReturnType.simpleName == 'String'
+            assert propMap['conventionProp'].writeMethod.get().parameters[0].type.simpleName == 'CharSequence'
+            assert propMap['conventionProp'].writeMethod.get().parameters[0].genericType.simpleName == 'String'
+            assert propMap['parentConstructorProp'].type.simpleName == 'String'
             assert propMap['parentConstructorProp'].genericType.simpleName == 'String'
             assert methodMap['parentFunc'].returnType.simpleName == 'CharSequence'
             assert methodMap['parentFunc'].genericReturnType.simpleName == 'String'
