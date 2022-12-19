@@ -692,7 +692,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         GeneratorAdapter overriddenMethodGenerator = new GeneratorAdapter(overridden, ACC_PUBLIC, methodElement.getName(), desc);
         overriddenMethodGenerator.loadThis();
         int i = 0;
-        for (ParameterElement param : methodElement.getSuspendParameters()) {
+        for (ParameterElement param : overriddenBy.getSuspendParameters()) {
             overriddenMethodGenerator.loadArg(i++);
             pushCastToType(overriddenMethodGenerator, param.getGenericType());
         }
