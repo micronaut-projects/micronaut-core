@@ -28,13 +28,14 @@ import java.lang.StringBuilder
 
 @OptIn(KspExperimental::class)
 fun KSDeclaration.getBinaryName(resolver: Resolver): String {
-    val binaryName = resolver.mapKotlinNameToJava(this.qualifiedName!!)?.asString()
+    val declaration = unwrap() as KSDeclaration
+    val binaryName = resolver.mapKotlinNameToJava(declaration.qualifiedName!!)?.asString()
     return if (binaryName != null) {
         binaryName
     } else {
-        val className = StringBuilder(packageName.asString())
-        val hierarchy = mutableListOf(this)
-        var parentDeclaration = parentDeclaration
+        val className = StringBuilder(declaration.packageName.asString())
+        val hierarchy = mutableListOf(declaration)
+        var parentDeclaration = declaration.parentDeclaration
         while (parentDeclaration is KSClassDeclaration) {
             hierarchy.add(0, parentDeclaration)
             parentDeclaration = parentDeclaration.parentDeclaration

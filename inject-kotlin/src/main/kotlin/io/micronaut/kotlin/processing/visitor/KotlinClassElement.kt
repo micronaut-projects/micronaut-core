@@ -194,6 +194,12 @@ open class KotlinClassElement(val kotlinType: KSType,
     override fun withBoundGenericTypes(typeArguments: MutableList<out ClassElement>?): ClassElement {
         val copy = copyThis()
         copy.overrideBoundGenericTypes = typeArguments
+        if (typeArguments != null && typeArguments.size == kotlinType.declaration.typeParameters.size) {
+            val i = typeArguments.iterator()
+            copy.resolvedTypeArguments = kotlinType.declaration.typeParameters.associate {
+                it.name.asString() to i.next()
+            }.toMutableMap()
+        }
         return copy
     }
 
@@ -213,7 +219,8 @@ open class KotlinClassElement(val kotlinType: KSType,
                         )
                         else -> elementFactory.newClassElement( // other cases
                             arg.type!!.resolve(),
-                            elementAnnotationMetadataFactory
+                            elementAnnotationMetadataFactory,
+                            false
                         )
                     }
                 }.toMutableList()
@@ -298,7 +305,7 @@ open class KotlinClassElement(val kotlinType: KSType,
     private fun resolveLowerBounds(arg: KSTypeArgument, elementFactory: KotlinElementFactory): List<KotlinClassElement?> {
         return if (arg.variance == Variance.CONTRAVARIANT) {
             listOf(
-                elementFactory.newClassElement(arg.type?.resolve()!!) as KotlinClassElement
+                elementFactory.newClassElement(arg.type?.resolve()!!, elementAnnotationMetadataFactory, false) as KotlinClassElement
             )
         } else {
             return emptyList()
@@ -312,12 +319,12 @@ open class KotlinClassElement(val kotlinType: KSType,
     ): List<KotlinClassElement?> {
         return if (arg.variance == Variance.COVARIANT) {
             listOf(
-                elementFactory.newClassElement(arg.type?.resolve()!!) as KotlinClassElement
+                elementFactory.newClassElement(arg.type?.resolve()!!, elementAnnotationMetadataFactory, false) as KotlinClassElement
             )
         } else {
             val objectType = visitorContext.resolver.getClassDeclarationByName(Object::class.java.name)!!
             listOf(
-                elementFactory.newClassElement(objectType.asStarProjectedType()) as KotlinClassElement
+                elementFactory.newClassElement(objectType.asStarProjectedType(), elementAnnotationMetadataFactory, false) as KotlinClassElement
             )
         }
     }

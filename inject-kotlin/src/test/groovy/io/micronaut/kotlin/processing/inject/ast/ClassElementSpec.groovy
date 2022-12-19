@@ -195,7 +195,6 @@ interface Three
         }
     }
 
-    @PendingFeature(reason = "Fix generic type evaluation")
     void "test class element generics"() {
         expect:
         buildClassElement('ast.test.Test', '''
