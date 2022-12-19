@@ -988,6 +988,92 @@ class TestInterceptor implements Interceptor {
         context.close()
     }
 
+    void 'test interceptor on an event'() {
+        given:
+        ApplicationContext context = buildContext('''
+package test;
+
+import java.lang.annotation.*;
+import io.micronaut.aop.*;
+import io.micronaut.context.annotation.Type;
+import io.micronaut.context.event.ApplicationEventListener;
+import io.micronaut.context.event.ApplicationEventPublisher;
+import io.micronaut.core.annotation.Indexed;
+import io.micronaut.core.annotation.Internal;
+import jakarta.inject.*;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import io.micronaut.aop.simple.*;
+import jakarta.inject.Singleton;
+
+class TheEvent {
+}
+
+@Singleton
+class MyBean {
+
+    private final ApplicationEventPublisher applicationEventPublisher;
+    long count = 0;
+
+    MyBean(ApplicationEventPublisher applicationEventPublisher) {
+        this.applicationEventPublisher = applicationEventPublisher;
+    }
+
+    void triggerEvent() {
+        applicationEventPublisher.publishEvent(new TheEvent());
+    }
+
+    @TransactionalEventListener
+    void test(TheEvent theEvent) {
+        count++;
+    }
+
+}
+
+@Target({ElementType.METHOD, ElementType.ANNOTATION_TYPE})
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@Adapter(ApplicationEventListener.class)
+@Indexed(ApplicationEventListener.class)
+@TransactionalEventAdvice
+@interface TransactionalEventListener {
+}
+
+@Target(ElementType.ANNOTATION_TYPE)
+@Retention(RetentionPolicy.RUNTIME)
+@Around
+@Type(TransactionalEventInterceptor.class)
+@Internal
+@interface TransactionalEventAdvice {
+}
+
+@Singleton
+class TransactionalEventInterceptor implements Interceptor {
+    long count = 0;
+    @Override
+    public Object intercept(InvocationContext context) {
+        count++;
+        return context.proceed();
+    }
+
+}
+''')
+        when:
+        def service = getBean(context, 'test.MyBean')
+        def interceptor = getBean(context, 'test.TransactionalEventInterceptor')
+
+        then:
+        interceptor.count == 0
+
+        when:
+        service.triggerEvent()
+
+        then:
+        interceptor.count == 1
+
+        cleanup:
+        context.close()
+    }
+
     void "test validated on class with generics"() {
         when:
         BeanDefinition beanDefinition = buildBeanDefinition('test.$BaseEntityService' + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionWriter.PROXY_SUFFIX, """
