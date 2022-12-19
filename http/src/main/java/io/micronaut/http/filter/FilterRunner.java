@@ -1,3 +1,18 @@
+/*
+ * Copyright 2017-2022 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.http.filter;
 
 import io.micronaut.core.annotation.Internal;
@@ -572,7 +587,7 @@ public class FilterRunner {
         boolean handle(FilterRunner runner, Object o, FilterContinuationImpl<?> passedOnContinuation) throws Throwable;
     }
 
-    private static abstract class DelayedFilterReturnHandler implements FilterReturnHandler {
+    private abstract static class DelayedFilterReturnHandler implements FilterReturnHandler {
         final boolean isResponseFilter;
         final FilterReturnHandler next;
 
@@ -659,6 +674,8 @@ public class FilterRunner {
      * calls {@link #proceed}, or when the filter throws an exception. Only the first of these
      * events actually continues working the {@link FilterRunner}, any events that follow are
      * discarded (logged or throw an exception).
+     *
+     * @param <R> Return value of the continuation
      */
     private abstract class FilterContinuationImpl<R> extends SuspensionPoint implements FilterContinuation<R> {
         /**

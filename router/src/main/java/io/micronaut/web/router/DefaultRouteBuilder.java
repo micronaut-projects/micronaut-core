@@ -143,7 +143,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         return route;
     }
 
-    FilterRoute addFilter(Supplier<GenericHttpFilter> internalFilter, AnnotationMetadata annotationMetadata) {
+    final FilterRoute addFilter(Supplier<GenericHttpFilter> internalFilter, AnnotationMetadata annotationMetadata) {
         FilterRoute fr = new DefaultFilterRoute(internalFilter, AnnotationMetadataResolver.DEFAULT) {
             @Override
             public AnnotationMetadata getAnnotationMetadata() {

@@ -1,3 +1,18 @@
+/*
+ * Copyright 2017-2022 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.http.filter;
 
 import io.micronaut.core.annotation.Experimental;
@@ -15,14 +30,14 @@ import io.micronaut.http.HttpRequest;
  * block, or it can return a reactive wrapper (e.g.
  * {@code FilterContinuation<Publisher<HttpResponse<?>>>}). With a reactive wrapper,
  * {@link #proceed()} will not block, and downstream processing will happen asynchronously (after
- * the reactive stream is subscribed to).<br>
+ * the reactive stream is subscribed to).
  *
  * @param <R> The type to return in {@link #proceed()}
  */
 @Experimental
 public interface FilterContinuation<R> {
     /**
-     * Update the request for downstream processing
+     * Update the request for downstream processing.
      *
      * @param request The new request
      * @return This continuation, for call chaining
