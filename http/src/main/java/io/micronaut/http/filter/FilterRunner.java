@@ -390,8 +390,12 @@ public class FilterRunner {
     }
 
     @Internal
-    public static <T> FilterMethod<T> prepareFilterMethod(T bean, ExecutableMethod<T, ?> method, boolean isResponseFilter, FilterOrder order) {
-        Argument<?>[] arguments = method.getArguments();
+    public static <T> FilterMethod<T> prepareFilterMethod(T bean, ExecutableMethod<T, ?> method, boolean isResponseFilter, FilterOrder order) throws IllegalArgumentException {
+        return prepareFilterMethod(bean, method, method.getArguments(), method.getReturnType().asArgument(), isResponseFilter, order);
+    }
+
+    @Internal
+    public static <T> FilterMethod<T> prepareFilterMethod(T bean, ExecutableMethod<T, ?> method, Argument<?>[] arguments, Argument<?> returnType, boolean isResponseFilter, FilterOrder order) throws IllegalArgumentException {
         FilterArgBinder[] fulfilled = new FilterArgBinder[arguments.length];
         Predicate<FilterRunner> filterConditionAlwaysTrue = runner -> true;
         Predicate<FilterRunner> filterCondition = filterConditionAlwaysTrue;
@@ -404,12 +408,12 @@ public class FilterRunner {
                 fulfilled[i] = runner -> runner.request;
             } else if (argument.getType().isAssignableFrom(MutableHttpResponse.class)) {
                 if (!isResponseFilter) {
-                    throw new IllegalStateException("Filter is called before the response is known, can't have a response argument");
+                    throw new IllegalArgumentException("Filter is called before the response is known, can't have a response argument");
                 }
                 fulfilled[i] = runner -> runner.response;
             } else if (Throwable.class.isAssignableFrom(argument.getType())) {
                 if (!isResponseFilter) {
-                    throw new IllegalStateException("Request filters cannot handle exceptions");
+                    throw new IllegalArgumentException("Request filters cannot handle exceptions");
                 }
                 if (!argument.isNullable()) {
                     filterCondition = filterCondition.and(runner -> runner.failure != null && argument.isInstance(runner.failure));
@@ -426,12 +430,12 @@ public class FilterRunner {
                 skipOnError = false;
             } else if (argument.getType() == FilterContinuation.class) {
                 if (isResponseFilter) {
-                    throw new IllegalStateException("Response filters cannot use filter continuations");
+                    throw new IllegalArgumentException("Response filters cannot use filter continuations");
                 }
                 if (passedOnContinuationArgIndex != -1) {
-                    throw new IllegalStateException("Only one continuation per filter is allowed");
+                    throw new IllegalArgumentException("Only one continuation per filter is allowed");
                 }
-                Argument<?> continuationReturnType = argument.getFirstTypeVariable().orElseThrow(() -> new IllegalStateException("Continuations must specify generic type"));
+                Argument<?> continuationReturnType = argument.getFirstTypeVariable().orElseThrow(() -> new IllegalArgumentException("Continuations must specify generic type"));
                 if (continuationReturnType.isReactive() && continuationReturnType.getWrappedType().isAssignableFrom(MutableHttpResponse.class)) {
                     fulfilled[i] = runner -> {
                         SuspensionPoint newSuspensionPoint = runner.new ReactiveContinuationImpl<>(
@@ -454,12 +458,12 @@ public class FilterRunner {
                         return newSuspensionPoint;
                     };
                 } else {
-                    throw new IllegalStateException("Unsupported continuation type: " + continuationReturnType);
+                    throw new IllegalArgumentException("Unsupported continuation type: " + continuationReturnType);
                 }
                 passedOnContinuationArgIndex = i;
 
             } else {
-                throw new IllegalStateException("Unsupported filter argument type: " + argument);
+                throw new IllegalArgumentException("Unsupported filter argument type: " + argument);
             }
         }
         if (skipOnError) {
@@ -476,14 +480,14 @@ public class FilterRunner {
             fulfilled,
             filterCondition,
             passedOnContinuationArgIndex,
-            prepareReturnHandler(method.getReturnType().asArgument(), isResponseFilter, passedOnContinuationArgIndex != -1)
+            prepareReturnHandler(returnType, isResponseFilter, passedOnContinuationArgIndex != -1)
         );
     }
 
-    private static FilterReturnHandler prepareReturnHandler(Argument<?> type, boolean isResponseFilter, boolean hasContinuation) {
+    private static FilterReturnHandler prepareReturnHandler(Argument<?> type, boolean isResponseFilter, boolean hasContinuation) throws IllegalArgumentException {
         if (type.isOptional()) {
             FilterReturnHandler next = prepareReturnHandler(type.getWrappedType(), isResponseFilter, hasContinuation);
-            return (r, o, c) -> next.handle(r, ((Optional<?>) o).orElse(null), c);
+            return (r, o, c) -> next.handle(r, o == null ? null : ((Optional<?>) o).orElse(null), c);
         }
         if (type.isVoid()) {
             if (hasContinuation) {
@@ -499,20 +503,31 @@ public class FilterRunner {
         if (!isResponseFilter) {
             if (type.getType() == HttpRequest.class || type.getType() == MutableHttpRequest.class) {
                 if (hasContinuation) {
-                    throw new IllegalStateException("Filter method that accepts a continuation cannot return an HttpRequest");
+                    throw new IllegalArgumentException("Filter method that accepts a continuation cannot return an HttpRequest");
                 }
                 return (r, o, c) -> {
-                    r.request = (HttpRequest<?>) o;
+                    if (o != null) {
+                        r.request = (HttpRequest<?>) o;
+                    }
                     return true;
                 };
             } else if (type.getType() == HttpResponse.class || type.getType() == MutableHttpResponse.class) {
                 if (hasContinuation) {
                     return (r, o, c) -> {
-                        c.forwardResponse((HttpResponse<?>) o, null);
+                        if (o == null) {
+                            // use response/failure from other filters
+                            c.forwardResponse(r.response, r.failure);
+                        } else {
+                            c.forwardResponse((HttpResponse<?>) o, null);
+                        }
                         return false;
                     };
                 } else {
                     return (r, o, c) -> {
+                        if (o == null) {
+                            return true;
+                        }
+
                         // cancel request pipeline, move immediately to response handling
                         r.response = (HttpResponse<?>) o;
                         r.failure = null;
@@ -528,6 +543,10 @@ public class FilterRunner {
             }
             if (type.getType() == HttpResponse.class || type.getType() == MutableHttpResponse.class) {
                 return (r, o, c) -> {
+                    if (o == null) {
+                        return true;
+                    }
+
                     // cancel request pipeline, move immediately to response handling
                     r.response = (HttpResponse<?>) o;
                     r.failure = null;
@@ -557,7 +576,7 @@ public class FilterRunner {
                 }
             };
         } else {
-            throw new UnsupportedOperationException("Unsupported filter return type " + type.getType().getName());
+            throw new IllegalArgumentException("Unsupported filter return type " + type.getType().getName());
         }
 
     }
@@ -584,7 +603,7 @@ public class FilterRunner {
     }
 
     private interface FilterReturnHandler {
-        boolean handle(FilterRunner runner, Object o, FilterContinuationImpl<?> passedOnContinuation) throws Throwable;
+        boolean handle(FilterRunner runner, @Nullable Object o, FilterContinuationImpl<?> passedOnContinuation) throws Throwable;
     }
 
     private abstract static class DelayedFilterReturnHandler implements FilterReturnHandler {
@@ -600,6 +619,10 @@ public class FilterRunner {
 
         @Override
         public boolean handle(FilterRunner runner, Object o, FilterContinuationImpl<?> passedOnContinuation) throws Throwable {
+            if (o == null) {
+                return next.handle(runner, null, passedOnContinuation);
+            }
+
             ExecutionFlow<?> delayedFlow = toFlow(runner, o);
             ImperativeExecutionFlow<?> doneFlow = delayedFlow.tryComplete();
             if (doneFlow != null) {
