@@ -18,6 +18,8 @@ package io.micronaut.inject;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.exceptions.BeanInstantiationException;
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.type.Argument;
 
 import java.util.Map;
@@ -29,11 +31,13 @@ import java.util.Map;
  * @author Denis Stepanov
  * @since 4.0
  */
+@Internal
 public interface ParametrizedInstantiatableBeanDefinition<T> extends InstantiatableBeanDefinition<T> {
 
     /**
      * @return The arguments required to construct this bean
      */
+    @NonNull
     Argument<Object>[] getRequiredArguments();
 
     /**
@@ -47,12 +51,14 @@ public interface ParametrizedInstantiatableBeanDefinition<T> extends Instantiata
      * @return The instantiated bean
      * @throws BeanInstantiationException If the bean cannot be instantiated for the arguments supplied
      */
-    T instantiate(BeanResolutionContext resolutionContext,
-                  BeanContext context,
-                  Map<String, Object> requiredArgumentValues) throws BeanInstantiationException;
+    @NonNull
+    T instantiate(@NonNull BeanResolutionContext resolutionContext,
+                  @NonNull BeanContext context,
+                  @NonNull Map<String, Object> requiredArgumentValues) throws BeanInstantiationException;
 
     @Override
-    default T instantiate(BeanResolutionContext resolutionContext, BeanContext context) throws BeanInstantiationException {
+    @NonNull
+    default T instantiate(@NonNull BeanResolutionContext resolutionContext, @NonNull BeanContext context) throws BeanInstantiationException {
         throw new BeanInstantiationException(this, "Cannot instantiate parametrized bean with no arguments");
     }
 }

@@ -19,6 +19,8 @@ import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.DefaultBeanResolutionContext;
 import io.micronaut.context.exceptions.BeanInstantiationException;
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 
 /**
  * <p>An type of {@link BeanDefinition} that can build a new instance.</p>
@@ -27,6 +29,7 @@ import io.micronaut.context.exceptions.BeanInstantiationException;
  * @author Denis Stepanov
  * @since 4.0
  */
+@Internal
 public interface InstantiatableBeanDefinition<T> extends BeanDefinition<T> {
 
     /**
@@ -36,8 +39,11 @@ public interface InstantiatableBeanDefinition<T> extends BeanDefinition<T> {
      * @return The instance
      * @throws BeanInstantiationException if the instance could not be instantiated
      */
-    default T instantiate(BeanContext context) throws BeanInstantiationException {
-        return instantiate(new DefaultBeanResolutionContext(context, this), context);
+    @NonNull
+    default T instantiate(@NonNull BeanContext context) throws BeanInstantiationException {
+        try (DefaultBeanResolutionContext resolutionContext = new DefaultBeanResolutionContext(context, this)) {
+            return instantiate(resolutionContext, context);
+        }
     }
 
     /**
@@ -48,5 +54,6 @@ public interface InstantiatableBeanDefinition<T> extends BeanDefinition<T> {
      * @return The instance
      * @throws BeanInstantiationException if the instance could not be instantiated
      */
-    T instantiate(BeanResolutionContext resolutionContext, BeanContext context) throws BeanInstantiationException;
+    @NonNull
+    T instantiate(@NonNull BeanResolutionContext resolutionContext, @NonNull BeanContext context) throws BeanInstantiationException;
 }
