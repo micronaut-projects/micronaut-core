@@ -20,6 +20,7 @@ class InterceptedAdapterSpec extends AbstractTypeElementSpec {
             service.triggerEvent()
 
         then:
+            service.count == 1
             interceptor.count == 1
 
         cleanup:

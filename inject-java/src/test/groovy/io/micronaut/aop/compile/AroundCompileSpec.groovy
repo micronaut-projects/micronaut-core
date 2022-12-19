@@ -1069,6 +1069,7 @@ class TransactionalEventInterceptor implements Interceptor {
 
         then:
         interceptor.count == 1
+        service.count == 1
 
         cleanup:
         context.close()
