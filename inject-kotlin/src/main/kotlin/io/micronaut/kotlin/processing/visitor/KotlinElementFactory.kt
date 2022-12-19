@@ -15,7 +15,6 @@
  */
 package io.micronaut.kotlin.processing.visitor
 
-import com.google.devtools.ksp.getJavaClassByName
 import com.google.devtools.ksp.processing.KSBuiltIns
 import com.google.devtools.ksp.symbol.*
 import io.micronaut.core.annotation.AnnotationUtil
@@ -153,25 +152,15 @@ class KotlinElementFactory(
         method: KSFunctionDeclaration,
         elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory
     ): MethodElement {
-        TODO("Not yet implemented")
         return newMethodElement(
             owningClass, method, elementAnnotationMetadataFactory
         )
     }
 
     override fun newMethodElement(
-        owningClass: ClassElement,
-        method: KSFunctionDeclaration,
-        elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory
-    ): MethodElement {
-        return newMethodElement(owningClass, method, elementAnnotationMetadataFactory, owningClass.typeArguments)
-    }
-
-    fun newMethodElement(
         declaringClass: ClassElement,
         method: KSFunctionDeclaration,
-        elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
-        typeArguments: Map<String, ClassElement>
+        elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory
     ): KotlinMethodElement {
         val returnType = method.returnType!!.resolve()
 

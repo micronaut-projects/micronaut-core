@@ -7,6 +7,7 @@ import io.micronaut.inject.ast.ElementModifier
 import io.micronaut.inject.ast.ElementQuery
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.PropertyElement
+import spock.lang.PendingFeature
 
 class ClassElementSpec extends AbstractKotlinCompilerSpec {
 
@@ -191,6 +192,91 @@ interface Three
             assert !methodMap['publicFunc'].isFinal() // should be final? But apparently not
             assert overridden != null
             assert methodMap['publicFunc'].overrides(overridden)
+        }
+    }
+
+    @PendingFeature(reason = "Fix generic type evaluation")
+    void "test class element generics"() {
+        expect:
+        buildClassElement('ast.test.Test', '''
+package ast.test
+
+class Test(
+    val constructorProp : String) : Parent<String>(constructorProp), One<String> {
+
+    val publicReadOnlyProp : Boolean = true
+    override val size: Int = 10
+    override fun get(index: Int): String {
+        return "ok"
+    }
+
+    open fun openFunc(name : String) : String {
+        return "ok"
+    }
+
+    override fun publicFunc(name : String) : String {
+        return "ok"
+    }
+}
+
+open abstract class Parent<T : CharSequence>(val parentConstructorProp : T) : AbstractList<T>() {
+
+    var parentProp : T = parentConstructorProp
+    private var conventionProp : T = parentConstructorProp
+
+    fun getConventionProp() : T {
+        return conventionProp
+    }
+
+    fun setConventionProp(name : T) {
+        this.conventionProp = name
+    }
+
+    open fun publicFunc(name : T) : T {
+        TODO("not yet implemented")
+    }
+
+    fun parentFunc(name :  T) : T {
+        TODO("not yet implemented")
+    }
+
+    suspend fun suspendFunc(name : T) : T {
+        TODO("not yet implemented")
+    }
+}
+
+interface One<E>
+interface Two
+interface Three
+''') { ClassElement classElement ->
+            List<ConstructorElement> constructorElements = classElement.getEnclosedElements(ElementQuery.CONSTRUCTORS)
+            List<ClassElement> declaredInnerClasses = classElement.getEnclosedElements(ElementQuery.ALL_INNER_CLASSES.onlyDeclared())
+            List<PropertyElement> propertyElements = classElement.getBeanProperties()
+            List<PropertyElement> syntheticProperties = classElement.getSyntheticBeanProperties()
+            List<MethodElement> methodElements = classElement.getEnclosedElements(ElementQuery.ALL_METHODS)
+            List<MethodElement> declaredMethodElements = classElement.getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared())
+            Map<String, MethodElement> methodMap = methodElements.collectEntries {
+                [it.name, it]
+            }
+            Map<String, PropertyElement> propMap = propertyElements.collectEntries {
+                [it.name, it]
+            }
+            Map<String, PropertyElement> synthPropMap = syntheticProperties.collectEntries {
+                [it.name, it]
+            }
+
+            assert methodMap['add'].parameters[0].genericType.simpleName == 'String'
+            assert methodMap['add'].parameters[0].type.simpleName == 'Object'
+            assert methodMap['iterator'].parameters[0].type.firstTypeArgument.get().simpleName == 'Object'
+            assert methodMap['iterator'].parameters[0].genericType.firstTypeArgument.get().simpleName == 'String'
+            assert propMap['conventionProp'].type.simpleName == 'CharSequence'
+            assert propMap['conventionProp'].genericType.simpleName == 'String'
+            assert propMap['parentConstructorProp'].type.simpleName == 'CharSequence'
+            assert propMap['parentConstructorProp'].genericType.simpleName == 'String'
+            assert methodMap['parentFunc'].returnType.simpleName == 'CharSequence'
+            assert methodMap['parentFunc'].genericReturnType.simpleName == 'String'
+            assert methodMap['parentFunc'].parameters[0].type.simpleName == 'CharSequence'
+            assert methodMap['parentFunc'].parameters[0].genericType.simpleName == 'String'
         }
     }
 }

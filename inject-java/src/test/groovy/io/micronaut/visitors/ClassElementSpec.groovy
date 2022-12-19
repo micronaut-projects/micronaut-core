@@ -31,6 +31,7 @@ import io.micronaut.inject.ast.MemberElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.PackageElement
 import io.micronaut.inject.ast.PrimitiveElement
+import io.micronaut.inject.ast.PropertyElement
 import jakarta.inject.Singleton
 import spock.lang.IgnoreIf
 import spock.lang.Issue
@@ -42,10 +43,213 @@ import java.sql.SQLException
 import java.util.function.Supplier
 
 class ClassElementSpec extends AbstractTypeElementSpec {
+    void "test class element generics"() {
+        given:
+        ClassElement classElement = buildClassElement('''
+package ast.test;
+
+import java.util.*;
+
+final class Test extends Parent<String> implements One<String> {
+    Test(String constructorProp) {
+        super(constructorProp);
+    }
+}
+
+abstract class Parent<T extends CharSequence> extends java.util.AbstractCollection<T> {
+    private final T parentConstructorProp;
+    private T conventionProp;
+
+    Parent(T parentConstructorProp) {
+        this.parentConstructorProp = parentConstructorProp;
+    }
+
+    public void setConventionProp(T conventionProp) {
+        this.conventionProp = conventionProp;
+    }
+    public T getConventionProp() {
+        return conventionProp;
+    }
+    public T getParentConstructorProp() {
+        return parentConstructorProp;
+    }
+
+    @Override public int size() {
+        return 0;
+    }
+
+    @Override public Iterator<T> iterator() {
+        return null;
+    }
+
+    public T publicFunc(T name) {
+        return name;
+    }
+
+    public T parentFunc(T name) {
+        return name;
+    }
+
+}
+
+interface One<E> {}
+''')
+        List<PropertyElement> propertyElements = classElement.getBeanProperties()
+        List<MethodElement> methodElements = classElement.getEnclosedElements(ElementQuery.ALL_METHODS)
+        Map<String, MethodElement> methodMap = methodElements.collectEntries {
+            [it.name, it]
+        }
+        Map<String, PropertyElement> propMap = propertyElements.collectEntries {
+            [it.name, it]
+        }
+
+        expect:
+        methodMap['add'].parameters[0].genericType.simpleName == 'String'
+        methodMap['add'].parameters[0].type.simpleName == 'Object'
+        methodMap['iterator'].returnType.firstTypeArgument.get().simpleName == 'CharSequence' // why?
+        methodMap['iterator'].genericReturnType.firstTypeArgument.get().simpleName == 'String'
+        methodMap['stream'].returnType.firstTypeArgument.get().simpleName == 'Object'
+        methodMap['stream'].genericReturnType.firstTypeArgument.get().simpleName == 'String'
+        propMap['conventionProp'].type.simpleName == 'String'
+        propMap['conventionProp'].genericType.simpleName == 'String'
+        propMap['conventionProp'].genericType.simpleName == 'String'
+        propMap['conventionProp'].readMethod.get().returnType.simpleName == 'CharSequence'
+        propMap['conventionProp'].readMethod.get().genericReturnType.simpleName == 'String'
+        propMap['conventionProp'].writeMethod.get().parameters[0].type.simpleName == 'CharSequence'
+        propMap['conventionProp'].writeMethod.get().parameters[0].genericType.simpleName == 'String'
+        propMap['parentConstructorProp'].type.simpleName == 'String'
+        propMap['parentConstructorProp'].genericType.simpleName == 'String'
+        methodMap['parentFunc'].returnType.simpleName == 'CharSequence'
+        methodMap['parentFunc'].genericReturnType.simpleName == 'String'
+        methodMap['parentFunc'].parameters[0].type.simpleName == 'CharSequence'
+        methodMap['parentFunc'].parameters[0].genericType.simpleName == 'String'
+    }
+
+    void "test class element generics - records"() {
+        given:
+        ClassElement classElement = buildClassElement('''
+package ast.test;
+
+import org.jetbrains.annotations.NotNull;import java.util.*;
+
+record Test(String constructorProp) implements Parent<String>, One<String> {
+    @Override public String publicFunc(String name) {
+        return null;
+    }
+    @Override public int size() {
+    return 0;
+    }
+    @Override public boolean isEmpty() {
+        return false;
+    }
+    @Override public boolean contains(Object o) {
+        return false;
+    }
+    @NotNull @Override public Iterator<String> iterator() {
+        return null;
+    }
+    @NotNull@Override public Object[] toArray() {
+        return new Object[0];
+    }
+    @NotNull@Override public<T> T[] toArray(@NotNull T[] a) {
+        return null;
+    }
+    @Override public boolean add(String s) {
+        return false;
+    }
+    @Override public boolean remove(Object o) {
+        return false;
+    }
+    @Override public boolean containsAll(@NotNull Collection<?> c) {
+        return false;
+    }
+    @Override public boolean addAll(@NotNull Collection<? extends String> c) {
+        return false;
+    }
+    @Override public boolean addAll(int index,@NotNull Collection<? extends String> c) {
+        return false;
+    }
+    @Override public boolean removeAll(@NotNull Collection<?> c) {
+        return false;
+    }
+    @Override public boolean retainAll(@NotNull Collection<?> c) {
+        return false;
+    }
+    @Override public void clear() {
+
+    }
+    @Override public void add(int index, String element) {
+
+
+    }@Override public String remove(int index) {
+        return null;
+    }
+    @Override public int indexOf(Object o) {
+        return 0;
+    }
+    @Override public int lastIndexOf(Object o) {
+        return 0;
+    }
+    @NotNull @Override public ListIterator<String> listIterator() {
+        return null;
+    }
+    @NotNull @Override public ListIterator<String> listIterator(int index) {
+        return null;
+    }
+    @NotNull @Override public List<String> subList(int fromIndex, int toIndex) {
+        return null;
+    }
+}
+
+interface Parent<T extends CharSequence> extends java.util.List<T> {
+
+    public T constructorProp();
+
+    public T publicFunc(T name);
+
+    default T parentFunc(T name) {
+        return name;
+    }
+
+    @Override default T get(int index) {
+        return null;
+    }
+    @Override default T set(int index, T element) {
+        return null;
+    }
+}
+
+interface One<E> {}
+''')
+        List<PropertyElement> propertyElements = classElement.getBeanProperties()
+        List<MethodElement> methodElements = classElement.getEnclosedElements(ElementQuery.ALL_METHODS)
+        Map<String, MethodElement> methodMap = methodElements.collectEntries {
+            [it.name, it]
+        }
+        Map<String, PropertyElement> propMap = propertyElements.collectEntries {
+            [it.name, it]
+        }
+
+        expect:
+        methodMap['add'].parameters[1].genericType.simpleName == 'String'
+        methodMap['add'].parameters[1].type.simpleName == 'String'
+        methodMap['iterator'].returnType.firstTypeArgument.get().simpleName == 'String'
+        methodMap['iterator'].genericReturnType.firstTypeArgument.get().simpleName == 'String'
+        methodMap['stream'].returnType.firstTypeArgument.get().simpleName == 'Object'
+        methodMap['stream'].genericReturnType.firstTypeArgument.get().simpleName == 'String'
+        propMap['constructorProp'].readMethod.get().returnType.simpleName == 'String'
+        propMap['constructorProp'].readMethod.get().genericReturnType.simpleName == 'String'
+        propMap['constructorProp'].type.simpleName == 'String'
+        propMap['constructorProp'].genericType.simpleName == 'String'
+        methodMap['parentFunc'].returnType.simpleName == 'CharSequence'
+        methodMap['parentFunc'].genericReturnType.simpleName == 'String'
+        methodMap['parentFunc'].parameters[0].type.simpleName == 'CharSequence'
+        methodMap['parentFunc'].parameters[0].genericType.simpleName == 'String'
+    }
 
     void "test equals with primitive"() {
         given:
-            def element = buildClassElement("""
+        def element = buildClassElement("""
 package test;
 
 class Test {
@@ -54,14 +258,14 @@ class Test {
 """)
 
         expect:
-            element != PrimitiveElement.BOOLEAN
-            element != PrimitiveElement.VOID
-            element != PrimitiveElement.BOOLEAN.withArrayDimensions(4)
-            PrimitiveElement.VOID != element
-            PrimitiveElement.INT != element
-            PrimitiveElement.INT.withArrayDimensions(2) != element
-            element.getFields().get(0).getType() == PrimitiveElement.BOOLEAN
-            PrimitiveElement.BOOLEAN == element.getFields().get(0).getType()
+        element != PrimitiveElement.BOOLEAN
+        element != PrimitiveElement.VOID
+        element != PrimitiveElement.BOOLEAN.withArrayDimensions(4)
+        PrimitiveElement.VOID != element
+        PrimitiveElement.INT != element
+        PrimitiveElement.INT.withArrayDimensions(2) != element
+        element.getFields().get(0).getType() == PrimitiveElement.BOOLEAN
+        PrimitiveElement.BOOLEAN == element.getFields().get(0).getType()
     }
 
     void "test resolve receiver type on method"() {
@@ -1071,7 +1275,7 @@ class Person {
 
     void "test find enum fields using ElementQuery"() {
         given:
-            ClassElement classElement = buildClassElement('''
+        ClassElement classElement = buildClassElement('''
 package elementquery;
 
 enum Test {
@@ -1100,7 +1304,7 @@ enum Test {
 }
 ''')
         when:
-        List<FieldElement>  allFields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS)
+        List<FieldElement> allFields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS)
 
         List<String> expected = [
                 'publicStaticFinalField',
@@ -1139,10 +1343,11 @@ enum Test {
     }
 
     @Issue("https://github.com/eclipse-ee4j/cdi-tck/blob/master/lang-model/src/main/java/org/jboss/cdi/lang/model/tck/InheritedMethods.java")
-    @Requires({ jvm.isJava9Compatible() }) // private static Since Java 9
+    @Requires({ jvm.isJava9Compatible() })
+    // private static Since Java 9
     void "test inherited methods using ElementQuery"() {
         given:
-            ClassElement classElement = buildClassElement('''
+        ClassElement classElement = buildClassElement('''
 package elementquery;
 
 class InheritedMethods extends SuperClassWithMethods implements SuperInterfaceWithMethods {
@@ -1388,13 +1593,13 @@ public class TestController {
 
 ''')
         expect:
-            AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].owningType.name == 'test.TestController'
-            AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].declaringType.name == 'test.TestController'
+        AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].owningType.name == 'test.TestController'
+        AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].declaringType.name == 'test.TestController'
     }
 
     void "test fields selection"() {
         given:
-            ClassElement classElement = buildClassElement('''
+        ClassElement classElement = buildClassElement('''
 package test;
 
 import io.micronaut.http.annotation.*;
@@ -1427,46 +1632,46 @@ class Pet {
 
 ''')
         when:
-            List<FieldElement> publicFields = classElement.getFirstTypeArgument()
-                    .get()
-                    .getEnclosedElements(ElementQuery.ALL_FIELDS.modifiers(mods -> mods.contains(ElementModifier.PUBLIC) && mods.size() == 1))
+        List<FieldElement> publicFields = classElement.getFirstTypeArgument()
+                .get()
+                .getEnclosedElements(ElementQuery.ALL_FIELDS.modifiers(mods -> mods.contains(ElementModifier.PUBLIC) && mods.size() == 1))
         then:
-            publicFields.size() == 1
-            publicFields.stream().map(FieldElement::getName).toList() == ["pub"]
+        publicFields.size() == 1
+        publicFields.stream().map(FieldElement::getName).toList() == ["pub"]
 
         when:
-            List<FieldElement> publicFields2 = classElement.getFirstTypeArgument()
-                    .get()
-                    .getEnclosedElements(ElementQuery.ALL_FIELDS.filter(e -> e.isPublic()))
+        List<FieldElement> publicFields2 = classElement.getFirstTypeArgument()
+                .get()
+                .getEnclosedElements(ElementQuery.ALL_FIELDS.filter(e -> e.isPublic()))
         then:
-            publicFields2.size() == 2
-            publicFields2.stream().map(FieldElement::getName).toList() == ["pub", "PUB_CONST"]
+        publicFields2.size() == 2
+        publicFields2.stream().map(FieldElement::getName).toList() == ["pub", "PUB_CONST"]
         when:
-            List<FieldElement> protectedFields = classElement.getFirstTypeArgument()
-                    .get()
-                    .getEnclosedElements(ElementQuery.ALL_FIELDS.filter(e -> e.isProtected()))
+        List<FieldElement> protectedFields = classElement.getFirstTypeArgument()
+                .get()
+                .getEnclosedElements(ElementQuery.ALL_FIELDS.filter(e -> e.isProtected()))
         then:
-            protectedFields.size() == 2
-            protectedFields.stream().map(FieldElement::getName).toList() == ["protectme", "PROT_CONST"]
+        protectedFields.size() == 2
+        protectedFields.stream().map(FieldElement::getName).toList() == ["protectme", "PROT_CONST"]
         when:
-            List<FieldElement> privateFields = classElement.getFirstTypeArgument()
-                    .get()
-                    .getEnclosedElements(ElementQuery.ALL_FIELDS.filter(e -> e.isPrivate()))
+        List<FieldElement> privateFields = classElement.getFirstTypeArgument()
+                .get()
+                .getEnclosedElements(ElementQuery.ALL_FIELDS.filter(e -> e.isPrivate()))
         then:
-            privateFields.size() == 2
-            privateFields.stream().map(FieldElement::getName).toList() == ["prvn", "PRV_CONST"]
+        privateFields.size() == 2
+        privateFields.stream().map(FieldElement::getName).toList() == ["prvn", "PRV_CONST"]
         when:
-            List<FieldElement> packPrvFields = classElement.getFirstTypeArgument()
-                    .get()
-                    .getEnclosedElements(ElementQuery.ALL_FIELDS.filter(e -> e.isPackagePrivate()))
+        List<FieldElement> packPrvFields = classElement.getFirstTypeArgument()
+                .get()
+                .getEnclosedElements(ElementQuery.ALL_FIELDS.filter(e -> e.isPackagePrivate()))
         then:
-            packPrvFields.size() == 2
-            packPrvFields.stream().map(FieldElement::getName).toList() == ["packprivme", "PACK_PRV_CONST"]
+        packPrvFields.size() == 2
+        packPrvFields.stream().map(FieldElement::getName).toList() == ["packprivme", "PACK_PRV_CONST"]
     }
 
     void "test annotations on generic type"() {
         given:
-            ClassElement classElement = buildClassElement('''
+        ClassElement classElement = buildClassElement('''
 package test;
 
 import io.micronaut.core.annotation.Introspected;
@@ -1486,13 +1691,13 @@ class Pet {
 
 ''')
         when:
-            def method = classElement.getEnclosedElements(ElementQuery.ALL_METHODS.named("save")).get(0)
-            def returnType = method.getReturnType()
-            def genericReturnType = method.getGenericReturnType()
+        def method = classElement.getEnclosedElements(ElementQuery.ALL_METHODS.named("save")).get(0)
+        def returnType = method.getReturnType()
+        def genericReturnType = method.getGenericReturnType()
 
         then:
-            returnType.hasAnnotation(Introspected)
-            genericReturnType.hasAnnotation(Introspected)
+        returnType.hasAnnotation(Introspected)
+        genericReturnType.hasAnnotation(Introspected)
     }
 
     private void assertMethodsByName(List<MethodElement> allMethods, String name, List<String> expectedDeclaringTypeSimpleNames) {
@@ -1513,7 +1718,7 @@ class Pet {
 
     private boolean oneElementPresentWithDeclaringType(Collection<MemberElement> elements, String declaringTypeSimpleName) {
         elements.stream()
-                .filter { it -> it.getDeclaringType().getSimpleName() == declaringTypeSimpleName}
+                .filter { it -> it.getDeclaringType().getSimpleName() == declaringTypeSimpleName }
                 .count() == 1
     }
 
