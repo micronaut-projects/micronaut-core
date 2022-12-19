@@ -22,6 +22,7 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.json.JsonFeatures;
 
 import java.util.ArrayList;
@@ -179,6 +180,6 @@ public final class JacksonFeatures implements JsonFeatures {
 
     @Override
     public int hashCode() {
-        return Objects.hash(serializationFeatures, deserializationFeatures);
+        return ObjectUtils.hash(serializationFeatures, deserializationFeatures);
     }
 }

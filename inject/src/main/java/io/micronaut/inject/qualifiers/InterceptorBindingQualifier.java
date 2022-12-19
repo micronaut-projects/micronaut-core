@@ -23,6 +23,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.inject.BeanType;
 
 import java.lang.annotation.Annotation;
@@ -32,7 +33,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -180,7 +180,7 @@ public final class InterceptorBindingQualifier<T> implements Qualifier<T> {
 
     @Override
     public int hashCode() {
-        return Objects.hash(supportedAnnotationNames, supportedInterceptorTypes);
+        return ObjectUtils.hash(supportedAnnotationNames, supportedInterceptorTypes);
     }
 
     @Override
@@ -202,7 +202,7 @@ public final class InterceptorBindingQualifier<T> implements Qualifier<T> {
             return bindings
                     .stream()
                     .filter(av -> {
-                        if (!av.stringValue().isPresent()) {
+                        if (av.stringValue().isEmpty()) {
                             return false;
                         }
                         if (kind == null) {

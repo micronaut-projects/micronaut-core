@@ -66,7 +66,7 @@ class MessageUtils {
     }
 
     static String buildMessage(BeanResolutionContext resolutionContext, String message, boolean circular) {
-        BeanResolutionContext.Segment<?> currentSegment = resolutionContext.getPath().peek();
+        BeanResolutionContext.Segment<?, ?> currentSegment = resolutionContext.getPath().peek();
         if (currentSegment instanceof AbstractBeanResolutionContext.ConstructorSegment) {
             return buildMessage(resolutionContext, currentSegment.getArgument(), message, circular);
         }

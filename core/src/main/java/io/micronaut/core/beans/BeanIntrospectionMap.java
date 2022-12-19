@@ -20,6 +20,8 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.util.CollectionUtils;
 
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.util.ObjectUtils;
+
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -60,7 +62,7 @@ final class BeanIntrospectionMap<T> implements BeanMap<T> {
 
     @Override
     public int hashCode() {
-        return Objects.hash(beanIntrospection, bean);
+        return ObjectUtils.hash(beanIntrospection, bean);
     }
 
     @Override

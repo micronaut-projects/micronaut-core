@@ -16,6 +16,7 @@
 package io.micronaut.discovery;
 
 import io.micronaut.core.convert.value.ConvertibleValues;
+import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.health.HealthStatus;
 import io.micronaut.http.HttpHeaders;
@@ -122,8 +123,7 @@ class DefaultServiceInstance implements ServiceInstance, ServiceInstance.Builder
 
     @Override
     public int hashCode() {
-
-        return Objects.hash(id, uri);
+        return ObjectUtils.hash(id, uri);
     }
 
     @Override

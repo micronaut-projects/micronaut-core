@@ -1,38 +1,12 @@
 package io.micronaut.inject.beans
 
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.Order
-import io.micronaut.core.order.Ordered
-import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
-import io.micronaut.inject.BeanDefinitionReference
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Issue
 
-import jakarta.inject.Named
-import jakarta.inject.Qualifier
-
 class BeanDefinitionSpec extends AbstractTypeElementSpec {
-
-
-    void 'test dynamic instantiate with constructor'() {
-        given:
-        def definition = buildBeanDefinition('genctor.Test', '''
-package genctor;
-
-import jakarta.inject.*;
-
-@Singleton
-class Test {
-    Test(Runnable foo) {}
-}
-
-''')
-        when:
-        def instance = definition.constructor.instantiate({} as Runnable)
-
-        then:
-        instance != null
-    }
 
     void "test limit the exposed bean types"() {
         given:

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2022 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,33 +19,31 @@ import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.DefaultBeanResolutionContext;
 import io.micronaut.context.exceptions.BeanInstantiationException;
-import io.micronaut.core.annotation.NextMajorVersion;
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 
 /**
- * <p>An interface for classes that are capable of taking the {@link BeanDefinition} instance and building a concrete
- * instance.
- * This interface is generally implemented by a build time tool such as an AST transformation framework that will build
- * the code necessary to construct a valid bean instance.</p>
+ * <p>An type of {@link BeanDefinition} that can build a new instance.</p>
  *
  * @param <T> The bean type
- * @author Graeme Rocher
- * @see io.micronaut.inject.writer.BeanDefinitionWriter
- * @since 1.0
+ * @author Denis Stepanov
+ * @since 4.0
  */
-@Deprecated(since = "4")
-@NextMajorVersion("Should be removed after Micronaut 4 Milestone 1")
-public interface BeanFactory<T> {
+@Internal
+public interface InstantiatableBeanDefinition<T> extends BeanDefinition<T> {
 
     /**
      * Builds a bean instance.
      *
      * @param context    The context
-     * @param definition The definition
      * @return The instance
      * @throws BeanInstantiationException if the instance could not be instantiated
      */
-    default T build(BeanContext context, BeanDefinition<T> definition) throws BeanInstantiationException {
-        return build(new DefaultBeanResolutionContext(context, definition), context, definition);
+    @NonNull
+    default T instantiate(@NonNull BeanContext context) throws BeanInstantiationException {
+        try (DefaultBeanResolutionContext resolutionContext = new DefaultBeanResolutionContext(context, this)) {
+            return instantiate(resolutionContext, context);
+        }
     }
 
     /**
@@ -53,9 +51,9 @@ public interface BeanFactory<T> {
      *
      * @param resolutionContext The bean resolution context
      * @param context           The context
-     * @param definition        The definition
      * @return The instance
      * @throws BeanInstantiationException if the instance could not be instantiated
      */
-    T build(BeanResolutionContext resolutionContext, BeanContext context, BeanDefinition<T> definition) throws BeanInstantiationException;
+    @NonNull
+    T instantiate(@NonNull BeanResolutionContext resolutionContext, @NonNull BeanContext context) throws BeanInstantiationException;
 }

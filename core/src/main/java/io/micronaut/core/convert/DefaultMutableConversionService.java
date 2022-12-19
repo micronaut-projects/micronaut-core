@@ -33,6 +33,7 @@ import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
 
@@ -1027,7 +1028,7 @@ public class DefaultMutableConversionService implements MutableConversionService
             this.source = source;
             this.target = target;
             this.formattingAnnotation = formattingAnnotation;
-            this.hashCode = Objects.hash(source, target, formattingAnnotation);
+            this.hashCode = ObjectUtils.hash(source, target, formattingAnnotation);
         }
 
         @Override

@@ -26,13 +26,17 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.naming.NameResolver;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanFactory;
 import io.micronaut.inject.DelegatingBeanDefinition;
 import io.micronaut.inject.DisposableBeanDefinition;
 import io.micronaut.inject.InitializingBeanDefinition;
+import io.micronaut.inject.InjectableBeanDefinition;
 import io.micronaut.inject.InjectionPoint;
+import io.micronaut.inject.InstantiatableBeanDefinition;
 import io.micronaut.inject.ParametrizedBeanFactory;
+import io.micronaut.inject.ParametrizedInstantiatableBeanDefinition;
 import io.micronaut.inject.ValidatedBeanDefinition;
 import io.micronaut.inject.qualifiers.PrimaryQualifier;
 
@@ -51,7 +55,8 @@ import java.util.Optional;
  */
 @Internal
 sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
-                                       implements DelegatingBeanDefinition<T>, BeanFactory<T>, NameResolver {
+    implements DelegatingBeanDefinition<T>, InstantiatableBeanDefinition<T>,
+    InjectableBeanDefinition<T>, NameResolver {
 
     protected final BeanDefinition<T> definition;
     @Nullable
@@ -124,24 +129,48 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
     }
 
     @Override
-    public T build(BeanResolutionContext resolutionContext, BeanContext context, BeanDefinition<T> definition) throws BeanInstantiationException {
+    public T inject(BeanContext context, T bean) {
+        if (definition instanceof InjectableBeanDefinition<T> injectableBeanDefinition) {
+            return injectableBeanDefinition.inject(context, bean);
+        }
+        return bean;
+    }
+
+    @Override
+    public T inject(BeanResolutionContext resolutionContext, BeanContext context, T bean) {
+        if (definition instanceof InjectableBeanDefinition<T> injectableBeanDefinition) {
+            return injectableBeanDefinition.inject(resolutionContext, context, bean);
+        }
+        return bean;
+    }
+
+    @Override
+    public T instantiate(BeanResolutionContext resolutionContext, BeanContext context) throws BeanInstantiationException {
         ConfigurationPath oldPath = null;
         if (configurationPath != null) {
             oldPath = resolutionContext.getConfigurationPath();
             resolutionContext.setConfigurationPath(configurationPath);
         }
-
         try {
+            // TODO: delete this after Micronaut 4 Milestone 1
             if (this.definition instanceof ParametrizedBeanFactory) {
                 ParametrizedBeanFactory<T> parametrizedBeanFactory = (ParametrizedBeanFactory<T>) this.definition;
-                Map<String, Object> fulfilled = getParametersValues(resolutionContext, (DefaultBeanContext) context, definition, parametrizedBeanFactory);
+                Argument[] requiredArguments = parametrizedBeanFactory.getRequiredArguments();
+                Map<String, Object> fulfilled = getParametersValues(resolutionContext, (DefaultBeanContext) context, definition, requiredArguments);
                 return parametrizedBeanFactory.build(resolutionContext, context, definition, fulfilled);
             }
-            if (this.definition instanceof BeanFactory) {
-                return ((BeanFactory<T>) this.definition).build(resolutionContext, context, definition);
-            } else {
-                throw new IllegalStateException("Cannot construct a dynamically registered singleton");
+            if (this.definition instanceof BeanFactory beanFactory) {
+                return (T) beanFactory.build(resolutionContext, context, definition);
             }
+            if (this.definition instanceof ParametrizedInstantiatableBeanDefinition<T> parametrizedInstantiatableBeanDefinition) {
+                Argument<Object>[] requiredArguments = parametrizedInstantiatableBeanDefinition.getRequiredArguments();
+                Map<String, Object> fulfilled = getParametersValues(resolutionContext, (DefaultBeanContext) context, definition, requiredArguments);
+                return parametrizedInstantiatableBeanDefinition.instantiate(resolutionContext, context, fulfilled);
+            }
+            if (this.definition instanceof InstantiatableBeanDefinition<T> instantiatableBeanDefinition) {
+                return instantiatableBeanDefinition.instantiate(resolutionContext, context);
+            }
+            throw new IllegalStateException("Cannot construct a dynamically registered singleton");
         } finally {
             resolutionContext.setConfigurationPath(oldPath);
         }
@@ -151,8 +180,7 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
     private Map<String, Object> getParametersValues(BeanResolutionContext resolutionContext,
                                                     DefaultBeanContext context,
                                                     BeanDefinition<T> definition,
-                                                    ParametrizedBeanFactory<T> parametrizedBeanFactory) {
-        Argument<Object>[] requiredArguments = (Argument<Object>[]) parametrizedBeanFactory.getRequiredArguments();
+                                                    Argument<Object>[] requiredArguments) {
         if (requiredArguments.length == 0) {
             return Collections.emptyMap();
         }
@@ -226,7 +254,7 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
 
     @Override
     public int hashCode() {
-        return Objects.hash(definition, qualifier);
+        return ObjectUtils.hash(definition, qualifier);
     }
 
     /**
