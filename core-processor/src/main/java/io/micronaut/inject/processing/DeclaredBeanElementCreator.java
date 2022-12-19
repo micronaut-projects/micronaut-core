@@ -600,6 +600,10 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
 
         MethodElement targetMethod = methods.iterator().next();
 
+        aopProxyWriter.visitInterceptorBinding(
+            InterceptedMethodUtil.resolveInterceptorBinding(methodAnnotationMetadata, InterceptorKind.AROUND)
+        );
+
         ParameterElement[] sourceParams = sourceMethod.getParameters();
         ParameterElement[] targetParams = targetMethod.getParameters();
 
