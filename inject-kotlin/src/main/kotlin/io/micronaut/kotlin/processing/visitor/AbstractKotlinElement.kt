@@ -37,7 +37,7 @@ import java.util.*
 import java.util.function.Consumer
 import java.util.function.Predicate
 
-abstract class AbstractKotlinElement<T : KSNode>(protected val declaration: T,
+abstract class AbstractKotlinElement<T : KSNode>(val declaration: T,
                                      protected  val annotationMetadataFactory: ElementAnnotationMetadataFactory,
                                      protected val visitorContext: KotlinVisitorContext) : Element, ElementMutableAnnotationMetadataDelegate<Element> {
 

@@ -269,8 +269,8 @@ interface Three
             }
 
             assert methodMap['add'].parameters[1].genericType.simpleName == 'String'
-            assert methodMap['add'].parameters[1].type.simpleName == 'Object'
-            assert methodMap['iterator'].returnType.firstTypeArgument.get().simpleName == 'CharSequence' // why?
+            assert methodMap['add'].parameters[1].type.simpleName == 'CharSequence'
+            assert methodMap['iterator'].returnType.firstTypeArgument.get().simpleName == 'Object'
             assert methodMap['iterator'].genericReturnType.firstTypeArgument.get().simpleName == 'String'
             assert methodMap['stream'].returnType.firstTypeArgument.get().simpleName == 'Object'
             assert methodMap['stream'].genericReturnType.firstTypeArgument.get().simpleName == 'String'
