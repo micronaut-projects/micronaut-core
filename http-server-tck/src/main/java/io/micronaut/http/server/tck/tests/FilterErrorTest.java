@@ -63,7 +63,7 @@ public class FilterErrorTest {
     @Test
     void testFilterThrowingExceptionHandledByExceptionHandlerThrowingException() throws IOException {
         TestScenario.builder()
-            .specName("FilterErrorSpec3")
+            .specName(SPEC_NAME + "3")
             .request(HttpRequest.GET("/filter-error-spec-3")
                 .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON))
             .assertion((server, request) -> {
@@ -83,7 +83,7 @@ public class FilterErrorTest {
     void testTheErrorRouteIsTheRouteMatch() throws IOException {
         TestScenario.builder()
             .request(HttpRequest.GET("/filter-error-spec-4/status").header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON))
-            .specName("FilterErrorSpec4")
+            .specName(SPEC_NAME + "4")
             .assertion((server, request) -> {
                     AssertionUtils.assertDoesNotThrow(server, request,
                         HttpResponseAssertion.builder()
@@ -102,7 +102,7 @@ public class FilterErrorTest {
         TestScenario.builder()
             .request(HttpRequest.GET("/filter-error-spec")
             .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON))
-            .specName("FilterErrorSpec2")
+            .specName(SPEC_NAME + "2")
                 .assertion((server, request) -> {
                     AssertionUtils.assertThrows(server, request,
                         HttpResponseAssertion.builder()
@@ -208,7 +208,7 @@ public class FilterErrorTest {
         }
     }
 
-    @Requires(property = "spec.name", value = "FilterErrorSpec2")
+    @Requires(property = "spec.name", value = SPEC_NAME + "2")
     @Filter(Filter.MATCH_ALL_PATTERN)
     static class FirstEvery implements HttpServerFilter {
         AtomicInteger executedCount = new AtomicInteger(0);
@@ -225,7 +225,7 @@ public class FilterErrorTest {
         }
     }
 
-    @Requires(property = "spec.name", value = "FilterErrorSpec3")
+    @Requires(property = "spec.name", value = SPEC_NAME + "3")
     @Filter(Filter.MATCH_ALL_PATTERN)
     static class ExceptionException implements HttpServerFilter {
         AtomicInteger executedCount = new AtomicInteger(0);
@@ -248,7 +248,7 @@ public class FilterErrorTest {
         }
     }
 
-    @Requires(property = "spec.name", value = "FilterErrorSpec4")
+    @Requires(property = "spec.name", value = SPEC_NAME + "4")
     @Filter(Filter.MATCH_ALL_PATTERN)
     static class ExceptionRoute implements HttpServerFilter {
         AtomicReference<RouteMatch<?>> routeMatch = new AtomicReference<>();
@@ -314,7 +314,7 @@ public class FilterErrorTest {
         @Override
         public boolean matches(ConditionContext context) {
             return context.getProperty("spec.name", String.class)
-                .map(val -> val.equals("FilterErrorSpec4") || val.equals("FilterErrorSpec3") || val.equals("FilterErrorSpec2") || val.equals(SPEC_NAME))
+                .map(val -> val.equals(SPEC_NAME + "4") || val.equals(SPEC_NAME + "3") || val.equals(SPEC_NAME + "2") || val.equals(SPEC_NAME))
                 .orElse(false);
         }
     }

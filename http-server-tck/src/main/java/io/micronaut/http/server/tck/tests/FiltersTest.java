@@ -19,6 +19,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
@@ -51,14 +52,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 })
 public class FiltersTest {
     public static final String SPEC_NAME = "FiltersTest";
+    public static final String PROP_MICRONAUT_SERVER_CORS_ENABLED = "micronaut.server.cors.enabled";
 
     @Test
     void testFiltersAreRunCorrectly() throws IOException {
         Map<String, Object> configuration = CollectionUtils.mapOf(
-            "micronaut.server.cors.enabled", StringUtils.TRUE
+            PROP_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE
         );
         try (ServerUnderTest server = ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer(SPEC_NAME, configuration)) {
-            assertTrue(true);
             HttpRequest<?> request = HttpRequest.GET("/filter-test/ok");
             AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                     .status(HttpStatus.OK)
@@ -71,14 +72,14 @@ public class FiltersTest {
     @Test
     void filtersAreAppliedOnNonMatchingMethodsCorsFilterWorks() throws IOException {
         Map<String, Object> configuration = CollectionUtils.mapOf(
-            "micronaut.server.cors.enabled", StringUtils.TRUE
+            PROP_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE
         );
         try (ServerUnderTest server = ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer(SPEC_NAME, configuration)) {
             HttpRequest<?> request = HttpRequest.OPTIONS("/filter-test/ok").header("Origin", "https://micronaut.io")
-                .header("Access-Control-Request-Method", "GET");
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "GET");
             AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
-                .headers(Collections.singletonMap("Access-Control-Allow-Origin", "https://micronaut.io"))
+                .headers(Collections.singletonMap(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "https://micronaut.io"))
                 .build());
         }
     }
@@ -86,7 +87,7 @@ public class FiltersTest {
     @Test
     void filtersAreAppliedOnNonMatchingMethodsCorsFilterDisableIfNotPreflight() throws IOException {
         Map<String, Object> configuration = CollectionUtils.mapOf(
-            "micronaut.server.cors.enabled", StringUtils.TRUE
+            PROP_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE
         );
         try (ServerUnderTest server = ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer(SPEC_NAME, configuration)) {
             HttpRequest<?> request = HttpRequest.OPTIONS("/filter-test/ok");
@@ -99,7 +100,7 @@ public class FiltersTest {
     @Test
     void testFiltersAreRunCorrectlyWithCustomExceptionHandler() throws IOException {
         Map<String, Object> configuration = CollectionUtils.mapOf(
-            "micronaut.server.cors.enabled", StringUtils.TRUE
+            PROP_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE
         );
         try (ServerUnderTest server = ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer(SPEC_NAME, configuration)) {
             HttpRequest<?> request = HttpRequest.GET("/filter-test/exception");
