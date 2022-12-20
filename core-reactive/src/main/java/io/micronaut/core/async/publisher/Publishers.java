@@ -98,7 +98,7 @@ public class Publishers {
     private static List<String> getSingleTypeNames() {
         return List.of(
             "io.micronaut.core.async.publisher.CompletableFuturePublisher",
-            "io.micronaut.core.async.publisher.Publishers.JustPublisher",
+            "io.micronaut.core.async.publisher.Publishers$JustPublisher",
             "io.reactivex.Single",
             "reactor.core.publisher.Mono",
             "io.reactivex.Maybe",
