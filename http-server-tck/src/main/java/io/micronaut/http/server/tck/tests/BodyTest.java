@@ -45,7 +45,7 @@ public class BodyTest {
     @Test
     void testCustomBodyPOJO() throws IOException {
         TestScenario.builder()
-            .specName("BodyTest")
+            .specName(SPEC_NAME)
             .request(HttpRequest.POST("/response-body/pojo", "{\"x\":10,\"y\":20}")
                 .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON))
             .assertion((server, request) -> AssertionUtils.assertDoesNotThrow(server, request,
