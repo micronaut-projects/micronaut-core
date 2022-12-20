@@ -30,8 +30,7 @@ import org.junit.jupiter.api.function.ThrowingSupplier;
 import java.util.Map;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Utility class used to perform assertions.
@@ -93,29 +92,31 @@ public final class AssertionUtils {
         if (expectedBody != null) {
             Optional<String> bodyOptional = response.getBody(String.class);
             assertTrue(bodyOptional.isPresent());
-            assertTrue(bodyOptional.get().contains(expectedBody));
+            bodyOptional.ifPresent(body -> assertTrue(body.contains(expectedBody)));
         }
     }
 
     private static void assertHeaders(@NonNull HttpResponse<?> response,  @Nullable Map<String, String> expectedHeaders) {
 
         if (expectedHeaders != null) {
-            for (String headerName : expectedHeaders.keySet()) {
+            for (Map.Entry<String, String> expectedHeadersEntrySet : expectedHeaders.entrySet()) {
+                String headerName = expectedHeadersEntrySet.getKey();
                 Optional<String> headerOptional = response.getHeaders().getFirst(headerName);
                 assertTrue(headerOptional.isPresent(), () -> "Header " +  headerName + " not present");
-                String headerValue = headerOptional.get();
-                String expectedValue = expectedHeaders.get(headerName);
-                if (headerName.equals(HttpHeaders.CONTENT_TYPE)) {
-                    if (headerValue.contains(";charset=")) {
-                        assertTrue(headerValue.startsWith(expectedValue), () -> "header value " + headerValue + " does not start with " + expectedValue);
+                headerOptional.ifPresent(headerValue -> {
+                    String expectedValue = expectedHeadersEntrySet.getValue();
+                    if (headerName.equals(HttpHeaders.CONTENT_TYPE)) {
+                        if (headerValue.contains(";charset=")) {
+                            assertTrue(headerValue.startsWith(expectedValue), () -> "header value " + headerValue + " does not start with " + expectedValue);
+                        } else {
+                            assertEquals(expectedValue, headerOptional.get());
+                        }
                     } else {
                         assertEquals(expectedValue, headerOptional.get());
                     }
-                } else {
-                    assertEquals(expectedValue, headerOptional.get());
-                }
-
+                });
             }
+
         }
     }
 
