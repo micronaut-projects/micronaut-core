@@ -38,11 +38,12 @@ import java.util.Collections;
     "checkstyle:DesignForExtension"
 })
 public class HelloWorldTest {
+    public static final String SPEC_NAME = "HelloWorldTest";
 
     @Test
     void helloWorld() throws IOException {
         TestScenario.builder()
-            .specName("HelloWorldTest")
+            .specName(SPEC_NAME)
             .request(HttpRequest.GET(UriBuilder.of("/hello").path("world").build()).accept(MediaType.TEXT_PLAIN))
             .assertion((server, request) -> AssertionUtils.assertDoesNotThrow(server, request,
                 HttpStatus.OK,
@@ -51,7 +52,7 @@ public class HelloWorldTest {
             .run();
     }
 
-    @Requires(property = "spec.name", value = "HelloWorldTest")
+    @Requires(property = "spec.name", value = SPEC_NAME)
     @Controller("/hello")
     static class HelloWorldController {
         @Produces(MediaType.TEXT_PLAIN)

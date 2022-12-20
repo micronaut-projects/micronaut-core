@@ -35,6 +35,7 @@ import java.io.IOException;
     "checkstyle:DesignForExtension"
 })
 public class VersionTest {
+    public static final String SPEC_NAME = "VersionTest";
 
     @Test
     void testControllerMethodWithVersion2() throws IOException {
@@ -42,7 +43,7 @@ public class VersionTest {
             .configuration(CollectionUtils.mapOf(
                 "micronaut.router.versioning.enabled", StringUtils.TRUE,
                 "micronaut.router.versioning.header.enabled", StringUtils.TRUE
-            )).specName("VersionSpec")
+            )).specName(SPEC_NAME)
             .request(HttpRequest.GET("/version/ping").header("X-API-VERSION", "2"))
             .assertion((server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
@@ -52,7 +53,7 @@ public class VersionTest {
     }
 
     @Controller("/version")
-    @Requires(property = "spec.name", value = "VersionSpec")
+    @Requires(property = "spec.name", value = SPEC_NAME)
     static class ConsumesController {
 
         @Get("/ping")

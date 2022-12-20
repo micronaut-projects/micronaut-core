@@ -38,11 +38,12 @@ import java.util.Map;
     "checkstyle:DesignForExtension"
 })
 public class CookiesTest {
+    public static final String SPEC_NAME = "CookiesTest";
 
     @Test
     void testCookieBind() throws IOException {
         TestScenario.builder()
-            .specName("CookiesTest")
+            .specName(SPEC_NAME)
             .request(HttpRequest.GET("/cookies-test/bind")
                 .cookie(Cookie.of("one", "foo"))
                 .cookie(Cookie.of("two", "bar")))
@@ -56,7 +57,7 @@ public class CookiesTest {
     @Test
     void testGetCookiesMethod() throws IOException {
         TestScenario.builder()
-            .specName("CookiesTest")
+            .specName(SPEC_NAME)
             .request(HttpRequest.GET("/cookies-test/all")
                 .cookie(Cookie.of("one", "foo"))
                 .cookie(Cookie.of("two", "bar")))
@@ -70,7 +71,7 @@ public class CookiesTest {
     @Test
     void testNoCookie() throws IOException {
         TestScenario.builder()
-            .specName("CookiesTest")
+            .specName(SPEC_NAME)
             .request(HttpRequest.GET("/cookies-test/all"))
             .assertion((server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
@@ -80,7 +81,7 @@ public class CookiesTest {
     }
 
     @Controller("/cookies-test")
-    @Requires(property = "spec.name", value = "CookiesTest")
+    @Requires(property = "spec.name", value = SPEC_NAME)
     static class CookieController {
 
         @Get(uri = "/all")

@@ -43,11 +43,12 @@ import java.util.Optional;
     "checkstyle:DesignForExtension"
 })
 public class ResponseStatusTest {
+    public static final String SPEC_NAME = "ResponseStatusTest";
 
     @Test
     void testConstraintViolationCauses400() throws IOException {
         TestScenario.builder()
-            .specName("ResponseStatusSpec")
+            .specName(SPEC_NAME)
             .request(HttpRequest.POST("/response-status/constraint-violation", Collections.emptyMap()).header(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN))
             .assertion((server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.BAD_REQUEST)
@@ -58,7 +59,7 @@ public class ResponseStatusTest {
     @Test
     void testVoidMethodsDoesNotCause404() throws IOException {
         TestScenario.builder()
-            .specName("ResponseStatusSpec")
+            .specName(SPEC_NAME)
             .request(HttpRequest.DELETE("/response-status/delete-something")
                 .header(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN))
             .assertion((server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
@@ -71,7 +72,7 @@ public class ResponseStatusTest {
     void testNullCauses404() throws IOException {
         TestScenario.builder()
             .request(HttpRequest.GET("/response-status/null").header(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN))
-            .specName("ResponseStatusSpec")
+            .specName(SPEC_NAME)
             .assertion((server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.NOT_FOUND)
                 .build()))
@@ -81,7 +82,7 @@ public class ResponseStatusTest {
     @Test
     void testOptionalCauses404() throws IOException {
         TestScenario.builder()
-            .specName("ResponseStatusSpec")
+            .specName(SPEC_NAME)
             .request(HttpRequest.GET("/response-status/optional").header(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN))
             .assertion((server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.NOT_FOUND)
@@ -92,7 +93,7 @@ public class ResponseStatusTest {
     @Test
     void testCustomResponseStatus() throws IOException {
         TestScenario.builder()
-            .specName("ResponseStatusSpec")
+            .specName(SPEC_NAME)
             .request(HttpRequest.POST("/response-status", "foo")
             .header(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN))
             .assertion((server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
@@ -103,7 +104,7 @@ public class ResponseStatusTest {
     }
 
     @Controller("/response-status")
-    @Requires(property = "spec.name", value = "ResponseStatusSpec")
+    @Requires(property = "spec.name", value = SPEC_NAME)
     static class StatusController {
 
         @Post(uri = "/", processes = MediaType.TEXT_PLAIN)

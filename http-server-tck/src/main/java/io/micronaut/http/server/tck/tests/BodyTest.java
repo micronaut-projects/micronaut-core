@@ -40,6 +40,7 @@ import java.util.Objects;
     "checkstyle:DesignForExtension"
 })
 public class BodyTest {
+    public static final String SPEC_NAME = "BodyTest";
 
     @Test
     void testCustomBodyPOJO() throws IOException {
@@ -58,7 +59,7 @@ public class BodyTest {
     @Test
     void testCustomBodyPOJODefaultToJSON() throws IOException {
         TestScenario.builder()
-            .specName("BodyTest")
+            .specName(SPEC_NAME)
             .request(HttpRequest.POST("/response-body/pojo", "{\"x\":10,\"y\":20}"))
             .assertion((server, request) -> AssertionUtils.assertDoesNotThrow(server, request,
                 HttpResponseAssertion.builder()
@@ -70,7 +71,7 @@ public class BodyTest {
     @Test
     void testCustomBodyPOJOWithWholeRequest() throws IOException {
         TestScenario.builder()
-            .specName("BodyTest")
+            .specName(SPEC_NAME)
             .request(HttpRequest.POST("/response-body/pojo-and-request", "{\"x\":10,\"y\":20}")
                 .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON))
             .assertion((server, request) -> HttpResponseAssertion.builder()
@@ -83,7 +84,7 @@ public class BodyTest {
     @Test
     void testCustomBodyPOJOReactiveTypes() throws IOException {
         TestScenario.builder()
-            .specName("BodyTest")
+            .specName(SPEC_NAME)
             .request(HttpRequest.POST("/response-body/pojo-reactive", "{\"x\":10,\"y\":20}")
                 .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON))
             .assertion((server, request) -> AssertionUtils.assertDoesNotThrow(server, request,
@@ -95,7 +96,7 @@ public class BodyTest {
     }
 
     @Controller("/response-body")
-    @Requires(property = "spec.name", value = "BodyTest")
+    @Requires(property = "spec.name", value = SPEC_NAME)
     static class BodyController {
 
         @Post(uri = "/pojo")

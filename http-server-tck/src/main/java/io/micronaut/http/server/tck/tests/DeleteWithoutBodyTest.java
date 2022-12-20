@@ -40,6 +40,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
     "checkstyle:DesignForExtension"
 })
 public class DeleteWithoutBodyTest {
+    public static final String SPEC_NAME = "DeleteWithoutBodyTest";
+
     @Test
     void verifiesItIsPossibleToExposesADeleteEndpointWhichIsInvokedWithoutABody() throws IOException {
         TestScenario.builder()
@@ -52,7 +54,7 @@ public class DeleteWithoutBodyTest {
             .run();
     }
 
-    @Requires(property = "spec.name", value = "DeleteWithoutBodyTest")
+    @Requires(property = "spec.name", value = SPEC_NAME)
     @Controller("/sessions")
     static class SessionsController {
         @Status(HttpStatus.OK)

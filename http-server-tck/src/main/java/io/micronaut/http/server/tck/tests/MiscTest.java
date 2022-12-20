@@ -45,6 +45,8 @@ import java.util.Map;
     "checkstyle:DesignForExtension"
 })
 public class MiscTest {
+    public static final String SPEC_NAME = "MiscTest";
+
     /**
      *
      * @see <a href="https://github.com/micronaut-projects/micronaut-aws/issues/868">micronaut-aws #868</a>
@@ -52,7 +54,7 @@ public class MiscTest {
     @Test
     void testSelectedRouteReflectsAcceptHeader() throws IOException {
         TestScenario.builder()
-            .specName("MiscTest")
+            .specName(SPEC_NAME)
             .request(HttpRequest.GET("/bar/ok").header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON))
             .assertion((server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
@@ -61,7 +63,7 @@ public class MiscTest {
             .run();
 
         TestScenario.builder()
-            .specName("MiscTest")
+            .specName(SPEC_NAME)
             .request(HttpRequest.GET("/bar/ok").header(HttpHeaders.ACCEPT, MediaType.TEXT_HTML))
             .assertion((server, request) -> AssertionUtils.assertDoesNotThrow(server, request,
                 HttpResponseAssertion.builder()
@@ -74,7 +76,7 @@ public class MiscTest {
     @Test
     void testBehaviourOf404() throws IOException {
         TestScenario.builder()
-            .specName("MiscTest")
+            .specName(SPEC_NAME)
             .request(HttpRequest.GET("/does-not-exist").header("Accept", MediaType.APPLICATION_JSON))
             .assertion((server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.NOT_FOUND)
@@ -85,7 +87,7 @@ public class MiscTest {
     @Test
     void postFormUrlEncodedBodyBindingToPojoWorks() throws IOException {
         TestScenario.builder()
-            .specName("MiscTest")
+            .specName(SPEC_NAME)
             .request(HttpRequest.POST("/form", "message=World")
                 .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_FORM_URLENCODED))
             .assertion((server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
@@ -98,7 +100,7 @@ public class MiscTest {
     @Test
     void postFormUrlEncodedBodyBindingToPojoWorksIfYouDontSpecifyBodyAnnotation() throws IOException {
         TestScenario.builder()
-            .specName("MiscTest")
+            .specName(SPEC_NAME)
             .request(HttpRequest.POST("/form/without-body-annotation", "message=World")
                 .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_FORM_URLENCODED))
             .assertion((server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
@@ -111,7 +113,7 @@ public class MiscTest {
     @Test
     void formUrlEncodedWithBodyAnnotationAndANestedAttribute() throws IOException {
         TestScenario.builder()
-            .specName("MiscTest")
+            .specName(SPEC_NAME)
             .request(HttpRequest.POST("/form/nested-attribute", "message=World")
                 .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_FORM_URLENCODED))
             .assertion((server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
@@ -128,7 +130,7 @@ public class MiscTest {
     @Test
     void applicationJsonWithBodyAnnotationAndANestedAttribute() throws IOException {
         TestScenario.builder()
-            .specName("MiscTest")
+            .specName(SPEC_NAME)
             .request(HttpRequest.POST("/form/json-nested-attribute", "{\"message\":\"World\"}")
                 .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON))
             .assertion((server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
@@ -141,7 +143,7 @@ public class MiscTest {
     @Test
     void applicationJsonWithoutBodyAnnotation() throws IOException {
         TestScenario.builder()
-            .specName("MiscTest")
+            .specName(SPEC_NAME)
             .request(HttpRequest.POST("/form/json-without-body-annotation", "{\"message\":\"World\"}")
                 .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON))
             .assertion((server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
@@ -154,7 +156,7 @@ public class MiscTest {
     @Test
     void applicationJsonWithBodyAnnotationAndANestedAttributeAndMapReturnRenderedAsJSON() throws IOException {
         TestScenario.builder()
-            .specName("MiscTest")
+            .specName(SPEC_NAME)
             .request(HttpRequest.POST("/form/json-nested-attribute-with-map-return", "{\"message\":\"World\"}")
             .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON))
             .assertion((server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
@@ -167,7 +169,7 @@ public class MiscTest {
     @Test
     void applicationJsonWithBodyAnnotationAndObjectReturnRenderedAsJson() throws IOException {
         TestScenario.builder()
-            .specName("MiscTest")
+            .specName(SPEC_NAME)
             .request(HttpRequest.POST("/form/json-with-body-annotation-and-with-object-return", "{\"message\":\"World\"}")
                 .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON))
             .assertion((server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
@@ -178,7 +180,7 @@ public class MiscTest {
     }
 
     @Controller
-    @Requires(property = "spec.name", value = "MiscTest")
+    @Requires(property = "spec.name", value = SPEC_NAME)
     static class SimpleController {
         @Get(uri = "/foo")
         HttpResponse<String> getParamValue(HttpRequest request) {
@@ -189,7 +191,7 @@ public class MiscTest {
     }
 
     @Controller("/bar")
-    @Requires(property = "spec.name", value = "MiscTest")
+    @Requires(property = "spec.name", value = SPEC_NAME)
     static class ProduceController {
         @Get(value = "/ok", produces = MediaType.APPLICATION_JSON)
         String getOkAsJson() {
@@ -237,7 +239,7 @@ public class MiscTest {
     }
 
     @Controller("/form")
-    @Requires(property = "spec.name", value = "MiscTest")
+    @Requires(property = "spec.name", value = SPEC_NAME)
     static class FormController {
 
         @Consumes(MediaType.APPLICATION_FORM_URLENCODED)

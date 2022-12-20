@@ -50,13 +50,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
     "checkstyle:DesignForExtension"
 })
 public class FiltersTest {
+    public static final String SPEC_NAME = "FiltersTest";
 
     @Test
     void testFiltersAreRunCorrectly() throws IOException {
         Map<String, Object> configuration = CollectionUtils.mapOf(
             "micronaut.server.cors.enabled", StringUtils.TRUE
         );
-        try (ServerUnderTest server = ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer("FiltersTest", configuration)) {
+        try (ServerUnderTest server = ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer(SPEC_NAME, configuration)) {
             assertTrue(true);
             HttpRequest<?> request = HttpRequest.GET("/filter-test/ok");
             AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
@@ -72,7 +73,7 @@ public class FiltersTest {
         Map<String, Object> configuration = CollectionUtils.mapOf(
             "micronaut.server.cors.enabled", StringUtils.TRUE
         );
-        try (ServerUnderTest server = ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer("FiltersTest", configuration)) {
+        try (ServerUnderTest server = ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer(SPEC_NAME, configuration)) {
             HttpRequest<?> request = HttpRequest.OPTIONS("/filter-test/ok").header("Origin", "https://micronaut.io")
                 .header("Access-Control-Request-Method", "GET");
             AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
@@ -87,7 +88,7 @@ public class FiltersTest {
         Map<String, Object> configuration = CollectionUtils.mapOf(
             "micronaut.server.cors.enabled", StringUtils.TRUE
         );
-        try (ServerUnderTest server = ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer("FiltersTest", configuration)) {
+        try (ServerUnderTest server = ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer(SPEC_NAME, configuration)) {
             HttpRequest<?> request = HttpRequest.OPTIONS("/filter-test/ok");
             AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.METHOD_NOT_ALLOWED)
@@ -100,7 +101,7 @@ public class FiltersTest {
         Map<String, Object> configuration = CollectionUtils.mapOf(
             "micronaut.server.cors.enabled", StringUtils.TRUE
         );
-        try (ServerUnderTest server = ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer("FiltersTest", configuration)) {
+        try (ServerUnderTest server = ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer(SPEC_NAME, configuration)) {
             HttpRequest<?> request = HttpRequest.GET("/filter-test/exception");
             AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
@@ -111,7 +112,7 @@ public class FiltersTest {
     }
 
     @Controller("/filter-test")
-    @Requires(property = "spec.name", value = "FiltersTest")
+    @Requires(property = "spec.name", value = SPEC_NAME)
     static class TestController {
         @Get("/ok")
         String ok() {
@@ -125,7 +126,7 @@ public class FiltersTest {
     }
 
     @Filter("/filter-test/**")
-    @Requires(property = "spec.name", value = "FiltersTest")
+    @Requires(property = "spec.name", value = SPEC_NAME)
     static class TestFilter implements HttpServerFilter {
         @Override
         public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
@@ -141,7 +142,7 @@ public class FiltersTest {
 
     @Produces
     @Singleton
-    @Requires(property = "spec.name", value = "FiltersTest")
+    @Requires(property = "spec.name", value = SPEC_NAME)
     static class CustomExceptionHandler implements ExceptionHandler<CustomException, HttpResponse<?>> {
         @Override
         public HttpResponse handle(HttpRequest request, CustomException exception) {

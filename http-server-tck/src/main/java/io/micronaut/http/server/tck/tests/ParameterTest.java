@@ -36,10 +36,12 @@ import java.util.List;
     "checkstyle:DesignForExtension"
 })
 public class ParameterTest {
+    public static final String SPEC_NAME = "ParameterTest";
+
     @Test
     void testGetAllMethod() throws IOException {
         TestScenario.builder()
-            .specName("ParameterTest")
+            .specName(SPEC_NAME)
             .request(HttpRequest.GET(UriBuilder.of("/parameters-test").path("all")
                 .queryParam("test", "one", "two", "three+four")
                 .build()))
@@ -51,7 +53,7 @@ public class ParameterTest {
     }
 
     @Controller("/parameters-test")
-    @Requires(property = "spec.name", value = "ParameterTest")
+    @Requires(property = "spec.name", value = SPEC_NAME)
     static class BodyController {
 
         @Get(uri = "/all")

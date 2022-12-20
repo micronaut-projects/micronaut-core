@@ -37,11 +37,12 @@ import java.util.Map;
     "checkstyle:DesignForExtension"
 })
 public class FluxTest {
+    public static final String SPEC_NAME = "FluxTest";
 
     @Test
     void testControllerReturningAFlux() throws IOException {
         TestScenario.builder()
-            .specName("FluxTest")
+            .specName(SPEC_NAME)
             .request(HttpRequest.GET("/users"))
             .assertion((server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
@@ -51,7 +52,7 @@ public class FluxTest {
     }
 
     @Controller("/users")
-    @Requires(property = "spec.name", value = "FluxTest")
+    @Requires(property = "spec.name", value = SPEC_NAME)
     static class UserController {
         @Get
         Flux<Map<String, String>> getAll() {

@@ -45,11 +45,12 @@ import java.util.Collections;
     "checkstyle:DesignForExtension"
 })
 public class RemoteAddressTest {
+    public static final String SPEC_NAME = "RemoteAddressTest";
 
     @Test
     void testRemoteAddressComesFromIdentitySourceIp() throws IOException {
         TestScenario.builder()
-            .specName("RemoteAddressTest")
+            .specName(SPEC_NAME)
             .request(HttpRequest.GET("/remoteAddress/fromSourceIp"))
             .assertion((server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
@@ -58,7 +59,7 @@ public class RemoteAddressTest {
             .run();
     }
 
-    @Requires(property = "spec.name", value = "RemoteAddressTest")
+    @Requires(property = "spec.name", value = SPEC_NAME)
     @Controller("/remoteAddress")
     static class TestController {
         @Get("fromSourceIp")
@@ -66,7 +67,7 @@ public class RemoteAddressTest {
         }
     }
 
-    @Requires(property = "spec.name", value = "RemoteAddressTest")
+    @Requires(property = "spec.name", value = SPEC_NAME)
     @Filter("/remoteAddress/**")
     static class CaptureRemoteAddressFiter implements HttpServerFilter {
         @Override
@@ -78,7 +79,7 @@ public class RemoteAddressTest {
         }
     }
 
-    @Requires(property = "spec.name", value = "RemoteAddressTest")
+    @Requires(property = "spec.name", value = SPEC_NAME)
     @Produces
     @Singleton
     static class CustomExceptionHandler implements ExceptionHandler<Exception, HttpResponse> {

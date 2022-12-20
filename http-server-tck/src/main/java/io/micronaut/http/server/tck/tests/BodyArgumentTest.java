@@ -35,13 +35,15 @@ import java.io.IOException;
     "checkstyle:DesignForExtension"
 })
 public class BodyArgumentTest {
+    public static final String SPEC_NAME = "BodyArgumentTest";
+
     /**
      * @see <a href="https://github.com/micronaut-projects/micronaut-aws/issues/1164">micronaut-aws #1164</a>
      */
     @Test
     void testBodyArguments() throws IOException {
         TestScenario.builder()
-            .specName("BodyArgumentTest")
+            .specName(SPEC_NAME)
             .request(HttpRequest.POST("/body-arguments-test/getA", "{\"a\":\"A\",\"b\":\"B\"}").header(HttpHeaders.ACCEPT, MediaType.TEXT_PLAIN))
             .assertion(((server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
@@ -51,7 +53,7 @@ public class BodyArgumentTest {
     }
 
     @Controller("/body-arguments-test")
-    @Requires(property = "spec.name", value = "BodyArgumentTest")
+    @Requires(property = "spec.name", value = SPEC_NAME)
     static class BodyController {
 
         @Post(uri = "/getA")

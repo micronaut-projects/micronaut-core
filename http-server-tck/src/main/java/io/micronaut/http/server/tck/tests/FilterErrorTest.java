@@ -58,6 +58,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
     "checkstyle:DesignForExtension"
 })
 public class FilterErrorTest {
+    public static final String SPEC_NAME = "FilterErrorTest";
+
     @Test
     void testFilterThrowingExceptionHandledByExceptionHandlerThrowingException() throws IOException {
         TestScenario.builder()
@@ -118,7 +120,7 @@ public class FilterErrorTest {
             .request(HttpRequest.GET("/filter-error-spec").
             header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON)
             .header("X-Passthru", StringUtils.TRUE))
-            .specName("FilterErrorSpec")
+            .specName(SPEC_NAME)
             .assertion((server, request) -> {
                 AssertionUtils.assertThrows(server, request,
                     HttpResponseAssertion.builder()
@@ -137,7 +139,7 @@ public class FilterErrorTest {
     @Test
     void testErrorsEmittedFromFiltersInteractingWithExceptionHandlers() throws IOException {
         TestScenario.builder()
-            .specName("FilterErrorSpec")
+            .specName(SPEC_NAME)
             .request(HttpRequest.GET("/filter-error-spec").header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON))
             .assertion((server, request) -> {
                 AssertionUtils.assertThrows(server, request,
@@ -164,7 +166,7 @@ public class FilterErrorTest {
     static class NextFilterException extends RuntimeException {
     }
 
-    @Requires(property = "spec.name", value = "FilterErrorSpec")
+    @Requires(property = "spec.name", value = SPEC_NAME)
     @Filter(Filter.MATCH_ALL_PATTERN)
     static class First implements HttpServerFilter {
         AtomicInteger executedCount = new AtomicInteger(0);
@@ -189,7 +191,7 @@ public class FilterErrorTest {
         }
     }
 
-    @Requires(property = "spec.name", value = "FilterErrorSpec")
+    @Requires(property = "spec.name", value = SPEC_NAME)
     @Filter(Filter.MATCH_ALL_PATTERN)
     static class Next implements HttpServerFilter {
         AtomicInteger executedCount = new AtomicInteger(0);
@@ -312,7 +314,7 @@ public class FilterErrorTest {
         @Override
         public boolean matches(ConditionContext context) {
             return context.getProperty("spec.name", String.class)
-                .map(val -> val.equals("FilterErrorSpec4") || val.equals("FilterErrorSpec3") || val.equals("FilterErrorSpec2") || val.equals("FilterErrorSpec"))
+                .map(val -> val.equals("FilterErrorSpec4") || val.equals("FilterErrorSpec3") || val.equals("FilterErrorSpec2") || val.equals(SPEC_NAME))
                 .orElse(false);
         }
     }

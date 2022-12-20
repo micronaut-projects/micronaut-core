@@ -36,10 +36,12 @@ import java.io.IOException;
     "checkstyle:DesignForExtension"
 })
 public class ConsumesTest {
+    public static final String SPEC_NAME = "ConsumesTest";
+
     @Test
     void testMultipleConsumesDefinition() throws IOException {
         TestScenario.builder()
-            .specName("ConsumesTest")
+            .specName(SPEC_NAME)
             .request(HttpRequest.POST("/consumes-test", "{\"name\":\"Fred\"}").header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON))
             .assertion((server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
@@ -49,7 +51,7 @@ public class ConsumesTest {
     }
 
     @Controller("/consumes-test")
-    @Requires(property = "spec.name", value = "ConsumesTest")
+    @Requires(property = "spec.name", value = SPEC_NAME)
     static class ConsumesController {
 
         @Post("/")

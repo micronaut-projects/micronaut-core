@@ -40,6 +40,8 @@ import java.io.IOException;
     "checkstyle:DesignForExtension"
 })
 public class StatusTest {
+    public static final String SPEC_NAME = "StatusTest";
+
     /**
      * @see <a href="https://github.com/micronaut-projects/micronaut-aws/issues/1387">micronaut-aws #1387</a>
      * @param path Request Path
@@ -48,7 +50,7 @@ public class StatusTest {
     @ValueSource(strings = {"/http-status", "/http-response-status", "/http-exception"})
     void testControllerReturningHttpStatus(String path) throws IOException {
         TestScenario.builder()
-            .specName("StatusSpec")
+            .specName(SPEC_NAME)
             .request(HttpRequest.GET(path))
             .assertion((server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.I_AM_A_TEAPOT)
@@ -56,7 +58,7 @@ public class StatusTest {
             .run();
     }
 
-    @Requires(property = "spec.name", value = "StatusSpec")
+    @Requires(property = "spec.name", value = SPEC_NAME)
     @Controller("/http-status")
     static class HttpStatusController {
         @Get
@@ -65,7 +67,7 @@ public class StatusTest {
         }
     }
 
-    @Requires(property = "spec.name", value = "StatusSpec")
+    @Requires(property = "spec.name", value = SPEC_NAME)
     @Controller("/http-response-status")
     static class HttpResponseStatusController {
 
@@ -75,7 +77,7 @@ public class StatusTest {
         }
     }
 
-    @Requires(property = "spec.name", value = "StatusSpec")
+    @Requires(property = "spec.name", value = SPEC_NAME)
     @Controller("/http-exception")
     static class HttpResponseErrorController {
 
