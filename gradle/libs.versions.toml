@@ -22,7 +22,6 @@ jsr107 = "1.1.1"
 javax-el = "3.0.1-b12"
 javax-el-impl = "2.2.1-b05"
 logbook-netty = "2.14.0"
-log4j = "2.19.0"
 selenium = "3.141.59"
 smallrye = "5.5.0"
 systemlambda = "1.2.1"
@@ -53,7 +52,7 @@ managed-h2 = "1.4.200"
 managed-hystrix = "1.5.18"
 managed-jakarta-annotation-api = "2.1.1"
 managed-jackson = "2.14.0"
-managed-jackson-databind = "2.14.0"
+managed-jackson-databind = "2.14.1"
 managed-javax-annotation-api = "1.3.2"
 managed-jcache = "1.1.1"
 managed-jna = "5.12.1"
@@ -62,18 +61,18 @@ managed-kafka = "2.8.2"
 managed-ktor = "1.6.8"
 managed-logback = "1.2.11"
 managed-lombok = "1.18.24"
-managed-maven-native-plugin = "0.9.18"
+managed-maven-native-plugin = "0.9.19"
 managed-methvin-directory-watcher = "0.16.1"
 managed-micrometer = "1.9.4"
 managed-micronaut-acme = "3.2.0"
 managed-micronaut-aot = "1.1.1"
-managed-micronaut-aws = "3.9.3"
+managed-micronaut-aws = "3.10.0"
 managed-micronaut-azure = "3.6.0"
 managed-micronaut-cache = "3.5.0"
 managed-micronaut-cassandra = "5.1.1"
 managed-micronaut-coherence = "3.5.1"
 managed-micronaut-crac = "1.0.1"
-managed-micronaut-data = "3.8.1"
+managed-micronaut-data = "3.9.1"
 managed-micronaut-discovery = "3.2.0"
 managed-micronaut-elasticsearch = "4.3.0"
 managed-micronaut-email = "1.5.0"
@@ -100,7 +99,7 @@ managed-micronaut-neo4j = "5.2.0"
 managed-micronaut-nats = "3.1.0"
 managed-micronaut-netflix = "2.1.0"
 managed-micronaut-object-storage = "1.1.0"
-managed-micronaut-openapi = "4.8.0"
+managed-micronaut-openapi = "4.8.1"
 managed-micronaut-oraclecloud = "2.3.0"
 managed-micronaut-picocli = "4.3.0"
 managed-micronaut-problem = "2.5.1"
@@ -118,7 +117,7 @@ managed-micronaut-servlet = "3.3.2"
 managed-micronaut-spring = "4.3.1"
 managed-micronaut-sql = "4.7.2"
 managed-micronaut-test = "3.8.0"
-managed-micronaut-test-resources = "1.1.3"
+managed-micronaut-test-resources = "1.2.3"
 managed-micronaut-toml = "1.1.1"
 managed-micronaut-tracing = "4.4.0"
 managed-micronaut-tracing-legacy = "3.2.7"
@@ -134,6 +133,7 @@ managed-reactor = "3.4.23"
 managed-rxjava1 = "1.3.8"
 managed-rxjava1-interop = "0.13.7"
 managed-slf4j = "1.7.36"
+managed-log4j = "2.19.0"
 managed-spock = "2.0-groovy-3.0"
 managed-spotbugs = "4.7.1"
 managed-spring = "5.3.23"
@@ -191,6 +191,7 @@ boms-micronaut-test-resources = { module = "io.micronaut.testresources:micronaut
 
 boms-groovy = { module = "org.codehaus.groovy:groovy-bom", version.ref = "managed-groovy" }
 boms-jackson = { module = "com.fasterxml.jackson:jackson-bom", version.ref = "managed-jackson" }
+boms-log4j = { module = "org.apache.logging.log4j:log4j-bom", version.ref = "managed-log4j" }
 boms-junit5 = { module = "org.junit:junit-bom", version.ref = "managed-junit5" }
 boms-kotlin = { module = "org.jetbrains.kotlin:kotlin-bom", version.ref = "managed-kotlin" }
 boms-kotlin-coroutines = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-bom", version.ref = "managed-kotlin-coroutines" }
@@ -266,6 +267,8 @@ managed-jsr305 = { module = "com.google.code.findbugs:jsr305", version.ref = "ma
 managed-kafka212 = { module = "org.apache.kafka:kafka_2.12", version.ref = "managed-kafka" }
 
 managed-logback = { module = "ch.qos.logback:logback-classic", version.ref = "managed-logback" }
+managed-logback-core = { module = "ch.qos.logback:logback-core", version.ref = "managed-logback" }
+managed-logback-access = { module = "ch.qos.logback:logback-access", version.ref = "managed-logback" }
 
 managed-lombok = { module = "org.projectlombok:lombok", version.ref = "managed-lombok" }
 
@@ -331,6 +334,14 @@ managed-rxjava1-interop = { module = "com.github.akarnokd:rxjava2-interop", vers
 
 managed-slf4j = { module = "org.slf4j:slf4j-api", version.ref = "managed-slf4j" }
 managed-slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "managed-slf4j" }
+managed-slf4j-nop = { module = "org.slf4j:slf4j-nop", version.ref = "managed-slf4j" }
+managed-slf4j-log4j12 = { module = "org.slf4j:slf4j-log4j12", version.ref = "managed-slf4j" }
+managed-slf4j-reload4j = { module = "org.slf4j:slf4j-reload4j", version.ref = "managed-slf4j" }
+managed-slf4j-ext = { module = "org.slf4j:slf4j-ext", version.ref = "managed-slf4j" }
+managed-slf4j-jcl-over-slf4j = { module = "org.slf4j:jcl-over-slf4j", version.ref = "managed-slf4j" }
+managed-slf4j-log4j-over-slf4j = { module = "org.slf4j:log4j-over-slf4j", version.ref = "managed-slf4j" }
+managed-slf4j-jul-to-slf4j = { module = "org.slf4j:jul-to-slf4j", version.ref = "managed-slf4j" }
+managed-slf4j-osgi-over-slf4j = { module = "org.slf4j:osgi-over-slf4j", version.ref = "managed-slf4j" }
 
 managed-snakeyaml = { module = "org.yaml:snakeyaml", version.ref = "managed-snakeyaml" }
 
@@ -409,7 +420,7 @@ kotlinx-coroutines-rx2 = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-rx
 kotlinx-coroutines-slf4j = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-slf4j", version.ref = "managed-kotlin-coroutines" }
 kotlinx-coroutines-reactor = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-reactor", version.ref = "managed-kotlin-coroutines" }
 
-log4j = { module = "org.apache.logging.log4j:log4j-core", version.ref = "log4j" }
+log4j = { module = "org.apache.logging.log4j:log4j-core", version.ref = "managed-log4j" }
 
 logbook-netty = { module = "org.zalando:logbook-netty", version.ref = "logbook-netty" }
 
