@@ -37,6 +37,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * @author Sergio del Amo
  * @since 3.8.0
  */
+@SuppressWarnings({
+    "java:S5960", // We're allowed assertions, as these are used in tests only
+})
 public final class AssertionUtils {
 
     private AssertionUtils() {
