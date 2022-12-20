@@ -313,7 +313,7 @@ public class ErrorHandlerTest {
     }
 
     @Controller("/global-errors")
-    @Requires(property = "spec.name", value = "ErrorHandlerTest")
+    @Requires(property = "spec.name", value = SPEC_NAME)
     static class GlobalErrorController {
 
         @Error(global = true, exception = GloballyHandledException.class)
@@ -333,7 +333,7 @@ public class ErrorHandlerTest {
     }
 
     @Singleton
-    @Requires(property = "spec.name", value = "ErrorHandlerTest")
+    @Requires(property = "spec.name", value = SPEC_NAME)
     static class CodecExceptionExceptionHandler
         implements ExceptionHandler<CodecException, HttpResponse> {
 
@@ -344,7 +344,7 @@ public class ErrorHandlerTest {
     }
 
     @Singleton
-    @Requires(property = "spec.name", value = "ErrorHandlerTest")
+    @Requires(property = "spec.name", value = SPEC_NAME)
     static class RuntimeErrorHandler implements ExceptionHandler<RuntimeException, HttpResponse> {
 
         @Override
@@ -355,7 +355,7 @@ public class ErrorHandlerTest {
     }
 
     @Singleton
-    @Requires(property = "spec.name", value = "ErrorHandlerTest")
+    @Requires(property = "spec.name", value = SPEC_NAME)
     static class MyErrorHandler implements ExceptionHandler<MyException, HttpResponse> {
 
         @Override
