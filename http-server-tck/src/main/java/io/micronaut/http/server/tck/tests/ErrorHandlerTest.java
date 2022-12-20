@@ -54,11 +54,12 @@ import java.util.Map;
 @SuppressWarnings({
     "java:S5960", // We're allowed assertions, as these are used in tests only
     "checkstyle:MissingJavadocType",
+    "checkstyle:DesignForExtension"
 })
 
-public interface ErrorHandlerTest {
+public class ErrorHandlerTest {
     @Test
-    default void testCustomGlobalExceptionHandlersDeclaredInController() throws IOException {
+    void testCustomGlobalExceptionHandlersDeclaredInController() throws IOException {
         TestScenario.builder()
             .configuration(CollectionUtils.mapOf(
                 "micronaut.server.cors.configurations.web.allowedOrigins", Collections.singletonList("http://localhost:8080"),
@@ -75,7 +76,7 @@ public interface ErrorHandlerTest {
     }
 
     @Test
-    default void testCustomGlobalExceptionHandlers() throws IOException {
+    void testCustomGlobalExceptionHandlers() throws IOException {
         TestScenario.builder()
             .configuration(CollectionUtils.mapOf(
                 "micronaut.server.cors.configurations.web.allowedOrigins", Collections.singletonList("http://localhost:8080"),
@@ -92,7 +93,7 @@ public interface ErrorHandlerTest {
     }
 
     @Test
-    default void testCustomGlobalExceptionHandlersForPOSTWithBody() throws IOException {
+    void testCustomGlobalExceptionHandlersForPOSTWithBody() throws IOException {
         Map<String, Object> configuration = CollectionUtils.mapOf(
             "micronaut.server.cors.configurations.web.allowedOrigins", Collections.singletonList("http://localhost:8080"),
             "micronaut.server.cors.enabled", StringUtils.TRUE
@@ -109,7 +110,7 @@ public interface ErrorHandlerTest {
     }
 
     @Test
-    default void testCustomGlobalStatusHandlersDeclaredInController() throws IOException {
+    void testCustomGlobalStatusHandlersDeclaredInController() throws IOException {
         TestScenario.builder()
             .configuration(CollectionUtils.mapOf(
                 "micronaut.server.cors.configurations.web.allowedOrigins", Collections.singletonList("http://localhost:8080"),
@@ -125,7 +126,7 @@ public interface ErrorHandlerTest {
     }
 
     @Test
-    default void testLocalExceptionHandlers() throws IOException {
+    void testLocalExceptionHandlers() throws IOException {
         TestScenario.builder()
             .configuration(CollectionUtils.mapOf(
             "micronaut.server.cors.configurations.web.allowedOrigins", Collections.singletonList("http://localhost:8080"),
@@ -140,7 +141,7 @@ public interface ErrorHandlerTest {
     }
 
     @Test
-    default void jsonMessageFormatErrorsReturn400() throws IOException {
+    void jsonMessageFormatErrorsReturn400() throws IOException {
         TestScenario.builder()
             .configuration(CollectionUtils.mapOf(
             "micronaut.server.cors.configurations.web.allowedOrigins", Collections.singletonList("http://localhost:8080"),
@@ -156,7 +157,7 @@ public interface ErrorHandlerTest {
     }
 
     @Test
-    default void corsHeadersArePresentAfterFailedDeserialisationWhenErrorHandlerIsUsed() throws IOException {
+    void corsHeadersArePresentAfterFailedDeserialisationWhenErrorHandlerIsUsed() throws IOException {
         TestScenario.builder()
             .configuration(CollectionUtils.mapOf(
             "micronaut.server.cors.configurations.web.allowedOrigins", Collections.singletonList("http://localhost:8080"),
@@ -172,7 +173,7 @@ public interface ErrorHandlerTest {
     }
 
     @Test
-    default void corsHeadersArePresentAfterFailedDeserialisation() throws IOException {
+    void corsHeadersArePresentAfterFailedDeserialisation() throws IOException {
         TestScenario.builder()
             .configuration(CollectionUtils.mapOf(
                 "micronaut.server.cors.configurations.web.allowedOrigins", Collections.singletonList("http://localhost:8080"),
@@ -189,7 +190,7 @@ public interface ErrorHandlerTest {
     }
 
     @Test
-    default void corsHeadersArePresentAfterExceptions() throws IOException {
+    void corsHeadersArePresentAfterExceptions() throws IOException {
         TestScenario.builder()
             .configuration(CollectionUtils.mapOf(
             "micronaut.server.cors.configurations.web.allowedOrigins", Collections.singletonList("http://localhost:8080"),
@@ -206,7 +207,7 @@ public interface ErrorHandlerTest {
     }
 
     @Test
-    default void messageValidationErrorsReturn400() throws IOException {
+    void messageValidationErrorsReturn400() throws IOException {
         TestScenario.builder()
             .configuration(CollectionUtils.mapOf(
             "micronaut.server.cors.configurations.web.allowedOrigins", Collections.singletonList("http://localhost:8080"),
@@ -223,7 +224,7 @@ public interface ErrorHandlerTest {
 
     @Controller("/secret")
     @Requires(property = "spec.name", value = "ErrorHandlerTest")
-    class SecretController {
+    static class SecretController {
         @Get
         @Produces(MediaType.TEXT_PLAIN)
         String index() {
@@ -233,7 +234,7 @@ public interface ErrorHandlerTest {
 
     @Requires(property = "spec.name", value = "ErrorHandlerTest")
     @Controller("/errors")
-    class ErrorController {
+    static class ErrorController {
 
         @Get("/global")
         String globalHandler() {
@@ -266,7 +267,7 @@ public interface ErrorHandlerTest {
 
     @Controller(value = "/json/errors", produces = io.micronaut.http.MediaType.APPLICATION_JSON)
     @Requires(property = "spec.name", value = "ErrorHandlerTest")
-    class JsonErrorController {
+    static class JsonErrorController {
 
         @Post("/global")
         String globalHandlerPost(@Body RequestObject object) {
@@ -284,7 +285,7 @@ public interface ErrorHandlerTest {
     }
 
     @Introspected
-    class RequestObject {
+    static class RequestObject {
         @Min(1L)
         private Integer numberField;
 
@@ -299,7 +300,7 @@ public interface ErrorHandlerTest {
 
     @Controller("/json")
     @Requires(property = "spec.name", value = "ErrorHandlerTest")
-    class JsonController {
+    static class JsonController {
         @Post("/jsonBody")
         String jsonBody(@Valid @Body RequestObject data) {
             return "blah";
@@ -308,7 +309,7 @@ public interface ErrorHandlerTest {
 
     @Controller("/global-errors")
     @Requires(property = "spec.name", value = "ErrorHandlerTest")
-    class GlobalErrorController {
+    static class GlobalErrorController {
 
         @Error(global = true, exception = GloballyHandledException.class)
         @Produces(io.micronaut.http.MediaType.TEXT_PLAIN)
@@ -328,7 +329,7 @@ public interface ErrorHandlerTest {
 
     @Singleton
     @Requires(property = "spec.name", value = "ErrorHandlerTest")
-    class CodecExceptionExceptionHandler
+    static class CodecExceptionExceptionHandler
         implements ExceptionHandler<CodecException, HttpResponse> {
 
         @Override
@@ -339,7 +340,7 @@ public interface ErrorHandlerTest {
 
     @Singleton
     @Requires(property = "spec.name", value = "ErrorHandlerTest")
-    class RuntimeErrorHandler implements ExceptionHandler<RuntimeException, HttpResponse> {
+    static class RuntimeErrorHandler implements ExceptionHandler<RuntimeException, HttpResponse> {
 
         @Override
         public HttpResponse handle(HttpRequest request, RuntimeException exception) {
@@ -350,7 +351,7 @@ public interface ErrorHandlerTest {
 
     @Singleton
     @Requires(property = "spec.name", value = "ErrorHandlerTest")
-    class MyErrorHandler implements ExceptionHandler<MyException, HttpResponse> {
+    static class MyErrorHandler implements ExceptionHandler<MyException, HttpResponse> {
 
         @Override
         public HttpResponse handle(HttpRequest request, MyException exception) {
@@ -360,19 +361,19 @@ public interface ErrorHandlerTest {
     }
 
 
-    class MyException extends RuntimeException {
+    static class MyException extends RuntimeException {
         public MyException(String badThings) {
             super(badThings);
         }
     }
 
-    class AnotherException extends RuntimeException {
+    static class AnotherException extends RuntimeException {
         public AnotherException(String badThings) {
             super(badThings);
         }
     }
 
-    class GloballyHandledException extends Exception {
+    static class GloballyHandledException extends Exception {
         public GloballyHandledException(String badThingsHappensGlobally) {
             super(badThingsHappensGlobally);
         }

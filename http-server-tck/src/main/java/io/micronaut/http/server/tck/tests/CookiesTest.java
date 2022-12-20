@@ -35,11 +35,12 @@ import java.util.Map;
 @SuppressWarnings({
     "java:S5960", // We're allowed assertions, as these are used in tests only
     "checkstyle:MissingJavadocType",
+    "checkstyle:DesignForExtension"
 })
-public interface CookiesTest {
+public class CookiesTest {
 
     @Test
-    default void testCookieBind() throws IOException {
+    void testCookieBind() throws IOException {
         TestScenario.builder()
             .specName("CookiesTest")
             .request(HttpRequest.GET("/cookies-test/bind")
@@ -53,7 +54,7 @@ public interface CookiesTest {
     }
 
     @Test
-    default void testGetCookiesMethod() throws IOException {
+    void testGetCookiesMethod() throws IOException {
         TestScenario.builder()
             .specName("CookiesTest")
             .request(HttpRequest.GET("/cookies-test/all")
@@ -67,7 +68,7 @@ public interface CookiesTest {
     }
 
     @Test
-    default void testNoCookie() throws IOException {
+    void testNoCookie() throws IOException {
         TestScenario.builder()
             .specName("CookiesTest")
             .request(HttpRequest.GET("/cookies-test/all"))
@@ -80,7 +81,7 @@ public interface CookiesTest {
 
     @Controller("/cookies-test")
     @Requires(property = "spec.name", value = "CookiesTest")
-    class CookieController {
+    static class CookieController {
 
         @Get(uri = "/all")
         Map<String, String> all(HttpRequest request) {

@@ -29,15 +29,15 @@ import io.micronaut.http.server.tck.TestScenario;
 import org.junit.jupiter.api.Test;
 import java.io.IOException;
 
-
 @SuppressWarnings({
     "java:S5960", // We're allowed assertions, as these are used in tests only
     "checkstyle:MissingJavadocType",
+    "checkstyle:DesignForExtension"
 })
-public interface VersionTest {
+public class VersionTest {
 
     @Test
-    default void testControllerMethodWithVersion2() throws IOException {
+    void testControllerMethodWithVersion2() throws IOException {
         TestScenario.builder()
             .configuration(CollectionUtils.mapOf(
                 "micronaut.router.versioning.enabled", StringUtils.TRUE,
@@ -53,7 +53,7 @@ public interface VersionTest {
 
     @Controller("/version")
     @Requires(property = "spec.name", value = "VersionSpec")
-    class ConsumesController {
+    static class ConsumesController {
 
         @Get("/ping")
         String pingV1() {

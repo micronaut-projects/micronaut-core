@@ -37,15 +37,16 @@ import java.io.IOException;
 @SuppressWarnings({
     "java:S5960", // We're allowed assertions, as these are used in tests only
     "checkstyle:MissingJavadocType",
+    "checkstyle:DesignForExtension"
 })
-public interface StatusTest {
+public class StatusTest {
     /**
      * @see <a href="https://github.com/micronaut-projects/micronaut-aws/issues/1387">micronaut-aws #1387</a>
      * @param path Request Path
      */
     @ParameterizedTest
     @ValueSource(strings = {"/http-status", "/http-response-status", "/http-exception"})
-    default void testControllerReturningHttpStatus(String path) throws IOException {
+    void testControllerReturningHttpStatus(String path) throws IOException {
         TestScenario.builder()
             .specName("StatusSpec")
             .request(HttpRequest.GET(path))
@@ -57,7 +58,7 @@ public interface StatusTest {
 
     @Requires(property = "spec.name", value = "StatusSpec")
     @Controller("/http-status")
-    class HttpStatusController {
+    static class HttpStatusController {
         @Get
         HttpStatus index() {
             return HttpStatus.I_AM_A_TEAPOT;
@@ -66,7 +67,7 @@ public interface StatusTest {
 
     @Requires(property = "spec.name", value = "StatusSpec")
     @Controller("/http-response-status")
-    class HttpResponseStatusController {
+    static class HttpResponseStatusController {
 
         @Get
         HttpResponse<?> index() {
@@ -76,7 +77,7 @@ public interface StatusTest {
 
     @Requires(property = "spec.name", value = "StatusSpec")
     @Controller("/http-exception")
-    class HttpResponseErrorController {
+    static class HttpResponseErrorController {
 
         @Get
         HttpResponse<?> index() {
@@ -84,12 +85,12 @@ public interface StatusTest {
         }
     }
 
-    class TeapotException extends RuntimeException {
+    static class TeapotException extends RuntimeException {
     }
 
     @Produces
     @Singleton
-    class TeapotExceptionHandler implements ExceptionHandler<TeapotException, HttpResponse<?>> {
+    static class TeapotExceptionHandler implements ExceptionHandler<TeapotException, HttpResponse<?>> {
         private final ErrorResponseProcessor<?> errorResponseProcessor;
 
         TeapotExceptionHandler(ErrorResponseProcessor<?> errorResponseProcessor) {

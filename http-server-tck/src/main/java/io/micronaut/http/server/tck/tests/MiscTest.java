@@ -42,14 +42,15 @@ import java.util.Map;
 @SuppressWarnings({
     "java:S5960", // We're allowed assertions, as these are used in tests only
     "checkstyle:MissingJavadocType",
+    "checkstyle:DesignForExtension"
 })
-public interface MiscTest {
+public class MiscTest {
     /**
      *
      * @see <a href="https://github.com/micronaut-projects/micronaut-aws/issues/868">micronaut-aws #868</a>
      */
     @Test
-    default void testSelectedRouteReflectsAcceptHeader() throws IOException {
+    void testSelectedRouteReflectsAcceptHeader() throws IOException {
         TestScenario.builder()
             .specName("MiscTest")
             .request(HttpRequest.GET("/bar/ok").header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON))
@@ -71,7 +72,7 @@ public interface MiscTest {
     }
 
     @Test
-    default void testBehaviourOf404() throws IOException {
+    void testBehaviourOf404() throws IOException {
         TestScenario.builder()
             .specName("MiscTest")
             .request(HttpRequest.GET("/does-not-exist").header("Accept", MediaType.APPLICATION_JSON))
@@ -82,7 +83,7 @@ public interface MiscTest {
     }
 
     @Test
-    default void postFormUrlEncodedBodyBindingToPojoWorks() throws IOException {
+    void postFormUrlEncodedBodyBindingToPojoWorks() throws IOException {
         TestScenario.builder()
             .specName("MiscTest")
             .request(HttpRequest.POST("/form", "message=World")
@@ -95,7 +96,7 @@ public interface MiscTest {
     }
 
     @Test
-    default void postFormUrlEncodedBodyBindingToPojoWorksIfYouDontSpecifyBodyAnnotation() throws IOException {
+    void postFormUrlEncodedBodyBindingToPojoWorksIfYouDontSpecifyBodyAnnotation() throws IOException {
         TestScenario.builder()
             .specName("MiscTest")
             .request(HttpRequest.POST("/form/without-body-annotation", "message=World")
@@ -108,7 +109,7 @@ public interface MiscTest {
     }
 
     @Test
-    default void formUrlEncodedWithBodyAnnotationAndANestedAttribute() throws IOException {
+    void formUrlEncodedWithBodyAnnotationAndANestedAttribute() throws IOException {
         TestScenario.builder()
             .specName("MiscTest")
             .request(HttpRequest.POST("/form/nested-attribute", "message=World")
@@ -125,7 +126,7 @@ public interface MiscTest {
      * @see <a href="https://github.com/micronaut-projects/micronaut-aws/issues/1410">micronaut-aws #1410</a>
      */
     @Test
-    default void applicationJsonWithBodyAnnotationAndANestedAttribute() throws IOException {
+    void applicationJsonWithBodyAnnotationAndANestedAttribute() throws IOException {
         TestScenario.builder()
             .specName("MiscTest")
             .request(HttpRequest.POST("/form/json-nested-attribute", "{\"message\":\"World\"}")
@@ -138,7 +139,7 @@ public interface MiscTest {
     }
 
     @Test
-    default void applicationJsonWithoutBodyAnnotation() throws IOException {
+    void applicationJsonWithoutBodyAnnotation() throws IOException {
         TestScenario.builder()
             .specName("MiscTest")
             .request(HttpRequest.POST("/form/json-without-body-annotation", "{\"message\":\"World\"}")
@@ -151,7 +152,7 @@ public interface MiscTest {
     }
 
     @Test
-    default void applicationJsonWithBodyAnnotationAndANestedAttributeAndMapReturnRenderedAsJSON() throws IOException {
+    void applicationJsonWithBodyAnnotationAndANestedAttributeAndMapReturnRenderedAsJSON() throws IOException {
         TestScenario.builder()
             .specName("MiscTest")
             .request(HttpRequest.POST("/form/json-nested-attribute-with-map-return", "{\"message\":\"World\"}")
@@ -164,7 +165,7 @@ public interface MiscTest {
     }
 
     @Test
-    default void applicationJsonWithBodyAnnotationAndObjectReturnRenderedAsJson() throws IOException {
+    void applicationJsonWithBodyAnnotationAndObjectReturnRenderedAsJson() throws IOException {
         TestScenario.builder()
             .specName("MiscTest")
             .request(HttpRequest.POST("/form/json-with-body-annotation-and-with-object-return", "{\"message\":\"World\"}")
@@ -178,7 +179,7 @@ public interface MiscTest {
 
     @Controller
     @Requires(property = "spec.name", value = "MiscTest")
-    class SimpleController {
+    static class SimpleController {
         @Get(uri = "/foo")
         HttpResponse<String> getParamValue(HttpRequest request) {
             return HttpResponse.ok()
@@ -189,7 +190,7 @@ public interface MiscTest {
 
     @Controller("/bar")
     @Requires(property = "spec.name", value = "MiscTest")
-    class ProduceController {
+    static class ProduceController {
         @Get(value = "/ok", produces = MediaType.APPLICATION_JSON)
         String getOkAsJson() {
             return "{\"status\":\"ok\"}";
@@ -202,7 +203,7 @@ public interface MiscTest {
     }
 
     @Introspected
-    class MessageCreate {
+    static class MessageCreate {
 
         @NonNull
         @NotBlank
@@ -219,7 +220,7 @@ public interface MiscTest {
     }
 
     @Introspected
-    class MyResponse {
+    static class MyResponse {
 
         @NonNull
         @NotBlank
@@ -237,7 +238,7 @@ public interface MiscTest {
 
     @Controller("/form")
     @Requires(property = "spec.name", value = "MiscTest")
-    class FormController {
+    static class FormController {
 
         @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
         @Post("/without-body-annotation")

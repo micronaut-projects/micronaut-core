@@ -34,11 +34,12 @@ import java.util.Map;
 @SuppressWarnings({
     "java:S5960", // We're allowed assertions, as these are used in tests only
     "checkstyle:MissingJavadocType",
+    "checkstyle:DesignForExtension"
 })
-public interface FluxTest {
+public class FluxTest {
 
     @Test
-    default void testControllerReturningAFlux() throws IOException {
+    void testControllerReturningAFlux() throws IOException {
         TestScenario.builder()
             .specName("FluxTest")
             .request(HttpRequest.GET("/users"))
@@ -51,7 +52,7 @@ public interface FluxTest {
 
     @Controller("/users")
     @Requires(property = "spec.name", value = "FluxTest")
-    class UserController {
+    static class UserController {
         @Get
         Flux<Map<String, String>> getAll() {
             return Flux.fromIterable(Arrays.asList(Collections.singletonMap("name", "Joe"), Collections.singletonMap("name", "Lewis")));

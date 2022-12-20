@@ -5,4 +5,5 @@ dependencies {
     testImplementation(projects.httpServerNetty)
     testImplementation(projects.httpClient)
     testImplementation(projects.httpServerTck)
+    testImplementation(libs.junit.platform.engine)
 }

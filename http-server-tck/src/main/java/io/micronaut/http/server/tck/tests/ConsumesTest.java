@@ -33,10 +33,11 @@ import java.io.IOException;
 @SuppressWarnings({
     "java:S5960", // We're allowed assertions, as these are used in tests only
     "checkstyle:MissingJavadocType",
+    "checkstyle:DesignForExtension"
 })
-public interface ConsumesTest {
+public class ConsumesTest {
     @Test
-    default void testMultipleConsumesDefinition() throws IOException {
+    void testMultipleConsumesDefinition() throws IOException {
         TestScenario.builder()
             .specName("ConsumesTest")
             .request(HttpRequest.POST("/consumes-test", "{\"name\":\"Fred\"}").header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON))
@@ -49,7 +50,7 @@ public interface ConsumesTest {
 
     @Controller("/consumes-test")
     @Requires(property = "spec.name", value = "ConsumesTest")
-    class ConsumesController {
+    static class ConsumesController {
 
         @Post("/")
         @Consumes({MediaType.APPLICATION_FORM_URLENCODED, MediaType.APPLICATION_JSON})
@@ -58,7 +59,7 @@ public interface ConsumesTest {
         }
     }
 
-    class Pojo {
+    static class Pojo {
         private String name;
 
         public String getName() {

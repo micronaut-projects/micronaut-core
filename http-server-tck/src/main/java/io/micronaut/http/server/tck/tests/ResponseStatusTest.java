@@ -40,11 +40,12 @@ import java.util.Optional;
 @SuppressWarnings({
     "java:S5960", // We're allowed assertions, as these are used in tests only
     "checkstyle:MissingJavadocType",
+    "checkstyle:DesignForExtension"
 })
-public interface ResponseStatusTest {
+public class ResponseStatusTest {
 
     @Test
-    default void testConstraintViolationCauses400() throws IOException {
+    void testConstraintViolationCauses400() throws IOException {
         TestScenario.builder()
             .specName("ResponseStatusSpec")
             .request(HttpRequest.POST("/response-status/constraint-violation", Collections.emptyMap()).header(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN))
@@ -55,7 +56,7 @@ public interface ResponseStatusTest {
     }
 
     @Test
-    default void testVoidMethodsDoesNotCause404() throws IOException {
+    void testVoidMethodsDoesNotCause404() throws IOException {
         TestScenario.builder()
             .specName("ResponseStatusSpec")
             .request(HttpRequest.DELETE("/response-status/delete-something")
@@ -67,7 +68,7 @@ public interface ResponseStatusTest {
     }
 
     @Test
-    default void testNullCauses404() throws IOException {
+    void testNullCauses404() throws IOException {
         TestScenario.builder()
             .request(HttpRequest.GET("/response-status/null").header(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN))
             .specName("ResponseStatusSpec")
@@ -78,7 +79,7 @@ public interface ResponseStatusTest {
     }
 
     @Test
-    default void testOptionalCauses404() throws IOException {
+    void testOptionalCauses404() throws IOException {
         TestScenario.builder()
             .specName("ResponseStatusSpec")
             .request(HttpRequest.GET("/response-status/optional").header(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN))
@@ -89,7 +90,7 @@ public interface ResponseStatusTest {
     }
 
     @Test
-    default void testCustomResponseStatus() throws IOException {
+    void testCustomResponseStatus() throws IOException {
         TestScenario.builder()
             .specName("ResponseStatusSpec")
             .request(HttpRequest.POST("/response-status", "foo")
@@ -103,7 +104,7 @@ public interface ResponseStatusTest {
 
     @Controller("/response-status")
     @Requires(property = "spec.name", value = "ResponseStatusSpec")
-    class StatusController {
+    static class StatusController {
 
         @Post(uri = "/", processes = MediaType.TEXT_PLAIN)
         @Status(HttpStatus.CREATED)

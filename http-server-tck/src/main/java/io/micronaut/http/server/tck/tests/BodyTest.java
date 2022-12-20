@@ -37,11 +37,12 @@ import java.util.Objects;
 @SuppressWarnings({
     "java:S5960", // We're allowed assertions, as these are used in tests only
     "checkstyle:MissingJavadocType",
+    "checkstyle:DesignForExtension"
 })
-public interface BodyTest {
+public class BodyTest {
 
     @Test
-    default void testCustomBodyPOJO() throws IOException {
+    void testCustomBodyPOJO() throws IOException {
         TestScenario.builder()
             .specName("BodyTest")
             .request(HttpRequest.POST("/response-body/pojo", "{\"x\":10,\"y\":20}")
@@ -55,7 +56,7 @@ public interface BodyTest {
     }
 
     @Test
-    default void testCustomBodyPOJODefaultToJSON() throws IOException {
+    void testCustomBodyPOJODefaultToJSON() throws IOException {
         TestScenario.builder()
             .specName("BodyTest")
             .request(HttpRequest.POST("/response-body/pojo", "{\"x\":10,\"y\":20}"))
@@ -67,7 +68,7 @@ public interface BodyTest {
     }
 
     @Test
-    default void testCustomBodyPOJOWithWholeRequest() throws IOException {
+    void testCustomBodyPOJOWithWholeRequest() throws IOException {
         TestScenario.builder()
             .specName("BodyTest")
             .request(HttpRequest.POST("/response-body/pojo-and-request", "{\"x\":10,\"y\":20}")
@@ -80,7 +81,7 @@ public interface BodyTest {
     }
 
     @Test
-    default void testCustomBodyPOJOReactiveTypes() throws IOException {
+    void testCustomBodyPOJOReactiveTypes() throws IOException {
         TestScenario.builder()
             .specName("BodyTest")
             .request(HttpRequest.POST("/response-body/pojo-reactive", "{\"x\":10,\"y\":20}")
@@ -95,7 +96,7 @@ public interface BodyTest {
 
     @Controller("/response-body")
     @Requires(property = "spec.name", value = "BodyTest")
-    class BodyController {
+    static class BodyController {
 
         @Post(uri = "/pojo")
         @Status(HttpStatus.CREATED)
@@ -123,7 +124,7 @@ public interface BodyTest {
         }
     }
 
-    class Point {
+    static class Point {
         private Integer x;
         private Integer y;
 

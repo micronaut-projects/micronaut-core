@@ -33,10 +33,11 @@ import java.util.List;
 @SuppressWarnings({
     "java:S5960", // We're allowed assertions, as these are used in tests only
     "checkstyle:MissingJavadocType",
+    "checkstyle:DesignForExtension"
 })
-public interface ParameterTest {
+public class ParameterTest {
     @Test
-    default void testGetAllMethod() throws IOException {
+    void testGetAllMethod() throws IOException {
         TestScenario.builder()
             .specName("ParameterTest")
             .request(HttpRequest.GET(UriBuilder.of("/parameters-test").path("all")

@@ -42,11 +42,12 @@ import java.util.Collections;
 @SuppressWarnings({
     "java:S5960", // We're allowed assertions, as these are used in tests only
     "checkstyle:MissingJavadocType",
+    "checkstyle:DesignForExtension"
 })
-public interface RemoteAddressTest {
+public class RemoteAddressTest {
 
     @Test
-    default void testRemoteAddressComesFromIdentitySourceIp() throws IOException {
+    void testRemoteAddressComesFromIdentitySourceIp() throws IOException {
         TestScenario.builder()
             .specName("RemoteAddressTest")
             .request(HttpRequest.GET("/remoteAddress/fromSourceIp"))
@@ -59,7 +60,7 @@ public interface RemoteAddressTest {
 
     @Requires(property = "spec.name", value = "RemoteAddressTest")
     @Controller("/remoteAddress")
-    class TestController {
+    static class TestController {
         @Get("fromSourceIp")
         void sourceIp() {
         }
@@ -67,7 +68,7 @@ public interface RemoteAddressTest {
 
     @Requires(property = "spec.name", value = "RemoteAddressTest")
     @Filter("/remoteAddress/**")
-    class CaptureRemoteAddressFiter implements HttpServerFilter {
+    static class CaptureRemoteAddressFiter implements HttpServerFilter {
         @Override
         public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
             return Publishers.map(chain.proceed(request), httpResponse -> {
@@ -80,7 +81,7 @@ public interface RemoteAddressTest {
     @Requires(property = "spec.name", value = "RemoteAddressTest")
     @Produces
     @Singleton
-    class CustomExceptionHandler implements ExceptionHandler<Exception, HttpResponse> {
+    static class CustomExceptionHandler implements ExceptionHandler<Exception, HttpResponse> {
         @Override
         public HttpResponse handle(HttpRequest request, Exception exception) {
             return HttpResponse.serverError(exception.toString());

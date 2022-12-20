@@ -37,10 +37,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 @SuppressWarnings({
     "java:S5960", // We're allowed assertions, as these are used in tests only
     "checkstyle:MissingJavadocType",
+    "checkstyle:DesignForExtension"
 })
-public interface DeleteWithoutBodyTest {
+public class DeleteWithoutBodyTest {
     @Test
-    default void verifiesItIsPossibleToExposesADeleteEndpointWhichIsInvokedWithoutABody() throws IOException {
+    void verifiesItIsPossibleToExposesADeleteEndpointWhichIsInvokedWithoutABody() throws IOException {
         TestScenario.builder()
             .specName("DeleteWithoutBodyTest")
             .request(HttpRequest.DELETE("/sessions/sergio").header(HttpHeaders.AUTHORIZATION, HttpHeaderValues.AUTHORIZATION_PREFIX_BEARER + " xxx"))
@@ -53,7 +54,7 @@ public interface DeleteWithoutBodyTest {
 
     @Requires(property = "spec.name", value = "DeleteWithoutBodyTest")
     @Controller("/sessions")
-    class SessionsController {
+    static class SessionsController {
         @Status(HttpStatus.OK)
         @Delete("/{username}")
         void delete(@PathVariable String username,

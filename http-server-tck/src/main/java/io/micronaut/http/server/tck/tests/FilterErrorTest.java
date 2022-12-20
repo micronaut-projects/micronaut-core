@@ -55,10 +55,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @SuppressWarnings({
     "java:S5960", // We're allowed assertions, as these are used in tests only
     "checkstyle:MissingJavadocType",
+    "checkstyle:DesignForExtension"
 })
-public interface FilterErrorTest {
+public class FilterErrorTest {
     @Test
-    default void testFilterThrowingExceptionHandledByExceptionHandlerThrowingException() throws IOException {
+    void testFilterThrowingExceptionHandledByExceptionHandlerThrowingException() throws IOException {
         TestScenario.builder()
             .specName("FilterErrorSpec3")
             .request(HttpRequest.GET("/filter-error-spec-3")
@@ -77,7 +78,7 @@ public interface FilterErrorTest {
     }
 
     @Test
-    default void testTheErrorRouteIsTheRouteMatch() throws IOException {
+    void testTheErrorRouteIsTheRouteMatch() throws IOException {
         TestScenario.builder()
             .request(HttpRequest.GET("/filter-error-spec-4/status").header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON))
             .specName("FilterErrorSpec4")
@@ -95,7 +96,7 @@ public interface FilterErrorTest {
     }
 
     @Test
-    default void testNonOncePerRequestFilterThrowingErrorDoesNotLoop() throws IOException {
+    void testNonOncePerRequestFilterThrowingErrorDoesNotLoop() throws IOException {
         TestScenario.builder()
             .request(HttpRequest.GET("/filter-error-spec")
             .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON))
@@ -112,7 +113,7 @@ public interface FilterErrorTest {
     }
 
     @Test
-    default void testErrorsEmittedFromSecondFilterInteractingWithExceptionHandlers() throws IOException {
+    void testErrorsEmittedFromSecondFilterInteractingWithExceptionHandlers() throws IOException {
         TestScenario.builder()
             .request(HttpRequest.GET("/filter-error-spec").
             header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON)
@@ -134,7 +135,7 @@ public interface FilterErrorTest {
     }
 
     @Test
-    default void testErrorsEmittedFromFiltersInteractingWithExceptionHandlers() throws IOException {
+    void testErrorsEmittedFromFiltersInteractingWithExceptionHandlers() throws IOException {
         TestScenario.builder()
             .specName("FilterErrorSpec")
             .request(HttpRequest.GET("/filter-error-spec").header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON))
@@ -154,18 +155,18 @@ public interface FilterErrorTest {
             .run();
     }
 
-    class FilterExceptionException extends RuntimeException {
+    static class FilterExceptionException extends RuntimeException {
     }
 
-    class FilterException extends RuntimeException {
+    static class FilterException extends RuntimeException {
     }
 
-    class NextFilterException extends RuntimeException {
+    static class NextFilterException extends RuntimeException {
     }
 
     @Requires(property = "spec.name", value = "FilterErrorSpec")
     @Filter(Filter.MATCH_ALL_PATTERN)
-    class First implements HttpServerFilter {
+    static class First implements HttpServerFilter {
         AtomicInteger executedCount = new AtomicInteger(0);
         AtomicReference<HttpStatus> responseStatus = new AtomicReference<>();
 
@@ -224,7 +225,7 @@ public interface FilterErrorTest {
 
     @Requires(property = "spec.name", value = "FilterErrorSpec3")
     @Filter(Filter.MATCH_ALL_PATTERN)
-    class ExceptionException implements HttpServerFilter {
+    static class ExceptionException implements HttpServerFilter {
         AtomicInteger executedCount = new AtomicInteger(0);
         AtomicReference<HttpStatus> responseStatus = new AtomicReference<>();
 
@@ -247,7 +248,7 @@ public interface FilterErrorTest {
 
     @Requires(property = "spec.name", value = "FilterErrorSpec4")
     @Filter(Filter.MATCH_ALL_PATTERN)
-    class ExceptionRoute implements HttpServerFilter {
+    static class ExceptionRoute implements HttpServerFilter {
         AtomicReference<RouteMatch<?>> routeMatch = new AtomicReference<>();
 
         @Override
@@ -264,7 +265,7 @@ public interface FilterErrorTest {
 
     @Requires(condition = FilterCondition.class)
     @Controller("/filter-error-spec")
-    class NeverReachedController {
+    static class NeverReachedController {
         @Get
         String get() {
             return "OK";
@@ -273,7 +274,7 @@ public interface FilterErrorTest {
 
     @Requires(condition = FilterCondition.class)
     @Controller("/filter-error-spec-3")
-    class HandledByHandlerController {
+    static class HandledByHandlerController {
         @Get
         String get() {
             throw new FilterExceptionException();
@@ -282,7 +283,7 @@ public interface FilterErrorTest {
 
     @Requires(condition = FilterCondition.class)
     @Controller("/filter-error-spec-4")
-    class HandledByErrorRouteController {
+    static class HandledByErrorRouteController {
         @Get("/exception")
         String getException() {
             throw new FilterExceptionException();
@@ -306,7 +307,7 @@ public interface FilterErrorTest {
         }
     }
 
-    class FilterCondition implements Condition {
+    static class FilterCondition implements Condition {
 
         @Override
         public boolean matches(ConditionContext context) {
@@ -318,7 +319,7 @@ public interface FilterErrorTest {
 
     @Requires(condition = FilterCondition.class)
     @Singleton
-    class FilterExceptionExceptionHandler implements ExceptionHandler<FilterExceptionException, HttpResponse<?>> {
+    static class FilterExceptionExceptionHandler implements ExceptionHandler<FilterExceptionException, HttpResponse<?>> {
 
         @Override
         public HttpResponse<?> handle(HttpRequest request, FilterExceptionException exception) {
@@ -328,7 +329,7 @@ public interface FilterErrorTest {
 
     @Requires(condition = FilterCondition.class)
     @Singleton
-    class FilterExceptionHandler implements ExceptionHandler<FilterException, HttpResponse<?>> {
+    static class FilterExceptionHandler implements ExceptionHandler<FilterException, HttpResponse<?>> {
 
         @Override
         public HttpResponse<?> handle(HttpRequest request, FilterException exception) {
@@ -338,7 +339,7 @@ public interface FilterErrorTest {
 
     @Requires(condition = FilterCondition.class)
     @Singleton
-    class NextFilterExceptionHandler implements ExceptionHandler<NextFilterException, HttpResponse<?>> {
+    static class NextFilterExceptionHandler implements ExceptionHandler<NextFilterException, HttpResponse<?>> {
 
         @Override
         public HttpResponse<?> handle(HttpRequest request, NextFilterException exception) {

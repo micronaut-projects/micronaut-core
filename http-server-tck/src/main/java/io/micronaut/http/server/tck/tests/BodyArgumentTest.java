@@ -32,13 +32,14 @@ import java.io.IOException;
 @SuppressWarnings({
     "java:S5960", // We're allowed assertions, as these are used in tests only
     "checkstyle:MissingJavadocType",
+    "checkstyle:DesignForExtension"
 })
-public interface BodyArgumentTest {
+public class BodyArgumentTest {
     /**
      * @see <a href="https://github.com/micronaut-projects/micronaut-aws/issues/1164">micronaut-aws #1164</a>
      */
     @Test
-    default void testBodyArguments() throws IOException {
+    void testBodyArguments() throws IOException {
         TestScenario.builder()
             .specName("BodyArgumentTest")
             .request(HttpRequest.POST("/body-arguments-test/getA", "{\"a\":\"A\",\"b\":\"B\"}").header(HttpHeaders.ACCEPT, MediaType.TEXT_PLAIN))

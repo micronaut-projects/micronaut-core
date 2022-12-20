@@ -47,11 +47,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @SuppressWarnings({
     "java:S5960", // We're allowed assertions, as these are used in tests only
     "checkstyle:MissingJavadocType",
+    "checkstyle:DesignForExtension"
 })
-public interface FiltersTest {
+public class FiltersTest {
 
     @Test
-    default void testFiltersAreRunCorrectly() throws IOException {
+    void testFiltersAreRunCorrectly() throws IOException {
         Map<String, Object> configuration = CollectionUtils.mapOf(
             "micronaut.server.cors.enabled", StringUtils.TRUE
         );
@@ -67,7 +68,7 @@ public interface FiltersTest {
     }
 
     @Test
-    default void filtersAreAppliedOnNonMatchingMethodsCorsFilterWorks() throws IOException {
+    void filtersAreAppliedOnNonMatchingMethodsCorsFilterWorks() throws IOException {
         Map<String, Object> configuration = CollectionUtils.mapOf(
             "micronaut.server.cors.enabled", StringUtils.TRUE
         );
@@ -82,7 +83,7 @@ public interface FiltersTest {
     }
 
     @Test
-    default void filtersAreAppliedOnNonMatchingMethodsCorsFilterDisableIfNotPreflight() throws IOException {
+    void filtersAreAppliedOnNonMatchingMethodsCorsFilterDisableIfNotPreflight() throws IOException {
         Map<String, Object> configuration = CollectionUtils.mapOf(
             "micronaut.server.cors.enabled", StringUtils.TRUE
         );
@@ -95,7 +96,7 @@ public interface FiltersTest {
     }
 
     @Test
-    default void testFiltersAreRunCorrectlyWithCustomExceptionHandler() throws IOException {
+    void testFiltersAreRunCorrectlyWithCustomExceptionHandler() throws IOException {
         Map<String, Object> configuration = CollectionUtils.mapOf(
             "micronaut.server.cors.enabled", StringUtils.TRUE
         );
@@ -125,7 +126,7 @@ public interface FiltersTest {
 
     @Filter("/filter-test/**")
     @Requires(property = "spec.name", value = "FiltersTest")
-    class TestFilter implements HttpServerFilter {
+    static class TestFilter implements HttpServerFilter {
         @Override
         public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
             return Publishers.map(chain.proceed(request), httpResponse -> {
@@ -141,7 +142,7 @@ public interface FiltersTest {
     @Produces
     @Singleton
     @Requires(property = "spec.name", value = "FiltersTest")
-    class CustomExceptionHandler implements ExceptionHandler<CustomException, HttpResponse<?>> {
+    static class CustomExceptionHandler implements ExceptionHandler<CustomException, HttpResponse<?>> {
         @Override
         public HttpResponse handle(HttpRequest request, CustomException exception) {
             return HttpResponse.ok("Exception Handled");

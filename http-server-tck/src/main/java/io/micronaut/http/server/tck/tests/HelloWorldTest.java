@@ -35,11 +35,12 @@ import java.util.Collections;
 @SuppressWarnings({
     "java:S5960", // We're allowed assertions, as these are used in tests only
     "checkstyle:MissingJavadocType",
+    "checkstyle:DesignForExtension"
 })
-public interface HelloWorldTest {
+public class HelloWorldTest {
 
     @Test
-    default void helloWorld() throws IOException {
+    void helloWorld() throws IOException {
         TestScenario.builder()
             .specName("HelloWorldTest")
             .request(HttpRequest.GET(UriBuilder.of("/hello").path("world").build()).accept(MediaType.TEXT_PLAIN))
@@ -52,7 +53,7 @@ public interface HelloWorldTest {
 
     @Requires(property = "spec.name", value = "HelloWorldTest")
     @Controller("/hello")
-    class HelloWorldController {
+    static class HelloWorldController {
         @Produces(MediaType.TEXT_PLAIN)
         @Get("/world")
         String hello() {
