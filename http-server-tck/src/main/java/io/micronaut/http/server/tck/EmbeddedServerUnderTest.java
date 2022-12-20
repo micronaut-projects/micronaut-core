@@ -16,6 +16,7 @@
 package io.micronaut.http.server.tck;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
@@ -33,6 +34,7 @@ import java.util.Optional;
  * @author Sergio del Amo
  * @since 3.0.0
  */
+@Experimental
 public class EmbeddedServerUnderTest implements ServerUnderTest {
 
     private EmbeddedServer embeddedServer;

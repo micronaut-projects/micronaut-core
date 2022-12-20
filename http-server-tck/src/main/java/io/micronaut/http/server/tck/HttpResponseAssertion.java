@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.tck;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.HttpStatus;
 
 import java.util.Map;
@@ -25,6 +26,7 @@ import java.util.Objects;
  * @author Sergio del Amo
  * @since 3.8.0
  */
+@Experimental
 public final class HttpResponseAssertion {
 
     private final HttpStatus httpStatus;

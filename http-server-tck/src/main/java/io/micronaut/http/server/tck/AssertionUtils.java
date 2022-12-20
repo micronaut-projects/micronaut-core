@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.tck;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpHeaders;
@@ -40,6 +41,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @SuppressWarnings({
     "java:S5960", // We're allowed assertions, as these are used in tests only
 })
+@Experimental
 public final class AssertionUtils {
 
     private AssertionUtils() {

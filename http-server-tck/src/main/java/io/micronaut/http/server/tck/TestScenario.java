@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.tck;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.HttpRequest;
 import java.io.IOException;
 import java.util.Map;
@@ -26,6 +27,7 @@ import java.util.function.BiConsumer;
  * @author Sergio del Amo
  * @since 3.8.0
  */
+@Experimental
 public final class TestScenario {
     private final String specName;
     private final Map<String, Object> configuration;

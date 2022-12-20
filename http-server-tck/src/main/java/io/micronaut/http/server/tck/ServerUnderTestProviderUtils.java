@@ -16,6 +16,7 @@
 package io.micronaut.http.server.tck;
 
 import io.micronaut.context.exceptions.ConfigurationException;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 
 import java.util.Iterator;
@@ -26,6 +27,7 @@ import java.util.ServiceLoader;
  * @author Sergio del Amo
  * @since 3.8.0
  */
+@Experimental
 public final class ServerUnderTestProviderUtils {
 
     private ServerUnderTestProviderUtils() {

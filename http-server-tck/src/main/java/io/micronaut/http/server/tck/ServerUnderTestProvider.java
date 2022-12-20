@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.tck;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 
 import java.util.Collections;
@@ -26,6 +27,7 @@ import java.util.Map;
  * @author Sergio del Amo
  * @since 3.8.0
  */
+@Experimental
 @FunctionalInterface
 public interface ServerUnderTestProvider {
 
