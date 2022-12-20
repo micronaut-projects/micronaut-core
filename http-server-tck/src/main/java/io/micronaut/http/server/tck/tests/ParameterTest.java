@@ -22,7 +22,7 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.server.tck.AssertionUtils;
 import io.micronaut.http.server.tck.HttpResponseAssertion;
-import io.micronaut.http.server.tck.TestScenario;
+import static io.micronaut.http.server.tck.TestScenario.asserts;
 import io.micronaut.http.uri.UriBuilder;
 import org.junit.jupiter.api.Test;
 
@@ -40,16 +40,14 @@ public class ParameterTest {
 
     @Test
     void testGetAllMethod() throws IOException {
-        TestScenario.builder()
-            .specName(SPEC_NAME)
-            .request(HttpRequest.GET(UriBuilder.of("/parameters-test").path("all")
+        asserts(SPEC_NAME,
+            HttpRequest.GET(UriBuilder.of("/parameters-test").path("all")
                 .queryParam("test", "one", "two", "three+four")
-                .build()))
-            .assertion((server, request) ->  AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                .build()),
+            (server, request) ->  AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .body("[\"one\",\"two\",\"three+four\"]")
-                .build()))
-            .run();
+                .build()));
     }
 
     @Controller("/parameters-test")

@@ -22,7 +22,7 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.server.tck.AssertionUtils;
 import io.micronaut.http.server.tck.HttpResponseAssertion;
-import io.micronaut.http.server.tck.TestScenario;
+import static io.micronaut.http.server.tck.TestScenario.asserts;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Flux;
 
@@ -41,14 +41,12 @@ public class FluxTest {
 
     @Test
     void testControllerReturningAFlux() throws IOException {
-        TestScenario.builder()
-            .specName(SPEC_NAME)
-            .request(HttpRequest.GET("/users"))
-            .assertion((server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+        asserts(SPEC_NAME,
+            HttpRequest.GET("/users"),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .body("[{\"name\":\"Joe\"},{\"name\":\"Lewis\"}]")
-                .build()))
-            .run();
+                .build()));
     }
 
     @Controller("/users")

@@ -40,7 +40,7 @@ import io.micronaut.http.server.tck.AssertionUtils;
 import io.micronaut.http.server.tck.HttpResponseAssertion;
 import io.micronaut.http.server.tck.ServerUnderTest;
 import io.micronaut.http.server.tck.ServerUnderTestProviderUtils;
-import io.micronaut.http.server.tck.TestScenario;
+import static io.micronaut.http.server.tck.TestScenario.asserts;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
 
@@ -65,36 +65,30 @@ public class ErrorHandlerTest {
 
     @Test
     void testCustomGlobalExceptionHandlersDeclaredInController() throws IOException {
-        TestScenario.builder()
-            .configuration(CollectionUtils.mapOf(
+        asserts(SPEC_NAME,
+            CollectionUtils.mapOf(
                 PROPERTY_MICRONAUT_SERVER_CORS_CONFIGURATIONS_WEB_ALLOWED_ORIGINS, Collections.singletonList("http://localhost:8080"),
                 PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE
-            ))
-            .specName(SPEC_NAME)
-            .request(HttpRequest.GET("/errors/global-ctrl")
-                .header(HttpHeaders.CONTENT_TYPE, io.micronaut.http.MediaType.APPLICATION_JSON))
-            .assertion((server, request) -> AssertionUtils.assertDoesNotThrow(server, request,
+            ),
+            HttpRequest.GET("/errors/global-ctrl").header(HttpHeaders.CONTENT_TYPE, io.micronaut.http.MediaType.APPLICATION_JSON),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request,
                 HttpStatus.OK,
                 "bad things happens globally",
-                Collections.singletonMap(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN)))
-            .run();
+                Collections.singletonMap(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN)));
     }
 
     @Test
     void testCustomGlobalExceptionHandlers() throws IOException {
-        TestScenario.builder()
-            .configuration(CollectionUtils.mapOf(
+        asserts(SPEC_NAME,
+            CollectionUtils.mapOf(
                 PROPERTY_MICRONAUT_SERVER_CORS_CONFIGURATIONS_WEB_ALLOWED_ORIGINS, Collections.singletonList("http://localhost:8080"),
                 PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE
-            ))
-            .specName(SPEC_NAME)
-            .request(HttpRequest.GET("/errors/global")
-                .header(HttpHeaders.CONTENT_TYPE, io.micronaut.http.MediaType.APPLICATION_JSON))
-            .assertion((server, request) -> AssertionUtils.assertDoesNotThrow(server, request,
+            ), HttpRequest.GET("/errors/global")
+                .header(HttpHeaders.CONTENT_TYPE, io.micronaut.http.MediaType.APPLICATION_JSON),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request,
                 HttpStatus.OK,
                 "Exception Handled",
-                Collections.singletonMap(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN)))
-            .run();
+                Collections.singletonMap(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN)));
     }
 
     @Test
@@ -116,115 +110,97 @@ public class ErrorHandlerTest {
 
     @Test
     void testCustomGlobalStatusHandlersDeclaredInController() throws IOException {
-        TestScenario.builder()
-            .configuration(CollectionUtils.mapOf(
+        asserts(SPEC_NAME,
+            CollectionUtils.mapOf(
                 PROPERTY_MICRONAUT_SERVER_CORS_CONFIGURATIONS_WEB_ALLOWED_ORIGINS, Collections.singletonList("http://localhost:8080"),
                 PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE
-            ))
-            .specName(SPEC_NAME)
-            .request(HttpRequest.GET("/errors/global-status-ctrl"))
-            .assertion((server, request) -> AssertionUtils.assertDoesNotThrow(server, request,
+            ), HttpRequest.GET("/errors/global-status-ctrl"),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request,
                 HttpStatus.OK,
                 "global status",
-                Collections.singletonMap(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN)))
-            .run();
+                Collections.singletonMap(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN)));
     }
 
     @Test
     void testLocalExceptionHandlers() throws IOException {
-        TestScenario.builder()
-            .configuration(CollectionUtils.mapOf(
+        asserts(SPEC_NAME,
+            CollectionUtils.mapOf(
             PROPERTY_MICRONAUT_SERVER_CORS_CONFIGURATIONS_WEB_ALLOWED_ORIGINS, Collections.singletonList("http://localhost:8080"),
-            PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE))
-            .specName(SPEC_NAME)
-            .request(HttpRequest.GET("/errors/local"))
-            .assertion((server, request) -> AssertionUtils.assertDoesNotThrow(server, request,
+            PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE),
+            HttpRequest.GET("/errors/local"),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request,
                 HttpStatus.OK,
                 "bad things",
-                Collections.singletonMap(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN)))
-            .run();
+                Collections.singletonMap(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN)));
     }
 
     @Test
     void jsonMessageFormatErrorsReturn400() throws IOException {
-        TestScenario.builder()
-            .configuration(CollectionUtils.mapOf(
+        asserts(SPEC_NAME,
+            CollectionUtils.mapOf(
             PROPERTY_MICRONAUT_SERVER_CORS_CONFIGURATIONS_WEB_ALLOWED_ORIGINS, Collections.singletonList("http://localhost:8080"),
-            PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE
-        )).specName(SPEC_NAME)
-            .request(HttpRequest.POST("/json/jsonBody", "{\"numberField\": \"textInsteadOfNumber\"}"))
-            .assertion((server, request) -> AssertionUtils.assertThrows(server, request,
+            PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE),
+            HttpRequest.POST("/json/jsonBody", "{\"numberField\": \"textInsteadOfNumber\"}"),
+            (server, request) -> AssertionUtils.assertThrows(server, request,
                 HttpResponseAssertion.builder()
                     .status(HttpStatus.BAD_REQUEST)
                     .headers(Collections.singletonMap(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON))
                     .build()
-            )).run();
+            ));
     }
 
     @Test
     void corsHeadersArePresentAfterFailedDeserialisationWhenErrorHandlerIsUsed() throws IOException {
-        TestScenario.builder()
-            .configuration(CollectionUtils.mapOf(
+        asserts(SPEC_NAME,
+            CollectionUtils.mapOf(
             PROPERTY_MICRONAUT_SERVER_CORS_CONFIGURATIONS_WEB_ALLOWED_ORIGINS, Collections.singletonList("http://localhost:8080"),
             PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE
-        )).specName(SPEC_NAME)
-            .request(HttpRequest.POST("/json/errors/global", "{\"numberField\": \"string is not a number\"}")
-                .header(HttpHeaders.ORIGIN, LOCALHOST))
-            .assertion((server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+        ), HttpRequest.POST("/json/errors/global", "{\"numberField\": \"string is not a number\"}")
+                .header(HttpHeaders.ORIGIN, LOCALHOST),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .headers(Collections.singletonMap(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, LOCALHOST))
-                .build()))
-            .run();
+                .build()));
     }
 
     @Test
     void corsHeadersArePresentAfterFailedDeserialisation() throws IOException {
-        TestScenario.builder()
-            .configuration(CollectionUtils.mapOf(
+        asserts(SPEC_NAME,
+            CollectionUtils.mapOf(
                 PROPERTY_MICRONAUT_SERVER_CORS_CONFIGURATIONS_WEB_ALLOWED_ORIGINS, Collections.singletonList(LOCALHOST),
                 PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE
-            ))
-            .specName(SPEC_NAME)
-            .request(HttpRequest.POST("/json/jsonBody", "{\"numberField\": \"string is not a number\"}")
-                .header(HttpHeaders.ORIGIN, LOCALHOST))
-            .assertion((server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
+            ), HttpRequest.POST("/json/jsonBody", "{\"numberField\": \"string is not a number\"}")
+                .header(HttpHeaders.ORIGIN, LOCALHOST),
+            (server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.BAD_REQUEST)
                 .headers(Collections.singletonMap(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, LOCALHOST))
-                .build()))
-            .run();
+                .build()));
     }
 
     @Test
     void corsHeadersArePresentAfterExceptions() throws IOException {
-        TestScenario.builder()
-            .configuration(CollectionUtils.mapOf(
+        asserts(SPEC_NAME,
+            CollectionUtils.mapOf(
             PROPERTY_MICRONAUT_SERVER_CORS_CONFIGURATIONS_WEB_ALLOWED_ORIGINS, Collections.singletonList(LOCALHOST),
             PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE
-        ))
-            .specName(SPEC_NAME)
-            .request(HttpRequest.GET("/errors/global")
-                .header(HttpHeaders.ORIGIN, LOCALHOST))
-            .assertion((server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+        ), HttpRequest.GET("/errors/global").header(HttpHeaders.ORIGIN, LOCALHOST),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .headers(Collections.singletonMap(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, LOCALHOST))
-                .build()))
-            .run();
+                .build()));
     }
 
     @Test
     void messageValidationErrorsReturn400() throws IOException {
-        TestScenario.builder()
-            .configuration(CollectionUtils.mapOf(
+        asserts(SPEC_NAME,
+            CollectionUtils.mapOf(
                 PROPERTY_MICRONAUT_SERVER_CORS_CONFIGURATIONS_WEB_ALLOWED_ORIGINS, Collections.singletonList("http://localhost:8080"),
             PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE
-        ))
-            .specName(SPEC_NAME)
-            .request(HttpRequest.POST("/json/jsonBody", "{\"numberField\": 0}"))
-            .assertion((server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
+        ), HttpRequest.POST("/json/jsonBody", "{\"numberField\": 0}"),
+            (server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.BAD_REQUEST)
                 .headers(Collections.singletonMap(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON))
-                .build()))
-            .run();
+                .build()));
     }
 
     @Controller("/secret")

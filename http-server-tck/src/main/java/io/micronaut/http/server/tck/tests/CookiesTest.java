@@ -25,7 +25,7 @@ import io.micronaut.http.annotation.Get;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.server.tck.AssertionUtils;
 import io.micronaut.http.server.tck.HttpResponseAssertion;
-import io.micronaut.http.server.tck.TestScenario;
+import static io.micronaut.http.server.tck.TestScenario.asserts;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -42,42 +42,36 @@ public class CookiesTest {
 
     @Test
     void testCookieBind() throws IOException {
-        TestScenario.builder()
-            .specName(SPEC_NAME)
-            .request(HttpRequest.GET("/cookies-test/bind")
+        asserts(SPEC_NAME,
+            HttpRequest.GET("/cookies-test/bind")
                 .cookie(Cookie.of("one", "foo"))
-                .cookie(Cookie.of("two", "bar")))
-            .assertion((server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                .cookie(Cookie.of("two", "bar")),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .body("{\"one\":\"foo\",\"two\":\"bar\"}")
-                .build()))
-            .run();
+                .build()));
     }
 
     @Test
     void testGetCookiesMethod() throws IOException {
-        TestScenario.builder()
-            .specName(SPEC_NAME)
-            .request(HttpRequest.GET("/cookies-test/all")
+        asserts(SPEC_NAME,
+            HttpRequest.GET("/cookies-test/all")
                 .cookie(Cookie.of("one", "foo"))
-                .cookie(Cookie.of("two", "bar")))
-            .assertion((server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                .cookie(Cookie.of("two", "bar")),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .body("{\"one\":\"foo\",\"two\":\"bar\"}")
-                .build()))
-            .run();
+                .build()));
     }
 
     @Test
     void testNoCookie() throws IOException {
-        TestScenario.builder()
-            .specName(SPEC_NAME)
-            .request(HttpRequest.GET("/cookies-test/all"))
-            .assertion((server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+        asserts(SPEC_NAME,
+            HttpRequest.GET("/cookies-test/all"),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .body("{}")
-                .build()))
-            .run();
+                .build()));
     }
 
     @Controller("/cookies-test")

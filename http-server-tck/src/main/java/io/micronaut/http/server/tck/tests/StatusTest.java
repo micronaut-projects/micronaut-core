@@ -27,7 +27,7 @@ import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
 import io.micronaut.http.server.tck.AssertionUtils;
 import io.micronaut.http.server.tck.HttpResponseAssertion;
-import io.micronaut.http.server.tck.TestScenario;
+import static io.micronaut.http.server.tck.TestScenario.asserts;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -49,13 +49,11 @@ public class StatusTest {
     @ParameterizedTest
     @ValueSource(strings = {"/http-status", "/http-response-status", "/http-exception"})
     void testControllerReturningHttpStatus(String path) throws IOException {
-        TestScenario.builder()
-            .specName(SPEC_NAME)
-            .request(HttpRequest.GET(path))
-            .assertion((server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
+        asserts(SPEC_NAME,
+            HttpRequest.GET(path),
+            (server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.I_AM_A_TEAPOT)
-                .build()))
-            .run();
+                .build()));
     }
 
     @Requires(property = "spec.name", value = SPEC_NAME)

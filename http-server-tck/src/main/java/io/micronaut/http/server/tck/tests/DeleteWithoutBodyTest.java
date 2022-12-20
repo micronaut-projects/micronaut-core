@@ -26,7 +26,7 @@ import io.micronaut.http.annotation.Delete;
 import io.micronaut.http.annotation.Header;
 import io.micronaut.http.annotation.PathVariable;
 import io.micronaut.http.annotation.Status;
-import io.micronaut.http.server.tck.TestScenario;
+import static io.micronaut.http.server.tck.TestScenario.asserts;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -41,17 +41,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 })
 public class DeleteWithoutBodyTest {
     public static final String SPEC_NAME = "DeleteWithoutBodyTest";
-
     @Test
     void verifiesItIsPossibleToExposesADeleteEndpointWhichIsInvokedWithoutABody() throws IOException {
-        TestScenario.builder()
-            .specName("DeleteWithoutBodyTest")
-            .request(HttpRequest.DELETE("/sessions/sergio").header(HttpHeaders.AUTHORIZATION, HttpHeaderValues.AUTHORIZATION_PREFIX_BEARER + " xxx"))
-            .assertion((server, request) -> {
+        asserts(SPEC_NAME,
+            HttpRequest.DELETE("/sessions/sergio").header(HttpHeaders.AUTHORIZATION, HttpHeaderValues.AUTHORIZATION_PREFIX_BEARER + " xxx"),
+            (server, request) -> {
                 HttpResponse<?> response = assertDoesNotThrow(() -> server.exchange(request));
                 assertEquals(HttpStatus.OK, response.getStatus());
-            })
-            .run();
+            });
     }
 
     @Requires(property = "spec.name", value = SPEC_NAME)

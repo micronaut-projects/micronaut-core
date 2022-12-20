@@ -24,7 +24,7 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.server.tck.AssertionUtils;
-import io.micronaut.http.server.tck.TestScenario;
+import static io.micronaut.http.server.tck.TestScenario.asserts;
 import io.micronaut.http.uri.UriBuilder;
 import org.junit.jupiter.api.Test;
 
@@ -42,14 +42,12 @@ public class HelloWorldTest {
 
     @Test
     void helloWorld() throws IOException {
-        TestScenario.builder()
-            .specName(SPEC_NAME)
-            .request(HttpRequest.GET(UriBuilder.of("/hello").path("world").build()).accept(MediaType.TEXT_PLAIN))
-            .assertion((server, request) -> AssertionUtils.assertDoesNotThrow(server, request,
+        asserts(SPEC_NAME,
+            HttpRequest.GET(UriBuilder.of("/hello").path("world").build()).accept(MediaType.TEXT_PLAIN),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request,
                 HttpStatus.OK,
                 "Hello World",
-                Collections.singletonMap(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN)))
-            .run();
+                Collections.singletonMap(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN)));
     }
 
     @Requires(property = "spec.name", value = SPEC_NAME)

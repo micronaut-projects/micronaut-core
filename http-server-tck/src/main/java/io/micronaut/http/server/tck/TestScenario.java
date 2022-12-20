@@ -45,6 +45,22 @@ public final class TestScenario {
         this.assertion = assertion;
     }
 
+    public static void asserts(String specName, Map<String, Object> configuration, HttpRequest<?> request, BiConsumer<ServerUnderTest, HttpRequest<?>> assertion) throws IOException {
+        TestScenario.builder()
+            .specName(specName)
+            .configuration(configuration)
+            .request(request)
+            .assertion(assertion)
+            .run();
+    }
+    public static void asserts(String specName, HttpRequest<?> request, BiConsumer<ServerUnderTest, HttpRequest<?>> assertion) throws IOException {
+        TestScenario.builder()
+            .specName(specName)
+            .request(request)
+            .assertion(assertion)
+            .run();
+    }
+
     /**
      *
      * @return A Test Scenario builder.

@@ -30,7 +30,7 @@ import io.micronaut.http.filter.ServerFilterChain;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
 import io.micronaut.http.server.tck.AssertionUtils;
 import io.micronaut.http.server.tck.HttpResponseAssertion;
-import io.micronaut.http.server.tck.TestScenario;
+import static io.micronaut.http.server.tck.TestScenario.asserts;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
 import org.reactivestreams.Publisher;
@@ -49,14 +49,12 @@ public class RemoteAddressTest {
 
     @Test
     void testRemoteAddressComesFromIdentitySourceIp() throws IOException {
-        TestScenario.builder()
-            .specName(SPEC_NAME)
-            .request(HttpRequest.GET("/remoteAddress/fromSourceIp"))
-            .assertion((server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+        asserts(SPEC_NAME,
+            HttpRequest.GET("/remoteAddress/fromSourceIp"),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .headers(Collections.singletonMap("X-Captured-Remote-Address", "127.0.0.1"))
-                .build()))
-            .run();
+                .build()));
     }
 
     @Requires(property = "spec.name", value = SPEC_NAME)

@@ -30,7 +30,7 @@ import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.server.tck.AssertionUtils;
 import io.micronaut.http.server.tck.HttpResponseAssertion;
-import io.micronaut.http.server.tck.TestScenario;
+import static io.micronaut.http.server.tck.TestScenario.asserts;
 import org.junit.jupiter.api.Test;
 
 import javax.validation.constraints.NotBlank;
@@ -53,74 +53,61 @@ public class MiscTest {
      */
     @Test
     void testSelectedRouteReflectsAcceptHeader() throws IOException {
-        TestScenario.builder()
-            .specName(SPEC_NAME)
-            .request(HttpRequest.GET("/bar/ok").header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON))
-            .assertion((server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+        asserts(SPEC_NAME,
+            HttpRequest.GET("/bar/ok").header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .body("{\"status\":\"ok\"}")
-                .build()))
-            .run();
+                .build()));
 
-        TestScenario.builder()
-            .specName(SPEC_NAME)
-            .request(HttpRequest.GET("/bar/ok").header(HttpHeaders.ACCEPT, MediaType.TEXT_HTML))
-            .assertion((server, request) -> AssertionUtils.assertDoesNotThrow(server, request,
+        asserts(SPEC_NAME,
+            HttpRequest.GET("/bar/ok").header(HttpHeaders.ACCEPT, MediaType.TEXT_HTML),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request,
                 HttpResponseAssertion.builder()
                     .status(HttpStatus.OK)
                     .body("<div>ok</div>")
-                    .build()))
-            .run();
+                    .build()));
     }
 
     @Test
     void testBehaviourOf404() throws IOException {
-        TestScenario.builder()
-            .specName(SPEC_NAME)
-            .request(HttpRequest.GET("/does-not-exist").header("Accept", MediaType.APPLICATION_JSON))
-            .assertion((server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
+        asserts(SPEC_NAME,
+            HttpRequest.GET("/does-not-exist").header("Accept", MediaType.APPLICATION_JSON),
+            (server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.NOT_FOUND)
-                .build()))
-            .run();
+                .build()));
     }
 
     @Test
     void postFormUrlEncodedBodyBindingToPojoWorks() throws IOException {
-        TestScenario.builder()
-            .specName(SPEC_NAME)
-            .request(HttpRequest.POST("/form", "message=World")
-                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_FORM_URLENCODED))
-            .assertion((server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+        asserts(SPEC_NAME,
+            HttpRequest.POST("/form", "message=World").header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_FORM_URLENCODED),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .body("{\"message\":\"Hello World\"}")
-                .build()))
-            .run();
+                .build()));
     }
 
     @Test
     void postFormUrlEncodedBodyBindingToPojoWorksIfYouDontSpecifyBodyAnnotation() throws IOException {
-        TestScenario.builder()
-            .specName(SPEC_NAME)
-            .request(HttpRequest.POST("/form/without-body-annotation", "message=World")
-                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_FORM_URLENCODED))
-            .assertion((server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+        asserts(SPEC_NAME,
+            HttpRequest.POST("/form/without-body-annotation", "message=World")
+                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_FORM_URLENCODED),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .body("{\"message\":\"Hello World\"}")
-                .build()))
-            .run();
+                .build()));
     }
 
     @Test
     void formUrlEncodedWithBodyAnnotationAndANestedAttribute() throws IOException {
-        TestScenario.builder()
-            .specName(SPEC_NAME)
-            .request(HttpRequest.POST("/form/nested-attribute", "message=World")
-                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_FORM_URLENCODED))
-            .assertion((server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+        asserts(SPEC_NAME,
+            HttpRequest.POST("/form/nested-attribute", "message=World")
+                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_FORM_URLENCODED),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .body("{\"message\":\"Hello World\"}")
-                .build()))
-            .run();
+                .build()));
     }
 
     /**
@@ -129,54 +116,46 @@ public class MiscTest {
      */
     @Test
     void applicationJsonWithBodyAnnotationAndANestedAttribute() throws IOException {
-        TestScenario.builder()
-            .specName(SPEC_NAME)
-            .request(HttpRequest.POST("/form/json-nested-attribute", "{\"message\":\"World\"}")
-                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON))
-            .assertion((server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+        asserts(SPEC_NAME,
+            HttpRequest.POST("/form/json-nested-attribute", "{\"message\":\"World\"}")
+                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .body("{\"message\":\"Hello World\"}")
-                .build()))
-            .run();
+                .build()));
     }
 
     @Test
     void applicationJsonWithoutBodyAnnotation() throws IOException {
-        TestScenario.builder()
-            .specName(SPEC_NAME)
-            .request(HttpRequest.POST("/form/json-without-body-annotation", "{\"message\":\"World\"}")
-                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON))
-            .assertion((server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+        asserts(SPEC_NAME,
+            HttpRequest.POST("/form/json-without-body-annotation", "{\"message\":\"World\"}")
+                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .body("{\"message\":\"Hello World\"}")
-                .build()))
-            .run();
+                .build()));
     }
 
     @Test
     void applicationJsonWithBodyAnnotationAndANestedAttributeAndMapReturnRenderedAsJSON() throws IOException {
-        TestScenario.builder()
-            .specName(SPEC_NAME)
-            .request(HttpRequest.POST("/form/json-nested-attribute-with-map-return", "{\"message\":\"World\"}")
-            .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON))
-            .assertion((server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+        asserts(SPEC_NAME,
+            HttpRequest.POST("/form/json-nested-attribute-with-map-return", "{\"message\":\"World\"}")
+            .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .body("{\"message\":\"Hello World\"}")
-                .build()))
-            .run();
+                .build()));
     }
 
     @Test
     void applicationJsonWithBodyAnnotationAndObjectReturnRenderedAsJson() throws IOException {
-        TestScenario.builder()
-            .specName(SPEC_NAME)
-            .request(HttpRequest.POST("/form/json-with-body-annotation-and-with-object-return", "{\"message\":\"World\"}")
-                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON))
-            .assertion((server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+        asserts(SPEC_NAME,
+            HttpRequest.POST("/form/json-with-body-annotation-and-with-object-return", "{\"message\":\"World\"}")
+                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .body("{\"greeting\":\"Hello World\"}")
-                .build()))
-            .run();
+                .build()));
     }
 
     @Controller

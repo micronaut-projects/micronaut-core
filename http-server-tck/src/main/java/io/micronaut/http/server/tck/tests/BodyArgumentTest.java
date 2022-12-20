@@ -25,9 +25,9 @@ import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.server.tck.AssertionUtils;
 import io.micronaut.http.server.tck.HttpResponseAssertion;
-import io.micronaut.http.server.tck.TestScenario;
 import org.junit.jupiter.api.Test;
 import java.io.IOException;
+import static io.micronaut.http.server.tck.TestScenario.asserts;
 
 @SuppressWarnings({
     "java:S5960", // We're allowed assertions, as these are used in tests only
@@ -42,14 +42,12 @@ public class BodyArgumentTest {
      */
     @Test
     void testBodyArguments() throws IOException {
-        TestScenario.builder()
-            .specName(SPEC_NAME)
-            .request(HttpRequest.POST("/body-arguments-test/getA", "{\"a\":\"A\",\"b\":\"B\"}").header(HttpHeaders.ACCEPT, MediaType.TEXT_PLAIN))
-            .assertion(((server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+        asserts(SPEC_NAME,
+            HttpRequest.POST("/body-arguments-test/getA", "{\"a\":\"A\",\"b\":\"B\"}").header(HttpHeaders.ACCEPT, MediaType.TEXT_PLAIN),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .body("A")
-                .build())))
-            .run();
+                .build()));
     }
 
     @Controller("/body-arguments-test")

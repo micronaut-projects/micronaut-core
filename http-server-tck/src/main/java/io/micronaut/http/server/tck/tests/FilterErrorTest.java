@@ -37,7 +37,7 @@ import io.micronaut.http.filter.ServerFilterChain;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
 import io.micronaut.http.server.tck.AssertionUtils;
 import io.micronaut.http.server.tck.HttpResponseAssertion;
-import io.micronaut.http.server.tck.TestScenario;
+import static io.micronaut.http.server.tck.TestScenario.asserts;
 import io.micronaut.web.router.MethodBasedRouteMatch;
 import io.micronaut.web.router.RouteMatch;
 import jakarta.inject.Singleton;
@@ -62,11 +62,10 @@ public class FilterErrorTest {
 
     @Test
     void testFilterThrowingExceptionHandledByExceptionHandlerThrowingException() throws IOException {
-        TestScenario.builder()
-            .specName(SPEC_NAME + "3")
-            .request(HttpRequest.GET("/filter-error-spec-3")
-                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON))
-            .assertion((server, request) -> {
+        asserts(SPEC_NAME + "3",
+            HttpRequest.GET("/filter-error-spec-3")
+                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON),
+            (server, request) -> {
                 AssertionUtils.assertThrows(server, request,
                     HttpResponseAssertion.builder()
                         .status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -75,16 +74,14 @@ public class FilterErrorTest {
                 ExceptionException filter = server.getApplicationContext().getBean(ExceptionException.class);
                 assertEquals(1, filter.executedCount.get());
                 assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, filter.responseStatus.getAndSet(null));
-            })
-            .run();
+            });
     }
 
     @Test
     void testTheErrorRouteIsTheRouteMatch() throws IOException {
-        TestScenario.builder()
-            .request(HttpRequest.GET("/filter-error-spec-4/status").header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON))
-            .specName(SPEC_NAME + "4")
-            .assertion((server, request) -> {
+        asserts(SPEC_NAME + "4",
+            HttpRequest.GET("/filter-error-spec-4/status").header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON),
+            (server, request) -> {
                     AssertionUtils.assertDoesNotThrow(server, request,
                         HttpResponseAssertion.builder()
                             .status(HttpStatus.OK)
@@ -93,17 +90,14 @@ public class FilterErrorTest {
                     RouteMatch match = filter.routeMatch.getAndSet(null);
                     assertTrue(match instanceof MethodBasedRouteMatch);
                     assertEquals("testStatus", ((MethodBasedRouteMatch) match).getName());
-                })
-            .run();
+                });
     }
 
     @Test
     void testNonOncePerRequestFilterThrowingErrorDoesNotLoop() throws IOException {
-        TestScenario.builder()
-            .request(HttpRequest.GET("/filter-error-spec")
-            .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON))
-            .specName(SPEC_NAME + "2")
-                .assertion((server, request) -> {
+        asserts(SPEC_NAME + "2",
+            HttpRequest.GET("/filter-error-spec").header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON),
+            (server, request) -> {
                     AssertionUtils.assertThrows(server, request,
                         HttpResponseAssertion.builder()
                             .status(HttpStatus.BAD_REQUEST)
@@ -111,17 +105,14 @@ public class FilterErrorTest {
                             .build());
                     FirstEvery filter = server.getApplicationContext().getBean(FirstEvery.class);
                     assertEquals(1, filter.executedCount.get());
-                }).run();
+                });
     }
 
     @Test
     void testErrorsEmittedFromSecondFilterInteractingWithExceptionHandlers() throws IOException {
-        TestScenario.builder()
-            .request(HttpRequest.GET("/filter-error-spec").
-            header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON)
-            .header("X-Passthru", StringUtils.TRUE))
-            .specName(SPEC_NAME)
-            .assertion((server, request) -> {
+        asserts(SPEC_NAME,
+            HttpRequest.GET("/filter-error-spec").header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON).header("X-Passthru", StringUtils.TRUE),
+            (server, request) -> {
                 AssertionUtils.assertThrows(server, request,
                     HttpResponseAssertion.builder()
                         .status(HttpStatus.BAD_REQUEST)
@@ -133,15 +124,14 @@ public class FilterErrorTest {
                 assertEquals(1, first.executedCount.get());
                 assertEquals(HttpStatus.BAD_REQUEST, first.responseStatus.getAndSet(null));
                 assertEquals(1, next.executedCount.get());
-            }).run();
+            });
     }
 
     @Test
     void testErrorsEmittedFromFiltersInteractingWithExceptionHandlers() throws IOException {
-        TestScenario.builder()
-            .specName(SPEC_NAME)
-            .request(HttpRequest.GET("/filter-error-spec").header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON))
-            .assertion((server, request) -> {
+        asserts(SPEC_NAME,
+            HttpRequest.GET("/filter-error-spec").header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON),
+            (server, request) -> {
                 AssertionUtils.assertThrows(server, request,
                     HttpResponseAssertion.builder()
                         .status(HttpStatus.BAD_REQUEST)
@@ -153,8 +143,7 @@ public class FilterErrorTest {
                 assertEquals(1, first.executedCount.get());
                 assertNull(first.responseStatus.getAndSet(null));
                 assertEquals(0, next.executedCount.get());
-            })
-            .run();
+            });
     }
 
     static class FilterExceptionException extends RuntimeException {

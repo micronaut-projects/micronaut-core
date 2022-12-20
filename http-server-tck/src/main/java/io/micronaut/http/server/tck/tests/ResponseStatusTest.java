@@ -28,7 +28,7 @@ import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Status;
 import io.micronaut.http.server.tck.AssertionUtils;
 import io.micronaut.http.server.tck.HttpResponseAssertion;
-import io.micronaut.http.server.tck.TestScenario;
+import static io.micronaut.http.server.tck.TestScenario.asserts;
 import org.junit.jupiter.api.Test;
 
 import javax.validation.ConstraintViolationException;
@@ -47,60 +47,48 @@ public class ResponseStatusTest {
 
     @Test
     void testConstraintViolationCauses400() throws IOException {
-        TestScenario.builder()
-            .specName(SPEC_NAME)
-            .request(HttpRequest.POST("/response-status/constraint-violation", Collections.emptyMap()).header(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN))
-            .assertion((server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
+        asserts(SPEC_NAME,
+            HttpRequest.POST("/response-status/constraint-violation", Collections.emptyMap()).header(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN),
+            (server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.BAD_REQUEST)
-                .build()))
-            .run();
+                .build()));
     }
 
     @Test
     void testVoidMethodsDoesNotCause404() throws IOException {
-        TestScenario.builder()
-            .specName(SPEC_NAME)
-            .request(HttpRequest.DELETE("/response-status/delete-something")
-                .header(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN))
-            .assertion((server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+        asserts(SPEC_NAME,
+            HttpRequest.DELETE("/response-status/delete-something").header(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.NO_CONTENT)
-                .build()))
-            .run();
+                .build()));
     }
 
     @Test
     void testNullCauses404() throws IOException {
-        TestScenario.builder()
-            .request(HttpRequest.GET("/response-status/null").header(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN))
-            .specName(SPEC_NAME)
-            .assertion((server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
+        asserts(SPEC_NAME,
+            HttpRequest.GET("/response-status/null").header(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN),
+            (server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.NOT_FOUND)
-                .build()))
-            .run();
+                .build()));
     }
 
     @Test
     void testOptionalCauses404() throws IOException {
-        TestScenario.builder()
-            .specName(SPEC_NAME)
-            .request(HttpRequest.GET("/response-status/optional").header(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN))
-            .assertion((server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
+        asserts(SPEC_NAME,
+            HttpRequest.GET("/response-status/optional").header(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN),
+            (server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.NOT_FOUND)
-                .build()))
-            .run();
+                .build()));
     }
 
     @Test
     void testCustomResponseStatus() throws IOException {
-        TestScenario.builder()
-            .specName(SPEC_NAME)
-            .request(HttpRequest.POST("/response-status", "foo")
-            .header(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN))
-            .assertion((server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+        asserts(SPEC_NAME,
+            HttpRequest.POST("/response-status", "foo").header(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.CREATED)
                 .body("foo")
-                .build()))
-            .run();
+                .build()));
     }
 
     @Controller("/response-status")

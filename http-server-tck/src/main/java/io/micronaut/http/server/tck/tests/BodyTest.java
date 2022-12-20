@@ -27,7 +27,7 @@ import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Status;
 import io.micronaut.http.server.tck.AssertionUtils;
 import io.micronaut.http.server.tck.HttpResponseAssertion;
-import io.micronaut.http.server.tck.TestScenario;
+import static io.micronaut.http.server.tck.TestScenario.asserts;
 import org.junit.jupiter.api.Test;
 import org.reactivestreams.Publisher;
 
@@ -44,24 +44,21 @@ public class BodyTest {
 
     @Test
     void testCustomBodyPOJO() throws IOException {
-        TestScenario.builder()
-            .specName(SPEC_NAME)
-            .request(HttpRequest.POST("/response-body/pojo", "{\"x\":10,\"y\":20}")
-                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON))
-            .assertion((server, request) -> AssertionUtils.assertDoesNotThrow(server, request,
+        asserts(SPEC_NAME,
+            HttpRequest.POST("/response-body/pojo", "{\"x\":10,\"y\":20}")
+                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request,
                 HttpResponseAssertion.builder()
                     .status(HttpStatus.CREATED)
                     .body("{\"x\":10,\"y\":20}")
-                    .build()))
-            .run();
+                    .build()));
     }
 
     @Test
     void testCustomBodyPOJODefaultToJSON() throws IOException {
-        TestScenario.builder()
-            .specName(SPEC_NAME)
-            .request(HttpRequest.POST("/response-body/pojo", "{\"x\":10,\"y\":20}"))
-            .assertion((server, request) -> AssertionUtils.assertDoesNotThrow(server, request,
+        asserts(SPEC_NAME,
+            HttpRequest.POST("/response-body/pojo", "{\"x\":10,\"y\":20}"),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request,
                 HttpResponseAssertion.builder()
                     .status(HttpStatus.CREATED)
                     .body("{\"x\":10,\"y\":20}")
@@ -70,29 +67,25 @@ public class BodyTest {
 
     @Test
     void testCustomBodyPOJOWithWholeRequest() throws IOException {
-        TestScenario.builder()
-            .specName(SPEC_NAME)
-            .request(HttpRequest.POST("/response-body/pojo-and-request", "{\"x\":10,\"y\":20}")
-                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON))
-            .assertion((server, request) -> HttpResponseAssertion.builder()
+        asserts(SPEC_NAME,
+            HttpRequest.POST("/response-body/pojo-and-request", "{\"x\":10,\"y\":20}")
+                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON),
+            (server, request) -> HttpResponseAssertion.builder()
                 .status(HttpStatus.CREATED)
                 .body("{\"x\":10,\"y\":20}")
-                .build())
-            .run();
+                .build());
     }
 
     @Test
     void testCustomBodyPOJOReactiveTypes() throws IOException {
-        TestScenario.builder()
-            .specName(SPEC_NAME)
-            .request(HttpRequest.POST("/response-body/pojo-reactive", "{\"x\":10,\"y\":20}")
-                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON))
-            .assertion((server, request) -> AssertionUtils.assertDoesNotThrow(server, request,
+        asserts(SPEC_NAME,
+            HttpRequest.POST("/response-body/pojo-reactive", "{\"x\":10,\"y\":20}")
+                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request,
                 HttpResponseAssertion.builder()
                     .status(HttpStatus.CREATED)
                     .body("{\"x\":10,\"y\":20}")
-                    .build()))
-            .run();
+                    .build()));
     }
 
     @Controller("/response-body")

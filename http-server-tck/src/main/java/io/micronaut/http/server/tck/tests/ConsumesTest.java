@@ -26,7 +26,7 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.server.tck.AssertionUtils;
 import io.micronaut.http.server.tck.HttpResponseAssertion;
-import io.micronaut.http.server.tck.TestScenario;
+import static io.micronaut.http.server.tck.TestScenario.asserts;
 import org.junit.jupiter.api.Test;
 import java.io.IOException;
 
@@ -40,14 +40,12 @@ public class ConsumesTest {
 
     @Test
     void testMultipleConsumesDefinition() throws IOException {
-        TestScenario.builder()
-            .specName(SPEC_NAME)
-            .request(HttpRequest.POST("/consumes-test", "{\"name\":\"Fred\"}").header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON))
-            .assertion((server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+        asserts(SPEC_NAME,
+            HttpRequest.POST("/consumes-test", "{\"name\":\"Fred\"}").header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .body("{\"name\":\"Fred\"}")
-                .build()))
-            .run();
+                .build()));
     }
 
     @Controller("/consumes-test")

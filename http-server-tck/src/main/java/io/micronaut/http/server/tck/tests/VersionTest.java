@@ -25,7 +25,7 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.server.tck.AssertionUtils;
 import io.micronaut.http.server.tck.HttpResponseAssertion;
-import io.micronaut.http.server.tck.TestScenario;
+import static io.micronaut.http.server.tck.TestScenario.asserts;
 import org.junit.jupiter.api.Test;
 import java.io.IOException;
 
@@ -39,17 +39,15 @@ public class VersionTest {
 
     @Test
     void testControllerMethodWithVersion2() throws IOException {
-        TestScenario.builder()
-            .configuration(CollectionUtils.mapOf(
+        asserts(SPEC_NAME,
+            CollectionUtils.mapOf(
                 "micronaut.router.versioning.enabled", StringUtils.TRUE,
                 "micronaut.router.versioning.header.enabled", StringUtils.TRUE
-            )).specName(SPEC_NAME)
-            .request(HttpRequest.GET("/version/ping").header("X-API-VERSION", "2"))
-            .assertion((server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+            ), HttpRequest.GET("/version/ping").header("X-API-VERSION", "2"),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .body("pong v2")
-                .build()))
-            .run();
+                .build()));
     }
 
     @Controller("/version")
