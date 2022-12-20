@@ -41,6 +41,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 })
 public class DeleteWithoutBodyTest {
     public static final String SPEC_NAME = "DeleteWithoutBodyTest";
+
     @Test
     void verifiesItIsPossibleToExposesADeleteEndpointWhichIsInvokedWithoutABody() throws IOException {
         asserts(SPEC_NAME,

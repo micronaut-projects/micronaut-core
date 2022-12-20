@@ -42,9 +42,6 @@ import org.reactivestreams.Publisher;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
 @SuppressWarnings({
     "java:S5960", // We're allowed assertions, as these are used in tests only
     "checkstyle:MissingJavadocType",

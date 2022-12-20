@@ -45,7 +45,18 @@ public final class TestScenario {
         this.assertion = assertion;
     }
 
-    public static void asserts(String specName, Map<String, Object> configuration, HttpRequest<?> request, BiConsumer<ServerUnderTest, HttpRequest<?>> assertion) throws IOException {
+    /**
+     *
+     * @param specName Value for {@literal spec.name} property. Used to avoid bean pollution.
+     * @param configuration Test Scenario configuration
+     * @param request HTTP Request to be sent in the test scenario
+     * @param assertion Assertion for a request and server.
+     * @throws IOException Exception thrown while getting the server under test.
+     */
+    public static void asserts(String specName,
+                               Map<String, Object> configuration,
+                               HttpRequest<?> request,
+                               BiConsumer<ServerUnderTest, HttpRequest<?>> assertion) throws IOException {
         TestScenario.builder()
             .specName(specName)
             .configuration(configuration)
@@ -53,7 +64,17 @@ public final class TestScenario {
             .assertion(assertion)
             .run();
     }
-    public static void asserts(String specName, HttpRequest<?> request, BiConsumer<ServerUnderTest, HttpRequest<?>> assertion) throws IOException {
+
+    /**
+     *
+     * @param specName Value for {@literal spec.name} property. Used to avoid bean pollution.
+     * @param request HTTP Request to be sent in the test scenario
+     * @param assertion Assertion for a request and server.
+     * @throws IOException Exception thrown while getting the server under test.
+     */
+    public static void asserts(String specName,
+                               HttpRequest<?> request,
+                               BiConsumer<ServerUnderTest, HttpRequest<?>> assertion) throws IOException {
         TestScenario.builder()
             .specName(specName)
             .request(request)
