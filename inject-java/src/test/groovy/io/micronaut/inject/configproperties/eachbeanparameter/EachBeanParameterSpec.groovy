@@ -7,7 +7,12 @@ class EachBeanParameterSpec extends AbstractTypeElementSpec {
 
     void 'test interceptor on an event'() {
         given:
-            ApplicationContext ctx = ApplicationContext.run(['spec': 'EachBeanParameterSpec', 'mydatasources.default.xyz': '111', 'mydatasources.foo.xyz': '111', 'mydatasources.bar.xyz': '111'])
+            Map<String, Object> datasourcesConfiguration = [
+                    'mydatasources.default.xyz': '111',
+                    'mydatasources.foo.xyz': '111',
+                    'mydatasources.bar.xyz': '111'
+            ]
+            ApplicationContext ctx = ApplicationContext.run(['spec': 'EachBeanParameterSpec'] + datasourcesConfiguration)
 
         when:
             def service = ctx.getBean(MyService)
@@ -16,6 +21,9 @@ class EachBeanParameterSpec extends AbstractTypeElementSpec {
             service.getDefaultBean().name == "default"
             service.getBarBean().name == "bar"
             service.getFooBean().name == "foo"
+
+        and:
+            ctx.getBeansOfType(AbstractDataSource).size() == datasourcesConfiguration.size() + 1 // DefaultDataSource
 
         cleanup:
             ctx.close()
