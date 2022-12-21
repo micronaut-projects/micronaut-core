@@ -5,7 +5,7 @@ import io.micronaut.context.ApplicationContext
 
 class EachBeanParameterSpec extends AbstractTypeElementSpec {
 
-    void 'test interceptor on an event'() {
+    void 'test name parameter is properly injected when a bean is annotated with @Named and @Primary'() {
         given:
             Map<String, Object> datasourcesConfiguration = [
                     'mydatasources.default.xyz': '111',
