@@ -2,6 +2,7 @@ package io.micronaut.inject.configproperties.eachbeanparameter
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
+import io.micronaut.inject.qualifiers.Qualifiers
 
 class EachBeanParameterSpec extends AbstractTypeElementSpec {
 
@@ -24,6 +25,9 @@ class EachBeanParameterSpec extends AbstractTypeElementSpec {
 
         and:
             ctx.getBeansOfType(AbstractDataSource).size() == datasourcesConfiguration.size() + 1 // DefaultDataSource
+            ctx.getBeansOfType(MyHelper).size() == datasourcesConfiguration.size() + 1
+            ctx.getBeansOfType(MyBean).size() == datasourcesConfiguration.size() + 1
+            ctx.getBeansOfType(MyBean, Qualifiers.byName("default")).size() == 2
 
         cleanup:
             ctx.close()
