@@ -661,52 +661,48 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
     @SuppressWarnings("unchecked")
     @Override
-    public <T, R> Optional<MethodExecutionHandle<T, R>> findExecutionHandle(Class<T> beanType, Qualifier<?> qualifier, String method, Class<?>... arguments) {
-        Optional<? extends BeanDefinition<?>> foundBean = findBeanDefinition(beanType, (Qualifier) qualifier);
-        if (foundBean.isPresent()) {
-            BeanDefinition<?> beanDefinition = foundBean.get();
-            Optional<? extends ExecutableMethod<?, Object>> foundMethod = beanDefinition.findMethod(method, arguments);
-            if (foundMethod.isPresent()) {
-                return foundMethod.map((ExecutableMethod executableMethod) ->
-                        new BeanExecutionHandle(this, beanType, qualifier, executableMethod)
-                );
-            } else {
-                return beanDefinition.findPossibleMethods(method)
-                        .findFirst()
-                        .filter(m -> {
-                            Class<?>[] argTypes = m.getArgumentTypes();
-                            if (argTypes.length == arguments.length) {
-                                for (int i = 0; i < argTypes.length; i++) {
-                                    if (!arguments[i].isAssignableFrom(argTypes[i])) {
-                                        return false;
-                                    }
-                                }
-                                return true;
-                            }
-                            return false;
-                        })
-                        .map((ExecutableMethod executableMethod) -> new BeanExecutionHandle(this, beanType, qualifier, executableMethod));
-            }
+    public <T, R> Optional<MethodExecutionHandle<T, R>> findExecutionHandle(Class<T> beanType, Qualifier<?> q, String method, Class<?>... arguments) {
+        Qualifier<T> qualifier = (Qualifier<T>) q;
+        Optional<BeanDefinition<T>> foundBean = findBeanDefinition(beanType, qualifier);
+        if (foundBean.isEmpty()) {
+            return Optional.empty();
         }
-        return Optional.empty();
+        BeanDefinition<T> beanDefinition = foundBean.get();
+        Optional<ExecutableMethod<T, R>> foundMethod = beanDefinition.findMethod(method, arguments);
+        if (foundMethod.isEmpty()) {
+            foundMethod = beanDefinition.<R>findPossibleMethods(method)
+                .findFirst()
+                .filter(m -> {
+                    Class<?>[] argTypes = m.getArgumentTypes();
+                    if (argTypes.length == arguments.length) {
+                        for (int i = 0; i < argTypes.length; i++) {
+                            if (!arguments[i].isAssignableFrom(argTypes[i])) {
+                                return false;
+                            }
+                        }
+                        return true;
+                    }
+                    return false;
+                });
+        }
+        return foundMethod.map(executableMethod -> new BeanExecutionHandle<>(this, beanType, qualifier, executableMethod));
     }
 
     @Override
     public <T, R> Optional<ExecutableMethod<T, R>> findExecutableMethod(Class<T> beanType, String method, Class<?>[] arguments) {
-        if (beanType != null) {
-            Collection<BeanDefinition<T>> definitions = getBeanDefinitions(beanType);
-            if (!definitions.isEmpty()) {
-                BeanDefinition<T> beanDefinition = definitions.iterator().next();
-                Optional<ExecutableMethod<T, R>> foundMethod = beanDefinition.findMethod(method, arguments);
-                if (foundMethod.isPresent()) {
-                    return foundMethod;
-                } else {
-                    return beanDefinition.<R>findPossibleMethods(method)
-                            .findFirst();
-                }
-            }
+        if (beanType == null) {
+            return Optional.empty();
         }
-        return Optional.empty();
+        Collection<BeanDefinition<T>> definitions = getBeanDefinitions(beanType);
+        if (definitions.isEmpty()) {
+            return Optional.empty();
+        }
+        BeanDefinition<T> beanDefinition = definitions.iterator().next();
+        Optional<ExecutableMethod<T, R>> foundMethod = beanDefinition.findMethod(method, arguments);
+        if (foundMethod.isPresent()) {
+            return foundMethod;
+        }
+        return beanDefinition.<R>findPossibleMethods(method).findFirst();
     }
 
     @SuppressWarnings("unchecked")
