@@ -2,6 +2,8 @@ package io.micronaut.inject.configproperties.eachbeanparameter
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.Qualifier
+import io.micronaut.context.exceptions.NonUniqueBeanException
 import io.micronaut.inject.qualifiers.Qualifiers
 
 class EachBeanParameterSpec extends AbstractTypeElementSpec {
@@ -17,7 +19,7 @@ class EachBeanParameterSpec extends AbstractTypeElementSpec {
 
         when:
             def service = ctx.getBean(MyService)
-
+            Qualifier defaultNameQualifier = Qualifiers.byName("default")
         then:
             service.getDefaultBean().name == "default"
             service.getBarBean().name == "bar"
@@ -27,7 +29,17 @@ class EachBeanParameterSpec extends AbstractTypeElementSpec {
             ctx.getBeansOfType(AbstractDataSource).size() == datasourcesConfiguration.size() + 1 // DefaultDataSource
             ctx.getBeansOfType(MyHelper).size() == datasourcesConfiguration.size() + 1
             ctx.getBeansOfType(MyBean).size() == datasourcesConfiguration.size() + 1
-            ctx.getBeansOfType(MyBean, Qualifiers.byName("default")).size() == 2
+            ctx.getBeansOfType(AbstractDataSource).stream().filter(it -> it instanceof MyDataSource).count() == 3
+            ctx.getBeansOfType(AbstractDataSource).stream().filter(it -> it instanceof DefaultDataSource).count() == 1
+
+            ctx.getBeansOfType(AbstractDataSource, defaultNameQualifier).size() == 2
+            ctx.getBeansOfType(MyHelper, defaultNameQualifier).size() == 2
+            ctx.getBeansOfType(MyBean, defaultNameQualifier).size() == 2
+
+        when:
+            ctx.getBean(AbstractDataSource, defaultNameQualifier)
+        then:
+            thrown(NonUniqueBeanException) // DefaultDataSource is annotated with `@Primary`. MyDataSource also defines primary via the annotation member `@EachProperty(value = "mydatasources", primary = "default")`
 
         cleanup:
             ctx.close()
