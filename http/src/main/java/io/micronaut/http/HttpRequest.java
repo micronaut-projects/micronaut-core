@@ -389,6 +389,18 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     }
 
     /**
+     * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#DELETE} request for the given URI.
+     *
+     * @param uri The URI
+     * @param <T> The Http request type
+     * @return The {@link MutableHttpRequest} instance
+     * @see HttpRequestFactory
+     */
+    static <T> MutableHttpRequest<T> DELETE(URI uri) {
+        return DELETE(uri.toString(), null);
+    }
+
+    /**
      * Create a new {@link MutableHttpRequest} for the given method and URI.
      *
      * @param httpMethod The method

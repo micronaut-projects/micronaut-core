@@ -14,8 +14,10 @@ pluginManagement {
 }
 
 plugins {
-    id 'io.micronaut.build.shared.settings' version '5.3.14'
+    id 'io.micronaut.build.shared.settings' version '5.3.15'
 }
+enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
+
 
 rootProject.name = 'micronaut'
 
@@ -35,6 +37,7 @@ include "http-client-core"
 include "http-client"
 include "http-netty"
 include "http-server"
+include "http-server-tck"
 include "http-server-netty"
 include "http-validation"
 include "inject"
@@ -61,8 +64,10 @@ include "test-suite"
 include "test-suite-helper"
 include "test-suite-javax-inject"
 include "test-suite-jakarta-inject-bean-import"
+include "test-suite-http-server-tck-netty"
 include "test-suite-kotlin"
 include "test-suite-graal"
+include "test-suite-groovy"
 include "test-suite-groovy"
 include "test-utils"
 

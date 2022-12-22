@@ -422,7 +422,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements BeanI
                 throw new IllegalArgumentException("Invalid bean [" + bean + "] for type: " + beanType);
             }
             if (isWriteOnly()) {
-                throw new UnsupportedOperationException("Cannot read from a write-only property");
+                throw new UnsupportedOperationException("Cannot read from a write-only property: " + getName());
             }
             return dispatchOne(ref.getMethodIndex, bean, null);
         }
