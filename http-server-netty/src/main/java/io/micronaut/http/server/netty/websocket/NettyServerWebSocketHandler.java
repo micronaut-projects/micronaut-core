@@ -22,7 +22,6 @@ import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.bind.BoundExecutable;
 import io.micronaut.core.bind.DefaultExecutableBinder;
 import io.micronaut.core.bind.ExecutableBinder;
-import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Executable;
@@ -88,7 +87,6 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
     private final NettyEmbeddedServices nettyEmbeddedServices;
     @Nullable
     private final CoroutineHelper coroutineHelper;
-    private final ConversionService conversionService;
 
     private final Argument<?> bodyArgument;
     private final Argument<?> pongArgument;
@@ -192,7 +190,6 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
                 LOG.error("Error publishing WebSocket opened event: " + e.getMessage(), e);
             }
         }
-        conversionService = nettyEmbeddedServices.getApplicationContext().getConversionService();
     }
 
     @Override
