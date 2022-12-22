@@ -34,7 +34,7 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.core.util.SupplierUtil;
+import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpResponseWrapper;
 import io.micronaut.http.HttpStatus;
@@ -89,6 +89,7 @@ import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.micronaut.http.sse.Event;
 import io.micronaut.http.uri.UriBuilder;
 import io.micronaut.http.uri.UriTemplate;
+import io.micronaut.http.util.HttpHeadersUtil;
 import io.micronaut.jackson.databind.JacksonDatabindMapper;
 import io.micronaut.json.JsonMapper;
 import io.micronaut.json.codec.JsonMediaTypeCodec;
@@ -182,9 +183,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-
 import static io.micronaut.scheduling.instrument.InvocationInstrumenter.NOOP;
 
 /**
@@ -210,9 +209,6 @@ public class DefaultHttpClient implements
     private static final int DEFAULT_HTTP_PORT = 80;
     private static final int DEFAULT_HTTPS_PORT = 443;
 
-    private static final Supplier<Pattern> HEADER_MASK_PATTERNS = SupplierUtil.memoized(() ->
-        Pattern.compile(".*(password|cred|cert|key|secret|token|auth|signat).*", Pattern.CASE_INSENSITIVE)
-    );
     /**
      * Which headers <i>not</i> to copy from the first request when redirecting to a second request. There doesn't
      * appear to be a spec for this. {@link java.net.HttpURLConnection} seems to drop all headers, but that would be a
@@ -1188,7 +1184,13 @@ public class DefaultHttpClient implements
             Publisher<R> responsePublisher) {
 
         if (request instanceof MutableHttpRequest) {
-            ((MutableHttpRequest<I>) request).uri(requestURI);
+            MutableHttpRequest<I> mutRequest = (MutableHttpRequest<I>) request;
+            mutRequest.uri(requestURI);
+            if (informationalServiceId != null &&
+                !mutRequest.getAttribute(HttpAttributes.SERVICE_ID).isPresent()) {
+
+                mutRequest.setAttribute(HttpAttributes.SERVICE_ID, informationalServiceId);
+            }
 
             List<HttpClientFilter> filters =
                     filterResolver.resolveFilters(request, clientFilterEntries);
@@ -1747,7 +1749,7 @@ public class DefaultHttpClient implements
 
     private void traceRequest(io.micronaut.http.HttpRequest<?> request, io.netty.handler.codec.http.HttpRequest nettyRequest) {
         HttpHeaders headers = nettyRequest.headers();
-        traceHeaders(headers);
+        HttpHeadersUtil.trace(log, headers.names(), headers::getAll);
         if (io.micronaut.http.HttpMethod.permitsRequestBody(request.getMethod()) && request.getBody().isPresent() && nettyRequest instanceof FullHttpRequest) {
             FullHttpRequest fullHttpRequest = (FullHttpRequest) nettyRequest;
             ByteBuf content = fullHttpRequest.content();
@@ -1769,30 +1771,6 @@ public class DefaultHttpClient implements
         log.trace("----");
         log.trace(content.toString(defaultCharset));
         log.trace("----");
-    }
-
-    private void traceHeaders(HttpHeaders headers) {
-        for (String name : headers.names()) {
-            boolean isMasked = HEADER_MASK_PATTERNS.get().matcher(name).matches();
-            List<String> all = headers.getAll(name);
-            if (all.size() > 1) {
-                for (String value : all) {
-                    String maskedValue = isMasked ? mask(value) : value;
-                    log.trace("{}: {}", name, maskedValue);
-                }
-            } else if (!all.isEmpty()) {
-                String maskedValue = isMasked ? mask(all.get(0)) : all.get(0);
-                log.trace("{}: {}", name, maskedValue);
-            }
-        }
-    }
-
-    @Nullable
-    private String mask(@Nullable String value) {
-        if (value == null) {
-            return null;
-        }
-        return "*MASKED*";
     }
 
     private static MediaTypeCodecRegistry createDefaultMediaTypeRegistry() {
@@ -2109,7 +2087,7 @@ public class DefaultHttpClient implements
             HttpHeaders headers = msg.headers();
             if (log.isTraceEnabled()) {
                 log.trace("HTTP Client Response Received ({}) for Request: {} {}", msg.status(), finalRequest.getMethodName(), finalRequest.getUri());
-                traceHeaders(headers);
+                HttpHeadersUtil.trace(log, headers.names(), headers::getAll);
             }
             buildResponse(responsePromise, msg, httpStatus);
         }
