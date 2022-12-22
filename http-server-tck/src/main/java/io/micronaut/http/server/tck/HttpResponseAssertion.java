@@ -16,10 +16,16 @@
 package io.micronaut.http.server.tck;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.function.Consumer;
 
 /**
  * Utility class to verify assertions given an HTTP Response.
@@ -33,10 +39,22 @@ public final class HttpResponseAssertion {
     private final Map<String, String> headers;
     private final String body;
 
-    private HttpResponseAssertion(HttpStatus httpStatus, Map<String, String> headers, String body) {
+    @Nullable
+    private final Consumer<HttpResponse<?>> responseConsumer;
+
+    private HttpResponseAssertion(HttpStatus httpStatus,
+                                  Map<String, String> headers,
+                                  String body,
+                                  @Nullable Consumer<HttpResponse<?>> responseConsumer) {
         this.httpStatus = httpStatus;
         this.headers = headers;
         this.body = body;
+        this.responseConsumer = responseConsumer;
+    }
+
+    @NonNull
+    public Optional<Consumer<HttpResponse<?>>> getResponseConsumer() {
+        return Optional.ofNullable(responseConsumer);
     }
 
     /**
@@ -79,6 +97,18 @@ public final class HttpResponseAssertion {
         private Map<String, String> headers;
         private String body;
 
+        private Consumer<HttpResponse<?>> responseConsumer;
+
+        /**
+         *
+         * @param responseConsumer HTTP Response Consumer
+         * @return HTTP Response Assertion Builder
+         */
+        public Builder assertResponse(Consumer<HttpResponse<?>> responseConsumer) {
+            this.responseConsumer = responseConsumer;
+            return this;
+        }
+
         /**
          *
          * @param headers HTTP Headers
@@ -86,6 +116,20 @@ public final class HttpResponseAssertion {
          */
         public Builder headers(Map<String, String> headers) {
             this.headers = headers;
+            return this;
+        }
+
+        /**
+         *
+         * @param headerName Header Name
+         * @param headerValue Header Value
+         * @return HTTP Response Assertion Builder
+         */
+        public Builder header(String headerName, String headerValue) {
+            if (this.headers == null) {
+                this.headers = new HashMap<>();
+            }
+            this.headers.put(headerName, headerValue);
             return this;
         }
 
@@ -114,7 +158,7 @@ public final class HttpResponseAssertion {
          * @return HTTP Response Assertion
          */
         public HttpResponseAssertion build() {
-            return new HttpResponseAssertion(Objects.requireNonNull(httpStatus), headers, body);
+            return new HttpResponseAssertion(Objects.requireNonNull(httpStatus), headers, body, responseConsumer);
         }
     }
 }
