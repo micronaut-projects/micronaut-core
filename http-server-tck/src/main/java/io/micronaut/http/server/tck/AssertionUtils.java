@@ -50,7 +50,15 @@ public final class AssertionUtils {
     public static void assertThrows(@NonNull ServerUnderTest server,
                                     @NonNull HttpRequest<?> request,
                                     @NonNull HttpResponseAssertion assertion) {
-        assertThrows(server, request, assertion.getHttpStatus(), assertion.getBody(), assertion.getHeaders());
+        Executable e = assertion.getBody() != null ?
+            () -> server.exchange(request, String.class) :
+            () -> server.exchange(request);
+        HttpClientResponseException thrown = Assertions.assertThrows(HttpClientResponseException.class, e);
+        HttpResponse<?> response = thrown.getResponse();
+        assertEquals(assertion.getHttpStatus(), response.getStatus());
+        assertHeaders(response, assertion.getHeaders());
+        assertBody(response, assertion.getBody());
+        assertion.getResponseConsumer().ifPresent(httpResponseConsumer -> httpResponseConsumer.accept(response));
     }
 
     public static void assertThrows(@NonNull ServerUnderTest server,
@@ -58,20 +66,11 @@ public final class AssertionUtils {
                                     @NonNull HttpStatus expectedStatus,
                                     @Nullable String expectedBody,
                                     @Nullable Map<String, String> expectedHeaders) {
-        Executable e = expectedBody != null ?
-            () -> server.exchange(request, String.class) :
-            () -> server.exchange(request);
-        HttpClientResponseException thrown = Assertions.assertThrows(HttpClientResponseException.class, e);
-        HttpResponse<?> response = thrown.getResponse();
-        assertEquals(expectedStatus, response.getStatus());
-        assertHeaders(response, expectedHeaders);
-        assertBody(response, expectedBody);
-    }
-
-    public static <T> void assertDoesNotThrow(@NonNull ServerUnderTest server,
-                                          @NonNull HttpRequest<T> request,
-                                          @NonNull HttpResponseAssertion assertion) {
-        assertDoesNotThrow(server, request, assertion.getHttpStatus(), assertion.getBody(), assertion.getHeaders());
+        assertThrows(server, request, HttpResponseAssertion.builder()
+            .status(expectedStatus)
+            .body(expectedBody)
+            .headers(expectedHeaders)
+            .build());
     }
 
     public static <T> void assertDoesNotThrow(@NonNull ServerUnderTest server,
@@ -79,13 +78,24 @@ public final class AssertionUtils {
                                           @NonNull HttpStatus expectedStatus,
                                           @Nullable String expectedBody,
                                           @Nullable Map<String, String> expectedHeaders) {
-        ThrowingSupplier<HttpResponse<?>> executable = expectedBody != null ?
+        assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+            .status(expectedStatus)
+            .body(expectedBody)
+            .headers(expectedHeaders)
+            .build());
+    }
+
+    public static <T> void assertDoesNotThrow(@NonNull ServerUnderTest server,
+                                              @NonNull HttpRequest<T> request,
+                                              @NonNull HttpResponseAssertion assertion) {
+        ThrowingSupplier<HttpResponse<?>> executable = assertion.getBody() != null ?
             () -> server.exchange(request, String.class) :
             () -> server.exchange(request);
         HttpResponse<?> response = Assertions.assertDoesNotThrow(executable);
-        assertEquals(expectedStatus, response.getStatus());
-        assertHeaders(response, expectedHeaders);
-        assertBody(response, expectedBody);
+        assertEquals(assertion.getHttpStatus(), response.getStatus());
+        assertHeaders(response, assertion.getHeaders());
+        assertBody(response, assertion.getBody());
+        assertion.getResponseConsumer().ifPresent(httpResponseConsumer -> httpResponseConsumer.accept(response));
     }
 
     private static void assertBody(@NonNull HttpResponse<?> response,  @Nullable String expectedBody) {
