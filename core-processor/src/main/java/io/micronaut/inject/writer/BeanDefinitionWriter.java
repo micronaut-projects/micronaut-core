@@ -2109,7 +2109,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             writer.loadArg(INSTANTIATE_METHOD_BEAN_CONTEXT_PARAM);
             return true;
         }
-        if (visitorContext.getClassElement(ConversionService.class).orElseThrow().isAssignable(type)) {
+        if (visitorContext.getClassElement(ConversionService.class).orElseThrow().equals(type)) {
             // We only want to assign to exact `ConversionService` classes not to classes extending `ConversionService`
             writer.loadArg(INSTANTIATE_METHOD_BEAN_CONTEXT_PARAM);
             writer.invokeInterface(TYPE_BEAN_CONTEXT, METHOD_BEAN_CONTEXT_GET_CONVERSION_SERVICE);
