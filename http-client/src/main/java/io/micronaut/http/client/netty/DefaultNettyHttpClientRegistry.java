@@ -56,6 +56,7 @@ import io.micronaut.http.netty.channel.DefaultEventLoopGroupConfiguration;
 import io.micronaut.http.netty.channel.EventLoopGroupConfiguration;
 import io.micronaut.http.netty.channel.EventLoopGroupFactory;
 import io.micronaut.http.netty.channel.EventLoopGroupRegistry;
+import io.micronaut.http.netty.channel.NettyChannelType;
 import io.micronaut.inject.InjectionPoint;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.json.JsonFeatures;
@@ -418,7 +419,8 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
                         new DefaultRequestBinderRegistry(conversionService)
                 ),
                 eventLoopGroup,
-                resolveSocketChannelFactory(configuration, beanContext),
+                resolveSocketChannelFactory(NettyChannelType.CLIENT_SOCKET, configuration, beanContext),
+                resolveSocketChannelFactory(NettyChannelType.DATAGRAM_SOCKET, configuration, beanContext),
                 clientCustomizer,
                 invocationInstrumenterFactories,
                 clientId,
@@ -461,7 +463,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
         }
     }
 
-    private ChannelFactory resolveSocketChannelFactory(HttpClientConfiguration configuration, BeanContext beanContext) {
+    private ChannelFactory resolveSocketChannelFactory(NettyChannelType type, HttpClientConfiguration configuration, BeanContext beanContext) {
         final String eventLoopGroup = configuration.getEventLoopGroup();
 
         final EventLoopGroupConfiguration eventLoopGroupConfiguration = beanContext.findBean(EventLoopGroupConfiguration.class, Qualifiers.byName(eventLoopGroup))
@@ -473,7 +475,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
                     }
                 });
 
-        return () -> eventLoopGroupFactory.clientSocketChannelInstance(eventLoopGroupConfiguration);
+        return () -> eventLoopGroupFactory.channelInstance(type, eventLoopGroupConfiguration);
     }
 
     private ClientKey getClientKey(AnnotationMetadata metadata) {

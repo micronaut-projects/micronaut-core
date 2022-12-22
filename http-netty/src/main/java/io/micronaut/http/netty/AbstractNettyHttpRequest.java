@@ -148,7 +148,7 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
 
     @Override
     public HttpVersion getHttpVersion() {
-        if (nettyRequest.headers().contains(HTTP2_SCHEME)) {
+        if (nettyRequest.headers().contains(HTTP2_SCHEME) || nettyRequest.headers().contains("x-http3-scheme")) {
             return HttpVersion.HTTP_2_0;
         }
         return HttpVersion.HTTP_1_1;

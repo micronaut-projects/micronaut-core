@@ -26,7 +26,13 @@ import org.reactivestreams.Subscription;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static io.micronaut.http.netty.reactive.HandlerSubscriber.State.*;
+import static io.micronaut.http.netty.reactive.HandlerSubscriber.State.CANCELLED;
+import static io.micronaut.http.netty.reactive.HandlerSubscriber.State.COMPLETE;
+import static io.micronaut.http.netty.reactive.HandlerSubscriber.State.INACTIVE;
+import static io.micronaut.http.netty.reactive.HandlerSubscriber.State.NO_CONTEXT;
+import static io.micronaut.http.netty.reactive.HandlerSubscriber.State.NO_SUBSCRIPTION;
+import static io.micronaut.http.netty.reactive.HandlerSubscriber.State.NO_SUBSCRIPTION_OR_CONTEXT;
+import static io.micronaut.http.netty.reactive.HandlerSubscriber.State.RUNNING;
 
 /**
  * Subscriber that publishes received messages to the handler pipeline.
@@ -217,7 +223,7 @@ public class HandlerSubscriber<T> extends ChannelDuplexHandler implements Subscr
         });
     }
 
-    private void maybeRequestMore() {
+    protected final void maybeRequestMore() { // todo: make private https://github.com/netty/netty-incubator-codec-http3/pull/211
         if (ctx.channel().isWritable() && !(state == COMPLETE || state == CANCELLED)) {
             subscription.request(1);
         }

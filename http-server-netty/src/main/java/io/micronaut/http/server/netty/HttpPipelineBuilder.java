@@ -62,6 +62,11 @@ import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.ssl.SslHandshakeCompletionEvent;
 import io.netty.handler.stream.ChunkedWriteHandler;
 import io.netty.handler.timeout.IdleStateHandler;
+import io.netty.incubator.codec.http3.Http3;
+import io.netty.incubator.codec.http3.Http3FrameToHttpObjectCodec;
+import io.netty.incubator.codec.http3.Http3ServerConnectionHandler;
+import io.netty.incubator.codec.quic.QuicSslContext;
+import io.netty.incubator.codec.quic.QuicStreamChannel;
 import io.netty.util.AsciiString;
 import io.netty.util.AttributeKey;
 import io.netty.util.ReferenceCountUtil;
@@ -102,6 +107,7 @@ final class HttpPipelineBuilder {
 
     private final LoggingHandler loggingHandler;
     private final SslContext sslContext;
+    private final QuicSslContext quicSslContext;
     private final HttpAccessLogHandler accessLogHandler;
     private final HttpRequestDecoder requestDecoder;
     private final HttpResponseEncoder responseEncoder;
@@ -110,17 +116,21 @@ final class HttpPipelineBuilder {
 
     private final NettyServerCustomizer serverCustomizer;
 
-    HttpPipelineBuilder(NettyHttpServer server, NettyEmbeddedServices embeddedServices, ServerSslConfiguration sslConfiguration, RoutingInBoundHandler routingInBoundHandler, HttpHostResolver hostResolver, NettyServerCustomizer serverCustomizer) {
+    private final boolean quic;
+
+    HttpPipelineBuilder(NettyHttpServer server, NettyEmbeddedServices embeddedServices, ServerSslConfiguration sslConfiguration, RoutingInBoundHandler routingInBoundHandler, HttpHostResolver hostResolver, NettyServerCustomizer serverCustomizer, boolean quic) {
         this.server = server;
         this.embeddedServices = embeddedServices;
         this.sslConfiguration = sslConfiguration;
         this.routingInBoundHandler = routingInBoundHandler;
         this.hostResolver = hostResolver;
         this.serverCustomizer = serverCustomizer;
+        this.quic = quic;
 
         Optional<LogLevel> logLevel = server.getServerConfiguration().getLogLevel();
         loggingHandler = logLevel.map(level -> new LoggingHandler(NettyHttpServer.class, level)).orElse(null);
-        sslContext = embeddedServices.getServerSslBuilder() != null ? embeddedServices.getServerSslBuilder().build().orElse(null) : null;
+        sslContext = embeddedServices.getServerSslBuilder() != null && !quic ? embeddedServices.getServerSslBuilder().build().orElse(null) : null;
+        quicSslContext = quic ? embeddedServices.getServerSslBuilder().buildQuic() : null;
 
         NettyHttpServerConfiguration.AccessLogger accessLogger = server.getServerConfiguration().getAccessLogger();
         if (accessLogger != null && accessLogger.isEnabled()) {
@@ -130,9 +140,9 @@ final class HttpPipelineBuilder {
         }
 
         requestDecoder = new HttpRequestDecoder(server,
-                server.getEnvironment(),
-                server.getServerConfiguration(),
-                embeddedServices.getEventPublisher(HttpRequestReceivedEvent.class));
+            server.getEnvironment(),
+            server.getServerConfiguration(),
+            embeddedServices.getEventPublisher(HttpRequestReceivedEvent.class));
         responseEncoder = new HttpResponseEncoder(
                 embeddedServices.getMediaTypeCodecRegistry(),
                 server.getServerConfiguration(),
@@ -158,7 +168,7 @@ final class HttpPipelineBuilder {
             this.connectionCustomizer = serverCustomizer.specializeForChannel(channel, NettyServerCustomizer.ChannelRole.CONNECTION);
         }
 
-        void insertPcapLoggingHandler(String qualifier) {
+        void insertPcapLoggingHandler(Channel ch, String qualifier) {
             String pattern = server.getServerConfiguration().getPcapLoggingPathPattern();
             if (pattern == null) {
                 return;
@@ -166,8 +176,16 @@ final class HttpPipelineBuilder {
 
             String path = pattern;
             path = path.replace("{qualifier}", qualifier);
-            path = path.replace("{localAddress}", resolveIfNecessary(pipeline.channel().localAddress()));
-            path = path.replace("{remoteAddress}", resolveIfNecessary(pipeline.channel().remoteAddress()));
+            if (ch.localAddress() != null) {
+                path = path.replace("{localAddress}", resolveIfNecessary(ch.localAddress()));
+            }
+            if (ch.remoteAddress() != null) {
+                path = path.replace("{remoteAddress}", resolveIfNecessary(ch.remoteAddress()));
+            }
+            if (quic && ch instanceof QuicStreamChannel qsc) {
+                path = path.replace("{localAddress}", resolveIfNecessary(qsc.parent().localAddress()));
+                path = path.replace("{remoteAddress}", resolveIfNecessary(qsc.parent().remoteAddress()));
+            }
             path = path.replace("{random}", Long.toHexString(ThreadLocalRandom.current().nextLong()));
             path = path.replace("{timestamp}", Instant.now().toString());
 
@@ -176,7 +194,13 @@ final class HttpPipelineBuilder {
             LOG.warn("Logging *full* request data, as configured. This will contain sensitive information! Path: '{}'", path);
 
             try {
-                pipeline.addLast(new PcapWriteHandler(new FileOutputStream(path)));
+                PcapWriteHandler.Builder builder = PcapWriteHandler.builder();
+
+                if (quic && ch instanceof QuicStreamChannel qsc) {
+                    builder.forceTcpChannel((InetSocketAddress) qsc.parent().localAddress(), (InetSocketAddress) qsc.parent().remoteAddress(), true);
+                }
+
+                ch.pipeline().addLast(builder.build(new FileOutputStream(path)));
             } catch (FileNotFoundException e) {
                 LOG.warn("Failed to create target pcap at '{}', not logging.", path, e);
             }
@@ -219,18 +243,46 @@ final class HttpPipelineBuilder {
             }
         }
 
+        void initHttp3Channel() {
+            insertPcapLoggingHandler(channel, "udp-encapsulated");
+
+            pipeline.addLast(Http3.newQuicServerCodecBuilder()
+                .sslContext(quicSslContext)
+                // todo
+                .initialMaxData(10000000)
+                .initialMaxStreamDataBidirectionalLocal(1000000)
+                .initialMaxStreamDataBidirectionalRemote(1000000)
+                .initialMaxStreamsBidirectional(100)
+                .tokenHandler(new QuicTokenHandlerImpl(channel.alloc()))
+                .handler(new ChannelInitializer<Channel>() {
+                    @Override
+                    protected void initChannel(@NonNull Channel ch) throws Exception {
+                        insertPcapLoggingHandler(ch, "quic-decapsulated");
+                        ch.pipeline().addLast(new Http3ServerConnectionHandler(new ChannelInitializer<QuicStreamChannel>() {
+                            @Override
+                            protected void initChannel(@NonNull QuicStreamChannel ch) throws Exception {
+                                StreamPipeline streamPipeline = new StreamPipeline(ch, ssl, connectionCustomizer.specializeForChannel(ch, NettyServerCustomizer.ChannelRole.REQUEST_STREAM));
+                                streamPipeline.insertHttp3FrameHandlers();
+                                streamPipeline.streamCustomizer.onStreamPipelineBuilt();
+                            }
+                        }));
+                    }
+                })
+                .build());
+        }
+
         /**
          * Insert handlers that wrap the outermost TCP stream. This is SSL and potentially packet capture.
          */
         void insertOuterTcpHandlers() {
-            insertPcapLoggingHandler("encapsulated");
+            insertPcapLoggingHandler(channel, "encapsulated");
 
             if (ssl) {
                 SslHandler sslHandler = sslContext.newHandler(channel.alloc());
                 sslHandler.setHandshakeTimeoutMillis(sslConfiguration.getHandshakeTimeout().toMillis());
                 pipeline.addLast(ChannelPipelineCustomizer.HANDLER_SSL, sslHandler);
 
-                insertPcapLoggingHandler("ssl-decapsulated");
+                insertPcapLoggingHandler(channel, "ssl-decapsulated");
             }
 
             if (loggingHandler != null) {
@@ -448,6 +500,15 @@ final class HttpPipelineBuilder {
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECODER, new Http2StreamFrameToHttpObjectCodec(true, server.getServerConfiguration().isValidateHeaders()));
 
             insertHttp2DownstreamHandlers();
+        }
+
+        private void insertHttp3FrameHandlers() {
+            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECODER, new Http3FrameToHttpObjectCodec(true, server.getServerConfiguration().isValidateHeaders()));
+
+            insertHttp2DownstreamHandlers();
+
+            // todo: remove https://github.com/netty/netty-incubator-codec-http3/pull/211
+            pipeline.get(HttpStreamsServerHandler.class).doNotWaitForWrite();
         }
 
         /**

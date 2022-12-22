@@ -79,7 +79,6 @@ import io.micronaut.http.filter.HttpClientFilter;
 import io.micronaut.http.filter.HttpClientFilterResolver;
 import io.micronaut.http.filter.HttpFilterResolver;
 import io.micronaut.http.multipart.MultipartException;
-import io.micronaut.http.netty.AbstractNettyHttpRequest;
 import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.NettyHttpRequestBuilder;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
@@ -120,6 +119,7 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.MultithreadEventLoopGroup;
+import io.netty.channel.socket.nio.NioDatagramChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.TooLongFrameException;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
@@ -137,7 +137,6 @@ import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponseStatus;
-import io.netty.handler.codec.http.HttpScheme;
 import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.codec.http.multipart.DefaultHttpDataFactory;
@@ -293,6 +292,7 @@ public class DefaultHttpClient implements
             new DefaultRequestBinderRegistry(conversionService),
             null,
             NioSocketChannel::new,
+            NioDatagramChannel::new,
             CompositeNettyClientCustomizer.EMPTY,
             invocationInstrumenterFactories,
             null,
@@ -332,6 +332,7 @@ public class DefaultHttpClient implements
                              @NonNull RequestBinderRegistry requestBinderRegistry,
                              @Nullable EventLoopGroup eventLoopGroup,
                              @NonNull ChannelFactory socketChannelFactory,
+                             @NonNull ChannelFactory udpChannelFactory,
                              NettyClientCustomizer clientCustomizer,
                              List<InvocationInstrumenterFactory> invocationInstrumenterFactories,
                              @Nullable String informationalServiceId,
@@ -382,6 +383,7 @@ public class DefaultHttpClient implements
             explicitHttpVersion,
             combineFactories(),
             socketChannelFactory,
+            udpChannelFactory,
             nettyClientSslBuilder,
             clientCustomizer,
             informationalServiceId);
@@ -1987,15 +1989,6 @@ public class DefaultHttpClient implements
          * @param emitter     The emitter
          */
         protected void write(ConnectionManager.PoolHandle poolHandle, boolean isSecure, FluxSink<?> emitter) {
-            if (poolHandle.http2) {
-                // todo: move to ConnectionManager, DefaultHttpClient shouldn't care about the scheme
-                if (isSecure) {
-                    nettyRequest.headers().add(AbstractNettyHttpRequest.HTTP2_SCHEME, HttpScheme.HTTPS);
-                } else {
-                    nettyRequest.headers().add(AbstractNettyHttpRequest.HTTP2_SCHEME, HttpScheme.HTTP);
-                }
-            }
-
             Channel channel = poolHandle.channel;
             ChannelFuture writeFuture;
             if (encoder != null && encoder.isChunked()) {

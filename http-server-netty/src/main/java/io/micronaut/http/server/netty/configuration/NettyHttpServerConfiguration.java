@@ -1209,6 +1209,10 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
              * UNIX domain socket.
              */
             UNIX,
+            /**
+             * QUIC (HTTP/3) listener.
+             */
+            QUIC,
         }
     }
 }
