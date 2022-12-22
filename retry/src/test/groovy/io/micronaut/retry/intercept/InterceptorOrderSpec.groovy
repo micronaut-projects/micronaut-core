@@ -15,6 +15,7 @@
  */
 package io.micronaut.retry.intercept
 
+import io.micronaut.core.convert.ConversionService
 import io.micronaut.core.order.OrderUtil
 import spock.lang.Specification
 
@@ -26,7 +27,7 @@ class InterceptorOrderSpec extends Specification {
 
     void "test interceptors orders"() {
         given:
-        List interceptors = [new DefaultRetryInterceptor(conversionService, null, null), new RecoveryInterceptor() ]
+        List interceptors = [new DefaultRetryInterceptor(ConversionService.SHARED, null, null), new RecoveryInterceptor() ]
         OrderUtil.sort(interceptors)
 
         expect:
@@ -36,7 +37,7 @@ class InterceptorOrderSpec extends Specification {
 
     void "test interceptors orders 2"() {
         given:
-        List interceptors = [new RecoveryInterceptor(), new DefaultRetryInterceptor(conversionService, null, null) ]
+        List interceptors = [new RecoveryInterceptor(ConversionService.SHARED), new DefaultRetryInterceptor(ConversionService.SHARED, null, null) ]
         OrderUtil.sort(interceptors)
 
         expect:
