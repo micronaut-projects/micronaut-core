@@ -24,6 +24,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.ConfigurationProperties
 import io.micronaut.context.exceptions.BeanInstantiationException
 import io.micronaut.core.annotation.Nullable
+import io.micronaut.core.convert.ConversionService
 import io.micronaut.core.order.OrderUtil
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
@@ -70,7 +71,7 @@ class ValidatedSpec extends Specification {
             Object intercept(InvocationContext context) {
                 return null
             }
-        }, new ValidatingInterceptor(null, null, conversionService)]
+        }, new ValidatingInterceptor(null, null, ConversionService.SHARED)]
         OrderUtil.sort(list)
 
         expect:
