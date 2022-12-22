@@ -448,7 +448,7 @@ public class Publishers {
      * @return The Resulting in publisher
      * @deprecated replaced by {@link #convertPublisher(ConversionService, Object, Class)}
      */
-    @Deprecated(since = "4")
+    @Deprecated(since = "4", forRemoval = true)
     public static <T> T convertPublisher(Object object, Class<T> publisherType) {
         return convertPublisher(ConversionService.SHARED, object, publisherType);
     }

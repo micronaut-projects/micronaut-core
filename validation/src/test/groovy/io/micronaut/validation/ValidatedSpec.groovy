@@ -70,7 +70,7 @@ class ValidatedSpec extends Specification {
             Object intercept(InvocationContext context) {
                 return null
             }
-        }, new ValidatingInterceptor(null, null)]
+        }, new ValidatingInterceptor(null, null, conversionService)]
         OrderUtil.sort(list)
 
         expect:

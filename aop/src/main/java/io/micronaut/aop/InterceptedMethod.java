@@ -39,7 +39,9 @@ public interface InterceptedMethod {
      *
      * @param context The {@link MethodInvocationContext}
      * @return The {@link InterceptedMethod}
+     * @deprecated replaced with {@link #of(MethodInvocationContext, ConversionService)}
      */
+    @Deprecated(since = "4", forRemoval = true)
     static InterceptedMethod of(MethodInvocationContext<?, ?> context) {
         return of(context, ConversionService.SHARED);
     }
