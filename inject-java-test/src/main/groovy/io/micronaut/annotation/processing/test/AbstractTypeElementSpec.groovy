@@ -17,11 +17,20 @@ package io.micronaut.annotation.processing.test
 
 import com.sun.source.util.JavacTask
 import groovy.transform.CompileStatic
-import io.micronaut.annotation.processing.*
+import io.micronaut.annotation.processing.AggregatingTypeElementVisitorProcessor
+import io.micronaut.annotation.processing.AnnotationUtils
+import io.micronaut.annotation.processing.GenericUtils
+import io.micronaut.annotation.processing.JavaAnnotationMetadataBuilder
+import io.micronaut.annotation.processing.ModelUtils
+import io.micronaut.annotation.processing.TypeElementVisitorProcessor
 import io.micronaut.annotation.processing.visitor.JavaElementFactory
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext
 import io.micronaut.aop.internal.InterceptorRegistryBean
-import io.micronaut.context.*
+import io.micronaut.context.ApplicationContext
+import io.micronaut.context.ApplicationContextBuilder
+import io.micronaut.context.ApplicationContextConfiguration
+import io.micronaut.context.DefaultApplicationContext
+import io.micronaut.context.Qualifier
 import io.micronaut.context.event.ApplicationEventPublisherFactory
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.Experimental
@@ -59,6 +68,7 @@ import javax.tools.JavaFileObject
 import java.lang.annotation.Annotation
 import java.util.stream.Collectors
 import java.util.stream.StreamSupport
+
 /**
  * Base class to extend from to allow compilation of Java sources
  * at runtime to allow testing of compile time behavior.
@@ -338,7 +348,7 @@ class Test {
         return metadata
     }
 
-    protected TypeElement buildTypeElement(String cls) {
+    protected TypeElement buildTypeElement(@Language('java') String cls) {
         List<Element> elements = []
 
         newJavaParser().parseLines("",

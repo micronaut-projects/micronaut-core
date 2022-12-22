@@ -35,6 +35,7 @@ import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.websocket.CloseReason;
 import io.micronaut.websocket.WebSocketPongMessage;
+import io.micronaut.websocket.WebSocketSession;
 import io.micronaut.websocket.bind.WebSocketState;
 import io.micronaut.websocket.bind.WebSocketStateBinderRegistry;
 import io.micronaut.websocket.context.WebSocketBean;
@@ -55,6 +56,7 @@ import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import java.io.IOException;
@@ -89,13 +91,10 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
     protected final HttpRequest<?> originatingRequest;
     protected final MethodExecutionHandle<?, ?> messageHandler;
     protected final MethodExecutionHandle<?, ?> pongHandler;
-    protected final NettyWebSocketSession session;
     protected final MediaTypeCodecRegistry mediaTypeCodecRegistry;
     protected final WebSocketVersion webSocketVersion;
     protected final String subProtocol;
     protected final WebSocketSessionRepository webSocketSessionRepository;
-    private final Argument<?> bodyArgument;
-    private final Argument<?> pongArgument;
     private final AtomicBoolean closed = new AtomicBoolean(false);
     private AtomicReference<CompositeByteBuf> frameBuffer = new AtomicReference<>();
 
@@ -132,138 +131,68 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         this.pongHandler = webSocketBean.pongMethod().orElse(null);
         this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
         this.webSocketVersion = version;
-        this.session = createWebSocketSession(ctx);
-
-        if (session != null) {
-
-            ExecutableBinder<WebSocketState> binder = new DefaultExecutableBinder<>();
-
-            if (messageHandler != null) {
-                BoundExecutable<?, ?> bound = binder.tryBind(messageHandler.getExecutableMethod(), webSocketBinder, new WebSocketState(session, originatingRequest));
-                List<Argument<?>> unboundArguments = bound.getUnboundArguments();
-
-                if (unboundArguments.size() == 1) {
-                    this.bodyArgument = unboundArguments.iterator().next();
-                } else {
-                    this.bodyArgument = null;
-                    if (LOG.isErrorEnabled()) {
-                        LOG.error("WebSocket @OnMessage method " + webSocketBean.getTarget() + "." + messageHandler.getExecutableMethod() + " should define exactly 1 message parameter, but found 2 possible candidates: " + unboundArguments);
-                    }
-
-                    if (session.isOpen()) {
-                        session.close(CloseReason.INTERNAL_ERROR);
-                    }
-                }
-            } else {
-                this.bodyArgument = null;
-            }
-
-            if (pongHandler != null) {
-                BoundExecutable<?, ?> bound = binder.tryBind(pongHandler.getExecutableMethod(), webSocketBinder, new WebSocketState(session, originatingRequest));
-                List<Argument<?>> unboundArguments = bound.getUnboundArguments();
-                if (unboundArguments.size() == 1 && unboundArguments.get(0).isAssignableFrom(WebSocketPongMessage.class)) {
-                    this.pongArgument = unboundArguments.get(0);
-                } else {
-                    this.pongArgument = null;
-                    if (LOG.isErrorEnabled()) {
-                        LOG.error("WebSocket @OnMessage pong handler method " + webSocketBean.getTarget() + "." + pongHandler.getExecutableMethod() + " should define exactly 1 message parameter assignable from a WebSocketPongMessage, but found: " + unboundArguments);
-                    }
-
-                    if (session.isOpen()) {
-                        session.close(CloseReason.INTERNAL_ERROR);
-                    }
-                }
-            } else {
-                this.pongArgument = null;
-            }
-        } else {
-            this.bodyArgument = null;
-            this.pongArgument = null;
-        }
     }
 
     /**
      * Calls the open method of the websocket bean.
      *
-     * @param ctx THe handler context
+     * @param ctx The handler context
+     * @return Publisher for any errors, or the result of the open method
      */
-    protected void callOpenMethod(ChannelHandlerContext ctx) {
-        if (session == null) {
-            return;
-        }
+    protected Publisher<?> callOpenMethod(ChannelHandlerContext ctx) {
+        WebSocketSession session = getSession();
 
         Optional<? extends MethodExecutionHandle<?, ?>> executionHandle = webSocketBean.openMethod();
         if (executionHandle.isPresent()) {
             MethodExecutionHandle<?, ?> openMethod = executionHandle.get();
-            BoundExecutable boundExecutable = null;
+
+            BoundExecutable<?, ?> boundExecutable;
             try {
                 boundExecutable = bindMethod(originatingRequest, webSocketBinder, openMethod, Collections.emptyList());
             } catch (Throwable e) {
-                if (LOG.isErrorEnabled()) {
-                    LOG.error("Error Binding method @OnOpen for WebSocket [" + webSocketBean + "]: " + e.getMessage(), e);
-                }
-
                 if (session.isOpen()) {
                     session.close(CloseReason.INTERNAL_ERROR);
                 }
+                return Mono.error(e);
             }
 
-            if (boundExecutable != null) {
-                try {
-                    BoundExecutable finalBoundExecutable = boundExecutable;
-                    Object result = invokeExecutable(finalBoundExecutable, openMethod);
-                    if (Publishers.isConvertibleToPublisher(result)) {
-                        Flux<?> flowable = Flux.from(instrumentPublisher(ctx, result));
-                        flowable.subscribe(
-                                o -> {
-                                },
-                                error -> {
-                                    if (LOG.isErrorEnabled()) {
-                                        LOG.error("Error Opening WebSocket [" + webSocketBean + "]: " + error.getMessage(), error);
-                                    }
-                                    if (session.isOpen()) {
-                                        session.close(CloseReason.INTERNAL_ERROR);
-                                    }
-                                },
-                                () -> {
-                                }
-                        );
-                    }
-                } catch (Throwable e) {
-                    forwardErrorToUser(ctx, t -> {
-                        if (LOG.isErrorEnabled()) {
-                            LOG.error("Error Opening WebSocket [" + webSocketBean + "]: " + t.getMessage(), t);
+            try {
+                Object result = invokeExecutable(boundExecutable, openMethod);
+                if (Publishers.isConvertibleToPublisher(result)) {
+                    return Flux.from(instrumentPublisher(ctx, result)).doOnError(t -> {
+                        if (session.isOpen()) {
+                            session.close(CloseReason.INTERNAL_ERROR);
                         }
-                    }, e);
-                    // since we failed to call onOpen, we should always close here
-                    if (session.isOpen()) {
-                        session.close(CloseReason.INTERNAL_ERROR);
-                    }
+                    });
+                } else {
+                    return Mono.empty();
                 }
+            } catch (Throwable e) {
+                // since we failed to call onOpen, we should always close here
+                if (session.isOpen()) {
+                    session.close(CloseReason.INTERNAL_ERROR);
+                }
+                return Mono.error(e);
             }
+        } else {
+            return Mono.empty();
         }
     }
 
     /**
      * @return The body argument for the message handler
      */
-    public Argument<?> getBodyArgument() {
-        return bodyArgument;
-    }
+    public abstract Argument<?> getBodyArgument();
 
     /**
      * @return The pong argument for the pong handler
      */
-    public Argument<?> getPongArgument() {
-        return pongArgument;
-    }
+    public abstract Argument<?> getPongArgument();
 
     /**
      * @return The session
      */
-    public NettyWebSocketSession getSession() {
-        return session;
-    }
+    public abstract NettyWebSocketSession getSession();
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
@@ -271,7 +200,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         forwardErrorToUser(ctx, e -> handleUnexpected(ctx, e), cause);
     }
 
-    private void forwardErrorToUser(ChannelHandlerContext ctx, Consumer<Throwable> fallback, Throwable cause) {
+    protected final void forwardErrorToUser(ChannelHandlerContext ctx, Consumer<Throwable> fallback, Throwable cause) {
         Optional<? extends MethodExecutionHandle<?, ?>> opt = webSocketBean.errorMethod();
 
         if (opt.isPresent()) {
@@ -443,10 +372,10 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                                     o -> {
                                     },
                                     error -> messageProcessingException(ctx, error),
-                                    () -> messageHandled(ctx, session, v)
+                                    () -> messageHandled(ctx, v)
                             );
                         } else {
-                            messageHandled(ctx, session, v);
+                            messageHandled(ctx, v);
                         }
                     } catch (Throwable e) {
                         messageProcessingException(ctx, e);
@@ -528,10 +457,9 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
      * Method called once a message has been handled by the handler.
      *
      * @param ctx     The channel handler context
-     * @param session The session
      * @param message The message that was handled
      */
-    protected void messageHandled(ChannelHandlerContext ctx, NettyWebSocketSession session, Object message) {
+    protected void messageHandled(ChannelHandlerContext ctx, Object message) {
         // no-op
     }
 
@@ -547,12 +475,12 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
     }
 
     /**
-     * Used to close thee session with a given reason.
+     * Used to close the session with a given reason.
      * @param ctx The context
      * @param cr The reason
      * @param writeCloseReason Whether to allow writing the close reason to the remote
      */
-    private void handleCloseReason(ChannelHandlerContext ctx, CloseReason cr, boolean writeCloseReason) {
+    protected void handleCloseReason(ChannelHandlerContext ctx, CloseReason cr, boolean writeCloseReason) {
         cleanupBuffer();
         if (closed.compareAndSet(false, true)) {
             if (LOG.isDebugEnabled()) {
