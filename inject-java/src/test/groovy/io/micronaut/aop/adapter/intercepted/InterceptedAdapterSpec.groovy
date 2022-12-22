@@ -22,6 +22,7 @@ class InterceptedAdapterSpec extends AbstractTypeElementSpec {
         then:
             service.count == 1
             interceptor.count == 1
+            interceptor.executableMethod.name == "test"
 
         cleanup:
             ctx.close()

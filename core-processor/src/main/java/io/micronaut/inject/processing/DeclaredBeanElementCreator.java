@@ -392,10 +392,10 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
         if (preprocess) {
             visitor.setRequiresMethodProcessing(true);
         }
-        if (methodElement.hasStereotype("io.micronaut.aop.Adapter")) {
+        if (methodElement.hasStereotype(Adapter.class)) {
             staticMethodCheck(methodElement);
-            visitAdaptedMethod(visitor, methodElement);
-            return true;
+            visitAdaptedMethod(methodElement);
+            // Adapter is always an executable method but can also be intercepted so continue with visitors below
         }
         if (visitAopMethod(visitor, methodElement)) {
             return true;
@@ -560,7 +560,7 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
         return classElement.equals(memberElement.getDeclaringType());
     }
 
-    private void visitAdaptedMethod(BeanDefinitionVisitor visitor, MethodElement sourceMethod) {
+    private void visitAdaptedMethod(MethodElement sourceMethod) {
         AnnotationMetadata methodAnnotationMetadata = sourceMethod.getDeclaredMetadata();
 
         Optional<ClassElement> interfaceToAdaptValue = methodAnnotationMetadata.getValue(Adapter.class, String.class)
@@ -599,10 +599,6 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
         }
 
         MethodElement targetMethod = methods.iterator().next();
-
-        aopProxyWriter.visitInterceptorBinding(
-            InterceptedMethodUtil.resolveInterceptorBinding(methodAnnotationMetadata, InterceptorKind.AROUND)
-        );
 
         ParameterElement[] sourceParams = sourceMethod.getParameters();
         ParameterElement[] targetParams = targetMethod.getParameters();
@@ -664,8 +660,6 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
         });
 
         aopProxyWriter.visitAroundMethod(interfaceToAdapt, targetMethod);
-
-        visitor.visitExecutableMethod(sourceMethod.getDeclaringType(), sourceMethod, visitorContext);
 
         beanDefinitionWriters.add(aopProxyWriter);
     }
