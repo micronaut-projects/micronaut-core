@@ -442,12 +442,28 @@ public class Publishers {
     /**
      * Attempts to convert the publisher to the given type.
      *
-     * @param object The object to convert
+     * @param object        The object to convert
      * @param publisherType The publisher type
-     * @param <T> The generic type
+     * @param <T>           The generic type
      * @return The Resulting in publisher
+     * @deprecated replaced by {@link #convertPublisher(ConversionService, Object, Class)}
      */
+    @Deprecated(since = "4")
     public static <T> T convertPublisher(Object object, Class<T> publisherType) {
+        return convertPublisher(ConversionService.SHARED, object, publisherType);
+    }
+
+    /**
+     * Attempts to convert the publisher to the given type.
+     *
+     * @param conversionService The conversion service
+     * @param object            The object to convert
+     * @param publisherType     The publisher type
+     * @param <T>               The generic type
+     * @return The Resulting in publisher
+     * @since 4.0.0
+     */
+    public static <T> T convertPublisher(ConversionService conversionService, Object object, Class<T> publisherType) {
         Objects.requireNonNull(object, "Argument [object] cannot be null");
         Objects.requireNonNull(publisherType, "Argument [publisherType] cannot be null");
         if (publisherType.isInstance(object)) {
@@ -455,14 +471,14 @@ public class Publishers {
         }
         if (object instanceof CompletableFuture) {
             @SuppressWarnings("unchecked") Publisher<T> futurePublisher = Publishers.fromCompletableFuture(() -> ((CompletableFuture) object));
-            return ConversionService.SHARED.convert(futurePublisher, publisherType)
-                    .orElseThrow(() -> unconvertibleError(object, publisherType));
-        } else if (object instanceof MicronautPublisher && MicronautPublisher.class.isAssignableFrom(publisherType)) {
-            return (T) object;
-        } else {
-            return ConversionService.SHARED.convert(object, publisherType)
+            return conversionService.convert(futurePublisher, publisherType)
                     .orElseThrow(() -> unconvertibleError(object, publisherType));
         }
+        if (object instanceof MicronautPublisher && MicronautPublisher.class.isAssignableFrom(publisherType)) {
+            return (T) object;
+        }
+        return conversionService.convert(object, publisherType)
+                .orElseThrow(() -> unconvertibleError(object, publisherType));
     }
 
     /**
