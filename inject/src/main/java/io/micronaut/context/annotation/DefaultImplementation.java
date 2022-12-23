@@ -66,6 +66,7 @@ public @interface DefaultImplementation {
     /**
      * @return The bean type that is the default implementation
      */
+    @AliasFor(member = "name")
     Class<?> value() default void.class;
 
     /**

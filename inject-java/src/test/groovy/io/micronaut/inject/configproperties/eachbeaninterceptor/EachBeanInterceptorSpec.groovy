@@ -5,7 +5,7 @@ import io.micronaut.context.ApplicationContext
 
 class EachBeanInterceptorSpec extends AbstractTypeElementSpec {
 
-    void 'test interceptor on an event'() {
+    void 'test prototype interceptor is injected with introspected bean qualifier'() {
         given:
             ApplicationContext ctx = ApplicationContext.run(['spec': 'EachBeanInterceptorSpec', 'mydatasources.default.xyz': '111', 'mydatasources.foo.xyz': '111', 'mydatasources.bar.xyz': '111'])
 
