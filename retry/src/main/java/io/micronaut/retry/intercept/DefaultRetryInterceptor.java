@@ -22,6 +22,7 @@ import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.retry.RetryState;
@@ -63,6 +64,7 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
     private static final Logger LOG = LoggerFactory.getLogger(DefaultRetryInterceptor.class);
     private static final int DEFAULT_CIRCUIT_BREAKER_TIMEOUT_IN_MILLIS = 20;
 
+    private final ConversionService conversionService;
     private final ApplicationEventPublisher eventPublisher;
     private final ScheduledExecutorService executorService;
     private final Map<ExecutableMethod, CircuitBreakerRetry> circuitContexts = new ConcurrentHashMap<>();
@@ -70,10 +72,14 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
     /**
      * Construct a default retry method interceptor with the event publisher.
      *
-     * @param eventPublisher  The event publisher to publish retry events
-     * @param executorService The executor service to use for completable futures
+     * @param conversionService The conversion service
+     * @param eventPublisher    The event publisher to publish retry events
+     * @param executorService   The executor service to use for completable futures
      */
-    public DefaultRetryInterceptor(ApplicationEventPublisher eventPublisher, @Named(TaskExecutors.SCHEDULED) ExecutorService executorService) {
+    public DefaultRetryInterceptor(ConversionService conversionService,
+                                   ApplicationEventPublisher eventPublisher,
+                                   @Named(TaskExecutors.SCHEDULED) ExecutorService executorService) {
+        this.conversionService = conversionService;
         this.eventPublisher = eventPublisher;
         this.executorService = (ScheduledExecutorService) executorService;
     }
@@ -116,28 +122,32 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
         MutableConvertibleValues<Object> attrs = context.getAttributes();
         attrs.put(RetryState.class.getName(), retry);
 
-        InterceptedMethod interceptedMethod = InterceptedMethod.of(context);
+        InterceptedMethod interceptedMethod = InterceptedMethod.of(context, conversionService);
         try {
             retryState.open();
             // Retry method call before we have actual Publisher/CompletionStage result
             Object result = retrySync(context, retryState, interceptedMethod);
             switch (interceptedMethod.resultType()) {
-                case PUBLISHER:
+                case PUBLISHER -> {
                     Flux<Object> reactiveSequence = Flux.from((Publisher<?>) result);
                     return interceptedMethod.handleResult(
                             reactiveSequence.onErrorResume(retryFlowable(context, retryState, reactiveSequence))
                                     .doOnNext(o -> retryState.close(null))
                     );
-                case COMPLETION_STAGE:
+                }
+                case COMPLETION_STAGE -> {
                     CompletableFuture<Object> newFuture = new CompletableFuture<>();
                     Supplier<CompletionStage<?>> retrySupplier = () -> interceptedMethod.interceptResultAsCompletionStage(this);
                     ((CompletionStage<?>) result).whenComplete(retryCompletable(context, retryState, newFuture, retrySupplier));
                     return interceptedMethod.handleResult(newFuture);
-                case SYNCHRONOUS:
+                }
+                case SYNCHRONOUS -> {
                     retryState.close(null);
                     return result;
-                default:
+                }
+                default -> {
                     return interceptedMethod.unsupported();
+                }
             }
         } catch (Exception e) {
             return interceptedMethod.handleException(e);

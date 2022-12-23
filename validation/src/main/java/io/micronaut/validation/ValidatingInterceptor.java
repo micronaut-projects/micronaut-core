@@ -20,17 +20,19 @@ import io.micronaut.aop.InterceptedMethod;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.validation.validator.ExecutableMethodValidator;
 import io.micronaut.validation.validator.ReactiveValidator;
 import io.micronaut.validation.validator.Validator;
 import jakarta.inject.Singleton;
-import java.lang.reflect.Method;
-import java.util.Set;
+
 import javax.validation.ConstraintViolation;
 import javax.validation.ConstraintViolationException;
 import javax.validation.ValidatorFactory;
 import javax.validation.executable.ExecutableValidator;
+import java.lang.reflect.Method;
+import java.util.Set;
 
 /**
  * A {@link MethodInterceptor} that validates method invocations.
@@ -46,6 +48,7 @@ public class ValidatingInterceptor implements MethodInterceptor<Object, Object> 
      */
     public static final int POSITION = InterceptPhase.VALIDATE.getPosition();
 
+    private final ConversionService conversionService;
     private final @Nullable ExecutableValidator executableValidator;
     private final @Nullable ExecutableMethodValidator micronautValidator;
 
@@ -54,9 +57,12 @@ public class ValidatingInterceptor implements MethodInterceptor<Object, Object> 
      *
      * @param micronautValidator The micronaut validator use if no factory is available
      * @param validatorFactory   Factory returning initialized {@code Validator} instances
+     * @param conversionService  The conversion service
      */
     public ValidatingInterceptor(@Nullable Validator micronautValidator,
-                                 @Nullable ValidatorFactory validatorFactory) {
+                                 @Nullable ValidatorFactory validatorFactory,
+                                 ConversionService conversionService) {
+        this.conversionService = conversionService;
 
         if (validatorFactory != null) {
             javax.validation.Validator validator = validatorFactory.getValidator();
@@ -113,26 +119,22 @@ public class ValidatingInterceptor implements MethodInterceptor<Object, Object> 
             }
             if (hasValidationAnnotation(context)) {
                 if (micronautValidator instanceof ReactiveValidator) {
-                    InterceptedMethod interceptedMethod = InterceptedMethod.of(context);
+                    InterceptedMethod interceptedMethod = InterceptedMethod.of(context, conversionService);
                     try {
-                        switch (interceptedMethod.resultType()) {
-                            case PUBLISHER:
-                                return interceptedMethod.handleResult(
-                                        ((ReactiveValidator) micronautValidator).validatePublisher(
-                                                interceptedMethod.interceptResultAsPublisher(),
-                                                getValidationGroups(context))
-                                );
-                            case COMPLETION_STAGE:
-                                return interceptedMethod.handleResult(
-                                        ((ReactiveValidator) micronautValidator).validateCompletionStage(
-                                                interceptedMethod.interceptResultAsCompletionStage(),
-                                                getValidationGroups(context))
-                                );
-                            case SYNCHRONOUS:
-                                return validateReturnMicronautValidator(context, executableMethod);
-                            default:
-                                return interceptedMethod.unsupported();
-                        }
+                        return switch (interceptedMethod.resultType()) {
+                            case PUBLISHER -> interceptedMethod.handleResult(
+                                    ((ReactiveValidator) micronautValidator).validatePublisher(
+                                            interceptedMethod.interceptResultAsPublisher(),
+                                            getValidationGroups(context))
+                            );
+                            case COMPLETION_STAGE -> interceptedMethod.handleResult(
+                                    ((ReactiveValidator) micronautValidator).validateCompletionStage(
+                                            interceptedMethod.interceptResultAsCompletionStage(),
+                                            getValidationGroups(context))
+                            );
+                            case SYNCHRONOUS -> validateReturnMicronautValidator(context, executableMethod);
+                            default -> interceptedMethod.unsupported();
+                        };
                     } catch (Exception e) {
                         return interceptedMethod.handleException(e);
                     }
