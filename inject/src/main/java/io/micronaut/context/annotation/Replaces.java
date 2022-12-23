@@ -32,6 +32,11 @@ import java.lang.annotation.RetentionPolicy;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Replaces {
 
+    String MEMBER_NAMED = "named";
+    String MEMBER_FACTORY = "factory";
+    String MEMBER_BEAN = "bean";
+    String MEMBER_QUALIFIER = "qualifier";
+
     /**
      * @return The bean type that this bean replaces
      */
@@ -41,7 +46,6 @@ public @interface Replaces {
     /**
      * @return The bean type that this bean replaces
      */
-    @AliasFor(member = "value")
     Class<?> bean() default void.class;
 
     /**
