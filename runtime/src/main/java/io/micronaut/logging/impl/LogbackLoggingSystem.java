@@ -17,7 +17,6 @@ package io.micronaut.logging.impl;
 
 import java.net.URL;
 import java.util.Objects;
-import java.util.Optional;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.LoggerContext;
@@ -26,6 +25,7 @@ import ch.qos.logback.core.joran.spi.JoranException;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.logging.LogLevel;
 import io.micronaut.logging.LoggingSystem;
 import io.micronaut.logging.LoggingSystemException;
@@ -45,8 +45,11 @@ public final class LogbackLoggingSystem implements LoggingSystem {
 
     private static final String DEFAULT_LOGBACK_LOCATION = "logback.xml";
 
-    @Property(name = "logger.config")
-    private Optional<String> logbackXmlLocation;
+    private String logbackXmlLocation;
+
+    public LogbackLoggingSystem(@Nullable @Property(name = "logger.config") String logbackXmlLocation) {
+        this.logbackXmlLocation = logbackXmlLocation != null ? logbackXmlLocation : DEFAULT_LOGBACK_LOCATION;
+    }
 
     @Override
     public void setLogLevel(String name, LogLevel level) {
@@ -57,13 +60,12 @@ public final class LogbackLoggingSystem implements LoggingSystem {
     public void refresh() {
         LoggerContext context = getLoggerContext();
         context.reset();
-        String logbackXml = logbackXmlLocation.orElse(DEFAULT_LOGBACK_LOCATION);
-        URL resource = getClass().getClassLoader().getResource(logbackXml);
+        URL resource = getClass().getClassLoader().getResource(logbackXmlLocation);
         if (Objects.isNull(resource)) {
-            throw new LoggingSystemException("Resource " + logbackXml + " not found");
+            throw new LoggingSystemException("Resource " + logbackXmlLocation + " not found");
         }
 
-        try {            
+        try {
             new ContextInitializer(context).configureByResource(resource);
         } catch (JoranException e) {
             throw new LoggingSystemException("Error while refreshing Logback", e);
