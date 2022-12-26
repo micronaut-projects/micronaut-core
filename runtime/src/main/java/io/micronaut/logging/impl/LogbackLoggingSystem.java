@@ -45,7 +45,7 @@ public final class LogbackLoggingSystem implements LoggingSystem {
 
     private static final String DEFAULT_LOGBACK_LOCATION = "logback.xml";
 
-    private String logbackXmlLocation;
+    private final String logbackXmlLocation;
 
     public LogbackLoggingSystem(@Nullable @Property(name = "logger.config") String logbackXmlLocation) {
         this.logbackXmlLocation = logbackXmlLocation != null ? logbackXmlLocation : DEFAULT_LOGBACK_LOCATION;
