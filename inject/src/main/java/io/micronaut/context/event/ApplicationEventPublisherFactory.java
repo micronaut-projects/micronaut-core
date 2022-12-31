@@ -85,7 +85,7 @@ public final class ApplicationEventPublisherFactory<T>
 
     @Override
     public boolean isCandidateBean(Argument<?> beanType) {
-        return InstantiatableBeanDefinition.super.isCandidateBean(beanType);
+        return beanType.isAssignableFrom(ApplicationEventPublisher.class);
     }
 
     @Override

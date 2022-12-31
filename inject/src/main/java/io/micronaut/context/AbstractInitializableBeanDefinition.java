@@ -384,42 +384,53 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
             return constructorInjectionPoint;
         }
         if (constructor == null) {
-            constructorInjectionPoint = new DefaultConstructorInjectionPoint<>(
+            DefaultConstructorInjectionPoint<T> point = new DefaultConstructorInjectionPoint<>(
                 this,
                 getBeanType(),
                 AnnotationMetadata.EMPTY_METADATA,
                 Argument.ZERO_ARGUMENTS
             );
-        } else {
-            if (constructor instanceof MethodReference methodConstructor) {
-                if ("<init>".equals(methodConstructor.methodName)) {
-                    this.constructorInjectionPoint = new DefaultConstructorInjectionPoint<>(
-                        this,
-                        methodConstructor.declaringType,
-                        methodConstructor.annotationMetadata,
-                        methodConstructor.arguments
-                    );
-                } else {
-                    this.constructorInjectionPoint = new DefaultMethodConstructorInjectionPoint<>(
-                        this,
-                        methodConstructor.declaringType,
-                        methodConstructor.methodName,
-                        methodConstructor.arguments,
-                        methodConstructor.annotationMetadata
-                    );
-                }
-            } else if (constructor instanceof FieldReference fieldConstructor) {
-                constructorInjectionPoint = new DefaultFieldConstructorInjectionPoint<>(
+            if (environment != null) {
+                point.configure(environment);
+            }
+            constructorInjectionPoint = point;
+        } else if (constructor instanceof MethodReference methodConstructor) {
+            if ("<init>".equals(methodConstructor.methodName)) {
+                DefaultConstructorInjectionPoint<T> point = new DefaultConstructorInjectionPoint<>(
                     this,
-                    fieldConstructor.declaringType,
-                    type,
-                    fieldConstructor.argument.getName(),
-                    fieldConstructor.argument.getAnnotationMetadata()
+                    methodConstructor.declaringType,
+                    methodConstructor.annotationMetadata,
+                    methodConstructor.arguments
                 );
+                if (environment != null) {
+                    point.configure(environment);
+                }
+                constructorInjectionPoint = point;
+            } else {
+                DefaultMethodConstructorInjectionPoint<T> point = new DefaultMethodConstructorInjectionPoint<>(
+                    this,
+                    methodConstructor.declaringType,
+                    methodConstructor.methodName,
+                    methodConstructor.arguments,
+                    methodConstructor.annotationMetadata
+                );
+                if (environment != null) {
+                    point.configure(environment);
+                }
+                constructorInjectionPoint = point;
             }
-            if (environment != null && constructorInjectionPoint instanceof EnvironmentConfigurable environmentConfigurable) {
-                environmentConfigurable.configure(environment);
+        } else if (constructor instanceof FieldReference fieldConstructor) {
+            DefaultFieldConstructorInjectionPoint<T> point = new DefaultFieldConstructorInjectionPoint<>(
+                this,
+                fieldConstructor.declaringType,
+                type,
+                fieldConstructor.argument.getName(),
+                fieldConstructor.argument.getAnnotationMetadata()
+            );
+            if (environment != null) {
+                point.configure(environment);
             }
+            constructorInjectionPoint = point;
         }
         return constructorInjectionPoint;
     }
@@ -585,7 +596,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     }
 
     @Override
-    public final Collection<ExecutableMethod<T, ?>> getExecutableMethods() {
+    public final Collection<ExecutableMethod<T, Object>> getExecutableMethods() {
         if (executableMethodsDefinition == null) {
             return Collections.emptyList();
         }
@@ -2131,6 +2142,9 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
             boolean isNotInnerConfiguration = !precalculatedInfo.isConfigurationProperties || !isInnerConfiguration(argument);
             ConfigurationPath previousPath = isNotInnerConfiguration ? resolutionContext.setConfigurationPath(null) : null;
             try {
+                if (argument.isDeclaredNullable()) {
+                    return resolutionContext.findBean(argument, qualifier).orElse(null);
+                }
                 return resolutionContext.getBean(argument, qualifier);
             } finally {
                 if (previousPath != null) {
@@ -2144,15 +2158,9 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
             if (isIterable() && getAnnotationMetadata().hasDeclaredAnnotation(EachBean.class)) {
                 throw new DisabledBeanException("Bean [" + getBeanType().getSimpleName() + "] disabled by parent: " + e.getMessage());
             } else {
-                if (argument.isDeclaredNullable()) {
-                    return null;
-                }
                 throw new DependencyInjectionException(resolutionContext, e);
             }
         } catch (NoSuchBeanException e) {
-            if (argument.isDeclaredNullable()) {
-                return null;
-            }
             throw new DependencyInjectionException(resolutionContext, e);
         }
     }

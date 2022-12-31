@@ -1753,7 +1753,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             Set<ConstraintViolation<T>> errors = validate(introspection, bean);
             failOnError(resolutionContext, errors, beanType);
         } else if (bean instanceof Intercepted && definition.hasStereotype(ConfigurationReader.class)) {
-            final Collection<ExecutableMethod<T, ?>> executableMethods = definition.getExecutableMethods();
+            final Collection<ExecutableMethod<T, Object>> executableMethods = definition.getExecutableMethods();
             if (CollectionUtils.isNotEmpty(executableMethods)) {
                 Set<ConstraintViolation<Object>> errors = new HashSet<>();
                 final DefaultConstraintValidatorContext context = new DefaultConstraintValidatorContext(bean);

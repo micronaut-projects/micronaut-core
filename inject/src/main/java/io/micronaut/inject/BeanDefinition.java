@@ -267,7 +267,7 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
     /**
      * @return The {@link ExecutableMethod} instances for this definition
      */
-    default Collection<ExecutableMethod<T, ?>> getExecutableMethods() {
+    default Collection<ExecutableMethod<T, Object>> getExecutableMethods() {
         return Collections.emptyList();
     }
 

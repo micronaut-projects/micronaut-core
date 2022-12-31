@@ -176,8 +176,12 @@ public abstract class AbstractInitializableBeanDefinitionReference<T> extends Ab
     @Override
     public BeanDefinition load(BeanContext context) {
         BeanDefinition definition = load();
-        if (context instanceof ApplicationContext && definition instanceof EnvironmentConfigurable) {
-            ((EnvironmentConfigurable) definition).configure(((ApplicationContext) context).getEnvironment());
+        if (context instanceof DefaultApplicationContext applicationContext
+            && definition instanceof EnvironmentConfigurable environmentConfigurable) {
+            // Performance optimization to check for the actual class to avoid the type-check pollution
+            environmentConfigurable.configure(applicationContext.getEnvironment());
+        } else if (context instanceof ApplicationContext applicationContext && definition instanceof EnvironmentConfigurable environmentConfigurable) {
+            environmentConfigurable.configure(applicationContext.getEnvironment());
         }
         return definition;
     }

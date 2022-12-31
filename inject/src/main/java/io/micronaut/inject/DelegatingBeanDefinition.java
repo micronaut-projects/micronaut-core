@@ -135,7 +135,7 @@ public interface DelegatingBeanDefinition<T> extends BeanDefinition<T> {
     }
 
     @Override
-    default Collection<ExecutableMethod<T, ?>> getExecutableMethods() {
+    default Collection<ExecutableMethod<T, Object>> getExecutableMethods() {
         return getTarget().getExecutableMethods();
     }
 

@@ -16,11 +16,11 @@
 package io.micronaut.context.converters;
 
 import io.micronaut.context.BeanContext;
+import io.micronaut.context.annotation.Prototype;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.reflect.ClassUtils;
-import jakarta.inject.Singleton;
 
 import java.util.Arrays;
 import java.util.Map;
@@ -33,7 +33,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * @author graemerocher
  * @since 2.0
  */
-@Singleton
+@Prototype
 @Internal
 public class ContextConverterRegistrar implements TypeConverterRegistrar {
 
