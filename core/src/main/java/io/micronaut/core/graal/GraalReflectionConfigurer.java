@@ -23,14 +23,13 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.ReflectionConfig;
 import io.micronaut.core.annotation.TypeHint;
-import io.micronaut.core.reflect.ReflectionUtils;
-import io.micronaut.core.util.CollectionUtils;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -63,7 +62,7 @@ public interface GraalReflectionConfigurer extends AnnotationMetadataProvider {
                     return;
                 }
                 context.register(t);
-                final Set<TypeHint.AccessType> accessType = CollectionUtils.setOf(
+                final Set<TypeHint.AccessType> accessType = Set.of(
                     reflectConfig.enumValues("accessType", TypeHint.AccessType.class)
                 );
                 if (accessType.contains(TypeHint.AccessType.ALL_PUBLIC_METHODS)) {
@@ -146,7 +145,13 @@ public interface GraalReflectionConfigurer extends AnnotationMetadataProvider {
 
                 for (AnnotationValue<ReflectionConfig.ReflectiveFieldConfig> field : fields) {
                     field.stringValue("name")
-                            .flatMap(n -> ReflectionUtils.findField(t, n))
+                            .flatMap(n -> {
+                                try {
+                                    return Optional.of(t.getDeclaredField(n));
+                                } catch (NoSuchFieldException e) {
+                                    return Optional.empty();
+                                }
+                            })
                             .ifPresent(context::register);
                 }
             });
