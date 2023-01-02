@@ -11,6 +11,29 @@ import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class IntroductionAdviceWithNewInterfaceSpec extends Specification {
 
+    void "test introduction advice with primitive generics"() {
+        when:
+        def context = buildContext( '''
+package test
+
+import io.micronaut.kotlin.processing.aop.introduction.*
+import javax.validation.constraints.NotNull
+
+@RepoDef
+interface MyRepo : DeleteByIdCrudRepo<Int> {
+
+    override fun deleteById(@NotNull id: Int)
+}
+
+
+''', true)
+
+        def bean =
+                getBean(context, 'test.MyRepo')
+        then:
+        bean != null
+    }
+
     void "test that it is possible for @Introduction advice to implement additional interfaces on concrete classes"() {
         when:
         BeanDefinition beanDefinition = buildBeanDefinition('test.MyBean' + BeanDefinitionVisitor.PROXY_SUFFIX, '''

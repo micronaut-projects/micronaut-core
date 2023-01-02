@@ -192,15 +192,17 @@ open class KotlinClassElement(val kotlinType: KSType,
     }
 
     override fun withBoundGenericTypes(typeArguments: MutableList<out ClassElement>?): ClassElement {
-        val copy = copyThis()
-        copy.overrideBoundGenericTypes = typeArguments
         if (typeArguments != null && typeArguments.size == kotlinType.declaration.typeParameters.size) {
+            val copy = copyThis()
+            copy.overrideBoundGenericTypes = typeArguments
+
             val i = typeArguments.iterator()
             copy.resolvedTypeArguments = kotlinType.declaration.typeParameters.associate {
                 it.name.asString() to i.next()
             }.toMutableMap()
+            return copy
         }
-        return copy
+        return this
     }
 
     override fun getBoundGenericTypes(): MutableList<out ClassElement> {
