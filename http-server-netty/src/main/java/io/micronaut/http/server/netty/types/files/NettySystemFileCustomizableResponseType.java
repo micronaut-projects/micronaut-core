@@ -34,9 +34,8 @@ import io.netty.channel.DefaultFileRegion;
 import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.HttpChunkedInput;
 import io.netty.handler.codec.http.LastHttpContent;
-import io.netty.handler.codec.http2.Http2StreamChannel;
-import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.stream.ChunkedFile;
+import io.netty.util.AttributeKey;
 import io.netty.util.ResourceLeakDetector;
 import io.netty.util.ResourceLeakDetectorFactory;
 import io.netty.util.ResourceLeakTracker;
@@ -59,6 +58,8 @@ import java.util.function.Supplier;
  */
 @Internal
 public class NettySystemFileCustomizableResponseType extends SystemFile implements NettyFileCustomizableResponseType {
+    public static final Supplier<AttributeKey<SmartHttpContentCompressor>> ZERO_COPY_PREDICATE =
+        SupplierUtil.memoized(() -> AttributeKey.newInstance("zero-copy-predicate"));
 
     private static final int LENGTH_8K = 8192;
     private static final Logger LOG = LoggerFactory.getLogger(NettySystemFileCustomizableResponseType.class);
@@ -116,9 +117,8 @@ public class NettySystemFileCustomizableResponseType extends SystemFile implemen
             FileHolder file = new FileHolder(getFile());
 
             // Write the content.
-            if (context.pipeline().get(SslHandler.class) == null &&
-                    context.pipeline().get(SmartHttpContentCompressor.class).shouldSkip(finalResponse) &&
-                    !(context.channel() instanceof Http2StreamChannel)) {
+            SmartHttpContentCompressor predicate = context.channel().attr(ZERO_COPY_PREDICATE.get()).get();
+            if (predicate != null && predicate.shouldSkip(finalResponse)) {
                 // SSL not enabled - can use zero-copy file transfer.
                 context.write(new DefaultFileRegion(file.raf.getChannel(), 0, getLength()), context.newProgressivePromise())
                         .addListener(file);

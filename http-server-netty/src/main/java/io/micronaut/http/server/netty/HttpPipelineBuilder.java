@@ -26,6 +26,7 @@ import io.micronaut.http.server.netty.decoders.HttpRequestDecoder;
 import io.micronaut.http.server.netty.encoders.HttpResponseEncoder;
 import io.micronaut.http.server.netty.handler.accesslog.HttpAccessLogHandler;
 import io.micronaut.http.server.netty.ssl.HttpRequestCertificateHandler;
+import io.micronaut.http.server.netty.types.files.NettySystemFileCustomizableResponseType;
 import io.micronaut.http.server.netty.websocket.NettyServerWebSocketUpgradeHandler;
 import io.micronaut.http.server.util.HttpHostResolver;
 import io.micronaut.http.ssl.ServerSslConfiguration;
@@ -523,17 +524,21 @@ final class HttpPipelineBuilder {
 
             registerMicronautChannelHandlers();
 
-            insertMicronautHandlers();
+            insertMicronautHandlers(false);
         }
 
         /**
          * Insert the handlers that manage the micronaut message handling, e.g. conversion between micronaut requests
          * and netty requests, and routing.
          */
-        private void insertMicronautHandlers() {
+        private void insertMicronautHandlers(boolean zeroCopySupported) {
             channel.attr(STREAM_PIPELINE_ATTRIBUTE.get()).set(this);
 
-            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_COMPRESSOR, new SmartHttpContentCompressor(embeddedServices.getHttpCompressionStrategy()));
+            SmartHttpContentCompressor contentCompressor = new SmartHttpContentCompressor(embeddedServices.getHttpCompressionStrategy());
+            if (zeroCopySupported) {
+                channel.attr(NettySystemFileCustomizableResponseType.ZERO_COPY_PREDICATE.get()).set(contentCompressor);
+            }
+            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_COMPRESSOR, contentCompressor);
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECOMPRESSOR, new HttpContentDecompressor());
 
             pipeline.addLast(NettyServerWebSocketUpgradeHandler.COMPRESSION_HANDLER, new WebSocketServerCompressionHandler());
@@ -567,7 +572,7 @@ final class HttpPipelineBuilder {
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_FLOW_CONTROL, new FlowControlHandler());
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_KEEP_ALIVE, new HttpServerKeepAliveHandler());
 
-            insertMicronautHandlers();
+            insertMicronautHandlers(!ssl);
         }
 
         /**
