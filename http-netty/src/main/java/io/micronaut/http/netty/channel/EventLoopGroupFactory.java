@@ -125,7 +125,8 @@ public interface EventLoopGroupFactory {
     /**
      * Returns the domain socket server channel class.
      *
-     * @return A ServerDomainSocketChannel class.
+     * @param type Type of the channel to return
+     * @return A channel class.
      * @throws UnsupportedOperationException if domain sockets are not supported.
      */
     @NonNull
@@ -161,8 +162,9 @@ public interface EventLoopGroupFactory {
     /**
      * Returns the domain socket server channel class.
      *
+     * @param type Type of the channel to return
      * @param configuration The configuration
-     * @return A ServerDomainSocketChannel implementation.
+     * @return A channel implementation.
      * @throws UnsupportedOperationException if domain sockets are not supported.
      */
     default @NonNull Class<? extends Channel> channelClass(NettyChannelType type, @Nullable EventLoopGroupConfiguration configuration) {
@@ -206,6 +208,7 @@ public interface EventLoopGroupFactory {
     /**
      * Returns the domain socket server channel class.
      *
+     * @param type Type of the channel to return
      * @param configuration The configuration
      * @return A ServerDomainSocketChannel implementation.
      * @throws UnsupportedOperationException if domain sockets are not supported.

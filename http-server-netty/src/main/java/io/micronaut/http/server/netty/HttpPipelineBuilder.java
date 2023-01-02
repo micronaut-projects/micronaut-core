@@ -479,12 +479,12 @@ final class HttpPipelineBuilder {
     }
 
     final class StreamPipeline {
+        HttpVersion httpVersion = HttpVersion.HTTP_1_1;
         private final Channel channel;
         private final ChannelPipeline pipeline;
         private final boolean ssl;
 
         private final NettyServerCustomizer streamCustomizer;
-        HttpVersion httpVersion = HttpVersion.HTTP_1_1;
 
         private StreamPipeline(Channel channel, boolean ssl, NettyServerCustomizer streamCustomizer) {
             this.channel = channel;

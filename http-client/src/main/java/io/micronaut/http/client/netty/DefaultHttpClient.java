@@ -301,7 +301,7 @@ public class DefaultHttpClient implements
 
     /**
      * Construct a client for the given arguments.
-     *  @param loadBalancer                    The {@link LoadBalancer} to use for selecting servers
+     * @param loadBalancer                    The {@link LoadBalancer} to use for selecting servers
      * @param explicitHttpVersion                     The HTTP version to use. Can be null and defaults to {@link io.micronaut.http.HttpVersion#HTTP_1_1}
      * @param configuration                   The {@link HttpClientConfiguration} object
      * @param contextPath                     The base URI to prepend to request uris
@@ -314,6 +314,7 @@ public class DefaultHttpClient implements
      * @param requestBinderRegistry           The request binder registry
      * @param eventLoopGroup                  The event loop group to use
      * @param socketChannelFactory            The socket channel factory
+     * @param udpChannelFactory               The UDP channel factory
      * @param clientCustomizer                The pipeline customizer
      * @param invocationInstrumenterFactories The invocation instrumeter factories to instrument netty handlers execution with
      * @param informationalServiceId          Optional service ID that will be passed to exceptions created by this client

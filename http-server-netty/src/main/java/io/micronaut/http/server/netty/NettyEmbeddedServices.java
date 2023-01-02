@@ -174,8 +174,9 @@ public interface NettyEmbeddedServices {
 
     /**
      * Gets the domain server socket channel instance.
+     * @param type The channel type to return
      * @param workerConfig The worker config
-     * @return The {@link io.netty.channel.unix.DomainSocketChannel}
+     * @return The channel
      * @throws UnsupportedOperationException if domain sockets are not supported.
      */
     @NonNull default Channel getChannelInstance(NettyChannelType type, @NonNull EventLoopGroupConfiguration workerConfig) {
