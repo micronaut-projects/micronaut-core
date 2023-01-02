@@ -2330,32 +2330,27 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         }
     }
 
+    @Nullable
     private <B, R> Qualifier<B> resolveQualifier(BeanResolutionContext resolutionContext, Argument<B> beanType, Argument<R> resultType) {
         if (isInnerConfiguration(beanType)) {
             ConfigurationPath configurationPath = resolutionContext.getConfigurationPath();
             Qualifier<B> q = configurationPath.beanQualifier();
             if (q instanceof Named named && resultType.isContainerType()) {
                 return Qualifiers.byNamePrefix(named.getName());
-            } else {
-                if (q == null && isEachBeanParent(beanType)) {
-                    return (Qualifier<B>) resolutionContext.getCurrentQualifier();
-                } else {
-                    return q;
-                }
             }
-        } else if (Qualifier.class == resultType.getType()) {
+            if (q == null && isEachBeanParent(beanType)) {
+                return (Qualifier<B>) resolutionContext.getCurrentQualifier();
+            }
+            return q;
+        }
+        if (Qualifier.class == resultType.getType()) {
             final Qualifier<B> currentQualifier = (Qualifier<B>) resolutionContext.getCurrentQualifier();
             if (currentQualifier != null &&
                 currentQualifier.getClass() != InterceptorBindingQualifier.class &&
                 currentQualifier.getClass() != TypeAnnotationQualifier.class) {
                 return currentQualifier;
-            } else {
-                BeanResolutionContext.Path path = resolutionContext.getPath();
-                BeanResolutionContext.Segment<?, ?> segment = path.peek();
-                if (segment != null && segment.getDeclaringType().hasAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS)) {
-                    return resolutionContext.getConfigurationPath().beanQualifier();
-                }
             }
+            return resolutionContext.getConfigurationPath().beanQualifier();
         } else if (precalculatedInfo.isIterable && resultType.isAnnotationPresent(Parameter.class)) {
             return (Qualifier<B>) resolutionContext.getCurrentQualifier();
         }

@@ -24,7 +24,6 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.naming.NameResolver;
-import io.micronaut.core.naming.Named;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.inject.BeanDefinition;
@@ -39,6 +38,7 @@ import io.micronaut.inject.ParametrizedBeanFactory;
 import io.micronaut.inject.ParametrizedInstantiatableBeanDefinition;
 import io.micronaut.inject.ValidatedBeanDefinition;
 import io.micronaut.inject.qualifiers.PrimaryQualifier;
+import io.micronaut.inject.qualifiers.Qualifiers;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -114,11 +114,11 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
 
     @Override
     public boolean isPrimary() {
-        return isLocalQualifierPrimary() || definition.isPrimary() || isPrimaryThroughAttribute();
+        return isQualifiedAsPrimary(qualifier) || definition.isPrimary() || isPrimaryThroughAttribute();
     }
 
-    private boolean isLocalQualifierPrimary() {
-        return qualifier != null && (qualifier == PrimaryQualifier.INSTANCE || qualifier.contains(PrimaryQualifier.INSTANCE));
+    private boolean isQualifiedAsPrimary(Qualifier<?> q) {
+        return q != null && (q == PrimaryQualifier.INSTANCE || q.contains(PrimaryQualifier.INSTANCE));
     }
 
     private boolean isPrimaryThroughAttribute() {
@@ -195,20 +195,17 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
                     if (simpleName != null) {
                         fulfilled.put(argumentName, simpleName);
                     } else {
-                        Qualifier<?> q = resolutionContext.getCurrentQualifier();
-                        if (q instanceof Named named) {
-                            fulfilled.put(argumentName, named.getName());
-                        } else if (q == PrimaryQualifier.INSTANCE) {
-                            fulfilled.put(argumentName, Primary.SIMPLE_NAME);
+                        String name = findName(resolutionContext.getCurrentQualifier());
+                        if (name != null) {
+                            fulfilled.put(argumentName, name);
                         }
                     }
                 } else if (Number.class.isAssignableFrom(type)) {
                     fulfilled.put(argumentName, context.getConversionService().convertRequired(configurationPath.index(), argument));
                 } else if (qualifier != null && hasDeclaredAnnotation(EachBean.class) && String.class.equals(type) && "name".equals(argumentName)) {
-                    if (isLocalQualifierPrimary()) {
-                        fulfilled.put(argumentName, Primary.SIMPLE_NAME);
-                    } else if (qualifier instanceof Named named) {
-                        fulfilled.put(argumentName, named.getName());
+                    String name = findName(qualifier);
+                    if (name != null) {
+                        fulfilled.put(argumentName, name);
                     }
                 } else {
                     if (argument.isProvider()) {
@@ -239,6 +236,21 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
         return fulfilled;
     }
 
+    @Nullable
+    private String findName(@Nullable Qualifier<?> q) {
+        if (q == null) {
+            return null;
+        }
+        String name = Qualifiers.findName(q);
+        if (name != null) {
+            return name;
+        }
+        if (isQualifiedAsPrimary(q)) {
+            return Primary.SIMPLE_NAME;
+        }
+        return null;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {
@@ -267,10 +279,7 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
 
     @Override
     public Optional<String> resolveName() {
-        if (qualifier instanceof Named named) {
-            return Optional.of(named.getName());
-        }
-        return Optional.empty();
+        return Optional.ofNullable(findName(qualifier));
     }
 
     @Override

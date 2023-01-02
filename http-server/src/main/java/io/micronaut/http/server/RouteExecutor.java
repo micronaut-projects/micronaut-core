@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.type.Argument;
@@ -100,6 +101,7 @@ public final class RouteExecutor {
     final ErrorResponseProcessor<?> errorResponseProcessor;
     private final ExecutorSelector executorSelector;
     private final Optional<CoroutineHelper> coroutineHelper;
+    private final ConversionService conversionService;
 
     /**
      * Default constructor.
@@ -124,6 +126,7 @@ public final class RouteExecutor {
         this.errorResponseProcessor = errorResponseProcessor;
         this.executorSelector = executorSelector;
         this.coroutineHelper = beanContext.findBean(CoroutineHelper.class);
+        this.conversionService = beanContext.getConversionService();
     }
 
     /**
@@ -575,7 +578,7 @@ public final class RouteExecutor {
         boolean isCompletable = !isSingle && routeInfo.isVoid() && Publishers.isCompletable(bodyClass);
         if (isSingle || isCompletable) {
             // full response case
-            Publisher<Object> publisher = Publishers.convertPublisher(body, Publisher.class);
+            Publisher<Object> publisher = Publishers.convertPublisher(conversionService, body, Publisher.class);
             Supplier<MutableHttpResponse<?>> emptyResponse = () -> {
                 MutableHttpResponse<?> singleResponse;
                 if (isCompletable || routeInfo.isVoid()) {
@@ -618,7 +621,7 @@ public final class RouteExecutor {
         Argument<?> typeArgument = routeInfo.getReturnType().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
         if (HttpResponse.class.isAssignableFrom(typeArgument.getType())) {
             // a response stream
-            Publisher<HttpResponse<?>> bodyPublisher = Publishers.convertPublisher(body, Publisher.class);
+            Publisher<HttpResponse<?>> bodyPublisher = Publishers.convertPublisher(conversionService, body, Publisher.class);
             Flux<MutableHttpResponse<?>> response = Flux.from(bodyPublisher)
                 .map(this::toMutableResponse);
             Argument<?> bodyArgument = typeArgument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
@@ -640,14 +643,14 @@ public final class RouteExecutor {
             return Mono.just(response);
         }
         if (Publishers.isSingle(body.getClass())) {
-            return Mono.from(Publishers.convertPublisher(body, Publisher.class)).map(b -> {
+            return Mono.from(Publishers.convertPublisher(conversionService, body, Publisher.class)).map(b -> {
                 response.body(b);
                 return response;
             });
         }
         MediaType mediaType = response.getContentType().orElseGet(() -> resolveDefaultResponseContentType(request, routeInfo));
 
-        Flux<Object> bodyPublisher = applyExecutorToPublisher(Publishers.convertPublisher(body, Publisher.class), findExecutor(routeInfo));
+        Flux<Object> bodyPublisher = applyExecutorToPublisher(Publishers.convertPublisher(conversionService, body, Publisher.class), findExecutor(routeInfo));
 
         return Mono.just(response
             .header(HttpHeaders.TRANSFER_ENCODING, "chunked")

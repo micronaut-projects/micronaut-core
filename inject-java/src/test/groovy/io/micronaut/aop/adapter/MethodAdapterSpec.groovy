@@ -122,7 +122,7 @@ class Test {
 
     @Adapter(ApplicationEventListener.class)
     void onStartup(StartupEvent event) {
-        
+
     }
 }
 
@@ -148,23 +148,23 @@ import io.micronaut.runtime.event.annotation.*;
 public class Test {
     boolean invoked = false;
     boolean shutdown = false;
-    
+
     public boolean getInvoked() {
         return invoked;
-    } 
+    }
     public boolean isShutdown() {
         return shutdown;
     }
-    
+
     @EventListener
     void receive(StartupEvent event) {
         invoked = true;
     }
-    
+
     @EventListener
     void receive(ShutdownEvent event) {
         shutdown = true;
-    } 
+    }
 }
 
 ''')
@@ -203,10 +203,10 @@ public class Test {
         invoked = true;
         return CompletableFuture.completedFuture(invoked);
     }
-    
+
     public boolean getInvoked() {
         return invoked;
-    } 
+    }
 }
 
 ''')
@@ -235,7 +235,7 @@ class Test {
 
     @Adapter(ApplicationEventListener.class)
     void onStartup(StartupEvent event) {
-        
+
     }
 }
 
@@ -263,7 +263,7 @@ class Test implements TestContract {
 
     @Override
     public void onStartup(StartupEvent event) {
-        
+
     }
 }
 
@@ -296,7 +296,7 @@ class Test {
 
     @Adapter(Foo.class)
     void myMethod(String blah) {
-        
+
     }
 }
 
@@ -325,7 +325,7 @@ class Test {
 
     @Adapter(Foo.class)
     void myMethod(Integer blah) {
-        
+
     }
 }
 
@@ -351,7 +351,7 @@ class Test {
 
     @Adapter(ApplicationEventListener.class)
     void onStartup(StartupEvent event, boolean stuff) {
-        
+
     }
 }
 
@@ -389,7 +389,7 @@ class EventListener {
 
     void "test adapter is invoked"() {
         given:
-        ApplicationContext ctx = ApplicationContext.run()
+        ApplicationContext ctx = ApplicationContext.run(["spec" : getClass().getSimpleName()])
 
         when:
         Test t = ctx.getBean(Test)

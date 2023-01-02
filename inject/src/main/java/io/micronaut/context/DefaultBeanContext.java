@@ -162,7 +162,6 @@ public class DefaultBeanContext implements InitializableBeanContext {
     protected static final Logger LOG_LIFECYCLE = LoggerFactory.getLogger(DefaultBeanContext.class.getPackage().getName() + ".lifecycle");
     @SuppressWarnings("rawtypes")
     private static final Qualifier PROXY_TARGET_QUALIFIER = new Qualifier<>() {
-        @SuppressWarnings("rawtypes")
         @Override
         public <T extends BeanType<Object>> Stream<T> reduce(Class<Object> beanType, Stream<T> candidates) {
             return candidates.filter(bt -> {
@@ -177,8 +176,6 @@ public class DefaultBeanContext implements InitializableBeanContext {
     private static final String SCOPED_PROXY_ANN = "io.micronaut.runtime.context.scope.ScopedProxy";
     private static final String INTRODUCTION_TYPE = "io.micronaut.aop.Introduction";
     private static final String ADAPTER_TYPE = "io.micronaut.aop.Adapter";
-    private static final String NAMED_MEMBER = "named";
-    private static final String QUALIFIER_MEMBER = "qualifier";
     private static final String PARALLEL_TYPE = Parallel.class.getName();
     private static final String INDEXES_TYPE = Indexes.class.getName();
     private static final String REPLACES_ANN = Replaces.class.getName();
@@ -661,52 +658,48 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
     @SuppressWarnings("unchecked")
     @Override
-    public <T, R> Optional<MethodExecutionHandle<T, R>> findExecutionHandle(Class<T> beanType, Qualifier<?> qualifier, String method, Class<?>... arguments) {
-        Optional<? extends BeanDefinition<?>> foundBean = findBeanDefinition(beanType, (Qualifier) qualifier);
-        if (foundBean.isPresent()) {
-            BeanDefinition<?> beanDefinition = foundBean.get();
-            Optional<? extends ExecutableMethod<?, Object>> foundMethod = beanDefinition.findMethod(method, arguments);
-            if (foundMethod.isPresent()) {
-                return foundMethod.map((ExecutableMethod executableMethod) ->
-                        new BeanExecutionHandle(this, beanType, qualifier, executableMethod)
-                );
-            } else {
-                return beanDefinition.findPossibleMethods(method)
-                        .findFirst()
-                        .filter(m -> {
-                            Class<?>[] argTypes = m.getArgumentTypes();
-                            if (argTypes.length == arguments.length) {
-                                for (int i = 0; i < argTypes.length; i++) {
-                                    if (!arguments[i].isAssignableFrom(argTypes[i])) {
-                                        return false;
-                                    }
-                                }
-                                return true;
-                            }
-                            return false;
-                        })
-                        .map((ExecutableMethod executableMethod) -> new BeanExecutionHandle(this, beanType, qualifier, executableMethod));
-            }
+    public <T, R> Optional<MethodExecutionHandle<T, R>> findExecutionHandle(Class<T> beanType, Qualifier<?> q, String method, Class<?>... arguments) {
+        Qualifier<T> qualifier = (Qualifier<T>) q;
+        Optional<BeanDefinition<T>> foundBean = findBeanDefinition(beanType, qualifier);
+        if (foundBean.isEmpty()) {
+            return Optional.empty();
         }
-        return Optional.empty();
+        BeanDefinition<T> beanDefinition = foundBean.get();
+        Optional<ExecutableMethod<T, R>> foundMethod = beanDefinition.findMethod(method, arguments);
+        if (foundMethod.isEmpty()) {
+            foundMethod = beanDefinition.<R>findPossibleMethods(method)
+                .findFirst()
+                .filter(m -> {
+                    Class<?>[] argTypes = m.getArgumentTypes();
+                    if (argTypes.length == arguments.length) {
+                        for (int i = 0; i < argTypes.length; i++) {
+                            if (!arguments[i].isAssignableFrom(argTypes[i])) {
+                                return false;
+                            }
+                        }
+                        return true;
+                    }
+                    return false;
+                });
+        }
+        return foundMethod.map(executableMethod -> new BeanExecutionHandle<>(this, beanType, qualifier, executableMethod));
     }
 
     @Override
     public <T, R> Optional<ExecutableMethod<T, R>> findExecutableMethod(Class<T> beanType, String method, Class<?>[] arguments) {
-        if (beanType != null) {
-            Collection<BeanDefinition<T>> definitions = getBeanDefinitions(beanType);
-            if (!definitions.isEmpty()) {
-                BeanDefinition<T> beanDefinition = definitions.iterator().next();
-                Optional<ExecutableMethod<T, R>> foundMethod = beanDefinition.findMethod(method, arguments);
-                if (foundMethod.isPresent()) {
-                    return foundMethod;
-                } else {
-                    return beanDefinition.<R>findPossibleMethods(method)
-                            .findFirst();
-                }
-            }
+        if (beanType == null) {
+            return Optional.empty();
         }
-        return Optional.empty();
+        Collection<BeanDefinition<T>> definitions = getBeanDefinitions(beanType);
+        if (definitions.isEmpty()) {
+            return Optional.empty();
+        }
+        BeanDefinition<T> beanDefinition = definitions.iterator().next();
+        Optional<ExecutableMethod<T, R>> foundMethod = beanDefinition.findMethod(method, arguments);
+        if (foundMethod.isPresent()) {
+            return foundMethod;
+        }
+        return beanDefinition.<R>findPossibleMethods(method).findFirst();
     }
 
     @SuppressWarnings("unchecked")
@@ -2590,16 +2583,14 @@ public class DefaultBeanContext implements InitializableBeanContext {
         }
     }
 
-    private <T> void filterReplacedBeans(BeanResolutionContext resolutionContext, Collection<? extends BeanType<T>> candidates) {
+    private <T> void filterReplacedBeans(BeanResolutionContext resolutionContext, Collection<BeanDefinition<T>> candidates) {
         if (candidates.size() > 1) {
-            List<BeanType<T>> replacementTypes = new ArrayList<>(2);
-
-            for (BeanType<T> candidate : candidates) {
+            List<BeanDefinition<T>> replacementTypes = new ArrayList<>(2);
+            for (BeanDefinition<T> candidate : candidates) {
                 if (candidate.getAnnotationMetadata().hasStereotype(REPLACES_ANN)) {
                     replacementTypes.add(candidate);
                 }
             }
-
             if (!replacementTypes.isEmpty()) {
                 candidates.removeIf(definition -> checkIfReplacementExists(resolutionContext, replacementTypes, definition));
             }
@@ -2607,8 +2598,8 @@ public class DefaultBeanContext implements InitializableBeanContext {
     }
 
     private <T> boolean checkIfReplacementExists(BeanResolutionContext resolutionContext,
-                                                 List<BeanType<T>> replacementTypes,
-                                                 BeanType<T> definitionToBeReplaced) {
+                                                 List<BeanDefinition<T>> replacementTypes,
+                                                 BeanDefinition<T> definitionToBeReplaced) {
         if (!definitionToBeReplaced.isEnabled(this, resolutionContext)) {
             return true;
         }
@@ -2616,7 +2607,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
         if (annotationMetadata.hasDeclaredStereotype(Infrastructure.class)) {
             return false;
         }
-        for (BeanType<T> replacementType : replacementTypes) {
+        for (BeanDefinition<T> replacementType : replacementTypes) {
             if (isNotTheSameDefinition(replacementType, definitionToBeReplaced) &&
                     isNotProxy(replacementType, definitionToBeReplaced) &&
                     checkIfReplaces(replacementType, definitionToBeReplaced, annotationMetadata)) {
@@ -2626,21 +2617,26 @@ public class DefaultBeanContext implements InitializableBeanContext {
         return false;
     }
 
-    private <T> boolean isNotTheSameDefinition(BeanType<T> replacingCandidate, BeanType<T> definitionToBeReplaced) {
+    private <T> boolean isNotTheSameDefinition(BeanDefinition<T> replacingCandidate, BeanDefinition<T> definitionToBeReplaced) {
+        if (replacingCandidate instanceof BeanDefinitionDelegate<T> beanDefinitionDelegate) {
+            replacingCandidate = beanDefinitionDelegate.getDelegate();
+        }
+        if (definitionToBeReplaced instanceof BeanDefinitionDelegate<T> beanDefinitionDelegate) {
+            definitionToBeReplaced = beanDefinitionDelegate.getDelegate();
+        }
         return replacingCandidate != definitionToBeReplaced;
     }
 
-    private <T> boolean isNotProxy(BeanType<T> replacingCandidate, BeanType<T> definitionToBeReplaced) {
+    private <T> boolean isNotProxy(BeanDefinition<T> replacingCandidate, BeanDefinition<T> definitionToBeReplaced) {
         return !(replacingCandidate instanceof ProxyBeanDefinition &&
                 ((ProxyBeanDefinition<T>) replacingCandidate).getTargetDefinitionType() == definitionToBeReplaced.getClass());
     }
 
-    private <T> boolean checkIfReplaces(BeanType<T> replacingCandidate, BeanType<T> definitionToBeReplaced, AnnotationMetadata annotationMetadata) {
-
+    private <T> boolean checkIfReplaces(BeanDefinition<T> replacingCandidate, BeanDefinition<T> definitionToBeReplaced, AnnotationMetadata annotationMetadata) {
         final AnnotationValue<Replaces> replacesAnnotation = replacingCandidate.getAnnotation(Replaces.class);
-        Class replacedBeanType = replacesAnnotation.classValue().orElse(getCanonicalBeanType(replacingCandidate));
-        final Optional<String> named = replacesAnnotation.stringValue(NAMED_MEMBER);
-        final Optional<AnnotationClassValue<?>> qualifier = replacesAnnotation.annotationClassValue(QUALIFIER_MEMBER);
+        final Class replacedBeanType = replacesAnnotation.classValue(Replaces.MEMBER_BEAN).orElse(getCanonicalBeanType(replacingCandidate));
+        final Optional<String> named = replacesAnnotation.stringValue(Replaces.MEMBER_NAMED);
+        final Optional<AnnotationClassValue<?>> qualifier = replacesAnnotation.annotationClassValue(Replaces.MEMBER_QUALIFIER);
 
         if (named.isPresent() && qualifier.isPresent()) {
             throw new ConfigurationException("Both \"named\" and \"qualifier\" should not be present: " + replacesAnnotation);
@@ -2670,20 +2666,20 @@ public class DefaultBeanContext implements InitializableBeanContext {
             return false;
         }
 
-        Optional<Class<?>> factory = replacesAnnotation.classValue("factory");
-
-        Optional<Class<?>> declaringType = definitionToBeReplaced instanceof BeanDefinition ?
-                ((BeanDefinition<?>) definitionToBeReplaced).getDeclaringType() :
-                Optional.empty();
-        if (factory.isPresent() && declaringType.isPresent()) {
-            final boolean factoryReplaces = factory.get() == declaringType.get() &&
-                    checkIfTypeMatches(definitionToBeReplaced, annotationMetadata, replacedBeanType);
-            if (factoryReplaces) {
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Bean [{}] replaces existing bean of type [{}] in factory type [{}]",
-                            replacingCandidate.getBeanType(), replacedBeanType, factory.get());
+        Optional<Class<?>> factory = replacesAnnotation.classValue(Replaces.MEMBER_FACTORY);
+        if (factory.isPresent()) {
+            Optional<Class<?>> declaringType = definitionToBeReplaced.getDeclaringType();
+            if (declaringType.isPresent()) {
+                Class<?> factoryClass = factory.get();
+                final boolean factoryReplaces = factoryClass == declaringType.get() &&
+                        checkIfTypeMatches(definitionToBeReplaced, annotationMetadata, replacedBeanType);
+                if (factoryReplaces) {
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Bean [{}] replaces existing bean of type [{}] in factory type [{}]",
+                                replacingCandidate.getBeanType(), replacedBeanType, factoryClass);
+                    }
+                    return true;
                 }
-                return true;
             }
             return false;
         }
@@ -2695,7 +2691,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
         return isTypeMatches;
     }
 
-    private <T> boolean qualifiedByQualifier(BeanType<T> definitionToBeReplaced,
+    private <T> boolean qualifiedByQualifier(BeanDefinition<T> definitionToBeReplaced,
                                              Class<T> replacedBeanType,
                                              AnnotationClassValue<?> qualifier) {
         @SuppressWarnings("unchecked") final Class<? extends Annotation> qualifierClass =
@@ -2713,63 +2709,23 @@ public class DefaultBeanContext implements InitializableBeanContext {
             .isPresent();
     }
 
-    private <T> Class<T> getCanonicalBeanType(BeanType<T> beanType) {
-        if (beanType instanceof AdvisedBeanType) {
-            return (Class<T>) ((AdvisedBeanType<T>) beanType).getInterceptedType();
-        } else if (beanType instanceof ProxyBeanDefinition) {
-            return ((ProxyBeanDefinition<T>) beanType).getTargetType();
-        } else {
-            AnnotationMetadata annotationMetadata = beanType.getAnnotationMetadata();
-            Class<T> bt = beanType.getBeanType();
-            if (annotationMetadata.hasStereotype(INTRODUCTION_TYPE)) {
-                Class<? super T> superclass = bt.getSuperclass();
-                if (superclass == Object.class || superclass == null) {
-                    // interface introduction
-                    return bt;
-                } else {
-                    // abstract class introduction
-                    return (Class<T>) superclass;
-                }
-            } else if (annotationMetadata.hasStereotype(AnnotationUtil.ANN_AROUND)) {
-                Class<? super T> superclass = bt.getSuperclass();
-                if (superclass != null) {
-                    return (Class<T>) superclass;
-                } else {
-                    return bt;
-                }
-            }
-            return bt;
+    private <T> Class<T> getCanonicalBeanType(BeanDefinition<T> beanDefinition) {
+        if (beanDefinition instanceof BeanDefinitionDelegate<T> beanDefinitionDelegate) {
+            beanDefinition = beanDefinitionDelegate.getDelegate();
         }
+        if (beanDefinition instanceof AdvisedBeanType<?> advisedBeanType) {
+            return (Class<T>) advisedBeanType.getInterceptedType();
+        }
+        if (beanDefinition instanceof ProxyBeanDefinition<T> proxyBeanDefinition) {
+            return proxyBeanDefinition.getTargetType();
+        }
+        return beanDefinition.getBeanType();
     }
 
-    private <T> boolean checkIfTypeMatches(BeanType<T> definitionToBeReplaced,
-                                                            AnnotationMetadata annotationMetadata,
-                                                            Class replacingCandidate) {
-        Class<T> bt;
-
-        if (definitionToBeReplaced instanceof ProxyBeanDefinition) {
-            bt = ((ProxyBeanDefinition<T>) definitionToBeReplaced).getTargetType();
-        } else if (definitionToBeReplaced instanceof AdvisedBeanType) {
-            //noinspection unchecked
-            bt = (Class<T>) ((AdvisedBeanType<T>) definitionToBeReplaced).getInterceptedType();
-        } else {
-            bt = definitionToBeReplaced.getBeanType();
-            if (annotationMetadata.hasStereotype(INTRODUCTION_TYPE)) {
-                Class<? super T> superclass = bt.getSuperclass();
-                if (superclass == Object.class) {
-                    // interface introduction
-                    return replacingCandidate.isAssignableFrom(bt);
-                } else {
-                    // abstract class introduction
-                    return replacingCandidate == superclass;
-                }
-            }
-            if (annotationMetadata.hasStereotype(AnnotationUtil.ANN_AROUND)) {
-                Class<? super T> superclass = bt.getSuperclass();
-                return replacingCandidate == superclass || replacingCandidate == bt;
-            }
-        }
-
+    private <T> boolean checkIfTypeMatches(BeanDefinition<T> definitionToBeReplaced,
+                                           AnnotationMetadata annotationMetadata,
+                                           Class replacingCandidate) {
+        Class<T> bt = getCanonicalBeanType(definitionToBeReplaced);
         if (annotationMetadata.hasAnnotation(DefaultImplementation.class)) {
             Optional<Class> defaultImpl = annotationMetadata.classValue(DefaultImplementation.class);
             if (!defaultImpl.isPresent()) {
@@ -2781,15 +2737,13 @@ public class DefaultBeanContext implements InitializableBeanContext {
                 return replacingCandidate == bt;
             }
         }
-
         return replacingCandidate != Object.class && replacingCandidate.isAssignableFrom(bt);
     }
 
     private <T> void doInjectAndInitialize(BeanResolutionContext resolutionContext, T instance, BeanDefinition<T> beanDefinition) {
         if (beanDefinition instanceof InjectableBeanDefinition<T> injectableBeanDefinition) {
             injectableBeanDefinition.inject(resolutionContext, this, instance);
-            if (injectableBeanDefinition instanceof InitializingBeanDefinition) {
-                InitializingBeanDefinition<T> initializingBeanDefinition = ((InitializingBeanDefinition<T>) injectableBeanDefinition);
+            if (beanDefinition instanceof InitializingBeanDefinition<T> initializingBeanDefinition) {
                 initializingBeanDefinition.initialize(resolutionContext, this, instance);
             }
         } else {
