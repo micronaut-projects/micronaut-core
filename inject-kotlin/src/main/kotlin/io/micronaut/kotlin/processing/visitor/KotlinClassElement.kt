@@ -218,7 +218,7 @@ open class KotlinClassElement(val kotlinType: KSType,
                             elementAnnotationMetadataFactory, visitorContext
                         )
                         else -> elementFactory.newClassElement( // other cases
-                            arg.type!!.resolve(),
+                            arg,
                             elementAnnotationMetadataFactory,
                             false
                         )

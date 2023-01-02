@@ -447,7 +447,7 @@ class Foo {
 @MustBeDocumented
 @Retention(AnnotationRetention.RUNTIME)
 @Target(FUNCTION, PROPERTY, ANNOTATION_CLASS, CONSTRUCTOR, VALUE_PARAMETER, TYPE)
-annotation class SomeAnn()
+annotation class SomeAnn
 ''')
         when:
         BeanProperty<?, ?> property = introspection.getRequiredProperty("value", List)
