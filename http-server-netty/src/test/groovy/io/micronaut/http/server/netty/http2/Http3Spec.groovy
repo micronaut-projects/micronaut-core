@@ -19,7 +19,6 @@ class Http3Spec extends Specification {
                 'micronaut.server.ssl.enabled': true,
                 'micronaut.server.ssl.buildSelfSigned': true,
                 'micronaut.server.netty.listeners.a.family': 'QUIC',
-                'micronaut.server.netty.listeners.a.port': 8443,
 
                 "micronaut.http.client.alpn-modes" : ["h3"],
                 'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
