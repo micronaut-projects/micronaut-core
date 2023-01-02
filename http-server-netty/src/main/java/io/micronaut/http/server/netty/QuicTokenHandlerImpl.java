@@ -55,6 +55,14 @@ class QuicTokenHandlerImpl implements QuicTokenHandler {
     }
 
     /**
+     * Alias for {@link #QuicTokenHandlerImpl}, avoids a {@link NoClassDefFoundError} when quic is
+     * missing from the classpath.
+     */
+    static QuicTokenHandler create(ByteBufAllocator alloc) {
+        return new QuicTokenHandlerImpl(alloc);
+    }
+
+    /**
      * Write the validation token. The output buffer contains first the token, then the
      * {@code dcid}, the same format that is passed into {@link #validateToken}.
      *

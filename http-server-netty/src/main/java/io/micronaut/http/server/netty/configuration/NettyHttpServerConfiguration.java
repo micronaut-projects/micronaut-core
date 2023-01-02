@@ -20,6 +20,7 @@ import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -1212,6 +1213,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
             /**
              * QUIC (HTTP/3) listener.
              */
+            @Experimental
             QUIC,
         }
     }

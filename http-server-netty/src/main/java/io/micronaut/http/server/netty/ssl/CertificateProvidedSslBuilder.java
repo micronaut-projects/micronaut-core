@@ -145,7 +145,7 @@ public class CertificateProvidedSslBuilder extends SslBuilder<SslContext> implem
     }
 
     @Override
-    public QuicSslContext buildQuic() {
+    public Optional<QuicSslContext> buildQuic() {
         // todo: test
         QuicSslContextBuilder sslBuilder = QuicSslContextBuilder.forServer(getKeyManagerFactory(ssl), ssl.getKeyStore().getPassword().orElse(null))
             .applicationProtocols(Http3.supportedApplicationProtocols());
@@ -158,7 +158,7 @@ public class CertificateProvidedSslBuilder extends SslBuilder<SslContext> implem
                 sslBuilder.clientAuth(ClientAuth.OPTIONAL);
             }
         }
-        return sslBuilder.build();
+        return Optional.of(sslBuilder.build());
     }
 
     @Override

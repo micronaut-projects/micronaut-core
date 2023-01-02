@@ -47,6 +47,7 @@ class Http2RequestSpec extends Specification {
                 "micronaut.http.client.alpn-modes" : ["h2"],
                 'micronaut.server.ssl.buildSelfSigned': true,
                 'micronaut.server.ssl.port': -1,
+                'micronaut.server.http-version': '2.0',
                 "micronaut.http.client.log-level" : "TRACE",
                 "micronaut.server.netty.log-level" : "TRACE",
                 'micronaut.http.client.ssl.insecure-trust-all-certificates': true

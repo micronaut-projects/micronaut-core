@@ -6,7 +6,6 @@ class Http3RequestSpec extends Http2RequestSpec {
         return super.config() + [
                 "micronaut.http.client.alpn-modes" : ["h3"],
                 'micronaut.server.netty.listeners.a.family': 'QUIC',
-                'micronaut.server.netty.listeners.a.port': 8443,
         ]
     }
 }

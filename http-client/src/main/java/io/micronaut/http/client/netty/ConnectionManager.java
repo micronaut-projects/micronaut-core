@@ -140,7 +140,7 @@ class ConnectionManager {
     private Bootstrap udpBootstrap;
     private final HttpClientConfiguration configuration;
     private final SslContext sslContext;
-    private final QuicSslContext http3SslContext;
+    private final /* QuicSslContext */ Object http3SslContext;
     private final NettyClientCustomizer clientCustomizer;
     private final String informationalServiceId;
 
@@ -798,7 +798,7 @@ class ConnectionManager {
 
             ch.pipeline()
                 .addLast(Http3.newQuicClientCodecBuilder()
-                    .sslEngineProvider(c -> http3SslContext.newEngine(c.alloc(), host, port))
+                    .sslEngineProvider(c -> ((QuicSslContext) http3SslContext).newEngine(c.alloc(), host, port))
                     .initialMaxData(10000000)
                     .initialMaxStreamDataBidirectionalLocal(1000000)
                     .build())

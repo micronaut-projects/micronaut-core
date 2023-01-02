@@ -37,7 +37,7 @@ public interface ServerSslBuilder {
      */
     Optional<SslContext> build();
 
-    default QuicSslContext buildQuic() {
+    default Optional<QuicSslContext> buildQuic() {
         throw new UnsupportedOperationException("QUIC not supported");
     }
 }

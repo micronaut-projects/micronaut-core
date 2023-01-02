@@ -18,6 +18,7 @@ package io.micronaut.http.server.netty;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.util.SupplierUtil;
+import io.micronaut.http.HttpVersion;
 import io.micronaut.http.context.event.HttpRequestReceivedEvent;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.stream.HttpStreamsServerHandler;
@@ -131,7 +132,7 @@ final class HttpPipelineBuilder {
         Optional<LogLevel> logLevel = server.getServerConfiguration().getLogLevel();
         loggingHandler = logLevel.map(level -> new LoggingHandler(NettyHttpServer.class, level)).orElse(null);
         sslContext = embeddedServices.getServerSslBuilder() != null && !quic ? embeddedServices.getServerSslBuilder().build().orElse(null) : null;
-        quicSslContext = quic ? embeddedServices.getServerSslBuilder().buildQuic() : null;
+        quicSslContext = quic ? embeddedServices.getServerSslBuilder().buildQuic().orElse(null) : null;
 
         NettyHttpServerConfiguration.AccessLogger accessLogger = server.getServerConfiguration().getAccessLogger();
         if (accessLogger != null && accessLogger.isEnabled()) {
@@ -254,7 +255,7 @@ final class HttpPipelineBuilder {
                 .initialMaxStreamDataBidirectionalLocal(1000000)
                 .initialMaxStreamDataBidirectionalRemote(1000000)
                 .initialMaxStreamsBidirectional(100)
-                .tokenHandler(new QuicTokenHandlerImpl(channel.alloc()))
+                .tokenHandler(QuicTokenHandlerImpl.create(channel.alloc()))
                 .handler(new ChannelInitializer<Channel>() {
                     @Override
                     protected void initChannel(@NonNull Channel ch) throws Exception {
@@ -483,6 +484,7 @@ final class HttpPipelineBuilder {
         private final boolean ssl;
 
         private final NettyServerCustomizer streamCustomizer;
+        HttpVersion httpVersion = HttpVersion.HTTP_1_1;
 
         private StreamPipeline(Channel channel, boolean ssl, NettyServerCustomizer streamCustomizer) {
             this.channel = channel;
@@ -517,6 +519,8 @@ final class HttpPipelineBuilder {
          * for ALPN HTTP 2 and h2c.
          */
         private void insertHttp2DownstreamHandlers() {
+            httpVersion = HttpVersion.HTTP_2_0;
+
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_FLOW_CONTROL, new FlowControlHandler());
             if (accessLogHandler != null) {
                 pipeline.addLast(ChannelPipelineCustomizer.HANDLER_ACCESS_LOGGER, accessLogHandler);
@@ -565,6 +569,7 @@ final class HttpPipelineBuilder {
          * after a H2C negotiation failure.
          */
         private void insertHttp1DownstreamHandlers() {
+            httpVersion = HttpVersion.HTTP_1_1;
             if (accessLogHandler != null) {
                 pipeline.addLast(ChannelPipelineCustomizer.HANDLER_ACCESS_LOGGER, accessLogHandler);
             }
