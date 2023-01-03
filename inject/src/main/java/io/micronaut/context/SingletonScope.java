@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
+import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
 
@@ -361,7 +362,7 @@ final class SingletonScope {
 
         @Override
         public int hashCode() {
-            return Objects.hash(beanDefinitionDelegate.getBeanType(), beanDefinitionDelegate.getDeclaredQualifier());
+            return ObjectUtils.hash(beanDefinitionDelegate.getBeanType(), beanDefinitionDelegate.getDeclaredQualifier());
         }
     }
 
@@ -395,7 +396,7 @@ final class SingletonScope {
 
         @Override
         public int hashCode() {
-            return Objects.hash(beanDefinition.getBeanDefinitionName());
+            return beanDefinition.getBeanDefinitionName().hashCode();
         }
     }
 

@@ -19,7 +19,7 @@ import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.PropertySource
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.BeanFactory
+import io.micronaut.inject.InstantiatableBeanDefinition
 import org.neo4j.driver.v1.Config
 
 class ConfigurationPropertiesBuilderSpec extends AbstractBeanDefinitionSpec {
@@ -72,12 +72,12 @@ class TestAA {
 ''')
 
         when:
-        BeanFactory factory = beanDefinition
+        InstantiatableBeanDefinition factory = beanDefinition
         ApplicationContext applicationContext = ApplicationContext.run(
                 'test.foo':'good',
                 'test.bar':'bad'
         )
-        def bean = factory.build(applicationContext, beanDefinition)
+        def bean = factory.instantiate(applicationContext)
 
         then:
         bean.test.foo == 'good'
@@ -124,12 +124,12 @@ class TestA {
 ''')
 
         when:
-        BeanFactory factory = beanDefinition
+        InstantiatableBeanDefinition factory = beanDefinition
         ApplicationContext applicationContext = ApplicationContext.run(
                 'test.foo':'good',
                 'test.bar':'bad'
         )
-        def bean = factory.build(applicationContext, beanDefinition)
+        def bean = factory.instantiate(applicationContext)
 
         then:
         bean.test.foo == 'good'
@@ -164,11 +164,11 @@ class TestB {
 ''')
 
         when:
-        BeanFactory factory = beanDefinition
+        InstantiatableBeanDefinition factory = beanDefinition
         ApplicationContext applicationContext = ApplicationContext.run(
                 'test.bar':'good',
         )
-        def bean = factory.build(applicationContext, beanDefinition)
+        def bean = factory.instantiate(applicationContext)
 
         then:
         bean.test.bar == 'good'
@@ -197,11 +197,11 @@ class TestC {
 ''')
 
         expect:"The bean was built and a warning was logged"
-        BeanFactory factory = beanDefinition
+        InstantiatableBeanDefinition factory = beanDefinition
         ApplicationContext applicationContext = ApplicationContext.run(
                 'test.foo':'good',
         )
-        factory.build(applicationContext, beanDefinition)
+        factory.instantiate(applicationContext)
     }
 
 
@@ -230,13 +230,13 @@ class TestD {
 ''')
 
         when:
-        BeanFactory factory = beanDefinition
+        InstantiatableBeanDefinition factory = beanDefinition
         ApplicationContext applicationContext = ApplicationContext.run(
                 'test.foo':'good',
                 'test.bar': '10',
                 'test.baz':'20'
         )
-        def bean = factory.build(applicationContext, beanDefinition)
+        def bean = factory.instantiate(applicationContext)
 
         then:
         bean != null
@@ -276,13 +276,13 @@ class Neo4jProperties {
         beanDefinition.injectedFields.first().name == 'uri'
 
         when:
-        BeanFactory factory = beanDefinition
+        InstantiatableBeanDefinition factory = beanDefinition
         ApplicationContext applicationContext = ApplicationContext.run(
                 'neo4j.test.encryptionLevel':'none',
                 'neo4j.test.leakedSessionsLogging':true,
                 'neo4j.test.maxIdleSessions':2
         )
-        def bean = factory.build(applicationContext, beanDefinition)
+        def bean = factory.instantiate(applicationContext)
 
         then:
         bean != null
@@ -324,13 +324,13 @@ class Neo4jProperties {
         beanDefinition.injectedFields.first().name == 'uri'
 
         when:
-        BeanFactory factory = beanDefinition
+        InstantiatableBeanDefinition factory = beanDefinition
         ApplicationContext applicationContext = ApplicationContext.run(
                 'neo4j.test.options.encryptionLevel':'none',
                 'neo4j.test.options.leakedSessionsLogging':true,
                 'neo4j.test.options.maxIdleSessions':2
         )
-        def bean = factory.build(applicationContext, beanDefinition)
+        def bean = factory.instantiate(applicationContext)
 
         then:
         bean != null
@@ -372,13 +372,13 @@ class Neo4jProperties {
         beanDefinition.injectedFields.first().name == 'uri'
 
         when:
-        BeanFactory factory = beanDefinition
+        InstantiatableBeanDefinition factory = beanDefinition
         ApplicationContext applicationContext = ApplicationContext.run(
                 'neo4j.test.options.encryptionLevel':'none',
                 'neo4j.test.options.leakedSessionsLogging':true,
                 'neo4j.test.options.maxIdleSessions':2
         )
-        def bean = factory.build(applicationContext, beanDefinition)
+        def bean = factory.instantiate(applicationContext)
 
         then:
         bean != null
@@ -418,11 +418,11 @@ class Neo4jProperties {
         beanDefinition.injectedFields.first().name == 'uri'
 
         when:
-        BeanFactory factory = beanDefinition
+        InstantiatableBeanDefinition factory = beanDefinition
         ApplicationContext applicationContext = ApplicationContext.run(
                 'neo4j.test.connectionLivenessCheckTimeout': '6s'
         )
-        def bean = factory.build(applicationContext, beanDefinition)
+        def bean = factory.instantiate(applicationContext)
 
         then:
         bean != null
@@ -454,11 +454,11 @@ class Neo4jProperties {
 
 }
 ''')
-        BeanFactory factory = beanDefinition
+        InstantiatableBeanDefinition factory = beanDefinition
         ApplicationContext applicationContext = ApplicationContext.run(
                 'neo4j.test.connectionLivenessCheckTimeout': '17s'
         )
-        def bean = factory.build(applicationContext, beanDefinition)
+        def bean = factory.instantiate(applicationContext)
 
         then:
         bean != null

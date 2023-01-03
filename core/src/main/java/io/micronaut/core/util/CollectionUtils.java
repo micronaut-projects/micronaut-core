@@ -229,7 +229,7 @@ public class CollectionUtils {
                 continue;
             } else {
                 if (CharSequence.class.isInstance(o)) {
-                    builder.append(o.toString());
+                    builder.append(o);
                 } else {
                     Optional<String> converted = ConversionService.SHARED.convert(o, String.class);
                     converted.ifPresent(builder::append);

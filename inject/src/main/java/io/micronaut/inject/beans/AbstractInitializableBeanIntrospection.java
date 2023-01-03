@@ -318,7 +318,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements BeanI
 
     @Override
     public int hashCode() {
-        return Objects.hash(beanType);
+        return beanType.hashCode();
     }
 
     @Override

@@ -104,7 +104,7 @@ final class ExactTypeArgumentNameQualifier<T> implements Qualifier<T> {
 
     @Override
     public int hashCode() {
-        return Objects.hash(generify(typeName));
+        return generify(typeName).hashCode();
     }
 
     @Override

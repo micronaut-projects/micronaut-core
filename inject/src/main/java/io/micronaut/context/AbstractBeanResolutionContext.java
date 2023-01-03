@@ -29,6 +29,7 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ArgumentCoercible;
+import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.inject.*;
 
 import java.util.*;
@@ -108,12 +109,6 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     @Override
     public <T> Optional<T> findBean(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         return context.findBean(this, beanType, qualifier);
-    }
-
-    @NonNull
-    @Override
-    public <T> T inject(@Nullable BeanDefinition<?> beanDefinition, @NonNull T instance) {
-        return context.inject(this, beanDefinition, instance);
     }
 
     @NonNull
@@ -288,7 +283,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         return Optional.empty();
     }
 
-    protected void onNewSegment(Segment<?> segment) {
+    protected void onNewSegment(Segment<?, ?> segment) {
         //no-op
     }
 
@@ -303,7 +298,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     /**
      * Class that represents a default path.
      */
-    class DefaultPath extends LinkedList<Segment<?>> implements Path {
+    class DefaultPath extends LinkedList<Segment<?, ?>> implements Path {
 
         public static final String RIGHT_ARROW = " --> ";
         private static final String CIRCULAR_ERROR_MSG = "Circular dependency detected";
@@ -313,7 +308,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
         @Override
         public String toString() {
-            Iterator<Segment<?>> i = descendingIterator();
+            Iterator<Segment<?, ?>> i = descendingIterator();
             StringBuilder pathString = new StringBuilder();
             while (i.hasNext()) {
                 pathString.append(i.next().toString());
@@ -327,7 +322,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         @SuppressWarnings("MagicNumber")
         @Override
         public String toCircularString() {
-            Iterator<Segment<?>> i = descendingIterator();
+            Iterator<Segment<?, ?>> i = descendingIterator();
             StringBuilder pathString = new StringBuilder();
             String ls = CachedEnvironment.getProperty("line.separator");
             while (i.hasNext()) {
@@ -356,28 +351,27 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         }
 
         @Override
-        public Optional<Segment<?>> currentSegment() {
+        public Optional<Segment<?, ?>> currentSegment() {
             return Optional.ofNullable(peek());
         }
 
         @Override
         public Path pushConstructorResolve(BeanDefinition declaringType, Argument argument) {
-            ConstructorInjectionPoint constructor = declaringType.getConstructor();
-            if (constructor instanceof MethodInjectionPoint) {
-                MethodInjectionPoint<?, ?> methodInjectionPoint = (MethodInjectionPoint<?, ?>) constructor;
-                return pushConstructorResolve(declaringType, methodInjectionPoint.getName(), argument, constructor.getArguments(), constructor.requiresReflection());
+            ConstructorInjectionPoint<?> constructor = declaringType.getConstructor();
+            if (constructor instanceof MethodInjectionPoint<?, ?> methodInjectionPoint) {
+                return pushConstructorResolve(declaringType, methodInjectionPoint.getName(), argument, constructor.getArguments());
             }
-            return pushConstructorResolve(declaringType, "<init>", argument, constructor.getArguments(), constructor.requiresReflection());
+            return pushConstructorResolve(declaringType, "<init>", argument, constructor.getArguments());
         }
 
         @Override
-        public Path pushConstructorResolve(BeanDefinition declaringType, String methodName, Argument argument, Argument[] arguments, boolean requiresReflection) {
+        public Path pushConstructorResolve(BeanDefinition declaringType, String methodName, Argument argument, Argument[] arguments) {
             if ("<init>".equals(methodName)) {
                 ConstructorSegment constructorSegment = new ConstructorArgumentSegment(declaringType, methodName, argument, arguments);
                 detectCircularDependency(declaringType, argument, constructorSegment);
             } else {
-                Segment<?> previous = peek();
-                MethodSegment methodSegment = new MethodArgumentSegment(declaringType, methodName, argument, arguments, requiresReflection, previous instanceof MethodSegment ? (MethodSegment) previous : null);
+                Segment<?, ?> previous = peek();
+                MethodSegment<?, ?> methodSegment = new MethodArgumentSegment(declaringType, methodName, argument, arguments, previous instanceof MethodSegment ? (MethodSegment) previous : null);
                 if (contains(methodSegment)) {
                     throw new CircularDependencyException(AbstractBeanResolutionContext.this, argument, CIRCULAR_ERROR_MSG);
                 } else {
@@ -394,9 +388,9 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
         @Override
         public Path pushMethodArgumentResolve(BeanDefinition declaringType, MethodInjectionPoint methodInjectionPoint, Argument argument) {
-            Segment<?> previous = peek();
-            MethodSegment methodSegment = new MethodArgumentSegment(declaringType, methodInjectionPoint.getName(), argument,
-                    methodInjectionPoint.getArguments(), methodInjectionPoint.requiresReflection(), previous instanceof MethodSegment ? (MethodSegment) previous : null);
+            Segment<?, ?> previous = peek();
+            MethodSegment<?, ?> methodSegment = new MethodArgumentSegment(declaringType, methodInjectionPoint.getName(), argument,
+                    methodInjectionPoint.getArguments(), previous instanceof MethodSegment ? (MethodSegment) previous : null);
             if (contains(methodSegment)) {
                 throw new CircularDependencyException(AbstractBeanResolutionContext.this, methodInjectionPoint, argument, CIRCULAR_ERROR_MSG);
             } else {
@@ -407,9 +401,9 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         }
 
         @Override
-        public Path pushMethodArgumentResolve(BeanDefinition declaringType, String methodName, Argument argument, Argument[] arguments, boolean requiresReflection) {
-            Segment<?> previous = peek();
-            MethodSegment methodSegment = new MethodArgumentSegment(declaringType, methodName, argument, arguments, requiresReflection, previous instanceof MethodSegment ? (MethodSegment) previous : null);
+        public Path pushMethodArgumentResolve(BeanDefinition declaringType, String methodName, Argument argument, Argument[] arguments) {
+            Segment<?, ?> previous = peek();
+            MethodSegment<?, ?> methodSegment = new MethodArgumentSegment(declaringType, methodName, argument, arguments, previous instanceof MethodSegment ? (MethodSegment) previous : null);
             if (contains(methodSegment)) {
                 throw new CircularDependencyException(AbstractBeanResolutionContext.this, declaringType, methodName, argument, CIRCULAR_ERROR_MSG);
             } else {
@@ -421,7 +415,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
         @Override
         public Path pushFieldResolve(BeanDefinition declaringType, FieldInjectionPoint fieldInjectionPoint) {
-            FieldSegment fieldSegment = new FieldSegment(declaringType, fieldInjectionPoint.asArgument(), fieldInjectionPoint.requiresReflection());
+            FieldSegment<?, ?> fieldSegment = new FieldSegment<>(declaringType, fieldInjectionPoint.asArgument());
             if (contains(fieldSegment)) {
                 throw new CircularDependencyException(AbstractBeanResolutionContext.this, fieldInjectionPoint, CIRCULAR_ERROR_MSG);
             } else {
@@ -431,8 +425,8 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         }
 
         @Override
-        public Path pushFieldResolve(BeanDefinition declaringType, Argument fieldAsArgument, boolean requiresReflection) {
-            FieldSegment fieldSegment = new FieldSegment(declaringType, fieldAsArgument, requiresReflection);
+        public Path pushFieldResolve(BeanDefinition declaringType, Argument fieldAsArgument) {
+            FieldSegment<?, ?> fieldSegment = new FieldSegment<>(declaringType, fieldAsArgument);
             if (contains(fieldSegment)) {
                 throw new CircularDependencyException(AbstractBeanResolutionContext.this, declaringType, fieldAsArgument.getName(), CIRCULAR_ERROR_MSG);
             } else {
@@ -461,16 +455,16 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
                     // if the currently injected segment is a constructor argument and the type to be constructed is the
                     // same as the candidate, then filter out the candidate to avoid a circular injection problem
                     if (!declaringBean.equals(declaringType)) {
-                        if (declaringType instanceof ProxyBeanDefinition) {
+                        if (declaringType instanceof ProxyBeanDefinition<?> proxyBeanDefinition) {
                             // take into account proxies
-                            if (!((ProxyBeanDefinition) declaringType).getTargetDefinitionType().equals(declaringBean.getClass())) {
+                            if (!proxyBeanDefinition.getTargetDefinitionType().equals(declaringBean.getClass())) {
                                 throw new CircularDependencyException(AbstractBeanResolutionContext.this, argument, CIRCULAR_ERROR_MSG);
                             } else {
                                 push(constructorSegment);
                             }
-                        } else if (declaringBean instanceof ProxyBeanDefinition) {
+                        } else if (declaringBean instanceof ProxyBeanDefinition<?> proxyBeanDefinition) {
                             // take into account proxies
-                            if (!((ProxyBeanDefinition) declaringBean).getTargetDefinitionType().equals(declaringType.getClass())) {
+                            if (!proxyBeanDefinition.getTargetDefinitionType().equals(declaringType.getClass())) {
                                 throw new CircularDependencyException(AbstractBeanResolutionContext.this, argument, CIRCULAR_ERROR_MSG);
                             } else {
                                 push(constructorSegment);
@@ -490,7 +484,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         }
 
         @Override
-        public void push(Segment<?> segment) {
+        public void push(Segment<?, ?> segment) {
             super.push(segment);
             AbstractBeanResolutionContext.this.onNewSegment(segment);
         }
@@ -514,10 +508,6 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
             return getDeclaringType();
         }
 
-        @Override
-        public boolean requiresReflection() {
-            return false;
-        }
     }
 
     /**
@@ -576,11 +566,6 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
                 }
 
                 @Override
-                public boolean requiresReflection() {
-                    return constructorInjectionPoint.requiresReflection();
-                }
-
-                @Override
                 public AnnotationMetadata getAnnotationMetadata() {
                     return getArgument().getAnnotationMetadata();
                 }
@@ -595,8 +580,8 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     public static class MethodArgumentSegment extends MethodSegment implements ArgumentInjectionPoint {
         private final MethodSegment outer;
 
-        public MethodArgumentSegment(BeanDefinition declaringType, String methodName, Argument argument, Argument[] arguments, boolean requiresReflection, MethodSegment outer) {
-            super(declaringType, methodName, argument, arguments, requiresReflection);
+        public MethodArgumentSegment(BeanDefinition declaringType, String methodName, Argument argument, Argument[] arguments, MethodSegment outer) {
+            super(declaringType, methodName, argument, arguments);
             this.outer = outer;
         }
 
@@ -626,22 +611,19 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     /**
      * A segment that represents a method.
      */
-    public static class MethodSegment extends AbstractSegment implements CallableInjectionPoint {
+    public static class MethodSegment<B, T> extends AbstractSegment<B, T> implements CallableInjectionPoint<B> {
 
         private final Argument[] arguments;
-        private final boolean requiresReflection;
 
         /**
          * @param declaringType      The declaring type
          * @param methodName         The method name
          * @param argument           The argument
          * @param arguments          The arguments
-         * @param requiresReflection Is requires reflection
          */
-        MethodSegment(BeanDefinition declaringType, String methodName, Argument argument, Argument[] arguments, boolean requiresReflection) {
+        MethodSegment(BeanDefinition<B> declaringType, String methodName, Argument<T> argument, Argument[] arguments) {
             super(declaringType, methodName, argument);
             this.arguments = arguments;
-            this.requiresReflection = requiresReflection;
         }
 
         @Override
@@ -653,18 +635,13 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         }
 
         @Override
-        public InjectionPoint getInjectionPoint() {
+        public InjectionPoint<B> getInjectionPoint() {
             return this;
         }
 
         @Override
-        public BeanDefinition getDeclaringBean() {
+        public BeanDefinition<B> getDeclaringBean() {
             return getDeclaringType();
-        }
-
-        @Override
-        public boolean requiresReflection() {
-            return requiresReflection;
         }
 
         @Override
@@ -681,18 +658,14 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     /**
      * A segment that represents a field.
      */
-    public static class FieldSegment extends AbstractSegment implements InjectionPoint, ArgumentCoercible, ArgumentInjectionPoint {
-
-        private final boolean requiresReflection;
+    public static class FieldSegment<B, T> extends AbstractSegment<B, T> implements InjectionPoint<B>, ArgumentCoercible<T>, ArgumentInjectionPoint<B, T> {
 
         /**
          * @param declaringClass     The declaring class
          * @param argument           The argument
-         * @param requiresReflection Is requires reflection
          */
-        FieldSegment(BeanDefinition declaringClass, Argument argument, boolean requiresReflection) {
+        FieldSegment(BeanDefinition<B> declaringClass, Argument<T> argument) {
             super(declaringClass, argument.getName(), argument);
-            this.requiresReflection = requiresReflection;
         }
 
         @Override
@@ -701,27 +674,22 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         }
 
         @Override
-        public InjectionPoint getInjectionPoint() {
+        public InjectionPoint<B> getInjectionPoint() {
             return this;
         }
 
         @Override
-        public BeanDefinition getDeclaringBean() {
+        public BeanDefinition<B> getDeclaringBean() {
             return getDeclaringType();
         }
 
         @Override
-        public boolean requiresReflection() {
-            return requiresReflection;
-        }
-
-        @Override
-        public CallableInjectionPoint getOuterInjectionPoint() {
+        public CallableInjectionPoint<B> getOuterInjectionPoint() {
             throw new UnsupportedOperationException("Outer injection point not retrievable from here");
         }
 
         @Override
-        public Argument asArgument() {
+        public Argument<T> asArgument() {
             return getArgument();
         }
 
@@ -736,12 +704,12 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
      *
      * @since 3.3.0
      */
-    public static final class AnnotationSegment extends AbstractSegment implements InjectionPoint {
+    public static final class AnnotationSegment<B> extends AbstractSegment<B, B> implements InjectionPoint<B> {
         /**
          * @param beanDefinition The bean definition
          * @param argument       The argument
          */
-        AnnotationSegment(BeanDefinition beanDefinition, Argument argument) {
+        AnnotationSegment(BeanDefinition<B> beanDefinition, Argument<B> argument) {
             super(beanDefinition, argument.getName(), argument);
         }
 
@@ -751,35 +719,30 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         }
 
         @Override
-        public InjectionPoint getInjectionPoint() {
+        public InjectionPoint<B> getInjectionPoint() {
             return this;
         }
 
         @Override
-        public BeanDefinition getDeclaringBean() {
+        public BeanDefinition<B> getDeclaringBean() {
             return getDeclaringType();
-        }
-
-        @Override
-        public boolean requiresReflection() {
-            return false;
         }
     }
 
     /**
      * Abstract class for a Segment.
      */
-    abstract static class AbstractSegment implements Segment, Named {
-        private final BeanDefinition declaringComponent;
+    abstract static class AbstractSegment<B, T> implements Segment<B, T>, Named {
+        private final BeanDefinition<B> declaringComponent;
         private final String name;
-        private final Argument argument;
+        private final Argument<T> argument;
 
         /**
          * @param declaringClass The declaring class
          * @param name           The name
          * @param argument       The argument
          */
-        AbstractSegment(BeanDefinition declaringClass, String name, Argument argument) {
+        AbstractSegment(BeanDefinition<B> declaringClass, String name, Argument<T> argument) {
             this.declaringComponent = declaringClass;
             this.name = name;
             this.argument = argument;
@@ -791,12 +754,12 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         }
 
         @Override
-        public BeanDefinition getDeclaringType() {
+        public BeanDefinition<B> getDeclaringType() {
             return declaringComponent;
         }
 
         @Override
-        public Argument getArgument() {
+        public Argument<T> getArgument() {
             return argument;
         }
 
@@ -816,10 +779,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
         @Override
         public int hashCode() {
-            int result = declaringComponent.hashCode();
-            result = 31 * result + name.hashCode();
-            result = 31 * result + argument.hashCode();
-            return result;
+            return ObjectUtils.hash(declaringComponent, name, argument);
         }
 
         /**
@@ -829,7 +789,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         void outputArguments(StringBuilder baseString, Argument[] arguments) {
             baseString.append('(');
             for (int i = 0; i < arguments.length; i++) {
-                Argument argument = arguments[i];
+                Argument<?> argument = arguments[i];
                 boolean isInjectedArgument = argument.equals(getArgument());
                 if (isInjectedArgument) {
                     baseString.append('[');

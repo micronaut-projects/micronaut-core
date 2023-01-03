@@ -362,7 +362,7 @@ final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.microna
             isJsonFormattable(hasRouteInfo ? routeInfo.getBodyType() : null);
         NettyByteBufferFactory byteBufferFactory = new NettyByteBufferFactory(context.alloc());
 
-        Flux<Object> bodyPublisher = Flux.from(Publishers.convertPublisher(body, Publisher.class));
+        Flux<Object> bodyPublisher = Flux.from(Publishers.convertPublisher(conversionService, body, Publisher.class));
 
         MediaType finalMediaType = mediaType;
         Flux<HttpContent> httpContentPublisher = bodyPublisher.map(message -> {

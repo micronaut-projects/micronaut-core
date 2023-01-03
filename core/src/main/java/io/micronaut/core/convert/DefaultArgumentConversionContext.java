@@ -17,6 +17,7 @@ package io.micronaut.core.convert;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.ObjectUtils;
 
 import java.nio.charset.Charset;
 import java.util.*;
@@ -115,7 +116,7 @@ class DefaultArgumentConversionContext<T> implements ArgumentConversionContext<T
 
     @Override
     public int hashCode() {
-        return Objects.hash(argument, finalLocale, finalCharset);
+        return ObjectUtils.hash(argument, finalLocale, finalCharset);
     }
 
     @Override

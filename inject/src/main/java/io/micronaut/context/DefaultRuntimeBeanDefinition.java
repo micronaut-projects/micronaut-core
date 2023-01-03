@@ -219,9 +219,7 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
     }
 
     @Override
-    public T build(BeanResolutionContext resolutionContext,
-                   BeanContext context,
-                   BeanDefinition<T> definition) throws BeanInstantiationException {
+    public T instantiate(BeanResolutionContext resolutionContext, BeanContext context) throws BeanInstantiationException {
         return supplier.get();
     }
 

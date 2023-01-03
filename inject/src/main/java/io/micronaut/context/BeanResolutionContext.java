@@ -113,18 +113,6 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     <T> Optional<T> findBean(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier);
 
     /**
-     * Injects a bean.
-     *
-     * @param beanDefinition The requesting bean definition
-     * @param instance       The instance
-     * @param <T>            The instance type
-     * @return The instance
-     * @since 3.5.0
-     */
-    @NonNull
-    <T> T inject(@Nullable BeanDefinition<?> beanDefinition, @NonNull T instance);
-
-    /**
      * Obtains the bean registrations for the given type and qualifier.
      *
      * @param beanType          The bean type
@@ -315,7 +303,7 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     /**
      * Represents a path taken to resolve a bean definitions dependencies.
      */
-    interface Path extends Deque<Segment<?>>, AutoCloseable {
+    interface Path extends Deque<Segment<?, ?>>, AutoCloseable {
         /**
          * Push an unresolved constructor call onto the queue.
          *
@@ -332,10 +320,9 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
          * @param methodName           The method name
          * @param argument             The unresolved argument
          * @param arguments            The arguments
-         * @param requiresReflection  is requires reflection
          * @return This path
          */
-        Path pushConstructorResolve(BeanDefinition declaringType, String methodName, Argument argument, Argument[] arguments, boolean requiresReflection);
+        Path pushConstructorResolve(BeanDefinition declaringType, String methodName, Argument argument, Argument[] arguments);
 
         /**
          * Push an unresolved constructor call onto the queue.
@@ -363,10 +350,9 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
          * @param methodName           The method name
          * @param argument             The unresolved argument
          * @param arguments            The arguments
-         * @param requiresReflection  is requires reflection
          * @return This path
          */
-        Path pushMethodArgumentResolve(BeanDefinition declaringType, String methodName, Argument argument, Argument[] arguments, boolean requiresReflection);
+        Path pushMethodArgumentResolve(BeanDefinition declaringType, String methodName, Argument argument, Argument[] arguments);
 
         /**
          * Push an unresolved field onto the queue.
@@ -382,10 +368,9 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
          *
          * @param declaringType       declaring type
          * @param fieldAsArgument     The field as argument
-         * @param requiresReflection  is requires reflection
          * @return This path
          */
-        Path pushFieldResolve(BeanDefinition declaringType, Argument fieldAsArgument, boolean requiresReflection);
+        Path pushFieldResolve(BeanDefinition declaringType, Argument fieldAsArgument);
 
         Path pushAnnotationResolve(BeanDefinition beanDefinition, Argument annotationMemberBeanAsArgument);
 
@@ -399,7 +384,7 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
         /**
          * @return The current path segment
          */
-        Optional<Segment<?>> currentSegment();
+        Optional<Segment<?, ?>> currentSegment();
 
         @Override
         default void close() {
@@ -410,19 +395,20 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     /**
      * A segment in a path.
      *
-     * @param <T> the bean type
+     * @param <B> the declaring type
+     * @param <T> the injected type
      */
-    interface Segment<T> {
+    interface Segment<B, T> {
 
         /**
          * @return The type requested
          */
-        BeanDefinition<T> getDeclaringType();
+        BeanDefinition<B> getDeclaringType();
 
         /**
          * @return The inject point
          */
-        InjectionPoint<T> getInjectionPoint();
+        InjectionPoint<B> getInjectionPoint();
 
         /**
          * @return The name of the segment. For a field this is the field name, for a method the method name and for a constructor the type name
@@ -432,6 +418,6 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
         /**
          * @return The argument to create the type. For a field this will be empty
          */
-        Argument getArgument();
+        Argument<T> getArgument();
     }
 }

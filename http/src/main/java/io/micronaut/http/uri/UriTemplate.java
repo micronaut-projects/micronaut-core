@@ -17,6 +17,7 @@ package io.micronaut.http.uri;
 
 import io.micronaut.core.beans.BeanMap;
 import io.micronaut.core.reflect.ClassUtils;
+import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.core.util.StringUtils;
 
 import java.io.UnsupportedEncodingException;
@@ -855,9 +856,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
 
             @Override
             public int hashCode() {
-                int result = (isQuerySegment ? 1 : 0);
-                result = 31 * result + (value != null ? value.hashCode() : 0);
-                return result;
+                return ObjectUtils.hash(isQuerySegment, value);
             }
 
             @Override

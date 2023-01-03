@@ -18,6 +18,7 @@ package io.micronaut.validation.validator;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.beans.BeanIntrospection;
+import io.micronaut.core.convert.ConversionService;
 
 import javax.validation.Constraint;
 import javax.validation.ConstraintViolation;
@@ -87,13 +88,14 @@ public interface Validator extends javax.validation.Validator {
     /**
      * Constructs a new default instance. Note that the returned instance will not contain
      * managed {@link io.micronaut.validation.validator.constraints.ConstraintValidator} instances and using
-     * {@link javax.inject.Inject} should be preferred.
+     * {@link jakarta.inject.Inject} should be preferred.
      *
      * @return The validator.
      */
     static @NonNull Validator getInstance() {
+        ConversionService conversionService = ConversionService.SHARED;
         return new DefaultValidator(
-                new DefaultValidatorConfiguration()
-        );
+                new DefaultValidatorConfiguration(conversionService),
+                conversionService);
     }
 }

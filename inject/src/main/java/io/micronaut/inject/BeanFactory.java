@@ -19,6 +19,7 @@ import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.DefaultBeanResolutionContext;
 import io.micronaut.context.exceptions.BeanInstantiationException;
+import io.micronaut.core.annotation.NextMajorVersion;
 
 /**
  * <p>An interface for classes that are capable of taking the {@link BeanDefinition} instance and building a concrete
@@ -31,6 +32,8 @@ import io.micronaut.context.exceptions.BeanInstantiationException;
  * @see io.micronaut.inject.writer.BeanDefinitionWriter
  * @since 1.0
  */
+@Deprecated(since = "4")
+@NextMajorVersion("Should be removed after Micronaut 4 Milestone 1")
 public interface BeanFactory<T> {
 
     /**

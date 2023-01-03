@@ -15,11 +15,11 @@
  */
 package io.micronaut.context;
 
-import io.micronaut.core.util.ArgumentUtils;
-
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.util.ArgumentUtils;
+import io.micronaut.core.util.ObjectUtils;
+
 import java.util.Locale;
-import java.util.Objects;
 
 /**
  * Abstract {@link MessageSource} implementation that provides basic message interpolation.
@@ -136,7 +136,7 @@ public abstract class AbstractMessageSource implements MessageSource {
 
         @Override
         public int hashCode() {
-            return Objects.hash(locale, code);
+            return ObjectUtils.hash(locale, code);
         }
     }
 }

@@ -135,16 +135,6 @@ public interface DelegatingBeanDefinition<T> extends BeanDefinition<T> {
     }
 
     @Override
-    default T inject(BeanContext context, T bean) {
-        return getTarget().inject(context, bean);
-    }
-
-    @Override
-    default T inject(BeanResolutionContext resolutionContext, BeanContext context, T bean) {
-        return getTarget().inject(resolutionContext, context, bean);
-    }
-
-    @Override
     default Collection<ExecutableMethod<T, ?>> getExecutableMethods() {
         return getTarget().getExecutableMethods();
     }

@@ -27,6 +27,7 @@ import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
+import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
@@ -644,7 +645,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
         @Override
         public int hashCode() {
-            return Objects.hash(consumesMediaTypes, producesMediaTypes);
+            return ObjectUtils.hash(consumesMediaTypes, producesMediaTypes);
         }
     }
 
@@ -753,7 +754,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
         @Override
         public int hashCode() {
-            return Objects.hash(super.hashCode(), error, originatingClass);
+            return ObjectUtils.hash(super.hashCode(), error, originatingClass);
         }
 
         @Override
@@ -872,7 +873,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
         @Override
         public int hashCode() {
-            return Objects.hash(super.hashCode(), status, originatingClass);
+            return ObjectUtils.hash(super.hashCode(), status, originatingClass);
         }
     }
 

@@ -21,12 +21,11 @@ import io.micronaut.aop.introduction.NotImplementedAdvice
 import io.micronaut.context.BeanContext
 import io.micronaut.inject.AdvisedBeanType
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.BeanFactory
+import io.micronaut.inject.InstantiatableBeanDefinition
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 
 import javax.validation.constraints.Min
 import javax.validation.constraints.NotBlank
-
 /**
  * @author graemerocher
  * @since 1.0
@@ -50,7 +49,7 @@ interface MyBean {
 
 ''')
         def context = BeanContext.run()
-        def bean = ((BeanFactory) beanDefinition).build(context, beanDefinition)
+        def bean = ((InstantiatableBeanDefinition) beanDefinition).instantiate(context)
 
         when:
         bean.test()
@@ -91,7 +90,7 @@ abstract class MyBean {
 
 ''')
         def context = BeanContext.run()
-        def bean = ((BeanFactory) beanDefinition).build(context, beanDefinition)
+        def bean = ((InstantiatableBeanDefinition) beanDefinition).instantiate(context)
         when:
         bean.test()
 

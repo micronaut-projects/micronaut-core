@@ -35,6 +35,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpResponse;
@@ -1943,7 +1944,7 @@ public class DefaultHttpClient implements
 
         @Override
         public int hashCode() {
-            return Objects.hash(host, port, secure);
+            return ObjectUtils.hash(host, port, secure);
         }
     }
 
