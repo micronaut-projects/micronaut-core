@@ -436,16 +436,15 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                             createAndAddDelegate(resolutionContext, candidate, transformedCandidates, subPath)
                         );
                     } else {
-                        ConfigurationPath oldPath = configurationPath;
                         ConfigurationPath newPath = ConfigurationPath.newPath();
-                        resolutionContext.setConfigurationPath(configurationPath);
+                        resolutionContext.setConfigurationPath(newPath);
                         try {
                             newPath.pushConfigurationReader(candidate);
                             newPath.traverseResolvableSegments(getEnvironment(), subPath ->
                                 createAndAddDelegate(resolutionContext, candidate, transformedCandidates, subPath)
                             );
                         } finally {
-                            resolutionContext.setConfigurationPath(oldPath);
+                            resolutionContext.setConfigurationPath(configurationPath);
                         }
                     }
                 } else if (prefix.indexOf('*') == -1) {
@@ -530,15 +529,31 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                                                          BeanDefinition<T> candidate,
                                                          Set<BeanDefinition<T>> transformedCandidates) {
         try {
-            ConfigurationPath configurationPath = resolutionContext.getConfigurationPath();
-            configurationPath.pushEachPropertyRoot(candidate);
-            try {
-                ConfigurationPath rootConfig = resolutionContext.getConfigurationPath();
-                rootConfig.traverseResolvableSegments(getEnvironment(), (subPath ->
-                    createAndAddDelegate(resolutionContext, candidate, transformedCandidates, subPath)
-                ));
-            } finally {
-                configurationPath.removeLast();
+            final String prefix = candidate.stringValue(ConfigurationReader.class, ConfigurationReader.PREFIX).orElse(null);
+            if (prefix != null) {
+                ConfigurationPath configurationPath = resolutionContext.getConfigurationPath();
+                if (configurationPath.isWithin(prefix)) {
+                    configurationPath.pushEachPropertyRoot(candidate);
+                    try {
+                        ConfigurationPath rootConfig = resolutionContext.getConfigurationPath();
+                        rootConfig.traverseResolvableSegments(getEnvironment(), (subPath ->
+                            createAndAddDelegate(resolutionContext, candidate, transformedCandidates, subPath)
+                        ));
+                    } finally {
+                        configurationPath.removeLast();
+                    }
+                } else {
+                    ConfigurationPath newPath = ConfigurationPath.newPath();
+                    resolutionContext.setConfigurationPath(newPath);
+                    try {
+                        newPath.pushEachPropertyRoot(candidate);
+                        newPath.traverseResolvableSegments(getEnvironment(), subPath ->
+                            createAndAddDelegate(resolutionContext, candidate, transformedCandidates, subPath)
+                        );
+                    } finally {
+                        resolutionContext.setConfigurationPath(configurationPath);
+                    }
+                }
             }
         } catch (IllegalStateException e) {
             throw new DependencyInjectionException(
