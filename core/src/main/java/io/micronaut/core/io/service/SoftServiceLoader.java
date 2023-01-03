@@ -38,7 +38,7 @@ import java.util.stream.Stream;
 
 /**
  * <p>Variation of {@link java.util.ServiceLoader} that allows soft loading and conditional loading of
- * META-INF/services classes.</p>
+ * META-INF/micronaut classes.</p>
  *
  * @param <S> The service type
  * @author Graeme Rocher

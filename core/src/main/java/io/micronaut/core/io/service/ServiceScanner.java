@@ -119,9 +119,6 @@ final class ServiceScanner<S> {
         return typeNames;
     }
 
-    private Enumeration<URL> findStandardServiceConfigs() throws IOException {
-        return classLoader.getResources(SoftServiceLoader.META_INF_SERVICES + '/' + serviceName);
-    }
 
     private void findMicronautMetaServiceConfigs(BiConsumer<URI, String> consumer) throws IOException, URISyntaxException {
         final String path = "META-INF/micronaut/" + serviceName;
@@ -157,13 +154,6 @@ final class ServiceScanner<S> {
         @Override
         protected void compute() {
             try {
-                Enumeration<URL> serviceConfigs = findStandardServiceConfigs();
-                while (serviceConfigs.hasMoreElements()) {
-                    URL url = serviceConfigs.nextElement();
-                    UrlServicesLoader task = new UrlServicesLoader(url);
-                    tasks.add(task);
-                    task.fork();
-                }
                 findMicronautMetaServiceConfigs((uri, path) -> {
                     final MicronautMetaServicesLoader task = new MicronautMetaServicesLoader(uri, path);
                     tasks.add(task);
@@ -193,13 +183,6 @@ final class ServiceScanner<S> {
                 }
             } else {
                 try {
-                    Enumeration<URL> serviceConfigs = findStandardServiceConfigs();
-                    while (serviceConfigs.hasMoreElements()) {
-                        URL url = serviceConfigs.nextElement();
-                        for (String typeName : computeStandardServiceTypeNames(url)) {
-                            values.add(transformer.apply(typeName));
-                        }
-                    }
                     findMicronautMetaServiceConfigs((uri, path) -> {
                         for (String typeName : computeMicronautServiceTypeNames(uri, path)) {
                             values.add(transformer.apply(typeName));
