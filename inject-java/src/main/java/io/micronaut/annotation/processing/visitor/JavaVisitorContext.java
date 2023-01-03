@@ -375,18 +375,26 @@ public class JavaVisitorContext implements VisitorContext, BeanElementVisitorCon
         final List<? extends Element> enclosedElements = packageElement.getEnclosedElements();
         boolean includeAll = Arrays.equals(stereotypes, new String[] { "*" });
         for (Element enclosedElement : enclosedElements) {
-            if (enclosedElement instanceof TypeElement) {
-                final AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(enclosedElement);
-                if (includeAll || Arrays.stream(stereotypes).anyMatch(annotationMetadata::hasStereotype)) {
-                    JavaClassElement classElement = elementFactory.newClassElement((TypeElement) enclosedElement, annotationMetadata);
+            populateClassElements(stereotypes, includeAll, packageElement, enclosedElement, classElements);
+        }
+    }
 
-                    if (!classElement.isAbstract()) {
-                        classElements.add(classElement);
-                    }
+    private void populateClassElements(@NonNull String[] stereotypes, boolean includeAll, PackageElement packageElement, Element enclosedElement, List<ClassElement> classElements) {
+        if (enclosedElement instanceof TypeElement) {
+            final AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(enclosedElement);
+            if (includeAll || Arrays.stream(stereotypes).anyMatch(annotationMetadata::hasStereotype)) {
+                JavaClassElement classElement = elementFactory.newClassElement((TypeElement) enclosedElement, annotationMetadata);
+
+                if (!classElement.isAbstract()) {
+                    classElements.add(classElement);
                 }
-            } else if (enclosedElement instanceof PackageElement) {
-                populateClassElements(stereotypes, (PackageElement) enclosedElement, classElements);
             }
+            List<? extends Element> nestedElements = enclosedElement.getEnclosedElements();
+            for (Element nestedElement : nestedElements) {
+                populateClassElements(stereotypes, includeAll, packageElement, nestedElement, classElements);
+            }
+        } else if (enclosedElement instanceof PackageElement) {
+            populateClassElements(stereotypes, (PackageElement) enclosedElement, classElements);
         }
     }
 
