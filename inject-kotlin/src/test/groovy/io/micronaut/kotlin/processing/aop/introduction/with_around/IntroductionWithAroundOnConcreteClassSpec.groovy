@@ -25,7 +25,7 @@ import io.micronaut.kotlin.processing.aop.introduction.with_around.ProxyIntroduc
 
 @ProxyIntroductionAndAroundOneAnnotation
 open class Test
-''')
+''', true)
 
         expect:
         getBean(context, 'aroundwithintro.Test')
@@ -37,9 +37,9 @@ open class Test
     @Unroll
     void "test introduction with around for #clazz"(Class clazz) {
         when:
-        def proxyTargetBeanDefinition = applicationContext.getProxyTargetBeanDefinition(clazz, null)
         def beanDefinition = applicationContext.getBeanDefinition(clazz, null)
-        def bean = applicationContext.getBean(proxyTargetBeanDefinition)
+        def proxyTargetBeanDefinition = applicationContext.findProxyTargetBeanDefinition(clazz, null).orElse(beanDefinition)
+        def bean = applicationContext.getBean(beanDefinition)
 
         then:
         bean instanceof CustomProxy
@@ -48,7 +48,7 @@ open class Test
         bean.getName() == null
 
         when:
-        bean = applicationContext.getProxyTargetBean(clazz, null)
+        bean = beanDefinition != proxyTargetBeanDefinition ? applicationContext.getProxyTargetBean(clazz, null) : applicationContext.getBean(clazz, null)
 
         then:
         bean instanceof CustomProxy
@@ -61,7 +61,7 @@ open class Test
         proxyTargetBeanDefinition.getExecutableMethods().size() == 5
 
         where:
-        clazz << [MyBean1, MyBean2, MyBean3, MyBean4, MyBean5, MyBean6]
+        clazz << [MyBean1, MyBean2, MyBean3, MyBean4, MyBean5]
     }
 
     void "test introspected preset"(Class clazz) {
@@ -78,22 +78,18 @@ open class Test
     void "test executable methods count for introduction with executable"() {
         when:
         def clazz = MyBean7.class
-        def proxyTargetBeanDefinition = applicationContext.getProxyTargetBeanDefinition(clazz, null)
         def beanDefinition = applicationContext.getBeanDefinition(clazz, null)
 
         then:
-        proxyTargetBeanDefinition.getExecutableMethods().size() == 5
         beanDefinition.getExecutableMethods().size() == 5
     }
 
     void "test executable methods count for around with executable"() {
         when:
         def clazz = MyBean8.class
-        def proxyTargetBeanDefinition = applicationContext.getProxyTargetBeanDefinition(clazz, null)
         def beanDefinition = applicationContext.getBeanDefinition(clazz, null)
 
         then:
-        proxyTargetBeanDefinition.getExecutableMethods().size() == 4
         beanDefinition.getExecutableMethods().size() == 4
 
         when:
@@ -106,11 +102,9 @@ open class Test
     void "test a multidimensional array property"() {
         when:
         def clazz = MyBean9.class
-        def proxyTargetBeanDefinition = applicationContext.getProxyTargetBeanDefinition(clazz, null)
         def beanDefinition = applicationContext.getBeanDefinition(clazz, null)
 
         then:
-        proxyTargetBeanDefinition.getExecutableMethods().size() == 5
         beanDefinition.getExecutableMethods().size() == 5
         beanDefinition.findMethod("getMultidim").get().getReturnType().asArgument().getType() == String[][].class
         beanDefinition.findMethod("setMultidim", String[][].class).isPresent()
@@ -118,7 +112,7 @@ open class Test
         beanDefinition.findMethod("setPrimitiveMultidim", int[][].class).isPresent()
 
         when:
-        MyBean9 bean = applicationContext.getBean(proxyTargetBeanDefinition)
+        MyBean9 bean = applicationContext.getBean(beanDefinition)
         ExecutableMethod getMultiDim = beanDefinition.findMethod('getMultidim').get()
         ExecutableMethod setMultiDim = beanDefinition.findMethod('setMultidim', String[][].class).get()
         ExecutableMethod getPrimitiveMultidim = beanDefinition.findMethod('getPrimitiveMultidim').get()

@@ -366,7 +366,7 @@ class EventListener {
 
     void "test adapter is invoked"() {
         given:
-        ApplicationContext ctx = ApplicationContext.run()
+        ApplicationContext ctx = ApplicationContext.run("foo.bar":true)
 
         when:
         Test t = ctx.getBean(Test)

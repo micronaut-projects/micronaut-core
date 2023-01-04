@@ -19,7 +19,7 @@ class MyRepoIntroductionSpec extends Specification {
 
         then:
         repoDeclaredMethods.size() == 3
-        interceptorDeclaredMethods.size() == 3
+        interceptorDeclaredMethods.size() == 4
         bean.getClass().getName().contains("Intercepted")
         myRepoIntroducer.executableMethods.isEmpty()
 

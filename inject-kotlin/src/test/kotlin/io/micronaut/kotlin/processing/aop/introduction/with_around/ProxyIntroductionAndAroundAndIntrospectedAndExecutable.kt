@@ -6,7 +6,7 @@ import io.micronaut.context.annotation.Executable
 import io.micronaut.context.annotation.Type
 import io.micronaut.core.annotation.Introspected
 
-@Around
+@Around(proxyTarget = true)
 @Introduction(interfaces = [CustomProxy::class])
 @Type(ProxyAdviceInterceptor::class)
 @MustBeDocumented

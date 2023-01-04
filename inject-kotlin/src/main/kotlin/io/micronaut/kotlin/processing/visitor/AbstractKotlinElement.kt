@@ -237,7 +237,7 @@ abstract class AbstractKotlinElement<T : KSNode>(val declaration: T,
                         resolvedType = visitorContext.elementFactory.newClassElement(
                             ksType,
                             visitorContext.elementAnnotationMetadataFactory,
-                            false
+                            true
                         )
                         if (type.isArray) {
                             resolvedType = resolvedType.toArray()

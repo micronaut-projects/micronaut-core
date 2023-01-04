@@ -24,7 +24,7 @@ import io.micronaut.core.convert.ConversionService
 open class MyBean {
 
     @jakarta.inject.Inject
-    lateinit var conversionService: ConversionService<*>
+    lateinit var conversionService: ConversionService
 
     var count = 0
 
@@ -37,7 +37,7 @@ open class MyBean {
         count++
     }
 
-    @javax.annotation.PreDestroy
+    @jakarta.annotation.PreDestroy
     fun destroyed() {
         count--
     }
@@ -75,7 +75,7 @@ import io.micronaut.core.convert.ConversionService
 open class MyBean {
 
     @jakarta.inject.Inject
-    lateinit var conversionService: ConversionService<*>
+    lateinit var conversionService: ConversionService
 
     var count = 0
 
@@ -89,7 +89,7 @@ open class MyBean {
         count++
     }
 
-    @javax.annotation.PreDestroy
+    @jakarta.annotation.PreDestroy
     fun destroyed() {
         count--
     }
@@ -127,7 +127,7 @@ import io.micronaut.core.convert.ConversionService
 open class MyBean {
 
     @jakarta.inject.Inject
-    lateinit var conversionService: ConversionService<*>
+    lateinit var conversionService: ConversionService
 
     var count = 0
 
@@ -136,7 +136,7 @@ open class MyBean {
         count++
     }
 
-    @javax.annotation.PreDestroy
+    @jakarta.annotation.PreDestroy
     fun destroyed() {
         count--
     }

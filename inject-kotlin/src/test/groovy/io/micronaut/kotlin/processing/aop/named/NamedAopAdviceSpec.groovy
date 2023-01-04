@@ -8,7 +8,6 @@ import spock.lang.Specification
 
 class NamedAopAdviceSpec extends Specification {
 
-    @PendingFeature(reason = "annotation defaults")
     void "test that named beans that have AOP advice applied lookup the correct target named bean - primary included"() {
         given:
         def context = ApplicationContext.run(
@@ -29,7 +28,6 @@ class NamedAopAdviceSpec extends Specification {
         context.close()
     }
 
-    @PendingFeature(reason = "annotation defaults")
     void "test that named beans that have AOP advice applied lookup the correct target named bean - no primary"() {
         given:
         def context = ApplicationContext.run(
@@ -47,7 +45,6 @@ class NamedAopAdviceSpec extends Specification {
         context.close()
     }
 
-    @PendingFeature(reason = "annotation defaults")
     void "test manually named beans with AOP advice"() {
         given:
         def context = ApplicationContext.run()
@@ -64,7 +61,6 @@ class NamedAopAdviceSpec extends Specification {
         context.close()
     }
 
-    @PendingFeature(reason = "annotation defaults")
     void "test named bean relying on non iterable config"() {
         given:
         def context = ApplicationContext.run(['other.interfaces.third': 'third'])
