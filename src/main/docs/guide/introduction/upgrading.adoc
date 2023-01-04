@@ -109,9 +109,7 @@ If you use Maven, update the parent POM version and `micronaut.version` property
 
 === Build Plugin Update
 
-If you use the Micronaut Gradle plugin, update the version to `2.0.3`
-
-`id("io.micronaut.application") version "2.0.3"`
+If you use the https://micronaut-projects.github.io/micronaut-gradle-plugin/latest/[Micronaut Gradle plugin] update to the https://github.com/micronaut-projects/micronaut-gradle-plugin/releases/latest[latest version].
 
 For Maven users the plugin version is updated automatically when you update the Micronaut version.
 

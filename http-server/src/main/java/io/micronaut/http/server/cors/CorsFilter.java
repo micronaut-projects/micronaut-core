@@ -33,6 +33,7 @@ import io.micronaut.http.filter.HttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
 import io.micronaut.http.filter.ServerFilterPhase;
 import io.micronaut.http.server.HttpServerConfiguration;
+import io.micronaut.http.server.util.HttpHostResolver;
 import org.jetbrains.annotations.NotNull;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
@@ -60,14 +61,21 @@ import static io.micronaut.http.annotation.Filter.MATCH_ALL_PATTERN;
 public class CorsFilter implements HttpServerFilter {
     private static final Logger LOG = LoggerFactory.getLogger(CorsFilter.class);
     private static final ArgumentConversionContext<HttpMethod> CONVERSION_CONTEXT_HTTP_METHOD = ImmutableArgumentConversionContext.of(HttpMethod.class);
+    private static final String LOCALHOST = "http://localhost";
 
     protected final HttpServerConfiguration.CorsConfiguration corsConfiguration;
 
+    @Nullable
+    private final HttpHostResolver httpHostResolver;
+
     /**
      * @param corsConfiguration The {@link CorsOriginConfiguration} instance
+     * @param httpHostResolver HTTP Host resolver
      */
-    public CorsFilter(HttpServerConfiguration.CorsConfiguration corsConfiguration) {
+    public CorsFilter(HttpServerConfiguration.CorsConfiguration corsConfiguration,
+                      @Nullable HttpHostResolver httpHostResolver) {
         this.corsConfiguration = corsConfiguration;
+        this.httpHostResolver = httpHostResolver;
     }
 
     @Override
@@ -85,38 +93,35 @@ public class CorsFilter implements HttpServerFilter {
             if (!validateMethodToMatch(request, corsOriginConfiguration).isPresent()) {
                 return forbidden();
             }
+            if (shouldDenyToPreventDriveByLocalhostAttack(corsOriginConfiguration, request)) {
+                LOG.trace("The resolved configuration allows any origin. To prevent drive-by-localhost attacks the request is forbidden");
+                return forbidden();
+            }
             return Publishers.then(chain.proceed(request), resp -> decorateResponseWithHeaders(request, resp, corsOriginConfiguration));
         }
         LOG.trace("CORS configuration not found for {} origin", origin);
         return chain.proceed(request);
     }
 
+    /**
+     *
+     * @param corsOriginConfiguration CORS Origin configuration for request's HTTP Header origin.
+     * @param request HTTP Request
+     * @return {@literal true} if the resolved host starts with {@literal http://localhost} and the CORS configuration has any for allowed origins.
+     */
+    protected boolean shouldDenyToPreventDriveByLocalhostAttack(@NonNull CorsOriginConfiguration corsOriginConfiguration,
+                                                                @NonNull HttpRequest<?> request) {
+        if (httpHostResolver == null) {
+            return false;
+        }
+        String host = httpHostResolver.resolve(request);
+        return isAny(corsOriginConfiguration.getAllowedOrigins()) && host.startsWith(LOCALHOST);
+
+    }
+
     @Override
     public int getOrder() {
         return ServerFilterPhase.METRICS.after();
-    }
-
-    /**
-     * Handles a CORS response.
-     *
-     * @param request  The {@link HttpRequest} object
-     * @param response The {@link MutableHttpResponse} object
-     * @deprecated not used
-     */
-    @Deprecated
-    protected void handleResponse(HttpRequest<?> request, MutableHttpResponse<?> response) {
-    }
-
-    /**
-     * Handles a CORS {@link HttpRequest}.
-     *
-     * @param request The {@link HttpRequest} object
-     * @return An optional {@link MutableHttpResponse}. The request should proceed normally if empty
-     * @deprecated Not used any more.
-     */
-    @Deprecated
-    protected Optional<MutableHttpResponse<?>> handleRequest(HttpRequest request) {
-        return Optional.empty();
     }
 
     @NonNull
