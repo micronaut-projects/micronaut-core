@@ -118,6 +118,7 @@ httpServer:
     websocketServer: Using @ServerWebSocket
     websocketClient: Using @ClientWebSocket
   http2Server: HTTP/2 Support
+  http3Server: HTTP/3 Support
   serverEvents: Server Events
   serverConfiguration:
     title: Configuring the HTTP Server
@@ -161,6 +162,7 @@ httpClient:
     netflixHystrix: Netflix Hystrix Support
   clientFilter: HTTP Client Filters
   clientHttp2: HTTP/2 Support
+  clientHttp3: HTTP/3 Support
   clientSample: HTTP Client Sample
 cloud:
   title: Cloud Native Features
