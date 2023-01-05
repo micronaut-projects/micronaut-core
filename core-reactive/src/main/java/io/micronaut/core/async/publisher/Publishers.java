@@ -55,7 +55,7 @@ public class Publishers {
     private static final List<Class<?>> COMPLETABLE_TYPES;
 
     static {
-        List<Class<?>> reactiveTypes ;
+        List<Class<?>> reactiveTypes;
         List<Class<?>> singleTypes;
         List<Class<?>> completableTypes;
         ClassLoader classLoader = Publishers.class.getClassLoader();
@@ -176,7 +176,7 @@ public class Publishers {
      * @return A list of known reactive types.
      */
     public static List<Class<?>> getKnownReactiveTypes() {
-        return Collections.unmodifiableList(new ArrayList<>(REACTIVE_TYPES));
+        return List.copyOf(REACTIVE_TYPES);
     }
 
     /**
