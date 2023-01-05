@@ -5,6 +5,7 @@ import io.micronaut.context.BeanContext
 import io.micronaut.inject.AdvisedBeanType
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanFactory
+import io.micronaut.inject.ExecutableMethod
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 import io.micronaut.kotlin.processing.aop.introduction.NotImplementedAdvice
 import spock.lang.Specification
@@ -118,15 +119,20 @@ interface MyBean: MyInterface
         beanDefinition != null
         beanDefinition.injectedFields.size() == 0
         beanDefinition.executableMethods.size() == 2
-        beanDefinition.executableMethods[0].methodName == 'save'
-        beanDefinition.executableMethods[0].returnType.type == void.class
-        beanDefinition.executableMethods[0].arguments[0].getAnnotationMetadata().hasAnnotation(NotBlank)
-        beanDefinition.executableMethods[0].arguments[1].getAnnotationMetadata().hasAnnotation(Min)
-        beanDefinition.executableMethods[0].arguments[1].getAnnotationMetadata().getValue(Min, Integer).get() == 1
 
-        beanDefinition.executableMethods[1].methodName == 'saveTwo'
-        beanDefinition.executableMethods[1].returnType.type == void.class
-        beanDefinition.executableMethods[1].arguments[0].getAnnotationMetadata().hasAnnotation(Min)
+        def saveMethod = beanDefinition.executableMethods.find {it.methodName == 'save'}
+        saveMethod != null
+        saveMethod.returnType.type == void.class
+        saveMethod.arguments[0].getAnnotationMetadata().hasAnnotation(NotBlank)
+        saveMethod.arguments[1].getAnnotationMetadata().hasAnnotation(Min)
+        saveMethod.arguments[1].getAnnotationMetadata().getValue(Min, Integer).get() == 1
+
+
+        def saveTwoMethod = beanDefinition.executableMethods.find {it.methodName == 'saveTwo'}
+        saveTwoMethod != null
+        saveTwoMethod.methodName == 'saveTwo'
+        saveTwoMethod.returnType.type == void.class
+        saveTwoMethod.arguments[0].getAnnotationMetadata().hasAnnotation(Min)
     }
 
 }

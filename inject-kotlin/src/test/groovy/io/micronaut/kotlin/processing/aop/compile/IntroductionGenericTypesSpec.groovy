@@ -39,12 +39,12 @@ interface MyBean: MyInterface<URL>
         beanDefinition != null
         beanDefinition.injectedFields.size() == 0
         beanDefinition.executableMethods.size() == 2
-        beanDefinition.executableMethods[0].methodName == 'getURL'
-        beanDefinition.executableMethods[0].targetMethod.returnType == URL
-        beanDefinition.executableMethods[0].returnType.type == URL
-        beanDefinition.executableMethods[1].returnType.type == List
-        beanDefinition.executableMethods[1].returnType.asArgument().hasTypeVariables()
-        beanDefinition.executableMethods[1].returnType.asArgument().typeVariables['E'].type == URL
+
+        beanDefinition.getRequiredMethod("getURL").targetMethod.returnType == URL
+        beanDefinition.getRequiredMethod("getURL").returnType.type == URL
+        beanDefinition.getRequiredMethod("getURLs").returnType.type == List
+        beanDefinition.getRequiredMethod("getURLs").returnType.asArgument().hasTypeVariables()
+        beanDefinition.getRequiredMethod("getURLs").returnType.asArgument().typeVariables['E'].type == URL
     }
 
     void "test that generic return types are correct when implementing an interface with type arguments 2"() {
