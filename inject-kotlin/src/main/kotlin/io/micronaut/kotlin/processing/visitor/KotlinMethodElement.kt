@@ -43,6 +43,7 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
             visitorContext.getClassElement(Object::class.java.name).get()
         }
     }
+
     private val parameters: List<ParameterElement>
     private val returnType: ClassElement
     private val abstract: Boolean

@@ -666,7 +666,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         return typeArguments.stream()
             //return getGenericTypeInfo().getOrDefault(classElement.getQualifiedName().toString(), Collections.emptyMap()).values().stream()
             .map(tm -> mirrorToClassElement(tm, visitorContext, getGenericTypeInfo()))
-            .collect(Collectors.toList());
+            .toList();
     }
 
     @NonNull
@@ -675,7 +675,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         return classElement.getTypeParameters().stream()
             // we want the *declared* variables, so we don't pass in our genericsInfo.
             .map(tpe -> (GenericPlaceholderElement) mirrorToClassElement(tpe.asType(), visitorContext))
-            .collect(Collectors.toList());
+            .toList();
     }
 
     @NonNull

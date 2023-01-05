@@ -128,7 +128,6 @@ open class KotlinClassElement(val kotlinType: KSType,
 
     }
 
-    @OptIn(KspExperimental::class)
     override fun getName(): String {
         return classDeclaration.getBinaryName(visitorContext.resolver)
     }
