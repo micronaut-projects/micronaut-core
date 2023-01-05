@@ -20,29 +20,26 @@ import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MutableHttpResponse
 import io.micronaut.http.annotation.RequestFilter
-import io.micronaut.http.annotation.ResponseFilter
 import io.micronaut.http.annotation.ServerFilter
+import io.micronaut.http.filter.FilterContinuation
 import io.micronaut.scheduling.TaskExecutors
 import io.micronaut.scheduling.annotation.ExecuteOn
 
 // end::imports[]
 
-@Requires(property = "spec.filter", value = "TraceFilter")
+@Requires(property = "spec.filter", value = "TraceFilter2")
 // tag::class[]
 @ServerFilter("/hello/**") // <1>
-class TraceFilter(private val traceService: TraceService) { // <2>
+class TraceFilter2(private val traceService: TraceService) { // <2>
     // end::class[]
 
     // tag::doFilter[]
     // end::class[]
     @RequestFilter
-    @ExecuteOn(TaskExecutors.BLOCKING) // <2>
-    fun filterRequest(request: HttpRequest<*>) {
-        traceService.trace(request) // <1>
-    }
-
-    @ResponseFilter
-    fun filterResponse(res: MutableHttpResponse<*>) {
+    @ExecuteOn(TaskExecutors.BLOCKING) // <4>
+    fun filterRequest(request: HttpRequest<*>, continuation: FilterContinuation<MutableHttpResponse<*>>) { // <1>
+        traceService.trace(request)
+        val res = continuation.proceed() // <2>
         res.headers.add("X-Trace-Enabled", "true") // <3>
     }
     // end::doFilter[]

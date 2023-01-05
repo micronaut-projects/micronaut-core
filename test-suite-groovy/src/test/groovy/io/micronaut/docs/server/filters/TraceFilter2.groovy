@@ -15,34 +15,40 @@
  */
 package io.micronaut.docs.server.filters
 
-// tag::imports[]
 import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MutableHttpResponse
+
+// tag::imports[]
+
 import io.micronaut.http.annotation.RequestFilter
-import io.micronaut.http.annotation.ResponseFilter
 import io.micronaut.http.annotation.ServerFilter
+import io.micronaut.http.filter.FilterContinuation
 import io.micronaut.scheduling.TaskExecutors
 import io.micronaut.scheduling.annotation.ExecuteOn
 
 // end::imports[]
 
-@Requires(property = "spec.filter", value = "TraceFilter")
-// tag::class[]
-@ServerFilter("/hello/**") // <1>
-class TraceFilter(private val traceService: TraceService) { // <2>
-    // end::class[]
+/**
+ * @author Graeme Rocher
+ * @since 1.0
+ */
+@Requires(property = "spec.filter", value = "TraceFilter2")
+@ServerFilter("/hello/**")
+class TraceFilter2 {
 
-    // tag::doFilter[]
-    // end::class[]
-    @RequestFilter
-    @ExecuteOn(TaskExecutors.BLOCKING) // <2>
-    fun filterRequest(request: HttpRequest<*>) {
-        traceService.trace(request) // <1>
+    private final TraceService traceService
+
+    TraceFilter2(TraceService traceService) {
+        this.traceService = traceService
     }
 
-    @ResponseFilter
-    fun filterResponse(res: MutableHttpResponse<*>) {
+    // tag::doFilter[]
+    @RequestFilter
+    @ExecuteOn(TaskExecutors.BLOCKING) // <4>
+    void filterRequest(HttpRequest<?> request, FilterContinuation<MutableHttpResponse<?>> continuation) { // <1>
+        traceService.trace(request)
+        MutableHttpResponse<?> res = continuation.proceed(); // <2>
         res.headers.add("X-Trace-Enabled", "true") // <3>
     }
     // end::doFilter[]

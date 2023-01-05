@@ -22,45 +22,52 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.runtime.server.EmbeddedServer;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
 import org.junit.Test;
+
 import java.util.HashMap;
 import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
 
 public class TraceFilterSpec {
-    private static EmbeddedServer server;
-    private static HttpClient client;
-
-    @BeforeClass
-    public static void setupServer() {
-        Map<String, Object> map = new HashMap<>();
-        map.put("spec.name", HelloControllerSpec.class.getSimpleName());
-        map.put("spec.lang", "java");
-
-        server = ApplicationContext.run(EmbeddedServer.class, map, Environment.TEST);
-        client = server
-                .getApplicationContext()
-                .createBean(HttpClient.class, server.getURL());
-    }
-
-    @AfterClass
-    public static void stopServer() {
-        if(server != null) {
-            server.stop();
-        }
-        if(client != null) {
-            client.stop();
-        }
-    }
-
     @Test
     public void testTraceFilter() {
+        Map<String, Object> map = new HashMap<>();
+        map.put("spec.name", HelloControllerSpec.class.getSimpleName());
+        map.put("spec.filter", "TraceFilter");
+        map.put("spec.lang", "java");
+
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class, map, Environment.TEST);
+        HttpClient client = server
+            .getApplicationContext()
+            .createBean(HttpClient.class, server.getURL());
+
         HttpResponse response = client.toBlocking().exchange(HttpRequest.GET("/hello"));
 
         assertEquals("true", response.getHeaders().get("X-Trace-Enabled"));
+
+        server.stop();
+        client.stop();
+    }
+
+    @Test
+    public void testTraceFilter2() {
+        Map<String, Object> map = new HashMap<>();
+        map.put("spec.name", HelloControllerSpec.class.getSimpleName());
+        map.put("spec.filter", "TraceFilter2");
+        map.put("spec.lang", "java");
+
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class, map, Environment.TEST);
+        HttpClient client = server
+            .getApplicationContext()
+            .createBean(HttpClient.class, server.getURL());
+
+        HttpResponse response = client.toBlocking().exchange(HttpRequest.GET("/hello"));
+
+        assertEquals("true", response.getHeaders().get("X-Trace-Enabled"));
+
+        server.stop();
+        client.stop();
     }
 }
 

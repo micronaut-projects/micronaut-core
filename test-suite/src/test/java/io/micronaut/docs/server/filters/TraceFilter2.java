@@ -21,33 +21,28 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.RequestFilter;
-import io.micronaut.http.annotation.ResponseFilter;
 import io.micronaut.http.annotation.ServerFilter;
+import io.micronaut.http.filter.FilterContinuation;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
 // end::imports[]
 
-@Requires(property = "spec.filter", value = "TraceFilter")
-// tag::class[]
-@ServerFilter("/hello/**") // <1>
-public class TraceFilter {
+@Requires(property = "spec.filter", value = "TraceFilter2")
+@ServerFilter("/hello/**")
+public class TraceFilter2 {
 
     private final TraceService traceService;
 
-    public TraceFilter(TraceService traceService) { // <2>
+    public TraceFilter2(TraceService traceService) { // <2>
         this.traceService = traceService;
     }
-// end::class[]
 
     // tag::doFilter[]
     @RequestFilter
-    @ExecuteOn(TaskExecutors.BLOCKING) // <2>
-    public void filterRequest(HttpRequest<?> request) {
-        traceService.trace(request); // <1>
-    }
-
-    @ResponseFilter
-    public void filterResponse(MutableHttpResponse<?> res) {
+    @ExecuteOn(TaskExecutors.BLOCKING) // <4>
+    public void filterRequest(HttpRequest<?> request, FilterContinuation<MutableHttpResponse<?>> continuation) { // <1>
+        traceService.trace(request);
+        MutableHttpResponse<?> res = continuation.proceed(); // <2>
         res.getHeaders().add("X-Trace-Enabled", "true"); // <3>
     }
     // end::doFilter[]
