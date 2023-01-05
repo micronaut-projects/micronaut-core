@@ -194,7 +194,6 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.function.Supplier;
 
 import static io.micronaut.scheduling.instrument.InvocationInstrumenter.NOOP;
 
@@ -288,7 +287,7 @@ public class DefaultHttpClient implements
             null,
             configuration,
             contextPath,
-            new DefaultHttpClientFilterResolver(annotationMetadataResolver, Arrays.asList(filters)),
+            new DefaultHttpClientFilterResolver(null, annotationMetadataResolver, Arrays.asList(filters)),
             null,
             threadFactory,
             nettyClientSslBuilder,

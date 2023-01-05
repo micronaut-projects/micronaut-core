@@ -106,10 +106,9 @@ public interface HttpFilterResolver<T extends AnnotationMetadataProvider> {
          * @param patternStyle the pattern style
          * @param patterns The patterns
          * @return The filter entry
-         * @param <FT> the filter type
          */
-        static <FT extends HttpFilter> FilterEntry of(
-            @NonNull FT filter,
+        static FilterEntry of(
+            @NonNull HttpFilter filter,
             @Nullable AnnotationMetadata annotationMetadata,
             @Nullable Set<HttpMethod> methods,
             @NonNull FilterPatternStyle patternStyle, String... patterns) {
