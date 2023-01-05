@@ -62,6 +62,7 @@ include "websocket"
 
 // test suites
 include "test-suite"
+include "test-suite-geb"
 include "test-suite-helper"
 include "test-suite-javax-inject"
 include "test-suite-jakarta-inject-bean-import"
