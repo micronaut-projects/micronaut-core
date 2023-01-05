@@ -15,11 +15,18 @@
  */
 package io.micronaut.http.server.cors;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpMethod;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.web.router.MethodBasedRouteMatch;
+import io.micronaut.web.router.RouteMatch;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Stores configuration for CORS.
@@ -153,5 +160,35 @@ public class CorsOriginConfiguration {
         } else {
             this.maxAge = maxAge;
         }
+    }
+
+    /**
+     *
+     * @param request the HTTP request for the configuration
+     * @return the cors origin configuration for the given request
+     */
+    @NonNull
+    public Optional<CorsOriginConfiguration> getCorsOriginConfigurationForRequest(@NonNull HttpRequest<?> request) {
+        RouteMatch<?> routeMatch = request.getAttribute(HttpAttributes.ROUTE_MATCH, RouteMatch.class).orElse(null);
+        if (routeMatch instanceof MethodBasedRouteMatch) {
+            MethodBasedRouteMatch<?, ?> methodRoute = (MethodBasedRouteMatch<?, ?>) routeMatch;
+            if (methodRoute.hasAnnotation(CrossOrigin.class)) {
+                CorsOriginConfiguration annotated = new CorsOriginConfiguration();
+                methodRoute.getValue(CrossOrigin.class, "allowedOrigins", String[].class)
+                    .ifPresent(origins -> annotated.setAllowedOrigins(Arrays.asList(origins)));
+                methodRoute.getValue(CrossOrigin.class, "allowedHeaders", String[].class)
+                    .ifPresent(headers -> annotated.setAllowedHeaders(Arrays.asList(headers)));
+                methodRoute.getValue(CrossOrigin.class, "exposedHeaders", String[].class)
+                    .ifPresent(headers -> annotated.setExposedHeaders(Arrays.asList(headers)));
+                methodRoute.getValue(CrossOrigin.class, "allowedMethods", HttpMethod[].class)
+                    .ifPresent(methods -> annotated.setAllowedMethods(Arrays.asList(methods)));
+                methodRoute.getValue(CrossOrigin.class, "allowCredentials", Boolean.class)
+                    .ifPresent(allowCredentials -> annotated.setAllowCredentials(allowCredentials));
+                methodRoute.getValue(CrossOrigin.class, "maxAge", Long.class)
+                    .ifPresent(maxAge -> annotated.setMaxAge(maxAge));
+                return Optional.of(annotated);
+            }
+        }
+        return Optional.empty();
     }
 }

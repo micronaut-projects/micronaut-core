@@ -96,7 +96,7 @@ public class CorsFilter implements HttpServerFilter {
             LOG.trace("Http Header " + HttpHeaders.ORIGIN + " not present. Proceeding with the request.");
             return chain.proceed(request);
         }
-        CorsOriginConfiguration corsOriginConfiguration = getConfiguration(origin).orElse(null);
+        CorsOriginConfiguration corsOriginConfiguration = getConfiguration(request).orElse(null);
         if (corsOriginConfiguration != null) {
             if (CorsUtil.isPreflightRequest(request)) {
                 return handlePreflightRequest(request, chain, corsOriginConfiguration);
@@ -248,12 +248,18 @@ public class CorsFilter implements HttpServerFilter {
     }
 
     @NonNull
-    private Optional<CorsOriginConfiguration> getConfiguration(@NonNull String requestOrigin) {
-        return corsConfiguration.getConfigurations().values().stream()
-            .filter(config -> {
-                List<String> allowedOrigins = config.getAllowedOrigins();
+    private Optional<CorsOriginConfiguration> getConfiguration(@NonNull HttpRequest<?> request) {
+        // requestOrigin shouldn't really be null, doFilter() caller already determined that
+        String requestOrigin = request.getHeaders().getOrigin().orElse(null);
+
+        return requestOrigin != null ?
+            corsConfiguration.getConfigurations().values().stream().filter(config -> {
+                // is there a @CrossOrigin annotation on the route method?
+                CorsOriginConfiguration appliedConfig = config.getCorsOriginConfigurationForRequest(request).orElse(config);
+                List<String> allowedOrigins = appliedConfig.getAllowedOrigins();
                 return !allowedOrigins.isEmpty() && (isAny(allowedOrigins) || allowedOrigins.stream().anyMatch(origin -> matchesOrigin(origin, requestOrigin)));
-            }).findFirst();
+            }).findFirst()
+            : Optional.empty();
     }
 
     private boolean matchesOrigin(@NonNull String origin, @NonNull String requestOrigin) {
