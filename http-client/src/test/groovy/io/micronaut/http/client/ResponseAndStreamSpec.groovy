@@ -12,6 +12,7 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.filter.HttpServerFilter
 import io.micronaut.http.filter.ServerFilterChain
+import io.micronaut.http.server.cors.CrossOrigin
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import org.reactivestreams.Publisher
@@ -41,6 +42,7 @@ class ResponseAndStreamSpec extends Specification {
     }
 
     @Requires(property = 'spec.name', value = 'ResponseAndStreamSpec')
+    @CrossOrigin
     @Controller('/test/response-stream')
     static class ResponseStreamController {
 
