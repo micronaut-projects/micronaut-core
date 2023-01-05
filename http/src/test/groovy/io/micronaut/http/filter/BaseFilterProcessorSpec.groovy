@@ -1,11 +1,11 @@
-package io.micronaut.web.router
+package io.micronaut.http.filter
 
 import spock.lang.Specification
 
-class ServerFilterRouteBuilderTest extends Specification {
+class BaseFilterProcessorSpec extends Specification {
     def 'combine ant patterns'(String bean, String method, String combined) {
         expect:
-        ServerFilterRouteBuilder.concatAntPatterns(bean, method) == combined
+        BaseFilterProcessor.concatAntPatterns(bean, method) == combined
 
         where:
         bean       | method | combined

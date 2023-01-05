@@ -22,6 +22,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.annotation.ClientFilter;
 import io.micronaut.http.annotation.RequestFilter;
 import io.micronaut.http.annotation.ResponseFilter;
 import io.micronaut.http.annotation.ServerFilter;
@@ -65,8 +66,10 @@ public final class FilterVisitor implements TypeElementVisitor<Object, Object> {
             return;
         }
 
-        if (!element.getDeclaringType().isAnnotationPresent(ServerFilter.class)) {
-            context.fail("Filter method must be declared on a @ServerFilter bean", element);
+        if (!element.getDeclaringType().isAnnotationPresent(ServerFilter.class) &&
+            !element.getDeclaringType().isAnnotationPresent(ClientFilter.class)) {
+
+            context.fail("Filter method must be declared on a @ServerFilter or @ClientFilter bean", element);
             return;
         }
 
