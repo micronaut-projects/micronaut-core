@@ -1,9 +1,25 @@
+/*
+ * Copyright 2017-2023 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.http.filter;
 
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.Order;
 import io.micronaut.core.order.Ordered;
@@ -24,6 +40,14 @@ import java.util.OptionalInt;
 import java.util.concurrent.Executor;
 import java.util.function.Supplier;
 
+/**
+ * Base class for processing {@link io.micronaut.http.annotation.ServerFilter} and
+ * {@link io.micronaut.http.annotation.ClientFilter} beans.
+ *
+ * @param <A> Filter annotation type
+ * @author Jonas Konrad
+ * @since 4.0.0
+ */
 @Internal
 public abstract class BaseFilterProcessor<A extends Annotation> implements ExecutableMethodProcessor<A> {
     private final BeanContext beanContext;
@@ -40,6 +64,13 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements Execu
         process0(beanDefinition, (ExecutableMethod) method);
     }
 
+    /**
+     * Add a filter. Called during {@link #process(BeanDefinition, ExecutableMethod)}.
+     *
+     * @param factory           Factory that will create the filter instance
+     * @param methodAnnotations Annotations on the filter method
+     * @param metadata          Filter metadata from class and method annotations
+     */
     protected abstract void addFilter(Supplier<GenericHttpFilter> factory, AnnotationMetadata methodAnnotations, FilterMetadata metadata);
 
     private <T> void process0(BeanDefinition<T> beanDefinition, ExecutableMethod<T, ?> method) {
@@ -106,7 +137,14 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements Execu
         );
     }
 
-    protected List<String> prependContextPath(List<String> patterns) {
+    /**
+     * Prepend server context path if necessary.
+     *
+     * @param patterns Input patterns
+     * @return Output patterns with server context path prepended
+     */
+    @NonNull
+    protected List<String> prependContextPath(@NonNull List<String> patterns) {
         return patterns;
     }
 

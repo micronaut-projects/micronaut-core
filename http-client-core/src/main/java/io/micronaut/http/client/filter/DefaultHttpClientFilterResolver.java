@@ -66,6 +66,7 @@ public class DefaultHttpClientFilterResolver extends BaseFilterProcessor<ClientF
     /**
      * Default constructor.
      *
+     * @param beanContext                The bean context
      * @param annotationMetadataResolver The annotation metadata resolver
      * @param legacyClientFilters        All client filters
      */

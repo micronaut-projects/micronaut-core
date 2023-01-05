@@ -40,6 +40,9 @@ import java.util.Collection;
 import java.util.Set;
 import java.util.concurrent.CompletionStage;
 
+/**
+ * Visitor that checks validity of {@link ServerFilter} and {@link ClientFilter} classes.
+ */
 public final class FilterVisitor implements TypeElementVisitor<Object, Object> {
     private static final Set<Class<?>> PERMITTED_CLASSES = Set.of(
         void.class,
