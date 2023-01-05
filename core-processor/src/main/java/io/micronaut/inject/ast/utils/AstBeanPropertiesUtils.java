@@ -109,7 +109,7 @@ public final class AstBeanPropertiesUtils {
                 || configuration.isAllowSetterWithMultipleArgs() && methodElement.getParameters().length > 1)) {
                 String propertyName = customWriterPropertyNameResolver.apply(methodElement)
                     .orElseGet(() -> NameUtils.getPropertyNameForSetter(methodName, writePrefixes));
-                processSetter(props, methodElement, propertyName, isAccessor, configuration);
+                processSetter(classElement, props, methodElement, propertyName, isAccessor, configuration);
             }
         }
         for (FieldElement fieldElement : fieldSupplier.get()) {
@@ -248,7 +248,7 @@ public final class AstBeanPropertiesUtils {
         }
     }
 
-    private static void processSetter(Map<String, BeanPropertyData> props, MethodElement methodElement, String propertyName, boolean isAccessor, PropertyElementQuery configuration) {
+    private static void processSetter(ClassElement classElement, Map<String, BeanPropertyData> props, MethodElement methodElement, String propertyName, boolean isAccessor, PropertyElementQuery configuration) {
         BeanPropertyData beanPropertyData = props.computeIfAbsent(propertyName, BeanPropertyData::new);
         ClassElement paramType = methodElement.getParameters().length == 0 ? PrimitiveElement.BOOLEAN : methodElement.getParameters()[0].getGenericType();
         ClassElement setterType = unwrapType(paramType);
@@ -256,8 +256,13 @@ public final class AstBeanPropertiesUtils {
             if (setterType.isAssignable(unwrapType(beanPropertyData.type))) {
                 // Override the setter because the type is higher
                 beanPropertyData.setter = methodElement;
+            } else if (beanPropertyData.setter.getDeclaringType().equals(classElement)) {
+                // skip
+                return;
+            } else {
+                // override must be a subclass
+                beanPropertyData.setter = methodElement;
             }
-            return;
         }
         beanPropertyData.setter = methodElement;
         if (isAccessor) {
