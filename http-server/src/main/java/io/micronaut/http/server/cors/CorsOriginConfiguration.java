@@ -183,9 +183,9 @@ public class CorsOriginConfiguration {
                 methodRoute.getValue(CrossOrigin.class, "allowedMethods", HttpMethod[].class)
                     .ifPresent(methods -> annotated.setAllowedMethods(Arrays.asList(methods)));
                 methodRoute.getValue(CrossOrigin.class, "allowCredentials", Boolean.class)
-                    .ifPresent(allowCredentials -> annotated.setAllowCredentials(allowCredentials));
+                    .ifPresent(annotated::setAllowCredentials);
                 methodRoute.getValue(CrossOrigin.class, "maxAge", Long.class)
-                    .ifPresent(maxAge -> annotated.setMaxAge(maxAge));
+                    .ifPresent(annotated::setMaxAge);
                 return Optional.of(annotated);
             }
         }
