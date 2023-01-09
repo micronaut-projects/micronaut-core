@@ -1680,12 +1680,11 @@ public class DefaultBeanContext implements InitializableBeanContext {
         Class<B> beanType = definition.getBeanType();
         for (Class<?> indexedType : indexedTypes) {
             if (indexedType == beanType || indexedType.isAssignableFrom(beanType)) {
-                final Collection<BeanDefinitionProducer> indexed = resolveTypeIndex(indexedType);
-                indexed.remove(definition);
+                resolveTypeIndex(indexedType).forEach(p -> p.disable(definition));
                 break;
             }
         }
-        this.beanDefinitionsClasses.remove(definition);
+        beanDefinitionsClasses.forEach(p -> p.disable(definition));
         purgeCacheForBeanType(definition.getBeanType());
     }
 
@@ -4229,5 +4228,11 @@ public class DefaultBeanContext implements InitializableBeanContext {
             return reference != null && reference.isCandidateBean(beanType);
         }
 
+        public void disable(BeanDefinitionReference<?> reference) {
+            BeanDefinitionReference ref = this.reference;
+            if (ref != null && ref.equals(reference)) {
+                this.reference = null;
+            }
+        }
     }
 }
