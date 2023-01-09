@@ -145,7 +145,7 @@ public final class HttpResponseAssertion {
         }
 
         /**
-         * Set the expected contents of a body
+         * Set the expected contents of a body.
          *
          * @param body Response Body
          * @return HTTP Response Assertion Builder
@@ -156,7 +156,7 @@ public final class HttpResponseAssertion {
         }
 
         /**
-         * Set the expected partial contents of a body
+         * Set the expected partial contents of a body.
          *
          * @param body Response Body
          * @return HTTP Response Assertion Builder
