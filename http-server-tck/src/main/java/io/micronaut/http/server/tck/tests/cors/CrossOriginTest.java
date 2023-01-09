@@ -19,11 +19,15 @@ import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpHeaders;
+import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Delete;
 import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.PathVariable;
+import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.server.cors.CrossOrigin;
 import io.micronaut.http.server.tck.AssertionUtils;
@@ -36,6 +40,7 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 
 import static io.micronaut.http.server.tck.TestScenario.asserts;
+import static org.junit.jupiter.api.Assertions.assertAll;
 
 
 @SuppressWarnings({
@@ -57,6 +62,27 @@ public class CrossOriginTest {
                 .build()));
     }
 
+    @Test
+    void corsSimpleRequestMethods() {
+        assertAll(
+            () -> asserts(SPECNAME,
+                HttpRequest.GET(UriBuilder.of("/methods").path("getit").build()).header(HttpHeaders.ORIGIN, "http://www.google.com"),
+                (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .build())),
+            () -> asserts(SPECNAME,
+                HttpRequest.POST(UriBuilder.of("/methods").path("postit/id").build(),"post").header(HttpHeaders.ORIGIN, "https://www.google.com"),
+                (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .build())),
+            () -> asserts(SPECNAME,
+                HttpRequest.DELETE(UriBuilder.of("/methods").path("deleteit/id").build(),"delete").header(HttpHeaders.ORIGIN, "https://www.google.com"),
+                (server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
+                    .status(HttpStatus.FORBIDDEN)
+                    .build()))
+        );
+    }
+
     @Requires(property = "spec.name", value = SPECNAME)
     @Controller("/foo")
     static class Foo {
@@ -66,6 +92,30 @@ public class CrossOriginTest {
         @Get("/bar")
         String index() {
             return "bar";
+        }
+    }
+    @Requires(property = "spec.name", value = SPECNAME)
+    @Controller("/methods")
+    @CrossOrigin(
+        allowedOrigins = "^http(|s):\\/\\/www\\.google\\.com$",
+        allowedMethods = { HttpMethod.GET, HttpMethod.POST }
+    )
+    static class AllowedMethods {
+        @Produces(MediaType.TEXT_PLAIN)
+        @Get("/getit")
+        String canGet() {
+            return "get";
+        }
+
+        @Produces(MediaType.TEXT_PLAIN)
+        @Post("/postit/{id}")
+        String canPost(@PathVariable String id) {
+            return id;
+        }
+
+        @Delete("/deleteit/{id}")
+        String cantDelete(@PathVariable String id) {
+            return id;
         }
     }
 
