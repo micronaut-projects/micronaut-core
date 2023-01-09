@@ -19,7 +19,4 @@
  * @author Graeme Rocher
  * @since 1.0
  */
-@Configuration
 package io.micronaut.http.server.cors;
-
-import io.micronaut.context.annotation.Configuration;

@@ -559,6 +559,11 @@ class CorsFilterSpec extends Specification {
     }
 
     private CorsFilter buildCorsHandler(HttpServerConfiguration.CorsConfiguration config) {
-        new CorsFilter(config ?: enabledCorsConfiguration())
+        new CorsFilter(config ?: enabledCorsConfiguration(), new HttpHostResolver() {
+            @Override
+            String resolve(@Nullable HttpRequest request) {
+                return "http://micronautexample.com";
+            }
+        })
     }
 }
