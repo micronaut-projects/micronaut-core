@@ -244,7 +244,11 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
     }
 
     override fun getGenericReturnType(): ClassElement {
-        return resolveGeneric(declaration.parent, returnType, owningType, visitorContext)
+        return if (this is ConstructorElement) {
+            returnType
+        } else {
+            resolveGeneric(declaration.parent, returnType, owningType, visitorContext)
+        }
     }
 
     override fun getParameters(): Array<ParameterElement> {

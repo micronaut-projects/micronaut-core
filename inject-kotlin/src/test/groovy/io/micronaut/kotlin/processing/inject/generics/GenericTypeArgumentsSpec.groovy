@@ -21,7 +21,7 @@ class Outer {
     interface Foo<T : CharSequence>
 
     @jakarta.inject.Singleton
-    inner class FooImpl : Foo<String>
+    class FooImpl : Foo<String>
 }
 ''')
         def itfe = definition.beanType.classLoader.loadClass('innergenerics.Outer$Foo')

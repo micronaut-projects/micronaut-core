@@ -98,7 +98,7 @@ class SimpleClassMethodLevelAopSpec extends Specification {
         SimpleClass foo = beanContext.getBean(SimpleClass)
 
         when: "the interceptor is called"
-        foo.invalidInterceptor$inject_kotlin()
+        foo.invalidInterceptor()
 
         then:
         thrown(UnsupportedOperationException)

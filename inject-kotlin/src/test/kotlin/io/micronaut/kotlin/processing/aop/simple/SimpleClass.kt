@@ -182,6 +182,6 @@ open class SimpleClass<A : CharSequence?>(private val bar: Bar?) {
     }
 
     @Invalid
-    internal open fun invalidInterceptor() {
+    open fun invalidInterceptor() {
     }
 }

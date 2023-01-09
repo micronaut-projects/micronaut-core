@@ -244,17 +244,60 @@ abstract class AbstractKotlinElement<T : KSNode>(val declaration: T,
                         }
                     }
                 }
-            } else if (type.declaredGenericPlaceholders.isNotEmpty()) {
-                resolvedType = type.foldBoundGenericTypes {
-                    if (it is GenericPlaceholderElement) {
-                        resolveGeneric(parent, it, owningClass, visitorContext)
-                    } else {
-                        it
-                    }
+            } else if (type.declaredGenericPlaceholders.isNotEmpty() && type is KotlinClassElement) {
+                val genericTypeInfo = owningClass.getGenericTypeInfo()
+                val kotlinType = type.kotlinType
+                val boundInfo = if (parent.qualifiedName != null)  genericTypeInfo[parent.getBinaryName(visitorContext.resolver)] else null
+                resolvedType = if (boundInfo != null) {
+                    val boundArgs = kotlinType.arguments.map { arg ->
+                        resolveTypeArgument(arg, boundInfo, visitorContext)
+                    }.toMutableList()
+                    type.withBoundGenericTypes(boundArgs)
+                } else {
+                    type
                 }
             }
         }
         return resolvedType
+    }
+
+    private fun resolveTypeArgument(
+        arg: KSTypeArgument,
+        boundInfo: Map<String, KSType>,
+        visitorContext: KotlinVisitorContext
+    ): ClassElement {
+        val n = arg.type?.toString()
+        val resolved = boundInfo[n]
+        return if (resolved != null) {
+            visitorContext.elementFactory.newClassElement(
+                resolved,
+                annotationMetadataFactory,
+                false
+            )
+        } else {
+            if (arg.type != null) {
+                val t = arg.type!!.resolve()
+                if (t.arguments.isNotEmpty()) {
+                    visitorContext.elementFactory.newClassElement(
+                        t,
+                        annotationMetadataFactory,
+                        false
+                    ).withBoundGenericTypes(
+                        t.arguments.map {
+                            resolveTypeArgument(it, boundInfo, visitorContext)
+                        }
+                    )
+                } else {
+                    visitorContext.elementFactory.newClassElement(
+                        t,
+                        annotationMetadataFactory,
+                        false
+                    )
+                }
+            } else {
+                visitorContext.getClassElement(Object::class.java.name).get()
+            }
+        }
     }
 
     override fun toString(): String {
