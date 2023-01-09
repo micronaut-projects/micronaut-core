@@ -28,6 +28,7 @@ import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.context.exceptions.DependencyInjectionException;
 import io.micronaut.context.exceptions.NoSuchBeanException;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -173,6 +174,14 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
             environment = createEnvironment(configuration);
         }
         return environment;
+    }
+
+    /**
+     * @param environment The environment
+     */
+    @Internal
+    public void setEnvironment(Environment environment) {
+        this.environment = environment;
     }
 
     @Override

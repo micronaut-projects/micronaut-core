@@ -465,6 +465,8 @@ public class DefaultBeanContext implements InitializableBeanContext {
             proxyTargetBeans.clear();
             attributes.clear();
             beanIndex.clear();
+            beanConfigurationsList = null;
+            beanDefinitionReferences = null;
             beanInitializedEventListeners = null;
             beanCreationEventListeners = null;
             beanPreDestroyEventListeners = null;

@@ -214,7 +214,7 @@ public final class ApplicationEventPublisherFactory<T>
     private ApplicationEventPublisher<Object> createEventPublisher(Argument<?> eventType, BeanContext beanContext) {
         return new ApplicationEventPublisher<Object>() {
 
-            private final Supplier<List<ApplicationEventListener>> lazyListeners = SupplierUtil.memoizedNonEmpty(() -> {
+            private final Supplier<List<ApplicationEventListener>> lazyListeners = SupplierUtil.memoized(() -> {
                 List<ApplicationEventListener> listeners = new ArrayList<>(
                         beanContext.getBeansOfType(ApplicationEventListener.class, Qualifiers.byTypeArguments(eventType.getType()))
                 );
