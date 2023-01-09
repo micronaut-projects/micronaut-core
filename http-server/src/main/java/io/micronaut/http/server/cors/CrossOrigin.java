@@ -56,7 +56,7 @@ public @interface CrossOrigin {
      *
      * @return request headers permitted in requests
      */
-    String[] allowedHeaders() default { "*" };
+    String[] allowedHeaders() default {};
 
     /**
      *

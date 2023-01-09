@@ -15,7 +15,9 @@
  */
 package io.micronaut.http.server.tck.tests.cors;
 
+import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
@@ -26,7 +28,9 @@ import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.server.cors.CrossOrigin;
 import io.micronaut.http.server.tck.AssertionUtils;
 import io.micronaut.http.server.tck.HttpResponseAssertion;
+import io.micronaut.http.server.util.HttpHostResolver;
 import io.micronaut.http.uri.UriBuilder;
+import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -62,6 +66,16 @@ public class CrossOriginTest {
         @Get("/bar")
         String index() {
             return "bar";
+        }
+    }
+
+    @Requires(property = "spec.name", value = SPECNAME)
+    @Replaces(HttpHostResolver.class)
+    @Singleton
+    static class HttpHostResolverReplacement implements HttpHostResolver {
+        @Override
+        public String resolve(@Nullable HttpRequest request) {
+            return "https://micronautexample.com";
         }
     }
 }

@@ -15,16 +15,15 @@
  */
 package io.micronaut.http.server.cors;
 
-import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.web.router.MethodBasedRouteMatch;
-import io.micronaut.web.router.RouteMatch;
 
-import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -52,38 +51,32 @@ public final class CrossOriginUtil {
      */
     @NonNull
     public static Optional<CorsOriginConfiguration> getCorsOriginConfigurationForRequest(@NonNull HttpRequest<?> request) {
-        RouteMatch<?> routeMatch = request.getAttribute(HttpAttributes.ROUTE_MATCH, RouteMatch.class).orElse(null);
-        return (routeMatch instanceof MethodBasedRouteMatch) ?
-            getCorsOriginConfiguration((MethodBasedRouteMatch<?, ?>) routeMatch) :
-            Optional.empty();
+        return request.getAttribute(HttpAttributes.ROUTE_MATCH, AnnotationMetadata.class)
+            .flatMap(CrossOriginUtil::getCorsOriginConfiguration);
     }
 
-    @NonNull
-    private static Optional<CorsOriginConfiguration> getCorsOriginConfiguration(@NonNull MethodBasedRouteMatch<?, ?> methodRoute) {
-        if (!methodRoute.hasAnnotation(CrossOrigin.class)) {
+    private static Optional<CorsOriginConfiguration> getCorsOriginConfiguration(@NonNull AnnotationMetadata annotationMetadata) {
+        if (!annotationMetadata.hasAnnotation(CrossOrigin.class)) {
             return Optional.empty();
         }
-        AnnotationValue<CrossOrigin> annotationValue = methodRoute.getDeclaredAnnotation(CrossOrigin.class);
-        return annotationValue != null ?
-            getCorsOriginConfiguration(annotationValue) :
-            Optional.empty();
-    }
+        CorsOriginConfiguration config = new CorsOriginConfiguration();
+        config.setAllowedOrigins(Arrays.asList(annotationMetadata.stringValues(CrossOrigin.class, MEMBER_ALLOWED_ORIGINS)));
+        String[] allowedHeaders = annotationMetadata.stringValues(CrossOrigin.class, MEMBER_ALLOWED_HEADERS);
+        List<String> allowedHeadersList = allowedHeaders.length == 0 ? CorsOriginConfiguration.ANY : Arrays.asList(allowedHeaders);
+        config.setAllowedHeaders(allowedHeadersList);
+        config.setExposedHeaders(Arrays.asList(annotationMetadata.stringValues(CrossOrigin.class, MEMBER_EXPOSED_HEADERS)));
 
-    private static Optional<CorsOriginConfiguration> getCorsOriginConfiguration(@NonNull AnnotationValue<CrossOrigin> annotationValue) {
-        CorsOriginConfiguration annotated = new CorsOriginConfiguration();
-        annotated.setAllowedOrigins(Arrays.asList(annotationValue.stringValues(MEMBER_ALLOWED_ORIGINS)));
 
-        annotated.setAllowedHeaders(Arrays.asList(annotationValue.stringValues(MEMBER_ALLOWED_HEADERS)));
-        annotated.setExposedHeaders(Arrays.asList(annotationValue.stringValues(MEMBER_EXPOSED_HEADERS)));
-        annotated.setAllowedMethods(Stream.of(annotationValue.stringValues(MEMBER_ALLOWED_METHODS))
+        List<HttpMethod> allowedMethods = Stream.of(annotationMetadata.stringValues(CrossOrigin.class, MEMBER_ALLOWED_METHODS))
             .map(HttpMethod::parse)
             .filter(method -> method != HttpMethod.CUSTOM)
-            .collect(Collectors.toList()));
+            .collect(Collectors.toList());
+        config.setAllowedMethods(CollectionUtils.isNotEmpty(allowedMethods) ? allowedMethods : CorsOriginConfiguration.ANY_METHOD);
 
-        annotationValue.booleanValue(MEMBER_ALLOW_CREDENTIALS)
-            .ifPresent(annotated::setAllowCredentials);
-        annotationValue.longValue(MEMBER_MAX_AGE)
-            .ifPresent(annotated::setMaxAge);
-        return Optional.of(annotated);
+        annotationMetadata.booleanValue(CrossOrigin.class, MEMBER_ALLOW_CREDENTIALS)
+            .ifPresent(config::setAllowCredentials);
+        annotationMetadata.longValue(CrossOrigin.class, MEMBER_MAX_AGE)
+            .ifPresent(config::setMaxAge);
+        return Optional.of(config);
     }
 }
