@@ -183,7 +183,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
     private final BeanContextConfiguration beanContextConfiguration;
 
     // The collection should be modified only when new bean definition is added
-    // That should't happen that offen, so we can use CopyOnWriteArrayList
+    // That shouldn't happen that often, so we can use CopyOnWriteArrayList
     private final Collection<BeanDefinitionProducer> beanDefinitionsClasses = new CopyOnWriteArrayList<>();
     private final Collection<BeanDefinitionProducer> proxyTargetBeans = new CopyOnWriteArrayList<>();
 
