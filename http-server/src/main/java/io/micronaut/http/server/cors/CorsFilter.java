@@ -96,7 +96,7 @@ public class CorsFilter implements HttpServerFilter {
             LOG.trace("Http Header " + HttpHeaders.ORIGIN + " not present. Proceeding with the request.");
             return chain.proceed(request);
         }
-        CorsOriginConfiguration corsOriginConfiguration = getConfiguration(origin).orElse(null);
+        CorsOriginConfiguration corsOriginConfiguration = getConfiguration(request).orElse(null);
         if (corsOriginConfiguration != null) {
             if (CorsUtil.isPreflightRequest(request)) {
                 return handlePreflightRequest(request, chain, corsOriginConfiguration);
@@ -266,7 +266,15 @@ public class CorsFilter implements HttpServerFilter {
     }
 
     @NonNull
-    private Optional<CorsOriginConfiguration> getConfiguration(@NonNull String requestOrigin) {
+    private Optional<CorsOriginConfiguration> getConfiguration(@NonNull HttpRequest<?> request) {
+        Optional<CorsOriginConfiguration> originConfiguration = CrossOriginUtil.getCorsOriginConfigurationForRequest(request);
+        if (originConfiguration.isPresent()) {
+            return originConfiguration;
+        }
+        String requestOrigin = request.getHeaders().getOrigin().orElse(null);
+        if (requestOrigin == null) {
+            return Optional.empty();
+        }
         if (!corsConfiguration.isEnabled()) {
             return Optional.empty();
         }

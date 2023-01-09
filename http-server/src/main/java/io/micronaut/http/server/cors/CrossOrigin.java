@@ -20,6 +20,7 @@ import io.micronaut.http.HttpMethod;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
+import java.lang.annotation.Inherited;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
@@ -28,9 +29,11 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 /**
  * Support CORs configuration via annotation. For example, it will enable Micronaut developers only
  * to allow CORS for a few routes in their applications. Thus, having more secure
- * applications. It will also ease people migrating from Spring Framework to the Micronaut framework.
+ * applications.
+ * @since 3.9.0
  */
 @Documented
+@Inherited
 @Retention(RUNTIME)
 @Target({ElementType.TYPE, ElementType.METHOD})
 public @interface CrossOrigin {
@@ -53,7 +56,7 @@ public @interface CrossOrigin {
      *
      * @return request headers permitted in requests
      */
-    String[] allowedHeaders() default {};
+    String[] allowedHeaders() default { "*" };
 
     /**
      *
