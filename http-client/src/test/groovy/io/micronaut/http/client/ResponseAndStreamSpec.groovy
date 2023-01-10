@@ -57,7 +57,7 @@ class ResponseAndStreamSpec extends Specification {
         @Override
         Publisher<MutableHttpResponse<?>> doFilter(
                 HttpRequest<?> request, ServerFilterChain chain) {
-            return Flux.from(chain.proceed()).map { MutableHttpResponse<?> response ->
+            return Flux.from(chain.proceed(request)).map { MutableHttpResponse<?> response ->
                 return response.body(Flux.fromIterable([
                         "chunk1",
                         "chunk2",
