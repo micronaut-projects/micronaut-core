@@ -38,6 +38,7 @@ import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.util.Collections;
 
 import static io.micronaut.http.server.tck.TestScenario.asserts;
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -60,6 +61,12 @@ public class CrossOriginTest {
                 .status(HttpStatus.OK)
                 .body("bar")
                 .build()));
+        asserts(SPECNAME,
+            HttpRequest.GET(UriBuilder.of("/foo").path("bar").build()).header(HttpHeaders.ORIGIN, "https://bar.com"),
+            (server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.FORBIDDEN)
+                .build()));
+
     }
 
     @Test
@@ -83,10 +90,32 @@ public class CrossOriginTest {
         );
     }
 
+    @Test
+    void corsSimpleRequestHeaders() throws IOException {
+        asserts(SPECNAME,
+            Collections.singletonMap("micronaut.server.cors.enabled", true),
+            HttpRequest.GET(UriBuilder.of("/allowedheaders").path("bar").build())
+                .header(HttpHeaders.ORIGIN, "https://foo.com")
+                .header(HttpHeaders.AUTHORIZATION, "foo")
+                .header(HttpHeaders.CONTENT_TYPE, "bar"),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("bar")
+                .build()));
+        asserts(SPECNAME,
+            Collections.singletonMap("micronaut.server.cors.enabled", true),
+            HttpRequest.GET(UriBuilder.of("/allowedheaders").path("bar").build())
+                .header(HttpHeaders.ORIGIN, "https://foo.com")
+                .header("foo", "bar"),
+            (server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.FORBIDDEN)
+                .body("bar")
+                .build()));
+    }
+
     @Requires(property = "spec.name", value = SPECNAME)
     @Controller("/foo")
     static class Foo {
-
         @CrossOrigin("https://foo.com")
         @Produces(MediaType.TEXT_PLAIN)
         @Get("/bar")
@@ -94,6 +123,7 @@ public class CrossOriginTest {
             return "bar";
         }
     }
+
     @Requires(property = "spec.name", value = SPECNAME)
     @Controller("/methods")
     @CrossOrigin(
@@ -116,6 +146,48 @@ public class CrossOriginTest {
         @Delete("/deleteit/{id}")
         String cantDelete(@PathVariable String id) {
             return id;
+        }
+    }
+
+    @Requires(property = "spec.name", value = SPECNAME)
+    @Controller("/allowedheaders")
+    @CrossOrigin(
+        value = "https://foo.com",
+        allowedHeaders = { HttpHeaders.CONTENT_TYPE, HttpHeaders.AUTHORIZATION }
+    )
+    static class AllowedHeaders {
+        @Produces(MediaType.TEXT_PLAIN)
+        @Get("/bar")
+        String index() {
+            return "bar";
+        }
+    }
+    @Requires(property = "spec.name", value = SPECNAME)
+    @Controller("/exposedheaders")
+    @CrossOrigin(
+        value = "https://foo.com",
+        exposedHeaders = { HttpHeaders.CONTENT_TYPE, HttpHeaders.AUTHORIZATION }
+    )
+    static class ExposedHeaders {
+        @Produces(MediaType.TEXT_PLAIN)
+        @Get("/bar")
+        String index() {
+            return "bar";
+        }
+    }
+
+    // TODO: tests for CrossOrigin.allowCredentials, CrossOrigin.maxAge
+    @Requires(property = "spec.name", value = SPECNAME)
+    @Controller("/credentials")
+    @CrossOrigin(
+        value = "https://foo.com",
+        allowCredentials = "false"
+    )
+    static class Credentials {
+        @Produces(MediaType.TEXT_PLAIN)
+        @Get("/bar")
+        String index() {
+            return "bar";
         }
     }
 
