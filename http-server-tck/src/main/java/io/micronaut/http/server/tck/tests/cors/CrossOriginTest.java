@@ -21,8 +21,10 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Delete;
 import io.micronaut.http.annotation.Get;
@@ -40,7 +42,7 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 
 import static io.micronaut.http.server.tck.TestScenario.asserts;
-import static org.junit.jupiter.api.Assertions.assertAll;
+import static org.junit.jupiter.api.Assertions.*;
 
 
 @SuppressWarnings({
@@ -53,66 +55,80 @@ public class CrossOriginTest {
     private static final String SPECNAME = "CrossOriginTest";
 
     @Test
-    void corsSimpleRequestNotAllowedForLocalhostAndAny() throws IOException {
-
+    void crossOriginAnnotationWithMatchingOrigin() throws IOException {
         asserts(SPECNAME,
-            HttpRequest.GET(UriBuilder.of("/foo").path("bar").build()).header(HttpHeaders.ORIGIN, "https://foo.com"),
+            preflight(UriBuilder.of("/foo").path("bar"), "https://foo.com", HttpMethod.GET),
             (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
-                .body("bar")
+                .assertResponse(response -> {
+                    assertCorsHeaders(response, "https://foo.com", HttpMethod.GET);
+                    assertFalse(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS));
+                })
                 .build()));
+    }
+
+    @Test
+    void crossOriginAnnotationWithNoMatchingOrigin() throws IOException {
         asserts(SPECNAME,
             preflight(UriBuilder.of("/foo").path("bar"), "https://bar.com", HttpMethod.GET),
             (server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.METHOD_NOT_ALLOWED)
+                .assertResponse(this::assertCorsHeadersNotPresent)
                 .build()));
     }
 
-    private static HttpRequest<?> preflight(UriBuilder uriBuilder, String originValue, HttpMethod method) {
-        return HttpRequest.OPTIONS(uriBuilder.build())
-            .header(HttpHeaders.ORIGIN, originValue)
-            .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, method);
-    }
     @Test
     void corsSimpleRequestMethods() {
         assertAll(
             () -> asserts(SPECNAME,
-                HttpRequest.GET(UriBuilder.of("/methods").path("getit").build()).header(HttpHeaders.ORIGIN, "http://www.google.com"),
+                preflight(UriBuilder.of("/methods").path("getit"), "http://www.google.com", HttpMethod.GET),
                 (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                     .status(HttpStatus.OK)
+                    .assertResponse(response -> {
+                        assertCorsHeaders(response, "http://www.google.com", HttpMethod.GET);
+                        assertFalse(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS));
+                    })
                     .build())),
             () -> asserts(SPECNAME,
-                HttpRequest.POST(UriBuilder.of("/methods").path("postit").path("id").build(),"post").header(HttpHeaders.ORIGIN, "https://www.google.com"),
+                preflight(UriBuilder.of("/methods").path("postit").path("id"), "https://www.google.com", HttpMethod.POST),
                 (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                     .status(HttpStatus.OK)
+                    .assertResponse(response -> {
+                        assertCorsHeaders(response, "https://www.google.com", HttpMethod.POST);
+                        assertFalse(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS));
+                    })
                     .build())),
             () -> asserts(SPECNAME,
-                HttpRequest.DELETE(UriBuilder.of("/methods").path("deleteit").path("id").build(),"delete").header(HttpHeaders.ORIGIN, "https://www.google.com"),
+                preflight(UriBuilder.of("/methods").path("deleteit").path("id"), "https://www.google.com", HttpMethod.DELETE),
                 (server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
                     .status(HttpStatus.FORBIDDEN)
+                    .assertResponse(this::assertCorsHeadersNotPresent)
                     .build()))
         );
     }
 
     @Test
-    void corsSimpleRequestHeaders() throws IOException {
+    void allowedHeadersHappyPath() throws IOException {
         asserts(SPECNAME,
-            HttpRequest.GET(UriBuilder.of("/allowedheaders").path("bar").build())
-                .header(HttpHeaders.ORIGIN, "https://foo.com")
-                .header(HttpHeaders.AUTHORIZATION, "foo")
-                .header(HttpHeaders.CONTENT_TYPE, "bar"),
+            preflight(UriBuilder.of("/allowedheaders").path("bar"), "https://foo.com", HttpMethod.GET)
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, HttpHeaders.AUTHORIZATION + "," + HttpHeaders.CONTENT_TYPE),
             (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
-                .body("bar")
+                .assertResponse(response -> {
+                    assertCorsHeaders(response, "https://foo.com", HttpMethod.GET);
+                    assertTrue(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS));
+                })
                 .build()));
+    }
 
+    @Test
+    void allowedHeadersFailure() throws IOException {
         asserts(SPECNAME,
-            HttpRequest.GET(UriBuilder.of("/allowedheaders").path("bar").build())
-                .header(HttpHeaders.ORIGIN, "https://foo.com")
-                .header("foo", "bar"),
+            preflight(UriBuilder.of("/allowedheaders").path("bar"), "https://foo.com", HttpMethod.GET)
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, "foo"),
             (server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.FORBIDDEN)
-                .body("bar")
+                .assertResponse(this::assertCorsHeadersNotPresent)
                 .build()));
     }
 
@@ -202,5 +218,34 @@ public class CrossOriginTest {
         public String resolve(@Nullable HttpRequest request) {
             return "https://micronautexample.com";
         }
+    }
+
+    private static MutableHttpRequest<?> preflight(UriBuilder uriBuilder, String originValue, HttpMethod method) {
+        return HttpRequest.OPTIONS(uriBuilder.build())
+            .header(HttpHeaders.ACCEPT, MediaType.TEXT_PLAIN)
+            .header(HttpHeaders.ORIGIN, originValue)
+            .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, method);
+    }
+
+    private void assertCorsHeadersNotPresent(HttpResponse<?> response) {
+        assertFalse(response.getHeaders().names().contains(HttpHeaders.VARY));
+        assertFalse(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS));
+        assertFalse(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_MAX_AGE));
+        assertFalse(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN));
+        assertFalse(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS));
+        assertFalse(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS));
+    }
+
+    private void assertCorsHeaders(HttpResponse<?> response, String origin, HttpMethod method) {
+        assertTrue(response.getHeaders().names().contains(HttpHeaders.VARY));
+        assertEquals("Origin", response.getHeaders().get(HttpHeaders.VARY));
+        assertTrue(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS));
+        assertEquals("true", response.getHeaders().get(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS));
+        assertTrue(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_MAX_AGE));
+        assertEquals("1800", response.getHeaders().get(HttpHeaders.ACCESS_CONTROL_MAX_AGE));
+        assertTrue(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN));
+        assertEquals(origin, response.getHeaders().get(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN));
+        assertTrue(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS));
+        assertEquals(method.toString(), response.getHeaders().get(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS));
     }
 }
