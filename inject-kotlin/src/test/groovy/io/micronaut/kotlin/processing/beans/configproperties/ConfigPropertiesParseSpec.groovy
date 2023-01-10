@@ -7,6 +7,7 @@ import io.micronaut.context.annotation.Property
 import io.micronaut.core.convert.format.ReadableBytes
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.InstantiatableBeanDefinition
+import io.micronaut.inject.MethodInjectionPoint
 import io.micronaut.kotlin.processing.beans.configuration.Engine
 import spock.lang.Specification
 
@@ -156,8 +157,8 @@ open class MyProperties {
         then:
         beanDefinition != null
         beanDefinition.injectedMethods.size() == 2
-        beanDefinition.injectedMethods[0].name == 'setFieldTest'
-        beanDefinition.injectedMethods[1].name == 'setSetterTest'
+        beanDefinition.injectedMethods.find { it.name == 'setFieldTest' }
+        beanDefinition.injectedMethods.find { it.name == 'setSetterTest' }
 
         when:
         InstantiatableBeanDefinition factory = beanDefinition
@@ -175,7 +176,7 @@ open class MyProperties {
                 ['foo.setterTest' :'foo',
                 'foo.fieldTest' :'bar']
         )
-        bean = factory.build(applicationContext, beanDefinition)
+        bean = factory.instantiate(applicationContext)
 
         then:
         bean != null
@@ -212,17 +213,23 @@ open class Parent {
 ''')
         then:
         beanDefinition.injectedMethods.size() == 3
-        beanDefinition.injectedMethods[0].name == 'setFieldTest'
-        beanDefinition.injectedMethods[0].getAnnotationMetadata().hasAnnotation(Property)
-        beanDefinition.injectedMethods[0].getAnnotationMetadata().synthesize(Property).name() == 'foo.field-test'
 
-        beanDefinition.injectedMethods[1].name == 'setParentTest'
-        beanDefinition.injectedMethods[1].getAnnotationMetadata().hasAnnotation(Property)
-        beanDefinition.injectedMethods[1].getAnnotationMetadata().synthesize(Property).name() == 'foo.parent-test'
+        def setFieldMethod = beanDefinition.injectedMethods.find { it.name == 'setFieldTest'}
+        setFieldMethod.name == 'setFieldTest'
+        setFieldMethod.getAnnotationMetadata().hasAnnotation(Property)
+        setFieldMethod.getAnnotationMetadata().synthesize(Property).name() == 'foo.field-test'
 
-        beanDefinition.injectedMethods[2].name == 'setSetterTest'
-        beanDefinition.injectedMethods[2].getAnnotationMetadata().hasAnnotation(Property)
-        beanDefinition.injectedMethods[2].getAnnotationMetadata().synthesize(Property).name() == 'foo.setter-test'
+
+        def setParentMethod = beanDefinition.injectedMethods.find { it.name == 'setParentTest'}
+        setParentMethod.name == 'setParentTest'
+        setParentMethod.getAnnotationMetadata().hasAnnotation(Property)
+        setParentMethod.getAnnotationMetadata().synthesize(Property).name() == 'foo.parent-test'
+
+
+        def setSetterTest = beanDefinition.injectedMethods.find { it.name == 'setSetterTest'}
+        setSetterTest.name == 'setSetterTest'
+        setSetterTest.getAnnotationMetadata().hasAnnotation(Property)
+        setSetterTest.getAnnotationMetadata().synthesize(Property).name() == 'foo.setter-test'
 
         when:
         InstantiatableBeanDefinition factory = beanDefinition
@@ -242,7 +249,7 @@ open class Parent {
                 'foo.fieldTest' :'bar',
                 'foo.parentTest': 'baz']
         )
-        bean = factory.build(applicationContext, beanDefinition)
+        bean = factory.instantiate(applicationContext)
 
         then:
         bean != null
@@ -457,10 +464,14 @@ open class Parent {
         then:
         noExceptionThrown()
         beanDefinition.injectedMethods.size() == 2
-        beanDefinition.injectedMethods[0].name == "setChildProp"
-        beanDefinition.injectedMethods[0].annotationMetadata.stringValue(Property, "name").get() == "parent.child.child-prop"
-        beanDefinition.injectedMethods[1].name == "setProp"
-        beanDefinition.injectedMethods[1].annotationMetadata.stringValue(Property, "name").get() == "parent.prop"
+
+        def setChildProp = beanDefinition.injectedMethods.find { it.name == 'setChildProp'}
+        setChildProp.name == "setChildProp"
+        setChildProp.annotationMetadata.stringValue(Property, "name").get() == "parent.child.child-prop"
+
+        def setProp = beanDefinition.injectedMethods.find { it.name == 'setProp'}
+        setProp.name == "setProp"
+        setProp.annotationMetadata.stringValue(Property, "name").get() == "parent.prop"
     }
 
     void "test inner each bean internal constructor"() {

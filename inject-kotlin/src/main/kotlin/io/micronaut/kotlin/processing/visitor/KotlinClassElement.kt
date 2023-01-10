@@ -759,7 +759,6 @@ open class KotlinClassElement(val kotlinType: KSType,
                 FieldElement::class.java -> {
                     classNode.getDeclaredProperties()
                         .filter {
-                            !it.isInternal() &&
                             it.hasBackingField &&
                             it.origin != Origin.SYNTHETIC
                         }
