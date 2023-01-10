@@ -5,7 +5,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.exceptions.NoSuchBeanException
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.BeanFactory
+import io.micronaut.inject.InstantiatableBeanDefinition
 import io.micronaut.inject.ValidatedBeanDefinition
 import io.micronaut.runtime.context.env.ConfigurationAdvice
 
@@ -40,7 +40,7 @@ interface MyConfig {
 
         when:
         def context = ApplicationContext.run('foo.bar.host': 'test', 'foo.bar.server-port': '9999')
-        def config = ((BeanFactory) beanDefinition).build(context, beanDefinition)
+        def config = ((InstantiatableBeanDefinition) beanDefinition).instantiate(context)
 
         then:
         config.host == 'test'
@@ -87,7 +87,7 @@ interface MyConfig {
 
         when:
         def context = ApplicationContext.run()
-        def config = ((BeanFactory) beanDefinition).build(context, beanDefinition)
+        def config = ((InstantiatableBeanDefinition) beanDefinition).instantiate(context)
 
         then:
         config.host == null
@@ -96,7 +96,7 @@ interface MyConfig {
 
         when:
         def context2 = ApplicationContext.run('foo.bar.host': 'test', 'foo.bar.server-port': '9999', 'foo.bar.url': 'http://test')
-        def config2 = ((BeanFactory) beanDefinition).build(context2, beanDefinition)
+        def config2 = ((InstantiatableBeanDefinition) beanDefinition).instantiate(context2)
 
         then:
         config2.host == 'test'
@@ -143,7 +143,7 @@ interface ParentConfig {
 
         when:
         def context = ApplicationContext.run('foo.bar.host': 'test', 'foo.bar.server-port': '9999')
-        def config = ((BeanFactory) beanDefinition).build(context, beanDefinition)
+        def config = ((InstantiatableBeanDefinition) beanDefinition).instantiate(context)
 
         then:
         config.host == 'test'
@@ -181,7 +181,7 @@ interface MyConfig {
 
 ''')
         def context = ApplicationContext.run('foo.bar.child.url': 'http://test')
-        def config = ((BeanFactory) beanDefinition).build(context, beanDefinition)
+        def config = ((InstantiatableBeanDefinition) beanDefinition).instantiate(context)
 
         then:
         config.URL == new URL("http://test")
@@ -228,7 +228,7 @@ interface MyConfig {
 
         when:
         def context = ApplicationContext.run('foo.bar.child.url': 'http://test')
-        def config = ((BeanFactory) beanDefinition).build(context, beanDefinition)
+        def config = ((InstantiatableBeanDefinition) beanDefinition).instantiate(context)
         config.child
 
         then:"we expect a bean resolution"

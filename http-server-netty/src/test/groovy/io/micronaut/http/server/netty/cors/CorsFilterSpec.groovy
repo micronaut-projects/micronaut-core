@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty.cors
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.annotation.Nullable
 import io.micronaut.core.async.publisher.Publishers
 import io.micronaut.core.util.StringUtils
 import io.micronaut.http.*
@@ -25,6 +26,7 @@ import io.micronaut.http.filter.ServerFilterChain
 import io.micronaut.http.server.HttpServerConfiguration
 import io.micronaut.http.server.cors.CorsFilter
 import io.micronaut.http.server.cors.CorsOriginConfiguration
+import io.micronaut.http.server.util.HttpHostResolver
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.web.router.RouteMatch
 import io.micronaut.web.router.Router
@@ -295,12 +297,26 @@ class CorsFilterSpec extends Specification {
         HttpRequest request = Stub(HttpRequest) {
             getHeaders() >> headers
         }
-        when:
-        Optional<MutableHttpResponse<?>> result = corsHandler.handleRequest(request)
 
-        then: "the response is not modified"
+        when:
+        Optional<MutableHttpResponse<?>> result = Mono.from(corsHandler.doFilter(request, okChain())).blockOptional()
+
+        then:
         notThrown(NullPointerException)
-        !result.isPresent()
+        result.isPresent()
+
+        when:
+        MutableHttpResponse<?> response = result.get()
+
+        then:
+        HttpStatus.OK == response.status()
+
+        and:
+        !response.getHeaders().get(ACCESS_CONTROL_ALLOW_ORIGIN)
+        !response.getHeaders().get(VARY)
+        !response.getHeaders().getAll(ACCESS_CONTROL_EXPOSE_HEADERS)
+        !response.getHeaders().get(ACCESS_CONTROL_ALLOW_CREDENTIALS)
+        !response.getHeaders().get(ACCESS_CONTROL_MAX_AGE)
     }
 
     void "verify behaviour for normal request"() {
@@ -559,6 +575,11 @@ class CorsFilterSpec extends Specification {
     }
 
     private CorsFilter buildCorsHandler(HttpServerConfiguration.CorsConfiguration config) {
-        new CorsFilter(config ?: enabledCorsConfiguration())
+        new CorsFilter(config ?: enabledCorsConfiguration(), new HttpHostResolver() {
+            @Override
+            String resolve(@Nullable HttpRequest request) {
+                return "http://localhost:8080";
+            }
+        })
     }
 }

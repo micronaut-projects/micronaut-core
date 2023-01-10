@@ -271,7 +271,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
      * @return The flowable
      */
     protected Publisher<?> instrumentPublisher(ChannelHandlerContext ctx, Object result) {
-        Publisher<?> actual = Publishers.convertPublisher(result, Publisher.class);
+        Publisher<?> actual = Publishers.convertPublisher(conversionService, result, Publisher.class);
         return Flux.from(actual).subscribeOn(Schedulers.fromExecutorService(ctx.channel().eventLoop()));
     }
 

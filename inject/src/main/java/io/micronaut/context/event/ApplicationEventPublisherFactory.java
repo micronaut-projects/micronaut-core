@@ -15,19 +15,6 @@
  */
 package io.micronaut.context.event;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executor;
-import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.Future;
-import java.util.function.Supplier;
-
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
@@ -42,12 +29,25 @@ import io.micronaut.core.type.ArgumentCoercible;
 import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
-import io.micronaut.inject.BeanFactory;
 import io.micronaut.inject.InjectionPoint;
+import io.micronaut.inject.InstantiatableBeanDefinition;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.Future;
+import java.util.function.Supplier;
 
 /**
  * Constructs instances of {@link io.micronaut.context.event.ApplicationEventPublisher}.
@@ -58,7 +58,7 @@ import org.slf4j.LoggerFactory;
  */
 @Internal
 public final class ApplicationEventPublisherFactory<T>
-        implements BeanDefinition<ApplicationEventPublisher<T>>, BeanFactory<ApplicationEventPublisher<T>>,
+        implements InstantiatableBeanDefinition<ApplicationEventPublisher<T>>,
                    BeanDefinitionReference<ApplicationEventPublisher<T>> {
 
     private static final Argument<Object> TYPE_VARIABLE = Argument.ofTypeVariable(Object.class, "T");
@@ -85,7 +85,7 @@ public final class ApplicationEventPublisherFactory<T>
 
     @Override
     public boolean isCandidateBean(Argument<?> beanType) {
-        return BeanDefinition.super.isCandidateBean(beanType);
+        return InstantiatableBeanDefinition.super.isCandidateBean(beanType);
     }
 
     @Override
@@ -135,17 +135,14 @@ public final class ApplicationEventPublisherFactory<T>
     }
 
     @Override
-    public ApplicationEventPublisher<T> build(BeanResolutionContext resolutionContext,
-                                              BeanContext context,
-                                              BeanDefinition<ApplicationEventPublisher<T>> definition)
-            throws BeanInstantiationException {
+    public ApplicationEventPublisher<T> instantiate(BeanResolutionContext resolutionContext, BeanContext context) throws BeanInstantiationException {
         if (executorSupplier == null) {
             executorSupplier = SupplierUtil.memoized(() ->
                  context.findBean(Executor.class, Qualifiers.byName("scheduled")).orElseGet(ForkJoinPool::commonPool)
             );
         }
         Argument<?> eventType = Argument.OBJECT_ARGUMENT;
-        final BeanResolutionContext.Segment<?> segment = resolutionContext.getPath().currentSegment().orElse(null);
+        final BeanResolutionContext.Segment<?, ?> segment = resolutionContext.getPath().currentSegment().orElse(null);
         if (segment != null) {
             final InjectionPoint<?> injectionPoint = segment.getInjectionPoint();
             if (injectionPoint instanceof ArgumentCoercible) {

@@ -15,8 +15,6 @@
  */
 package io.micronaut.inject;
 
-import io.micronaut.context.BeanContext;
-import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.Qualifier;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.DefaultScope;
@@ -177,10 +175,6 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
      */
     default ConstructorInjectionPoint<T> getConstructor() {
         return new ConstructorInjectionPoint<T>() {
-            @Override
-            public T invoke(Object... args) {
-                throw new UnsupportedOperationException("Cannot be instantiated directly");
-            }
 
             @Override
             public Argument<?>[] getArguments() {
@@ -192,10 +186,6 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
                 return BeanDefinition.this;
             }
 
-            @Override
-            public boolean requiresReflection() {
-                return false;
-            }
         };
     }
 
@@ -272,29 +262,6 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
      */
     default <R> Stream<ExecutableMethod<T, R>> findPossibleMethods(String name) {
         return Stream.empty();
-    }
-
-    /**
-     * Inject the given bean with the context.
-     *
-     * @param context The context
-     * @param bean    The bean
-     * @return The injected bean
-     */
-    default T inject(BeanContext context, T bean) {
-        return bean;
-    }
-
-    /**
-     * Inject the given bean with the context.
-     *
-     * @param resolutionContext the resolution context
-     * @param context           The context
-     * @param bean              The bean
-     * @return The injected bean
-     */
-    default T inject(BeanResolutionContext resolutionContext, BeanContext context, T bean) {
-        return bean;
     }
 
     /**

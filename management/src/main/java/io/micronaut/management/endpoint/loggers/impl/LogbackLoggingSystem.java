@@ -18,17 +18,24 @@ package io.micronaut.management.endpoint.loggers.impl;
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.LoggerContext;
+import ch.qos.logback.classic.util.ContextInitializer;
+import ch.qos.logback.core.joran.spi.JoranException;
+import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.logging.LogLevel;
+import io.micronaut.logging.LoggingSystemException;
 import io.micronaut.management.endpoint.loggers.LoggerConfiguration;
 import io.micronaut.management.endpoint.loggers.LoggersEndpoint;
 import io.micronaut.management.endpoint.loggers.ManagedLoggingSystem;
 import jakarta.inject.Singleton;
 import org.slf4j.LoggerFactory;
 
+import java.net.URL;
 import java.util.Collection;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -42,6 +49,13 @@ import java.util.stream.Collectors;
 @Requires(classes = ch.qos.logback.classic.LoggerContext.class)
 @Replaces(io.micronaut.logging.impl.LogbackLoggingSystem.class)
 public class LogbackLoggingSystem implements ManagedLoggingSystem, io.micronaut.logging.LoggingSystem {
+    private static final String DEFAULT_LOGBACK_LOCATION = "logback.xml";
+
+    private final String logbackXmlLocation;
+
+    public LogbackLoggingSystem(@Nullable @Property(name = "logger.config") String logbackXmlLocation) {
+        this.logbackXmlLocation = logbackXmlLocation != null ? logbackXmlLocation : DEFAULT_LOGBACK_LOCATION;
+    }
 
     @Override
     @NonNull
@@ -104,6 +118,22 @@ public class LogbackLoggingSystem implements ManagedLoggingSystem, io.micronaut.
             return null;
         } else {
             return Level.valueOf(logLevel.name());
+        }
+    }
+
+    @Override
+    public void refresh() {
+        LoggerContext context = getLoggerContext();
+        context.reset();
+        URL resource = getClass().getClassLoader().getResource(logbackXmlLocation);
+        if (Objects.isNull(resource)) {
+            throw new LoggingSystemException("Resource " + logbackXmlLocation + " not found");
+        }
+
+        try {
+            new ContextInitializer(context).configureByResource(resource);
+        } catch (JoranException e) {
+            throw new LoggingSystemException("Error while refreshing Logback", e);
         }
     }
 }

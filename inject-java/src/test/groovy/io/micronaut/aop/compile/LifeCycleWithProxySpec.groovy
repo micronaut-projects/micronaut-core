@@ -3,10 +3,57 @@ package io.micronaut.aop.compile
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.BeanFactory
+import io.micronaut.inject.InstantiatableBeanDefinition
 import io.micronaut.inject.writer.BeanDefinitionWriter
 
 class LifeCycleWithProxySpec extends AbstractTypeElementSpec {
+    void "test that a proxy target AOP definition lifecycle hooks are invoked - annotation at class level"() {
+        when:
+        ApplicationContext context = buildContext('''
+package test;
+
+import io.micronaut.aop.proxytarget.*;
+import io.micronaut.context.annotation.*;
+import io.micronaut.core.convert.*;
+
+@Mutating("someVal")
+@jakarta.inject.Singleton
+class MyBean {
+
+    @jakarta.inject.Inject public ConversionService conversionService;
+    public int count = 0;
+
+    public String someMethod() {
+        return "good";
+    }
+
+    @jakarta.annotation.PostConstruct
+    void created() {
+        count++;
+    }
+
+    @javax.annotation.PreDestroy
+    void destroyed() {
+        count--;
+    }
+
+}
+''')
+
+        def instance = getBean(context, "test.MyBean")
+
+
+        then:"proxy post construct methods are not invoked"
+        instance.conversionService // injection works
+        instance.someMethod() == 'good'
+        instance.count == 0
+
+        and:"proxy target post construct methods are invoked"
+        instance.interceptedTarget().count == 1
+
+        cleanup:
+        context.close()
+    }
 
     void "test that a simple AOP definition lifecycle hooks are invoked - annotation at class level"() {
         when:
@@ -23,16 +70,16 @@ class MyBean {
 
     @jakarta.inject.Inject public ConversionService conversionService;
     public int count = 0;
-    
+
     public String someMethod() {
         return "good";
     }
-    
+
     @jakarta.annotation.PostConstruct
     void created() {
         count++;
     }
-    
+
     @javax.annotation.PreDestroy
     void destroyed() {
         count--;
@@ -49,7 +96,7 @@ class MyBean {
         when:
         def context = ApplicationContext.run()
 
-        def instance = ((BeanFactory) beanDefinition).build(context, beanDefinition)
+        def instance = ((InstantiatableBeanDefinition) beanDefinition).instantiate(context)
 
 
         then:
@@ -75,7 +122,7 @@ class MyBean {
     @jakarta.inject.Inject public ConversionService conversionService;
 
     public int count = 0;
-    
+
     @Mutating("someVal")
     public String someMethod() {
         return "good";
@@ -85,7 +132,7 @@ class MyBean {
     void created() {
         count++;
     }
-    
+
     @javax.annotation.PreDestroy
     void destroyed() {
         count--;
@@ -100,7 +147,7 @@ class MyBean {
 
         when:
         def context = ApplicationContext.run()
-        def instance = ((BeanFactory) beanDefinition).build(context, beanDefinition)
+        def instance = ((InstantiatableBeanDefinition) beanDefinition).instantiate(context)
 
 
         then:
@@ -126,17 +173,17 @@ class MyBean {
 
     @jakarta.inject.Inject public ConversionService conversionService;
     public int count = 0;
-    
+
     @jakarta.annotation.PostConstruct
     void created() {
         count++;
     }
-    
+
     @javax.annotation.PreDestroy
     void destroyed() {
         count--;
     }
-        
+
     @Mutating("someVal")
     public String someMethod() {
         return "good";
@@ -151,7 +198,7 @@ class MyBean {
 
         when:
         def context = ApplicationContext.run()
-        def instance = ((BeanFactory) beanDefinition).build(context, beanDefinition)
+        def instance = ((InstantiatableBeanDefinition) beanDefinition).instantiate(context)
 
 
         then:

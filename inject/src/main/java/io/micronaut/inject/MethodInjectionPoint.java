@@ -15,9 +15,7 @@
  */
 package io.micronaut.inject;
 
-import io.micronaut.core.type.Executable;
-
-import java.lang.reflect.Method;
+import io.micronaut.core.annotation.AnnotationMetadataProvider;
 
 /**
  * Defines an injection point for a method.
@@ -27,15 +25,7 @@ import java.lang.reflect.Method;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface MethodInjectionPoint<B, T> extends CallableInjectionPoint<B>, Executable<B, T> {
-
-    /**
-     * Resolves the {@link Method} instance. Note that this method will cause reflection
-     * metadata to be initialized and should be avoided.
-     *
-     * @return The setter to invoke to set said property
-     */
-    Method getMethod();
+public interface MethodInjectionPoint<B, T> extends CallableInjectionPoint<B>, AnnotationMetadataProvider {
 
     /**
      * @return The method name
@@ -52,17 +42,6 @@ public interface MethodInjectionPoint<B, T> extends CallableInjectionPoint<B>, E
      */
     boolean isPostConstructMethod();
 
-    /**
-     * Invokes the method.
-     *
-     * @param instance The instance
-     * @param args     The arguments. Should match the types of getArguments()
-     * @return The new value
-     */
-    @Override
-    T invoke(B instance, Object... args);
-
-    @Override
     default Class<B> getDeclaringType() {
         return getDeclaringBean().getBeanType();
     }

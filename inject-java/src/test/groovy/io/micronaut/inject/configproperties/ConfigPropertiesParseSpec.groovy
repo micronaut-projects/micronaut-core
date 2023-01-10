@@ -1,5 +1,6 @@
 package io.micronaut.inject.configproperties
 
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.ApplicationContextBuilder
 import io.micronaut.context.BeanContext
@@ -7,15 +8,55 @@ import io.micronaut.context.annotation.ConfigurationReader
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.PropertySource
 import io.micronaut.core.convert.format.ReadableBytes
-import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.BeanFactory
+import io.micronaut.inject.InstantiatableBeanDefinition
 import io.micronaut.inject.configuration.Engine
 import spock.lang.Issue
 
 import java.time.Duration
 
 class ConfigPropertiesParseSpec extends AbstractTypeElementSpec {
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/8574")
+    void "test configuration properties inherited from parent with multiple overloads"() {
+        when:
+        def context = buildContext('''
+package test;
+
+import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.core.convert.format.MapFormat;
+import io.micronaut.core.naming.conventions.StringConvention;
+import java.io.InputStream;
+import java.util.*;
+
+@ConfigurationProperties("freemarker")
+class TestConfiguration extends ParentConfiguration {
+    @Override
+    public void setSettings(
+            @MapFormat(keyFormat = StringConvention.UNDER_SCORE_SEPARATED_LOWER_CASE) Properties props){
+        super.setSettings(props);
+    }
+
+}
+class ParentConfiguration {
+    private Properties properties;
+    public void setSettings(InputStream inputStream) {
+    }
+    public void setSettings(Properties properties) {
+        this.properties = properties;
+    }
+
+    public Properties properties() {
+        return properties;
+    }
+}
+''')
+        def bean = getBean(context, 'test.TestConfiguration')
+
+        then:
+        bean != null
+        bean.properties() as Map == [url_escaping_charset:'UTF-8']
+    }
 
     @Issue("https://github.com/micronaut-projects/micronaut-core/issues/8480")
     void "test configuration properties inheritance for compiled classes - inherited props"() {
@@ -174,7 +215,8 @@ class MyConfig {
                 "micronaut.server.netty.parent.io-ratio": "10",
                 "micronaut.server.netty.parent.threads": "5",
                 "micronaut.server.netty.child.io-ratio": "15",
-                "micronaut.server.netty.child.threads": "55"
+                "micronaut.server.netty.child.threads": "55",
+                "freemarker.settings.urlEscapingCharset": 'UTF-8'
         )
     }
 
@@ -619,9 +661,9 @@ class MyProperties {
         beanDefinition.injectedMethods.size() == 1
 
         when:
-        BeanFactory factory = beanDefinition
+        InstantiatableBeanDefinition factory = beanDefinition
         ApplicationContext applicationContext = ApplicationContext.builder().start()
-        def bean = factory.build(applicationContext, beanDefinition)
+        def bean = factory.instantiate(applicationContext)
 
         then:
         bean != null
@@ -634,7 +676,7 @@ class MyProperties {
                 ['foo.setterTest' :'foo',
                 'foo.fieldTest' :'bar']
         )
-        bean = factory.build(applicationContext, beanDefinition)
+        bean = factory.instantiate(applicationContext)
 
         then:
         bean != null
@@ -687,9 +729,9 @@ class Parent {
 
 
         when:
-        BeanFactory factory = beanDefinition
+        InstantiatableBeanDefinition factory = beanDefinition
         ApplicationContext applicationContext = ApplicationContext.builder().start()
-        def bean = factory.build(applicationContext, beanDefinition)
+        def bean = factory.instantiate(applicationContext)
 
         then:
         bean != null
@@ -702,7 +744,7 @@ class Parent {
                 ['foo.setterTest' :'foo',
                 'foo.fieldTest' :'bar']
         )
-        bean = factory.build(applicationContext, beanDefinition)
+        bean = factory.instantiate(applicationContext)
 
         then:
         bean != null
@@ -766,9 +808,9 @@ class MyConfig {
         return this;
     }
 }''')
-        BeanFactory factory = beanDefinition
+        InstantiatableBeanDefinition factory = beanDefinition
         ApplicationContext applicationContext = ApplicationContext.builder(["my.host": "abc"]).start()
-        def bean = factory.build(applicationContext, beanDefinition)
+        def bean = factory.instantiate(applicationContext)
 
         then:
         bean.getHost() == "abc"
@@ -912,12 +954,12 @@ class Parent {
         beanDefinition.injectedFields.isEmpty()
 
         when:
-        BeanFactory factory = beanDefinition
+        InstantiatableBeanDefinition factory = beanDefinition
         ApplicationContext applicationContext = ApplicationContext.run(
                 'foo.manufacturer':'Subaru',
                 'foo.two.manufacturer':'Subaru'
         )
-        def bean = factory.build(applicationContext, beanDefinition)
+        def bean = factory.instantiate(applicationContext)
 
         then:
         ((Engine.Builder) bean.engine).build().manufacturer == 'Subaru'

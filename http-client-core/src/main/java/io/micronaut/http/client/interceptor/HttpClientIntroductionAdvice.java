@@ -215,7 +215,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 }
             }
 
-            InterceptedMethod interceptedMethod = InterceptedMethod.of(context);
+            InterceptedMethod interceptedMethod = InterceptedMethod.of(context, conversionService);
 
             // Apply all the argument binders
             Argument[] arguments = context.getArguments();

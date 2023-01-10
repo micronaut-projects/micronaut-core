@@ -25,7 +25,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanContextConditional;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
-import io.micronaut.inject.BeanFactory;
+import io.micronaut.inject.InstantiatableBeanDefinition;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
 import java.lang.annotation.Annotation;
@@ -53,7 +53,7 @@ import java.util.stream.Collectors;
  * @see BeanDefinitionRegistry#registerBeanDefinition(RuntimeBeanDefinition)
  */
 @Experimental
-public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, BeanDefinition<T>, BeanFactory<T>, BeanContextConditional {
+public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, InstantiatableBeanDefinition<T>, BeanContextConditional {
 
     @Override
     @NonNull
