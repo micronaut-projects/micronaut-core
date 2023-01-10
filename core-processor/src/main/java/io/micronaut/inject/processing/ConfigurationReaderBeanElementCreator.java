@@ -284,7 +284,7 @@ final class ConfigurationReaderBeanElementCreator extends DeclaredBeanElementCre
                         return false;
                     }
                     MethodElement methodElement = writeMethod.get();
-                    if (methodElement.hasStereotype(Deprecated.class) || !methodElement.isPublic()) {
+                    if (propertyElement.hasStereotype(Deprecated.class) || !methodElement.isPublic()) {
                         return false;
                     }
                     return methodElement.getParameters().length <= 2;
