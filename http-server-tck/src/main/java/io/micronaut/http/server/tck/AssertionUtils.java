@@ -57,7 +57,7 @@ public final class AssertionUtils {
         HttpResponse<?> response = thrown.getResponse();
         assertEquals(assertion.getHttpStatus(), response.getStatus());
         assertHeaders(response, assertion.getHeaders());
-        assertBody(response, assertion.getBody(), assertion.getContains());
+        assertBody(response, assertion.getBody());
         assertion.getResponseConsumer().ifPresent(httpResponseConsumer -> httpResponseConsumer.accept(response));
     }
 
@@ -73,18 +73,6 @@ public final class AssertionUtils {
             .build());
     }
 
-    public static void assertThrowsAndContains(@NonNull ServerUnderTest server,
-                                    @NonNull HttpRequest<?> request,
-                                    @NonNull HttpStatus expectedStatus,
-                                    @Nullable String expectedBody,
-                                    @Nullable Map<String, String> expectedHeaders) {
-        assertThrows(server, request, HttpResponseAssertion.builder()
-            .status(expectedStatus)
-            .containsBody(expectedBody)
-            .headers(expectedHeaders)
-            .build());
-    }
-
     public static <T> void assertDoesNotThrow(@NonNull ServerUnderTest server,
                                           @NonNull HttpRequest<T> request,
                                           @NonNull HttpStatus expectedStatus,
@@ -93,18 +81,6 @@ public final class AssertionUtils {
         assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
             .status(expectedStatus)
             .body(expectedBody)
-            .headers(expectedHeaders)
-            .build());
-    }
-
-    public static <T> void assertDoesNotThrowAndContains(@NonNull ServerUnderTest server,
-                                          @NonNull HttpRequest<T> request,
-                                          @NonNull HttpStatus expectedStatus,
-                                          @Nullable String expectedBody,
-                                          @Nullable Map<String, String> expectedHeaders) {
-        assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
-            .status(expectedStatus)
-            .containsBody(expectedBody)
             .headers(expectedHeaders)
             .build());
     }
@@ -118,21 +94,15 @@ public final class AssertionUtils {
         HttpResponse<?> response = Assertions.assertDoesNotThrow(executable);
         assertEquals(assertion.getHttpStatus(), response.getStatus());
         assertHeaders(response, assertion.getHeaders());
-        assertBody(response, assertion.getBody(), assertion.getContains());
+        assertBody(response, assertion.getBody());
         assertion.getResponseConsumer().ifPresent(httpResponseConsumer -> httpResponseConsumer.accept(response));
     }
 
-    private static void assertBody(@NonNull HttpResponse<?> response,  @Nullable String expectedBody, boolean contains) {
+    private static void assertBody(@NonNull HttpResponse<?> response,  @Nullable String expectedBody) {
         if (expectedBody != null) {
             Optional<String> bodyOptional = response.getBody(String.class);
             assertTrue(bodyOptional.isPresent());
-            bodyOptional.ifPresent(body -> {
-                if (contains) {
-                    assertTrue(body.contains(expectedBody));
-                } else {
-                    assertEquals(expectedBody, body);
-                }
-            });
+            bodyOptional.ifPresent(body -> assertTrue(body.contains(expectedBody)));
         }
     }
 

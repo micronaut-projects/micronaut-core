@@ -38,7 +38,6 @@ public final class HttpResponseAssertion {
     private final HttpStatus httpStatus;
     private final Map<String, String> headers;
     private final String body;
-    private final boolean contains;
 
     @Nullable
     private final Consumer<HttpResponse<?>> responseConsumer;
@@ -46,12 +45,10 @@ public final class HttpResponseAssertion {
     private HttpResponseAssertion(HttpStatus httpStatus,
                                   Map<String, String> headers,
                                   String body,
-                                  boolean contains,
                                   @Nullable Consumer<HttpResponse<?>> responseConsumer) {
         this.httpStatus = httpStatus;
         this.headers = headers;
         this.body = body;
-        this.contains = contains;
         this.responseConsumer = responseConsumer;
     }
 
@@ -93,20 +90,12 @@ public final class HttpResponseAssertion {
     }
 
     /**
-     * @return true if the body is expected to contain the expected body.
-     */
-    public boolean getContains() {
-        return contains;
-    }
-
-    /**
      * HTTP Response Assertion Builder.
      */
     public static class Builder {
         private HttpStatus httpStatus;
         private Map<String, String> headers;
         private String body;
-        private boolean contains = false;
 
         private Consumer<HttpResponse<?>> responseConsumer;
 
@@ -145,25 +134,12 @@ public final class HttpResponseAssertion {
         }
 
         /**
-         * Set the expected contents of a body.
          *
          * @param body Response Body
          * @return HTTP Response Assertion Builder
          */
         public Builder body(String body) {
             this.body = body;
-            return this;
-        }
-
-        /**
-         * Set the expected partial contents of a body.
-         *
-         * @param body Response Body
-         * @return HTTP Response Assertion Builder
-         */
-        public Builder containsBody(String body) {
-            this.body = body;
-            this.contains = true;
             return this;
         }
 
@@ -182,7 +158,7 @@ public final class HttpResponseAssertion {
          * @return HTTP Response Assertion
          */
         public HttpResponseAssertion build() {
-            return new HttpResponseAssertion(Objects.requireNonNull(httpStatus), headers, body, contains, responseConsumer);
+            return new HttpResponseAssertion(Objects.requireNonNull(httpStatus), headers, body, responseConsumer);
         }
     }
 }

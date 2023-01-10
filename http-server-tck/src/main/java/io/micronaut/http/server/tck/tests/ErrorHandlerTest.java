@@ -101,7 +101,7 @@ public class ErrorHandlerTest {
             ObjectMapper objectMapper = server.getApplicationContext().getBean(ObjectMapper.class);
             HttpRequest<?> request = HttpRequest.POST("/json/errors/global", objectMapper.writeValueAsString(new RequestObject(101)))
                 .header(HttpHeaders.CONTENT_TYPE, io.micronaut.http.MediaType.APPLICATION_JSON);
-            AssertionUtils.assertDoesNotThrowAndContains(server, request,
+            AssertionUtils.assertDoesNotThrow(server, request,
                 HttpStatus.OK,
                 "{\"message\":\"Error: bad things when post and body in request\",\"",
                 Collections.singletonMap(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON));
