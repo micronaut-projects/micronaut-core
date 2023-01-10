@@ -24,17 +24,21 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.naming.NameResolver;
-import io.micronaut.core.naming.Named;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanFactory;
 import io.micronaut.inject.DelegatingBeanDefinition;
 import io.micronaut.inject.DisposableBeanDefinition;
 import io.micronaut.inject.InitializingBeanDefinition;
+import io.micronaut.inject.InjectableBeanDefinition;
 import io.micronaut.inject.InjectionPoint;
+import io.micronaut.inject.InstantiatableBeanDefinition;
 import io.micronaut.inject.ParametrizedBeanFactory;
+import io.micronaut.inject.ParametrizedInstantiatableBeanDefinition;
 import io.micronaut.inject.ValidatedBeanDefinition;
 import io.micronaut.inject.qualifiers.PrimaryQualifier;
+import io.micronaut.inject.qualifiers.Qualifiers;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -51,7 +55,8 @@ import java.util.Optional;
  */
 @Internal
 sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
-                                       implements DelegatingBeanDefinition<T>, BeanFactory<T>, NameResolver {
+    implements DelegatingBeanDefinition<T>, InstantiatableBeanDefinition<T>,
+    InjectableBeanDefinition<T>, NameResolver {
 
     protected final BeanDefinition<T> definition;
     @Nullable
@@ -109,11 +114,11 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
 
     @Override
     public boolean isPrimary() {
-        return isLocalQualifierPrimary() || definition.isPrimary() || isPrimaryThroughAttribute();
+        return isQualifiedAsPrimary(qualifier) || definition.isPrimary() || isPrimaryThroughAttribute();
     }
 
-    private boolean isLocalQualifierPrimary() {
-        return qualifier != null && (qualifier == PrimaryQualifier.INSTANCE || qualifier.contains(PrimaryQualifier.INSTANCE));
+    private boolean isQualifiedAsPrimary(Qualifier<?> q) {
+        return q != null && (q == PrimaryQualifier.INSTANCE || q.contains(PrimaryQualifier.INSTANCE));
     }
 
     private boolean isPrimaryThroughAttribute() {
@@ -124,24 +129,48 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
     }
 
     @Override
-    public T build(BeanResolutionContext resolutionContext, BeanContext context, BeanDefinition<T> definition) throws BeanInstantiationException {
+    public T inject(BeanContext context, T bean) {
+        if (definition instanceof InjectableBeanDefinition<T> injectableBeanDefinition) {
+            return injectableBeanDefinition.inject(context, bean);
+        }
+        return bean;
+    }
+
+    @Override
+    public T inject(BeanResolutionContext resolutionContext, BeanContext context, T bean) {
+        if (definition instanceof InjectableBeanDefinition<T> injectableBeanDefinition) {
+            return injectableBeanDefinition.inject(resolutionContext, context, bean);
+        }
+        return bean;
+    }
+
+    @Override
+    public T instantiate(BeanResolutionContext resolutionContext, BeanContext context) throws BeanInstantiationException {
         ConfigurationPath oldPath = null;
         if (configurationPath != null) {
             oldPath = resolutionContext.getConfigurationPath();
             resolutionContext.setConfigurationPath(configurationPath);
         }
-
         try {
+            // TODO: delete this after Micronaut 4 Milestone 1
             if (this.definition instanceof ParametrizedBeanFactory) {
                 ParametrizedBeanFactory<T> parametrizedBeanFactory = (ParametrizedBeanFactory<T>) this.definition;
-                Map<String, Object> fulfilled = getParametersValues(resolutionContext, (DefaultBeanContext) context, definition, parametrizedBeanFactory);
+                Argument[] requiredArguments = parametrizedBeanFactory.getRequiredArguments();
+                Map<String, Object> fulfilled = getParametersValues(resolutionContext, (DefaultBeanContext) context, definition, requiredArguments);
                 return parametrizedBeanFactory.build(resolutionContext, context, definition, fulfilled);
             }
-            if (this.definition instanceof BeanFactory) {
-                return ((BeanFactory<T>) this.definition).build(resolutionContext, context, definition);
-            } else {
-                throw new IllegalStateException("Cannot construct a dynamically registered singleton");
+            if (this.definition instanceof BeanFactory beanFactory) {
+                return (T) beanFactory.build(resolutionContext, context, definition);
             }
+            if (this.definition instanceof ParametrizedInstantiatableBeanDefinition<T> parametrizedInstantiatableBeanDefinition) {
+                Argument<Object>[] requiredArguments = parametrizedInstantiatableBeanDefinition.getRequiredArguments();
+                Map<String, Object> fulfilled = getParametersValues(resolutionContext, (DefaultBeanContext) context, definition, requiredArguments);
+                return parametrizedInstantiatableBeanDefinition.instantiate(resolutionContext, context, fulfilled);
+            }
+            if (this.definition instanceof InstantiatableBeanDefinition<T> instantiatableBeanDefinition) {
+                return instantiatableBeanDefinition.instantiate(resolutionContext, context);
+            }
+            throw new IllegalStateException("Cannot construct a dynamically registered singleton");
         } finally {
             resolutionContext.setConfigurationPath(oldPath);
         }
@@ -151,8 +180,7 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
     private Map<String, Object> getParametersValues(BeanResolutionContext resolutionContext,
                                                     DefaultBeanContext context,
                                                     BeanDefinition<T> definition,
-                                                    ParametrizedBeanFactory<T> parametrizedBeanFactory) {
-        Argument<Object>[] requiredArguments = (Argument<Object>[]) parametrizedBeanFactory.getRequiredArguments();
+                                                    Argument<Object>[] requiredArguments) {
         if (requiredArguments.length == 0) {
             return Collections.emptyMap();
         }
@@ -167,20 +195,17 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
                     if (simpleName != null) {
                         fulfilled.put(argumentName, simpleName);
                     } else {
-                        Qualifier<?> q = resolutionContext.getCurrentQualifier();
-                        if (q instanceof Named named) {
-                            fulfilled.put(argumentName, named.getName());
-                        } else if (q == PrimaryQualifier.INSTANCE) {
-                            fulfilled.put(argumentName, Primary.SIMPLE_NAME);
+                        String name = findName(resolutionContext.getCurrentQualifier());
+                        if (name != null) {
+                            fulfilled.put(argumentName, name);
                         }
                     }
                 } else if (Number.class.isAssignableFrom(type)) {
                     fulfilled.put(argumentName, context.getConversionService().convertRequired(configurationPath.index(), argument));
                 } else if (qualifier != null && hasDeclaredAnnotation(EachBean.class) && String.class.equals(type) && "name".equals(argumentName)) {
-                    if (isLocalQualifierPrimary()) {
-                        fulfilled.put(argumentName, Primary.SIMPLE_NAME);
-                    } else if (qualifier instanceof Named named) {
-                        fulfilled.put(argumentName, named.getName());
+                    String name = findName(qualifier);
+                    if (name != null) {
+                        fulfilled.put(argumentName, name);
                     }
                 } else {
                     if (argument.isProvider()) {
@@ -211,6 +236,21 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
         return fulfilled;
     }
 
+    @Nullable
+    private String findName(@Nullable Qualifier<?> q) {
+        if (q == null) {
+            return null;
+        }
+        String name = Qualifiers.findName(q);
+        if (name != null) {
+            return name;
+        }
+        if (isQualifiedAsPrimary(q)) {
+            return Primary.SIMPLE_NAME;
+        }
+        return null;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {
@@ -226,7 +266,7 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
 
     @Override
     public int hashCode() {
-        return Objects.hash(definition, qualifier);
+        return ObjectUtils.hash(definition, qualifier);
     }
 
     /**
@@ -239,10 +279,7 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
 
     @Override
     public Optional<String> resolveName() {
-        if (qualifier instanceof Named named) {
-            return Optional.of(named.getName());
-        }
-        return Optional.empty();
+        return Optional.ofNullable(findName(qualifier));
     }
 
     @Override

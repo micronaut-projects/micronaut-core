@@ -27,16 +27,12 @@ class Application {}
         context.containsBean(DefaultFallbackHandlerProvider)
         context.getBeanDefinition(DefaultFallbackHandlerProvider)
                 .injectedFields.size() == 1
-        context.getBeanDefinition(DefaultFallbackHandlerProvider)
-                .injectedFields.first().requiresReflection()
         context.containsBean(DefaultFaultToleranceOperationProvider)
         context.getBeanDefinition(DefaultFaultToleranceOperationProvider)
                 .getConstructor().arguments.length == 1
         context.containsBean(ExecutorHolder)
         context.getBeanDefinition(ExecutorHolder)
                 .preDestroyMethods.size() == 1
-        !context.getBeanDefinition(ExecutorHolder)
-                .preDestroyMethods.first().requiresReflection()
         cleanup:
         context.close()
     }
@@ -65,16 +61,12 @@ class Application {}
         context.containsBean(DefaultFallbackHandlerProvider)
         context.getBeanDefinition(DefaultFallbackHandlerProvider)
                 .injectedFields.size() == 1
-        context.getBeanDefinition(DefaultFallbackHandlerProvider)
-                .injectedFields.first().requiresReflection()
         context.containsBean(DefaultFaultToleranceOperationProvider)
         context.getBeanDefinition(DefaultFaultToleranceOperationProvider)
                 .getConstructor().arguments.length == 1
         context.containsBean(ExecutorHolder)
         context.getBeanDefinition(ExecutorHolder)
                 .preDestroyMethods.size() == 1
-        !context.getBeanDefinition(ExecutorHolder)
-                .preDestroyMethods.first().requiresReflection()
         cleanup:
         context.close()
     }

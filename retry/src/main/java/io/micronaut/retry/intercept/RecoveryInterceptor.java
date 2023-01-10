@@ -20,7 +20,6 @@ import io.micronaut.aop.InterceptedMethod;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.BeanContext;
-import io.micronaut.core.convert.ConversionService;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
@@ -75,25 +74,29 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
         if (context.getAttribute(FALLBACK_NOT_FOUND, Boolean.class).orElse(Boolean.FALSE)) {
             return context.proceed();
         }
-        InterceptedMethod interceptedMethod = InterceptedMethod.of(context);
+        InterceptedMethod interceptedMethod = InterceptedMethod.of(context, beanContext.getConversionService());
         try {
             switch (interceptedMethod.resultType()) {
-                case PUBLISHER:
+                case PUBLISHER -> {
                     return interceptedMethod.handleResult(
                             fallbackForReactiveType(context, interceptedMethod.interceptResultAsPublisher())
                     );
-                case COMPLETION_STAGE:
+                }
+                case COMPLETION_STAGE -> {
                     return interceptedMethod.handleResult(
                             fallbackForFuture(context, interceptedMethod.interceptResultAsCompletionStage())
                     );
-                case SYNCHRONOUS:
+                }
+                case SYNCHRONOUS -> {
                     try {
                         return context.proceed();
                     } catch (RuntimeException e) {
                         return resolveFallback(context, e);
                     }
-                default:
+                }
+                default -> {
                     return interceptedMethod.unsupported();
+                }
             }
         } catch (Exception e) {
             return interceptedMethod.handleException(e);
@@ -119,7 +122,7 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
                 if (fallbackResult == null) {
                     return Flux.error(new FallbackException("Fallback handler [" + fallbackHandle + "] returned null value"));
                 } else {
-                    return ConversionService.SHARED.convert(fallbackResult, Publisher.class)
+                    return beanContext.getConversionService().convert(fallbackResult, Publisher.class)
                         .orElseThrow(() -> new FallbackException("Unsupported Reactive type: " + fallbackResult));
                 }
             }

@@ -20,9 +20,8 @@ import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.event.ApplicationEventListener
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.BeanFactory
+import io.micronaut.inject.InstantiatableBeanDefinition
 import io.micronaut.inject.writer.BeanDefinitionVisitor
-
 /**
  * @author graemerocher
  * @since 1.0
@@ -59,7 +58,7 @@ class MyBean  {
         when:
         def context = new DefaultBeanContext()
         context.start()
-        def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
+        def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
         ListenerAdviceInterceptor listenerAdviceInterceptor= context.getBean(ListenerAdviceInterceptor)
         listenerAdviceInterceptor.recievedMessages.clear()
         then:"the methods are invocable"
@@ -100,7 +99,7 @@ abstract class MyBean  {
         when:
         def context = new DefaultBeanContext()
         context.start()
-        def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
+        def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
         ListenerAdviceInterceptor listenerAdviceInterceptor= context.getBean(ListenerAdviceInterceptor)
         listenerAdviceInterceptor.recievedMessages.clear()
         then:"the methods are invocable"
@@ -145,7 +144,7 @@ interface MyBean  {
 
         when:
         def context = BeanContext.run()
-        def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
+        def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
         ListenerAdviceInterceptor listenerAdviceInterceptor= context.getBean(ListenerAdviceInterceptor)
         listenerAdviceInterceptor.recievedMessages.clear()
 
@@ -194,7 +193,7 @@ interface SpecificInterface {
         when:
         def context = new DefaultBeanContext()
         context.start()
-        def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
+        def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
 
         then:
         //I ended up going this route because actually calling the methods here would be relying on
@@ -273,7 +272,7 @@ interface MyInterface4 {
         when:
             def context = new DefaultBeanContext()
             context.start()
-            def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
+            def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
             def introducer = context.getBean(StubIntroducer)
         then:
             instance.myMethod1("abc1") == "abc1"

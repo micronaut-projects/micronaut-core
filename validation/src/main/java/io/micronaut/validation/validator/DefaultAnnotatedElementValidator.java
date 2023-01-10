@@ -17,6 +17,7 @@ package io.micronaut.validation.validator;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.util.ArrayUtils;
@@ -45,8 +46,8 @@ public class DefaultAnnotatedElementValidator extends DefaultValidator implement
      * Default constructor.
      */
     public DefaultAnnotatedElementValidator() {
-        super(new DefaultValidatorConfiguration()
-                    .setConstraintValidatorRegistry(new LocalConstraintValidators()));
+        super(new DefaultValidatorConfiguration(ConversionService.SHARED)
+                    .setConstraintValidatorRegistry(new LocalConstraintValidators()), ConversionService.SHARED);
     }
 
     /**

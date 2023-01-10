@@ -131,6 +131,29 @@ public class Qualifiers {
     }
 
     /**
+     * Finds a name in the provided qualifier.
+     *
+     * @return The qualifier
+     * @since 4.0.0
+     */
+    @Nullable
+    public static String findName(@NonNull Qualifier<?> qualifier) {
+        if (qualifier instanceof NameQualifier<?> nameQualifier) {
+            return nameQualifier.getName();
+        }
+        if (qualifier instanceof CompositeQualifier<?> compositeQualifier) {
+            for (Qualifier<?> composite : compositeQualifier.getQualifiers()) {
+                String name = findName(composite);
+                if (name != null) {
+                    return name;
+                }
+            }
+        }
+        return null;
+    }
+
+
+    /**
      * Qualify by a prefix. Applies starting with logic to the name of the bean..
      *
      * @param prefix The name

@@ -29,6 +29,8 @@ class InterceptorSpec : StringSpec() {
 
     private var myService = context.getBean(MyService::class.java)
 
+    private var repository = context.getBean(CustomRepository::class.java)
+
     init {
         "test correct interceptors calls" {
             runBlocking {
@@ -43,6 +45,16 @@ class InterceptorSpec : StringSpec() {
                 MyService.events[5] shouldBe "intercept1-end"
                 MyService.events[6] shouldBe "repository-count1"
                 MyService.events[7] shouldBe "repository-count2"
+            }
+        }
+
+        "test calling generic method" {
+            runBlocking {
+                MyService.events.clear()
+                // Validate that no bytecode error is produced
+                repository.findById(111)
+                MyService.events.size shouldBeExactly 1
+                MyService.events[0] shouldBe "repository-findById"
             }
         }
     }

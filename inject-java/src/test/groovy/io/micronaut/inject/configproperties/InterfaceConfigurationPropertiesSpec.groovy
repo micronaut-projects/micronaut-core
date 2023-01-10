@@ -1,12 +1,11 @@
 package io.micronaut.inject.configproperties
 
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.exceptions.NoSuchBeanException
-import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.BeanFactory
-import io.micronaut.inject.ExecutableMethod
+import io.micronaut.inject.InstantiatableBeanDefinition
 import io.micronaut.inject.ValidatedBeanDefinition
 import io.micronaut.runtime.context.env.ConfigurationAdvice
 
@@ -26,7 +25,7 @@ import java.time.Duration;
 interface MyConfig {
     @javax.validation.constraints.NotBlank
     String getHost();
-    
+
     @javax.validation.constraints.Min(10L)
     int getServerPort();
 }
@@ -42,7 +41,7 @@ interface MyConfig {
 
         when:
         def context = ApplicationContext.run('foo.bar.host': 'test', 'foo.bar.server-port': '9999')
-        def config = ((BeanFactory) beanDefinition).build(context, beanDefinition)
+        def config = ((InstantiatableBeanDefinition) beanDefinition).instantiate(context)
 
         then:
         config.host == 'test'
@@ -89,7 +88,7 @@ interface MyConfig {
 
         when:
         def context = ApplicationContext.run()
-        def config = ((BeanFactory) beanDefinition).build(context, beanDefinition)
+        def config = ((InstantiatableBeanDefinition) beanDefinition).instantiate(context)
 
         then:
         config.host == null
@@ -98,7 +97,7 @@ interface MyConfig {
 
         when:
         def context2 = ApplicationContext.run('foo.bar.host': 'test', 'foo.bar.server-port': '9999', 'foo.bar.url': 'http://test')
-        def config2 = ((BeanFactory) beanDefinition).build(context2, beanDefinition)
+        def config2 = ((InstantiatableBeanDefinition) beanDefinition).instantiate(context2)
 
         then:
         config2.host == 'test'
@@ -122,7 +121,7 @@ import java.time.Duration;
 
 @ConfigurationProperties("bar")
 interface MyConfig extends ParentConfig {
-    
+
     @Executable
     @javax.validation.constraints.Min(10L)
     int getServerPort();
@@ -145,7 +144,7 @@ interface ParentConfig {
 
         when:
         def context = ApplicationContext.run('foo.bar.host': 'test', 'foo.bar.server-port': '9999')
-        def config = ((BeanFactory) beanDefinition).build(context, beanDefinition)
+        def config = ((InstantiatableBeanDefinition) beanDefinition).instantiate(context)
 
         then:
         config.host == 'test'
@@ -171,12 +170,12 @@ interface MyConfig {
     @Executable
     @javax.validation.constraints.NotBlank
     String getHost();
-    
+
     @Executable
     @javax.validation.constraints.Min(10L)
     int getServerPort();
 
-    @ConfigurationProperties("child")    
+    @ConfigurationProperties("child")
     static interface ChildConfig {
         @Executable
         URL getURL();
@@ -191,7 +190,7 @@ interface MyConfig {
 
         when:
         def context = ApplicationContext.run('foo.bar.child.url': 'http://test')
-        def config = ((BeanFactory) beanDefinition).build(context, beanDefinition)
+        def config = ((InstantiatableBeanDefinition) beanDefinition).instantiate(context)
 
         then:
         config.URL == new URL("http://test")
@@ -216,15 +215,15 @@ interface MyConfig {
     @javax.validation.constraints.NotBlank
     @Executable
     String getHost();
-    
+
     @javax.validation.constraints.Min(10L)
     @Executable
     int getServerPort();
-    
+
     @Executable
     ChildConfig getChild();
 
-    @ConfigurationProperties("child")    
+    @ConfigurationProperties("child")
     static interface ChildConfig {
         @Executable
         URL getURL();
@@ -239,7 +238,7 @@ interface MyConfig {
 
         when:
         def context = ApplicationContext.run('foo.bar.child.url': 'http://test')
-        def config = ((BeanFactory) beanDefinition).build(context, beanDefinition)
+        def config = ((InstantiatableBeanDefinition) beanDefinition).instantiate(context)
         config.child
 
         then:"we expect a bean resolution"
@@ -264,7 +263,7 @@ import java.time.Duration;
 interface MyConfig {
     @javax.validation.constraints.NotBlank
     String junk(String s);
-    
+
     @javax.validation.constraints.Min(10L)
     int getServerPort();
 }

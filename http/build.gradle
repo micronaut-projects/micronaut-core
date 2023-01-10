@@ -19,10 +19,11 @@ dependencies {
     testImplementation project(":jackson-databind")
     testImplementation project(":inject")
     testImplementation project(":runtime")
+    testImplementation(libs.managed.logback.classic)
 }
 
 tasks.named("compileKotlin") {
-    kotlinOptions.jvmTarget = "1.8"
+    kotlinOptions.jvmTarget = "17"
 }
 
 //compileJava.options.fork = true

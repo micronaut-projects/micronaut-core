@@ -34,6 +34,7 @@ import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanIntrospector;
 import io.micronaut.core.beans.BeanProperty;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ArgumentValue;
@@ -117,14 +118,16 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
     private final TraversableResolver traversableResolver;
     private final ExecutionHandleLocator executionHandleLocator;
     private final MessageSource messageSource;
+    private final ConversionService conversionService;
 
     /**
      * Default constructor.
      *
-     * @param configuration The validator configuration
+     * @param configuration     The validator configuration
+     * @param conversionService The conversion service
      */
-    protected DefaultValidator(
-            @NonNull ValidatorConfiguration configuration) {
+    protected DefaultValidator(@NonNull ValidatorConfiguration configuration, ConversionService conversionService) {
+        this.conversionService = conversionService;
         ArgumentUtils.requireNonNull("configuration", configuration);
         this.constraintValidatorRegistry = configuration.getConstraintValidatorRegistry();
         this.clockProvider = configuration.getClockProvider();
@@ -901,7 +904,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             AnnotationMetadata annotationMetadata,
             Object parameterValue,
             boolean isValid) {
-        final Publisher<Object> publisher = Publishers.convertPublisher(parameterValue, Publisher.class);
+        final Publisher<Object> publisher = Publishers.convertPublisher(conversionService, parameterValue, Publisher.class);
         PathImpl copied = new PathImpl(context.currentPath);
         final Flux<Object> finalFlowable = Flux.from(publisher).flatMap(o -> {
             DefaultConstraintValidatorContext newContext =
@@ -949,7 +952,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
 
             return Flux.just(o);
         });
-        argumentValues[argumentIndex] = Publishers.convertPublisher(finalFlowable, parameterType);
+        argumentValues[argumentIndex] = Publishers.convertPublisher(conversionService, finalFlowable, parameterType);
     }
 
     private <T> void instrumentCompletionStageArgumentWithValidation(
@@ -1598,7 +1601,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
     @Override
     public <T> Publisher<T> validatePublisher(@NonNull Publisher<T> publisher, Class<?>... groups) {
         ArgumentUtils.requireNonNull("publisher", publisher);
-        final Publisher<T> reactiveSequence = Publishers.convertPublisher(publisher, Publisher.class);
+        final Publisher<T> reactiveSequence = Publishers.convertPublisher(conversionService, publisher, Publisher.class);
         return Flux.from(reactiveSequence).flatMap(object -> {
             final Set<ConstraintViolation<Object>> constraintViolations = validate(object, groups);
             if (!constraintViolations.isEmpty()) {

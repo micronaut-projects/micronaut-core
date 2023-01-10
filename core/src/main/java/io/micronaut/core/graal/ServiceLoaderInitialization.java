@@ -78,7 +78,7 @@ final class ServiceLoaderFeature implements Feature {
                         if (GraalReflectionConfigurer.class.isAssignableFrom(c)) {
                             continue;
                         } else if (BeanInfo.class.isAssignableFrom(c)) {
-
+                            RuntimeClassInitialization.initializeAtBuildTime(c);
                             BeanInfo<?> beanInfo;
                             try {
                                 beanInfo = (BeanInfo<?>) c.getDeclaredConstructor().newInstance();
@@ -105,7 +105,7 @@ final class ServiceLoaderFeature implements Feature {
                                 }
                             }
                         }
-                        RuntimeClassInitialization.initializeAtBuildTime(c);
+
                         RuntimeReflection.registerForReflectiveInstantiation(c);
                         RuntimeReflection.register(c);
                     }

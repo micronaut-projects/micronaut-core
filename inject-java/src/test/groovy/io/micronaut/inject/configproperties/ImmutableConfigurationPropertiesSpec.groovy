@@ -1,13 +1,11 @@
 package io.micronaut.inject.configproperties
 
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.ApplicationContextBuilder
-import io.micronaut.context.DefaultBeanResolutionContext
 import io.micronaut.context.annotation.Property
-import io.micronaut.core.naming.Named
-import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.BeanFactory
+import io.micronaut.inject.InstantiatableBeanDefinition
 import io.micronaut.inject.ValidatedBeanDefinition
 import io.micronaut.inject.qualifiers.Qualifiers
 
@@ -77,7 +75,7 @@ class MyConfig {
 
         when:
         def context = ApplicationContext.run('foo.bar.host': 'test', 'foo.bar.server-port': '9999')
-        def config = ((BeanFactory) beanDefinition).build(context, beanDefinition)
+        def config = ((InstantiatableBeanDefinition) beanDefinition).instantiate(context)
 
         then:
         config.host == 'test'
@@ -135,7 +133,7 @@ class MyConfig {
 
         when:
         def context = ApplicationContext.run('foo.bar.baz.stuff': 'test')
-        def config = ((BeanFactory) beanDefinition).build(context, beanDefinition)
+        def config = ((InstantiatableBeanDefinition) beanDefinition).instantiate(context)
 
         then:
         config.stuff == 'test'
@@ -236,7 +234,7 @@ class MyConfig {
 
 ''')
         def context = ApplicationContext.run('foo.bar.host': 'test', 'foo.bar.server-port': '9999')
-        def config = ((BeanFactory) beanDefinition).build(context, beanDefinition)
+        def config = ((InstantiatableBeanDefinition) beanDefinition).instantiate(context)
 
         then:
         config.host == 'test'

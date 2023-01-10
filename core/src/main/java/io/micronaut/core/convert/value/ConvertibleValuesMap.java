@@ -24,6 +24,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -104,6 +105,23 @@ public class ConvertibleValuesMap<V> implements ConvertibleValues<V>, Conversion
     @SuppressWarnings("unchecked")
     public static <V> ConvertibleValues<V> empty() {
         return EMPTY;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        ConvertibleValuesMap<?> that = (ConvertibleValuesMap<?>) o;
+        return map.equals(that.map);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(map);
     }
 
     @Override

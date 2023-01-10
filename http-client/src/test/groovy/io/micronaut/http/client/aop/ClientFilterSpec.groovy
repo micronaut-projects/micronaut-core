@@ -17,6 +17,7 @@ package io.micronaut.http.client.aop
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
+import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpVersion
 import io.micronaut.http.MediaType
@@ -32,8 +33,9 @@ import io.micronaut.http.filter.ClientFilterChain
 import io.micronaut.http.filter.HttpClientFilter
 import io.micronaut.runtime.server.EmbeddedServer
 import org.reactivestreams.Publisher
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 import spock.lang.AutoCleanup
-import spock.lang.Shared
 import spock.lang.Specification
 
 /**
@@ -265,6 +267,48 @@ class ClientFilterSpec extends Specification{
         @Override
         Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> request, ClientFilterChain chain) {
             throw new RuntimeException("from filter")
+        }
+    }
+
+    void "filter always observes a response"() {
+        given:
+        ObservesResponseClient client = context.getBean(ObservesResponseClient)
+        ObservesResponseFilter filter = context.getBean(ObservesResponseFilter)
+
+        when:
+        Mono.from(client.monoVoid()).block() == null
+        then:
+        filter.observedResponse != null
+    }
+
+    @Requires(property = 'spec.name', value = "ClientFilterSpec")
+    @Client('/observes-response')
+    static interface ObservesResponseClient {
+
+        @Get
+        @SingleResult
+        Publisher<Void> monoVoid()
+    }
+
+    @Requires(property = 'spec.name', value = "ClientFilterSpec")
+    @Filter("/observes-response/**")
+    static class ObservesResponseFilter implements HttpClientFilter {
+        HttpResponse<?> observedResponse
+
+        @Override
+        Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> request, ClientFilterChain chain) {
+            return Flux.from(chain.proceed(request)).doOnNext(r -> {
+                observedResponse = r
+            })
+        }
+    }
+
+    @Requires(property = 'spec.name', value = "ClientFilterSpec")
+    @Controller('/observes-response')
+    static class ObservesResponseController {
+        @Get
+        String index() {
+            return ""
         }
     }
 }

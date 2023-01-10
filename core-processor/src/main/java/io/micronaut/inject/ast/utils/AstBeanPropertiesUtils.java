@@ -102,14 +102,14 @@ public final class AstBeanPropertiesUtils {
             } else if (NameUtils.isReaderName(methodName, readPrefixes) && methodElement.getParameters().length == 0) {
                 String propertyName = customReaderPropertyNameResolver.apply(methodElement)
                     .orElseGet(() -> NameUtils.getPropertyNameForGetter(methodName, readPrefixes));
-                processGetter(props, methodElement, propertyName, isAccessor);
+                processGetter(props, methodElement, propertyName, isAccessor, configuration);
             } else if (NameUtils.isWriterName(methodName, writePrefixes)
                 && (methodElement.getParameters().length == 1
                 || configuration.isAllowSetterWithZeroArgs() && methodElement.getParameters().length == 0
                 || configuration.isAllowSetterWithMultipleArgs() && methodElement.getParameters().length > 1)) {
                 String propertyName = customWriterPropertyNameResolver.apply(methodElement)
                     .orElseGet(() -> NameUtils.getPropertyNameForSetter(methodName, writePrefixes));
-                processSetter(props, methodElement, propertyName, isAccessor);
+                processSetter(classElement, props, methodElement, propertyName, isAccessor, configuration);
             }
         }
         for (FieldElement fieldElement : fieldSupplier.get()) {
@@ -230,7 +230,7 @@ public final class AstBeanPropertiesUtils {
         beanPropertyData.type = beanPropertyData.getter.getGenericReturnType();
     }
 
-    private static void processGetter(Map<String, BeanPropertyData> props, MethodElement methodElement, String propertyName, boolean isAccessor) {
+    private static void processGetter(Map<String, BeanPropertyData> props, MethodElement methodElement, String propertyName, boolean isAccessor, PropertyElementQuery configuration) {
         BeanPropertyData beanPropertyData = props.computeIfAbsent(propertyName, BeanPropertyData::new);
         beanPropertyData.getter = methodElement;
         if (isAccessor) {
@@ -238,7 +238,7 @@ public final class AstBeanPropertiesUtils {
         }
         ClassElement genericReturnType = beanPropertyData.getter.getGenericReturnType();
         ClassElement getterType = unwrapType(genericReturnType);
-        if (beanPropertyData.type != null) {
+        if (configuration.isIgnoreSettersWithDifferingType() && beanPropertyData.type != null) {
             if (!getterType.isAssignable(unwrapType(beanPropertyData.type))) {
                 beanPropertyData.getter = null; // not a compatible getter
                 beanPropertyData.readAccessKind = null;
@@ -248,7 +248,7 @@ public final class AstBeanPropertiesUtils {
         }
     }
 
-    private static void processSetter(Map<String, BeanPropertyData> props, MethodElement methodElement, String propertyName, boolean isAccessor) {
+    private static void processSetter(ClassElement classElement, Map<String, BeanPropertyData> props, MethodElement methodElement, String propertyName, boolean isAccessor, PropertyElementQuery configuration) {
         BeanPropertyData beanPropertyData = props.computeIfAbsent(propertyName, BeanPropertyData::new);
         ClassElement paramType = methodElement.getParameters().length == 0 ? PrimitiveElement.BOOLEAN : methodElement.getParameters()[0].getGenericType();
         ClassElement setterType = unwrapType(paramType);
@@ -256,14 +256,19 @@ public final class AstBeanPropertiesUtils {
             if (setterType.isAssignable(unwrapType(beanPropertyData.type))) {
                 // Override the setter because the type is higher
                 beanPropertyData.setter = methodElement;
+            } else if (beanPropertyData.setter.getDeclaringType().equals(classElement)) {
+                // skip
+                return;
+            } else {
+                // override must be a subclass
+                beanPropertyData.setter = methodElement;
             }
-            return;
         }
         beanPropertyData.setter = methodElement;
         if (isAccessor) {
             beanPropertyData.writeAccessKind = BeanProperties.AccessKind.METHOD;
         }
-        if (beanPropertyData.type != null) {
+        if (configuration.isIgnoreSettersWithDifferingType() && beanPropertyData.type != null) {
             if (setterType != null && !setterType.isAssignable(unwrapType(beanPropertyData.type))) {
                 beanPropertyData.setter = null; // not a compatible setter
                 beanPropertyData.writeAccessKind = null;

@@ -15,11 +15,13 @@
  */
 package io.micronaut.function.executor;
 
+import io.micronaut.context.ApplicationContext;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
 import jakarta.annotation.PostConstruct;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -31,6 +33,12 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public class FunctionInitializerSpec   {
 
+    @BeforeEach
+    void reset() {
+        MathFunction.initCount.set(0);
+        MathFunction.injectCount.set(0);
+    }
+
     @Test
     public void testFunctionInitializer() {
         MathFunction mathFunction = new MathFunction();
@@ -39,10 +47,31 @@ public class FunctionInitializerSpec   {
         Assertions.assertEquals(2, mathFunction.round(1.6f));
     }
 
+    @Test
+    public void testFunctionInitializerSubclass() {
+        MathFunction mathFunction = new SubMathFunction(); // make anonymous
+        Assertions.assertEquals(1, MathFunction.initCount.get());
+        Assertions.assertEquals(1, MathFunction.injectCount.get());
+        Assertions.assertEquals(2, mathFunction.round(1.6f));
+    }
+
+
     @Singleton
     public static class MathService {
         int round(float input) {
             return Math.round(input);
+        }
+    }
+
+    @Singleton
+    public static class SubMathFunction extends MathFunction {
+        public SubMathFunction() {
+            super.injectThis(applicationContext);
+        }
+
+        @Override
+        protected void injectThis(ApplicationContext applicationContext) {
+            //
         }
     }
 

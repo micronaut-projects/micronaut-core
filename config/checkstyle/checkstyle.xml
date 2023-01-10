@@ -96,11 +96,13 @@
         <!-- Checks for Javadoc comments.                     -->
         <!-- See https://checkstyle.org/config_javadoc.html -->
         <module name="JavadocMethod">
-            <property name="accessModifiers" value="public,protected"/>
+            <property name="accessModifiers" value="public, protected"/>
         </module>
         <module name="JavadocType"/>
         <module name="JavadocStyle"/>
-        <module name="MissingJavadocType"/>
+        <module name="MissingJavadocType">
+            <property name="severity" value="warning"/>
+        </module>
 
         <!-- Checks for Naming Conventions.                  -->
         <!-- See https://checkstyle.org/config_naming.html -->

@@ -70,6 +70,7 @@ import javax.tools.JavaFileObject
 import java.lang.annotation.Annotation
 import java.util.stream.Collectors
 import java.util.stream.StreamSupport
+
 /**
  * Base class to extend from to allow compilation of Java sources
  * at runtime to allow testing of compile time behavior.
@@ -332,7 +333,7 @@ class Test {
         return metadata
     }
 
-    protected TypeElement buildTypeElement(String cls) {
+    protected TypeElement buildTypeElement(@Language('java') String cls) {
         List<Element> elements = []
 
         newJavaParser().parseLines("",

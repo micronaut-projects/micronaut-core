@@ -89,7 +89,7 @@ public class MockHttpHeaders implements MutableHttpHeaders {
 
     @Override
     public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
-        return ConversionService.SHARED.convert(get(name), conversionContext);
+        return conversionService.convert(get(name), conversionContext);
     }
 
     @Override

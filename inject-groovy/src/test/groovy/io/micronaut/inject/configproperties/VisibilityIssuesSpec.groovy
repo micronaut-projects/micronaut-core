@@ -18,7 +18,7 @@ package io.micronaut.inject.configproperties
 import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.BeanFactory
+import io.micronaut.inject.InstantiatableBeanDefinition
 
 class VisibilityIssuesSpec extends AbstractBeanDefinitionSpec {
 
@@ -42,7 +42,7 @@ class VisibilityIssuesSpec extends AbstractBeanDefinitionSpec {
                 'parent.name': 'Sally',
                 'parent.child.age': 22,
                 'parent.engine.manufacturer': 'Chevy')
-        def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
+        def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
 
         then:
             instance.getName() == null //methods that require reflection are not injected

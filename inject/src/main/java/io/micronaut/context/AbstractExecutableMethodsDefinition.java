@@ -21,6 +21,7 @@ import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ArgumentUtils;
+import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.ExecutableMethodsDefinition;
 import io.micronaut.inject.annotation.AbstractEnvironmentAnnotationMetadata;
@@ -394,7 +395,7 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
 
         @Override
         public int hashCode() {
-            return Objects.hash(
+            return ObjectUtils.hash(
                     methodReference.declaringType,
                     methodReference.methodName,
                     Arrays.hashCode(methodReference.arguments)

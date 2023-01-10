@@ -1,6 +1,7 @@
 package io.micronaut.validation.routes
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import spock.lang.IgnoreIf
 
 class RequestBeanParameterRuleSpec extends AbstractTypeElementSpec {
 
@@ -21,22 +22,22 @@ class Foo {
     String abc(@RequestBean Bean bean) {
         return "";
     }
-    
+
     @Introspected
     private static class Bean {
-        
+
         @Nullable
         @QueryValue
         private final String abc;
-        
+
         public Bean(String abc) {
             this.abc = abc;
         }
-        
+
         public String getAbc() { return abc; }
-        
+
     }
-    
+
 }
 
 """)
@@ -61,35 +62,35 @@ class Foo {
     String abc(@RequestBean Bean bean) {
         return "";
     }
-    
+
     @Introspected
     private static class Bean {
-        
+
         @Nullable
         @QueryValue
         private final String abc;
-        
+
         @Nullable
         @QueryValue
         private final String def;
-        
+
         public Bean(String abc) {
             this.abc = abc;
             this.def = null;
         }
-        
-        @Creator    
+
+        @Creator
         public Bean(String abc, String def) {
             this.abc = abc;
             this.def = def;
         }
-        
+
         public String getAbc() { return abc; }
-        
+
         public String getDef() { return def; }
-        
+
     }
-    
+
 }
 
 """)
@@ -114,25 +115,55 @@ class Foo {
     String abc(@RequestBean Bean bean) {
         return "";
     }
-    
+
     @Introspected
     private static class Bean {
-        
+
         @Nullable
         @QueryValue
         private String abc;
-        
+
         @Creator
         public static Bean of(String abc) {
             Bean bean = new Bean();
             bean.abc = abc;
             return bean;
         }
-        
+
         public String getAbc() { return abc; }
-        
+
     }
-    
+
+}
+
+""")
+        then:
+            noExceptionThrown()
+    }
+
+    @IgnoreIf({ !jvm.isJava14Compatible() })
+    void "test RequestBean compiles with record"() {
+        when:
+            buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.annotation.*;
+import io.micronaut.core.annotation.*;
+import io.micronaut.core.annotation.Nullable;
+
+@Controller("/foo")
+class Foo {
+
+    @Get("/abc/{abc}")
+    String abc(@RequestBean Bean bean) {
+        return "";
+    }
+
+    @Introspected
+    public record Bean(@Nullable @PathVariable String abc) {
+    }
+
 }
 
 """)
@@ -157,20 +188,20 @@ class Foo {
     String abc(@RequestBean Bean bean) {
         return "";
     }
-    
+
     @Introspected
     private static class Bean {
-        
+
         @Nullable
         @QueryValue
         private String abc;
-        
+
         public String getAbc() { return abc; }
-        
+
         public void setAbc(String abc) { this.abc = abc; }
-        
+
     }
-    
+
 }
 
 """)
@@ -195,18 +226,18 @@ class Foo {
     String abc(@RequestBean Bean bean) {
         return "";
     }
-    
+
     @Introspected
     public static class Bean {
-        
+
         @Nullable
         @QueryValue
         private String abc;
-        
+
         public String getAbc() { return abc; }
-        
+
     }
-    
+
 }
 
 """)
@@ -232,28 +263,28 @@ class Foo {
     String abc(@RequestBean Bean bean) {
         return "";
     }
-    
+
     @Introspected
     public static class Bean {
-        
+
         @Nullable
         @QueryValue
         private String abc;
-        
+
         @Nullable
         @QueryValue
         private String def;
-        
+
         public Bean(String def) {
             this.def = def;
         }
-        
+
         public String getAbc() { return abc; }
-        
+
         public String getDef() { return def; }
-        
+
     }
-    
+
 }
 
 """)
@@ -279,23 +310,23 @@ class Foo {
     String abc(@RequestBean Bean bean) {
         return "";
     }
-    
+
     @Introspected
     public static class Bean {
-    
+
         @Nullable
         @QueryValue
         private String abc;
-        
+
         @Creator
         public Bean(@Nullable @QueryValue String abc) {
             this.abc = abc;
         }
-        
+
         public String getAbc() { return abc; }
-                
+
     }
-    
+
 }
 
 """)
@@ -321,31 +352,31 @@ class Foo {
     String abc(@RequestBean Bean bean) {
         return "";
     }
-    
+
     @Introspected
     public static class Bean {
-    
+
         @Nullable
         @QueryValue
         private String abc;
-        
+
         @Nullable
         @QueryValue
         private String def;
-        
+
         @Creator
         public Bean(String def) {
             this.def = def;
         }
-        
+
         public String getAbc() { return abc; }
-        
+
         public void setAbc() { this.abc = abc; }
-        
+
         public String getDef() { return def; }
-                
+
     }
-    
+
 }
 
 """)

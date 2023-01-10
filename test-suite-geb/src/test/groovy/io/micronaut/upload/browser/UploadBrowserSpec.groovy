@@ -5,7 +5,6 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
-import spock.lang.Requires
 import spock.lang.Shared
 
 class UploadBrowserSpec extends GebSpec {
