@@ -145,7 +145,7 @@ abstract class AbstractJavanetHttpClient {
             }
         }
         // last chance, try type conversion
-        return conversionService.convert(bytes, ConversionContext.of(type));
+        return type != null ? conversionService.convert(bytes, ConversionContext.of(type)) : Optional.empty();
     }
 
     public MediaTypeCodecRegistry getMediaTypeCodecRegistry() {
@@ -180,7 +180,7 @@ abstract class AbstractJavanetHttpClient {
     }
 
     // TODO: Extract from DefaultHttpClient
-    private <E extends HttpClientException> E customizeException(E exc) {
+    protected <E extends HttpClientException> E customizeException(E exc) {
         customizeException0(configuration, clientId, exc);
         return exc;
     }
@@ -189,8 +189,8 @@ abstract class AbstractJavanetHttpClient {
     static void customizeException0(HttpClientConfiguration configuration, String informationalServiceId, HttpClientException exc) {
         if (informationalServiceId != null) {
             exc.setServiceId(informationalServiceId);
-        } else if (configuration instanceof ServiceHttpClientConfiguration) {
-            exc.setServiceId(((ServiceHttpClientConfiguration) configuration).getServiceId());
+        } else if (configuration instanceof ServiceHttpClientConfiguration clientConfiguration) {
+            exc.setServiceId(clientConfiguration.getServiceId());
         }
     }
 }

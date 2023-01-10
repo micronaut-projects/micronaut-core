@@ -3,7 +3,8 @@ package netty;
 import io.micronaut.tck.http.client.HttpMethodDeleteTest;
 import io.micronaut.tck.http.client.HttpMethodPostTest;
 import io.micronaut.tck.http.client.RedirectTest;
+import io.micronaut.tck.http.client.StatusTest;
 
-public class NettyHttpMethodTests implements HttpMethodDeleteTest, RedirectTest, HttpMethodPostTest {
+public class NettyHttpMethodTests implements HttpMethodDeleteTest, RedirectTest, HttpMethodPostTest, StatusTest {
 
 }

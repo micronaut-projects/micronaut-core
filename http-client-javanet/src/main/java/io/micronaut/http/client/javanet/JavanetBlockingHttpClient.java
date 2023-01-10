@@ -16,25 +16,21 @@
 package io.micronaut.http.client.javanet;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.client.BlockingHttpClient;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.exceptions.HttpClientException;
-import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
+import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
-import io.micronaut.http.uri.UriBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 
 /**
@@ -70,6 +66,11 @@ public class JavanetBlockingHttpClient extends AbstractJavanetHttpClient impleme
                 LOG.debug("Client {} Sending HTTP Request: {}", clientId, httpRequest);
             }
             HttpResponse<byte[]> httpResponse = client.send(httpRequest, HttpResponse.BodyHandlers.ofByteArray());
+            boolean errorStatus = httpResponse.statusCode() >= 400;
+            if (errorStatus) {
+                LOG.error("Client {} Received HTTP Response: {} {}", clientId, httpResponse.statusCode(), httpResponse.uri());
+                throw customizeException(new HttpClientResponseException(HttpStatus.valueOf(httpResponse.statusCode()).getReason(), getConvertedResponse(httpResponse, bodyType)));
+            }
             return getConvertedResponse(httpResponse, bodyType);
         } catch (IOException | InterruptedException e) {
             throw new HttpClientException("error sending request", e);

@@ -18,11 +18,11 @@ package io.micronaut.http.client.javanet;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.bind.DefaultRequestBinderRegistry;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.client.BlockingHttpClient;
@@ -31,6 +31,7 @@ import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.LoadBalancer;
+import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.json.JsonMapper;
 import io.micronaut.json.codec.JsonMediaTypeCodec;
@@ -39,9 +40,9 @@ import io.micronaut.runtime.ApplicationConfiguration;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.publisher.Mono;
 
 import java.net.URI;
-import java.util.concurrent.CompletableFuture;
 
 /**
  * {@link HttpClient} implementation for {@literal java.net.http.*} HTTP Client.
@@ -113,16 +114,23 @@ public class JavanetHttpClient extends AbstractJavanetHttpClient implements Http
     @Override
     public <I, O, E> Publisher<HttpResponse<O>> exchange(@NonNull HttpRequest<I> request, @NonNull Argument<O> bodyType, @NonNull Argument<E> errorType) {
         return mapToHttpRequest(request, bodyType)
-            .flatMap(httpRequest -> {
+            .map(httpRequest -> {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Client {} Sending HTTP Request: {}", clientId, httpRequest);
                 }
                 if (LOG.isTraceEnabled()) {
                     httpRequest.headers().map().forEach((k, v) -> LOG.trace("Client {} Sending HTTP Request Header: {}={}", clientId, k, v));
                 }
-                CompletableFuture<java.net.http.HttpResponse<byte[]>> completableHttpResponse = client.sendAsync(httpRequest, java.net.http.HttpResponse.BodyHandlers.ofByteArray());
-                CompletableFuture<HttpResponse<O>> response = completableHttpResponse.thenApply(netResponse -> getConvertedResponse(netResponse, bodyType));
-                return Publishers.fromCompletableFuture(response);
+                return client.sendAsync(httpRequest, java.net.http.HttpResponse.BodyHandlers.ofByteArray());
+            })
+            .flatMap(Mono::fromFuture)
+            .map(netResponse -> {
+                LOG.error("Client {} Received HTTP Response: {} {}", clientId, netResponse.statusCode(), netResponse.uri());
+                boolean errorStatus = netResponse.statusCode() >= 400;
+                if (errorStatus) {
+                    throw customizeException(new HttpClientResponseException(HttpStatus.valueOf(netResponse.statusCode()).getReason(), getConvertedResponse(netResponse, bodyType)));
+                }
+                return getConvertedResponse(netResponse, bodyType);
             });
     }
 
