@@ -326,6 +326,15 @@ public class CorsFilter implements HttpServerFilter {
         );
     }
 
+    private boolean hasExposedHeaders(@NonNull HttpRequest<?> request, @NonNull CorsOriginConfiguration config) {
+        Optional<List<String>> accessControlHeaders = request.getHeaders().get(ACCESS_CONTROL_EXPOSE_HEADERS, ConversionContext.LIST_OF_STRING);
+        List<String> exposedHeaders = config.getExposedHeaders();
+        return isAny(exposedHeaders) || (
+            accessControlHeaders.isPresent() &&
+                accessControlHeaders.get().stream().allMatch(header -> exposedHeaders.stream().anyMatch(exposedHeader -> exposedHeader.equalsIgnoreCase(header.trim())))
+        );
+    }
+
     @NotNull
     private static Publisher<MutableHttpResponse<?>> forbidden() {
         return Publishers.just(HttpResponse.status(HttpStatus.FORBIDDEN));
@@ -389,6 +398,9 @@ public class CorsFilter implements HttpServerFilter {
             availableHttpMethods.isPresent() &&
             availableHttpMethods.get().stream().anyMatch(method -> method.equals(methodToMatch))) {
             if (!hasAllowedHeaders(request, config)) {
+                return Optional.of(HttpStatus.FORBIDDEN);
+            }
+            if (!hasExposedHeaders(request, config)) {
                 return Optional.of(HttpStatus.FORBIDDEN);
             }
             return Optional.of(HttpStatus.OK);

@@ -132,6 +132,31 @@ public class CrossOriginTest {
                 .build()));
     }
 
+    @Test
+    void exposedHeadersHappyPath() throws IOException {
+        asserts(SPECNAME,
+            preflight(UriBuilder.of("/exposedheaders").path("bar"), "https://foo.com", HttpMethod.GET)
+                .header(HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS, HttpHeaders.AUTHORIZATION + "," + HttpHeaders.CONTENT_TYPE),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .assertResponse(response -> {
+                    assertCorsHeaders(response, "https://foo.com", HttpMethod.GET);
+                    assertTrue(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS));
+                })
+                .build()));
+    }
+
+    @Test
+    void exposedHeadersFailure() throws IOException {
+        asserts(SPECNAME,
+            preflight(UriBuilder.of("/exposedheaders").path("bar"), "https://foo.com", HttpMethod.GET)
+                .header(HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS, "foo"),
+            (server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.FORBIDDEN)
+                .assertResponse(this::assertCorsHeadersNotPresent)
+                .build()));
+    }
+
     @Requires(property = "spec.name", value = SPECNAME)
     @Controller("/foo")
     static class Foo {
