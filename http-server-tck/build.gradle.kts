@@ -21,8 +21,3 @@ java {
     sourceCompatibility = JavaVersion.toVersion("1.8")
     targetCompatibility = JavaVersion.toVersion("1.8")
 }
-micronautBuild {
-    binaryCompatibility {
-        enabled.set(false)
-    }
-}
