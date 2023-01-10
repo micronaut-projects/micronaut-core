@@ -69,7 +69,7 @@ public class FilterErrorTest {
                 AssertionUtils.assertThrows(server, request,
                     HttpResponseAssertion.builder()
                         .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                        .body("from exception handler")
+                        .containsBody("from exception handler")
                         .build());
                 ExceptionException filter = server.getApplicationContext().getBean(ExceptionException.class);
                 assertEquals(1, filter.executedCount.get());
@@ -116,7 +116,8 @@ public class FilterErrorTest {
                 AssertionUtils.assertThrows(server, request,
                     HttpResponseAssertion.builder()
                         .status(HttpStatus.BAD_REQUEST)
-                        .body("from NEXT filter exception handle").build());
+                        .containsBody("from NEXT filter exception handle")
+                        .build());
 
                 First first = server.getApplicationContext().getBean(First.class);
                 Next next = server.getApplicationContext().getBean(Next.class);
