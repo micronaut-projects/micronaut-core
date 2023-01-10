@@ -38,7 +38,6 @@ import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
-import java.util.Collections;
 
 import static io.micronaut.http.server.tck.TestScenario.asserts;
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -55,6 +54,7 @@ public class CrossOriginTest {
 
     @Test
     void corsSimpleRequestNotAllowedForLocalhostAndAny() throws IOException {
+
         asserts(SPECNAME,
             HttpRequest.GET(UriBuilder.of("/foo").path("bar").build()).header(HttpHeaders.ORIGIN, "https://foo.com"),
             (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
@@ -62,13 +62,17 @@ public class CrossOriginTest {
                 .body("bar")
                 .build()));
         asserts(SPECNAME,
-            HttpRequest.GET(UriBuilder.of("/foo").path("bar").build()).header(HttpHeaders.ORIGIN, "https://bar.com"),
+            preflight(UriBuilder.of("/foo").path("bar"), "https://bar.com", HttpMethod.GET),
             (server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
-                .status(HttpStatus.FORBIDDEN)
+                .status(HttpStatus.METHOD_NOT_ALLOWED)
                 .build()));
-
     }
 
+    private static HttpRequest<?> preflight(UriBuilder uriBuilder, String originValue, HttpMethod method) {
+        return HttpRequest.OPTIONS(uriBuilder.build())
+            .header(HttpHeaders.ORIGIN, originValue)
+            .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, method);
+    }
     @Test
     void corsSimpleRequestMethods() {
         assertAll(
@@ -78,12 +82,12 @@ public class CrossOriginTest {
                     .status(HttpStatus.OK)
                     .build())),
             () -> asserts(SPECNAME,
-                HttpRequest.POST(UriBuilder.of("/methods").path("postit/id").build(),"post").header(HttpHeaders.ORIGIN, "https://www.google.com"),
+                HttpRequest.POST(UriBuilder.of("/methods").path("postit").path("id").build(),"post").header(HttpHeaders.ORIGIN, "https://www.google.com"),
                 (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                     .status(HttpStatus.OK)
                     .build())),
             () -> asserts(SPECNAME,
-                HttpRequest.DELETE(UriBuilder.of("/methods").path("deleteit/id").build(),"delete").header(HttpHeaders.ORIGIN, "https://www.google.com"),
+                HttpRequest.DELETE(UriBuilder.of("/methods").path("deleteit").path("id").build(),"delete").header(HttpHeaders.ORIGIN, "https://www.google.com"),
                 (server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
                     .status(HttpStatus.FORBIDDEN)
                     .build()))
@@ -101,6 +105,7 @@ public class CrossOriginTest {
                 .status(HttpStatus.OK)
                 .body("bar")
                 .build()));
+
         asserts(SPECNAME,
             HttpRequest.GET(UriBuilder.of("/allowedheaders").path("bar").build())
                 .header(HttpHeaders.ORIGIN, "https://foo.com")

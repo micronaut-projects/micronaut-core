@@ -267,25 +267,28 @@ public class CorsFilter implements HttpServerFilter {
 
     @NonNull
     private Optional<CorsOriginConfiguration> getConfiguration(@NonNull HttpRequest<?> request) {
-        Optional<CorsOriginConfiguration> originConfiguration = CrossOriginUtil.getCorsOriginConfigurationForRequest(request);
-        if (originConfiguration.isPresent()) {
-            return originConfiguration;
-        }
         String requestOrigin = request.getHeaders().getOrigin().orElse(null);
         if (requestOrigin == null) {
             return Optional.empty();
+        }
+        Optional<CorsOriginConfiguration> originConfiguration = CrossOriginUtil.getCorsOriginConfigurationForRequest(request);
+        if (originConfiguration.isPresent() && matchesOrigin(originConfiguration.get(), requestOrigin)) {
+            return originConfiguration;
         }
         if (!corsConfiguration.isEnabled()) {
             return Optional.empty();
         }
         return corsConfiguration.getConfigurations().values().stream()
-            .filter(config -> {
-                List<String> allowedOrigins = config.getAllowedOrigins();
-                return !allowedOrigins.isEmpty() && (isAny(allowedOrigins) || allowedOrigins.stream().anyMatch(origin -> matchesOrigin(origin, requestOrigin)));
-            }).findFirst();
+            .filter(config -> matchesOrigin(config, requestOrigin))
+            .findFirst();
     }
 
-    private boolean matchesOrigin(@NonNull String origin, @NonNull String requestOrigin) {
+    private static boolean matchesOrigin(@NonNull CorsOriginConfiguration config, String requestOrigin) {
+        List<String> allowedOrigins = config.getAllowedOrigins();
+        return !allowedOrigins.isEmpty() && (isAny(allowedOrigins) || allowedOrigins.stream().anyMatch(origin -> matchesOrigin(origin, requestOrigin)));
+    }
+
+    private static boolean matchesOrigin(@NonNull String origin, @NonNull String requestOrigin) {
         if (origin.equals(requestOrigin)) {
             return true;
         }
@@ -294,11 +297,11 @@ public class CorsFilter implements HttpServerFilter {
         return m.matches();
     }
 
-    private boolean isAny(List<String> values) {
+    private static boolean isAny(List<String> values) {
         return values == CorsOriginConfiguration.ANY;
     }
 
-    private boolean isAnyMethod(List<HttpMethod> allowedMethods) {
+    private static boolean isAnyMethod(List<HttpMethod> allowedMethods) {
         return allowedMethods == CorsOriginConfiguration.ANY_METHOD;
     }
 
