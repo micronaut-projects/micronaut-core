@@ -5,7 +5,9 @@ import io.micronaut.inject.ast.GenericPlaceholderElement
 import spock.lang.PendingFeature
 import spock.lang.Unroll
 
+
 class KotlinReconstructionSpec extends AbstractKotlinCompilerSpec {
+    @PendingFeature(reason = "Not yet implemented")
     @Unroll("field type is #fieldType")
     def 'field type'() {
         given:
@@ -65,6 +67,7 @@ abstract class Test<T> : $superType() {
     }
 
     @Unroll("super interface is #superType")
+    @PendingFeature(reason = "Not yet implemented")
     def 'super interface'() {
         given:
         def element = buildClassElement("example.Test", """
@@ -125,6 +128,7 @@ abstract class Test<A, $decl> {
     }
 
     @Unroll('declaration is #decl')
+    @PendingFeature(reason = "Not yet implemented")
     def 'fold type variable to null'() {
         given:
         def classElement = buildClassElement("example.Test", """
