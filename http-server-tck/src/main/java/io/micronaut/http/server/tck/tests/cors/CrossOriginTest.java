@@ -93,7 +93,6 @@ public class CrossOriginTest {
     @Test
     void corsSimpleRequestHeaders() throws IOException {
         asserts(SPECNAME,
-            Collections.singletonMap("micronaut.server.cors.enabled", true),
             HttpRequest.GET(UriBuilder.of("/allowedheaders").path("bar").build())
                 .header(HttpHeaders.ORIGIN, "https://foo.com")
                 .header(HttpHeaders.AUTHORIZATION, "foo")
@@ -103,7 +102,6 @@ public class CrossOriginTest {
                 .body("bar")
                 .build()));
         asserts(SPECNAME,
-            Collections.singletonMap("micronaut.server.cors.enabled", true),
             HttpRequest.GET(UriBuilder.of("/allowedheaders").path("bar").build())
                 .header(HttpHeaders.ORIGIN, "https://foo.com")
                 .header("foo", "bar"),
