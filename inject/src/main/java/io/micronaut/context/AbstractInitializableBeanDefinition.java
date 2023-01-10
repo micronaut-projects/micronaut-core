@@ -15,6 +15,7 @@
  */
 package io.micronaut.context;
 
+import io.micronaut.context.DefaultBeanContext.ListenersSupplier;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Parameter;
@@ -820,12 +821,12 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     @Internal
     @UsedByGeneratedCode
     protected Object postConstruct(BeanResolutionContext resolutionContext, BeanContext context, Object bean) {
-        final Set<Map.Entry<Class<?>, List<BeanInitializedEventListener>>> beanInitializedEventListeners
+        final List<Map.Entry<Class<?>, ListenersSupplier<BeanInitializedEventListener>>> beanInitializedEventListeners
                 = ((DefaultBeanContext) context).beanInitializedEventListeners;
         if (CollectionUtils.isNotEmpty(beanInitializedEventListeners)) {
-            for (Map.Entry<Class<?>, List<BeanInitializedEventListener>> entry : beanInitializedEventListeners) {
+            for (Map.Entry<Class<?>, ListenersSupplier<BeanInitializedEventListener>> entry : beanInitializedEventListeners) {
                 if (entry.getKey().isAssignableFrom(getBeanType())) {
-                    for (BeanInitializedEventListener listener : entry.getValue()) {
+                    for (BeanInitializedEventListener listener : entry.getValue().get(resolutionContext)) {
                         bean = listener.onInitialized(new BeanInitializingEvent(context, this, bean));
                         if (bean == null) {
                             throw new BeanInstantiationException(resolutionContext, "Listener [" + listener + "] returned null from onInitialized event");

@@ -13,28 +13,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.inject.lifecycle.beancreationeventlistener;
+package io.micronaut.inject.lifecycle.beancreationeventlistener.circular;
 
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.BeanCreatedEvent;
 import io.micronaut.context.event.BeanCreatedEventListener;
-
 import jakarta.inject.Singleton;
 
+@Requires(property = "spec", value = "RecursiveListeners")
 @Singleton
-public class BCreationListener implements BeanCreatedEventListener<B> {
+public class BarCreationListener implements BeanCreatedEventListener<Bar> {
 
-    static boolean initialized;
-    static boolean executed;
+    final Foo foo;
 
-    BCreationListener() {
-        initialized = true;
+    public BarCreationListener(Foo foo) {
+        this.foo = foo;
     }
 
     @Override
-    public B onCreated(BeanCreatedEvent<B> event) {
-        executed = true;
-        ChildB childB = new ChildB(event.getBean());
-        childB.name = "good";
-        return childB;
+    public Bar onCreated(BeanCreatedEvent<Bar> event) {
+        return event.getBean();
     }
 }
