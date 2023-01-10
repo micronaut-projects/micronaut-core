@@ -21,6 +21,7 @@ import io.micronaut.aop.Introduction;
 import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil;
 import io.micronaut.aop.writer.AopProxyWriter;
 import io.micronaut.context.RequiresCondition;
+import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
@@ -121,6 +122,12 @@ abstract class AbstractBeanElementCreator implements BeanDefinitionCreator {
             || InterceptedMethodUtil.hasDeclaredAroundAdvice(methodElement.getAnnotationMetadata())) {
             addToIntroduction(aopProxyWriter, typeElement, methodElement, false);
             return true;
+        } else if (!methodElement.isAbstract() && methodElement.hasDeclaredStereotype(Executable.class)) {
+            aopProxyWriter.visitExecutableMethod(
+                typeElement,
+                methodElement,
+                visitorContext
+            );
         }
         return false;
     }
