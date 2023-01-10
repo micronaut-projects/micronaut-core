@@ -4,8 +4,7 @@ import io.micronaut.aop.exceptions.UnimplementedAdviceException
 import io.micronaut.context.BeanContext
 import io.micronaut.inject.AdvisedBeanType
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.BeanFactory
-import io.micronaut.inject.ExecutableMethod
+import io.micronaut.inject.InstantiatableBeanDefinition
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 import io.micronaut.kotlin.processing.aop.introduction.NotImplementedAdvice
 import spock.lang.Specification
@@ -30,7 +29,7 @@ interface MyBean {
 }
 ''')
         def context = BeanContext.run()
-        def bean = ((BeanFactory) beanDefinition).build(context, beanDefinition)
+        def bean = ((InstantiatableBeanDefinition) beanDefinition).instantiate(context)
 
         when:
         bean.test()
@@ -69,7 +68,7 @@ abstract class MyBean {
 }
 ''')
         def context = BeanContext.run()
-        def bean = ((BeanFactory) beanDefinition).build(context, beanDefinition)
+        def bean = ((InstantiatableBeanDefinition) beanDefinition).instantiate(context)
         def notImplementedAdvice = context.getBean(NotImplementedAdvice)
 
         when:

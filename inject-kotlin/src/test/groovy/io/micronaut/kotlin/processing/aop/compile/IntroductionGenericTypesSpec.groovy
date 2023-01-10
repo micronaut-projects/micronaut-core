@@ -3,7 +3,7 @@ package io.micronaut.kotlin.processing.aop.compile
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.core.type.ReturnType
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.BeanFactory
+import io.micronaut.inject.InstantiatableBeanDefinition
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 import spock.lang.Specification
 
@@ -108,7 +108,7 @@ class SubPerson: Person()
         when:
         def context = new DefaultBeanContext()
         context.start()
-        def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
+        def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
 
 
         then:"the methods are invocable"

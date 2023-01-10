@@ -5,7 +5,7 @@ import io.micronaut.context.DefaultBeanResolutionContext
 import io.micronaut.context.annotation.Property
 import io.micronaut.core.naming.Named
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.BeanFactory
+import io.micronaut.inject.InstantiatableBeanDefinition
 import io.micronaut.inject.ValidatedBeanDefinition
 import spock.lang.Specification
 import static io.micronaut.annotation.processing.test.KotlinCompiler.*
@@ -59,7 +59,7 @@ class MyConfig @ConfigurationInject constructor(@javax.validation.constraints.No
 
         when:
         def context = ApplicationContext.run('foo.bar.host': 'test', 'foo.bar.server-port': '9999')
-        def config = ((BeanFactory) beanDefinition).build(context, beanDefinition)
+        def config = ((InstantiatableBeanDefinition) beanDefinition).instantiate(context)
 
         then:
         config.host == 'test'
@@ -92,7 +92,7 @@ class MyConfig @ConfigurationInject constructor(@javax.validation.constraints.No
 
         when:
         def context = ApplicationContext.run('foo.bar.baz.stuff': 'test')
-        def config = ((BeanFactory) beanDefinition).build(context, beanDefinition)
+        def config = ((InstantiatableBeanDefinition) beanDefinition).instantiate(context)
 
         then:
         config.stuff == 'test'
@@ -129,7 +129,7 @@ class MyConfig @ConfigurationInject constructor(@javax.validation.constraints.No
                 Named.class.getName(),
                 "one"
         )
-        def config = ((BeanFactory) beanDefinition).build(resolutionContext,context, beanDefinition)
+        def config = ((InstantiatableBeanDefinition) beanDefinition).instantiate(resolutionContext,context)
 
         then:
         config.host == 'test'
@@ -163,7 +163,7 @@ class MyConfig {
 }
 ''')
         def context = ApplicationContext.run('foo.bar.host': 'test', 'foo.bar.server-port': '9999')
-        def config = ((BeanFactory) beanDefinition).build(context, beanDefinition)
+        def config = ((InstantiatableBeanDefinition) beanDefinition).instantiate(context)
 
         then:
         config.host == 'test'

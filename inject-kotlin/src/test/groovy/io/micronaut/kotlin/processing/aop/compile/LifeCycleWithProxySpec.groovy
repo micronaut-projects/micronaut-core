@@ -2,7 +2,7 @@ package io.micronaut.kotlin.processing.aop.compile
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.BeanFactory
+import io.micronaut.inject.InstantiatableBeanDefinition
 import io.micronaut.inject.writer.BeanDefinitionWriter
 import spock.lang.Specification
 
@@ -52,7 +52,7 @@ open class MyBean {
 
         when:
         def context = ApplicationContext.builder(beanDefinition.class.classLoader).start()
-        def instance = ((BeanFactory) beanDefinition).build(context, beanDefinition)
+        def instance = ((InstantiatableBeanDefinition) beanDefinition).instantiate(context)
 
         then:
         instance.conversionService // injection works
@@ -104,7 +104,7 @@ open class MyBean {
 
         when:
         def context = ApplicationContext.builder(beanDefinition.class.classLoader).start()
-        def instance = ((BeanFactory) beanDefinition).build(context, beanDefinition)
+        def instance = ((InstantiatableBeanDefinition) beanDefinition).instantiate(context)
 
         then:
         instance.conversionService != null
@@ -154,7 +154,7 @@ open class MyBean {
 
         when:
         def context = ApplicationContext.builder(beanDefinition.class.classLoader).start()
-        def instance = ((BeanFactory) beanDefinition).build(context, beanDefinition)
+        def instance = ((InstantiatableBeanDefinition) beanDefinition).instantiate(context)
 
 
         then:

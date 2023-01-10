@@ -2,7 +2,7 @@ package io.micronaut.kotlin.processing.inject.configproperties
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.BeanFactory
+import io.micronaut.inject.InstantiatableBeanDefinition
 import spock.lang.Specification
 import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
@@ -27,7 +27,7 @@ class ChildConfigProperties: ParentConfigProperties() {
                 'parent.child.age': 22,
                 'parent.name': 'Sally',
                 'parent.engine.manufacturer': 'Chevy')
-        def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
+        def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
 
         then:
         beanDefinition.injectedMethods.size() == 3
@@ -58,7 +58,7 @@ open class ChildConfigProperties: ParentConfigProperties() {
 
         when:
         def context = ApplicationContext.run('parent.nationality': 'Italian', 'parent.child.name': 'Sally')
-        def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
+        def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
 
         then:
         beanDefinition.injectedMethods.size() == 2

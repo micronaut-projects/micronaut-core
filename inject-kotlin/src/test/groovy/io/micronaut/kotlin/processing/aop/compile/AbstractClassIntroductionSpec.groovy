@@ -2,7 +2,7 @@ package io.micronaut.kotlin.processing.aop.compile
 
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.BeanFactory
+import io.micronaut.inject.InstantiatableBeanDefinition
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 import spock.lang.Specification
 
@@ -32,7 +32,7 @@ abstract class AbstractBean {
         when:
         def context = new DefaultBeanContext()
         context.start()
-        def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
+        def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
 
         then:
         instance.isAbstract() == null
@@ -65,7 +65,7 @@ abstract class AbstractBean: Foo {
         when:
         def context = new DefaultBeanContext()
         context.start()
-        def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
+        def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
 
         then:
         instance.isAbstract() == null
@@ -100,7 +100,7 @@ abstract class AbstractBean: Foo {
         when:
         def context = new DefaultBeanContext()
         context.start()
-        def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
+        def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
 
         then:
         instance.isAbstract() == null
@@ -140,7 +140,7 @@ abstract class AbstractBean: Foo {
         when:
         def context = new DefaultBeanContext()
         context.start()
-        def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
+        def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
 
 
         then:
@@ -176,7 +176,7 @@ abstract class AbstractBean: Foo {
         when:
         def context = new DefaultBeanContext()
         context.start()
-        def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
+        def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
 
         then:
         instance.isAbstract() == null
@@ -212,7 +212,7 @@ abstract class AbstractBean: Foo {
         when:
         def context = new DefaultBeanContext()
         context.start()
-        def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
+        def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
 
         then:
         instance.isAbstract() == null
@@ -252,7 +252,7 @@ abstract class AbstractBean: Foo {
         when:
         def context = new DefaultBeanContext()
         context.start()
-        def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
+        def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
 
         then:
         instance.isAbstract() == null

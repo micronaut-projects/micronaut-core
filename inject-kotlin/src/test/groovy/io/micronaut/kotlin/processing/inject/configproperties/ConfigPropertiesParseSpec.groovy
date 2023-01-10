@@ -6,7 +6,7 @@ import io.micronaut.context.annotation.ConfigurationReader
 import io.micronaut.context.annotation.Property
 import io.micronaut.core.convert.format.ReadableBytes
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.BeanFactory
+import io.micronaut.inject.InstantiatableBeanDefinition
 import io.micronaut.kotlin.processing.inject.configuration.Engine
 import spock.lang.Specification
 
@@ -291,9 +291,9 @@ open class MyProperties {
         beanDefinition.injectedMethods[1].name == 'setSetterTest'
 
         when:
-        BeanFactory factory = beanDefinition
+        InstantiatableBeanDefinition factory = beanDefinition
         ApplicationContext applicationContext = ApplicationContext.builder().start()
-        def bean = factory.build(applicationContext, beanDefinition)
+        def bean = factory.instantiate(applicationContext)
 
         then:
         bean != null
@@ -360,9 +360,9 @@ open class Parent {
 
 
         when:
-        BeanFactory factory = beanDefinition
+        InstantiatableBeanDefinition factory = beanDefinition
         ApplicationContext applicationContext = ApplicationContext.builder().start()
-        def bean = factory.build(applicationContext, beanDefinition)
+        def bean = factory.instantiate(applicationContext)
 
         then:
         bean != null
@@ -542,12 +542,12 @@ open class Parent {
         beanDefinition.injectedFields.isEmpty()
 
         when:
-        BeanFactory factory = beanDefinition
+        InstantiatableBeanDefinition factory = beanDefinition
         ApplicationContext applicationContext = ApplicationContext.run(
                 'foo.manufacturer':'Subaru',
                 'foo.two.manufacturer':'Subaru'
         )
-        def bean = factory.build(applicationContext, beanDefinition)
+        def bean = factory.instantiate(applicationContext)
 
         then:
         ((Engine.Builder) bean.engine).build().manufacturer == 'Subaru'

@@ -311,7 +311,7 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
             }
             staticMethodCheck(writeElement);
             // TODO: Require @ReflectiveAccess for private methods in Micronaut 4
-            visitMethodInjectionPoint(visitor, writeElement);
+            visitMethodInjectionPoint(visitor, writeElement, propertyElement);
             return true;
         }
         return visitAopAndExecutableMethod(visitor, writeElement);
@@ -362,7 +362,17 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
         if (!methodElement.isStatic() && isInjectPointMethod(propertyElement, methodElement)) {
             staticMethodCheck(methodElement);
             // TODO: Require @ReflectiveAccess for private methods in Micronaut 4
-            visitMethodInjectionPoint(visitor, methodElement);
+            if (propertyElement != null) {
+                // use the properties metadata for property elements
+                FieldElement fieldElement = propertyElement.getField().orElse(null);
+                if (fieldElement != null) {
+                    methodElement = methodElement.withAnnotationMetadata(new AnnotationMetadataHierarchy(
+                        fieldElement.getTargetAnnotationMetadata(),
+                        methodElement.getTargetAnnotationMetadata()
+                    ));
+                }
+            }
+            visitMethodInjectionPoint(visitor, methodElement, propertyElement);
             return true;
         }
         return false;
@@ -370,16 +380,18 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
 
     /**
      * Visit a method injection point.
-     * @param visitor The visitor
-     * @param methodElement The method element
+     *
+     * @param visitor         The visitor
+     * @param methodElement   The method element
+     * @param propertyElement The property element if it exists
      */
-    protected void visitMethodInjectionPoint(BeanDefinitionVisitor visitor, MethodElement methodElement) {
+    protected void visitMethodInjectionPoint(BeanDefinitionVisitor visitor, MethodElement methodElement, PropertyElement propertyElement) {
         applyConfigurationInjectionIfNecessary(visitor, methodElement);
         visitor.visitMethodInjectionPoint(
             methodElement.getDeclaringType(),
             methodElement,
             methodElement.isReflectionRequired(classElement),
-            visitorContext
+ propertyElement != null, visitorContext
         );
     }
 

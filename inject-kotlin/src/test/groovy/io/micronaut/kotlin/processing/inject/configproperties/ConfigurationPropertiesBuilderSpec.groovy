@@ -2,7 +2,7 @@ package io.micronaut.kotlin.processing.inject.configproperties
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.BeanFactory
+import io.micronaut.inject.InstantiatableBeanDefinition
 import org.neo4j.driver.v1.Config
 import spock.lang.PendingFeature
 import spock.lang.Specification
@@ -38,11 +38,11 @@ class Test private constructor() {
 ''')
 
         when:"The bean was built and a warning was logged"
-        BeanFactory factory = beanDefinition
+        InstantiatableBeanDefinition factory = beanDefinition
         ApplicationContext applicationContext = ApplicationContext.run(
                 'test.foo':'good'
         )
-        def bean = factory.build(applicationContext, beanDefinition)
+        def bean = factory.instantiate(applicationContext)
 
         then:
         bean.test.foo == 'good'
@@ -77,12 +77,12 @@ class Test private constructor() {
 ''')
 
         when:"The bean was built and a warning was logged"
-        BeanFactory factory = beanDefinition
+        InstantiatableBeanDefinition factory = beanDefinition
         ApplicationContext applicationContext = ApplicationContext.run(
                 'test.foo':'good',
                 'test.bar':'bad'
         )
-        def bean = factory.build(applicationContext, beanDefinition)
+        def bean = factory.instantiate(applicationContext)
 
         then:
         bean.test.foo == 'good'
@@ -111,11 +111,11 @@ class Test {
 ''')
 
         expect:"The bean was built and a warning was logged"
-        BeanFactory factory = beanDefinition
+        InstantiatableBeanDefinition factory = beanDefinition
         ApplicationContext applicationContext = ApplicationContext.run(
                 'test.foo':'good',
         )
-        factory.build(applicationContext, beanDefinition)
+        factory.instantiate(applicationContext)
     }
 
     void "test with setters that return void"() {
@@ -141,13 +141,13 @@ class Test {
 ''')
 
         when:
-        BeanFactory factory = beanDefinition
+        InstantiatableBeanDefinition factory = beanDefinition
         ApplicationContext applicationContext = ApplicationContext.run(
                 'test.foo':'good',
                 'test.bar': '10',
                 'test.baz':'20'
         )
-        def bean = factory.build(applicationContext, beanDefinition)
+        def bean = factory.instantiate(applicationContext)
 
         then:
         bean != null
@@ -186,13 +186,13 @@ class Neo4jProperties {
         beanDefinition.injectedMethods.first().name == 'setUri'
 
         when:
-        BeanFactory factory = beanDefinition
+        InstantiatableBeanDefinition factory = beanDefinition
         ApplicationContext applicationContext = ApplicationContext.run(
                 'neo4j.test.encryptionLevel':'none',
                 'neo4j.test.leakedSessionsLogging':true,
                 'neo4j.test.maxIdleSessions':2
         )
-        def bean = factory.build(applicationContext, beanDefinition)
+        def bean = factory.instantiate(applicationContext)
 
         then:
         bean != null
@@ -233,13 +233,13 @@ class Neo4jProperties {
         beanDefinition.injectedMethods.first().name == 'setUri'
 
         when:
-        BeanFactory factory = beanDefinition
+        InstantiatableBeanDefinition factory = beanDefinition
         ApplicationContext applicationContext = ApplicationContext.run(
                 'neo4j.test.options.encryptionLevel':'none',
                 'neo4j.test.options.leakedSessionsLogging':true,
                 'neo4j.test.options.maxIdleSessions':2
         )
-        def bean = factory.build(applicationContext, beanDefinition)
+        def bean = factory.instantiate(applicationContext)
 
         then:
         bean != null
@@ -279,13 +279,13 @@ class Neo4jProperties {
         beanDefinition.injectedMethods.first().name == 'setUri'
 
         when:
-        BeanFactory factory = beanDefinition
+        InstantiatableBeanDefinition factory = beanDefinition
         ApplicationContext applicationContext = ApplicationContext.run(
                 'neo4j.test.options.encryptionLevel':'none',
                 'neo4j.test.options.leakedSessionsLogging':true,
                 'neo4j.test.options.maxIdleSessions':2
         )
-        def bean = factory.build(applicationContext, beanDefinition)
+        def bean = factory.instantiate(applicationContext)
 
         then:
         bean != null
@@ -326,13 +326,13 @@ class Neo4jProperties {
         beanDefinition.injectedMethods.first().name == 'setUri'
 
         when:
-        BeanFactory factory = beanDefinition
+        InstantiatableBeanDefinition factory = beanDefinition
         ApplicationContext applicationContext = ApplicationContext.run(
             'neo4j.test.options.encryptionLevel':'none',
             'neo4j.test.options.leakedSessionsLogging':true,
             'neo4j.test.options.maxIdleSessions':2
         )
-        def bean = factory.build(applicationContext, beanDefinition)
+        def bean = factory.instantiate(applicationContext)
 
         then:
         bean != null
@@ -372,11 +372,11 @@ class Neo4jProperties {
         beanDefinition.injectedMethods.first().name == 'setUri'
 
         when:
-        BeanFactory factory = beanDefinition
+        InstantiatableBeanDefinition factory = beanDefinition
         ApplicationContext applicationContext = ApplicationContext.run(
                 'neo4j.test.connectionLivenessCheckTimeout': '6s'
         )
-        def bean = factory.build(applicationContext, beanDefinition)
+        def bean = factory.instantiate(applicationContext)
 
         then:
         bean != null
@@ -408,11 +408,11 @@ class Neo4jProperties {
 
 }
 ''')
-        BeanFactory factory = beanDefinition
+        InstantiatableBeanDefinition factory = beanDefinition
         ApplicationContext applicationContext = ApplicationContext.run(
                 'neo4j.test.connectionLivenessCheckTimeout': '17s'
         )
-        def bean = factory.build(applicationContext, beanDefinition)
+        def bean = factory.instantiate(applicationContext)
 
         then:
         bean != null

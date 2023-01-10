@@ -3,7 +3,7 @@ package io.micronaut.kotlin.processing.aop.compile
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.Blocking
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.BeanFactory
+import io.micronaut.inject.InstantiatableBeanDefinition
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 import io.micronaut.inject.writer.BeanDefinitionWriter
 import spock.lang.Specification
@@ -76,7 +76,7 @@ interface MyInterface {
 
         when:
         def context = ApplicationContext.run('foo.bar':'test')
-        def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
+        def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
 
         then:
         instance.someMethod() == 'test'

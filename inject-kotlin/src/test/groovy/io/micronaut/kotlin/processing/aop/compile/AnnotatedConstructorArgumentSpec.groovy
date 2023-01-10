@@ -16,12 +16,12 @@
 package io.micronaut.kotlin.processing.aop.compile
 
 import io.micronaut.aop.InterceptorBinding
+import io.micronaut.inject.InstantiatableBeanDefinition
 import io.micronaut.kotlin.processing.aop.simple.Mutating
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.BeanFactory
 import io.micronaut.inject.writer.BeanDefinitionWriter
 import spock.lang.Specification
 
@@ -64,7 +64,7 @@ open class MyBean(@Value("\\${foo.bar}") val myValue: String) {
 
         when:
         def context = ApplicationContext.run('foo.bar':'test')
-        def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
+        def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
 
         then:
         instance.someMethod("foo") == 'test changed'
@@ -107,7 +107,7 @@ open class MyBean(@Value("\\${foo.bar}") val myValue: String) {
 
         when:
         def context = ApplicationContext.run('foo.bar':'test')
-        def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
+        def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
 
         then:
         instance.someMethod("foo") == 'test changed'

@@ -2,7 +2,7 @@ package io.micronaut.kotlin.processing.aop.introduction.with_around
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.BeanFactory
+import io.micronaut.inject.InstantiatableBeanDefinition
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 import spock.lang.Specification
 
@@ -42,7 +42,7 @@ open class MyBean
 
         when:
         def context = ApplicationContext.run()
-        def instance = ((BeanFactory) beanDefinition).build(context, beanDefinition)
+        def instance = ((InstantiatableBeanDefinition) beanDefinition).instantiate(context)
 
         then:
         instance.hello() == "World"
