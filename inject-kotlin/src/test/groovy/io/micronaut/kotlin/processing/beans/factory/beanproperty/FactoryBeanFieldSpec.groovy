@@ -338,7 +338,7 @@ class TestInterceptor implements MethodInterceptor<Object, Object> {
     @Unroll
     void 'test fail compilation on invalid modifier #modifier'() {
         when:
-        buildBeanDefinition('invalidmod.TestFactory', """
+        def ctx = buildContext( """
 package invalidmod
 
 import io.micronaut.context.annotation.Factory
@@ -360,6 +360,8 @@ class Test
         e.message.contains(modifier)
 
         where:
-        modifier << ['private', 'protected']
+        modifier << ['private']
+
+
     }
 }

@@ -102,9 +102,7 @@ abstract class AbstractBean {
 package test
 
 @jakarta.inject.Singleton
-enum class Test {
-}
-
+enum class Test
 ''')
         then:
         def e = thrown(RuntimeException)

@@ -234,8 +234,8 @@ class Test
 
     void 'test named via alias'() {
         given:
-        def definition = buildBeanDefinition('test.Test', '''
-package test
+        def definition = buildBeanDefinition('aliastest.Test', '''
+package aliastest
 
 import io.micronaut.context.annotation.*
 
