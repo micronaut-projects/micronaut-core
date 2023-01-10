@@ -342,19 +342,23 @@ open class KotlinClassElement(val kotlinType: KSType,
             return mutableListOf()
         }
 
-        val allProperties = classDeclaration.getAllProperties()
-            .filter { !it.isInternal() }
-            .filter { !propertyElementQuery.excludes.contains(it.simpleName.asString()) }
-            .filter { propertyElementQuery.includes.isEmpty() || propertyElementQuery.includes.contains(it.simpleName.asString()) }
-            .filter {
+        val eq = ElementQuery.of(PropertyElement::class.java)
+            .named { n -> !propertyElementQuery.excludes.contains(n) }
+            .named { n -> propertyElementQuery.includes.isEmpty() || propertyElementQuery.includes.contains(n) }
+            .modifiers {
                 val visibility = propertyElementQuery.visibility
                 if (visibility == BeanProperties.Visibility.PUBLIC) {
-                    it.isPublic()
+                    it.contains(ElementModifier.PUBLIC)
                 } else {
-                    !it.isPrivate()
+                    !it.contains(ElementModifier.PRIVATE)
                 }
+            }.annotated { prop ->
+                val excludedAnnotations = propertyElementQuery.excludedAnnotations
+                excludedAnnotations.isEmpty() || !excludedAnnotations.any { prop.hasAnnotation(it) }
             }
-        val propertyNames = allProperties.map { it.simpleName.asString() }.toSet()
+        val allProperties =
+            enclosedElementsQuery.getEnclosedElements(this, eq)
+        val propertyNames = allProperties.map { it.name }.toSet()
 
         val resolvedProperties : MutableList<PropertyElement> = mutableListOf()
         val methodProperties = AstBeanPropertiesUtils.resolveBeanProperties(propertyElementQuery,
@@ -376,30 +380,8 @@ open class KotlinClassElement(val kotlinType: KSType,
                 )
             })
         resolvedProperties.addAll(methodProperties)
-        val kotlinPropertyElements = toKotlinProperties(allProperties, propertyElementQuery)
-        resolvedProperties.addAll(kotlinPropertyElements)
+        resolvedProperties.addAll(allProperties)
         return resolvedProperties
-    }
-
-    private fun toKotlinProperties(
-        allProperties: Sequence<KSPropertyDeclaration>,
-        propertyElementQuery: PropertyElementQuery
-    ): Sequence<KotlinPropertyElement> {
-        val kotlinPropertyElements = allProperties.map {
-            KotlinPropertyElement(
-                this,
-                visitorContext.elementFactory.newClassElement(
-                    it.type.resolve(),
-                    elementAnnotationMetadataFactory
-                ),
-                it,
-                elementAnnotationMetadataFactory, visitorContext
-            )
-        }.filter { prop ->
-            val excludedAnnotations = propertyElementQuery.excludedAnnotations
-            excludedAnnotations.isEmpty() || !excludedAnnotations.any { prop.hasAnnotation(it) }
-        }
-        return kotlinPropertyElements
     }
 
     private fun mapToPropertyElement(value: AstBeanPropertiesUtils.BeanPropertyData): KotlinPropertyElement {
@@ -746,7 +728,7 @@ open class KotlinClassElement(val kotlinType: KSType,
                     ).toList()
                 }
                 MethodElement::class.java -> {
-                    val result = classNode.getDeclaredFunctions()
+                    classNode.getDeclaredFunctions()
                         .filter { func: KSFunctionDeclaration ->
                             !func.isConstructor() &&
                             func.origin != Origin.SYNTHETIC &&
@@ -754,7 +736,6 @@ open class KotlinClassElement(val kotlinType: KSType,
                             !listOf("hashCode", "toString", "equals").contains(func.simpleName.asString())
                         }
                         .toList()
-                    result
                 }
                 FieldElement::class.java -> {
                     classNode.getDeclaredProperties()
@@ -763,6 +744,9 @@ open class KotlinClassElement(val kotlinType: KSType,
                             it.origin != Origin.SYNTHETIC
                         }
                         .toList()
+                }
+                PropertyElement::class.java -> {
+                    classNode.getDeclaredProperties().toList()
                 }
                 ConstructorElement::class.java -> {
                     classNode.getConstructors().toList()
@@ -787,7 +771,10 @@ open class KotlinClassElement(val kotlinType: KSType,
                     classNode.qualifiedName.toString() == Enum::class.java.name
         }
 
-        override fun toAstElement(enclosedElement: KSNode): Element {
+        override fun toAstElement(
+            enclosedElement: KSNode,
+            elementType: Class<*>
+        ): Element {
             var ee = enclosedElement
             if (ee is KSAnnotatedReference) {
                 ee = ee.node
@@ -811,11 +798,23 @@ open class KotlinClassElement(val kotlinType: KSType,
                 }
 
                 is KSPropertyDeclaration -> {
-                    return elementFactory.newFieldElement(
-                        this@KotlinClassElement,
-                        ee,
-                        elementAnnotationMetadataFactory
-                    )
+                    if (elementType == PropertyElement::class.java) {
+                        return KotlinPropertyElement(
+                            this@KotlinClassElement,
+                            visitorContext.elementFactory.newClassElement(
+                                ee.type.resolve(),
+                                elementAnnotationMetadataFactory
+                            ),
+                            ee,
+                            elementAnnotationMetadataFactory, visitorContext
+                        )
+                    } else {
+                        return elementFactory.newFieldElement(
+                            this@KotlinClassElement,
+                            ee,
+                            elementAnnotationMetadataFactory
+                        )
+                    }
                 }
 
                 is KSType -> elementFactory.newClassElement(

@@ -40,13 +40,17 @@ open class ParentConfig {
         then:
         beanDefinition.synthesize(ConfigurationReader).prefix() == 'foo.bar.baz'
         beanDefinition.injectedMethods.size() == 2
-        beanDefinition.injectedMethods[0].getAnnotationMetadata().hasAnnotation(Property)
-        beanDefinition.injectedMethods[0].getAnnotationMetadata().synthesize(Property).name() == 'foo.bar.baz.stuff'
-        beanDefinition.injectedMethods[0].name == 'setStuff'
 
-        beanDefinition.injectedMethods[1].getAnnotationMetadata().hasAnnotation(Property)
-        beanDefinition.injectedMethods[1].getAnnotationMetadata().synthesize(Property).name() == 'foo.bar.baz.foo'
-        beanDefinition.injectedMethods[1].name == 'setFoo'
+        def setStuff = beanDefinition.injectedMethods.find { it.name == 'setStuff'}
+        setStuff.getAnnotationMetadata().hasAnnotation(Property)
+        setStuff.getAnnotationMetadata().synthesize(Property).name() == 'foo.bar.baz.stuff'
+        setStuff.name == 'setStuff'
+
+
+        def setFooMethod = beanDefinition.injectedMethods.find { it.name == 'setFoo'}
+        setFooMethod.getAnnotationMetadata().hasAnnotation(Property)
+        setFooMethod.getAnnotationMetadata().synthesize(Property).name() == 'foo.bar.baz.foo'
+        setFooMethod.name == 'setFoo'
     }
 
     void "test inner class paths - fields"() {
@@ -233,14 +237,20 @@ class ChildConfig: MyConfig() {
         then:
         beanDefinition.injectedFields.size() == 0
         beanDefinition.injectedMethods.size() == 3
-        beanDefinition.injectedMethods[0].name == 'setStuff'
-        beanDefinition.injectedMethods[0].getAnnotationMetadata().hasAnnotation(Property)
-        beanDefinition.injectedMethods[0].getAnnotationMetadata().synthesize(Property).name() == 'foo.bar.baz.stuff'
-        beanDefinition.injectedMethods[1].name == 'setPort'
-        beanDefinition.injectedMethods[1].getAnnotationMetadata().synthesize(Property).name() == 'foo.bar.port'
-        beanDefinition.injectedMethods[2].getAnnotationMetadata().hasAnnotation(Property)
-        beanDefinition.injectedMethods[2].getAnnotationMetadata().synthesize(Property).name() == 'foo.bar.host'
-        beanDefinition.injectedMethods[2].name == 'setHost'
+
+        def stuffMethod = beanDefinition.injectedMethods.find { it.name == 'setStuff'}
+        stuffMethod.name == 'setStuff'
+        stuffMethod.getAnnotationMetadata().hasAnnotation(Property)
+        stuffMethod.getAnnotationMetadata().synthesize(Property).name() == 'foo.bar.baz.stuff'
+
+        def setPortMethod = beanDefinition.injectedMethods.find { it.name == 'setPort'}
+        setPortMethod.name == 'setPort'
+        setPortMethod.getAnnotationMetadata().synthesize(Property).name() == 'foo.bar.port'
+
+        def setHostMethod = beanDefinition.injectedMethods.find { it.name == 'setHost'}
+        setHostMethod.getAnnotationMetadata().hasAnnotation(Property)
+        setHostMethod.getAnnotationMetadata().synthesize(Property).name() == 'foo.bar.host'
+        setHostMethod.name == 'setHost'
 
     }
 
@@ -307,7 +317,7 @@ open class MyProperties {
                 ['foo.setterTest' :'foo',
                 'foo.fieldTest' :'bar']
         )
-        bean = factory.build(applicationContext, beanDefinition)
+        bean = factory.instantiate(beanDefinition)
 
         then:
         bean != null
@@ -382,7 +392,7 @@ open class Parent {
                 ['foo.setterTest' :'foo',
                 'foo.fieldTest' :'bar']
         )
-        bean = factory.build(applicationContext, beanDefinition)
+        bean = factory.instantiate(beanDefinition)
 
         then:
         bean != null

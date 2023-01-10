@@ -539,7 +539,6 @@ class Neo4jProperties {
         config.logLeakedSessions()
     }
 
-    @PendingFeature(reason = "annotation defaults")
     void "test specifying a configuration prefix"() {
         when:
         BeanDefinition beanDefinition = buildBeanDefinition('test.Neo4jProperties', '''

@@ -189,7 +189,7 @@ public abstract class EnclosedElementsQuery<C, N> {
             Set<io.micronaut.inject.ast.Element> addedFromClassElements = new LinkedHashSet<>();
             classElements:
             for (N element : classElements) {
-                io.micronaut.inject.ast.Element newElement = elementsCache.computeIfAbsent(getCacheKey(element), this::toAstElement);
+                io.micronaut.inject.ast.Element newElement = elementsCache.computeIfAbsent(getCacheKey(element), e -> this.toAstElement(e, result.getElementType()));
                 for (Iterator<io.micronaut.inject.ast.Element> iterator = elements.iterator(); iterator.hasNext(); ) {
                     io.micronaut.inject.ast.Element existingElement = iterator.next();
                     if (newElement.equals(existingElement)) {
@@ -289,9 +289,10 @@ public abstract class EnclosedElementsQuery<C, N> {
      * Converts the native element to the AST element.
      *
      * @param enclosedElement The native element.
+     * @param elementType     The result type
      * @return The AST element
      */
     @NonNull
-    protected abstract io.micronaut.inject.ast.Element toAstElement(N enclosedElement);
+    protected abstract io.micronaut.inject.ast.Element toAstElement(N enclosedElement, Class<?> elementType);
 
 }

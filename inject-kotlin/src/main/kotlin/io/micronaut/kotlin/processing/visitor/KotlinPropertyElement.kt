@@ -39,6 +39,24 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
     private val field: Optional<FieldElement>
     private val abstract: Boolean
     private var annotationMetadata: MutableAnnotationMetadataDelegate<*>? = null
+    private val internalDeclaringType: ClassElement by lazy {
+        var parent = declaration.parent
+        if (parent is KSPropertyDeclaration) {
+            parent = parent.parent
+        }
+        val owner = getOwningType()
+        if (parent is KSClassDeclaration) {
+            if (owner.name.equals(parent.qualifiedName)) {
+                owner
+            } else {
+                visitorContext.elementFactory.newClassElement(
+                    parent.asStarProjectedType()
+                )
+            }
+        } else {
+            owner
+        }
+    }
 
     constructor(classElement: ClassElement,
                 type: ClassElement,
@@ -411,7 +429,11 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
 
     override fun getType(): ClassElement = type
 
-    override fun getDeclaringType(): ClassElement = classElement
+    override fun getDeclaringType(): ClassElement {
+        return internalDeclaringType
+    }
+
+    override fun getOwningType(): ClassElement = classElement
 
     override fun getReadMethod(): Optional<MethodElement> = getter
 

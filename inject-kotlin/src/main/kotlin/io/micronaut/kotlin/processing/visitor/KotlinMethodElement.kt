@@ -34,13 +34,17 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
         if (parent is KSPropertyDeclaration) {
             parent = parent.parent
         }
+        val owner = getOwningType()
         if (parent is KSClassDeclaration) {
-            visitorContext.elementFactory.newClassElement(
-                parent.asStarProjectedType()
-            )
+            if (owner.name.equals(parent.qualifiedName)) {
+                owner
+            } else {
+                visitorContext.elementFactory.newClassElement(
+                    parent.asStarProjectedType()
+                )
+            }
         } else {
-            // shouldn't happen
-            visitorContext.getClassElement(Object::class.java.name).get()
+            owner
         }
     }
 

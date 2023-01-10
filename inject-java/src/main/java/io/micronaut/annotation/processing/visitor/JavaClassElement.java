@@ -901,7 +901,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         }
 
         @Override
-        protected io.micronaut.inject.ast.Element toAstElement(Element enclosedElement) {
+        protected io.micronaut.inject.ast.Element toAstElement(Element enclosedElement, Class<?> elementType) {
             final JavaElementFactory elementFactory = visitorContext.getElementFactory();
             return switch (enclosedElement.getKind()) {
                 case METHOD -> elementFactory.newMethodElement(
