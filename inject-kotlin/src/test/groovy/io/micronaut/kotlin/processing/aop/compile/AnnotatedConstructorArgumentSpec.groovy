@@ -68,7 +68,7 @@ open class MyBean(@Value("\\${foo.bar}") val myValue: String) {
 
         then:
         instance.someMethod("foo") == 'test changed'
-        instance.someMethodPackagePrivateMethod$main("foo") == 'test changed'
+        instance.someMethodPackagePrivateMethod$main("foo") == 'test foo'
     }
 
     void "test that constructor arguments propagate annotation metadata - method level AOP"() {

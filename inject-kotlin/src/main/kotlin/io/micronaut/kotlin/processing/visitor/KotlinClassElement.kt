@@ -748,7 +748,6 @@ open class KotlinClassElement(val kotlinType: KSType,
                 MethodElement::class.java -> {
                     val result = classNode.getDeclaredFunctions()
                         .filter { func: KSFunctionDeclaration ->
-                            !func.isInternal() &&
                             !func.isConstructor() &&
                             func.origin != Origin.SYNTHETIC &&
                             // this is a hack but no other way it seems
