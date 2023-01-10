@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty.cors
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.annotation.Nullable
 import io.micronaut.core.async.publisher.Publishers
 import io.micronaut.core.util.StringUtils
 import io.micronaut.http.*
@@ -25,6 +26,7 @@ import io.micronaut.http.filter.ServerFilterChain
 import io.micronaut.http.server.HttpServerConfiguration
 import io.micronaut.http.server.cors.CorsFilter
 import io.micronaut.http.server.cors.CorsOriginConfiguration
+import io.micronaut.http.server.util.HttpHostResolver
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.web.router.RouteMatch
 import io.micronaut.web.router.Router
@@ -559,6 +561,11 @@ class CorsFilterSpec extends Specification {
     }
 
     private CorsFilter buildCorsHandler(HttpServerConfiguration.CorsConfiguration config) {
-        new CorsFilter(config ?: enabledCorsConfiguration())
+        new CorsFilter(config ?: enabledCorsConfiguration(), new HttpHostResolver() {
+            @Override
+            String resolve(@Nullable HttpRequest request) {
+                return "http://micronautexample.com";
+            }
+        })
     }
 }
