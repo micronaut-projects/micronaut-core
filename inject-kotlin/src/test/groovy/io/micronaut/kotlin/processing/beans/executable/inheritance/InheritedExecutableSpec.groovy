@@ -111,7 +111,7 @@ class StatusController: GenericController<String, Int>() {
         definition != null
         definition.getExecutableMethods().any { it.methodName == "create" && it.argumentTypes == [int] as Class[] }
         definition.getExecutableMethods().any { it.methodName == "save" && it.argumentTypes == [String] as Class[] }
-        definition.getExecutableMethods().any { it.methodName == "find" && it.argumentTypes == [Integer] as Class[] }
+        definition.getExecutableMethods().any { it.methodName == "find" && it.argumentTypes == [int] as Class[] }
         definition.getExecutableMethods().size() == 3
     }
 

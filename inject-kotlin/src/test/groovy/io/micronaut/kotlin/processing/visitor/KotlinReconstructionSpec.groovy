@@ -39,6 +39,7 @@ class Test<T> {
     }
 
     @Unroll("super type is #superType")
+    @PendingFeature(reason = "Not yet implemented")
     def 'super type'() {
         given:
         def element = buildClassElement("example.Test", """

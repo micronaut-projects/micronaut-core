@@ -547,7 +547,7 @@ open class KotlinClassElement(val kotlinType: KSType,
             primaryConstructor
         } else {
             Optional.ofNullable(classDeclaration.primaryConstructor)
-                .filter { !it.isInternal() && !it.isPrivate() }
+                .filter { !it.isPrivate() }
                 .map { visitorContext.elementFactory.newConstructorElement(
                     this,
                     it,
@@ -562,7 +562,7 @@ open class KotlinClassElement(val kotlinType: KSType,
             defaultConstructor
         } else {
             Optional.ofNullable(classDeclaration.primaryConstructor)
-                .filter { !it.isInternal() && !it.isPrivate() && it.parameters.isEmpty() }
+                .filter { !it.isPrivate() && it.parameters.isEmpty() }
                 .map { visitorContext.elementFactory.newConstructorElement(
                     this,
                     it,
@@ -765,11 +765,7 @@ open class KotlinClassElement(val kotlinType: KSType,
                         .toList()
                 }
                 ConstructorElement::class.java -> {
-                    classNode.getConstructors()
-                        .filter { methodNode: KSFunctionDeclaration ->
-                            !methodNode.isInternal()
-                        }
-                        .toList()
+                    classNode.getConstructors().toList()
                 }
                 ClassElement::class.java -> {
                     classNode.declarations.filter {
