@@ -53,7 +53,7 @@ open class KotlinVisitorContext(private val environment: SymbolProcessorEnvironm
 
     init {
         visitorAttributes = MutableConvertibleValuesMap()
-        annotationMetadataBuilder = KotlinAnnotationMetadataBuilder(environment, resolver)
+        annotationMetadataBuilder = KotlinAnnotationMetadataBuilder(environment, resolver, this)
         elementFactory = KotlinElementFactory(this)
         elementAnnotationMetadataFactory = KotlinElementAnnotationMetadataFactory(false, annotationMetadataBuilder)
     }
@@ -100,7 +100,7 @@ open class KotlinVisitorContext(private val environment: SymbolProcessorEnvironm
             .filterIsInstance<KSClassDeclaration>()
             .filter { declaration ->
                 declaration.annotations.any { ann ->
-                    stereotypes.contains(KotlinAnnotationMetadataBuilder.getAnnotationTypeName(ann))
+                    stereotypes.contains(KotlinAnnotationMetadataBuilder.getAnnotationTypeName(ann, this))
                 }
             }
             .map { declaration ->

@@ -57,7 +57,7 @@ open class KotlinClassElement(val kotlinType: KSType,
         visitorContext: KotlinVisitorContext,
         arrayDimensions: Int = 0,
         typeVariable: Boolean = false
-    ) : this(type, type.declaration as KSClassDeclaration, type.declaration as KSClassDeclaration, elementAnnotationMetadataFactory, visitorContext, arrayDimensions, typeVariable)
+    ) : this(type, type.declaration.getClassDeclaration(visitorContext), type.declaration.getClassDeclaration(visitorContext), elementAnnotationMetadataFactory, visitorContext, arrayDimensions, typeVariable)
 
 
     val outerType: KSType? by lazy {

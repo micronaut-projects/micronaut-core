@@ -72,7 +72,13 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
         this.classElement = classElement
         this.setter = Optional.ofNullable(property.setter)
             .map { method ->
-                return@map if (method.modifiers.contains(Modifier.PRIVATE)) {
+                val modifiers = try {
+                    method.modifiers
+                } catch (e: IllegalStateException) {
+                    // KSP bug: IllegalStateException: unhandled visibility: invisible_fake
+                    setOf(Modifier.INTERNAL)
+                }
+                return@map if (modifiers.contains(Modifier.PRIVATE)) {
                     null
                 } else {
                     visitorContext.elementFactory.newMethodElement(classElement, method, type, elementAnnotationMetadataFactory)

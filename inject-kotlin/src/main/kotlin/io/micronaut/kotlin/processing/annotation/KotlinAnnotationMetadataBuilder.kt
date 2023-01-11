@@ -29,20 +29,22 @@ import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
 import io.micronaut.inject.annotation.MutableAnnotationMetadata
 import io.micronaut.inject.visitor.VisitorContext
 import io.micronaut.kotlin.processing.getBinaryName
+import io.micronaut.kotlin.processing.getClassDeclaration
 import io.micronaut.kotlin.processing.visitor.KotlinVisitorContext
 import java.lang.annotation.Inherited
 import java.lang.annotation.RetentionPolicy
 import java.util.*
 
 class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnvironment: SymbolProcessorEnvironment,
-                                      private val resolver: Resolver): AbstractAnnotationMetadataBuilder<KSAnnotated, KSAnnotation>() {
+                                      private val resolver: Resolver,
+                                      private val visitorContext: KotlinVisitorContext): AbstractAnnotationMetadataBuilder<KSAnnotated, KSAnnotation>() {
 
     companion object {
-        private fun getTypeForAnnotation(annotationMirror: KSAnnotation): KSClassDeclaration {
-            return annotationMirror.annotationType.resolve().declaration as KSClassDeclaration
+        private fun getTypeForAnnotation(annotationMirror: KSAnnotation, visitorContext: KotlinVisitorContext): KSClassDeclaration {
+            return annotationMirror.annotationType.resolve().declaration.getClassDeclaration(visitorContext)
         }
-        fun getAnnotationTypeName(annotationMirror: KSAnnotation): String {
-            val type = getTypeForAnnotation(annotationMirror)
+        fun getAnnotationTypeName(annotationMirror: KSAnnotation, visitorContext: KotlinVisitorContext): String {
+            val type = getTypeForAnnotation(annotationMirror, visitorContext)
             return if (type.qualifiedName != null) {
                 type.qualifiedName!!.asString()
             } else {
@@ -53,7 +55,7 @@ class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnvironment: Sy
     }
 
     override fun getTypeForAnnotation(annotationMirror: KSAnnotation): KSClassDeclaration {
-        return Companion.getTypeForAnnotation(annotationMirror)
+        return Companion.getTypeForAnnotation(annotationMirror, visitorContext)
     }
 
     override fun hasAnnotation(element: KSAnnotated, annotation: Class<out Annotation>): Boolean {
@@ -73,7 +75,7 @@ class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnvironment: Sy
     }
 
     override fun getAnnotationTypeName(annotationMirror: KSAnnotation): String {
-        return Companion.getAnnotationTypeName(annotationMirror)
+        return Companion.getAnnotationTypeName(annotationMirror, visitorContext)
     }
 
     override fun getElementName(element: KSAnnotated): String {
@@ -227,7 +229,7 @@ class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnvironment: Sy
 
     override fun readAnnotationRawValues(annotationMirror: KSAnnotation): MutableMap<out KSDeclaration, *> {
         val map = mutableMapOf<KSDeclaration, Any>()
-        val declaration = annotationMirror.annotationType.resolve().declaration as KSClassDeclaration
+        val declaration = annotationMirror.annotationType.resolve().declaration.getClassDeclaration(visitorContext)
         declaration.getAllProperties().forEach { prop ->
             val argument = annotationMirror.arguments.find { it.name == prop.simpleName }
             if (argument?.value != null && !argument.isDefault()) {
@@ -285,7 +287,7 @@ class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnvironment: Sy
         if (repeatable != null) {
             val value = repeatable.arguments.find { it.name?.asString() == "value" }?.value
             if (value != null) {
-                val declaration = (value as KSType).declaration as KSClassDeclaration
+                val declaration = (value as KSType).declaration.getClassDeclaration(visitorContext)
                 return declaration.getBinaryName(resolver)
             }
         }
@@ -313,8 +315,8 @@ class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnvironment: Sy
         }
         if (retention != null) {
             val value = retention.arguments.find { it.name?.asString() == "value" }?.value
-            if (value != null) {
-                return value as RetentionPolicy
+            if (value is KSType) {
+                return toRetentionPolicy(value)
             }
         } else {
             retention = annotation.annotations.find {
@@ -322,23 +324,30 @@ class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnvironment: Sy
             }
             if (retention != null) {
                 val value = retention.arguments.find { it.name?.asString() == "value" }?.value
-                if (value != null) {
-                    val entry = AnnotationRetention.valueOf((value as KSType).declaration.qualifiedName!!.getShortName())
-                    return when (entry) {
-                        AnnotationRetention.RUNTIME -> {
-                            RetentionPolicy.RUNTIME
-                        }
-                        AnnotationRetention.SOURCE -> {
-                            RetentionPolicy.SOURCE
-                        }
-                        AnnotationRetention.BINARY -> {
-                            RetentionPolicy.CLASS
-                        }
-                    }
+                if (value is KSType) {
+                    return toJavaRetentionPolicy(value)
                 }
             }
         }
         return RetentionPolicy.RUNTIME
+    }
+
+    private fun toRetentionPolicy(value: KSType) =
+        RetentionPolicy.valueOf(value.declaration.qualifiedName!!.getShortName())
+
+    private fun toJavaRetentionPolicy(value: KSType) =
+        when (AnnotationRetention.valueOf(value.declaration.qualifiedName!!.getShortName())) {
+            AnnotationRetention.RUNTIME -> {
+                RetentionPolicy.RUNTIME
+            }
+
+            AnnotationRetention.SOURCE -> {
+                RetentionPolicy.SOURCE
+            }
+
+            AnnotationRetention.BINARY -> {
+                RetentionPolicy.CLASS
+            }
     }
 
     override fun isInheritedAnnotation(annotationMirror: KSAnnotation): Boolean {
@@ -360,7 +369,7 @@ class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnvironment: Sy
                 val declaration = t.declaration
                 if (!hierarchy.contains(declaration)) {
                     hierarchy.add(declaration)
-                    populateTypeHierarchy(declaration as KSClassDeclaration, hierarchy)
+                    populateTypeHierarchy(declaration.getClassDeclaration(visitorContext), hierarchy)
                 }
             }
         }
@@ -393,7 +402,7 @@ class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnvironment: Sy
         val annotationMirror = getAnnotationMirror(annotationType)
         val members = mutableMapOf<String, KSAnnotated>()
         if (annotationMirror.isPresent) {
-            (annotationMirror.get() as KSClassDeclaration).getDeclaredProperties()
+            (annotationMirror.get().getClassDeclaration(visitorContext)).getDeclaredProperties()
                 .forEach {
                     members[it.simpleName.asString()] = it
                 }

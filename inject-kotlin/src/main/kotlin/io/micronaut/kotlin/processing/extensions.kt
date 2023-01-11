@@ -79,12 +79,18 @@ fun KSPropertyDeclaration.isTypeReference(): Boolean {
 }
 
 fun KSPropertySetter.getVisibility(): Visibility {
+    val modifierSet = try {
+        this.modifiers
+    } catch (e: IllegalStateException) {
+        // KSP bug: IllegalStateException: unhandled visibility: invisible_fake
+        setOf(Modifier.INTERNAL)
+    }
     return when {
-        this.modifiers.contains(Modifier.PUBLIC) -> Visibility.PUBLIC
-        this.modifiers.contains(Modifier.PRIVATE) -> Visibility.PRIVATE
-        this.modifiers.contains(Modifier.PROTECTED) ||
-                this.modifiers.contains(Modifier.OVERRIDE) -> Visibility.PROTECTED
-        this.modifiers.contains(Modifier.INTERNAL) -> Visibility.INTERNAL
+        modifierSet.contains(Modifier.PUBLIC) -> Visibility.PUBLIC
+        modifierSet.contains(Modifier.PRIVATE) -> Visibility.PRIVATE
+        modifierSet.contains(Modifier.PROTECTED) ||
+                modifierSet.contains(Modifier.OVERRIDE) -> Visibility.PROTECTED
+        modifierSet.contains(Modifier.INTERNAL) -> Visibility.INTERNAL
         else -> if (this.origin != Origin.JAVA && this.origin != Origin.JAVA_LIB)
             Visibility.PUBLIC else Visibility.JAVA_PACKAGE
     }
