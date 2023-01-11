@@ -280,7 +280,7 @@ interface Three
             assert propMap['conventionProp'].readMethod.get().genericReturnType.simpleName == 'String'
             assert propMap['conventionProp'].writeMethod.get().parameters[0].type.simpleName == 'CharSequence'
             assert propMap['conventionProp'].writeMethod.get().parameters[0].genericType.simpleName == 'String'
-            assert propMap['parentConstructorProp'].type.simpleName == 'String'
+            assert propMap['parentConstructorProp'].type.simpleName == 'CharSequence'
             assert propMap['parentConstructorProp'].genericType.simpleName == 'String'
             assert methodMap['parentFunc'].returnType.simpleName == 'CharSequence'
             assert methodMap['parentFunc'].genericReturnType.simpleName == 'String'

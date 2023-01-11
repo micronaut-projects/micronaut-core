@@ -28,7 +28,13 @@ import java.lang.StringBuilder
 
 @OptIn(KspExperimental::class)
 fun KSDeclaration.getBinaryName(resolver: Resolver): String {
-    val declaration = unwrap() as KSDeclaration
+    var declaration = unwrap() as KSDeclaration
+    if (declaration is KSFunctionDeclaration) {
+        val parent = declaration.parentDeclaration
+        if (parent != null) {
+            declaration = parent
+        }
+    }
     val binaryName = resolver.mapKotlinNameToJava(declaration.qualifiedName!!)?.asString()
     return if (binaryName != null) {
         binaryName
