@@ -19,7 +19,6 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.async.publisher.Publishers;
-import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.MediaType;
@@ -46,12 +45,11 @@ public final class HttpRequestFactory {
     @NonNull
     public static <I> HttpRequest.Builder builder(
         @NonNull URI uri, io.micronaut.http.HttpRequest<I> request,
-        ConversionService conversionService,
         Argument<?> bodyType,
         MediaTypeCodecRegistry mediaTypeCodecRegistry
     ) {
         final HttpRequest.Builder builder = HttpRequest.newBuilder().uri(uri);
-        HttpRequest.BodyPublisher bodyPublisher = publisherForRequest(request, conversionService, bodyType, mediaTypeCodecRegistry);
+        HttpRequest.BodyPublisher bodyPublisher = publisherForRequest(request, bodyType, mediaTypeCodecRegistry);
         builder.method(request.getMethod().toString(), bodyPublisher);
         request.getHeaders().forEach((name, values) -> values.forEach(value -> builder.header(name, value)));
         if (request.getContentType().isEmpty()) {
@@ -62,7 +60,6 @@ public final class HttpRequestFactory {
 
     private static <I> HttpRequest.BodyPublisher publisherForRequest(
         io.micronaut.http.HttpRequest<I> request,
-        ConversionService conversionService,
         Argument<?> bodyType,
         MediaTypeCodecRegistry mediaTypeCodecRegistry
     ) {
@@ -75,16 +72,16 @@ public final class HttpRequestFactory {
                 if (bodyValue instanceof CharSequence) {
                     return HttpRequest.BodyPublishers.ofString(bodyValue.toString());
                 } else {
-                    throw new UnsupportedOperationException("Body of type [" + bodyValue.getClass() + "] as " + requestContentType + " is not yet supported");
+                    throw unsupportedBodyType(bodyValue.getClass(), requestContentType.toString());
                 }
             } else if (requestContentType.equals(MediaType.MULTIPART_FORM_DATA_TYPE) && hasBody) {
                 Object bodyValue = body.get();
-                throw new UnsupportedOperationException("Body of type [" + bodyValue.getClass() + "] as " + requestContentType + " is not yet supported");
+                throw unsupportedBodyType(bodyValue.getClass(), requestContentType.toString());
             } else {
                 if (hasBody) {
                     Object bodyValue = body.get();
                     if (Publishers.isConvertibleToPublisher(bodyValue)) {
-                        throw new UnsupportedOperationException("Body of type [" + bodyValue.getClass() + "] as " + requestContentType + " is not yet supported");
+                        throw unsupportedBodyType(bodyValue.getClass(), requestContentType.toString());
                     } else if (bodyValue instanceof CharSequence) {
                         return HttpRequest.BodyPublishers.ofString(bodyValue.toString());
                     } else if (mediaTypeCodecRegistry != null) {
@@ -107,5 +104,9 @@ public final class HttpRequestFactory {
             }
         }
         return HttpRequest.BodyPublishers.noBody();
+    }
+
+    private static UnsupportedOperationException unsupportedBodyType(Class<?> clazz, String contentType) {
+        return new UnsupportedOperationException("Body of type [" + clazz + "] as " + contentType + " is not yet supported");
     }
 }

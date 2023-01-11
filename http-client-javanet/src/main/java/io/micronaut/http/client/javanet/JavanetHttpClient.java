@@ -66,7 +66,7 @@ public class JavanetHttpClient extends AbstractJavanetHttpClient implements Http
         String clientId,
         ConversionService conversionService
     ) {
-        super(LOG, loadBalancer, httpVersion, configuration, contextPath, mediaTypeCodecRegistry, requestBinderRegistry, clientId, conversionService);
+        super(loadBalancer, httpVersion, configuration, contextPath, mediaTypeCodecRegistry, requestBinderRegistry, clientId, conversionService);
     }
 
     public JavanetHttpClient(URI uri) {

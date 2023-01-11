@@ -55,7 +55,7 @@ public class JavanetBlockingHttpClient extends AbstractJavanetHttpClient impleme
         String clientId,
         ConversionService conversionService
     ) {
-        super(LOG, loadBalancer, httpVersion, configuration, contextPath, mediaTypeCodecRegistry, requestBinderRegistry, clientId, conversionService);
+        super(loadBalancer, httpVersion, configuration, contextPath, mediaTypeCodecRegistry, requestBinderRegistry, clientId, conversionService);
     }
 
     @Override
@@ -77,12 +77,13 @@ public class JavanetBlockingHttpClient extends AbstractJavanetHttpClient impleme
             }
             return getConvertedResponse(httpResponse, bodyType);
         } catch (IOException | InterruptedException e) {
+            Thread.currentThread().interrupt();
             throw new HttpClientException("error sending request", e);
         }
     }
 
     @Override
     public void close() throws IOException {
-
+        // Nothing to do here, we do not need to close clients
     }
 }

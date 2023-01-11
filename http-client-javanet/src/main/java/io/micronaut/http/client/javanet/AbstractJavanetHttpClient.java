@@ -65,11 +65,9 @@ abstract class AbstractJavanetHttpClient {
     protected final RequestBinderRegistry requestBinderRegistry;
     protected final String clientId;
     protected final ConversionService conversionService;
-    private final Logger log;
     protected MediaTypeCodecRegistry mediaTypeCodecRegistry;
 
     protected AbstractJavanetHttpClient(
-        Logger log,
         LoadBalancer loadBalancer,
         HttpVersionSelection httpVersion,
         HttpClientConfiguration configuration,
@@ -79,7 +77,6 @@ abstract class AbstractJavanetHttpClient {
         String clientId,
         ConversionService conversionService
     ) {
-        this.log = log;
         this.loadBalancer = loadBalancer;
         this.httpVersion = httpVersion;
         this.configuration = configuration;
@@ -183,7 +180,7 @@ abstract class AbstractJavanetHttpClient {
                 request.getCookies().getAll().forEach(cookie -> cookieConverter(cookie, request, server));
                 return server.resolve(prependContextPath(request.getUri()));
             })
-            .map(uri -> HttpRequestFactory.builder(uri, request, conversionService, bodyType, mediaTypeCodecRegistry).build());
+            .map(uri -> HttpRequestFactory.builder(uri, request, bodyType, mediaTypeCodecRegistry).build());
     }
 
     private <I> void cookieConverter(Cookie cookie, io.micronaut.http.HttpRequest<I> request, ServiceInstance server) {

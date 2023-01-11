@@ -87,6 +87,7 @@ public interface HttpMethodDeleteTest extends AbstractTck {
         @Delete
         @Status(HttpStatus.NO_CONTENT)
         void index() {
+            // no-op
         }
 
         @Delete("/string-response")

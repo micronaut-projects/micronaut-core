@@ -39,8 +39,6 @@ import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.LoadBalancerResolver;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.exceptions.HttpClientException;
-import io.micronaut.http.client.filter.ClientFilterResolutionContext;
-import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.inject.InjectionPoint;
@@ -49,9 +47,7 @@ import io.micronaut.json.JsonFeatures;
 import io.micronaut.json.JsonMapper;
 import io.micronaut.json.codec.MapperMediaTypeCodec;
 
-import java.net.URI;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -91,10 +87,9 @@ public class DefaultJavanetHttpClientRegistry implements AutoCloseable, HttpClie
         @Nullable InjectionPoint<?> injectionPoint,
         @Parameter @Nullable LoadBalancer loadBalancer,
         @Parameter @Nullable HttpClientConfiguration configuration,
-        @Nullable MediaTypeCodecRegistry mediaTypeCodecRegistry,
         BeanContext beanContext
     ) {
-        return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, mediaTypeCodecRegistry, beanContext);
+        return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext);
     }
 
 
@@ -102,7 +97,6 @@ public class DefaultJavanetHttpClientRegistry implements AutoCloseable, HttpClie
         @Nullable InjectionPoint<?> injectionPoint,
         @Nullable LoadBalancer loadBalancer,
         @Nullable HttpClientConfiguration configuration,
-        @Nullable MediaTypeCodecRegistry mediaTypeCodecRegistry,
         BeanContext beanContext
         ) {
         if (loadBalancer != null) {
