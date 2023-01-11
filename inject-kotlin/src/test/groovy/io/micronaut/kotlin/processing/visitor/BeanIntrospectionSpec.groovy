@@ -1634,7 +1634,7 @@ enum class Test(val number: Int) {
 
         expect:
         introspection != null
-        introspection.beanProperties.size() == 3
+        introspection.beanProperties.size() == 1
         introspection.getProperty("number").isPresent()
 
         when:

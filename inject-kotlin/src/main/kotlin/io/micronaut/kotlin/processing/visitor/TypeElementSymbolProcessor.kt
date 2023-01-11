@@ -213,17 +213,7 @@ open class TypeElementSymbolProcessor(private val environment: SymbolProcessorEn
                         visitConstructor(classElement, it)
                     }
 
-                val memberElements = classElement.getEnclosedElements(ElementQuery.ALL_FIELD_AND_METHODS)
-                for (memberElement in memberElements) {
-                    when(memberElement) {
-                        is FieldElement -> {
-                            visitField(memberElement)
-                        }
-                        is MethodElement -> {
-                            visitMethod(memberElement)
-                        }
-                    }
-                }
+                visitMembers(classElement)
                 val innerClassQuery =
                     ElementQuery.ALL_INNER_CLASSES.onlyStatic().modifiers { it.contains(ElementModifier.PUBLIC) }
                 val innerClasses = classElement.getEnclosedElements(innerClassQuery)
@@ -232,10 +222,26 @@ open class TypeElementSymbolProcessor(private val environment: SymbolProcessorEn
                     val visitorContext = loadedVisitor.visitorContext
                     if (loadedVisitor.matches(it)) {
                         visitor.visitClass(it, visitorContext)
+                        visitMembers(it)
                     }
                 }
             }
             return data
+        }
+
+        private fun visitMembers(classElement: ClassElement) {
+            val memberElements = classElement.getEnclosedElements(ElementQuery.ALL_FIELD_AND_METHODS)
+            for (memberElement in memberElements) {
+                when (memberElement) {
+                    is FieldElement -> {
+                        visitField(memberElement)
+                    }
+
+                    is MethodElement -> {
+                        visitMethod(memberElement)
+                    }
+                }
+            }
         }
 
         private fun visitMethod(memberElement: MethodElement) {

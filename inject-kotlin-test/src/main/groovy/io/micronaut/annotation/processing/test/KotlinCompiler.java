@@ -8,8 +8,10 @@ import com.tschuchort.compiletesting.KspKt;
 import com.tschuchort.compiletesting.SourceFile;
 import io.micronaut.aop.internal.InterceptorRegistryBean;
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.ApplicationContextConfiguration;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.DefaultApplicationContext;
+import io.micronaut.context.env.Environment;
 import io.micronaut.context.event.ApplicationEventPublisherFactory;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanIntrospector;
@@ -46,6 +48,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
@@ -210,16 +213,33 @@ public class KotlinCompiler {
         return buildContext(clazz, false);
     }
 
-    public static ApplicationContext buildContext(@Language("kotlin") String clazz, boolean includeAllBeans) {
+    public static ApplicationContext
+    buildContext(@Language("kotlin") String clazz, boolean includeAllBeans) {
+        return buildContext(clazz, includeAllBeans, Collections.emptyMap());
+    }
+
+    public static ApplicationContext
+    buildContext(@Language("kotlin") String clazz, boolean includeAllBeans, Map<String, Object> config) {
         Pair<Pair<KotlinCompilation, KotlinCompilation.Result>, Pair<KotlinCompilation, KotlinCompilation.Result>> pair = compile("temp", clazz, classElement -> {
         });
         ClassLoader classLoader = toClassLoader(pair);
-        return new DefaultApplicationContext(ClassPathResourceLoader.defaultLoader(classLoader),"test") {
+        var builder = ApplicationContext.builder();
+        builder.classLoader(classLoader);
+        builder.environments("test");
+        builder.properties(config);
+        Environment environment = builder.build().getEnvironment();
+        return new DefaultApplicationContext((ApplicationContextConfiguration) builder) {
+
+            @Override
+            public Environment getEnvironment() {
+                return environment;
+            }
+
             @Override
             protected List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
                 List<String> beanDefinitionNames = pair.component2().component1().
                     getClasspaths().stream().filter(f -> f.toURI().toString().contains("/ksp/sources/resources"))
-                        .flatMap(dir -> {
+                    .flatMap(dir -> {
                         File[] files = new File(dir, "META-INF/micronaut/io.micronaut.inject.BeanDefinitionReference").listFiles();
                         if (files == null) {
                             return Stream.empty();
@@ -232,7 +252,7 @@ public class KotlinCompiler {
                     try {
                         BeanDefinitionReference br = (BeanDefinitionReference) loadDefinition(classLoader, name);
                         if (br != null) {
-                             beanDefinitions.add(br);
+                            beanDefinitions.add(br);
                         }
                     } catch (NoSuchMethodException | InvocationTargetException | InstantiationException | IllegalAccessException e) {
                     }

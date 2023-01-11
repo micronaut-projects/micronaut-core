@@ -8,6 +8,9 @@ import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.InstantiatableBeanDefinition
 import io.micronaut.inject.ValidatedBeanDefinition
 import spock.lang.Specification
+
+import javax.validation.Constraint
+
 import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class ImmutableConfigurationPropertiesSpec extends Specification {
@@ -105,7 +108,7 @@ class MyConfig @ConfigurationInject constructor(@javax.validation.constraints.No
     void "test parse immutable configuration properties - each property"() {
 
         when:
-        BeanDefinition beanDefinition = buildBeanDefinition('test.MyConfig', '''
+        ApplicationContext context = buildContext( '''
 package test;
 
 import io.micronaut.context.annotation.*;
@@ -113,23 +116,8 @@ import java.time.Duration;
 
 @EachProperty("foo.bar")
 class MyConfig @ConfigurationInject constructor(@javax.validation.constraints.NotBlank val host: String, val serverPort: Int)
-''')
-        def arguments = beanDefinition.constructor.arguments
-        then:
-        arguments.length == 2
-        arguments[0].synthesize(Property)
-                .name() == 'foo.bar.*.host'
-        arguments[1].synthesize(Property)
-                .name() == 'foo.bar.*.server-port'
-
-        when:
-        def context = ApplicationContext.run('foo.bar.one.host': 'test', 'foo.bar.one.server-port': '9999')
-        def resolutionContext = new DefaultBeanResolutionContext(context, beanDefinition)
-        resolutionContext.setAttribute(
-                Named.class.getName(),
-                "one"
-        )
-        def config = ((InstantiatableBeanDefinition) beanDefinition).instantiate(resolutionContext,context)
+''', false, ['foo.bar.one.host': 'test', 'foo.bar.one.server-port': '9999'])
+        def config = getBean(context, 'test.MyConfig')
 
         then:
         config.host == 'test'
@@ -138,6 +126,7 @@ class MyConfig @ConfigurationInject constructor(@javax.validation.constraints.No
         cleanup:
         context.close()
     }
+
 
     void "test parse immutable configuration properties - init method"() {
 

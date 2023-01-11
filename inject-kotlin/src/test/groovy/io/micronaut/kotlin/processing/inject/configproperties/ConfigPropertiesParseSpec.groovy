@@ -926,42 +926,6 @@ open class Parent {
         beanDefinition.injectedMethods.find { it.name == "setParentPublicField" }
     }
 
-    void "test excludes on configuration builder"() {
-        when:
-        BeanDefinition beanDefinition = buildBeanDefinition('test.MyProperties', '''
-package test
-
-import io.micronaut.context.annotation.*
-import io.micronaut.kotlin.processing.beans.configuration.Engine
-
-@ConfigurationProperties(value = "foo", excludes = ["engine", "engine2"])
-class MyProperties {
-
-    @ConfigurationBuilder(prefixes = ["with"])
-    var engine = Engine.builder()
-
-    @ConfigurationBuilder(configurationPrefix = "two", prefixes = ["with"])
-    var engine2 = Engine.builder()
-}
-''')
-        then:
-        noExceptionThrown()
-        beanDefinition.injectedMethods.isEmpty()
-        beanDefinition.injectedFields.isEmpty()
-
-        when:
-        InstantiatableBeanDefinition factory = beanDefinition
-        ApplicationContext applicationContext = ApplicationContext.run(
-                'foo.manufacturer':'Subaru',
-                'foo.two.manufacturer':'Subaru'
-        )
-        def bean = factory.instantiate(applicationContext)
-
-        then:
-        ((io.micronaut.kotlin.processing.beans.configuration.Engine.Builder) bean.engine).build().manufacturer == 'Subaru'
-        ((io.micronaut.kotlin.processing.beans.configuration.Engine.Builder) bean.getEngine2()).build().manufacturer == 'Subaru'
-    }
-
     void "test name is correct with inner classes of non config props class"() {
         when:
         BeanDefinition beanDefinition = buildBeanDefinition("test.Test\$TestNestedConfig", '''

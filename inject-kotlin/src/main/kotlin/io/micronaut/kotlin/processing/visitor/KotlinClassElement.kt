@@ -18,6 +18,8 @@ package io.micronaut.kotlin.processing.visitor
 import com.google.devtools.ksp.*
 import com.google.devtools.ksp.symbol.*
 import io.micronaut.context.annotation.BeanProperties
+import io.micronaut.context.annotation.ConfigurationBuilder
+import io.micronaut.context.annotation.ConfigurationReader
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.Creator
 import io.micronaut.core.annotation.NonNull
@@ -356,8 +358,18 @@ open class KotlinClassElement(val kotlinType: KSType,
                 val excludedAnnotations = propertyElementQuery.excludedAnnotations
                 excludedAnnotations.isEmpty() || !excludedAnnotations.any { prop.hasAnnotation(it) }
             }
-        val allProperties =
-            enclosedElementsQuery.getEnclosedElements(this, eq)
+
+        val allProperties : MutableList<PropertyElement> = mutableListOf()
+        // unfortunate hack since these are not excluded?
+        if (hasDeclaredStereotype(ConfigurationReader::class.java)) {
+            val configurationBuilderQuery = ElementQuery.of(PropertyElement::class.java)
+                .annotated { it.hasDeclaredAnnotation(ConfigurationBuilder::class.java) }
+                .onlyInstance()
+            val configBuilderProps = enclosedElementsQuery.getEnclosedElements(this, configurationBuilderQuery)
+            allProperties.addAll(configBuilderProps)
+        }
+
+        allProperties.addAll(enclosedElementsQuery.getEnclosedElements(this, eq))
         val propertyNames = allProperties.map { it.name }.toSet()
 
         val resolvedProperties : MutableList<PropertyElement> = mutableListOf()
@@ -397,7 +409,8 @@ open class KotlinClassElement(val kotlinType: KSType,
             value.getter,
             value.setter,
             elementAnnotationMetadataFactory,
-            visitorContext
+            visitorContext,
+            value.isExcluded
         )
     }
 

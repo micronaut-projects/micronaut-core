@@ -28,6 +28,7 @@ import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.PropertyElement;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -173,6 +174,8 @@ public abstract class EnclosedElementsQuery<C, N> {
         if (!result.isIncludeOverriddenMethods()) {
             if (newElement instanceof MethodElement && existingElement instanceof MethodElement) {
                 return ((MethodElement) newElement).overrides((MethodElement) existingElement);
+            } else if (newElement instanceof PropertyElement newPropertyElement && existingElement instanceof PropertyElement existingPropertyElement) {
+                return newPropertyElement.overrides(existingPropertyElement);
             }
         }
         return false;

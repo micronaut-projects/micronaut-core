@@ -25,6 +25,7 @@ import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
 import io.micronaut.inject.ast.*
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate
+import io.micronaut.kotlin.processing.kspNode
 import java.util.*
 import java.util.function.Consumer
 import java.util.function.Predicate
@@ -38,6 +39,7 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
     private val getter: Optional<MethodElement>
     private val field: Optional<FieldElement>
     private val abstract: Boolean
+    private val exc: Boolean
     private var annotationMetadata: MutableAnnotationMetadataDelegate<*>? = null
     private val internalDeclaringType: ClassElement by lazy {
         var parent = declaration.parent
@@ -62,8 +64,10 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
                 type: ClassElement,
                 property: KSPropertyDeclaration,
                 elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
-                visitorContext: KotlinVisitorContext) : super(KSPropertyReference(property), elementAnnotationMetadataFactory, visitorContext) {
+                visitorContext: KotlinVisitorContext,
+                excluded : Boolean = false) : super(KSPropertyReference(property), elementAnnotationMetadataFactory, visitorContext) {
         this.name = property.simpleName.asString()
+        this.exc = excluded
         this.type = type
         this.classElement = classElement
         this.setter = Optional.ofNullable(property.setter)
@@ -185,9 +189,11 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
                 getter: KSFunctionDeclaration,
                 setter: KSFunctionDeclaration?,
                 elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
-                visitorContext: KotlinVisitorContext) : super(getter, elementAnnotationMetadataFactory, visitorContext) {
+                visitorContext: KotlinVisitorContext,
+                excluded : Boolean = false) : super(getter, elementAnnotationMetadataFactory, visitorContext) {
         this.name = name
         this.type = type
+        this.exc = excluded
         this.classElement = classElement
         this.setter = Optional.ofNullable(setter)
             .map { method ->
@@ -293,7 +299,8 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
                 getter: MethodElement?,
                 setter: MethodElement?,
                 elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
-                visitorContext: KotlinVisitorContext) : super(pickDeclaration(type, field, getter, setter), elementAnnotationMetadataFactory, visitorContext) {
+                visitorContext: KotlinVisitorContext,
+                excluded : Boolean = false) : super(pickDeclaration(type, field, getter, setter), elementAnnotationMetadataFactory, visitorContext) {
         this.name = name
         this.type = type
         this.classElement = classElement
@@ -305,6 +312,7 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
         this.setter.ifPresent { elements.add(it) }
         this.getter.ifPresent { elements.add(it) }
         this.field.ifPresent { elements.add(it) }
+        this.exc = excluded
 
         // The instance AnnotationMetadata of each element can change after a modification
         // Set annotation metadata as actual elements so the changes are reflected
@@ -410,6 +418,25 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
         }
     }
 
+    override fun overrides(overridden: PropertyElement?): Boolean {
+        if (overridden == null) {
+            return false
+        } else {
+            val nativeType = kspNode()
+            val overriddenNativeType = overridden.kspNode()
+            if (nativeType == overriddenNativeType) {
+                return false
+            } else if (nativeType is KSPropertyDeclaration) {
+                return overriddenNativeType == nativeType.findOverridee()
+            }
+            return false
+        }
+    }
+
+    override fun isExcluded(): Boolean {
+        return this.exc
+    }
+
     override fun getGenericType(): ClassElement {
         return resolveGeneric(declaration.parent, getType(), classElement, visitorContext)
     }
@@ -451,7 +478,8 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
                 type,
                 property,
                 annotationMetadataFactory,
-                visitorContext
+                visitorContext,
+                exc
             )
         } else {
             val getter : KSFunctionDeclaration = nativeType as KSFunctionDeclaration
@@ -462,7 +490,8 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
                 getter,
                 setter.map { it.nativeType as KSFunctionDeclaration }.orElse(null),
                 annotationMetadataFactory,
-                visitorContext
+                visitorContext,
+                exc
             )
         }
     }

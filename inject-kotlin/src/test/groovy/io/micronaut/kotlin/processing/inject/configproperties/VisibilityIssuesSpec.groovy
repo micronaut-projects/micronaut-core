@@ -31,9 +31,9 @@ class ChildConfigProperties: ParentConfigProperties() {
 
         then:
         beanDefinition.injectedMethods.size() == 3
-        beanDefinition.injectedMethods[0].name == "setAge"
-        beanDefinition.injectedMethods[1].name == "setName"
-        beanDefinition.injectedMethods[2].name == "setNationality"
+        beanDefinition.injectedMethods.find {it.name == "setAge" }
+        beanDefinition.injectedMethods.find {it.name == "setName" }
+        beanDefinition.injectedMethods.find {it.name == "setNationality" }
         instance.getName() == null //methods that require reflection are not injected
         instance.getAge() == 22
         instance.getBuilder().build().getManufacturer() == 'Chevy'
@@ -62,8 +62,8 @@ open class ChildConfigProperties: ParentConfigProperties() {
 
         then:
         beanDefinition.injectedMethods.size() == 2
-        beanDefinition.injectedMethods[0].name == "setName"
-        beanDefinition.injectedMethods[1].name == "setNationality"
+        beanDefinition.injectedMethods.find {it.name == "setName" }
+        beanDefinition.injectedMethods.find {it.name == "setNationality" }
         instance.getName() == "Sally"
         instance.getNationality() == null //methods that require reflection are not injected
 
