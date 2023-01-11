@@ -53,7 +53,7 @@ public class SimpleRequestWithCorsNotEnabledTest {
     @Test
     void corsSimpleRequestNotAllowedForLocalhostAndAny() throws IOException {
         asserts(SPECNAME,
-            createRequest(),
+            createRequest("https://sdelamo.github.io"),
             (server, request) -> {
             RefreshCounter refreshCounter = server.getApplicationContext().getBean(RefreshCounter.class);
                 assertEquals(0, refreshCounter.getRefreshCount());
@@ -66,7 +66,21 @@ public class SimpleRequestWithCorsNotEnabledTest {
             });
     }
 
-    private static HttpRequest<?> createRequest() {
+    @Test
+    void corsSimpleRequestAllowedForLocalhostAndOriginLocalhost() throws IOException {
+        asserts(SPECNAME,
+            createRequest("http://localhost:8000"),
+            (server, request) -> {
+                RefreshCounter refreshCounter = server.getApplicationContext().getBean(RefreshCounter.class);
+                assertEquals(0, refreshCounter.getRefreshCount());
+                AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .build());
+                assertEquals(1, refreshCounter.getRefreshCount());
+            });
+    }
+
+    private static HttpRequest<?> createRequest(String origin) {
         return HttpRequest.POST("/refresh", Collections.emptyMap())
             .header("Accept", "*/*")
             .header("Accept-Encoding", "gzip, deflate, br")
@@ -74,7 +88,7 @@ public class SimpleRequestWithCorsNotEnabledTest {
             .header("Connection", "keep-alive")
             .header("Content-Length", "0")
             .header("Host", "localhost:8080")
-            .header("Origin", "https://sdelamo.github.io")
+            .header("Origin", origin)
             .header("sec-ch-ua", "\"Not?A_Brand\";v=\"8\", \"Chromium\";v=\"108\", \"Google Chrome\";v=\"108\"")
             .header("sec-ch-ua-mobile", "?0")
             .header("sec-ch-ua-platform", "\"macOS\"")

@@ -72,13 +72,27 @@ public class CorsSimpleRequestTest {
             (server, request) -> {
                 RefreshCounter refreshCounter = server.getApplicationContext().getBean(RefreshCounter.class);
                 assertEquals(0, refreshCounter.getRefreshCount());
-
                 AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
                         .status(HttpStatus.FORBIDDEN)
                         .assertResponse(response -> assertFalse(response.getHeaders().contains("Vary")))
                     .build());
                 assertEquals(0, refreshCounter.getRefreshCount());
         });
+    }
+
+    @Test
+    void corsSimpleRequestAllowedForLocalhostAndOriginLocalhost() throws IOException {
+        asserts(SPECNAME,
+            Collections.singletonMap(PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE),
+            createRequest("http://localhost:8000"),
+            (server, request) -> {
+                RefreshCounter refreshCounter = server.getApplicationContext().getBean(RefreshCounter.class);
+                assertEquals(0, refreshCounter.getRefreshCount());
+                AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .build());
+                assertEquals(1, refreshCounter.getRefreshCount());
+            });
     }
 
     /**
