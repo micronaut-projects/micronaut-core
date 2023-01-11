@@ -80,6 +80,10 @@ public class CorsSimpleRequestTest {
         });
     }
 
+    /**
+     * It should not deny a cors request coming from a localhost origin if the micronaut application resolved host is localhost.
+     * @throws IOException scenario step fails
+     */
     @Test
     void corsSimpleRequestAllowedForLocalhostAndOriginLocalhost() throws IOException {
         asserts(SPECNAME,
