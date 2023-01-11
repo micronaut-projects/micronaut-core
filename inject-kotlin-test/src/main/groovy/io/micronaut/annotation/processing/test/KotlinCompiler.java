@@ -30,7 +30,6 @@ import io.micronaut.context.env.Environment;
 import io.micronaut.context.event.ApplicationEventPublisherFactory;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanIntrospector;
-import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
@@ -68,8 +67,8 @@ import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 public class KotlinCompiler {
-    static KotlinCompilation KOTLIN_COMPILATION = new KotlinCompilation();
-    static KotlinCompilation KSP_COMPILATION = new KotlinCompilation();
+    private static final KotlinCompilation KOTLIN_COMPILATION = new KotlinCompilation();
+    private static final KotlinCompilation KSP_COMPILATION = new KotlinCompilation();
 
     static {
 
