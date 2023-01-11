@@ -366,10 +366,8 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
                 // use the properties metadata for property elements
                 FieldElement fieldElement = propertyElement.getField().orElse(null);
                 if (fieldElement != null) {
-                    methodElement = methodElement.withAnnotationMetadata(new AnnotationMetadataHierarchy(
-                        fieldElement.getTargetAnnotationMetadata(),
-                        methodElement.getTargetAnnotationMetadata()
-                    ));
+                    methodElement = methodElement.withAnnotationMetadata(propertyElement.getTargetAnnotationMetadata()
+                    );
                 }
             }
             visitMethodInjectionPoint(visitor, methodElement, propertyElement);
