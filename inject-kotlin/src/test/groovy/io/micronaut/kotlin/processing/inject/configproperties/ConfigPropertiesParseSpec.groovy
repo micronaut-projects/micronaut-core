@@ -317,7 +317,7 @@ open class MyProperties {
                 ['foo.setterTest' :'foo',
                 'foo.fieldTest' :'bar']
         )
-        bean = factory.instantiate(beanDefinition)
+        bean = factory.instantiate(applicationContext)
 
         then:
         bean != null
@@ -392,7 +392,7 @@ open class Parent {
                 ['foo.setterTest' :'foo',
                 'foo.fieldTest' :'bar']
         )
-        bean = factory.instantiate(beanDefinition)
+        bean = factory.instantiate(applicationContext)
 
         then:
         bean != null
@@ -450,8 +450,8 @@ open class Parent {
         then:
         noExceptionThrown()
         beanDefinition.injectedMethods.size() == 2
-        beanDefinition.injectedMethods[0].name == "setPublicField"
-        beanDefinition.injectedMethods[1].name == "setParentPublicField"
+        beanDefinition.injectedMethods.find { it.name == "setPublicField" }
+        beanDefinition.injectedMethods.find { it.name == "setParentPublicField" }
     }
 
     void "test includes on methods"() {
@@ -476,8 +476,8 @@ open class Parent {
         then:
         noExceptionThrown()
         beanDefinition.injectedMethods.size() == 2
-        beanDefinition.injectedMethods[1].name == "setParentPublicMethod"
-        beanDefinition.injectedMethods[0].name == "setPublicMethod"
+        beanDefinition.injectedMethods.find { it.name == "setParentPublicMethod" }
+        beanDefinition.injectedMethods.find { it.name == "setPublicMethod" }
     }
 
     void "test excludes on fields"() {
@@ -501,8 +501,8 @@ open class Parent {
         then:
         noExceptionThrown()
         beanDefinition.injectedMethods.size() == 2
-        beanDefinition.injectedMethods[1].name == "setParentPublicField"
-        beanDefinition.injectedMethods[0].name == "setPublicField"
+        beanDefinition.injectedMethods.find { it.name == "setParentPublicField" }
+        beanDefinition.injectedMethods.find { it.name == "setPublicField" }
     }
 
     void "test excludes on methods"() {
@@ -527,8 +527,8 @@ open class Parent {
         then:
         noExceptionThrown()
         beanDefinition.injectedMethods.size() == 2
-        beanDefinition.injectedMethods[1].name == "setParentPublicMethod"
-        beanDefinition.injectedMethods[0].name == "setPublicMethod"
+        beanDefinition.injectedMethods.find { it.name == "setParentPublicMethod" }
+        beanDefinition.injectedMethods.find { it.name == "setPublicMethod" }
     }
 
     void "test excludes on configuration builder"() {
@@ -897,8 +897,8 @@ open class Parent {
         then:
         noExceptionThrown()
         beanDefinition.injectedMethods.size() == 2
-        beanDefinition.injectedMethods[0].name == "setPublicField"
-        beanDefinition.injectedMethods[1].name == "setParentPublicField"
+        beanDefinition.injectedMethods.find { it.name == "setPublicField" }
+        beanDefinition.injectedMethods.find { it.name == "setParentPublicField" }
     }
 
     void "test excludes on properties"() {
@@ -922,8 +922,8 @@ open class Parent {
         then:
         noExceptionThrown()
         beanDefinition.injectedMethods.size() == 2
-        beanDefinition.injectedMethods[0].name == "setPublicField"
-        beanDefinition.injectedMethods[1].name == "setParentPublicField"
+        beanDefinition.injectedMethods.find { it.name == "setPublicField" }
+        beanDefinition.injectedMethods.find { it.name == "setParentPublicField" }
     }
 
     void "test excludes on configuration builder"() {

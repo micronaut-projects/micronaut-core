@@ -375,9 +375,13 @@ open class KotlinClassElement(val kotlinType: KSType,
             customReaderPropertyNameResolver,
             customWriterPropertyNameResolver,
             { value: AstBeanPropertiesUtils.BeanPropertyData ->
-                this.mapToPropertyElement(
-                    value
-                )
+                if (!value.isExcluded) {
+                    this.mapToPropertyElement(
+                        value
+                    )
+                } else {
+                    null
+                }
             })
         resolvedProperties.addAll(methodProperties)
         resolvedProperties.addAll(allProperties)
