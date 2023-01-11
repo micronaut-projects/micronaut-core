@@ -230,7 +230,7 @@ abstract class AbstractKotlinElement<T : KSNode>(val declaration: T,
 
                 val variableName = type.variableName
                 val genericTypeInfo = owningClass.getGenericTypeInfo()
-                val boundInfo = genericTypeInfo[parent.getBinaryName(visitorContext.resolver)]
+                val boundInfo = genericTypeInfo[parent.getBinaryName(visitorContext.resolver, visitorContext)]
                 if (boundInfo != null) {
                     val ksType = boundInfo[variableName]
                     if (ksType != null) {
@@ -247,7 +247,7 @@ abstract class AbstractKotlinElement<T : KSNode>(val declaration: T,
             } else if (type.declaredGenericPlaceholders.isNotEmpty() && type is KotlinClassElement) {
                 val genericTypeInfo = owningClass.getGenericTypeInfo()
                 val kotlinType = type.kotlinType
-                val boundInfo = if (parent.qualifiedName != null)  genericTypeInfo[parent.getBinaryName(visitorContext.resolver)] else null
+                val boundInfo = if (parent.qualifiedName != null)  genericTypeInfo[parent.getBinaryName(visitorContext.resolver, visitorContext)] else null
                 resolvedType = if (boundInfo != null) {
                     val boundArgs = kotlinType.arguments.map { arg ->
                         resolveTypeArgument(arg, boundInfo, visitorContext)

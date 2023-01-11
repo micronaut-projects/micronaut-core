@@ -93,6 +93,9 @@ open class KotlinClassElement(val kotlinType: KSType,
     private val internalCanonicalName : String by lazy {
         classDeclaration.qualifiedName!!.asString()
     }
+    private val internalName : String by lazy {
+        classDeclaration.getBinaryName(visitorContext.resolver, visitorContext)
+    }
 
     private var overrideBoundGenericTypes: MutableList<out ClassElement>? = null
     private var resolvedTypeArguments : MutableMap<String, ClassElement>? = null
@@ -131,7 +134,7 @@ open class KotlinClassElement(val kotlinType: KSType,
     }
 
     override fun getName(): String {
-        return classDeclaration.getBinaryName(visitorContext.resolver)
+        return internalName
     }
 
     override fun getCanonicalName(): String {
@@ -246,7 +249,7 @@ open class KotlinClassElement(val kotlinType: KSType,
             if (superType != visitorContext.resolver.builtIns.anyType) {
                 val declaration = superType.declaration
                 val name = declaration.qualifiedName?.asString()
-                val binaryName = declaration.getBinaryName(visitorContext.resolver)
+                val binaryName = declaration.getBinaryName(visitorContext.resolver, visitorContext)
                 if (name != null && !data.containsKey(name)) {
                     val typeParameters = declaration.typeParameters
                     if (typeParameters.isEmpty()) {

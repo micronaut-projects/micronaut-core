@@ -45,7 +45,7 @@ class KotlinGenericPlaceholderElement(
     override fun getName(): String {
         val bounds = parameter.bounds.firstOrNull()
         if (bounds != null) {
-            return bounds.resolve().declaration.getBinaryName(visitorContext.resolver)
+            return bounds.resolve().declaration.getBinaryName(visitorContext.resolver, visitorContext)
         }
         return "java.lang.Object"
     }

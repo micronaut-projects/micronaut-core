@@ -288,7 +288,7 @@ class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnvironment: Sy
             val value = repeatable.arguments.find { it.name?.asString() == "value" }?.value
             if (value != null) {
                 val declaration = (value as KSType).declaration.getClassDeclaration(visitorContext)
-                return declaration.getBinaryName(resolver)
+                return declaration.getBinaryName(resolver, visitorContext)
             }
         }
         return null
@@ -388,7 +388,7 @@ class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnvironment: Sy
                 if (declaration.classKind == ClassKind.CLASS ||
                     declaration.classKind == ClassKind.INTERFACE ||
                     declaration.classKind == ClassKind.ANNOTATION_CLASS) {
-                    return AnnotationClassValue<Any>(declaration.getBinaryName(resolver))
+                    return AnnotationClassValue<Any>(declaration.getBinaryName(resolver, visitorContext))
                 }
             }
         }

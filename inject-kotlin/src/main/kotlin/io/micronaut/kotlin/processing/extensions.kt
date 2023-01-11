@@ -22,12 +22,11 @@ import com.google.devtools.ksp.symbol.*
 import io.micronaut.inject.ast.Element
 import io.micronaut.kotlin.processing.visitor.AbstractKotlinElement
 import io.micronaut.kotlin.processing.visitor.KSAnnotatedReference
-import io.micronaut.kotlin.processing.visitor.KSFunctionReference
 import io.micronaut.kotlin.processing.visitor.KotlinVisitorContext
 import java.lang.StringBuilder
 
 @OptIn(KspExperimental::class)
-fun KSDeclaration.getBinaryName(resolver: Resolver): String {
+fun KSDeclaration.getBinaryName(resolver: Resolver, visitorContext: KotlinVisitorContext): String {
     var declaration = unwrap() as KSDeclaration
     if (declaration is KSFunctionDeclaration) {
         val parent = declaration.parentDeclaration
@@ -39,16 +38,26 @@ fun KSDeclaration.getBinaryName(resolver: Resolver): String {
     return if (binaryName != null) {
         binaryName
     } else {
-        val className = StringBuilder(declaration.packageName.asString())
-        val hierarchy = mutableListOf(declaration)
-        var parentDeclaration = declaration.parentDeclaration
-        while (parentDeclaration is KSClassDeclaration) {
-            hierarchy.add(0, parentDeclaration)
-            parentDeclaration = parentDeclaration.parentDeclaration
+        val classDeclaration = declaration.getClassDeclaration(visitorContext)
+        val qn = classDeclaration.qualifiedName
+        if (qn != null) {
+            resolver.mapKotlinNameToJava(qn)?.asString() ?: computeName(declaration)
+        } else {
+            computeName(declaration)
         }
-        hierarchy.joinTo(className, "$", ".")
-        className.toString()
     }
+}
+
+private fun computeName(declaration: KSDeclaration): String {
+    val className = StringBuilder(declaration.packageName.asString())
+    val hierarchy = mutableListOf(declaration)
+    var parentDeclaration = declaration.parentDeclaration
+    while (parentDeclaration is KSClassDeclaration) {
+        hierarchy.add(0, parentDeclaration)
+        parentDeclaration = parentDeclaration.parentDeclaration
+    }
+    hierarchy.joinTo(className, "$", ".")
+    return className.toString()
 }
 
 fun KSNode.unwrap() : KSNode {

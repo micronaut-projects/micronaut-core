@@ -287,6 +287,10 @@ public class KotlinCompiler {
         return beanContext.getBean(beanContext.getClassLoader().loadClass(className));
     }
 
+    public static BeanDefinition<?> getBeanDefinition(BeanContext beanContext, String className) throws ClassNotFoundException {
+        return beanContext.getBeanDefinition(beanContext.getClassLoader().loadClass(className));
+    }
+
     private static Object loadDefinition(ClassLoader classLoader, String name) throws NoSuchMethodException, InvocationTargetException, InstantiationException, IllegalAccessException {
         try {
             Class<?> c = classLoader.loadClass(name);
