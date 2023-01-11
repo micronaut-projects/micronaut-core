@@ -9,4 +9,5 @@ dependencies {
 }
 tasks.named<Test>("test") {
     useJUnitPlatform()
+    systemProperty("jdk.httpclient.HttpClient.log", "all")
 }
