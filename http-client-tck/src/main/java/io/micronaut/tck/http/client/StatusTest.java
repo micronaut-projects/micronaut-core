@@ -16,6 +16,7 @@
 package io.micronaut.tck.http.client;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
@@ -57,30 +58,42 @@ public interface StatusTest extends AbstractTck {
             assertEquals(HttpStatus.I_AM_A_TEAPOT, thrown.getStatus());
         });
     }
-//
-//    @Test
-//    default void responseStatus() {
-//        runTest("StatusTest", (server, client) -> {
-//            var exchange = Flux.from(client.exchange(HttpRequest.GET("/status/return-status"))).blockFirst();
-//            assertEquals(HttpStatus.I_AM_A_TEAPOT, exchange.getStatus());
-//        });
-//        runBlockingTest("RedirectTest", (server, client) -> {
-//            var exchange = client.exchange(HttpRequest.GET("/status/return-status"));
-//            assertEquals(HttpStatus.I_AM_A_TEAPOT, exchange.getStatus());
-//        });
-//    }
-//
-//    @Test
-//    default void exceptionStatus() {
-//        runTest("StatusTest", (server, client) -> {
-//            var exchange = Flux.from(client.exchange(HttpRequest.GET("/status/exception-status"))).blockFirst();
-//            assertEquals(HttpStatus.I_AM_A_TEAPOT, exchange.getStatus());
-//        });
-//        runBlockingTest("RedirectTest", (server, client) -> {
-//            var exchange = client.exchange(HttpRequest.GET("/status/exception-status"));
-//            assertEquals(HttpStatus.I_AM_A_TEAPOT, exchange.getStatus());
-//        });
-//    }
+
+    @Test
+    default void responseStatus() {
+        runTest("StatusTest", (server, client) -> {
+            HttpClientResponseException thrown = Assertions.assertThrows(
+                HttpClientResponseException.class,
+                () -> Flux.from(client.exchange(HttpRequest.GET("/status/response-status"))).blockFirst()
+            );
+            assertEquals(HttpStatus.I_AM_A_TEAPOT, thrown.getStatus());
+        });
+        runBlockingTest("StatusTest", (server, client) -> {
+            HttpClientResponseException thrown = Assertions.assertThrows(
+                HttpClientResponseException.class,
+                () -> client.exchange(HttpRequest.GET("/status/response-status"))
+            );
+            assertEquals(HttpStatus.I_AM_A_TEAPOT, thrown.getStatus());
+        });
+    }
+
+    @Test
+    default void exceptionStatus() {
+        runTest("StatusTest", (server, client) -> {
+            HttpClientResponseException thrown = Assertions.assertThrows(
+                HttpClientResponseException.class,
+                () -> Flux.from(client.exchange(HttpRequest.GET("/status/exception-status"), Argument.STRING)).blockFirst()
+            );
+            assertEquals(HttpStatus.I_AM_A_TEAPOT, thrown.getStatus());
+        });
+        runBlockingTest("StatusTest", (server, client) -> {
+            HttpClientResponseException thrown = Assertions.assertThrows(
+                HttpClientResponseException.class,
+                () -> client.exchange(HttpRequest.GET("/status/exception-status"))
+            );
+            assertEquals(HttpStatus.I_AM_A_TEAPOT, thrown.getStatus());
+        });
+    }
 
     @Requires(property = "spec.name", value = "StatusTest")
     @Controller("/status")
