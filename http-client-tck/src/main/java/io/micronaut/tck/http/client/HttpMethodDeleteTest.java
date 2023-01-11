@@ -15,8 +15,14 @@
  */
 package io.micronaut.tck.http.client;
 
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Delete;
+import io.micronaut.http.annotation.Status;
+import io.micronaut.http.client.annotation.Client;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Flux;
 
@@ -30,12 +36,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 })
 public interface HttpMethodDeleteTest extends AbstractTck {
 
+    String HTTP_METHOD_DELETE_TEST = "HttpMethodDeleteTest";
+
     @Test
     default void deleteMethodMapping() {
-        runTest("HttpMethodDeleteTest", (server, client) ->
+        runTest(HTTP_METHOD_DELETE_TEST, (server, client) ->
             assertEquals(HttpStatus.NO_CONTENT, Flux.from(client.exchange(HttpRequest.DELETE("/delete"))).blockFirst().getStatus())
         );
-        runBlockingTest("HttpMethodDeleteTest", (server, client) -> {
+        runBlockingTest(HTTP_METHOD_DELETE_TEST, (server, client) -> {
             assertDoesNotThrow(() -> client.exchange(HttpRequest.DELETE("/delete")));
             assertEquals(HttpStatus.NO_CONTENT, client.exchange(HttpRequest.DELETE("/delete")).getStatus());
         });
@@ -43,7 +51,7 @@ public interface HttpMethodDeleteTest extends AbstractTck {
 
     @Test
     default void deleteMethodClientMappingWithStringResponse() {
-        runTest("HttpMethodDeleteTest", (server, client) -> {
+        runTest(HTTP_METHOD_DELETE_TEST, (server, client) -> {
             HttpMethodDeleteClient httpClient = server.getApplicationContext().getBean(HttpMethodDeleteClient.class);
             assertEquals("ok", httpClient.response());
         });
@@ -51,23 +59,57 @@ public interface HttpMethodDeleteTest extends AbstractTck {
 
     @Test
     default void deleteMethodMappingWithStringResponse() {
-        runTest("HttpMethodDeleteTest", (server, client) ->
+        runTest(HTTP_METHOD_DELETE_TEST, (server, client) ->
             assertEquals("ok", Flux.from(client.exchange(HttpRequest.DELETE("/delete/string-response"), String.class)).blockFirst().body())
         );
-        runBlockingTest("HttpMethodDeleteTest", (server, client) ->
+        runBlockingTest(HTTP_METHOD_DELETE_TEST, (server, client) ->
             assertEquals("ok", client.exchange(HttpRequest.DELETE("/delete/string-response"), String.class).body())
         );
     }
 
     @Test
     default void deleteMethodMappingWithObjectResponse() {
-        runTest("HttpMethodDeleteTest", (server, client) -> {
+        runTest(HTTP_METHOD_DELETE_TEST, (server, client) -> {
             assertEquals(new Person("Tim", 49), Flux.from(client.exchange(HttpRequest.DELETE("/delete/object-response"), Person.class)).blockFirst().body());
             assertEquals("{\"name\":\"Tim\",\"age\":49}", Flux.from(client.exchange(HttpRequest.DELETE("/delete/object-response"), String.class)).blockFirst().body());
         });
-        runBlockingTest("HttpMethodDeleteTest", (server, client) -> {
+        runBlockingTest(HTTP_METHOD_DELETE_TEST, (server, client) -> {
             assertEquals(new Person("Tim", 49), client.exchange(HttpRequest.DELETE("/delete/object-response"), Person.class).body());
             assertEquals("{\"name\":\"Tim\",\"age\":49}", client.exchange(HttpRequest.DELETE("/delete/object-response"), String.class).body());
         });
+    }
+
+    @Requires(property = "spec.name", value = HTTP_METHOD_DELETE_TEST)
+    @Controller("/delete")
+    class HttpMethodDeleteTestController {
+
+        @Delete
+        @Status(HttpStatus.NO_CONTENT)
+        void index() {
+        }
+
+        @Delete("/string-response")
+        String response() {
+            return "ok";
+        }
+
+        @Delete("/object-response")
+        Person person() {
+            return new Person("Tim", 49);
+        }
+    }
+
+    @SuppressWarnings("checkstyle:MissingJavadocType")
+    @Requires(property = "spec.name", value = HTTP_METHOD_DELETE_TEST)
+    @Client("/delete")
+    public interface HttpMethodDeleteClient {
+
+        HttpResponse<Void> index();
+
+        @Delete("/string-response")
+        String response();
+
+        @Delete("/object-response")
+        Person person();
     }
 }

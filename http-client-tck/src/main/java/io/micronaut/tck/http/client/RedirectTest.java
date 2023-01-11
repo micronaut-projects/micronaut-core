@@ -15,11 +15,22 @@
  */
 package io.micronaut.tck.http.client;
 
+import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
+import io.micronaut.http.annotation.Consumes;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.Header;
+import io.micronaut.http.annotation.Produces;
+import io.micronaut.http.client.annotation.Client;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Flux;
+
+import java.net.URI;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -30,14 +41,16 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 })
 public interface RedirectTest extends AbstractTck {
 
+    String REDIRECT_TEST = "RedirectTest";
+
     @Test
     default void absoluteRedirection() {
-        runTest("RedirectTest", (server, client) -> {
+        runTest(REDIRECT_TEST, (server, client) -> {
             var exchange = Flux.from(client.exchange(HttpRequest.GET("/redirect/redirect"), String.class)).blockFirst();
             assertEquals(HttpStatus.OK, exchange.getStatus());
             assertEquals("It works!", exchange.body());
         });
-        runBlockingTest("RedirectTest", (server, client) -> {
+        runBlockingTest(REDIRECT_TEST, (server, client) -> {
             var exchange = client.exchange(HttpRequest.GET("/redirect/redirect"), String.class);
             assertEquals(HttpStatus.OK, exchange.getStatus());
             assertEquals("It works!", exchange.body());
@@ -46,7 +59,7 @@ public interface RedirectTest extends AbstractTck {
 
     @Test
     default void clientRedirection() {
-        runTest("RedirectTest", (server, client) -> {
+        runTest(REDIRECT_TEST, (server, client) -> {
             var redirectClient = server.getApplicationContext().getBean(RedirectClient.class);
             assertEquals("It works!", redirectClient.redirect());
         });
@@ -54,12 +67,12 @@ public interface RedirectTest extends AbstractTck {
 
     @Test
     default void clientRelativeUriDirect() {
-        runTest("RedirectTest", "/redirect", (server, client) -> {
+        runTest(REDIRECT_TEST, "/redirect", (server, client) -> {
             var exchange = Flux.from(client.exchange(HttpRequest.GET("direct"), String.class)).blockFirst();
             assertEquals(HttpStatus.OK, exchange.getStatus());
             assertEquals("It works!", exchange.body());
         });
-        runBlockingTest("RedirectTest", "/redirect", (server, client) -> {
+        runBlockingTest(REDIRECT_TEST, "/redirect", (server, client) -> {
             var exchange = client.exchange(HttpRequest.GET("direct"), String.class);
             assertEquals(HttpStatus.OK, exchange.getStatus());
             assertEquals("It works!", exchange.body());
@@ -68,12 +81,12 @@ public interface RedirectTest extends AbstractTck {
 
     @Test
     default void clientRelativeUriNoSlash() {
-        runTest("RedirectTest", "redirect", (server, client) -> {
+        runTest(REDIRECT_TEST, "redirect", (server, client) -> {
             var exchange = Flux.from(client.exchange(HttpRequest.GET("direct"), String.class)).blockFirst();
             assertEquals(HttpStatus.OK, exchange.getStatus());
             assertEquals("It works!", exchange.body());
         });
-        runBlockingTest("RedirectTest", "redirect", (server, client) -> {
+        runBlockingTest(REDIRECT_TEST, "redirect", (server, client) -> {
             var exchange = client.exchange(HttpRequest.GET("direct"), String.class);
             assertEquals(HttpStatus.OK, exchange.getStatus());
             assertEquals("It works!", exchange.body());
@@ -82,12 +95,12 @@ public interface RedirectTest extends AbstractTck {
 
     @Test
     default void clientRelativeUriRedirectAbsolute() {
-        runTest("RedirectTest", "/redirect", (server, client) -> {
+        runTest(REDIRECT_TEST, "/redirect", (server, client) -> {
             var exchange = Flux.from(client.exchange(HttpRequest.GET("redirect"), String.class)).blockFirst();
             assertEquals(HttpStatus.OK, exchange.getStatus());
             assertEquals("It works!", exchange.body());
         });
-        runBlockingTest("RedirectTest", "/redirect", (server, client) -> {
+        runBlockingTest(REDIRECT_TEST, "/redirect", (server, client) -> {
             var exchange = client.exchange(HttpRequest.GET("redirect"), String.class);
             assertEquals(HttpStatus.OK, exchange.getStatus());
             assertEquals("It works!", exchange.body());
@@ -96,12 +109,12 @@ public interface RedirectTest extends AbstractTck {
 
     @Test
     default void hostHeaderIsCorrectForRedirect() {
-        runTest("RedirectTest", (server, otherServer, client) -> {
+        runTest(REDIRECT_TEST, (server, otherServer, client) -> {
             var exchange = Flux.from(client.exchange(HttpRequest.GET("/redirect/redirect-host").header("redirect", "http://localhost:" + otherServer.getPort() + "/redirect/host-header"), String.class)).blockFirst();
             assertEquals(HttpStatus.OK, exchange.getStatus());
             assertEquals("localhost:" + otherServer.getPort(), exchange.body());
         });
-        runBlockingTest("RedirectTest", (server, otherServer, client) -> {
+        runBlockingTest(REDIRECT_TEST, (server, otherServer, client) -> {
             var exchange = client.exchange(HttpRequest.GET("/redirect/redirect-host").header("redirect", "http://localhost:" + otherServer.getPort() + "/redirect/host-header"), String.class);
             assertEquals(HttpStatus.OK, exchange.getStatus());
             assertEquals("localhost:" + otherServer.getPort(), exchange.body());
@@ -111,15 +124,63 @@ public interface RedirectTest extends AbstractTck {
     @Test
     @Disabled("not supported, see -- io.micronaut.http.client.ClientRedirectSpec.test - client: full uri, redirect: relative")
     default void relativeRedirection() {
-        runTest("RedirectTest", (server, client) -> {
+        runTest(REDIRECT_TEST, (server, client) -> {
             var exchange = Flux.from(client.exchange(HttpRequest.GET("/redirect/redirect-relative"), String.class)).blockFirst();
             assertEquals(HttpStatus.OK, exchange.getStatus());
             assertEquals("It works!", exchange.body());
         });
-        runBlockingTest("RedirectTest", (server, client) -> {
+        runBlockingTest(REDIRECT_TEST, (server, client) -> {
             var exchange = client.exchange(HttpRequest.GET("/redirect/redirect-relative"), String.class);
             assertEquals(HttpStatus.OK, exchange.getStatus());
             assertEquals("It works!", exchange.body());
         });
+    }
+
+    @Requires(property = "spec.name", value = REDIRECT_TEST)
+    @Controller("/redirect")
+    class RedirectTestController {
+
+        @Get("/redirect")
+        HttpResponse<?> redirect() {
+            return HttpResponse.redirect(URI.create("/redirect/direct"));
+        }
+
+        @Get("/redirect-relative")
+        HttpResponse<?> redirectRelative() {
+            return HttpResponse.redirect(URI.create("./direct"));
+        }
+
+        @Get("/redirect-host")
+        HttpResponse<?> redirectHost(@Header String redirect) {
+            return HttpResponse.redirect(URI.create(redirect));
+        }
+
+        @Get("/direct")
+        @Produces("text/plain")
+        HttpResponse<?> direct() {
+            return HttpResponse.ok("It works!");
+        }
+    }
+
+    @Requires(property = "spec.name", value = REDIRECT_TEST)
+    @Requires(property = "redirect.server", value = StringUtils.TRUE)
+    @Controller("/redirect")
+    class RedirectHostHeaderController {
+
+        @Get("/host-header")
+        @Produces("text/plain")
+        HttpResponse<?> hostHeader(@Header String host) {
+            return HttpResponse.ok(host);
+        }
+    }
+
+    @SuppressWarnings("checkstyle:MissingJavadocType")
+    @Requires(property = "spec.name", value = REDIRECT_TEST)
+    @Client("/redirect")
+    public interface RedirectClient {
+
+        @Get("/redirect")
+        @Consumes({"text/plain", "application/json"})
+        String redirect();
     }
 }

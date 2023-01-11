@@ -41,16 +41,18 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 })
 public interface StatusTest extends AbstractTck {
 
+    String STATUS_TEST = "StatusTest";
+
     @Test
     default void returnStatus() {
-        runTest("StatusTest", (server, client) -> {
+        runTest(STATUS_TEST, (server, client) -> {
             HttpClientResponseException thrown = Assertions.assertThrows(
                 HttpClientResponseException.class,
                 () -> Flux.from(client.exchange(HttpRequest.GET("/status/http-status"))).blockFirst()
             );
             assertEquals(HttpStatus.I_AM_A_TEAPOT, thrown.getStatus());
         });
-        runBlockingTest("StatusTest", (server, client) -> {
+        runBlockingTest(STATUS_TEST, (server, client) -> {
             HttpClientResponseException thrown = Assertions.assertThrows(
                 HttpClientResponseException.class,
                 () -> client.exchange(HttpRequest.GET("/status/http-status"))
@@ -61,14 +63,14 @@ public interface StatusTest extends AbstractTck {
 
     @Test
     default void responseStatus() {
-        runTest("StatusTest", (server, client) -> {
+        runTest(STATUS_TEST, (server, client) -> {
             HttpClientResponseException thrown = Assertions.assertThrows(
                 HttpClientResponseException.class,
                 () -> Flux.from(client.exchange(HttpRequest.GET("/status/response-status"))).blockFirst()
             );
             assertEquals(HttpStatus.I_AM_A_TEAPOT, thrown.getStatus());
         });
-        runBlockingTest("StatusTest", (server, client) -> {
+        runBlockingTest(STATUS_TEST, (server, client) -> {
             HttpClientResponseException thrown = Assertions.assertThrows(
                 HttpClientResponseException.class,
                 () -> client.exchange(HttpRequest.GET("/status/response-status"))
@@ -79,14 +81,14 @@ public interface StatusTest extends AbstractTck {
 
     @Test
     default void exceptionStatus() {
-        runTest("StatusTest", (server, client) -> {
+        runTest(STATUS_TEST, (server, client) -> {
             HttpClientResponseException thrown = Assertions.assertThrows(
                 HttpClientResponseException.class,
                 () -> Flux.from(client.exchange(HttpRequest.GET("/status/exception-status"), Argument.STRING)).blockFirst()
             );
             assertEquals(HttpStatus.I_AM_A_TEAPOT, thrown.getStatus());
         });
-        runBlockingTest("StatusTest", (server, client) -> {
+        runBlockingTest(STATUS_TEST, (server, client) -> {
             HttpClientResponseException thrown = Assertions.assertThrows(
                 HttpClientResponseException.class,
                 () -> client.exchange(HttpRequest.GET("/status/exception-status"))
@@ -95,7 +97,7 @@ public interface StatusTest extends AbstractTck {
         });
     }
 
-    @Requires(property = "spec.name", value = "StatusTest")
+    @Requires(property = "spec.name", value = STATUS_TEST)
     @Controller("/status")
     static class HttpStatusController {
         @Get("/http-status")
@@ -119,6 +121,7 @@ public interface StatusTest extends AbstractTck {
 
     @Produces
     @Singleton
+    @Requires(property = "spec.name", value = STATUS_TEST)
     class TeapotExceptionHandler implements ExceptionHandler<TeapotException, HttpResponse<?>> {
         private final ErrorResponseProcessor<?> errorResponseProcessor;
 

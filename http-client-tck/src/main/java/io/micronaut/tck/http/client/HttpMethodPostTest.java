@@ -15,7 +15,10 @@
  */
 package io.micronaut.tck.http.client;
 
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Post;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Flux;
 
@@ -28,13 +31,30 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 })
 public interface HttpMethodPostTest extends AbstractTck {
 
+    String HTTP_METHOD_POST_TEST = "HttpMethodPostTest";
+
     @Test
     default void postBody() {
-        runTest("HttpMethodPostTest", (server, client) ->
+        runTest(HTTP_METHOD_POST_TEST, (server, client) ->
             assertEquals("Tim:49", Flux.from(client.exchange(HttpRequest.POST("/post/object-body", new Person("Tim", 49)), String.class)).blockFirst().body())
         );
-        runBlockingTest("HttpMethodPostTest", (server, client) ->
+        runBlockingTest(HTTP_METHOD_POST_TEST, (server, client) ->
                 assertEquals("Tim:49", client.exchange(HttpRequest.POST("/post/object-body", new Person("Tim", 49)), String.class).body())
         );
+    }
+
+    @Requires(property = "spec.name", value = HTTP_METHOD_POST_TEST)
+    @Controller("/post")
+    class HttpMethodPostTestController {
+
+        @Post()
+        String response() {
+            return "ok";
+        }
+
+        @Post("/object-body")
+        String person(Person person) {
+            return person.getName() + ":" + person.getAge();
+        }
     }
 }
