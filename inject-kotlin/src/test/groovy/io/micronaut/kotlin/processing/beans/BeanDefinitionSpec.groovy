@@ -10,6 +10,26 @@ import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class BeanDefinitionSpec extends Specification {
 
+    void "test controller with constructor arguments"() {
+        given:
+        def definition = buildBeanDefinition('controller.TestController', '''
+package controller
+
+import io.micronaut.context.annotation.*
+import io.micronaut.http.annotation.Controller
+import jakarta.inject.*
+import jakarta.inject.Singleton
+
+@Controller
+class TestController(var bar : Bar)
+
+@Singleton
+class Bar
+''')
+        expect:
+        definition != null
+    }
+
     void "test limit the exposed bean types"() {
         given:
         def definition = buildBeanDefinition('limittypes.Test', '''

@@ -20,6 +20,7 @@ import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSType
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.order.Ordered
+import io.micronaut.core.reflect.GenericTypeUtils
 import io.micronaut.inject.visitor.TypeElementVisitor
 import java.util.*
 
@@ -47,6 +48,28 @@ class LoadedVisitor(val visitor: TypeElementVisitor<*, *>,
                 }!!
             classAnnotation = getType(reference.arguments[0].type!!.resolve(), visitor.classType)
             elementAnnotation = getType(reference.arguments[1].type!!.resolve(), visitor.elementType)
+        } else {
+            val classes = GenericTypeUtils.resolveInterfaceTypeArguments(
+                javaClass,
+                TypeElementVisitor::class.java
+            )
+            if (classes != null && classes.size == 2) {
+                val classGeneric = classes[0]
+                classAnnotation = if (classGeneric == Any::class.java) {
+                    visitor.classType
+                } else {
+                    classGeneric.name
+                }
+                val elementGeneric = classes[1]
+                elementAnnotation = if (elementGeneric == Any::class.java) {
+                    visitor.elementType
+                } else {
+                    elementGeneric.name
+                }
+            } else {
+                classAnnotation = Any::class.java.name
+                elementAnnotation = Any::class.java.name
+            }
         }
         if (classAnnotation == ANY) {
             classAnnotation = Object::class.java.name

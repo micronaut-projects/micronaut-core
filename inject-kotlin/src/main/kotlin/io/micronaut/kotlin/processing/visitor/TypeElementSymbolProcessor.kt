@@ -30,6 +30,7 @@ import io.micronaut.core.order.OrderUtil
 import io.micronaut.core.util.StringUtils
 import io.micronaut.core.version.VersionUtils
 import io.micronaut.inject.ast.*
+import io.micronaut.inject.processing.ProcessingException
 import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.inject.visitor.VisitorContext
 import java.util.*
@@ -101,7 +102,11 @@ open class TypeElementSymbolProcessor(private val environment: SymbolProcessorEn
                         }
                         if (typeElement.classKind != ClassKind.ANNOTATION_CLASS) {
                             val className = typeElement.qualifiedName.toString()
-                            typeElement.accept(ElementVisitor(loadedVisitor, typeElement), className)
+                            try {
+                                typeElement.accept(ElementVisitor(loadedVisitor, typeElement), className)
+                            } catch (e: ProcessingException) {
+                                environment.logger.error(e.message!!, e.originatingElement as KSNode)
+                            }
                         }
                     }
                 }
@@ -199,30 +204,41 @@ open class TypeElementSymbolProcessor(private val environment: SymbolProcessorEn
             }
             if (classDeclaration == this.classDeclaration) {
                 val visitorContext = loadedVisitor.visitorContext
-                val classElement = newClassElement(visitorContext, classDeclaration)
-                loadedVisitor.visitor.visitClass(classElement, visitorContext)
+                if (loadedVisitor.matches(classDeclaration)) {
+                    val classElement = newClassElement(visitorContext, classDeclaration)
 
-                var properties = classElement.syntheticBeanProperties
-                for (property in properties) {
-                    visitNativeProperty(property)
-                }
-
-                classDeclaration.getAllFunctions()
-                    .filter { it.isConstructor() && !it.isInternal() }
-                    .forEach {
-                        visitConstructor(classElement, it)
+                    try {
+                        loadedVisitor.visitor.visitClass(classElement, visitorContext)
+                    } catch (e: Exception) {
+                        throw ProcessingException(classElement, e.message)
                     }
 
-                visitMembers(classElement)
-                val innerClassQuery =
-                    ElementQuery.ALL_INNER_CLASSES.onlyStatic().modifiers { it.contains(ElementModifier.PUBLIC) }
-                val innerClasses = classElement.getEnclosedElements(innerClassQuery)
-                innerClasses.forEach {
-                    val visitor = loadedVisitor.visitor
-                    val visitorContext = loadedVisitor.visitorContext
-                    if (loadedVisitor.matches(it)) {
-                        visitor.visitClass(it, visitorContext)
-                        visitMembers(it)
+                    val properties = classElement.syntheticBeanProperties
+                    for (property in properties) {
+                        try {
+                            visitNativeProperty(property)
+                        } catch (e: Exception) {
+                            throw ProcessingException(property, e.message)
+                        }
+                    }
+
+                    classDeclaration.getAllFunctions()
+                        .filter { it.isConstructor() && !it.isInternal() }
+                        .forEach {
+                            visitConstructor(classElement, it)
+                        }
+
+                    visitMembers(classElement)
+                    val innerClassQuery =
+                        ElementQuery.ALL_INNER_CLASSES.onlyStatic().modifiers { it.contains(ElementModifier.PUBLIC) }
+                    val innerClasses = classElement.getEnclosedElements(innerClassQuery)
+                    innerClasses.forEach {
+                        val visitor = loadedVisitor.visitor
+                        val visitorContext = loadedVisitor.visitorContext
+                        if (loadedVisitor.matches(it)) {
+                            visitor.visitClass(it, visitorContext)
+                            visitMembers(it)
+                        }
                     }
                 }
             }
@@ -248,7 +264,11 @@ open class TypeElementSymbolProcessor(private val environment: SymbolProcessorEn
             val visitor = loadedVisitor.visitor
             val visitorContext = loadedVisitor.visitorContext
             if (loadedVisitor.matches(memberElement)) {
-                visitor.visitMethod(memberElement, visitorContext)
+                try {
+                    visitor.visitMethod(memberElement, visitorContext)
+                } catch (e: Exception) {
+                    throw ProcessingException(memberElement, e.message)
+                }
             }
         }
 
@@ -256,7 +276,11 @@ open class TypeElementSymbolProcessor(private val environment: SymbolProcessorEn
             val visitor = loadedVisitor.visitor
             val visitorContext = loadedVisitor.visitorContext
             if (loadedVisitor.matches(memberElement)) {
-                visitor.visitField(memberElement, visitorContext)
+                try {
+                    visitor.visitField(memberElement, visitorContext)
+                } catch (e: Exception) {
+                    throw ProcessingException(memberElement, e.message)
+                }
             }
         }
 
@@ -269,7 +293,11 @@ open class TypeElementSymbolProcessor(private val environment: SymbolProcessorEn
                 visitorContext.elementAnnotationMetadataFactory
             )
             if (loadedVisitor.matches(ctorElement)) {
-                visitor.visitConstructor(ctorElement, visitorContext)
+                try {
+                    visitor.visitConstructor(ctorElement, visitorContext)
+                } catch (e: Exception) {
+                    throw ProcessingException(ctorElement, e.message)
+                }
             }
         }
 
