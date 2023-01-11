@@ -18,6 +18,7 @@ package io.micronaut.kotlin.processing.visitor
 import com.google.devtools.ksp.*
 import com.google.devtools.ksp.symbol.*
 import io.micronaut.core.annotation.AnnotationMetadata
+import io.micronaut.core.util.ArrayUtils
 import io.micronaut.inject.ast.*
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 import io.micronaut.kotlin.processing.getVisibility
@@ -76,11 +77,12 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
         ))
     }
 
-    constructor(method: KSPropertyGetter,
-                owningType: ClassElement,
-                returnType: ClassElement,
-                elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
-                visitorContext: KotlinVisitorContext,
+    constructor(
+        method: KSPropertyGetter,
+        owningType: ClassElement,
+        returnType: ClassElement,
+        elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
+        visitorContext: KotlinVisitorContext,
     ) : super(KSPropertyGetterReference(method), elementAnnotationMetadataFactory, visitorContext) {
         this.name = visitorContext.resolver.getJvmName(method)!!
         this.owningType = owningType
@@ -194,8 +196,19 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
     }
 
     override fun getSuspendParameters(): Array<ParameterElement> {
-        // TODO: suspend
-        return super.getSuspendParameters()
+        val parameters = getParameters()
+        return if (isSuspend) {
+            val continuationParameter = visitorContext.getClassElement("kotlin.coroutines.Continuation")
+                .map { ParameterElement.of(it, "continuation") }
+                .orElse(null)
+            if (continuationParameter != null) {
+                ArrayUtils.concat(parameters, continuationParameter)
+            } else {
+                parameters
+            }
+        } else {
+            parameters
+        }
     }
 
     override fun overrides(overridden: MethodElement): Boolean {

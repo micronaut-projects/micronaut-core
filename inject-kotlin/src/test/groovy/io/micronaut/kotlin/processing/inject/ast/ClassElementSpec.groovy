@@ -180,6 +180,9 @@ interface Three
             assert methodMap.keySet() == ['publicFunc',  'parentFunc', 'openFunc', 'privateFunc', 'protectedFunc', 'suspendFunc', 'getConventionProp', 'setConventionProp'] as Set
             assert declaredMethodMap.keySet()  == ['publicFunc', 'openFunc', 'privateFunc', 'protectedFunc', 'suspendFunc', 'getConventionProp', 'setConventionProp'] as Set
             assert methodMap['suspendFunc'].isSuspend()
+            assert methodMap['suspendFunc'].returnType.name == String.name
+            assert methodMap['suspendFunc'].parameters.size() == 1
+            assert methodMap['suspendFunc'].suspendParameters.size() == 2
             assert !methodMap['openFunc'].isFinal()
             assert !methodMap['publicFunc'].isPackagePrivate()
             assert !methodMap['publicFunc'].isPrivate()

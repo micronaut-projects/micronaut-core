@@ -30,6 +30,10 @@ dependencies {
     testImplementation libs.javax.persistence
     testImplementation project(":runtime")
     testImplementation(libs.neo4j.bolt)
+    testImplementation libs.kotlinx.coroutines.core
+    testImplementation libs.kotlinx.coroutines.jdk8
+    testImplementation libs.kotlinx.coroutines.rx2
+
 }
 
 afterEvaluate {
