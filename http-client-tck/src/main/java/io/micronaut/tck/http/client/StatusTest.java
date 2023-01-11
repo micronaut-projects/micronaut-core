@@ -38,6 +38,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
     "java:S2259", // The tests will show if it's null
     "java:S5960", // We're allowed assertions, as these are used in tests only
     "checkstyle:MissingJavadocType",
+    "checkstyle:DesignForExtension",
 })
 public interface StatusTest extends AbstractTck {
 
@@ -99,7 +100,7 @@ public interface StatusTest extends AbstractTck {
 
     @Requires(property = "spec.name", value = STATUS_TEST)
     @Controller("/status")
-    static class HttpStatusController {
+    class HttpStatusController {
         @Get("/http-status")
         HttpStatus status() {
             return HttpStatus.I_AM_A_TEAPOT;

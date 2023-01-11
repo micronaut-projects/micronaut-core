@@ -38,6 +38,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
     "java:S2259", // The tests will show if it's null
     "java:S5960", // We're allowed assertions, as these are used in tests only
     "checkstyle:MissingJavadocType",
+    "checkstyle:DesignForExtension",
 })
 public interface RedirectTest extends AbstractTck {
 
@@ -138,6 +139,7 @@ public interface RedirectTest extends AbstractTck {
 
     @Requires(property = "spec.name", value = REDIRECT_TEST)
     @Controller("/redirect")
+    @SuppressWarnings("checkstyle:MissingJavadocType")
     class RedirectTestController {
 
         @Get("/redirect")
@@ -165,6 +167,7 @@ public interface RedirectTest extends AbstractTck {
     @Requires(property = "spec.name", value = REDIRECT_TEST)
     @Requires(property = "redirect.server", value = StringUtils.TRUE)
     @Controller("/redirect")
+    @SuppressWarnings("checkstyle:MissingJavadocType")
     class RedirectHostHeaderController {
 
         @Get("/host-header")
@@ -177,7 +180,7 @@ public interface RedirectTest extends AbstractTck {
     @SuppressWarnings("checkstyle:MissingJavadocType")
     @Requires(property = "spec.name", value = REDIRECT_TEST)
     @Client("/redirect")
-    public interface RedirectClient {
+    interface RedirectClient {
 
         @Get("/redirect")
         @Consumes({"text/plain", "application/json"})

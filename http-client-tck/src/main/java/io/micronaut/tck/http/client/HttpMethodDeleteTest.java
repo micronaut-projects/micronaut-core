@@ -33,6 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
     "java:S2259", // The tests will show if it's null
     "java:S5960", // We're allowed assertions, as these are used in tests only
     "checkstyle:MissingJavadocType",
+    "checkstyle:DesignForExtension",
 })
 public interface HttpMethodDeleteTest extends AbstractTck {
 
@@ -99,10 +100,9 @@ public interface HttpMethodDeleteTest extends AbstractTck {
         }
     }
 
-    @SuppressWarnings("checkstyle:MissingJavadocType")
     @Requires(property = "spec.name", value = HTTP_METHOD_DELETE_TEST)
     @Client("/delete")
-    public interface HttpMethodDeleteClient {
+    interface HttpMethodDeleteClient {
 
         HttpResponse<Void> index();
 

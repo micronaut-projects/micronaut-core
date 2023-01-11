@@ -17,23 +17,15 @@ package io.micronaut.tck.http.client;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
-import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.CookieValue;
 import io.micronaut.http.annotation.Get;
-import io.micronaut.http.annotation.Header;
-import io.micronaut.http.annotation.Produces;
-import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.cookie.Cookie;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Flux;
 
-import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -43,6 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
     "java:S2259", // The tests will show if it's null
     "java:S5960", // We're allowed assertions, as these are used in tests only
     "checkstyle:MissingJavadocType",
+    "checkstyle:DesignForExtension",
 })
 public interface CookieTest extends AbstractTck {
 
@@ -100,7 +93,7 @@ public interface CookieTest extends AbstractTck {
 
     @Controller("/cookies-test")
     @Requires(property = "spec.name", value = COOKIE_TEST)
-    static class CookieController {
+    class CookieController {
 
         @Get(uri = "/all")
         Map<String, String> all(HttpRequest request) {
