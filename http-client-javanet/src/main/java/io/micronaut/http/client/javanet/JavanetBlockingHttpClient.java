@@ -68,7 +68,9 @@ public class JavanetBlockingHttpClient extends AbstractJavanetHttpClient impleme
             HttpResponse<byte[]> httpResponse = client.send(httpRequest, HttpResponse.BodyHandlers.ofByteArray());
             boolean errorStatus = httpResponse.statusCode() >= 400;
             if (errorStatus) {
-                LOG.error("Client {} Received HTTP Response: {} {}", clientId, httpResponse.statusCode(), httpResponse.uri());
+                if (LOG.isErrorEnabled()) {
+                    LOG.error("Client {} Received HTTP Response: {} {}", clientId, httpResponse.statusCode(), httpResponse.uri());
+                }
                 throw customizeException(new HttpClientResponseException(HttpStatus.valueOf(httpResponse.statusCode()).getReason(), getConvertedResponse(httpResponse, bodyType)));
             }
             return getConvertedResponse(httpResponse, bodyType);
