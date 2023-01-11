@@ -22,6 +22,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
@@ -34,9 +35,12 @@ import io.micronaut.http.client.ServiceHttpClientConfiguration;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
+import io.micronaut.http.cookie.Cookie;
 import org.slf4j.Logger;
 import reactor.core.publisher.Flux;
 
+import java.net.CookieManager;
+import java.net.HttpCookie;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.http.HttpClient;
@@ -45,18 +49,22 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
+/**
+ * TODO: HttpClient defaults to netty ByteBuffer as a type for exchange which isn't best for here
+ */
 abstract class AbstractJavanetHttpClient {
 
-    private final Logger log;
     protected final LoadBalancer loadBalancer;
     protected final HttpVersionSelection httpVersion;
     protected final HttpClientConfiguration configuration;
     protected final String contextPath;
     protected final HttpClient client;
-    protected MediaTypeCodecRegistry mediaTypeCodecRegistry;
+    protected final CookieManager cookieManager;
     protected final RequestBinderRegistry requestBinderRegistry;
     protected final String clientId;
     protected final ConversionService conversionService;
+    private final Logger log;
+    protected MediaTypeCodecRegistry mediaTypeCodecRegistry;
 
     protected AbstractJavanetHttpClient(
         Logger log,
@@ -85,10 +93,21 @@ abstract class AbstractJavanetHttpClient {
         this.requestBinderRegistry = requestBinderRegistry;
         this.clientId = clientId;
         this.conversionService = conversionService;
+        this.cookieManager = new CookieManager();
         this.client = java.net.http.HttpClient.newBuilder()
             .version(HttpClient.Version.HTTP_1_1)
             .followRedirects(configuration.isFollowRedirects() ? HttpClient.Redirect.NORMAL : HttpClient.Redirect.NEVER)
+            .cookieHandler(cookieManager)
             .build();
+    }
+
+    // TODO: Extract from DefaultHttpClient
+    static void customizeException0(HttpClientConfiguration configuration, String informationalServiceId, HttpClientException exc) {
+        if (informationalServiceId != null) {
+            exc.setServiceId(informationalServiceId);
+        } else if (configuration instanceof ServiceHttpClientConfiguration clientConfiguration) {
+            exc.setServiceId(clientConfiguration.getServiceId());
+        }
     }
 
     protected <O> HttpResponse<O> getConvertedResponse(java.net.http.HttpResponse<byte[]> httpResponse, @NonNull Argument<O> bodyType) {
@@ -130,7 +149,7 @@ abstract class AbstractJavanetHttpClient {
     }
 
     private <T> Optional convertBytes(@Nullable MediaType contentType, byte[] bytes, Argument<T> type) {
-        if (mediaTypeCodecRegistry != null && contentType != null) {
+        if (type != null && mediaTypeCodecRegistry != null && contentType != null) {
             if (CharSequence.class.isAssignableFrom(type.getType())) {
                 Charset charset = contentType.getCharset().orElse(StandardCharsets.UTF_8);
                 return Optional.of(new String(bytes, charset));
@@ -156,11 +175,23 @@ abstract class AbstractJavanetHttpClient {
         this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
     }
 
-    // TODO: Extract from DefaultHttpClient
     protected <I> Flux<HttpRequest> mapToHttpRequest(io.micronaut.http.HttpRequest<I> request, Argument<?> bodyType) {
         return Flux.from(loadBalancer.select(getLoadBalancerDiscriminator()))
-            .map(server -> server.resolve(prependContextPath(request.getUri())))
+            .map(server -> {
+                request.getCookies().getAll().forEach(cookie -> cookieConverter(cookie, request, server));
+                return server.resolve(prependContextPath(request.getUri()));
+            })
             .map(uri -> HttpRequestFactory.builder(uri, request, conversionService, bodyType, mediaTypeCodecRegistry).build());
+    }
+
+    private <I> void cookieConverter(Cookie cookie, io.micronaut.http.HttpRequest<I> request, ServiceInstance server) {
+        HttpCookie newCookie = new HttpCookie(cookie.getName(), cookie.getValue());
+        newCookie.setMaxAge(cookie.getMaxAge());
+        newCookie.setDomain(server.getHost());
+        newCookie.setHttpOnly(cookie.isHttpOnly());
+        newCookie.setSecure(cookie.isSecure());
+        newCookie.setPath(cookie.getPath() == null ? request.getPath() : cookie.getPath());
+        cookieManager.getCookieStore().add(server.getURI(), newCookie);
     }
 
     /**
@@ -183,14 +214,5 @@ abstract class AbstractJavanetHttpClient {
     protected <E extends HttpClientException> E customizeException(E exc) {
         customizeException0(configuration, clientId, exc);
         return exc;
-    }
-
-    // TODO: Extract from DefaultHttpClient
-    static void customizeException0(HttpClientConfiguration configuration, String informationalServiceId, HttpClientException exc) {
-        if (informationalServiceId != null) {
-            exc.setServiceId(informationalServiceId);
-        } else if (configuration instanceof ServiceHttpClientConfiguration clientConfiguration) {
-            exc.setServiceId(clientConfiguration.getServiceId());
-        }
     }
 }

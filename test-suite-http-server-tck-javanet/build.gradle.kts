@@ -7,3 +7,7 @@ dependencies {
     testImplementation(projects.httpServerTck)
     testImplementation(libs.junit.platform.engine)
 }
+
+tasks.withType(Test::class) {
+    systemProperty("jdk.httpclient.HttpClient.log", "all")
+}
