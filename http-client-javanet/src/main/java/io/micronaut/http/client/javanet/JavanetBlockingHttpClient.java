@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client.javanet;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
@@ -39,6 +40,7 @@ import java.net.http.HttpResponse;
  * @since 4.0.0
  */
 @Internal
+@Experimental
 public class JavanetBlockingHttpClient extends AbstractJavanetHttpClient implements BlockingHttpClient {
 
     private static final Logger LOG = LoggerFactory.getLogger(JavanetBlockingHttpClient.class);

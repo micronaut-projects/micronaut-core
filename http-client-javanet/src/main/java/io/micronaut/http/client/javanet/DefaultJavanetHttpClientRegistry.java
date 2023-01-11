@@ -22,6 +22,7 @@ import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
@@ -59,9 +60,8 @@ import java.util.concurrent.ConcurrentHashMap;
 @Factory
 @BootstrapContextCompatible
 @Internal
-public
-class DefaultJavanetHttpClientRegistry implements AutoCloseable,
-    HttpClientRegistry<HttpClient> {
+@Experimental
+public class DefaultJavanetHttpClientRegistry implements AutoCloseable, HttpClientRegistry<HttpClient> {
 
     private final Map<ClientKey, HttpClient> clients = new ConcurrentHashMap<>(10);
     private final BeanContext beanContext;

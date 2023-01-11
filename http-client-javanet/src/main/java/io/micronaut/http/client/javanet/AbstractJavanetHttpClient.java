@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client.javanet;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionContext;
@@ -52,6 +53,7 @@ import java.util.Optional;
 /**
  * TODO: HttpClient defaults to netty ByteBuffer as a type for exchange which isn't best for here
  */
+@Experimental
 abstract class AbstractJavanetHttpClient {
 
     protected final LoadBalancer loadBalancer;

@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client.javanet;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -50,6 +51,7 @@ import java.net.URI;
  * @since 4.0.0
  */
 @Internal
+@Experimental
 public class JavanetHttpClient extends AbstractJavanetHttpClient implements HttpClient {
 
     private static final Logger LOG = LoggerFactory.getLogger(JavanetHttpClient.class);

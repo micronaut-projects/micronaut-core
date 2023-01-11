@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client.javanet;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -33,6 +34,7 @@ import java.net.URL;
  * @since 4.0.0
  */
 @Internal
+@Experimental
 public class JavanetHttpClientFactory implements HttpClientFactory {
 
     final MediaTypeCodecRegistry mediaTypeCodecRegistry;

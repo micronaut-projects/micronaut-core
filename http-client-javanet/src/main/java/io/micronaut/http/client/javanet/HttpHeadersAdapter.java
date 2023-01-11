@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client.javanet;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.http.HttpHeaders;
@@ -30,6 +31,7 @@ import java.util.Set;
  * @since 4.0.0
  */
 @Internal
+@Experimental
 public class HttpHeadersAdapter implements HttpHeaders {
 
     private final java.net.http.HttpHeaders httpHeaders;

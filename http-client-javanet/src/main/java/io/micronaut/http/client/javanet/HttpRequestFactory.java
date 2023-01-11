@@ -15,13 +15,14 @@
  */
 package io.micronaut.http.client.javanet;
 
+import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 
@@ -35,6 +36,8 @@ import java.util.Optional;
  * @author Sergio del Amo
  * @since 4.0.0
  */
+@Internal
+@Experimental
 public final class HttpRequestFactory {
 
     private HttpRequestFactory() {
