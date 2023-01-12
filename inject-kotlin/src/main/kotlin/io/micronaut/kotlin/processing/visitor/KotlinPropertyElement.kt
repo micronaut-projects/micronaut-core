@@ -81,12 +81,12 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
                 return@map if (modifiers.contains(Modifier.PRIVATE)) {
                     null
                 } else {
-                    visitorContext.elementFactory.newMethodElement(classElement, method, type, elementAnnotationMetadataFactory)
+                    visitorContext.elementFactory.newMethodElement(classElement, this, method, type, elementAnnotationMetadataFactory)
                 }
             }
         this.getter = Optional.ofNullable(property.getter)
             .map { method ->
-                return@map visitorContext.elementFactory.newMethodElement(classElement, method, type, elementAnnotationMetadataFactory)
+                return@map visitorContext.elementFactory.newMethodElement(classElement, this, method, type, elementAnnotationMetadataFactory)
             }
         this.abstract = property.isAbstract()
         if (property.hasBackingField) {

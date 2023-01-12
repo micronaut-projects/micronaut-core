@@ -1048,11 +1048,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                         pushNewMethodReference(
                                 staticInit,
                                 JavaModelUtils.getTypeReference(methodVisitData.beanType),
-                                methodVisitData.methodElement,
-                                methodVisitData.getAnnotationMetadata(),
-                                methodVisitData.isPostConstruct(),
-                                methodVisitData.isPreDestroy(),
-                                methodVisitData.isProperty()
+                                methodVisitData
                         )
                 );
             }
@@ -1452,7 +1448,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                             declaringType,
                             methodElement,
                             false,
-                            false,
+                            null,
                             annotationMetadata);
                     methodInjectionPoints.add(methodVisitData);
                     allMethodVisits.add(methodVisitData);
@@ -1463,7 +1459,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                         declaringType,
                         methodElement,
                         false,
-                        false,
+                        null,
                         annotationMetadata);
                 visitMethodInjectionPointInternal(methodVisitData, injectMethodVisitor, injectInstanceLocalVarIndex);
                 methodInjectionPoints.add(methodVisitData);
@@ -1479,7 +1475,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                     declaringType,
                     methodElement,
                     false,
-                    false,
+                    null,
                     annotationMetadata);
             methodInjectionPoints.add(methodVisitData);
             allMethodVisits.add(methodVisitData);
@@ -1502,7 +1498,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 methodElement.getAnnotationMetadata(),
                 true,
                 false,
-                false
+                null
             );
             postConstructMethodVisits.add(methodVisitData);
             allMethodVisits.add(methodVisitData);
@@ -1527,7 +1523,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 methodElement.getAnnotationMetadata(),
                 false,
                 false,
-                false
+                null
             );
             preDestroyMethodVisits.add(methodVisitData);
             allMethodVisits.add(methodVisitData);
@@ -1540,12 +1536,12 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     public void visitMethodInjectionPoint(TypedElement declaringType,
                                           MethodElement methodElement,
                                           boolean requiresReflection,
-                                          boolean isProperty, VisitorContext visitorContext) {
+                                          PropertyElement propertyElement, VisitorContext visitorContext) {
         MethodVisitData methodVisitData = new MethodVisitData(
             declaringType,
             methodElement,
             requiresReflection,
-            isProperty,
+            propertyElement,
             methodElement.getAnnotationMetadata()
         );
         methodInjectionPoints.add(methodVisitData);
@@ -2507,7 +2503,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     private void pushMethodParameterValue(GeneratorAdapter injectMethodVisitor, int i, ParameterElement entry, MethodVisitData methodVisitData) {
-        AnnotationMetadata argMetadata = methodVisitData.isProperty() ? methodVisitData.getAnnotationMetadata() : entry.getAnnotationMetadata();
+        AnnotationMetadata argMetadata = entry.getAnnotationMetadata();
         if (!pushValueBypassingBeanContext(injectMethodVisitor, entry.getGenericType())) {
             boolean requiresGenericType = false;
             final ClassElement genericType = entry.getGenericType();
@@ -4029,11 +4025,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             pushNewMethodReference(
                 staticInit,
                 JavaModelUtils.getTypeReference(methodElement.getDeclaringType()),
-                methodElement,
-                methodElement.getAnnotationMetadata(),
-                false,
-                false,
-                false
+                new MethodVisitData(methodElement.getDeclaringType(), methodElement, false, methodElement.getAnnotationMetadata(), false, false, null)
             );
         } else if (constructor instanceof FieldElement fieldConstructor) {
             pushNewFieldReference(staticInit, JavaModelUtils.getTypeReference(fieldConstructor.getDeclaringType()), fieldConstructor, fieldConstructor.getAnnotationMetadata());
@@ -4182,12 +4174,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     private void pushNewMethodReference(GeneratorAdapter staticInit,
                                         Type beanType,
-                                        MethodElement methodElement,
-                                        AnnotationMetadata annotationMetadata,
-                                        boolean isPostConstructMethod,
-                                        boolean isPreDestroyMethod,
-                                        boolean isProperty) {
-        annotationMetadata = annotationMetadata.getTargetAnnotationMetadata();
+                                        MethodVisitData methodVisitData) {
+        AnnotationMetadata annotationMetadata = methodVisitData.getAnnotationMetadata().getTargetAnnotationMetadata();
+        MethodElement methodElement = methodVisitData.methodElement;
         for (ParameterElement value : methodElement.getParameters()) {
             DefaultAnnotationMetadata.contributeDefaults(this.annotationMetadata, value.getAnnotationMetadata());
             VisitorContextUtils.contributeRepeatable(this.annotationMetadata, value.getGenericType());
@@ -4202,13 +4191,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         if (!methodElement.hasParameters()) {
             staticInit.visitInsn(ACONST_NULL);
         } else {
-            List<ParameterElement> parameters;
-            if (isProperty) {
-                ParameterElement param = methodElement.getParameters()[0];
-                parameters = Collections.singletonList(param.withAnnotationMetadata(annotationMetadata));
-            } else {
-                parameters = Arrays.asList(methodElement.getParameters());
-            }
+            List<ParameterElement> parameters = Arrays.asList(methodElement.getParameters());
             pushBuildArgumentsForMethod(
                     beanFullClassName,
                     beanDefinitionType,
@@ -4224,6 +4207,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             annotationMetadata = ((AnnotationMetadataHierarchy) annotationMetadata).merge();
         }
         pushAnnotationMetadata(staticInit, annotationMetadata);
+        boolean isPostConstructMethod = methodVisitData.isPostConstruct();
+        boolean isPreDestroyMethod = methodVisitData.isPreDestroy();
         if (isPreDestroyMethod || isPostConstructMethod) {
             // 5: isPostConstructMethod
             staticInit.push(isPostConstructMethod);
@@ -4646,7 +4631,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         private final boolean postConstruct;
         private final boolean preDestroy;
 
-        private final boolean property;
+        private final PropertyElement property;
 
         /**
          * Default constructor.
@@ -4660,9 +4645,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 TypedElement beanType,
                 MethodElement methodElement,
                 boolean requiresReflection,
-                boolean isProperty,
+                @Nullable PropertyElement propertyElement,
                 AnnotationMetadata annotationMetadata) {
-            this(beanType, methodElement, requiresReflection, annotationMetadata, false, false, isProperty);
+            this(beanType, methodElement, requiresReflection, annotationMetadata, false, false, propertyElement);
         }
 
         MethodVisitData(
@@ -4672,14 +4657,14 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 AnnotationMetadata annotationMetadata,
                 boolean postConstruct,
                 boolean preDestroy,
-                boolean isProperty) {
+                @Nullable PropertyElement propertyElement) {
             this.beanType = beanType;
             this.requiresReflection = requiresReflection;
             this.methodElement = methodElement;
             this.annotationMetadata = annotationMetadata;
             this.postConstruct = postConstruct;
             this.preDestroy = preDestroy;
-            this.property = isProperty;
+            this.property = propertyElement;
         }
 
         /**
@@ -4719,6 +4704,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         }
 
         public boolean isProperty() {
+            return property != null;
+        }
+
+        public @Nullable PropertyElement getProperty() {
             return property;
         }
     }

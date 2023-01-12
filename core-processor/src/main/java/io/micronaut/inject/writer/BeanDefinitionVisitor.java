@@ -260,13 +260,13 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
      * @param beanType           The bean type of the method
      * @param methodElement      The method element
      * @param requiresReflection Whether the method requires reflection
-     * @param isProperty         Whether this method originates from a property
+     * @param propertyElement    Whether this method originates from a property
      * @param visitorContext     The visitor context
      */
     void visitMethodInjectionPoint(TypedElement beanType,
                                    MethodElement methodElement,
                                    boolean requiresReflection,
-                                   boolean isProperty, VisitorContext visitorContext);
+                                   @Nullable PropertyElement propertyElement, VisitorContext visitorContext);
 
     /**
      * Visit a method that is to be made executable allow invocation of said method without reflection.

@@ -724,7 +724,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
                                     ibm.getDeclaringType(),
                                     ibm,
                                     ibm.isReflectionRequired(),
-                                false, visitorContext
+                                null, visitorContext
                             )
                     );
 

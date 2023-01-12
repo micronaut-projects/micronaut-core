@@ -19,12 +19,14 @@ import com.google.devtools.ksp.*
 import com.google.devtools.ksp.symbol.*
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.util.ArrayUtils
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
 import io.micronaut.inject.ast.*
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 import io.micronaut.kotlin.processing.getVisibility
 import io.micronaut.kotlin.processing.kspNode
 import io.micronaut.kotlin.processing.unwrap
 import java.util.*
+import java.util.function.Supplier
 
 @OptIn(KspExperimental::class)
 open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElement {
@@ -50,21 +52,27 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
         }
     }
 
-    private val parameters: List<ParameterElement>
+    private var parameterInit : Supplier<List<ParameterElement>> = Supplier { emptyList() }
+    private val parameters: List<ParameterElement> by lazy {
+        parameterInit.get()
+    }
     private val returnType: ClassElement
     private val abstract: Boolean
     private val public: Boolean
     private val private: Boolean
     private val protected: Boolean
     private val internal: Boolean
+    private val propertyElement : KotlinPropertyElement?
 
     constructor(propertyType : ClassElement,
+                propertyElement: KotlinPropertyElement,
                 method: KSPropertySetter,
                 owningType: ClassElement,
                 elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
                 visitorContext: KotlinVisitorContext
     ) : super(KSPropertySetterReference(method), elementAnnotationMetadataFactory, visitorContext) {
         this.name = visitorContext.resolver.getJvmName(method)!!
+        this.propertyElement = propertyElement
         this.owningType = owningType
         this.returnType = PrimitiveElement.VOID
         this.abstract = method.receiver.isAbstract()
@@ -73,12 +81,35 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
         this.private = visibility == Visibility.PRIVATE
         this.protected = visibility == Visibility.PROTECTED
         this.internal = visibility == Visibility.INTERNAL
-        this.parameters = listOf(KotlinParameterElement(
-            propertyType, this, method.parameter, elementAnnotationMetadataFactory, visitorContext
-        ))
+        this.parameterInit = Supplier {
+            var parameterElement = KotlinParameterElement(
+                propertyType, this, method.parameter, elementAnnotationMetadataFactory, visitorContext
+            )
+            val allMetadata = mutableListOf<AnnotationMetadata>()
+            propertyElement.field.ifPresent {
+                allMetadata.add(it.targetAnnotationMetadata)
+            }
+            propertyElement.writeMethod.ifPresent {
+                allMetadata.add(it.targetAnnotationMetadata)
+            }
+            if (parameterElement.annotationMetadata.annotationNames.isNotEmpty()) {
+                allMetadata.add(parameterElement.targetAnnotationMetadata)
+            }
+            parameterElement = if (allMetadata.size == 1) {
+                parameterElement.withAnnotationMetadata(allMetadata.first()) as KotlinParameterElement
+            } else {
+                parameterElement.withAnnotationMetadata(
+                    AnnotationMetadataHierarchy(
+                        *allMetadata.toTypedArray()
+                    )
+                ) as KotlinParameterElement
+            }
+            listOf(parameterElement)
+        }
     }
 
     constructor(
+        propertyElement: KotlinPropertyElement,
         method: KSPropertyGetter,
         owningType: ClassElement,
         returnType: ClassElement,
@@ -86,8 +117,9 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
         visitorContext: KotlinVisitorContext,
     ) : super(KSPropertyGetterReference(method), elementAnnotationMetadataFactory, visitorContext) {
         this.name = visitorContext.resolver.getJvmName(method)!!
+        this.propertyElement = propertyElement
         this.owningType = owningType
-        this.parameters = emptyList()
+        this.parameterInit = Supplier { emptyList() }
         this.returnType = returnType
         this.abstract = method.receiver.isAbstract()
         this.public = method.receiver.isPublic()
@@ -104,18 +136,21 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
     ) : super(KSFunctionReference(method), elementAnnotationMetadataFactory, visitorContext) {
         this.name = visitorContext.resolver.getJvmName(method)!!
         this.owningType = owningType
-        this.parameters = method.parameters.map {
-            val t = visitorContext.elementFactory.newClassElement(
-                it.type.resolve(),
-                elementAnnotationMetadataFactory)
-            KotlinParameterElement(
-                t,
-                this,
-                it,
-                elementAnnotationMetadataFactory,
-                visitorContext
-            )
+        this.parameterInit = Supplier {
+            method.parameters.map {
+                val t = visitorContext.elementFactory.newClassElement(
+                    it.type.resolve(),
+                    elementAnnotationMetadataFactory)
+                KotlinParameterElement(
+                    t,
+                    this,
+                    it,
+                    elementAnnotationMetadataFactory,
+                    visitorContext
+                )
+            }
         }
+        this.propertyElement = null
         this.returnType = returnType
         this.abstract = method.isAbstract
         this.public = method.isPublic()
@@ -139,7 +174,10 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
     ) : super(method, elementAnnotationMetadataFactory, visitorContext) {
         this.name = name
         this.owningType = owningType
-        this.parameters = parameters
+        this.parameterInit = Supplier {
+            parameters
+        }
+        this.propertyElement = null
         this.returnType = returnType
         this.abstract = abstract
         this.public = public
@@ -282,6 +320,7 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
         if (declaration is KSPropertySetter) {
             return KotlinMethodElement(
                 parameters[0].type,
+                propertyElement!!,
                 declaration.unwrap() as KSPropertySetter,
                 owningType,
                 annotationMetadataFactory,
@@ -289,6 +328,7 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
             )
         } else if (declaration is KSPropertyGetter) {
             return KotlinMethodElement(
+                propertyElement!!,
                 declaration.unwrap() as KSPropertyGetter,
                 owningType,
                 returnType,

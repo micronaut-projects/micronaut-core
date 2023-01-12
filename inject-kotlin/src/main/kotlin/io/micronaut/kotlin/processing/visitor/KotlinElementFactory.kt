@@ -178,21 +178,24 @@ class KotlinElementFactory(
 
     fun newMethodElement(
         declaringClass: ClassElement,
+        propertyElement: KotlinPropertyElement,
         method: KSPropertyGetter,
         type: ClassElement,
         elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory
     ): MethodElement {
-        return KotlinMethodElement(method, declaringClass, type, elementAnnotationMetadataFactory, visitorContext)
+        return KotlinMethodElement(propertyElement, method, declaringClass, type, elementAnnotationMetadataFactory, visitorContext)
     }
 
     fun newMethodElement(
         declaringClass: ClassElement,
+        propertyElement: KotlinPropertyElement,
         method: KSPropertySetter,
         type: ClassElement,
         elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory
     ): MethodElement {
         return KotlinMethodElement(
             type,
+            propertyElement,
             method,
             declaringClass,
             elementAnnotationMetadataFactory,

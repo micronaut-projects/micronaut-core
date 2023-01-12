@@ -1,5 +1,7 @@
 package io.micronaut.kotlin.processing.beans
 
+import io.micronaut.annotation.processing.test.KotlinCompiler
+import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.Order
 import io.micronaut.http.client.annotation.Client
@@ -10,6 +12,45 @@ import spock.lang.Specification
 import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class BeanDefinitionSpec extends Specification {
+    void "test property annotation on properties and targeting params"() {
+        given:
+        def context = KotlinCompiler.buildContext('''
+package test
+import io.micronaut.context.annotation.Property
+import io.micronaut.core.convert.format.MapFormat
+import jakarta.inject.Inject
+import jakarta.inject.Singleton
+
+@Singleton
+class BeanWithProperty {
+
+    @set:Inject
+    @setparam:Property(name="app.string")
+    var stringParam:String ?= null
+
+    @set:Inject
+    @setparam:Property(name="app.map")
+    @setparam:MapFormat(transformation = MapFormat.MapTransformation.FLAT)
+    var mapParam:Map<String, String> ?= null
+
+    @Property(name="app.string")
+    var stringParamTwo:String ?= null
+
+    @Property(name="app.map")
+    @MapFormat(transformation = MapFormat.MapTransformation.FLAT)
+    var mapParamTwo:Map<String, String> ?= null
+}
+''', false, ["app.string": "Hello", "app.map.yyy.xxx": 2, "app.map.yyy.yyy": 3])
+
+        def bean = KotlinCompiler.getBean(context, 'test.BeanWithProperty')
+
+        expect:
+        bean.stringParam == 'Hello'
+
+        cleanup:
+        context.close()
+    }
+
     void "test annotations targeting field on properties"() {
         given:
         def definition = buildBeanDefinition('test.TestBean', '''

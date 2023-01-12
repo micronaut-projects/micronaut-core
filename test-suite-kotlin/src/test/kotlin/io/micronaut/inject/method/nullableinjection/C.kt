@@ -16,8 +16,10 @@
 package io.micronaut.inject.method.nullableinjection
 
 import jakarta.inject.Inject
+import jakarta.inject.Singleton
 
 
+@Singleton
 class C {
     internal var _a: A? = null
     internal var a: A

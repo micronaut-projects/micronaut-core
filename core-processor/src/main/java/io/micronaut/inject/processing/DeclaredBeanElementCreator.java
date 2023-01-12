@@ -389,7 +389,7 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
             methodElement.getDeclaringType(),
             methodElement,
             methodElement.isReflectionRequired(classElement),
- propertyElement != null, visitorContext
+            propertyElement, visitorContext
         );
     }
 
