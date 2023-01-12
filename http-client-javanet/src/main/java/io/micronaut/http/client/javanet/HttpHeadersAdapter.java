@@ -18,6 +18,7 @@ package io.micronaut.http.client.javanet;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.HttpHeaders;
 
 import java.util.Collection;
@@ -35,13 +36,15 @@ import java.util.Set;
 public class HttpHeadersAdapter implements HttpHeaders {
 
     private final java.net.http.HttpHeaders httpHeaders;
+    private final ConversionService conversionService;
 
     /**
      *
      * @param httpHeaders HTTP Headers.
      */
-    public HttpHeadersAdapter(java.net.http.HttpHeaders httpHeaders) {
+    public HttpHeadersAdapter(java.net.http.HttpHeaders httpHeaders, ConversionService conversionService) {
         this.httpHeaders = httpHeaders;
+        this.conversionService = conversionService;
     }
 
     @Override
@@ -66,6 +69,6 @@ public class HttpHeadersAdapter implements HttpHeaders {
 
     @Override
     public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
-        throw new UnsupportedOperationException("Unimplemented");
+        return conversionService.convert(get(name), conversionContext);
     }
 }

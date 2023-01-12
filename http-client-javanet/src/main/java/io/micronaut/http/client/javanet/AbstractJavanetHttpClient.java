@@ -127,7 +127,7 @@ abstract class AbstractJavanetHttpClient {
 
             @Override
             public HttpHeaders getHeaders() {
-                return new HttpHeadersAdapter(httpResponse.headers());
+                return new HttpHeadersAdapter(httpResponse.headers(), conversionService);
             }
 
             @Override

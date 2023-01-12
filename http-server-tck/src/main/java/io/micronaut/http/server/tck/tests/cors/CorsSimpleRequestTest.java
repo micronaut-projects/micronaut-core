@@ -33,6 +33,7 @@ import io.micronaut.http.server.tck.HttpResponseAssertion;
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -65,6 +66,7 @@ public class CorsSimpleRequestTest {
      * @throws IOException may throw the try for resources
      */
     @Test
+    @Tag("multipart")
     void corsSimpleRequestNotAllowedForLocalhostAndAny() throws IOException {
         asserts(SPECNAME,
             Collections.singletonMap(PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE),
@@ -85,6 +87,7 @@ public class CorsSimpleRequestTest {
      * @throws IOException scenario step fails
      */
     @Test
+    @Tag("multipart")
     void corsSimpleRequestAllowedForLocalhostAndOriginLocalhost() throws IOException {
         asserts(SPECNAME,
             Collections.singletonMap(PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE),
@@ -104,6 +107,7 @@ public class CorsSimpleRequestTest {
      * @throws IOException may throw the try for resources
      */
     @Test
+    @Tag("multipart")
     void corsSimpleRequestForLocalhostCanBeAllowedViaConfiguration() throws IOException {
         asserts(SPECNAME,
             CollectionUtils.mapOf(
