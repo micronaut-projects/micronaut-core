@@ -3,12 +3,19 @@ Log levels can be configured via properties defined in `application.yml` (and en
 [source,yaml]
 ----
 logger:
-  config: custom-logback.xml
   levels:
     foo.bar: ERROR
 ----
 
 The same configuration can be achieved by setting the environment variable `LOGGER_LEVELS_FOO_BAR`. Note that there is currently no way to set log levels for unconventional prefixes such as `foo.barBaz`.
+
+==== Custom Logback XML Configuration
+
+[source,yaml]
+----
+logger:
+  config: custom-logback.xml
+----  
 
 You can also set a custom Logback XML configuration file to be used via `logger.config`. Be aware that **the referenced file should be an accessible resource on your classpath**!
 
