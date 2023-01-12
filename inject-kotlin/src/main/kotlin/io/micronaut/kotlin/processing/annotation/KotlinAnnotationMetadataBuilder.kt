@@ -71,7 +71,12 @@ class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnvironment: Sy
     }
 
     override fun hasAnnotations(element: KSAnnotated): Boolean {
-        return element.annotations.iterator().hasNext()
+        return if (element is KSPropertyDeclaration) {
+            element.annotations.iterator().hasNext() ||
+                    element.getter?.annotations?.iterator()?.hasNext() ?: false
+        } else {
+            element.annotations.iterator().hasNext()
+        }
     }
 
     override fun getAnnotationTypeName(annotationMirror: KSAnnotation): String {
@@ -90,7 +95,32 @@ class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnvironment: Sy
     }
 
     override fun getAnnotationsForType(element: KSAnnotated): MutableList<out KSAnnotation> {
-        return element.annotations.toMutableList()
+        return if (element is KSPropertyDeclaration) {
+            val parent : KSClassDeclaration? = findClassDeclaration(element)
+            if (parent is KSClassDeclaration && parent.classKind == ClassKind.ANNOTATION_CLASS) {
+                val list = element.annotations.toMutableList()
+                val getter = element.getter
+                if (getter != null) {
+                    list.addAll(getter.annotations)
+                }
+                list
+            } else {
+                element.annotations.toMutableList()
+            }
+        } else {
+            element.annotations.toMutableList()
+        }
+    }
+
+    private fun findClassDeclaration(element: KSPropertyDeclaration): KSClassDeclaration? {
+        var parent = element.parent
+        while (parent != null) {
+           if (parent is KSClassDeclaration) {
+               return parent
+           }
+           parent = parent.parent
+        }
+        return null
     }
 
     override fun postProcess(annotationMetadata: MutableAnnotationMetadata, element: KSAnnotated) {

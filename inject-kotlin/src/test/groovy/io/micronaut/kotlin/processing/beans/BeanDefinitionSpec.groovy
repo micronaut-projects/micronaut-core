@@ -5,6 +5,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.Order
 import io.micronaut.http.client.annotation.Client
+import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.PendingFeature
 import spock.lang.Specification
@@ -12,6 +13,33 @@ import spock.lang.Specification
 import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class BeanDefinitionSpec extends Specification {
+
+    void "test non-binding qualifier"() {
+        given:
+        def definition = KotlinCompiler.buildBeanDefinition('test.V8Engine', '''
+package test
+
+import io.micronaut.context.annotation.NonBinding
+import jakarta.inject.Qualifier
+import jakarta.inject.Singleton
+import kotlin.annotation.Retention
+
+@Cylinders(value = 8, description = "test")
+@Singleton
+class V8Engine
+
+@Qualifier
+@Retention(AnnotationRetention.RUNTIME)
+annotation class Cylinders(
+    val value: Int,
+    @get:NonBinding // <2>
+    val description: String = ""
+)
+''')
+        expect:"the non-binding member is not there"
+        definition.declaredQualifier.qualifierAnn.memberNames == ["value"] as Set
+    }
+
     void "test property annotation on properties and targeting params"() {
         given:
         def context = KotlinCompiler.buildContext('''
