@@ -22,6 +22,7 @@ dependencies {
     testImplementation project(":jackson-databind")
     testImplementation project(":inject-kotlin-test")
     testImplementation libs.kotlin.stdlib
+    testImplementation project(':http-client')
     testImplementation libs.managed.jackson.annotations
     testImplementation libs.managed.validation
     testImplementation libs.managed.reactor

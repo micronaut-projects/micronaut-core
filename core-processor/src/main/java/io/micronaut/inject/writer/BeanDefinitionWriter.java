@@ -1051,7 +1051,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                                 methodVisitData.methodElement,
                                 methodVisitData.getAnnotationMetadata(),
                                 methodVisitData.isPostConstruct(),
-                                methodVisitData.isPreDestroy()
+                                methodVisitData.isPreDestroy(),
+                                methodVisitData.isProperty()
                         )
                 );
             }
@@ -4025,7 +4026,15 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             List<ParameterElement> parameterList = Arrays.asList(parameters);
             applyDefaultNamedToParameters(parameterList);
 
-            pushNewMethodReference(staticInit, JavaModelUtils.getTypeReference(methodElement.getDeclaringType()), methodElement, methodElement.getAnnotationMetadata(), false, false);
+            pushNewMethodReference(
+                staticInit,
+                JavaModelUtils.getTypeReference(methodElement.getDeclaringType()),
+                methodElement,
+                methodElement.getAnnotationMetadata(),
+                false,
+                false,
+                false
+            );
         } else if (constructor instanceof FieldElement fieldConstructor) {
             pushNewFieldReference(staticInit, JavaModelUtils.getTypeReference(fieldConstructor.getDeclaringType()), fieldConstructor, fieldConstructor.getAnnotationMetadata());
         } else {
@@ -4176,7 +4185,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                                         MethodElement methodElement,
                                         AnnotationMetadata annotationMetadata,
                                         boolean isPostConstructMethod,
-                                        boolean isPreDestroyMethod) {
+                                        boolean isPreDestroyMethod,
+                                        boolean isProperty) {
         annotationMetadata = annotationMetadata.getTargetAnnotationMetadata();
         for (ParameterElement value : methodElement.getParameters()) {
             DefaultAnnotationMetadata.contributeDefaults(this.annotationMetadata, value.getAnnotationMetadata());
@@ -4192,12 +4202,19 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         if (!methodElement.hasParameters()) {
             staticInit.visitInsn(ACONST_NULL);
         } else {
+            List<ParameterElement> parameters;
+            if (isProperty) {
+                ParameterElement param = methodElement.getParameters()[0];
+                parameters = Collections.singletonList(param.withAnnotationMetadata(annotationMetadata));
+            } else {
+                parameters = Arrays.asList(methodElement.getParameters());
+            }
             pushBuildArgumentsForMethod(
                     beanFullClassName,
                     beanDefinitionType,
                     classWriter,
                     staticInit,
-                    Arrays.asList(methodElement.getParameters()),
+                    parameters,
                     defaultsStorage,
                     loadTypeMethods
             );

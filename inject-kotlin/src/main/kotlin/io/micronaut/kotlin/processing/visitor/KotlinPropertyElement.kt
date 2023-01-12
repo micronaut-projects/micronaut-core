@@ -90,11 +90,12 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
             }
         this.abstract = property.isAbstract()
         if (property.hasBackingField) {
-            this.field = Optional.of(visitorContext.elementFactory.newFieldElement(
+            val newFieldElement = visitorContext.elementFactory.newFieldElement(
                 classElement,
                 property,
                 elementAnnotationMetadataFactory
-            ))
+            )
+            this.field = Optional.of(newFieldElement)
         } else {
             this.field = Optional.empty()
         }

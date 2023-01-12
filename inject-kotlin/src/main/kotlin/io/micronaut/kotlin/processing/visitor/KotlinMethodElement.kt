@@ -23,6 +23,7 @@ import io.micronaut.inject.ast.*
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 import io.micronaut.kotlin.processing.getVisibility
 import io.micronaut.kotlin.processing.kspNode
+import io.micronaut.kotlin.processing.unwrap
 import java.util.*
 
 @OptIn(KspExperimental::class)
@@ -278,20 +279,47 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
 
     override fun isProtected(): Boolean = protected
     override fun copyThis(): KotlinMethodElement {
-        return KotlinMethodElement(
-            declaration,
-            name,
-            owningType,
-            annotationMetadataFactory,
-            visitorContext,
-            returnType,
-            parameters,
-            abstract,
-            public,
-            private,
-            protected,
-            internal
-        )
+        if (declaration is KSPropertySetter) {
+            return KotlinMethodElement(
+                parameters[0].type,
+                declaration.unwrap() as KSPropertySetter,
+                owningType,
+                annotationMetadataFactory,
+                visitorContext
+            )
+        } else if (declaration is KSPropertyGetter) {
+            return KotlinMethodElement(
+                declaration.unwrap() as KSPropertyGetter,
+                owningType,
+                returnType,
+                annotationMetadataFactory,
+                visitorContext
+            )
+        } else if (declaration is KSFunctionDeclaration) {
+            return KotlinMethodElement(
+                declaration.unwrap() as KSFunctionDeclaration,
+                owningType,
+                returnType,
+                annotationMetadataFactory,
+                visitorContext
+            )
+        } else {
+
+            return KotlinMethodElement(
+                declaration,
+                name,
+                owningType,
+                annotationMetadataFactory,
+                visitorContext,
+                returnType,
+                parameters,
+                abstract,
+                public,
+                private,
+                protected,
+                internal
+            )
+        }
     }
 
     override fun isPrivate(): Boolean = private

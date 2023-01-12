@@ -2,6 +2,7 @@ package io.micronaut.kotlin.processing.beans
 
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.Order
+import io.micronaut.http.client.annotation.Client
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.PendingFeature
 import spock.lang.Specification
@@ -9,6 +10,54 @@ import spock.lang.Specification
 import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class BeanDefinitionSpec extends Specification {
+    void "test annotations targeting field on properties"() {
+        given:
+        def definition = buildBeanDefinition('test.TestBean', '''
+package test
+
+import jakarta.inject.Inject
+import jakarta.inject.Named
+import jakarta.inject.Singleton
+
+@Singleton
+class TestBean {
+    @Inject @field:Named("one") lateinit var otherBean: OtherBean
+}
+
+@Singleton
+@Named("one")
+class OtherBean
+''')
+        expect:
+        definition != null
+        definition.injectedMethods.size() == 1
+        definition.injectedMethods[0].annotationMetadata.hasAnnotation(AnnotationUtil.NAMED)
+        definition.injectedMethods[0].arguments[0].annotationMetadata.hasAnnotation(AnnotationUtil.NAMED)
+    }
+
+    void "test annotations targeting field on properties - client"() {
+        given:
+        def definition = buildBeanDefinition('test.TestBean', '''
+package test
+
+import io.micronaut.http.client.HttpClient
+import io.micronaut.http.client.annotation.Client
+import jakarta.inject.Inject
+import jakarta.inject.Named
+import jakarta.inject.Singleton
+
+@Singleton
+class TestBean {
+    @Inject @field:Client("/test") lateinit var client: HttpClient
+}
+
+''')
+        expect:
+        definition != null
+        definition.injectedMethods.size() == 1
+        definition.injectedMethods[0].annotationMetadata.hasAnnotation(Client)
+        definition.injectedMethods[0].arguments[0].annotationMetadata.hasAnnotation(Client)
+    }
 
     void "test controller with constructor arguments"() {
         given:
