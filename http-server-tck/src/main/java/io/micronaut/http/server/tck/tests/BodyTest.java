@@ -26,6 +26,7 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Status;
 import io.micronaut.http.server.tck.AssertionUtils;
+import io.micronaut.http.server.tck.BodyAssertion;
 import io.micronaut.http.server.tck.HttpResponseAssertion;
 import static io.micronaut.http.server.tck.TestScenario.asserts;
 import org.junit.jupiter.api.Test;
@@ -88,6 +89,19 @@ public class BodyTest {
                     .build()));
     }
 
+    @Test
+    void testCustomListBodyPOJOReactiveTypes() throws IOException {
+        String body = "[{\"x\":10,\"y\":20},{\"x\":30,\"y\":40}]";
+        asserts(SPEC_NAME,
+            HttpRequest.POST("/response-body/pojo-flux", body)
+                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request,
+                HttpResponseAssertion.builder()
+                    .status(HttpStatus.CREATED)
+                    .body(BodyAssertion.builder().body(body).equals())
+                    .build()));
+    }
+
     @Controller("/response-body")
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class BodyController {
@@ -108,6 +122,12 @@ public class BodyTest {
         @Status(HttpStatus.CREATED)
         @SingleResult
         Publisher<Point> post(@Body Publisher<Point> data) {
+            return data;
+        }
+
+        @Post(uri = "/pojo-flux")
+        @Status(HttpStatus.CREATED)
+        Publisher<Point> postMany(@Body Publisher<Point> data) {
             return data;
         }
 
