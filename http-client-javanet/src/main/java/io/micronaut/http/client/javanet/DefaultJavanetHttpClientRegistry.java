@@ -53,6 +53,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Factory to create {@literal java.net.http.*} HTTP Clients.
+ */
 @Factory
 @BootstrapContextCompatible
 @Internal
@@ -80,6 +83,15 @@ public class DefaultJavanetHttpClientRegistry implements AutoCloseable, HttpClie
         this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
     }
 
+    /**
+     * Creates a {@literal java.net.http.*} HTTP Client.
+     *
+     * @param injectionPoint
+     * @param loadBalancer
+     * @param configuration
+     * @param beanContext
+     * @return A {@literal java.net.http.*} HTTP Client
+     */
     @Bean
     @BootstrapContextCompatible
     @Primary
@@ -91,7 +103,6 @@ public class DefaultJavanetHttpClientRegistry implements AutoCloseable, HttpClie
     ) {
         return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext);
     }
-
 
     private HttpClient resolveDefaultHttpClient(
         @Nullable InjectionPoint<?> injectionPoint,

@@ -37,7 +37,6 @@ import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.cookie.Cookie;
-import org.slf4j.Logger;
 import reactor.core.publisher.Flux;
 
 import java.net.CookieManager;
@@ -50,8 +49,8 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
-/**
- * TODO: HttpClient defaults to netty ByteBuffer as a type for exchange which isn't best for here
+/*
+ * TODO: HttpClient defaults to netty ByteBuffer as a type for exchange which isn't best for here.
  */
 @Experimental
 abstract class AbstractJavanetHttpClient {
