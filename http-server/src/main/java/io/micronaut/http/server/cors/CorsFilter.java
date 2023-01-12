@@ -109,6 +109,9 @@ public class CorsFilter implements HttpServerFilter {
                 return forbidden();
             }
             return Publishers.then(chain.proceed(request), resp -> decorateResponseWithHeaders(request, resp, corsOriginConfiguration));
+        } else if (shouldDenyToPreventDriveByLocalhostAttack(origin, request)) {
+            LOG.trace("the request specifies an origin different than localhost. To prevent drive-by-localhost attacks the request is forbidden");
+            return forbidden();
         }
         LOG.trace("CORS configuration not found for {} origin", origin);
         return chain.proceed(request);
@@ -125,9 +128,31 @@ public class CorsFilter implements HttpServerFilter {
         if (httpHostResolver == null) {
             return false;
         }
+        String origin = request.getHeaders().getOrigin().orElse(null);
+        if (origin == null) {
+            return false;
+        }
+        if (origin.startsWith(LOCALHOST)) {
+            return false;
+        }
         String host = httpHostResolver.resolve(request);
         return isAny(corsOriginConfiguration.getAllowedOrigins()) && host.startsWith(LOCALHOST);
 
+    }
+
+    /**
+     *
+     * @param origin HTTP Header {@link HttpHeaders#ORIGIN} value.
+     * @param request HTTP Request
+     * @return {@literal true} if the resolved host starts with {@literal http://localhost} and origin does not start with localhost deny it.
+     */
+    protected boolean shouldDenyToPreventDriveByLocalhostAttack(@NonNull String origin,
+                                                                @NonNull HttpRequest<?> request) {
+        if (httpHostResolver == null) {
+            return false;
+        }
+        String host = httpHostResolver.resolve(request);
+        return !origin.startsWith(LOCALHOST) && host.startsWith(LOCALHOST);
     }
 
     @Override
@@ -249,6 +274,9 @@ public class CorsFilter implements HttpServerFilter {
 
     @NonNull
     private Optional<CorsOriginConfiguration> getConfiguration(@NonNull String requestOrigin) {
+        if (!corsConfiguration.isEnabled()) {
+            return Optional.empty();
+        }
         return corsConfiguration.getConfigurations().values().stream()
             .filter(config -> {
                 List<String> allowedOrigins = config.getAllowedOrigins();

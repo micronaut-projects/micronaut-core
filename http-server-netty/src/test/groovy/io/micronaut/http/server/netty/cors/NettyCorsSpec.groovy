@@ -15,7 +15,9 @@
  */
 package io.micronaut.http.server.netty.cors
 
+import io.micronaut.context.annotation.Replaces
 import io.micronaut.context.annotation.Requires
+import io.micronaut.core.annotation.Nullable
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
@@ -25,6 +27,8 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.server.netty.AbstractMicronautSpec
+import io.micronaut.http.server.util.HttpHostResolver
+import jakarta.inject.Singleton
 import reactor.core.publisher.Flux
 
 import static io.micronaut.http.HttpHeaders.*
@@ -309,6 +313,16 @@ class NettyCorsSpec extends AbstractMicronautSpec {
         'micronaut.server.cors.configurations.bar.maxAge': 150,
         'micronaut.server.cors.configurations.bar.allowCredentials': false,
         'micronaut.server.dateHeader': false]
+    }
+
+    @Requires(property = 'spec.name', value = 'NettyCorsSpec')
+    @Replaces(HttpHostResolver.class)
+    @Singleton
+    static class HttpHostResolverReplacement implements HttpHostResolver {
+        @Override
+        String resolve(@Nullable HttpRequest request) {
+            "https://micronautexample.com"
+        }
     }
 
     @Controller('/test')

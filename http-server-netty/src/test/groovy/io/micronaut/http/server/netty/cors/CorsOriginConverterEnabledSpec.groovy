@@ -12,8 +12,8 @@ class CorsOriginConverterEnabledSpec extends Specification {
     @Shared
     ApplicationContext applicationContext = ApplicationContext.run()
 
-    void "CorsOriginConverter is not enabled by default"() {
+    void "CorsOriginConverter is enabled by default"() {
         expect:
-        !applicationContext.containsBean(CorsOriginConverter)
+        applicationContext.containsBean(CorsOriginConverter)
     }
 }
