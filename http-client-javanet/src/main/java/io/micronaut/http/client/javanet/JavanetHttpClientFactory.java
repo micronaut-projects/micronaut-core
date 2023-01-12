@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.HttpClientFactory;
@@ -38,9 +39,14 @@ import java.net.URL;
 public class JavanetHttpClientFactory implements HttpClientFactory {
 
     final MediaTypeCodecRegistry mediaTypeCodecRegistry;
+    private final ConversionService conversionService;
 
-    public JavanetHttpClientFactory(@Nullable MediaTypeCodecRegistry mediaTypeCodecRegistry) {
+    public JavanetHttpClientFactory(
+        @Nullable MediaTypeCodecRegistry mediaTypeCodecRegistry,
+        ConversionService conversionService
+    ) {
         this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
+        this.conversionService = conversionService;
     }
 
     @Override
@@ -74,11 +80,11 @@ public class JavanetHttpClientFactory implements HttpClientFactory {
 
     @NonNull
     private JavanetHttpClient createJavanetClient(@Nullable URI uri) {
-        return new JavanetHttpClient(uri);
+        return new JavanetHttpClient(uri, conversionService);
     }
 
     @NonNull
     private JavanetHttpClient createJavanetClient(@Nullable URI uri, @NonNull HttpClientConfiguration configuration) {
-        return new JavanetHttpClient(uri, configuration, mediaTypeCodecRegistry);
+        return new JavanetHttpClient(uri, configuration, mediaTypeCodecRegistry, conversionService);
     }
 }

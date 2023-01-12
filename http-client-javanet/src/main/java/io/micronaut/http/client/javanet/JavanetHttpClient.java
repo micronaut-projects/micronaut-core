@@ -69,23 +69,24 @@ public class JavanetHttpClient extends AbstractJavanetHttpClient implements Http
         super(loadBalancer, httpVersion, configuration, contextPath, mediaTypeCodecRegistry, requestBinderRegistry, clientId, conversionService);
     }
 
-    public JavanetHttpClient(URI uri) {
+    public JavanetHttpClient(URI uri, ConversionService conversionService) {
         this(
             uri == null ? null : LoadBalancer.fixed(uri),
             null,
             new DefaultHttpClientConfiguration(),
             null,
             createDefaultMediaTypeRegistry(),
-            new DefaultRequestBinderRegistry(ConversionService.SHARED),
+            new DefaultRequestBinderRegistry(conversionService),
             null,
-            ConversionService.SHARED
+            conversionService
         );
     }
 
     public JavanetHttpClient(
         URI uri,
         HttpClientConfiguration configuration,
-        MediaTypeCodecRegistry mediaTypeCodecRegistry
+        MediaTypeCodecRegistry mediaTypeCodecRegistry,
+        ConversionService conversionService
     ) {
         this(
             uri == null ? null : LoadBalancer.fixed(uri),
@@ -93,9 +94,9 @@ public class JavanetHttpClient extends AbstractJavanetHttpClient implements Http
             configuration,
             null,
             mediaTypeCodecRegistry,
-            new DefaultRequestBinderRegistry(ConversionService.SHARED),
+            new DefaultRequestBinderRegistry(conversionService),
             null,
-            ConversionService.SHARED
+            conversionService
         );
     }
 
