@@ -128,6 +128,13 @@ public class CorsFilter implements HttpServerFilter {
         if (httpHostResolver == null) {
             return false;
         }
+        String origin = request.getHeaders().getOrigin().orElse(null);
+        if (origin == null) {
+            return false;
+        }
+        if (origin.startsWith(LOCALHOST)) {
+            return false;
+        }
         String host = httpHostResolver.resolve(request);
         return isAny(corsOriginConfiguration.getAllowedOrigins()) && host.startsWith(LOCALHOST);
 
