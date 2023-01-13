@@ -4,15 +4,38 @@ import io.micronaut.annotation.processing.test.KotlinCompiler
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.Order
+import io.micronaut.http.annotation.HttpMethodMapping
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.qualifiers.Qualifiers
+import io.micronaut.inject.writer.BeanDefinitionVisitor
 import spock.lang.PendingFeature
 import spock.lang.Specification
 
 import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class BeanDefinitionSpec extends Specification {
+
+    void "test annotation defaults"() {
+        given:
+        def definition = KotlinCompiler.buildBeanDefinition('test.TestClient' + BeanDefinitionVisitor.PROXY_SUFFIX, '''
+package test
+
+import io.micronaut.http.annotation.Post
+import io.micronaut.http.client.annotation.Client
+
+@Client("/")
+interface TestClient {
+    @Post
+    fun save(str : String) : String
+}
+''')
+        expect:
+        definition.getRequiredMethod("save", String)
+                .getAnnotation(HttpMethodMapping)
+                .getRequiredValue(String) == '/'
+    }
+
     void "test @Inject internal var"() {
         given:
         def context = KotlinCompiler.buildContext('''
