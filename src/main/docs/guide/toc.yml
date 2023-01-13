@@ -162,6 +162,9 @@ httpClient:
   clientFilter: HTTP Client Filters
   clientHttp2: HTTP/2 Support
   clientSample: HTTP Client Sample
+  javanetClient:
+    title: Using the JDK HTTP Client
+    unsupportedFeatures: Unsupported Features
 cloud:
   title: Cloud Native Features
   cloudConfiguration:

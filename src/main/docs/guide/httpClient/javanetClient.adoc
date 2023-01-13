@@ -1,0 +1,3 @@
+As of Micronaut 4.0.0, you can use a java client based on java.net.HttpClient in place of the netty based default. To do so, replace the http-client dependency in your build with:
+
+dependency:micronaut-http-client-javanet[]

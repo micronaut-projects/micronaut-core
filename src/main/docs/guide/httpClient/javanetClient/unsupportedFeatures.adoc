@@ -1,0 +1,9 @@
+Currently, there are several things supported by the default Http Client that are not-supported or implemented for the Java.net client.  These include:
+
+1. Proxy Support.
+1. Client Filters.
+1. Http2.
+1. Streaming support.
+1. Multipart requests.
+
+If you require any of these, we recommend you use the default Micronaut Http Client.
