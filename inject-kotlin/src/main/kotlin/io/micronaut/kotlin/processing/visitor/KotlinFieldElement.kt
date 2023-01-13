@@ -38,7 +38,7 @@ class KotlinFieldElement(declaration: KSPropertyDeclaration,
     }
 
     override fun isFinal(): Boolean {
-        return modifiers.contains(ElementModifier.FINAL)
+        return declaration.setter == null
     }
 
     override fun isPublic(): Boolean {

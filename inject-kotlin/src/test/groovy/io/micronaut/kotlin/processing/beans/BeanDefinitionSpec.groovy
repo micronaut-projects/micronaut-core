@@ -13,7 +13,43 @@ import spock.lang.Specification
 import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class BeanDefinitionSpec extends Specification {
-    void "test @Property targetting field"() {
+    void "test @Inject internal var"() {
+        given:
+        def context = KotlinCompiler.buildContext('''
+package test
+
+import io.micronaut.context.event.ApplicationEventPublisher
+import jakarta.inject.Inject
+import jakarta.inject.Singleton
+
+@Singleton
+class SampleEventEmitterBean {
+
+    @Inject
+    internal var eventPublisher: ApplicationEventPublisher<SampleEvent>? = null
+
+    fun publishSampleEvent() {
+        eventPublisher!!.publishEvent(SampleEvent())
+    }
+
+}
+
+class SampleEvent
+
+''')
+
+        def bean = getBean(context, 'test.SampleEventEmitterBean')
+        def definition = KotlinCompiler.getBeanDefinition(context, 'test.SampleEventEmitterBean')
+        expect:
+        definition.injectedFields.size() == 1
+        definition.injectedMethods.size() == 0
+
+        bean.eventPublisher
+
+        cleanup:
+        context.close()
+    }
+    void "test @Property targeting field"() {
         given:
         def context = buildContext('''
 package test
