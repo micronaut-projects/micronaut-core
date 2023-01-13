@@ -158,3 +158,72 @@ micronaut:
     cors:
       single-header: true
 ----
+
+== Annotation-based CORS Configuration
+
+Micronaut CORS configuration applies by default to all endpoints in the running application.
+
+As an alternative, CORS configuration can be applied in a more fine-grained manner to specific routes using the
+link:{api}/io/micronaut/http/server/cors/CrossOrigin.html[@CrossOrigin] annotation. This is applied to `@Controller` to apply the CORS configuration to all endpoints in the controller. Alternatively, the annotation can be applied to specific endpoints on a controller, for even more fine-grained control.
+
+The `@CrossOrigin` annotation maps with a one-to-one correspondence to application-wide link:{api}/io/micronaut/http/server/cors/CorsOriginConfiguration.html[CorsOriginConfiguration] configuration properties. To specify just an allowed origin, use `@CrossOrigin("https://foo.com")`. To specify additional configuration details,
+
+[source,java]
+----
+@CrossOrigin(
+	allowedOrigins = { "http://foo.com" ,"^http(|s):\\/\\/www\\.google\\.com$" },
+	allowedMethods = { HttpMethod.POST, HttpMethod.PUT },
+	allowedHeaders = { HttpHeaders.CONTENT_TYPE, HttpHeaders.AUTHORIZATION },
+	exposedHeaders = { HttpHeaders.CONTENT_TYPE, HttpHeaders.AUTHORIZATION },
+	allowCredentials = "false",
+	maxAge = 3600
+)
+----
+For this example, the controller class is annotated with `@CrossOrigin`, so the CORS configuration applies to all endpoints in the controller, but not to other routes in the application that don't otherwise have applicable CORS configuration.
+
+[source,java]
+----
+import io.micronaut.http.MediaType;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Get;
+import io.micronaut.http.server.cors.CrossOrigin;
+
+@CrossOrigin("https://hello.com") //
+@Controller("/hello")
+public class CorsController {
+
+    @Get(produces = MediaType.TEXT_PLAIN)
+    public String cors() {
+        return "Welcome to the worlds of CORS";
+    }
+
+    ...
+}
+----
+For the following example, the `@CrossOrigon` annotation is applied more specifically to the
+`GET /hello` endpoint, but not to `GET /hello/nocors`
+
+[source,java]
+----
+import io.micronaut.http.MediaType;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.Get;
+import io.micronaut.http.server.cors.CrossOrigin;
+
+@Controller("/hello")
+public class MethodCorsController {
+
+    @CrossOrigin("https://hello.com") //
+    @Get(produces = MediaType.TEXT_PLAIN) //
+    public String cors() {
+        return "Welcome to the worlds of CORS";
+    }
+
+    @Produces(MediaType.TEXT_PLAIN)
+    @Get("/nocors")
+    public String nocorstoday() {
+        return "Hello my own World";
+    }
+}
+----

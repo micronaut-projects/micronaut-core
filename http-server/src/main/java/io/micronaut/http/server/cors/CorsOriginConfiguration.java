@@ -34,6 +34,7 @@ public class CorsOriginConfiguration {
      * Constant to represent any value.
      */
     public static final List<String> ANY = Collections.singletonList("*");
+    public static final List<String> NONE = Collections.emptyList();
 
     /**
      * Constant to represent any method.
@@ -43,7 +44,7 @@ public class CorsOriginConfiguration {
     private List<String> allowedOrigins = ANY;
     private List<HttpMethod> allowedMethods = ANY_METHOD;
     private List<String> allowedHeaders = ANY;
-    private List<String> exposedHeaders = Collections.emptyList();
+    private List<String> exposedHeaders = NONE;
     private boolean allowCredentials = true;
     private Long maxAge = 1800L;
 

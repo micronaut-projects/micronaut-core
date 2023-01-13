@@ -308,6 +308,10 @@ public class CorsFilter implements HttpServerFilter {
         return values == CorsOriginConfiguration.ANY;
     }
 
+    private static boolean isNone(List<String> values) {
+        return values.isEmpty();
+    }
+
     private static boolean isAnyMethod(List<HttpMethod> allowedMethods) {
         return allowedMethods == CorsOriginConfiguration.ANY_METHOD;
     }
@@ -330,6 +334,14 @@ public class CorsFilter implements HttpServerFilter {
         return isAny(allowedHeaders) || (
             accessControlHeaders.isPresent() &&
                 accessControlHeaders.get().stream().allMatch(header -> allowedHeaders.stream().anyMatch(allowedHeader -> allowedHeader.equalsIgnoreCase(header.trim())))
+        );
+    }
+
+    private boolean hasExposedHeaders(@NonNull HttpRequest<?> request, @NonNull CorsOriginConfiguration config) {
+        Optional<List<String>> accessControlHeaders = request.getHeaders().get(ACCESS_CONTROL_EXPOSE_HEADERS, ConversionContext.LIST_OF_STRING);
+        List<String> exposedHeaders = config.getExposedHeaders();
+        return isNone(exposedHeaders) || !accessControlHeaders.isPresent() || (
+            accessControlHeaders.get().stream().allMatch(header -> exposedHeaders.stream().anyMatch(exposedHeader -> exposedHeader.equalsIgnoreCase(header.trim())))
         );
     }
 
@@ -396,6 +408,9 @@ public class CorsFilter implements HttpServerFilter {
             availableHttpMethods.isPresent() &&
             availableHttpMethods.get().stream().anyMatch(method -> method.equals(methodToMatch))) {
             if (!hasAllowedHeaders(request, config)) {
+                return Optional.of(HttpStatus.FORBIDDEN);
+            }
+            if (!hasExposedHeaders(request, config)) {
                 return Optional.of(HttpStatus.FORBIDDEN);
             }
             return Optional.of(HttpStatus.OK);

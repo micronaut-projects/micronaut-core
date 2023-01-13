@@ -42,8 +42,10 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 
 import static io.micronaut.http.server.tck.TestScenario.asserts;
-import static org.junit.jupiter.api.Assertions.*;
-
+import static org.junit.jupiter.api.Assertions.assertAll;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SuppressWarnings({
     "java:S2259", // The tests will show if it's null
@@ -81,11 +83,11 @@ public class CrossOriginTest {
     void corsSimpleRequestMethods() {
         assertAll(
             () -> asserts(SPECNAME,
-                preflight(UriBuilder.of("/methods").path("getit"), "http://www.google.com", HttpMethod.GET),
+                preflight(UriBuilder.of("/methods").path("getit"), "https://www.google.com", HttpMethod.GET),
                 (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                     .status(HttpStatus.OK)
                     .assertResponse(response -> {
-                        assertCorsHeaders(response, "http://www.google.com", HttpMethod.GET);
+                        assertCorsHeaders(response, "https://www.google.com", HttpMethod.GET);
                         assertFalse(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS));
                     })
                     .build())),
@@ -132,6 +134,31 @@ public class CrossOriginTest {
                 .build()));
     }
 
+    @Test
+    void exposedHeadersHappyPath() throws IOException {
+        asserts(SPECNAME,
+            preflight(UriBuilder.of("/exposedheaders").path("bar"), "https://foo.com", HttpMethod.GET)
+                .header(HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS, HttpHeaders.AUTHORIZATION + "," + HttpHeaders.CONTENT_TYPE),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .assertResponse(response -> {
+                    assertCorsHeaders(response, "https://foo.com", HttpMethod.GET);
+                    assertTrue(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS));
+                })
+                .build()));
+    }
+
+    @Test
+    void exposedHeadersFailure() throws IOException {
+        asserts(SPECNAME,
+            preflight(UriBuilder.of("/exposedheaders").path("bar"), "https://foo.com", HttpMethod.GET)
+                .header(HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS, "foo"),
+            (server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.FORBIDDEN)
+                .assertResponse(this::assertCorsHeadersNotPresent)
+                .build()));
+    }
+
     @Requires(property = "spec.name", value = SPECNAME)
     @Controller("/foo")
     static class Foo {
@@ -146,7 +173,7 @@ public class CrossOriginTest {
     @Requires(property = "spec.name", value = SPECNAME)
     @Controller("/methods")
     @CrossOrigin(
-        allowedOrigins = "^http(|s):\\/\\/www\\.google\\.com$",
+        allowedOrigins = "https://www.google.com",
         allowedMethods = { HttpMethod.GET, HttpMethod.POST }
     )
     static class AllowedMethods {
