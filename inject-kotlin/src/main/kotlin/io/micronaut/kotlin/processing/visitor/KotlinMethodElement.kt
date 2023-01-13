@@ -87,12 +87,18 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
             )
             val allMetadata = mutableListOf<AnnotationMetadata>()
             propertyElement.field.ifPresent {
-                allMetadata.add(it.targetAnnotationMetadata)
+                val annotationMetadata = it.targetAnnotationMetadata
+                if (!annotationMetadata.isEmpty) {
+                    allMetadata.add(annotationMetadata)
+                }
             }
             propertyElement.writeMethod.ifPresent {
-                allMetadata.add(it.targetAnnotationMetadata)
+                val annotationMetadata = it.targetAnnotationMetadata.declaredMetadata.targetAnnotationMetadata
+                if (!annotationMetadata.isEmpty) {
+                    allMetadata.add(annotationMetadata)
+                }
             }
-            if (parameterElement.annotationMetadata.annotationNames.isNotEmpty()) {
+            if (!parameterElement.annotationMetadata.isEmpty) {
                 allMetadata.add(parameterElement.targetAnnotationMetadata)
             }
             parameterElement = if (allMetadata.size == 1) {

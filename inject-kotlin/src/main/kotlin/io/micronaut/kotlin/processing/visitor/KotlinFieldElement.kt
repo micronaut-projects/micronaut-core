@@ -37,6 +37,10 @@ class KotlinFieldElement(declaration: KSPropertyDeclaration,
         resolveGeneric(declaration.parent, type, declaringType, visitorContext)
     }
 
+    override fun isFinal(): Boolean {
+        return modifiers.contains(ElementModifier.FINAL)
+    }
+
     override fun isPublic(): Boolean {
         return false // all Kotlin fields are private
     }

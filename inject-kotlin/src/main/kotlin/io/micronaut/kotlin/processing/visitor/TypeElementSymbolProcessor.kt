@@ -105,7 +105,18 @@ open class TypeElementSymbolProcessor(private val environment: SymbolProcessorEn
                             try {
                                 typeElement.accept(ElementVisitor(loadedVisitor, typeElement), className)
                             } catch (e: ProcessingException) {
-                                environment.logger.error(e.message!!, e.originatingElement as KSNode)
+                                val message = e.message
+                                if (message != null) {
+                                    environment.logger.error(message, e.originatingElement as KSNode)
+                                } else {
+                                    environment.logger.error("Unknown error processing element", e.originatingElement as KSNode)
+                                    val cause = e.cause
+                                    if (cause != null) {
+                                        environment.logger.exception(cause)
+                                    } else {
+                                        environment.logger.exception(e)
+                                    }
+                                }
                             }
                         }
                     }
@@ -218,7 +229,7 @@ open class TypeElementSymbolProcessor(private val environment: SymbolProcessorEn
                         try {
                             visitNativeProperty(property)
                         } catch (e: Exception) {
-                            throw ProcessingException(property, e.message)
+                            throw ProcessingException(property, e.message, e)
                         }
                     }
 

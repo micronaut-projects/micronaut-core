@@ -13,6 +13,40 @@ import spock.lang.Specification
 import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class BeanDefinitionSpec extends Specification {
+    void "test @Property targetting field"() {
+        given:
+        def context = buildContext('''
+package test
+
+import io.micronaut.context.annotation.Property
+
+import jakarta.inject.Inject
+import jakarta.inject.Singleton
+
+@Singleton
+class Engine {
+
+    @field:Property(name = "my.engine.cylinders") // <1>
+    protected var cylinders: Int = 0 // <2>
+
+    @set:Inject
+    @setparam:Property(name = "my.engine.manufacturer") // <3>
+    var manufacturer: String? = null
+
+    fun cylinders(): Int {
+        return cylinders
+    }
+}
+''', false, ['my.engine.cylinders': 8, 'my.engine.manufacturer':'Ford'])
+        def definition = getBeanDefinition(context, 'test.Engine')
+        def bean = getBean(context, 'test.Engine')
+
+        expect:"field targeting injects fields"
+        definition.injectedMethods.size() == 2
+        definition.injectedFields.size() == 0
+        bean.cylinders() == 8
+        bean.manufacturer == 'Ford'
+    }
 
     void "test non-binding qualifier"() {
         given:
