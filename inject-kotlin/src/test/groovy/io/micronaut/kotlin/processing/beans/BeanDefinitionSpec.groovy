@@ -3,6 +3,7 @@ package io.micronaut.kotlin.processing.beans
 import io.micronaut.annotation.processing.test.KotlinCompiler
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.AnnotationUtil
+import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.annotation.Order
 import io.micronaut.http.annotation.Header
 import io.micronaut.http.annotation.HttpMethodMapping
@@ -16,6 +17,31 @@ import spock.lang.Specification
 import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class BeanDefinitionSpec extends Specification {
+
+    void "test requires validation adds bean introspection"() {
+        given:
+        def definition = buildBeanDefinition('test.EngineConfig', '''
+package test
+
+import io.micronaut.context.annotation.ConfigurationProperties
+import io.micronaut.core.convert.format.MapFormat
+import javax.validation.constraints.Min
+// end::imports[]
+
+// tag::class[]
+@ConfigurationProperties("my.engine")
+class EngineConfig {
+
+    @Min(1L)
+    var cylinders: Int = 0
+
+    @MapFormat(transformation = MapFormat.MapTransformation.FLAT) //<1>
+    var sensors: Map<Int, String>? = null
+}
+''')
+        expect:
+        definition.hasAnnotation(Introspected)
+    }
 
     void "test repeated annotations"() {
         given:

@@ -79,6 +79,10 @@ class LoadedVisitor(val visitor: TypeElementVisitor<*, *>,
         }
     }
 
+    override fun getOrder(): Int {
+        return visitor.order
+    }
+
     private fun getType(type: KSType, default: String): String {
         return if (!type.isError) {
             val elementAnnotation = type.declaration.qualifiedName!!.asString()
