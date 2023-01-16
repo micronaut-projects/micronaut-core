@@ -7,7 +7,7 @@ To execute the threaddump endpoint, send a GET request to /threaddump.
 To configure the threaddump endpoint, supply configuration through `endpoints.threaddump`.
 
 .Threaddump Endpoint Configuration Example
-[source,yaml]
+[configuration]
 ----
 endpoints:
   threaddump:

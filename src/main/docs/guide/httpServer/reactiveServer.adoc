@@ -5,7 +5,7 @@ This makes it critical that if you do any blocking I/O operations (for example i
 For example the following configuration configures the I/O thread pool as a fixed thread pool with 75 threads (similar to what a traditional blocking server such as Tomcat uses in the thread-per-request model):
 
 .Configuring the IO thread pool
-[source,yaml]
+[configuration]
 ----
 micronaut:
   executors:
