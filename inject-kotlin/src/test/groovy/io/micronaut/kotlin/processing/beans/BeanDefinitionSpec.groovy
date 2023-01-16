@@ -19,6 +19,32 @@ import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class BeanDefinitionSpec extends Specification {
 
+    void "test suspend function with executable"() {
+        given:
+        def definition = buildBeanDefinition('test.SuspendTest', '''
+package test
+
+import io.micronaut.context.annotation.Executable
+import jakarta.inject.Inject
+import jakarta.inject.Named
+import jakarta.inject.Singleton
+
+@Singleton
+class SuspendTest {
+    @Executable
+    suspend fun test() {
+        TODO()
+    }
+}
+
+@Singleton
+class A
+''')
+        expect:
+        definition != null
+        definition.executableMethods.size() == 1
+    }
+
     void "test @Inject on set of Kotlin property"() {
         given:
         def definition = buildBeanDefinition('test.SetterInjectBean', '''

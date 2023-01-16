@@ -139,7 +139,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
     }
 
     /**
-     * Interceptor to apply headers, cookies, parameter and body arguements.
+     * Interceptor to apply headers, cookies, parameter and body arguments.
      *
      * @param context The context
      * @return httpClient or future

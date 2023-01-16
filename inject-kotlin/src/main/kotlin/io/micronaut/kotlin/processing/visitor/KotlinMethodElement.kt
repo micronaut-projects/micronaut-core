@@ -219,9 +219,19 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
         val parameters = getParameters()
         return if (isSuspend) {
             val continuationParameter = visitorContext.getClassElement("kotlin.coroutines.Continuation")
-                .map { ParameterElement.of(it, "continuation") }
-                .orElse(null)
+                .map {
+                    var rt = genericReturnType
+                    if (rt.isPrimitive && rt.name.equals("void")) {
+                        rt = ClassElement.of(Unit::class.java)
+                    }
+                    val resolvedType = it.withTypeArguments(mapOf("T" to rt))
+                    ParameterElement.of(
+                        resolvedType,
+                        "continuation"
+                    )
+                }.orElse(null)
             if (continuationParameter != null) {
+
                 ArrayUtils.concat(parameters, continuationParameter)
             } else {
                 parameters
