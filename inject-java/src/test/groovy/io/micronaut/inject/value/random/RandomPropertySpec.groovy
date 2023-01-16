@@ -22,6 +22,21 @@ import spock.lang.Specification
 
 class RandomPropertySpec extends Specification {
 
+    void "test random int"() {
+        given:
+        ApplicationContext context = ApplicationContext.run(
+                'my.int':'${random.int}'
+        )
+
+        expect:
+        context.getProperty('my.int', Integer).isPresent()
+        // Validate that the random int is resolved to the same value all the time
+        context.getProperty('my.int', Integer).get() == context.getProperty('my.int', Integer).get()
+        context.getProperty('my.int', Integer).get() == context.getProperty('my.int', Integer).get()
+        context.getProperty('my.int', Integer).get() == context.getProperty('my.int', Integer).get()
+        context.getProperty('my.int', Integer).get() == context.getProperty('my.int', Integer).get()
+    }
+
     void "test random port"() {
         given:
         ApplicationContext context = ApplicationContext.run(
@@ -34,7 +49,6 @@ class RandomPropertySpec extends Specification {
 
         context.getProperty('my.port', Integer).get() < SocketUtils.MAX_PORT_RANGE
         context.getProperty('my.port', Integer).get() > SocketUtils.MIN_PORT_RANGE
-
     }
 
     void "test random localhost port"() {
@@ -49,7 +63,8 @@ class RandomPropertySpec extends Specification {
         context.getProperty('my.address', String).get() ==~ /localhost:\d+/
         context.getProperty('my.addresses', String).isPresent()
         context.getProperty('my.addresses', String).get() ==~ /localhost:\d+,localhost:\d+/
-
+        context.getProperty('my.address', String).get() == context.getProperty('my.address', String).get()
+        context.getProperty('my.addresses', String).get() == context.getProperty('my.addresses', String).get()
     }
 
     void "test random integer"() {
