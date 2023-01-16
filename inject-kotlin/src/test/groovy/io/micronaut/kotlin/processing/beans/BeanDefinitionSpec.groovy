@@ -19,6 +19,31 @@ import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class BeanDefinitionSpec extends Specification {
 
+    void "test @Inject on set of Kotlin property"() {
+        given:
+        def definition = buildBeanDefinition('test.SetterInjectBean', '''
+package test
+
+import jakarta.inject.Inject
+import jakarta.inject.Named
+import jakarta.inject.Singleton
+
+@Singleton
+class SetterInjectBean {
+    internal var _a: A? = null
+    internal var a: A
+        get() = _a!!
+        @Inject set(value) { _a = value; }
+}
+
+@Singleton
+class A
+''')
+        expect:
+        definition != null
+        definition.injectedMethods.size() == 1
+    }
+
     void "test requires validation adds bean introspection"() {
         given:
         def definition = buildBeanDefinition('test.EngineConfig', '''

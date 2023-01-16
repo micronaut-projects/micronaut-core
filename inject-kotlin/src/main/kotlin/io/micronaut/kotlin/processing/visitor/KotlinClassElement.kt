@@ -71,7 +71,7 @@ open class KotlinClassElement(val kotlinType: KSType,
     private val enclosedElementsQuery = KotlinEnclosedElementsQuery()
     private val nativeProperties  : List<PropertyElement> by lazy {
         classDeclaration.getAllProperties()
-            .filter { !it.isInternal() && !it.isPrivate() }
+            .filter { !it.isPrivate() }
             .map { KotlinPropertyElement(
                 this,
                 visitorContext.elementFactory.newClassElement(it.type.resolve(), elementAnnotationMetadataFactory),
