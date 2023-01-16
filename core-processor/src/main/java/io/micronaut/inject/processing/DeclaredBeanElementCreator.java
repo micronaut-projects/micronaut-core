@@ -218,17 +218,18 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
         boolean claimed = false;
         Optional<? extends MemberElement> writeMember = propertyElement.getWriteMember();
         if (writeMember.isPresent()) {
-            claimed = visitPropertyWriteElement(visitor, propertyElement, writeMember.get());
+            claimed |= visitPropertyWriteElement(visitor, propertyElement, writeMember.get());
         }
         Optional<? extends MemberElement> readMember = propertyElement.getReadMember();
-        if (!claimed && readMember.isPresent()) {
-            claimed = visitPropertyReadElement(visitor, propertyElement, readMember.get());
+        if (readMember.isPresent()) {
+            boolean readElementClaimed = visitPropertyReadElement(visitor, propertyElement, readMember.get());
+            claimed |= readElementClaimed;
         }
         // Process property's field if no methods were processed
         Optional<FieldElement> field = propertyElement.getField();
         if (!claimed && field.isPresent()) {
             FieldElement writeElement = field.get();
-            claimed = visitField(visitor, writeElement);
+            claimed |= visitField(visitor, writeElement);
         }
         return claimed;
     }
@@ -365,7 +366,8 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
                 // use the properties metadata for property elements
                 FieldElement fieldElement = propertyElement.getField().orElse(null);
                 if (fieldElement != null) {
-                    methodElement = methodElement.withAnnotationMetadata(propertyElement.getTargetAnnotationMetadata());
+                    methodElement = methodElement.withAnnotationMetadata(propertyElement.getTargetAnnotationMetadata()
+                    );
                 }
             }
             visitMethodInjectionPoint(visitor, methodElement, propertyElement);
@@ -471,7 +473,7 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
      * @return true if it is
      */
     protected boolean isInjectPointMethod(PropertyElement propertyElement, MemberElement memberElement) {
-        return BeanDefinitionCreatorFactory.containsInjectPoint(memberElement) || (propertyElement != null && BeanDefinitionCreatorFactory.containsInjectPoint(propertyElement));
+        return memberElement.hasDeclaredStereotype(AnnotationUtil.INJECT) || (propertyElement != null && propertyElement.hasDeclaredAnnotation(AnnotationUtil.INJECT));
     }
 
     private void staticMethodCheck(MethodElement methodElement) {
