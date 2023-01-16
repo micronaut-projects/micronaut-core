@@ -1157,7 +1157,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
             LOG.trace("Creating bean for parameters: {}", ArrayUtils.toString(args));
         }
         MutableConversionService conversionService = getConversionService();
-        Map<String, Object> argumentValues = new LinkedHashMap<>(requiredArguments.length);
+        Map<String, Object> argumentValues = CollectionUtils.newLinkedHashMap(requiredArguments.length);
         BeanResolutionContext.Path currentPath = resolutionContext.getPath();
         for (int i = 0; i < requiredArguments.length; i++) {
             Argument<?> requiredArgument = requiredArguments[i];
@@ -1998,7 +1998,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
         if (beanDefinitions.isEmpty()) {
             return Collections.emptyMap();
         }
-        final HashMap<Class<?>, List<BeanDefinition<T>>> typeToListener = new HashMap<>(beanDefinitions.size(), 1);
+        final HashMap<Class<?>, List<BeanDefinition<T>>> typeToListener = CollectionUtils.newHashMap(beanDefinitions.size());
         for (BeanDefinition<T> beanCreatedDefinition : beanDefinitions) {
             List<Argument<?>> typeArguments = beanCreatedDefinition.getTypeArguments(listenerType);
             Argument<?> argument = CollectionUtils.last(typeArguments);
@@ -3931,7 +3931,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
     interface ListenersSupplier<T extends EventListener> {
 
         /**
-         * Retrived the listeners lazily.
+         * Retrieved the listeners lazily.
          *
          * @param beanResolutionContext The bean resolution context
          * @return the collection of listeners
@@ -4107,51 +4107,6 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
     private static final class CollectionHolder<T> {
         Collection<BeanRegistration<T>> registrations;
-    }
-
-    private final class ScanningBeanResolutionContext extends SingletonBeanResolutionContext {
-
-        private final HashMap<BeanDefinition<?>, Argument<?>> beanCreationTargets;
-        private final Map<BeanDefinition<?>, List<List<Argument<?>>>> foundTargets = new HashMap<>();
-
-        private ScanningBeanResolutionContext(BeanDefinition<?> beanDefinition, HashMap<BeanDefinition<?>, Argument<?>> beanCreationTargets) {
-            super(beanDefinition);
-            this.beanCreationTargets = beanCreationTargets;
-        }
-
-        private List<Argument<?>> getHierarchy() {
-            List<Argument<?>> hierarchy = new ArrayList<>(path.size());
-            for (Iterator<BeanResolutionContext.Segment<?, ?>> it = path.descendingIterator(); it.hasNext();) {
-                BeanResolutionContext.Segment<?, ?> segment = it.next();
-                hierarchy.add(segment.getArgument());
-            }
-            return hierarchy;
-        }
-
-        @Override
-        protected void onNewSegment(Segment<?, ?> segment) {
-            Argument<?> argument = segment.getArgument();
-            if (argument.isContainerType()) {
-                argument = argument.getFirstTypeVariable().orElse(null);
-                if (argument == null) {
-                    return;
-                }
-            }
-            if (argument.isProvider()) {
-                return;
-            }
-            for (Map.Entry<BeanDefinition<?>, Argument<?>> entry : beanCreationTargets.entrySet()) {
-                if (argument.isAssignableFrom(entry.getValue())) {
-                    foundTargets.computeIfAbsent(entry.getKey(), bd -> new ArrayList<>(5))
-                            .add(getHierarchy());
-                }
-            }
-        }
-
-        @SuppressWarnings("java:S1452")
-        Map<BeanDefinition<?>, List<List<Argument<?>>>> getFoundTargets() {
-            return foundTargets;
-        }
     }
 
     /**
