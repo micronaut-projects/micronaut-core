@@ -59,13 +59,13 @@ public class NettyByteBufferFactory implements ByteBufferFactory<ByteBufAllocato
     }
 
     /**
-     * @param allocatorSupplier The {@link ByteBufAllocator}
+     * @param allocator The {@link ByteBufAllocator}
      */
-    public NettyByteBufferFactory(ByteBufAllocator allocatorSupplier) {
+    public NettyByteBufferFactory(ByteBufAllocator allocator) {
         this.allocatorSupplier = new Supplier<ByteBufAllocator>() {
             @Override
             public ByteBufAllocator get() {
-                return allocatorSupplier;
+                return allocator;
             }
         };
     }

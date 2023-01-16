@@ -65,7 +65,7 @@ class DefaultWebSocketBeanRegistry implements WebSocketBeanRegistry {
             Qualifier<T> qualifier = Qualifiers.byStereotype(stereotype);
             BeanDefinition<T> beanDefinition = beanContext.getBeanDefinition(type, qualifier);
             T bean = beanContext.getBean(type, qualifier);
-            Collection<ExecutableMethod<T, Object>> executableMethods = beanDefinition.getExecutableMethods();
+            Collection<ExecutableMethod<T, ?>> executableMethods = beanDefinition.getExecutableMethods();
             MethodExecutionHandle<T, ?> onOpen = null;
             MethodExecutionHandle<T, ?> onClose = null;
             MethodExecutionHandle<T, ?> onMessage = null;

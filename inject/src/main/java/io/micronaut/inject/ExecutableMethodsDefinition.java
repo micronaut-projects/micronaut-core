@@ -58,6 +58,6 @@ public interface ExecutableMethodsDefinition<T> {
      * @return The {@link ExecutableMethod} instances for this definition
      */
     @NonNull
-    Collection<ExecutableMethod<T, Object>> getExecutableMethods();
+    Collection<ExecutableMethod<T, ?>> getExecutableMethods();
 
 }

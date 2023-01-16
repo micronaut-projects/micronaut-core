@@ -596,7 +596,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     }
 
     @Override
-    public final Collection<ExecutableMethod<T, Object>> getExecutableMethods() {
+    public final Collection<ExecutableMethod<T, ?>> getExecutableMethods() {
         if (executableMethodsDefinition == null) {
             return Collections.emptyList();
         }

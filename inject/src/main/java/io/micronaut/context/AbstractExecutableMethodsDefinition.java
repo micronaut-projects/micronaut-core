@@ -63,7 +63,7 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
     }
 
     @Override
-    public Collection<ExecutableMethod<T, Object>> getExecutableMethods() {
+    public Collection<ExecutableMethod<T, ?>> getExecutableMethods() {
         if (executableMethodsList == null) {
             // Initialize the collection
             for (int i = 0, methodsReferencesLength = methodsReferences.length; i < methodsReferencesLength; i++) {

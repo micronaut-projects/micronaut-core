@@ -2036,9 +2036,9 @@ public class DefaultBeanContext implements InitializableBeanContext {
                     continue;
                 }
                 BeanDefinition<Object> definition = processedBeanProducer.getDefinition(this);
-                for (ExecutableMethod<Object, Object> method : definition.getExecutableMethods()) {
+                for (ExecutableMethod<Object, ?> method : definition.getExecutableMethods()) {
                     if (method.hasStereotype(Executable.class)) {
-                        methodsToProcess.add(BeanDefinitionMethodReference.of(definition, method));
+                        methodsToProcess.add(BeanDefinitionMethodReference.of(definition, (ExecutableMethod<Object, Object>) method));
                     }
                 }
             }
@@ -2510,7 +2510,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                         }
                     });
 
-                    filterReplacedBeans(null, (Collection) parallelDefinitions);
+                    filterReplacedBeans(null, parallelDefinitions);
 
                     parallelDefinitions.forEach(beanDefinition -> ForkJoinPool.commonPool().execute(() -> {
                         try {
@@ -4132,7 +4132,13 @@ public class DefaultBeanContext implements InitializableBeanContext {
         }
 
         public boolean isDisabled() {
-            return reference == null || referenceEnabled != null && !referenceEnabled || definitionEnabled != null && !definitionEnabled;
+            if (reference == null) {
+                return true;
+            }
+            if (referenceEnabled != null && !referenceEnabled) {
+                return true;
+            }
+            return definitionEnabled != null && !definitionEnabled;
         }
 
         public boolean isDefinitionEnabled(DefaultBeanContext defaultBeanContext) {
