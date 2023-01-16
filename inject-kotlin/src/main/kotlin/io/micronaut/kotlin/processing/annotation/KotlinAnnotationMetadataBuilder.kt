@@ -24,6 +24,8 @@ import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.symbol.*
 import io.micronaut.core.annotation.AnnotationClassValue
 import io.micronaut.core.annotation.AnnotationUtil
+import io.micronaut.core.reflect.ReflectionUtils
+import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap
 import io.micronaut.core.value.OptionalValues
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
 import io.micronaut.inject.annotation.MutableAnnotationMetadata
@@ -33,11 +35,15 @@ import io.micronaut.kotlin.processing.getClassDeclaration
 import io.micronaut.kotlin.processing.visitor.KotlinVisitorContext
 import java.lang.annotation.Inherited
 import java.lang.annotation.RetentionPolicy
+import java.lang.reflect.Method
 import java.util.*
 
 class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnvironment: SymbolProcessorEnvironment,
                                       private val resolver: Resolver,
                                       private val visitorContext: KotlinVisitorContext): AbstractAnnotationMetadataBuilder<KSAnnotated, KSAnnotation>() {
+
+    private val annotationDefaultsCache: ConcurrentLinkedHashMap<String, MutableMap<out KSDeclaration, *>> =
+        ConcurrentLinkedHashMap.Builder<String, MutableMap<out KSDeclaration, *>>().maximumWeightedCapacity(200).build()
 
     companion object {
         private fun getTypeForAnnotation(annotationMirror: KSAnnotation, visitorContext: KotlinVisitorContext): KSClassDeclaration {
@@ -268,7 +274,71 @@ class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnvironment: Sy
         annotationType: KSAnnotated
     ): MutableMap<out KSDeclaration, *> {
         // issue getting default values for an annotation here
-        return mutableMapOf<KSDeclaration, Any>()
+        // TODO: awful hack due to https://github.com/google/ksp/issues/642 and not being able to access annotation defaults for a type
+        val classDeclaration = annotationType.getClassDeclaration(visitorContext)
+        val qualifiedName = classDeclaration.qualifiedName
+        return if (qualifiedName != null) {
+            annotationDefaultsCache.computeIfAbsent(qualifiedName.asString()) {
+                readDefaultValuesReflectively(
+                    classDeclaration,
+                    annotationType,
+                    "getDescriptor",
+                    "getJClass",
+                    "getMethods"
+                )
+            }
+        } else {
+            mutableMapOf<KSDeclaration, Any>()
+        }
+    }
+
+    private fun readDefaultValuesReflectively(classDeclaration : KSClassDeclaration, annotationType: KSAnnotated, vararg path : String): MutableMap<KSDeclaration, Any> {
+        var o: Any? = findValueReflectively(annotationType, *path)
+        val declaredProperties = classDeclaration.getDeclaredProperties()
+        val map = mutableMapOf<KSDeclaration, Any>()
+        if (o != null) {
+            if (o is Iterable<*>) {
+                for (m in o) {
+                    if (m != null) {
+                        val name = findValueReflectively(m, "getName")
+                        // currently only handles JavaLiteralAnnotationArgument but probably should handle others
+                        val value =
+                            findValueReflectively(m, "getAnnotationParameterDefaultValue", "getValue")
+                        if (value != null && name != null) {
+                            val ksPropertyDeclaration = declaredProperties.find { it.simpleName.asString() == name.toString() }
+                            if (ksPropertyDeclaration != null) {
+                                map[ksPropertyDeclaration] = value
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return map
+    }
+
+    private fun findValueReflectively(
+        root: Any,
+        vararg path : String
+    ): Any? {
+        var m: Method?
+        var o: Any = root
+        for (p in path) {
+            m = ReflectionUtils.findMethod(o.javaClass, p).orElse(null)
+            if (m == null) {
+                return null
+            } else {
+                try {
+                    o = m.invoke(o)
+                    if (o == null) {
+                        return null
+                    }
+                } catch (e: Exception) {
+                    return null
+                }
+            }
+        }
+        return o
     }
 
     override fun readAnnotationRawValues(annotationMirror: KSAnnotation): MutableMap<out KSDeclaration, *> {

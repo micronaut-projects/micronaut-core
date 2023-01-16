@@ -88,6 +88,30 @@ interface TestClient {
                 .getRequiredValue(String) == '/'
     }
 
+    void "test annotation defaults - inherited"() {
+        given:
+        def definition = KotlinCompiler.buildBeanDefinition('test.TestClient' + BeanDefinitionVisitor.PROXY_SUFFIX, '''
+package test
+
+import io.micronaut.http.annotation.Post
+import io.micronaut.http.client.annotation.Client
+
+@Client("/")
+interface TestClient : TestOperations {
+    override fun save(str : String) : String
+}
+
+interface TestOperations {
+    @Post
+    fun save(str : String) : String
+}
+''')
+        expect:
+        definition.getRequiredMethod("save", String)
+                .getAnnotation(HttpMethodMapping)
+                .getRequiredValue(String) == '/'
+    }
+
     void "test @Inject internal var"() {
         given:
         def context = KotlinCompiler.buildContext('''
