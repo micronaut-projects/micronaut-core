@@ -131,7 +131,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
@@ -158,19 +157,6 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
     protected static final Logger LOG = LoggerFactory.getLogger(DefaultBeanContext.class);
     protected static final Logger LOG_LIFECYCLE = LoggerFactory.getLogger(DefaultBeanContext.class.getPackage().getName() + ".lifecycle");
-    @SuppressWarnings("rawtypes")
-    private static final Qualifier PROXY_TARGET_QUALIFIER = new Qualifier<>() {
-        @Override
-        public <T extends BeanType<Object>> Stream<T> reduce(Class<Object> beanType, Stream<T> candidates) {
-            return candidates.filter(bt -> {
-                if (bt instanceof BeanDefinitionDelegate<?> delegate) {
-                    return !(delegate.getDelegate() instanceof ProxyBeanDefinition);
-                } else {
-                    return !(bt instanceof ProxyBeanDefinition);
-                }
-            });
-        }
-    };
     private static final String SCOPED_PROXY_ANN = "io.micronaut.runtime.context.scope.ScopedProxy";
     private static final String INTRODUCTION_TYPE = "io.micronaut.aop.Introduction";
     private static final String ADAPTER_TYPE = "io.micronaut.aop.Adapter";
@@ -1542,12 +1528,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                                     @NonNull Argument<T> beanType,
                                     @Nullable Qualifier<T> qualifier) {
         BeanDefinition<T> definition = getProxyTargetBeanDefinition(beanType, qualifier);
-        @SuppressWarnings("unchecked")
-        Qualifier<T> proxyQualifier = qualifier != null ? Qualifiers.byQualifiers(qualifier, PROXY_TARGET_QUALIFIER) : PROXY_TARGET_QUALIFIER;
-        return resolveBeanRegistration(
-                resolutionContext,
-                definition, beanType, proxyQualifier
-        ).bean;
+        return resolveBeanRegistration(resolutionContext, definition, beanType, null).bean;
     }
 
     @NonNull
@@ -2996,7 +2977,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
         final boolean isProxy = definition.isProxy();
 
-        if (isProxy && isScopedProxyDefinition && (qualifier == null || !qualifier.contains(PROXY_TARGET_QUALIFIER))) {
+        if (isProxy && isScopedProxyDefinition) {
             // AOP proxy
             Qualifier<T> q = qualifier;
             if (q == null) {
