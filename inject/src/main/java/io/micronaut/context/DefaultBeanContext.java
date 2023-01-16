@@ -1528,7 +1528,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                                     @NonNull Argument<T> beanType,
                                     @Nullable Qualifier<T> qualifier) {
         BeanDefinition<T> definition = getProxyTargetBeanDefinition(beanType, qualifier);
-        return resolveBeanRegistration(resolutionContext, definition, beanType, null).bean;
+        return resolveBeanRegistration(resolutionContext, definition, beanType, qualifier).bean;
     }
 
     @NonNull
