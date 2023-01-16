@@ -5,6 +5,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.annotation.Order
+import io.micronaut.core.bind.annotation.Bindable
 import io.micronaut.http.annotation.Header
 import io.micronaut.http.annotation.HttpMethodMapping
 import io.micronaut.http.client.annotation.Client
@@ -41,6 +42,38 @@ class EngineConfig {
 ''')
         expect:
         definition.hasAnnotation(Introspected)
+    }
+
+    void "test repeated annotations - auto unwrap"() {
+        given:
+        def definition = buildBeanDefinition('test.RepeatedTest', '''
+package test
+
+import io.micronaut.context.annotation.Executable
+import io.micronaut.http.annotation.Header
+import io.micronaut.http.annotation.Headers
+import jakarta.inject.Singleton
+
+@Singleton
+@Headers(
+    Header(name="Foo"),
+    Header(name="Bar")
+)
+
+class RepeatedTest {
+    @Executable
+    @Headers(
+        Header(name="Baz"),
+        Header(name="Stuff")
+    )
+    fun test() : String {
+        return "Ok"
+    }
+}
+''')
+        expect:
+        definition.getRequiredMethod("test").getAnnotationValuesByType(Header).size() == 4
+        definition.getRequiredMethod("test").getAnnotationNamesByStereotype(Bindable).size() == 2
     }
 
     void "test repeated annotations"() {

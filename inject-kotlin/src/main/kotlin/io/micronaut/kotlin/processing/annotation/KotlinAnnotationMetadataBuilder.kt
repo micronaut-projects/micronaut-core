@@ -134,7 +134,35 @@ class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnvironment: Sy
         } else {
             annotationMirrors.addAll(element.annotations)
         }
-        return annotationMirrors
+        val expanded : MutableList<KSAnnotation> = mutableListOf()
+        for (ann in annotationMirrors) {
+            val annotationName = getAnnotationTypeName(ann)
+            var repeateable = false
+            var hasOtherMembers = false
+            for (arg in ann.arguments) {
+                if ("value" == arg.name?.asString()) {
+                    val value = arg.value
+                    if (value is Iterable<*>) {
+                        for (nested in value) {
+                            if (nested is KSAnnotation) {
+                                val repeatableName = getRepeatableName(nested)
+                                if (repeatableName != null && repeatableName == annotationName) {
+                                    expanded.add(nested)
+                                    repeateable = true
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    hasOtherMembers = true
+                }
+            }
+
+            if (!repeateable || hasOtherMembers) {
+                expanded.add(ann)
+            }
+        }
+        return expanded
     }
 
     private fun findClassDeclaration(element: KSPropertyDeclaration): KSClassDeclaration? {
@@ -395,7 +423,7 @@ class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnvironment: Sy
 
     override fun getRepeatableNameForType(annotationType: KSAnnotated): String? {
         val name = java.lang.annotation.Repeatable::class.java.name
-        val repeatable = annotationType.annotations.find {
+        val repeatable = annotationType.getClassDeclaration(visitorContext).annotations.find {
             it.annotationType.resolve().declaration.qualifiedName?.asString() == name
         }
         if (repeatable != null) {
