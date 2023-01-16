@@ -82,34 +82,9 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
         this.protected = visibility == Visibility.PROTECTED
         this.internal = visibility == Visibility.INTERNAL
         this.parameterInit = Supplier {
-            var parameterElement = KotlinParameterElement(
+            val parameterElement = KotlinParameterElement(
                 propertyType, this, method.parameter, elementAnnotationMetadataFactory, visitorContext
             )
-            val allMetadata = mutableListOf<AnnotationMetadata>()
-            propertyElement.field.ifPresent {
-                val annotationMetadata = it.targetAnnotationMetadata
-                if (!annotationMetadata.isEmpty) {
-                    allMetadata.add(annotationMetadata)
-                }
-            }
-            propertyElement.writeMethod.ifPresent {
-                val annotationMetadata = it.targetAnnotationMetadata.declaredMetadata.targetAnnotationMetadata
-                if (!annotationMetadata.isEmpty) {
-                    allMetadata.add(annotationMetadata)
-                }
-            }
-            if (!parameterElement.annotationMetadata.isEmpty) {
-                allMetadata.add(parameterElement.targetAnnotationMetadata)
-            }
-            parameterElement = if (allMetadata.size == 1) {
-                parameterElement.withAnnotationMetadata(allMetadata.first()) as KotlinParameterElement
-            } else {
-                parameterElement.withAnnotationMetadata(
-                    AnnotationMetadataHierarchy(
-                        *allMetadata.toTypedArray()
-                    )
-                ) as KotlinParameterElement
-            }
             listOf(parameterElement)
         }
     }

@@ -41,6 +41,14 @@ class KotlinFieldElement(declaration: KSPropertyDeclaration,
         return declaration.setter == null
     }
 
+    override fun isReflectionRequired(): Boolean {
+        return true // all Kotlin fields are private
+    }
+
+    override fun isReflectionRequired(callingType: ClassElement?): Boolean {
+        return true // all Kotlin fields are private
+    }
+
     override fun isPublic(): Boolean {
         return false // all Kotlin fields are private
     }

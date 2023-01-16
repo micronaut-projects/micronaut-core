@@ -95,21 +95,40 @@ class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnvironment: Sy
     }
 
     override fun getAnnotationsForType(element: KSAnnotated): MutableList<out KSAnnotation> {
-        return if (element is KSPropertyDeclaration) {
+        val annotationMirrors : MutableList<KSAnnotation> = mutableListOf()
+
+        if (element is KSValueParameter) {
+            // fuse annotations for setter and property
+            val parent = element.parent
+            if (parent is KSPropertySetter) {
+                val property = parent.parent
+                if (property is KSPropertyDeclaration) {
+                    annotationMirrors.addAll(property.annotations)
+                }
+                annotationMirrors.addAll(parent.annotations)
+            }
+            annotationMirrors.addAll(element.annotations)
+        } else if (element is KSPropertyGetter || element is KSPropertySetter) {
+            val property = element.parent
+            if (property is KSPropertyDeclaration) {
+                annotationMirrors.addAll(property.annotations)
+            }
+            annotationMirrors.addAll(element.annotations)
+        } else if (element is KSPropertyDeclaration) {
             val parent : KSClassDeclaration? = findClassDeclaration(element)
             if (parent is KSClassDeclaration && parent.classKind == ClassKind.ANNOTATION_CLASS) {
-                val list = element.annotations.toMutableList()
+                annotationMirrors.addAll(element.annotations)
                 val getter = element.getter
                 if (getter != null) {
-                    list.addAll(getter.annotations)
+                    annotationMirrors.addAll(getter.annotations)
                 }
-                list
             } else {
-                element.annotations.toMutableList()
+                annotationMirrors.addAll(element.annotations)
             }
         } else {
-            element.annotations.toMutableList()
+            annotationMirrors.addAll(element.annotations)
         }
+        return annotationMirrors
     }
 
     private fun findClassDeclaration(element: KSPropertyDeclaration): KSClassDeclaration? {

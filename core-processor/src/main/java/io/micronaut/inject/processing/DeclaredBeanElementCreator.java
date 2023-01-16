@@ -366,8 +366,7 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
                 // use the properties metadata for property elements
                 FieldElement fieldElement = propertyElement.getField().orElse(null);
                 if (fieldElement != null) {
-                    methodElement = methodElement.withAnnotationMetadata(propertyElement.getTargetAnnotationMetadata()
-                    );
+                    methodElement = methodElement.withAnnotationMetadata(propertyElement.getTargetAnnotationMetadata());
                 }
             }
             visitMethodInjectionPoint(visitor, methodElement, propertyElement);
@@ -473,7 +472,17 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
      * @return true if it is
      */
     protected boolean isInjectPointMethod(PropertyElement propertyElement, MemberElement memberElement) {
-        return memberElement.hasDeclaredStereotype(AnnotationUtil.INJECT) || (propertyElement != null && propertyElement.hasDeclaredAnnotation(AnnotationUtil.INJECT));
+        return memberElement.hasDeclaredStereotype(AnnotationUtil.INJECT) || isInjectableProperty(propertyElement);
+    }
+
+    private static boolean isInjectableProperty(@Nullable PropertyElement propertyElement) {
+        if (propertyElement == null) {
+            return false;
+        }
+        return propertyElement.hasDeclaredAnnotation(AnnotationUtil.INJECT) ||
+            propertyElement.hasDeclaredStereotype(AnnotationUtil.QUALIFIER) ||
+            propertyElement.hasDeclaredAnnotation(Property.class) ||
+            propertyElement.hasDeclaredAnnotation(Value.class);
     }
 
     private void staticMethodCheck(MethodElement methodElement) {

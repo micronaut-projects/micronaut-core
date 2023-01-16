@@ -4,6 +4,7 @@ import io.micronaut.annotation.processing.test.KotlinCompiler
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.Order
+import io.micronaut.http.annotation.Header
 import io.micronaut.http.annotation.HttpMethodMapping
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.inject.BeanDefinition
@@ -15,6 +16,31 @@ import spock.lang.Specification
 import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class BeanDefinitionSpec extends Specification {
+
+    void "test repeated annotations"() {
+        given:
+        def definition = buildBeanDefinition('test.RepeatedTest', '''
+package test
+
+import io.micronaut.context.annotation.Executable
+import io.micronaut.http.annotation.Header
+import jakarta.inject.Singleton
+
+@Singleton
+@Header(name="Foo")
+@Header(name="Bar")
+class RepeatedTest {
+    @Executable
+    @Header(name="Baz")
+    @Header(name="Stuff")
+    fun test() : String {
+        return "Ok"
+    }
+}
+''')
+        expect:
+        definition.getRequiredMethod("test").getAnnotationValuesByType(Header).size() == 4
+    }
 
     void "test annotation defaults"() {
         given:
@@ -92,6 +118,13 @@ class Engine {
     @setparam:Property(name = "my.engine.manufacturer") // <3>
     var manufacturer: String? = null
 
+    @Inject
+    @Property(name = "my.engine.manufacturer") // <3>
+    var manufacturer2: String? = null
+
+    @Property(name = "my.engine.manufacturer") // <3>
+    var manufacturer3: String? = null
+
     fun cylinders(): Int {
         return cylinders
     }
@@ -101,10 +134,12 @@ class Engine {
         def bean = getBean(context, 'test.Engine')
 
         expect:"field targeting injects fields"
-        definition.injectedMethods.size() == 2
+        definition.injectedMethods.size() == 4
         definition.injectedFields.size() == 0
         bean.cylinders() == 8
         bean.manufacturer == 'Ford'
+        bean.manufacturer2 == 'Ford'
+        bean.manufacturer3 == 'Ford'
     }
 
     void "test non-binding qualifier"() {
