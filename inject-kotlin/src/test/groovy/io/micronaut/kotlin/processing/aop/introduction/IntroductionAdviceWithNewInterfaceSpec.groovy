@@ -11,6 +11,82 @@ import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class IntroductionAdviceWithNewInterfaceSpec extends Specification {
 
+    void "test configuration advice with Kotlin properties"() {
+        when:
+        def context = buildContext('''
+package test
+
+import io.micronaut.kotlin.processing.aop.introduction.*
+import io.micronaut.context.annotation.*
+import io.micronaut.context.annotation.ConfigurationProperties
+
+@ConfigurationProperties("test")
+interface MyBean  {
+    val foo : String
+}
+
+''', true, ['test.foo':'test'])
+        def bean = getBean(context, 'test.MyBean')
+
+        then:
+        bean.foo == 'test'
+
+        cleanup:
+        context.close()
+    }
+
+    void "test configuration advice with Kotlin properties inner classes"() {
+        when:
+        def context = buildContext('''
+package test
+
+import io.micronaut.kotlin.processing.aop.introduction.*
+import io.micronaut.context.annotation.*
+import io.micronaut.context.annotation.ConfigurationProperties
+
+@ConfigurationProperties("test")
+interface MyBean  {
+    val foo : String
+
+    @ConfigurationProperties("more")
+    interface InnerBean {
+        val foo : String
+    }
+}
+
+''', true, ['test.more.foo':'test'])
+        def bean = getBean(context, 'test.MyBean$InnerBean')
+
+        then:
+        bean.foo == 'test'
+
+        cleanup:
+        context.close()
+    }
+
+    void "test introduction advice with Kotlin properties"() {
+        when:
+        def context = buildContext('''
+package test
+
+import io.micronaut.kotlin.processing.aop.introduction.*
+import io.micronaut.context.annotation.*
+
+@Stub("test")
+interface MyBean  {
+    val foo : String
+}
+
+''', true)
+        def bean = getBean(context, 'test.MyBean')
+
+        then:
+        bean.foo == 'test'
+
+        cleanup:
+        context.close()
+    }
+
     void "test introduction advice with primitive generics"() {
         when:
         def context = buildContext( '''

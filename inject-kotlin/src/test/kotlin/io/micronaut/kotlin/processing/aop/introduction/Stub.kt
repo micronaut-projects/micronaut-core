@@ -7,4 +7,4 @@ import io.micronaut.context.annotation.Type
 @Type(StubIntroducer::class)
 @MustBeDocumented
 @Retention
-annotation class Stub
+annotation class Stub(val value: String = "")

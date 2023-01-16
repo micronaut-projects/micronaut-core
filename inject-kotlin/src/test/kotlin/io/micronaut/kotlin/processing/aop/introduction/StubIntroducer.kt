@@ -17,7 +17,12 @@ class StubIntroducer : MethodInterceptor<Any?, Any?> {
     }
 
     override fun intercept(context: MethodInvocationContext<Any?, Any?>): Any? {
-        val iterator: Iterator<MutableArgumentValue<*>> = context.parameters.values.iterator()
-        return if (iterator.hasNext()) iterator.next().value else null
+        return context.getValue<Any>( // <3>
+            Stub::class.java,
+            context.returnType.type
+        ).orElseGet {
+            val iterator: Iterator<MutableArgumentValue<*>> = context.parameters.values.iterator()
+            if (iterator.hasNext()) iterator.next().value else null
+        }
     }
 }

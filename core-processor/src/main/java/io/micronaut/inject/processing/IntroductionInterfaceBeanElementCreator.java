@@ -15,10 +15,13 @@
  */
 package io.micronaut.inject.processing;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.BeanDefinitionVisitor;
 
@@ -70,7 +73,22 @@ final class IntroductionInterfaceBeanElementCreator extends AbstractBeanElementC
         for (MethodElement methodElement : methods) {
             visitIntrospectedMethod(aopProxyWriter, classElement, methodElement);
         }
+        List<PropertyElement> beanProperties = classElement.getSyntheticBeanProperties();
+        for (PropertyElement beanProperty : beanProperties) {
+            handlePropertyMethod(aopProxyWriter, methods, beanProperty.getReadMethod().orElse(null));
+            handlePropertyMethod(aopProxyWriter, methods, beanProperty.getWriteMethod().orElse(null));
+        }
         beanDefinitionWriters.add(aopProxyWriter);
+    }
+
+    private void handlePropertyMethod(BeanDefinitionVisitor aopProxyWriter, List<MethodElement> methods, MethodElement method) {
+        if (method != null && method.isAbstract() && !methods.contains(method)) {
+            visitIntrospectedMethod(
+                aopProxyWriter,
+                this.classElement,
+                method
+            );
+        }
     }
 
 }

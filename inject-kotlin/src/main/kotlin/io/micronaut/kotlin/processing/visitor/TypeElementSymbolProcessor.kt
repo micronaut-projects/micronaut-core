@@ -224,14 +224,6 @@ open class TypeElementSymbolProcessor(private val environment: SymbolProcessorEn
                         throw ProcessingException(classElement, e.message)
                     }
 
-                    val properties = classElement.syntheticBeanProperties
-                    for (property in properties) {
-                        try {
-                            visitNativeProperty(property)
-                        } catch (e: Exception) {
-                            throw ProcessingException(property, e.message, e)
-                        }
-                    }
 
                     classDeclaration.getAllFunctions()
                         .filter { it.isConstructor() && !it.isInternal() }
@@ -257,6 +249,14 @@ open class TypeElementSymbolProcessor(private val environment: SymbolProcessorEn
         }
 
         private fun visitMembers(classElement: ClassElement) {
+            val properties = classElement.syntheticBeanProperties
+            for (property in properties) {
+                try {
+                    visitNativeProperty(property)
+                } catch (e: Exception) {
+                    throw ProcessingException(property, e.message, e)
+                }
+            }
             val memberElements = classElement.getEnclosedElements(ElementQuery.ALL_FIELD_AND_METHODS)
             for (memberElement in memberElements) {
                 when (memberElement) {
