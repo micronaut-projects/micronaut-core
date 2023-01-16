@@ -113,7 +113,6 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
                     Map.class,
                     Map.class,
                     Map.class,
-                    boolean.class,
                     boolean.class
             )
     );
@@ -410,14 +409,6 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
                     continue;
                 }
 
-//                Label falseCondition = new Label();
-//
-//                staticInit.push(annotationName);
-//                staticInit.invokeStatic(TYPE_DEFAULT_ANNOTATION_METADATA, METHOD_ARE_DEFAULTS_REGISTERED);
-//                staticInit.push(true);
-//                staticInit.ifCmp(Type.BOOLEAN_TYPE, GeneratorAdapter.EQ, falseCondition);
-//                staticInit.visitLabel(new Label());
-
                 invokeLoadClassValueMethod(owningType, classWriter, staticInit, loadTypeMethods, new AnnotationClassValue(annotationName));
 
                 if (!typeOnly) {
@@ -426,18 +417,13 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
                 } else {
                     staticInit.invokeStatic(TYPE_DEFAULT_ANNOTATION_METADATA, METHOD_REGISTER_ANNOTATION_TYPE);
                 }
-//                staticInit.visitLabel(falseCondition);
             }
-            if (annotationMetadata.repeated != null && !annotationMetadata.repeated.isEmpty()) {
-                Map<String, String> repeated = new HashMap<>();
-                for (Map.Entry<String, String> e : annotationMetadata.repeated.entrySet()) {
-                    repeated.put(e.getValue(), e.getKey());
-                }
-                AnnotationMetadataSupport.removeCoreRepeatableAnnotations(repeated);
-                if (!repeated.isEmpty()) {
-                    pushStringMapOf(staticInit, repeated, true, null, v -> pushValue(owningType, classWriter, staticInit, v, defaultsStorage, loadTypeMethods, true));
-                    staticInit.invokeStatic(TYPE_DEFAULT_ANNOTATION_METADATA, METHOD_REGISTER_REPEATABLE_ANNOTATIONS);
-                }
+        }
+        if (annotationMetadata.annotationRepeatableContainer != null && !annotationMetadata.annotationRepeatableContainer.isEmpty()) {
+            AnnotationMetadataSupport.registerRepeatableAnnotations(annotationMetadata.annotationRepeatableContainer);
+            if (!annotationMetadata.annotationRepeatableContainer.isEmpty()) {
+                pushStringMapOf(staticInit, annotationMetadata.annotationRepeatableContainer, true, null, v -> pushValue(owningType, classWriter, staticInit, v, defaultsStorage, loadTypeMethods, true));
+                staticInit.invokeStatic(TYPE_DEFAULT_ANNOTATION_METADATA, METHOD_REGISTER_REPEATABLE_ANNOTATIONS);
             }
         }
     }
@@ -496,8 +482,6 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
         pushStringMapOf(generatorAdapter, annotationsByStereotype, false, Collections.emptyList(), list -> pushListOfString(generatorAdapter, list));
         // 6th argument: has property expressions
         generatorAdapter.push(annotationMetadata.hasPropertyExpressions());
-        // 7th argument: use repeatable annotations
-        generatorAdapter.push(true);
 
         // invoke the constructor
         generatorAdapter.invokeConstructor(TYPE_DEFAULT_ANNOTATION_METADATA, CONSTRUCTOR_ANNOTATION_METADATA);

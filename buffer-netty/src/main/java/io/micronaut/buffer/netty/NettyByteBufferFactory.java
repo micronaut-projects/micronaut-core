@@ -26,6 +26,8 @@ import io.netty.buffer.Unpooled;
 import jakarta.annotation.PostConstruct;
 import jakarta.inject.Singleton;
 
+import java.util.function.Supplier;
+
 /**
  * A {@link ByteBufferFactory} implementation for Netty.
  *
@@ -42,20 +44,30 @@ public class NettyByteBufferFactory implements ByteBufferFactory<ByteBufAllocato
      */
     public static final NettyByteBufferFactory DEFAULT = new NettyByteBufferFactory();
 
-    private final ByteBufAllocator allocator;
+    private final Supplier<ByteBufAllocator> allocatorSupplier;
 
     /**
      * Default constructor.
      */
     public NettyByteBufferFactory() {
-        this.allocator = ByteBufAllocator.DEFAULT;
+        this.allocatorSupplier = new Supplier<ByteBufAllocator>() {
+            @Override
+            public ByteBufAllocator get() {
+                return ByteBufAllocator.DEFAULT;
+            }
+        };
     }
 
     /**
      * @param allocator The {@link ByteBufAllocator}
      */
     public NettyByteBufferFactory(ByteBufAllocator allocator) {
-        this.allocator = allocator;
+        this.allocatorSupplier = new Supplier<ByteBufAllocator>() {
+            @Override
+            public ByteBufAllocator get() {
+                return allocator;
+            }
+        };
     }
 
     @PostConstruct
@@ -71,22 +83,22 @@ public class NettyByteBufferFactory implements ByteBufferFactory<ByteBufAllocato
 
     @Override
     public ByteBufAllocator getNativeAllocator() {
-        return allocator;
+        return allocatorSupplier.get();
     }
 
     @Override
     public ByteBuffer<ByteBuf> buffer() {
-        return new NettyByteBuffer(allocator.buffer());
+        return new NettyByteBuffer(allocatorSupplier.get().buffer());
     }
 
     @Override
     public ByteBuffer<ByteBuf> buffer(int initialCapacity) {
-        return new NettyByteBuffer(allocator.buffer(initialCapacity));
+        return new NettyByteBuffer(allocatorSupplier.get().buffer(initialCapacity));
     }
 
     @Override
     public ByteBuffer<ByteBuf> buffer(int initialCapacity, int maxCapacity) {
-        return new NettyByteBuffer(allocator.buffer(initialCapacity, maxCapacity));
+        return new NettyByteBuffer(allocatorSupplier.get().buffer(initialCapacity, maxCapacity));
     }
 
     @Override

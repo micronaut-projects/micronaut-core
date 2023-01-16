@@ -33,6 +33,7 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.optim.StaticOptimizations;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.reflect.ClassUtils;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.BeanConfiguration;
 import org.slf4j.Logger;
@@ -435,11 +436,17 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     }
 
     private void readConstantPropertySources(String name, List<PropertySource> propertySources) {
-        Set<String> propertySourceNames = Stream.concat(Stream.of(name), getActiveNames().stream().map(env -> name + "-" + env))
-                .collect(Collectors.toSet());
-        getConstantPropertySources().stream()
-                .filter(p -> propertySourceNames.contains(p.getName()))
-                .forEach(propertySources::add);
+        Set<String> activeNames = getActiveNames();
+        Set<String> propertySourceNames = CollectionUtils.newHashSet(activeNames.size() + 1);
+        propertySourceNames.add(name);
+        for (String env : activeNames) {
+            propertySourceNames.add(name + "-" + env);
+        }
+        for (PropertySource p : getConstantPropertySources()) {
+            if (propertySourceNames.contains(p.getName())) {
+                propertySources.add(p);
+            }
+        }
     }
 
     /**

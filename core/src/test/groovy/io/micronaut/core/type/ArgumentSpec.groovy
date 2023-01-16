@@ -111,8 +111,26 @@ class ArgumentSpec extends Specification {
 
     void "test equals/hashcode"() {
         expect:
-        Argument.of(Optional.class, Integer.class).hashCode() == Argument.of(Optional.class, Integer.class).hashCode()
-        Argument.of(Optional.class, Integer.class) == Argument.of(Optional.class, Integer.class)
+        Argument.optionalOf(Integer.class).getName() == Argument.of(Optional.class, Integer.class).getName()
+        Argument.optionalOf(Integer.class).getName() == "optional"
+        Argument.optionalOf(Integer.class).hashCode() == Argument.of(Optional.class, Integer.class).hashCode()
+        Argument.optionalOf(Integer.class) == Argument.of(Optional.class, Integer.class)
+        assertArgumentWithOneTypeParameter(Argument.of(Optional.class, Integer.class), Argument.optionalOf(Integer.class))
+        assertArgumentWithOneTypeParameter(Argument.of(List.class, Integer.class), Argument.listOf(Integer.class))
+        assertArgumentWithOneTypeParameter(Argument.of(Set.class, Integer.class), Argument.setOf(Integer.class))
+        assertArgumentWithOneTypeParameter(Argument.of(Map.class, Integer.class, String.class), Argument.mapOf(Integer.class, String.class))
+    }
+
+    void assertArgumentWithOneTypeParameter(Argument a1, Argument a2) {
+        assertArgument(a1, a2)
+        assert a1.getTypeParameters() == a2.getTypeParameters()
+        assertArgument(a1.getTypeParameters()[0], a2.getTypeParameters()[0])
+    }
+
+    void assertArgument(Argument a1, Argument a2) {
+        assert a1 == a2
+        assert a1.hashCode() == a2.hashCode()
+        assert a1.name == a2.name
     }
 
     void "test generic list"() {

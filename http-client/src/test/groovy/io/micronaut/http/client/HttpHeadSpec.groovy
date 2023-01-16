@@ -190,7 +190,7 @@ class HttpHeadSpec extends Specification {
     void "test simple get request with POJO list"() {
         when:
         Flux<HttpResponse<List<Book>>> flowable = Flux.from(client.exchange(
-                HttpRequest.HEAD("/head/pojoList"), Argument.of(List, Book)
+                HttpRequest.HEAD("/head/pojoList"), Argument.listOf(Book)
         ))
 
         HttpResponse<List<Book>> response = flowable.blockFirst()

@@ -107,8 +107,8 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
         if (annotationDefaultValues != null) {
             cloned.annotationDefaultValues = new LinkedHashMap<>(annotationDefaultValues);
         }
-        if (repeated != null) {
-            cloned.repeated = new HashMap<>(repeated);
+        if (annotationRepeatableContainer != null) {
+            cloned.annotationRepeatableContainer = new HashMap<>(annotationRepeatableContainer);
         }
         if (sourceRetentionAnnotations != null) {
             cloned.sourceRetentionAnnotations = new HashSet<>(sourceRetentionAnnotations);

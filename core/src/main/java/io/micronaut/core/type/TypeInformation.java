@@ -199,7 +199,7 @@ public interface TypeInformation<T> extends TypeVariableResolver, AnnotationMeta
      * @since 2.0
      */
     default boolean isSpecifiedSingle() {
-        return RuntimeTypeInformation.isSpecifiedSingle(this);
+        return RuntimeTypeInformation.isSpecifiedSingle(getType(), this);
     }
 
     /**

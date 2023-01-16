@@ -408,9 +408,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
      */
     @NonNull
     private static ApplicationContextConfigurer loadApplicationContextCustomizer(@Nullable ClassLoader classLoader) {
-        SoftServiceLoader<ApplicationContextConfigurer> loader = classLoader != null ? SoftServiceLoader.load(
-                ApplicationContextConfigurer.class, classLoader
-        ) : SoftServiceLoader.load(ApplicationContextConfigurer.class);
+        SoftServiceLoader<ApplicationContextConfigurer> loader = SoftServiceLoader.load(ApplicationContextConfigurer.class, classLoader);
         List<ApplicationContextConfigurer> configurers = new ArrayList<>(10);
         loader.collectAll(configurers);
         if (configurers.isEmpty()) {

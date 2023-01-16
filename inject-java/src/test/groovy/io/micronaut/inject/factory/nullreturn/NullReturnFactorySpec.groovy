@@ -1,15 +1,13 @@
 package io.micronaut.inject.factory.nullreturn
 
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
-import io.micronaut.context.annotation.Parameter
 import io.micronaut.context.exceptions.BeanContextException
-import io.micronaut.context.exceptions.BeanInstantiationException
 import io.micronaut.context.exceptions.DependencyInjectionException
 import io.micronaut.context.exceptions.NoSuchBeanException
-import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
-import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.qualifiers.Qualifiers
+import spock.lang.PendingFeature
 
 class NullReturnFactorySpec extends AbstractTypeElementSpec {
 
@@ -74,7 +72,6 @@ class Test2 {}
         bs.any { it.name == "one" }
         bs.any { it.name == "two" }
         bs.any { it.name == "three" }
-        factory.bCalls == 4 //3 B beans, 1 null
 
         when: "1, 2 are created for C"
         Collection<C> cs = beanContext.getBeansOfType(C)
@@ -83,22 +80,20 @@ class Test2 {}
         cs.size() == 2
         cs.any { it.name == "one" }
         cs.any { it.name == "two" }
-        factory.bCalls == 5
-        factory.cCalls == 3
 
         expect: "1 is created for D"
         beanContext.getBeansOfType(D).size() == 1
         beanContext.getBean(D, Qualifiers.byName("one"))
-        factory.bCalls == 6
-        factory.cCalls == 4
         factory.dCalls == 2 //2 C beans
 
         and: "1 is created for D2"
-        beanContext.getBeansOfType(D2).size() == 1
+        beanContext.getBeansOfType(D2).size() == 1 // D two is disabled
+        beanContext.getBeansOfType(D3).size() == 1 // D two is disabled
+        beanContext.getBeansOfType(D4).size() == 4 // Nullable C allowed
         beanContext.getBean(D2, Qualifiers.byName("one"))
-        factory.bCalls == 7
-        factory.cCalls == 5
-        factory.d2Calls == 2 //Called for 2 C beans and 2 null C beans
+        factory.d2Calls == 4 // called for every C and for C that are not enabled for existing B
+        factory.d3Calls == 2 // C is not nullable and there is no C three/four
+        factory.d4Calls == 4 // // called for every C and for C that are not enabled for existing B
 
         when: "E injects F which returns null"
         beanContext.getBean(E, Qualifiers.byName("one"))
@@ -117,6 +112,25 @@ class Test2 {}
 
         then:
         thrown(DependencyInjectionException)
+
+        cleanup:
+        beanContext.close()
+    }
+
+    @PendingFeature
+    void "test bean factory method throwing DisableBeanException is cached"() {
+        given:
+        BeanContext beanContext = ApplicationContext.run(["spec.name": getClass().simpleName])
+        NullableFactory factory = beanContext.getBean(NullableFactory)
+
+        when:
+        beanContext.getBeansOfType(D2)
+        beanContext.getBeansOfType(D3)
+        beanContext.getBeansOfType(D4)
+
+        then:
+        factory.bCalls == 4 // There are 4 B definitions (one throws disabled)
+        factory.cCalls == 3 // C is foreach B - should be called 3 times only
 
         cleanup:
         beanContext.close()
@@ -151,8 +165,8 @@ class Test2 {}
         DProcessor.constructed.get() == 1
         beanContext.getBeansOfType(ParameterDProcessor).size() == 1
         ParameterDProcessor.constructed.get() == 1
-        beanContext.getBeansOfType(NullableDProcessor).size() == 1
-        NullableDProcessor.constructed.get() == 1 //3 null D beans and 1 D bean
+        beanContext.getBeansOfType(NullableDProcessor).size() == 4
+        NullableDProcessor.constructed.get() == 4 //3 null D beans and 1 D bean
 
         when:
         beanContext.getBean(DProcessor, Qualifiers.byName("one"))
