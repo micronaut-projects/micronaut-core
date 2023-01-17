@@ -35,6 +35,9 @@ class RandomPropertySpec extends Specification {
         context.getProperty('my.int', Integer).get() == context.getProperty('my.int', Integer).get()
         context.getProperty('my.int', Integer).get() == context.getProperty('my.int', Integer).get()
         context.getProperty('my.int', Integer).get() == context.getProperty('my.int', Integer).get()
+
+        cleanup:
+        context.close()
     }
 
     void "test random port"() {
@@ -49,6 +52,9 @@ class RandomPropertySpec extends Specification {
 
         context.getProperty('my.port', Integer).get() < SocketUtils.MAX_PORT_RANGE
         context.getProperty('my.port', Integer).get() > SocketUtils.MIN_PORT_RANGE
+
+        cleanup:
+        context.close()
     }
 
     void "test random localhost port"() {
@@ -65,6 +71,9 @@ class RandomPropertySpec extends Specification {
         context.getProperty('my.addresses', String).get() ==~ /localhost:\d+,localhost:\d+/
         context.getProperty('my.address', String).get() == context.getProperty('my.address', String).get()
         context.getProperty('my.addresses', String).get() == context.getProperty('my.addresses', String).get()
+
+        cleanup:
+        context.close()
     }
 
     void "test random integer"() {
@@ -77,6 +86,8 @@ class RandomPropertySpec extends Specification {
         context.getProperty('my.number', Integer).isPresent()
         context.getProperty('my.number', Integer).get() == context.getProperty('my.number', Integer).get()
 
+        cleanup:
+        context.close()
     }
 
     void "test random invalid"() {
@@ -84,11 +95,14 @@ class RandomPropertySpec extends Specification {
         ApplicationContext context = ApplicationContext.run(
                 'my.number':'${random.blah}'
         )
+        context.getProperty('my.number', Integer).isPresent()
 
         then:
         def e = thrown(ConfigurationException)
-        e.message == 'Invalid random expression ${random.blah} for property: my.number'
+        e.message == 'Invalid random expression: random.blah'
 
+        cleanup:
+        context.close()
     }
 
 }
