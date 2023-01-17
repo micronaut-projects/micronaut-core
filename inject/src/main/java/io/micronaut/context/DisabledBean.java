@@ -88,4 +88,9 @@ record DisabledBean<T>(
     public boolean isPresent() {
         return true;
     }
+
+    @Override
+    public int hashCode() {
+        return type.typeHashCode();
+    }
 }

@@ -578,7 +578,7 @@ class CorsFilterSpec extends Specification {
         new CorsFilter(config ?: enabledCorsConfiguration(), new HttpHostResolver() {
             @Override
             String resolve(@Nullable HttpRequest request) {
-                return "http://localhost:8080";
+                return "http://micronautexample.com";
             }
         })
     }

@@ -115,12 +115,24 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
 
     @Override
     public Optional<Class<? extends Annotation>> getAnnotationType(@NonNull String name) {
-        return getAnnotationType((metadata) -> metadata.getAnnotationType(name));
+        for (AnnotationMetadata metadata1 : hierarchy) {
+            final Optional<Class<? extends Annotation>> annotationType = ((Function<AnnotationMetadata, Optional<Class<? extends Annotation>>>) (metadata) -> metadata.getAnnotationType(name)).apply(metadata1);
+            if (annotationType.isPresent()) {
+                return annotationType;
+            }
+        }
+        return Optional.empty();
     }
 
     @Override
     public Optional<Class<? extends Annotation>> getAnnotationType(@NonNull String name, @NonNull ClassLoader classLoader) {
-        return getAnnotationType((metadata) -> metadata.getAnnotationType(name, classLoader));
+        for (AnnotationMetadata metadata1 : hierarchy) {
+            final Optional<Class<? extends Annotation>> annotationType = ((Function<AnnotationMetadata, Optional<Class<? extends Annotation>>>) (metadata) -> metadata.getAnnotationType(name, classLoader)).apply(metadata1);
+            if (annotationType.isPresent()) {
+                return annotationType;
+            }
+        }
+        return Optional.empty();
     }
 
     /**
@@ -389,7 +401,7 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
         for (AnnotationMetadata am : hierarchy) {
             list.addAll(Arrays.asList(am.classValues(annotation, member)));
         }
-        return ArrayUtils.toArray(list, Class[]::new);
+        return list.toArray(new Class[0]);
     }
 
     @Override
@@ -808,7 +820,7 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
         for (AnnotationMetadata am : hierarchy) {
             list.addAll(Arrays.asList(am.classValues(annotation, member)));
         }
-        return ArrayUtils.toArray(list, Class[]::new);
+        return list.toArray(new Class[0]);
     }
 
     @Override
@@ -868,7 +880,7 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
                 strings.addAll(Arrays.asList(am.stringValues(annotation, member)));
             }
         }
-        return ArrayUtils.toArray(strings, String[]::new);
+        return strings.toArray(new String[0]);
     }
 
     @Override
@@ -881,7 +893,7 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
                 strings.addAll(Arrays.asList(am.stringValues(annotation, member)));
             }
         }
-        return ArrayUtils.toArray(strings, String[]::new);
+        return strings.toArray(new String[0]);
     }
 
     @NonNull
@@ -965,16 +977,6 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     @Override
     public Iterator<AnnotationMetadata> iterator() {
         return ArrayUtils.reverseIterator(hierarchy);
-    }
-
-    private Optional<Class<? extends Annotation>> getAnnotationType(Function<AnnotationMetadata, Optional<Class<? extends Annotation>>> annotationTypeSupplier) {
-        for (AnnotationMetadata metadata : hierarchy) {
-            final Optional<Class<? extends Annotation>> annotationType = annotationTypeSupplier.apply(metadata);
-            if (annotationType.isPresent()) {
-                return annotationType;
-            }
-        }
-        return Optional.empty();
     }
 
     @Override

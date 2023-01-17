@@ -3,12 +3,10 @@ package io.micronaut.core.convert
 import io.micronaut.core.convert.exceptions.ConversionErrorException
 import io.micronaut.core.type.Argument
 import spock.lang.Specification
-import spock.lang.Unroll
 
 import java.nio.charset.Charset
 import java.nio.charset.StandardCharsets
 import java.time.DayOfWeek
-
 /**
  * Created by graemerocher on 12/06/2017.
  */
@@ -104,7 +102,7 @@ class DefaultConversionServiceSpec extends Specification {
         then:
         def e = thrown(ConversionErrorException)
         e.conversionError.originalValue.get() == 'junk'
-        e.message == 'Failed to convert argument [Integer] for value [junk] due to: For input string: "junk"'
+        e.message == 'Failed to convert argument [integer] for value [junk] due to: For input string: "junk"'
     }
 
     void "test conversion service with type arguments"() {

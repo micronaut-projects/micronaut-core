@@ -28,6 +28,7 @@ import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.context.exceptions.DependencyInjectionException;
 import io.micronaut.context.exceptions.NoSuchBeanException;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -175,6 +176,14 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         return environment;
     }
 
+    /**
+     * @param environment The environment
+     */
+    @Internal
+    public void setEnvironment(Environment environment) {
+        this.environment = environment;
+    }
+
     @Override
     @NonNull
     public synchronized ApplicationContext start() {
@@ -265,7 +274,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     }
 
     @Override
-    protected void initializeContext(List<BeanDefinitionReference> contextScopeBeans, List<BeanDefinitionReference> processedBeans, List<BeanDefinitionReference> parallelBeans) {
+    protected void initializeContext(List<BeanDefinitionProducer> contextScopeBeans, List<BeanDefinitionProducer> processedBeans, List<BeanDefinitionProducer> parallelBeans) {
         initializeTypeConverters(this);
         super.initializeContext(contextScopeBeans, processedBeans, parallelBeans);
     }
@@ -456,7 +465,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                     @SuppressWarnings("unchecked")
                     Class<Object> declaringClass = (Class<Object>) candidate.getBeanType().getDeclaringClass();
                     if (declaringClass != null) {
-                        Collection<BeanDefinition<Object>> beanCandidates = findBeanCandidates(resolutionContext, Argument.of(declaringClass), null, true);
+                        Collection<BeanDefinition<Object>> beanCandidates = findBeanCandidates(resolutionContext, Argument.of(declaringClass), null);
                         for (BeanDefinition<Object> beanCandidate : beanCandidates) {
                             if (beanCandidate instanceof BeanDefinitionDelegate<Object> delegate) {
                                 ConfigurationPath cp = delegate.getConfigurationPath().orElse(configurationPath).copy();
@@ -810,12 +819,12 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         }
 
         @Override
-        protected void initializeContext(List<BeanDefinitionReference> contextScopeBeans, List<BeanDefinitionReference> processedBeans, List<BeanDefinitionReference> parallelBeans) {
+        protected void initializeContext(List<BeanDefinitionProducer> contextScopeBeans, List<BeanDefinitionProducer> processedBeans, List<BeanDefinitionProducer> parallelBeans) {
             // no-op .. @Context scope beans are not started for bootstrap
         }
 
         @Override
-        protected void processParallelBeans(List<BeanDefinitionReference> parallelBeans) {
+        protected void processParallelBeans(List<BeanDefinitionProducer> parallelBeans) {
             // no-op
         }
 

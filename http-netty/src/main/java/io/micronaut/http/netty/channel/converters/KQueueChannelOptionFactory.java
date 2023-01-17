@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.netty.channel.converters;
 
+import io.micronaut.context.annotation.Prototype;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.Internal;
@@ -26,7 +27,6 @@ import io.netty.channel.kqueue.AcceptFilter;
 import io.netty.channel.kqueue.KQueue;
 import io.netty.channel.kqueue.KQueueChannelOption;
 import io.netty.channel.unix.UnixChannelOption;
-import jakarta.inject.Singleton;
 
 import java.util.Map;
 import java.util.Optional;
@@ -36,7 +36,7 @@ import java.util.Optional;
  * @author croudet
  */
 @Internal
-@Singleton
+@Prototype
 @Requires(classes = KQueue.class, condition = KQueueAvailabilityCondition.class)
 public class KQueueChannelOptionFactory implements ChannelOptionFactory, TypeConverterRegistrar {
 

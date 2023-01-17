@@ -244,7 +244,7 @@ class HttpGetSpec extends Specification {
     void "test simple get request with POJO list"() {
         when:
         Flux<HttpResponse<List<Book>>> flowable = Flux.from(client.exchange(
-                HttpRequest.GET("/get/pojoList"), Argument.of(List, Book)
+                HttpRequest.GET("/get/pojoList"), Argument.listOf(Book)
         ))
 
         HttpResponse<List<Book>> response = flowable.blockFirst()

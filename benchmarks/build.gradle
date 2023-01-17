@@ -7,7 +7,8 @@ dependencies {
     annotationProcessor project(":inject-java")
     jmhAnnotationProcessor project(":inject-java")
     jmhAnnotationProcessor libs.bundles.asm
-    
+    jmhAnnotationProcessor libs.jmh.generator.annprocess
+
     annotationProcessor project(":validation")
     compileOnly project(":validation")
     api project(":inject")
@@ -17,16 +18,11 @@ dependencies {
     api project(":router")
     api project(":runtime")
 
-    jmh libs.jmh
-    jmh libs.jmh.generator.annprocess
+    jmh libs.jmh.core
 }
 jmh {
     includes = ['io.micronaut.http.server.StartupBenchmark']
     duplicateClassesStrategy = DuplicatesStrategy.WARN
-    warmupIterations = 2
-    iterations = 3
-    fork = 1
-//    jvmArgs = ["-agentpath:/Applications/YourKit-Java-Profiler-2018.04.app/Contents/Resources/bin/mac/libyjpagent.jnilib"]
 }
 
 tasks.named("processJmhResources") {

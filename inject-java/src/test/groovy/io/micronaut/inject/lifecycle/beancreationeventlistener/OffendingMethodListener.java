@@ -9,6 +9,13 @@ import jakarta.inject.Singleton;
 @Singleton
 public class OffendingMethodListener implements BeanCreatedEventListener<B> {
 
+    static boolean initialized;
+    static boolean executed;
+
+    OffendingMethodListener() {
+        initialized = true;
+    }
+
     @Inject
     void setA(A a) {}
     @Inject
@@ -16,6 +23,7 @@ public class OffendingMethodListener implements BeanCreatedEventListener<B> {
 
     @Override
     public B onCreated(BeanCreatedEvent<B> event) {
+        executed = true;
         return event.getBean();
     }
 }

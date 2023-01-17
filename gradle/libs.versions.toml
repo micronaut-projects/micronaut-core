@@ -6,10 +6,7 @@ blaze = "1.6.8"
 caffeine = "2.9.3"
 compile-testing = "0.19"
 
-geb = "3.4.1"
-geb-groovy = "3.0.13"
-geb-micronaut-test = "3.7.0"
-geb-spock = "2.2-groovy-3.0"
+geb = "7.0"
 gorm = "7.3.2"
 # be sure to update graal version in gradle.properties as well
 # Intentionally pin to 22.0.0.2 see https://github.com/micronaut-projects/micronaut-kafka/pull/564 and https://github.com/micronaut-projects/micronaut-core/pull/7663
@@ -18,7 +15,7 @@ h2 = "2.1.210"
 hibernate = "5.5.9.Final"
 hibernate-validator = "6.1.6.Final"
 htmlSanityCheck = "1.1.6"
-htmlunit = "2.64.0"
+htmlunit = "2.68.0"
 httpcomponents-client = "4.5.14"
 jakarta-inject-api = "2.0.1"
 jakarta-inject-tck = "2.0.1"
@@ -50,7 +47,7 @@ micronaut-serde = "2.0.0-SNAPSHOT"
 micronaut-tracing = "4.4.0"
 micrometer = "1.10.2"
 neo4j-java-driver = "1.4.5"
-selenium = "3.141.59"
+selenium = "4.7.2"
 smallrye = "5.5.0"
 spock = "2.2-groovy-4.0"
 spotbugs = "4.7.1"
@@ -155,8 +152,6 @@ caffeine = { module = "com.github.ben-manes.caffeine:caffeine", version.ref = "c
 compile-testing = { module = "com.google.testing.compile:compile-testing", version.ref = "compile-testing" }
 
 geb-spock = { module = "org.gebish:geb-spock", version.ref = "geb" }
-spock-for-geb = { module = "org.spockframework:spock-core", version.ref = "geb-spock" }
-geb-groovy-test = { module = "org.codehaus.groovy:groovy-test", version.ref = "geb-groovy" }
 gorm = { module = "org.grails:grails-datastore-core", version.ref = "gorm" }
 graal = { module = "org.graalvm.nativeimage:svm", version.ref = "graal-svm" }
 groovy-test-junit5 = { module = "org.apache.groovy:groovy-test-junit5", version.ref = "managed-groovy" }
@@ -180,8 +175,8 @@ jcache = { module = "javax.cache:cache-api", version.ref = "jcache" }
 
 jetty-alpn-openjdk8-client = { module = "org.eclipse.jetty:jetty-alpn-openjdk8-client", version.ref = "jetty" }
 
-jmh = { module = "org.openjdk.jmh:jmh-core", version.ref = "jmh" }
-jmh-generator-annprocess = { module = "org.openjdk.jmh:jmh-core", version.ref = "jmh" }
+jmh-core = { module = "org.openjdk.jmh:jmh-core", version.ref = "jmh" }
+jmh-generator-annprocess = { module = "org.openjdk.jmh:jmh-generator-annprocess", version.ref = "jmh" }
 
 jsr107 = { module = "org.jsr107.ri:cache-ri-impl", version.ref = "jsr107" }
 jsr305 = { module = "com.google.code.findbugs:jsr305", version.ref = "jsr305" }
@@ -241,7 +236,7 @@ selenium-api = { module = "org.seleniumhq.selenium:selenium-api", version.ref = 
 selenium-support = { module = "org.seleniumhq.selenium:selenium-support", version.ref = "selenium" }
 selenium-driver-chrome = { module = "org.seleniumhq.selenium:selenium-chrome-driver", version.ref = "selenium" }
 selenium-driver-firefox = { module = "org.seleniumhq.selenium:selenium-firefox-driver", version.ref = "selenium" }
-selenium-driver-htmlunit = { module = "org.seleniumhq.selenium:htmlunit-driver", version.ref = "htmlunit" }
+selenium-driver-htmlunit = { module = "org.seleniumhq.selenium:htmlunit-driver", version.ref = "selenium" }
 
 smallrye = { module = "io.smallrye:smallrye-fault-tolerance", version.ref = "smallrye" }
 spock = { module = "org.spockframework:spock-core", version.ref = "spock" }

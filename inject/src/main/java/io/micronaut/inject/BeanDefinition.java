@@ -286,7 +286,7 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
      * @return True if it represents a proxy
      */
     default boolean isProxy() {
-        return this instanceof ProxyBeanDefinition;
+        return false;
     }
 
     /**

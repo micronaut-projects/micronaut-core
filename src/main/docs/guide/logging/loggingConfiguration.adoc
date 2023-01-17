@@ -9,6 +9,16 @@ logger:
 
 The same configuration can be achieved by setting the environment variable `LOGGER_LEVELS_FOO_BAR`. Note that there is currently no way to set log levels for unconventional prefixes such as `foo.barBaz`.
 
+==== Custom Logback XML Configuration
+
+[source,yaml]
+----
+logger:
+  config: custom-logback.xml
+----  
+
+You can also set a custom Logback XML configuration file to be used via `logger.config`. Be aware that **the referenced file should be an accessible resource on your classpath**!
+
 ==== Disabling a Logger with Properties
 
 To disable a logger, you need to set the logger level to `OFF`:
