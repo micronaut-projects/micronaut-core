@@ -48,6 +48,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.annotation.ReflectionConfig;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.InstantiationUtils;
@@ -143,7 +144,8 @@ public final class AnnotationMetadataSupport {
                 new AbstractMap.SimpleEntry<>(Indexed.class, Indexes.class),
                 new AbstractMap.SimpleEntry<>(Requires.class, Requirements.class),
                 new AbstractMap.SimpleEntry<>(AliasFor.class, Aliases.class),
-                new AbstractMap.SimpleEntry<>(Property.class, PropertySource.class)
+                new AbstractMap.SimpleEntry<>(Property.class, PropertySource.class),
+                new AbstractMap.SimpleEntry<>(ReflectionConfig.class, ReflectionConfig.ReflectionConfigList.class)
         );
     }
 
