@@ -104,10 +104,10 @@ public final class RandomPropertyExpressionResolver implements PropertyExpressio
             String[] tokens = range.split(",");
             int lowerBound = Integer.parseInt(tokens[0]);
             if (tokens.length == 1) {
-                return lowerBound >= 0 ? 1 : -1  * (LazyInit.RANDOM.nextInt(Math.abs(lowerBound)));
+                return (lowerBound >= 0 ? 1 : -1) * LazyInit.RANDOM.nextInt(Math.abs(lowerBound));
             }
             int upperBound = Integer.parseInt(tokens[1]);
-            return lowerBound + (int) (Math.random() * (upperBound - lowerBound));
+            return LazyInit.RANDOM.nextInt(lowerBound, upperBound);
         } catch (NumberFormatException ex) {
             throw new ValueException("Invalid range: `" + range + "` found for type Integer for expression: " + expression, ex);
         }
@@ -118,10 +118,10 @@ public final class RandomPropertyExpressionResolver implements PropertyExpressio
             String[] tokens = range.split(",");
             long lowerBound = Long.parseLong(tokens[0]);
             if (tokens.length == 1) {
-                return (long) (Math.random() * (lowerBound));
+                return (lowerBound >= 0 ? 1 : -1) * LazyInit.RANDOM.nextLong(Math.abs(lowerBound));
             }
             long upperBound = Long.parseLong(tokens[1]);
-            return lowerBound + (long) (Math.random() * (upperBound - lowerBound));
+            return LazyInit.RANDOM.nextLong(lowerBound, upperBound);
         } catch (NumberFormatException ex) {
             throw new ValueException("Invalid range: `" + range + "` found for type Long for expression: " + expression, ex);
         }
@@ -132,10 +132,10 @@ public final class RandomPropertyExpressionResolver implements PropertyExpressio
             String[] tokens = range.split(",");
             float lowerBound = Float.parseFloat(tokens[0]);
             if (tokens.length == 1) {
-                return (float) (Math.random() * (lowerBound));
+                return (lowerBound >= 0 ? 1 : -1) * LazyInit.RANDOM.nextFloat(Math.abs(lowerBound));
             }
             float upperBound = Float.parseFloat(tokens[1]);
-            return lowerBound + (float) (Math.random() * (upperBound - lowerBound));
+            return LazyInit.RANDOM.nextFloat(lowerBound, upperBound);
         } catch (NumberFormatException ex) {
             throw new ValueException("Invalid range: `" + range + "` found for type Float for expression: " + expression, ex);
         }
@@ -145,7 +145,7 @@ public final class RandomPropertyExpressionResolver implements PropertyExpressio
         private static final SecureRandom RANDOM = new SecureRandom();
         private static final String RANDOM_UPPER_LIMIT = "(\\(-?\\d+(\\.\\d+)?\\))";
         private static final String RANDOM_RANGE = "(\\[-?\\d+(\\.\\d+)?,\\s?-?\\d+(\\.\\d+)?])";
-        private static final Pattern RANGE_PATTERN = Pattern.compile( "\\s?(\\S+?)(" + RANDOM_UPPER_LIMIT + "|" + RANDOM_RANGE + ")");
+        private static final Pattern RANGE_PATTERN = Pattern.compile("\\s?(\\S+?)(" + RANDOM_UPPER_LIMIT + "|" + RANDOM_RANGE + ")");
     }
 
 }
