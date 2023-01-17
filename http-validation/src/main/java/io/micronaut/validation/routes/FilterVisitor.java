@@ -117,6 +117,9 @@ public final class FilterVisitor implements TypeElementVisitor<Object, Object> {
         if (classElement.isAssignable(CompletionStage.class)) {
             return CompletionStage.class;
         }
+        if (classElement.isAssignable(Throwable.class)) {
+            return Throwable.class;
+        }
         for (String reactiveTypeName : Publishers.getReactiveTypeNames()) {
             if (classElement.isAssignable(reactiveTypeName)) {
                 return Publisher.class;
