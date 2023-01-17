@@ -3,6 +3,7 @@ package io.micronaut.kotlin.processing.aop.introduction
 import io.micronaut.aop.MethodInterceptor
 import io.micronaut.aop.MethodInvocationContext
 import io.micronaut.core.type.MutableArgumentValue
+import io.micronaut.core.util.StringUtils
 import jakarta.inject.Singleton
 
 @Singleton
@@ -17,12 +18,11 @@ class StubIntroducer : MethodInterceptor<Any?, Any?> {
     }
 
     override fun intercept(context: MethodInvocationContext<Any?, Any?>): Any? {
-        return context.getValue<Any>( // <3>
-            Stub::class.java,
-            context.returnType.type
-        ).orElseGet {
+        return context.stringValue(// <3>
+            Stub::class.java
+        ).filter { StringUtils.isNotEmpty(it) }.orElseGet {
             val iterator: Iterator<MutableArgumentValue<*>> = context.parameters.values.iterator()
-            if (iterator.hasNext()) iterator.next().value else null
+            if (iterator.hasNext()) iterator.next().value?.toString() else null
         }
     }
 }
