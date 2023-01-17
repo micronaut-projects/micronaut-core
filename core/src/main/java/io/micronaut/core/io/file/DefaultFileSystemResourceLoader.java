@@ -66,7 +66,7 @@ public class DefaultFileSystemResourceLoader implements FileSystemResourceLoader
      * @param path The path
      */
     public DefaultFileSystemResourceLoader(Path path) {
-        this.baseDir = SupplierUtil.memoizedNonEmpty(() -> {
+        this.baseDir = SupplierUtil.memoized(() -> {
             Path baseDirPath;
             try {
                 baseDirPath = path.normalize().toRealPath();

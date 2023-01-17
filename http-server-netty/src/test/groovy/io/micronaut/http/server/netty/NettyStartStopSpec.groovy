@@ -15,6 +15,7 @@ class NettyStartStopSpec extends Specification {
 
     void "stopping and starting the netty server in a named application should work"() {
         given:
+        StartListener.globalEventCount.set(0)
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
                 'spec.name': 'NettyStartStopSpec',
                 'micronaut.application.name': 'example'
@@ -28,7 +29,8 @@ class NettyStartStopSpec extends Specification {
         server.start()
 
         then:
-        listener.eventCount.get() == 2
+        StartListener.globalEventCount.get() == 2
+        listener.eventCount.get() == 1
         server.applicationContext.isRunning()
 
         cleanup:
@@ -40,10 +42,12 @@ class NettyStartStopSpec extends Specification {
     @Requires(property = "spec.name", value = "NettyStartStopSpec")
     static class StartListener implements ApplicationEventListener<ServiceReadyEvent> {
 
+        static AtomicInteger globalEventCount = new AtomicInteger(0)
         AtomicInteger eventCount = new AtomicInteger(0)
 
         @Override
         void onApplicationEvent(ServiceReadyEvent event) {
+            globalEventCount.incrementAndGet()
             eventCount.incrementAndGet()
         }
     }

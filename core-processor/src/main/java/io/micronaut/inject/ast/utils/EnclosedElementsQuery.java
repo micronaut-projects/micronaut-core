@@ -192,7 +192,13 @@ public abstract class EnclosedElementsQuery<C, N> {
             Set<io.micronaut.inject.ast.Element> addedFromClassElements = new LinkedHashSet<>();
             classElements:
             for (N element : classElements) {
-                io.micronaut.inject.ast.Element newElement = elementsCache.computeIfAbsent(getCacheKey(element), e -> this.toAstElement(e, result.getElementType()));
+                N cacheKey = getCacheKey(element);
+                io.micronaut.inject.ast.Element newElement = elementsCache.computeIfAbsent(cacheKey, e -> this.toAstElement(e, result.getElementType()));
+                if (!result.getElementType().isInstance(newElement)) {
+                    // dirty cache
+                    elementsCache.remove(cacheKey);
+                    newElement = elementsCache.computeIfAbsent(cacheKey, e -> this.toAstElement(e, result.getElementType()));
+                }
                 for (Iterator<io.micronaut.inject.ast.Element> iterator = elements.iterator(); iterator.hasNext(); ) {
                     io.micronaut.inject.ast.Element existingElement = iterator.next();
                     if (newElement.equals(existingElement)) {

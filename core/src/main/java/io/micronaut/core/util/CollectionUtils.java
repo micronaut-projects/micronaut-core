@@ -32,6 +32,57 @@ import java.util.*;
 public class CollectionUtils {
 
     /**
+     * Create new {@link HashSet} sized to fit all the elements of the size provided.
+     * @param size The size to fit all the elements
+     * @param <E> The element type
+     * @return a new {@link HashSet} with reallocated size
+     * @since 4.0.0
+     */
+    public static <E> HashSet<E> newHashSet(int size) {
+        return new HashSet<>(calculateHashSetSize(size));
+    }
+
+    /**
+     * Create new {@link LinkedHashSet} sized to fit all the elements of the size provided.
+     * @param size The size to fit all the elements
+     * @param <E> The element type
+     * @return a new {@link LinkedHashSet} with reallocated size
+     * @since 4.0.0
+     */
+    public static <E> LinkedHashSet<E> newLinkedHashSet(int size) {
+        return new LinkedHashSet<>(calculateHashSetSize(size));
+    }
+
+    /**
+     * Create new {@link HashMap} sized to fit all the elements of the size provided.
+     * @param size The size to fit all the elements
+     * @param <K> The key type
+     * @param <V> The value type
+     * @return a new {@link HashMap} with reallocated size
+     * @since 4.0.0
+     */
+    public static <K, V> HashMap<K, V> newHashMap(int size) {
+        return new HashMap<>(calculateHashSetSize(size));
+    }
+
+    /**
+     * Create new {@link LinkedHashMap} sized to fit all the elements of the size provided.
+     * @param size The size to fit all the elements
+     * @param <K> The key type
+     * @param <V> The value type
+     * @return a new {@link LinkedHashMap} with reallocated size
+     * @since 4.0.0
+     */
+    public static <K, V> LinkedHashMap<K, V> newLinkedHashMap(int size) {
+        return new LinkedHashMap<>(calculateHashSetSize(size));
+    }
+
+    private static int calculateHashSetSize(int size) {
+        // Based on the calculation in new HashSet(Collection)
+        return Math.max((int) (size / .75f) + 1, 16);
+    }
+
+    /**
      * Is the given type an iterable or map type.
      * @param type The type
      * @return True if it is iterable or map

@@ -16,6 +16,7 @@
 package io.micronaut.json.convert;
 
 import io.micronaut.context.BeanProvider;
+import io.micronaut.context.annotation.Prototype;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.bind.ArgumentBinder;
@@ -33,7 +34,6 @@ import io.micronaut.json.JsonMapper;
 import io.micronaut.json.tree.JsonArray;
 import io.micronaut.json.tree.JsonNode;
 import jakarta.inject.Inject;
-import jakarta.inject.Singleton;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -52,7 +52,7 @@ import java.util.Optional;
  * @since 3.1
  */
 @Experimental
-@Singleton
+@Prototype
 public final class JsonConverterRegistrar implements TypeConverterRegistrar {
     private final BeanProvider<JsonMapper> objectCodec;
     private final ConversionService conversionService;

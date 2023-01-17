@@ -34,21 +34,20 @@ import java.util.function.Consumer;
  */
 @Experimental
 public final class HttpResponseAssertion {
-
     private final HttpStatus httpStatus;
     private final Map<String, String> headers;
-    private final String body;
+    private final BodyAssertion bodyAssertion;
 
     @Nullable
     private final Consumer<HttpResponse<?>> responseConsumer;
 
     private HttpResponseAssertion(HttpStatus httpStatus,
                                   Map<String, String> headers,
-                                  String body,
+                                  BodyAssertion bodyAssertion,
                                   @Nullable Consumer<HttpResponse<?>> responseConsumer) {
         this.httpStatus = httpStatus;
         this.headers = headers;
-        this.body = body;
+        this.bodyAssertion = bodyAssertion;
         this.responseConsumer = responseConsumer;
     }
 
@@ -77,8 +76,9 @@ public final class HttpResponseAssertion {
      *
      * @return Expected HTTP Response body
      */
-    public String getBody() {
-        return body;
+
+    public BodyAssertion getBody() {
+        return bodyAssertion;
     }
 
     /**
@@ -95,7 +95,7 @@ public final class HttpResponseAssertion {
     public static class Builder {
         private HttpStatus httpStatus;
         private Map<String, String> headers;
-        private String body;
+        private BodyAssertion bodyAssertion;
 
         private Consumer<HttpResponse<?>> responseConsumer;
 
@@ -135,11 +135,21 @@ public final class HttpResponseAssertion {
 
         /**
          *
-         * @param body Response Body
+         * @param containsBody Response Body
          * @return HTTP Response Assertion Builder
          */
-        public Builder body(String body) {
-            this.body = body;
+        public Builder body(String containsBody) {
+            this.bodyAssertion = BodyAssertion.builder().body(containsBody).contains();
+            return this;
+        }
+
+        /**
+         *
+         * @param bodyAssertion Response Body Assertion
+         * @return HTTP Response Assertion Builder
+         */
+        public Builder body(BodyAssertion bodyAssertion) {
+            this.bodyAssertion = bodyAssertion;
             return this;
         }
 
@@ -158,7 +168,7 @@ public final class HttpResponseAssertion {
          * @return HTTP Response Assertion
          */
         public HttpResponseAssertion build() {
-            return new HttpResponseAssertion(Objects.requireNonNull(httpStatus), headers, body, responseConsumer);
+            return new HttpResponseAssertion(Objects.requireNonNull(httpStatus), headers, bodyAssertion, responseConsumer);
         }
     }
 }

@@ -17,6 +17,7 @@ package io.micronaut.http.server.netty.binders;
 
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.BeanProvider;
+import io.micronaut.context.annotation.Prototype;
 import io.micronaut.context.event.BeanCreatedEvent;
 import io.micronaut.context.event.BeanCreatedEventListener;
 import io.micronaut.core.annotation.Internal;
@@ -27,7 +28,6 @@ import io.micronaut.http.server.netty.HttpContentProcessorResolver;
 import io.micronaut.http.server.netty.multipart.MultipartBodyArgumentBinder;
 import io.micronaut.scheduling.TaskExecutors;
 import jakarta.inject.Named;
-import jakarta.inject.Singleton;
 
 import java.util.concurrent.ExecutorService;
 
@@ -37,7 +37,7 @@ import java.util.concurrent.ExecutorService;
  * @author graemerocher
  * @since 2.0.0
  */
-@Singleton
+@Prototype
 @Internal
 class NettyBinderRegistrar implements BeanCreatedEventListener<RequestBinderRegistry> {
 

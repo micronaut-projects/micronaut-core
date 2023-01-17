@@ -70,15 +70,7 @@ open class KotlinClassElement(val kotlinType: KSType,
     }
     private val enclosedElementsQuery = KotlinEnclosedElementsQuery()
     private val nativeProperties  : List<PropertyElement> by lazy {
-        classDeclaration.getAllProperties()
-            .filter { !it.isPrivate() }
-            .map { KotlinPropertyElement(
-                this,
-                visitorContext.elementFactory.newClassElement(it.type.resolve(), elementAnnotationMetadataFactory),
-                it,
-                elementAnnotationMetadataFactory, visitorContext
-            ) }
-            .toList()
+        enclosedElementsQuery.getEnclosedElements(this, ElementQuery.of(PropertyElement::class.java))
     }
     private val internalGenerics : Map<String, Map<String, KSType>> by lazy {
         val boundMirrors : Map<String, KSType> = getBoundTypeMirrors()

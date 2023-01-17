@@ -58,8 +58,6 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * <p>A {@link PropertyResolver} that resolves from one or many {@link PropertySource} instances.</p>
@@ -211,16 +209,22 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                     name, false, PropertyCatalog.NORMALIZED);
             if (entries != null) {
                 String prefix = name + '.';
-                return entries.keySet().stream().filter(k -> k.startsWith(prefix))
-                              .map(k -> {
-                                  String withoutPrefix = k.substring(prefix.length());
-                                  int i = withoutPrefix.indexOf('.');
-                                  if (i > -1) {
-                                      return withoutPrefix.substring(0, i);
-                                  }
-                                  return withoutPrefix;
-                              })
-                              .collect(Collectors.toSet());
+                Set<String> result = new HashSet<>();
+                Set<String> strings = entries.keySet();
+                for (String k : strings) {
+                    if (k.startsWith(prefix)) {
+                        String withoutPrefix = k.substring(prefix.length());
+                        int i = withoutPrefix.indexOf('.');
+                        String s;
+                        if (i > -1) {
+                            s = withoutPrefix.substring(0, i);
+                        } else {
+                            s = withoutPrefix;
+                        }
+                        result.add(s);
+                    }
+                }
+                return result;
             }
         }
         return Collections.emptySet();

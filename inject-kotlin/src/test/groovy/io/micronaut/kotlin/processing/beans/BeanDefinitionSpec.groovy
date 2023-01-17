@@ -19,6 +19,79 @@ import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class BeanDefinitionSpec extends Specification {
 
+    void "test injection order for inheritance"() {
+        given:
+        def context = KotlinCompiler.buildContext('''
+package inherit
+
+import jakarta.inject.*
+import jakarta.inject.Inject
+
+@Singleton
+class Child : Parent() {
+
+    var parentMethodInjectBeforeChildMethod : Boolean = false
+    var parentMethodInjectBeforeChildField : Boolean = false
+    var childFieldInjectedBeforeChildMethod : Boolean = false
+
+    @Inject
+    var childProp : Other? = Other()
+        set(value) {
+           if (parentProp != null && parentMethod != null) {
+                parentMethodInjectBeforeChildField = true
+           }
+        }
+    lateinit var childMethod : Other
+
+    @Inject
+    fun antherMethod(other : Other)  {
+        if (parentProp != null && parentMethod != null) {
+            parentMethodInjectBeforeChildMethod = true
+        }
+        if (childProp != null) {
+            childFieldInjectedBeforeChildMethod = true
+        }
+        childMethod = other
+    }
+}
+
+open class Parent {
+    var parentPropInjectedBeforeParentMethod : Boolean = false
+
+    @Inject
+    lateinit var parentProp : Other
+    lateinit var parentMethod : Other
+
+    @Inject
+    fun someMethod(other : Other)  {
+        if (parentProp != null) {
+            parentPropInjectedBeforeParentMethod = true
+        }
+        parentMethod = other
+    }
+}
+
+@Singleton
+class Other
+''')
+        def bean = KotlinCompiler.getBean(context, 'inherit.Child')
+
+        expect:"The parent property was injected before the parent method"
+        bean.parentPropInjectedBeforeParentMethod
+
+        and:"All injection points of the parent were injected before the child method"
+        bean.parentInjectBeforeChildMethod
+
+        and:"All injection points of the parent were injected before the child field"
+        bean.parentInjectBeforeChildField
+
+        and:"The child property was injected before the child method"
+        bean.childFieldInjectedBeforeChildMethod
+
+        cleanup:
+        context.close()
+    }
+
     void "test suspend function with executable"() {
         given:
         def definition = buildBeanDefinition('test.SuspendTest', '''
@@ -224,8 +297,8 @@ class SampleEvent
         def bean = getBean(context, 'test.SampleEventEmitterBean')
         def definition = KotlinCompiler.getBeanDefinition(context, 'test.SampleEventEmitterBean')
         expect:
-        definition.injectedFields.size() == 1
-        definition.injectedMethods.size() == 0
+        definition.injectedFields.size() == 0
+        definition.injectedMethods.size() == 1
 
         bean.eventPublisher
 
