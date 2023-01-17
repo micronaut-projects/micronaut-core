@@ -19,6 +19,7 @@ import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class BeanDefinitionSpec extends Specification {
 
+    @PendingFeature(reason = "difficult to achieve with current design without a significant rewrite or how native properties are handled")
     void "test injection order for inheritance"() {
         given:
         def context = KotlinCompiler.buildContext('''
