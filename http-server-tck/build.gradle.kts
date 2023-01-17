@@ -4,6 +4,7 @@ plugins {
 dependencies {
     annotationProcessor(projects.injectJava)
     annotationProcessor(projects.validation)
+    annotationProcessor(projects.httpValidation)
     implementation(projects.validation)
     implementation(projects.runtime)
     implementation(projects.jacksonDatabind)
