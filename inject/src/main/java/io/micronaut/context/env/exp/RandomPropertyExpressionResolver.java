@@ -94,7 +94,7 @@ public final class RandomPropertyExpressionResolver implements PropertyExpressio
                         }
                     }
                 }
-                throw new ConfigurationException("Invalid random expression " + expression);
+                throw new ConfigurationException("Invalid random expression: " + expression);
             }
         }
     }
