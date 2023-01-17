@@ -42,13 +42,13 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  * <ul>
  *     <li>{@link HttpRequest} or {@link MutableHttpRequest}, to access the request</li>
  *     <li>{@link FilterContinuation}&lt;{@link HttpResponse}&gt;,
- *     {@link FilterContinuation}&lt;{@link Publisher}&lt;{@link HttpResponse}&gt;&gt; or any other
- *     reactive type. A call to the continuation (and, for the reactive variants, subscribing to
- *     the {@link Publisher}) will trigger execution of downstream filters, and finally perform the
- *     request. The response returned by the continuation will be the response produced by the
- *     downstream, and can be modified and returned. Note that if you call a non-reactive
- *     continuation, the call will block, which may block the netty event loop. For that reason,
- *     always mark such a filter with {@link io.micronaut.scheduling.annotation.ExecuteOn}.</li>
+ *     {@link FilterContinuation}&lt;{@link Publisher}&lt;{@link HttpResponse}&gt;&gt;. A call to
+ *     the continuation (and, for the reactive variant, subscribing to the {@link Publisher}) will
+ *     trigger execution of downstream filters, and finally perform the request. The response
+ *     returned by the continuation will be the response produced by the downstream, and can be
+ *     modified and returned. Note that if you call a non-reactive continuation, the call will
+ *     block, which may block the netty event loop. For that reason, always mark such a filter with
+ *     {@link io.micronaut.scheduling.annotation.ExecuteOn}.</li>
  * </ul>
  *
  * The return value may be:

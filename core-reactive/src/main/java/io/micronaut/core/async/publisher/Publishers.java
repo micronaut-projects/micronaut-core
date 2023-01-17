@@ -493,8 +493,8 @@ public class Publishers {
         if (publisherType.isInstance(object)) {
             return (T) object;
         }
-        if (object instanceof CompletableFuture) {
-            @SuppressWarnings("unchecked") Publisher<T> futurePublisher = Publishers.fromCompletableFuture(() -> ((CompletableFuture) object));
+        if (object instanceof CompletableFuture cf && !(object instanceof Publisher<?>)) {
+            @SuppressWarnings("unchecked") Publisher<T> futurePublisher = Publishers.fromCompletableFuture(() -> cf);
             return conversionService.convert(futurePublisher, publisherType)
                     .orElseThrow(() -> unconvertibleError(object, publisherType));
         }

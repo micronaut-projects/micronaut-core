@@ -404,8 +404,15 @@ public class FilterRunner {
         int passedOnContinuationArgIndex = -1;
         for (int i = 0; i < arguments.length; i++) {
             Argument<?> argument = arguments[i];
-            if (argument.getType().isAssignableFrom(MutableHttpRequest.class)) {
+            if (argument.getType().isAssignableFrom(HttpRequest.class)) {
                 fulfilled[i] = runner -> runner.request;
+            } else if (argument.getType().isAssignableFrom(MutableHttpRequest.class)) {
+                fulfilled[i] = runner -> {
+                    if (!(runner.request instanceof MutableHttpRequest<?>)) {
+                        runner.request = runner.request.mutate();
+                    }
+                    return runner.request;
+                };
             } else if (argument.getType().isAssignableFrom(MutableHttpResponse.class)) {
                 if (!isResponseFilter) {
                     throw new IllegalArgumentException("Filter is called before the response is known, can't have a response argument");
@@ -436,7 +443,7 @@ public class FilterRunner {
                     throw new IllegalArgumentException("Only one continuation per filter is allowed");
                 }
                 Argument<?> continuationReturnType = argument.getFirstTypeVariable().orElseThrow(() -> new IllegalArgumentException("Continuations must specify generic type"));
-                if (continuationReturnType.isReactive() && continuationReturnType.getWrappedType().isAssignableFrom(MutableHttpResponse.class)) {
+                if (isReactive(continuationReturnType) && continuationReturnType.getWrappedType().isAssignableFrom(MutableHttpResponse.class)) {
                     fulfilled[i] = runner -> {
                         SuspensionPoint newSuspensionPoint = runner.new ReactiveContinuationImpl<>(
                             runner.index - 1,
@@ -482,6 +489,11 @@ public class FilterRunner {
             passedOnContinuationArgIndex,
             prepareReturnHandler(returnType, isResponseFilter, passedOnContinuationArgIndex != -1)
         );
+    }
+
+    private static boolean isReactive(Argument<?> continuationReturnType) {
+        // Argument.isReactive doesn't work in http-validation, this is a workaround
+        return continuationReturnType.isReactive() || continuationReturnType.getType() == Publisher.class;
     }
 
     private static FilterReturnHandler prepareReturnHandler(Argument<?> type, boolean isResponseFilter, boolean hasContinuation) throws IllegalArgumentException {
@@ -555,7 +567,7 @@ public class FilterRunner {
                 };
             }
         }
-        if (type.isReactive()) {
+        if (isReactive(type)) {
             var next = prepareReturnHandler(type.getWrappedType(), isResponseFilter, hasContinuation);
             return new DelayedFilterReturnHandler(isResponseFilter, next) {
                 @Override
