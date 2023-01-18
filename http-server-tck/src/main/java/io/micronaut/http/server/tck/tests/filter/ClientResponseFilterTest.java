@@ -42,6 +42,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -174,6 +175,34 @@ public class ClientResponseFilterTest {
     }
 
     @Test
+    public void responseFilterReplaceResponseNull() throws IOException {
+        TestScenario.builder()
+            .specName(SPEC_NAME)
+            .request(HttpRequest.GET("/response-filter/replace-response-null"))
+            .assertion((server, request) -> {
+                AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .body("foo")
+                    .build());
+            })
+            .run();
+    }
+
+    @Test
+    public void responseFilterReplaceResponseEmpty() throws IOException {
+        TestScenario.builder()
+            .specName(SPEC_NAME)
+            .request(HttpRequest.GET("/response-filter/replace-response-empty"))
+            .assertion((server, request) -> {
+                AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .body("foo")
+                    .build());
+            })
+            .run();
+    }
+
+    @Test
     public void responseFilterReplacePublisherResponse() throws IOException {
         TestScenario.builder()
             .specName(SPEC_NAME)
@@ -289,6 +318,17 @@ public class ClientResponseFilterTest {
             return HttpResponse.ok("responseFilterReplaceMutableResponse " + response.body());
         }
 
+        @ResponseFilter("/response-filter/replace-response-null")
+        @Nullable
+        public HttpResponse<?> responseFilterReplaceResponseNull() {
+            return null;
+        }
+
+        @ResponseFilter("/response-filter/replace-response-empty")
+        public Optional<HttpResponse<?>> responseFilterReplaceResponseEmpty() {
+            return Optional.empty();
+        }
+
         @ResponseFilter("/response-filter/replace-publisher-response")
         public Publisher<MutableHttpResponse<?>> responseFilterReplacePublisherResponse(HttpResponse<?> response) {
             return Flux.just(HttpResponse.ok("responseFilterReplacePublisherResponse " + response.body()));
@@ -345,6 +385,16 @@ public class ClientResponseFilterTest {
 
         @Get("/response-filter/replace-mutable-response")
         public String responseFilterReplaceMutableResponse() {
+            return "foo";
+        }
+
+        @Get("/response-filter/replace-response-null")
+        public String responseFilterReplaceResponseNull() {
+            return "foo";
+        }
+
+        @Get("/response-filter/replace-response-empty")
+        public String responseFilterReplaceResponseEmpty() {
             return "foo";
         }
 
