@@ -778,18 +778,6 @@ class Foo {}
         AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].parameters[0].type.typeArguments.get("E").name == 'test.Foo'
     }
 
-    // TODO: Investigate why this fails on JDK 11
-    // com.sun.tools.javac.util.PropagatedException: java.lang.IllegalStateException
-    //     at jdk.compiler/com.sun.tools.javac.api.JavacTaskImpl.prepareCompiler(JavacTaskImpl.java:187)
-    //     at jdk.compiler/com.sun.tools.javac.api.JavacTaskImpl.enter(JavacTaskImpl.java:290)
-    //     at jdk.compiler/com.sun.tools.javac.api.JavacTaskImpl.ensureEntered(JavacTaskImpl.java:481)
-    //     at jdk.compiler/com.sun.tools.javac.model.JavacElements.ensureEntered(JavacElements.java:779)
-    //     at jdk.compiler/com.sun.tools.javac.model.JavacElements.doGetTypeElement(JavacElements.java:171)
-    //     at jdk.compiler/com.sun.tools.javac.model.JavacElements.getTypeElement(JavacElements.java:160)
-    //     at jdk.compiler/com.sun.tools.javac.model.JavacElements.getTypeElement(JavacElements.java:87)
-    //     at io.micronaut.annotation.processing.GenericUtils.buildGenericTypeArgumentElementInfo(GenericUtils.java:91)
-    //     at io.micronaut.annotation.processing.visitor.JavaClassElement.getSuperType(JavaClassElement.java:127)
-    @IgnoreIf({ Jvm.current.isJava9Compatible() })
     void "test JavaClassElement.getSuperType() with generic types"() {
         given:
         buildBeanDefinition('test.MyBean', '''
@@ -1493,6 +1481,87 @@ class Pet {
         then:
             returnType.hasAnnotation(Introspected)
             genericReturnType.hasAnnotation(Introspected)
+    }
+
+    void "test annotation metadata present on deep type parameters for field"() {
+        ClassElement ce = buildClassElement('''
+package test;
+import io.micronaut.core.annotation.*;
+import javax.validation.constraints.*;
+import java.util.List;
+
+class Test {
+    List<@Size(min=1, max=2) List<@NotEmpty List<@NotNull String>>> deepList;
+}
+''')
+        expect:
+            def field = ce.getFields().find { it.name == "deepList"}
+            def fieldType = field.getGenericType()
+
+            fieldType.getAnnotationMetadata().getAnnotationNames().size() == 0
+
+            assertListGenericArgument(fieldType, { ClassElement listArg1 ->
+                assert listArg1.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.Size$List']
+                assertListGenericArgument(listArg1, { ClassElement listArg2 ->
+                    assert listArg2.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.NotEmpty$List']
+                    assertListGenericArgument(listArg2, { ClassElement listArg3 ->
+                        assert listArg3.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.NotNull$List']
+                    })
+                })
+            })
+
+            def level1 = fieldType.getTypeArguments()["E"]
+            level1.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.Size$List']
+            def level2 = level1.getTypeArguments()["E"]
+            level2.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.NotEmpty$List']
+            def level3 = level2.getTypeArguments()["E"]
+            level3.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.NotNull$List']
+    }
+
+    void "test annotation metadata present on deep type parameters for method"() {
+        ClassElement ce = buildClassElement('''
+package test;
+import io.micronaut.core.annotation.*;
+import javax.validation.constraints.*;
+import java.util.List;
+
+class Test {
+    List<@Size(min=1, max=2) List<@NotEmpty List<@NotNull String>>> deepList() {
+        return null;
+    }
+}
+''')
+        expect:
+            def method = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("deepList")).get()
+            def theType = method.getGenericReturnType()
+
+            theType.getAnnotationMetadata().getAnnotationNames().size() == 0
+
+            assertListGenericArgument(theType, { ClassElement listArg1 ->
+                assert listArg1.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.Size$List']
+                assertListGenericArgument(listArg1, { ClassElement listArg2 ->
+                    assert listArg2.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.NotEmpty$List']
+                    assertListGenericArgument(listArg2, { ClassElement listArg3 ->
+                        assert listArg3.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.NotNull$List']
+                    })
+                })
+            })
+
+            def level1 = theType.getTypeArguments()["E"]
+            level1.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.Size$List']
+            def level2 = level1.getTypeArguments()["E"]
+            level2.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.NotEmpty$List']
+            def level3 = level2.getTypeArguments()["E"]
+            level3.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.NotNull$List']
+    }
+
+    private void assertListGenericArgument(ClassElement type, Closure cl) {
+        def arg1 = type.getAllTypeArguments().get(List.class.name).get("E")
+        def arg2 = type.getAllTypeArguments().get(Collection.class.name).get("E")
+        def arg3 = type.getAllTypeArguments().get(Iterable.class.name).get("T")
+        cl.call(arg1)
+        cl.call(arg2)
+        cl.call(arg3)
     }
 
     private void assertMethodsByName(List<MethodElement> allMethods, String name, List<String> expectedDeclaringTypeSimpleNames) {

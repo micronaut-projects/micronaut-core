@@ -25,19 +25,19 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ArrayableClassElement;
-import io.micronaut.inject.ast.PropertyElementQuery;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
-import io.micronaut.inject.ast.ParameterElement;
-import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.PackageElement;
+import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PropertyElement;
+import io.micronaut.inject.ast.PropertyElementQuery;
 import io.micronaut.inject.ast.WildcardElement;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.utils.AstBeanPropertiesUtils;
 import io.micronaut.inject.ast.utils.EnclosedElementsQuery;
 import io.micronaut.inject.processing.JavaModelUtils;
@@ -93,6 +93,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     private String name;
     private String packageName;
     private Map<String, ClassElement> resolvedTypeArguments;
+    private Map<String, Map<String, ClassElement>> allTypeArguments;
     private final JavaEnclosedElementsQuery enclosedElementsQuery = new JavaEnclosedElementsQuery();
 
     /**
@@ -794,41 +795,44 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     @NonNull
     @Override
     public Map<String, Map<String, ClassElement>> getAllTypeArguments() {
-        Map<String, TypeMirror> typeArguments = getBoundTypeMirrors();
-        Map<String, Map<String, TypeMirror>> info = visitorContext.getGenericUtils()
-            .buildGenericTypeArgumentElementInfo(
-                classElement,
-                null,
-                typeArguments
-            );
-        Map<String, Map<String, ClassElement>> result = new LinkedHashMap<>(info.size());
-        info.forEach((name, generics) -> {
-            Map<String, ClassElement> resolved = new LinkedHashMap<>(generics.size());
-            generics.forEach((variable, mirror) -> {
-                final Map<String, TypeMirror> typeInfo = this.genericTypeInfo != null ? this.genericTypeInfo.get(getName()) : null;
-                TypeMirror resolvedType = mirror;
-                if (mirror instanceof TypeVariable && typeInfo != null) {
-                    final TypeMirror tm = typeInfo.get(mirror.toString());
-                    if (tm != null) {
-                        resolvedType = tm;
-                    }
-                }
-                ClassElement classElement = mirrorToClassElement(
-                    resolvedType,
-                    visitorContext,
-                    info,
-                    visitorContext.getConfiguration().includeTypeLevelAnnotationsInGenericArguments(),
-                    mirror instanceof TypeVariable
+        if (allTypeArguments == null) {
+            Map<String, TypeMirror> typeArguments = getBoundTypeMirrors();
+            Map<String, Map<String, TypeMirror>> info = visitorContext.getGenericUtils()
+                .buildGenericTypeArgumentElementInfo(
+                    classElement,
+                    null,
+                    typeArguments
                 );
-                resolved.put(variable, classElement);
+            Map<String, Map<String, ClassElement>> result = new LinkedHashMap<>(info.size());
+            info.forEach((name, generics) -> {
+                Map<String, ClassElement> resolved = new LinkedHashMap<>(generics.size());
+                generics.forEach((variable, mirror) -> {
+                    final Map<String, TypeMirror> typeInfo = this.genericTypeInfo != null ? this.genericTypeInfo.get(getName()) : null;
+                    TypeMirror resolvedType = mirror;
+                    if (mirror instanceof TypeVariable && typeInfo != null) {
+                        final TypeMirror tm = typeInfo.get(mirror.toString());
+                        if (tm != null) {
+                            resolvedType = tm;
+                        }
+                    }
+                    ClassElement classElement = mirrorToClassElement(
+                        resolvedType,
+                        visitorContext,
+                        info,
+                        visitorContext.getConfiguration().includeTypeLevelAnnotationsInGenericArguments(),
+                        mirror instanceof TypeVariable
+                    );
+                    resolved.put(variable, classElement);
+                });
+                result.put(name, resolved);
             });
-            result.put(name, resolved);
-        });
 
-        if (!typeArguments.isEmpty()) {
-            result.put(JavaModelUtils.getClassName(this.classElement), getTypeArguments());
+            if (!typeArguments.isEmpty()) {
+                result.put(JavaModelUtils.getClassName(this.classElement), getTypeArguments());
+            }
+            allTypeArguments = result;
         }
-        return result;
+        return allTypeArguments;
     }
 
     /**
