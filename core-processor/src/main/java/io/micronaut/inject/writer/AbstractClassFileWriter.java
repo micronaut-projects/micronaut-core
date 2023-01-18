@@ -394,11 +394,13 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         boolean hasAnnotationMetadata = !annotationMetadata.isEmpty();
 
         boolean isRecursiveType = false;
-        if (classElement instanceof GenericPlaceholderElement) {
-            if (visitedTypes.contains(classElement)) {
+        if (classElement instanceof GenericPlaceholderElement placeholderElement) {
+            // Prevent placeholder recursion
+            Object genericNativeType = placeholderElement.getGenericNativeType();
+            if (visitedTypes.contains(genericNativeType)) {
                 isRecursiveType = true;
             } else {
-                visitedTypes.add(classElement);
+                visitedTypes.add(genericNativeType);
             }
         }
 

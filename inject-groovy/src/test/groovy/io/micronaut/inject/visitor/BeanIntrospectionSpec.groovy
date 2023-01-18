@@ -2277,5 +2277,44 @@ class Test extends RecursiveGenerics<Test> {
             introspection != null
     }
 
+    void "test type_use annotations"() {
+        given:
+            def introspection = buildBeanIntrospection('test.Test', '''
+package test;
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.*;
+import io.micronaut.inject.visitor.*;
+@Introspected
+class Test {
+    @io.micronaut.inject.visitor.TypeUseRuntimeAnn
+    private String name;
+    @io.micronaut.inject.visitor.TypeUseClassAnn
+    private String secondName;
+    public String getName() {
+        return name;
+    }
+    public void setName(String name) {
+        this.name = name;
+    }
+    public String getSecondName() {
+        return name;
+    }
+    public void setSecondName(String secondName) {
+        this.secondName = secondName;
+    }
+}
+''')
+            def nameField = introspection.getProperty("name").orElse(null)
+            def secondNameField = introspection.getProperty("secondName").orElse(null)
+
+        expect:
+            nameField
+            secondNameField
+
+            nameField.hasStereotype(TypeUseRuntimeAnn)
+            nameField.hasStereotype("io.micronaut.inject.visitor.TypeUseRuntimeAnn")
+            !secondNameField.hasStereotype(TypeUseClassAnn)
+            !secondNameField.hasStereotype("io.micronaut.inject.visitor.TypeUseClassAnn")
+    }
 
 }

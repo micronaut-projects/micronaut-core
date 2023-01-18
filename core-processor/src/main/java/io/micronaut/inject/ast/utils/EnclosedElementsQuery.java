@@ -56,6 +56,26 @@ public abstract class EnclosedElementsQuery<C, N> {
     private final Map<N, Element> elementsCache = new ConcurrentLinkedHashMap.Builder<N, Element>().maximumWeightedCapacity(200).build();
 
     /**
+     * Get native class element.
+     *
+     * @param classElement The class element
+     * @return The native element
+     */
+    protected C getNativeClassType(ClassElement classElement) {
+        return (C) classElement.getNativeType();
+    }
+
+    /**
+     * Get native element.
+     *
+     * @param element The element
+     * @return The native element
+     */
+    protected N getNativeType(Element element) {
+        return (N) element.getNativeType();
+    }
+
+    /**
      * Return the elements that match the given query.
      *
      * @param classElement The class element
@@ -68,7 +88,7 @@ public abstract class EnclosedElementsQuery<C, N> {
         ElementQuery.Result<T> result = query.result();
         Set<N> excludeElements = getExcludedNativeElements(result);
         Predicate<io.micronaut.inject.ast.Element> filter = element -> {
-            if (excludeElements.contains(element.getNativeType())) {
+            if (excludeElements.contains(getNativeType(element))) {
                 return false;
             }
             List<Predicate<T>> elementPredicates = result.getElementPredicates();
@@ -136,12 +156,12 @@ public abstract class EnclosedElementsQuery<C, N> {
                     ClassElement ce;
                     if (element instanceof ConstructorElement) {
                         ce = classElement;
-                    } else if (element instanceof MethodElement) {
-                        ce = ((MethodElement) element).getGenericReturnType();
-                    } else if (element instanceof ClassElement) {
-                        ce = (ClassElement) element;
-                    } else if (element instanceof FieldElement) {
-                        ce = ((FieldElement) element).getGenericField();
+                    } else if (element instanceof MethodElement methodElement) {
+                        ce = methodElement.getGenericReturnType();
+                    } else if (element instanceof ClassElement theClass) {
+                        ce = theClass;
+                    } else if (element instanceof FieldElement fieldElement) {
+                        ce = fieldElement.getGenericField();
                     } else {
                         throw new IllegalStateException("Unknown element: " + element);
                     }
@@ -152,7 +172,7 @@ public abstract class EnclosedElementsQuery<C, N> {
             }
             return true;
         };
-        return (List<T>) getAllElements((C) classElement.getNativeType(), result.isOnlyDeclared(), (t1, t2) -> reduceElements(t1, t2, result), result)
+        return (List<T>) getAllElements(getNativeClassType(classElement), result.isOnlyDeclared(), (t1, t2) -> reduceElements(t1, t2, result), result)
             .stream()
             .filter(filter)
             .toList();
@@ -162,18 +182,18 @@ public abstract class EnclosedElementsQuery<C, N> {
                                    io.micronaut.inject.ast.Element existingElement,
                                    ElementQuery.Result<?> result) {
         if (!result.isIncludeHiddenElements()) {
-            if (newElement instanceof FieldElement && existingElement instanceof FieldElement) {
-                return ((FieldElement) newElement).hides((FieldElement) existingElement);
+            if (newElement instanceof FieldElement newFiledElement && existingElement instanceof FieldElement existingFieldElement) {
+                return newFiledElement.hides(existingFieldElement);
             }
-            if (newElement instanceof MethodElement && existingElement instanceof MethodElement) {
-                if (((MethodElement) newElement).hides((MethodElement) existingElement)) {
+            if (newElement instanceof MethodElement newMethodElement && existingElement instanceof MethodElement existingMethodElement) {
+                if (newMethodElement.hides(existingMethodElement)) {
                     return true;
                 }
             }
         }
         if (!result.isIncludeOverriddenMethods()) {
-            if (newElement instanceof MethodElement && existingElement instanceof MethodElement) {
-                return ((MethodElement) newElement).overrides((MethodElement) existingElement);
+            if (newElement instanceof MethodElement newMethodElement && existingElement instanceof MethodElement existingMethodElement) {
+                return newMethodElement.overrides(existingMethodElement);
             } else if (newElement instanceof PropertyElement newPropertyElement && existingElement instanceof PropertyElement existingPropertyElement) {
                 return newPropertyElement.overrides(existingPropertyElement);
             }
@@ -220,6 +240,7 @@ public abstract class EnclosedElementsQuery<C, N> {
 
     /**
      * get the cache key.
+     *
      * @param element The element
      * @return The cache key
      */

@@ -20,13 +20,14 @@ import groovy.transform.CompileStatic
 import io.micronaut.ast.groovy.utils.AstMessageUtils
 import io.micronaut.ast.groovy.utils.InMemoryByteCodeGroovyClassLoader
 import io.micronaut.ast.groovy.utils.InMemoryClassWriterOutputVisitor
+import io.micronaut.ast.groovy.visitor.GroovyNativeElement
 import io.micronaut.ast.groovy.visitor.GroovyPackageElement
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.context.annotation.Configuration
 import io.micronaut.context.annotation.Context
-import io.micronaut.inject.processing.ProcessingException
 import io.micronaut.inject.processing.BeanDefinitionCreator
 import io.micronaut.inject.processing.BeanDefinitionCreatorFactory
+import io.micronaut.inject.processing.ProcessingException
 import io.micronaut.inject.visitor.VisitorConfiguration
 import io.micronaut.inject.writer.BeanConfigurationWriter
 import io.micronaut.inject.writer.BeanDefinitionReferenceWriter
@@ -126,7 +127,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     }
                 })
             } catch (ProcessingException ex) {
-                groovyVisitorContext.fail(ex.getMessage(), ex.getOriginatingElement() as ASTNode)
+                groovyVisitorContext.fail(ex.getMessage(), (ex.getOriginatingElement() as GroovyNativeElement).annotatedNode())
             }
         }
 

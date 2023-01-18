@@ -78,7 +78,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     private static final Map<String, List<AnnotationMapper<?>>> ANNOTATION_MAPPERS = new HashMap<>(10);
     private static final Map<String, List<AnnotationTransformer<?>>> ANNOTATION_TRANSFORMERS = new HashMap<>(5);
     private static final Map<String, List<AnnotationRemapper>> ANNOTATION_REMAPPERS = new HashMap<>(5);
-    private static final Map<MetadataKey<?>, CachedAnnotationMetadata> MUTATED_ANNOTATION_METADATA = new HashMap<>(100);
+    private static final Map<Object, CachedAnnotationMetadata> MUTATED_ANNOTATION_METADATA = new HashMap<>(100);
     private static final Map<String, Set<String>> NON_BINDING_CACHE = new HashMap<>(50);
     private static final Map<String, Map<CharSequence, Object>> ANNOTATION_DEFAULTS = new HashMap<>(20);
 
@@ -254,6 +254,21 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             T element = elements[elements.length - 1];
             return buildInternal(inheritTypeAnnotations, false, element);
         });
+    }
+
+    /**
+     * Lookup or build new annotation metadata.
+     *
+     * @param key                    The cache key
+     * @param element                The type element
+     * @param includeTypeAnnotations Whether to include type level annotations in the metadata for the element
+     * @return The annotation metadata
+     */
+    public CachedAnnotationMetadata lookupOrBuild(Object key, T element, boolean includeTypeAnnotations) {
+        return MUTATED_ANNOTATION_METADATA.computeIfAbsent(
+            key,
+            metadataKey -> new DefaultCachedAnnotationMetadata(buildInternal(includeTypeAnnotations, false, element))
+        );
     }
 
     private AnnotationMetadata buildInternal(boolean inheritTypeAnnotations, boolean declaredOnly, T element) {

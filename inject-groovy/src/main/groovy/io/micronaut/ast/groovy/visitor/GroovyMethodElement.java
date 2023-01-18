@@ -48,25 +48,33 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
     private final MethodNode methodNode;
     private final GroovyClassElement owningType;
     private ClassElement declaringType;
+    private Map<String, ClassElement> declaredTypeArguments;
+    private Map<String, ClassElement> typeArguments;
 
     /**
      * @param owningType         The owning type
      * @param visitorContext     The visitor context
+     * @param nativeElement      The native element
      * @param methodNode         The {@link MethodNode}
      * @param annotationMetadata The annotation metadata
      */
     GroovyMethodElement(GroovyClassElement owningType,
                         GroovyVisitorContext visitorContext,
+                        GroovyNativeElement nativeElement,
                         MethodNode methodNode,
                         ElementAnnotationMetadataFactory annotationMetadata) {
-        super(visitorContext, methodNode, annotationMetadata);
+        super(visitorContext, nativeElement, annotationMetadata);
         this.methodNode = methodNode;
         this.owningType = owningType;
     }
 
+    public final MethodNode getMethodNode() {
+        return methodNode;
+    }
+
     @Override
     protected AbstractGroovyElement copyConstructor() {
-        return new GroovyMethodElement(owningType, visitorContext, methodNode, elementAnnotationMetadataFactory);
+        return new GroovyMethodElement(owningType, visitorContext, getNativeType(), methodNode, elementAnnotationMetadataFactory);
     }
 
     @Override
@@ -88,7 +96,7 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
 
     @Override
     public MethodElement withNewOwningType(ClassElement owningType) {
-        GroovyMethodElement groovyMethodElement = new GroovyMethodElement((GroovyClassElement) owningType, visitorContext, methodNode, elementAnnotationMetadataFactory);
+        GroovyMethodElement groovyMethodElement = new GroovyMethodElement((GroovyClassElement) owningType, visitorContext, getNativeType(), methodNode, elementAnnotationMetadataFactory);
         copyValues(groovyMethodElement);
         return groovyMethodElement;
     }
@@ -113,7 +121,7 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
     public String toString() {
         ClassNode declaringClass = methodNode.getDeclaringClass();
         if (declaringClass == null) {
-            declaringClass = owningType.getNativeType();
+            declaringClass = owningType.classNode;
         }
         return declaringClass.getName() + "." + methodNode.getName() + "(..)";
     }
@@ -164,16 +172,25 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
     }
 
     @Override
-    public MethodNode getNativeType() {
-        return methodNode;
+    public Map<String, ClassElement> getDeclaredTypeArguments() {
+        if (declaredTypeArguments == null) {
+            declaredTypeArguments = resolveMethodTypeArguments(getNativeType(), methodNode, getDeclaringType().getTypeArguments());
+        }
+        return declaredTypeArguments;
+    }
+
+    @Override
+    public Map<String, ClassElement> getTypeArguments() {
+        if (typeArguments == null) {
+            typeArguments = MethodElement.super.getTypeArguments();
+        }
+        return typeArguments;
     }
 
     @NonNull
     @Override
     public ClassElement getGenericReturnType() {
-        Map<String, ClassElement> parentTypeArguments = getDeclaringType().getTypeArguments();
-        Map<String, ClassElement> methodTypeArguments = resolveTypeArguments(methodNode, parentTypeArguments);
-        return newClassElement(methodNode.getReturnType(), methodTypeArguments);
+        return newClassElement(methodNode.getReturnType(), getTypeArguments());
     }
 
     @Override
@@ -195,6 +212,7 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
         return new GroovyParameterElement(
                 this,
                 visitorContext,
+                new GroovyNativeElement.Parameter(parameter, methodNode),
                 parameter,
                 elementAnnotationMetadataFactory
         );

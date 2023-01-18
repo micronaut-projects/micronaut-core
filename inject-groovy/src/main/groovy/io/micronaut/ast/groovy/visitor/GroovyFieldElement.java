@@ -50,7 +50,7 @@ public class GroovyFieldElement extends AbstractGroovyElement implements FieldEl
                        GroovyClassElement owningType,
                        FieldNode fieldNode,
                        ElementAnnotationMetadataFactory annotationMetadataFactory) {
-        super(visitorContext, fieldNode, annotationMetadataFactory);
+        super(visitorContext, new GroovyNativeElement.Field(fieldNode, owningType.getNativeType()), annotationMetadataFactory);
         this.owningType = owningType;
         this.fieldNode = fieldNode;
     }
@@ -63,11 +63,6 @@ public class GroovyFieldElement extends AbstractGroovyElement implements FieldEl
     @Override
     public FieldElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
         return (FieldElement) super.withAnnotationMetadata(annotationMetadata);
-    }
-
-    @Override
-    public FieldNode getNativeType() {
-        return fieldNode;
     }
 
     @Override
@@ -162,7 +157,7 @@ public class GroovyFieldElement extends AbstractGroovyElement implements FieldEl
         if (declaringClass == null) {
             throw new IllegalStateException("Declaring class could not be established");
         }
-        if (owningType.getNativeType().equals(declaringClass)) {
+        if (owningType.getNativeType().annotatedNode().equals(declaringClass)) {
             return owningType;
         }
         Map<String, ClassElement> typeArguments = getOwningType().getTypeArguments(declaringClass.getName());

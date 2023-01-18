@@ -41,7 +41,7 @@ public class GroovyPackageElement extends AbstractGroovyElement implements Packa
     public GroovyPackageElement(GroovyVisitorContext visitorContext,
                                 PackageNode packageNode,
                                 ElementAnnotationMetadataFactory annotationMetadataFactory) {
-        super(visitorContext, packageNode, annotationMetadataFactory);
+        super(visitorContext, new GroovyNativeElement.Package(packageNode), annotationMetadataFactory);
         this.packageNode = packageNode;
     }
 
@@ -78,12 +78,6 @@ public class GroovyPackageElement extends AbstractGroovyElement implements Packa
     @Override
     public boolean isPublic() {
         return true;
-    }
-
-    @NonNull
-    @Override
-    public PackageNode getNativeType() {
-        return packageNode;
     }
 
 }
