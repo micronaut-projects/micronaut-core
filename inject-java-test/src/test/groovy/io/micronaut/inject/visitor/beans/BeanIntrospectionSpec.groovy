@@ -24,6 +24,7 @@ import io.micronaut.core.convert.TypeConverter
 import io.micronaut.core.reflect.InstantiationUtils
 import io.micronaut.core.reflect.exception.InstantiationException
 import io.micronaut.core.type.Argument
+import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.ExecutableMethod
 import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
 import io.micronaut.inject.visitor.TypeElementVisitor
@@ -1904,11 +1905,11 @@ public class Test {
     int num;
     String str;
 
+    @Creator
     public <T extends Enum<T>> Test(int num, String str, Class<T> enumClass) {
         this(num, str + enumClass.getName());
     }
 
-    @Creator
     public <T extends Enum<T>> Test(int num, String str) {
         this.num = num;
         this.str = str;
@@ -1919,6 +1920,40 @@ public class Test {
 ''')
         expect:
         introspection != null
+    }
+
+    void "test annotation metadata present on deep type parameters"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test','''\
+package test;
+import io.micronaut.core.annotation.*;
+import javax.validation.constraints.*;
+import java.util.List;
+
+@Introspected
+public class Test {
+    List<@Size(min=1, max=2) List<@NotEmpty List<@NotNull String>>> deepList;
+
+    Test(List<List<List<String>>> deepList) { this.deepList = deepList; }
+    List<List<List<String>>> getDeepList() { return deepList; }
+}
+''')
+        expect:
+        introspection != null
+        def property = introspection.getProperty("deepList").get().asArgument()
+        property.getTypeParameters().length == 1
+        def param1 = property.getTypeParameters()[0]
+        param1.getTypeParameters().length == 1
+        def param2 = param1.getTypeParameters()[0]
+        param2.getTypeParameters().length == 1
+        def param3 = param2.getTypeParameters()[0]
+
+        property.getAnnotationMetadata().getAnnotationNames().size() == 0
+        param1.getAnnotationMetadata().getAnnotationNames().size() == 1
+        param1.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.Size$List']
+        param2.getAnnotationMetadata().getAnnotationNames().size() == 1
+        param2.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.NotEmpty$List']
+        param3.getAnnotationMetadata().getAnnotationNames().size() == 1
+        param3.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.NotNull$List']
     }
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/2083')
