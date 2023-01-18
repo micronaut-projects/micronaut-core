@@ -16,6 +16,7 @@
 package io.micronaut.http.filter;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.HttpRequest;
 
 /**
@@ -42,7 +43,8 @@ public interface FilterContinuation<R> {
      * @param request The new request
      * @return This continuation, for call chaining
      */
-    FilterContinuation<R> request(HttpRequest<?> request);
+    @NonNull
+    FilterContinuation<R> request(@NonNull HttpRequest<?> request);
 
     /**
      * Proceed processing downstream of this filter. If {@link R} is not a reactive type, this
@@ -57,5 +59,6 @@ public interface FilterContinuation<R> {
      *
      * @return The downstream result, or reactive stream wrapper thereof
      */
+    @NonNull
     R proceed();
 }

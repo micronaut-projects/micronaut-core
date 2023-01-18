@@ -83,15 +83,16 @@ public final class FilterVisitor implements TypeElementVisitor<Object, Object> {
             Argument<?> ret = toArgument(element.getReturnType(), context);
 
             if (requestFilterAnnotation != null) {
+                // will throw on validation error
                 FilterRunner.prepareFilterMethod(null, null, args, ret, false, null);
             }
             if (responseFilterAnnotation != null) {
+                // will throw on validation error
                 FilterRunner.prepareFilterMethod(null, null, args, ret, true, null);
             }
         } catch (IllegalArgumentException e) {
             context.fail(e.getMessage(), element);
         }
-        context.warn("hi", element);
     }
 
     private Argument<?>[] toArguments(Collection<ClassElement> classElements, VisitorContext context) {

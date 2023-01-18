@@ -43,6 +43,7 @@ import reactor.core.publisher.Mono;
 import reactor.util.context.Context;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -73,8 +74,7 @@ import java.util.function.Predicate;
 @Internal
 public class FilterRunner {
     private static final Logger LOG = LoggerFactory.getLogger(FilterRunner.class);
-
-    private static final Object[] SKIP_FILTER = new Object[0];
+    private static final Predicate<FilterRunner> FILTER_CONDITION_ALWAYS_TRUE = runner -> true;
 
     private final List<GenericHttpFilter> filters;
 
@@ -87,8 +87,13 @@ public class FilterRunner {
 
     private Context reactorContext = Context.empty();
 
+    /**
+     * Create a new filter runner, to be used only once.
+     *
+     * @param filters The filters to run
+     */
     public FilterRunner(List<GenericHttpFilter> filters) {
-        this.filters = filters;
+        this.filters = Objects.requireNonNull(filters, "filters");
     }
 
     private static void checkOrdered(List<GenericHttpFilter> filters) {
@@ -97,12 +102,24 @@ public class FilterRunner {
         }
     }
 
-    public static void sort(List<GenericHttpFilter> filters) {
+    /**
+     * Sort filters according to their declared order (e.g. annotation,
+     * {@link Ordered#getOrder()}...). List must not contain terminal filters.
+     *
+     * @param filters The list of filters to sort in place
+     */
+    public static void sort(@NonNull List<GenericHttpFilter> filters) {
         checkOrdered(filters);
         OrderUtil.sort(filters);
     }
 
-    public static void sortReverse(List<GenericHttpFilter> filters) {
+    /**
+     * Sort filters according to their declared order (e.g. annotation,
+     * {@link Ordered#getOrder()}...). List must not contain terminal filters. Reverse order.
+     *
+     * @param filters The list of filters to sort in place
+     */
+    public static void sortReverse(@NonNull List<GenericHttpFilter> filters) {
         checkOrdered(filters);
         OrderUtil.reverseSort(filters);
     }
@@ -397,8 +414,7 @@ public class FilterRunner {
     @Internal
     public static <T> FilterMethod<T> prepareFilterMethod(T bean, ExecutableMethod<T, ?> method, Argument<?>[] arguments, Argument<?> returnType, boolean isResponseFilter, FilterOrder order) throws IllegalArgumentException {
         FilterArgBinder[] fulfilled = new FilterArgBinder[arguments.length];
-        Predicate<FilterRunner> filterConditionAlwaysTrue = runner -> true;
-        Predicate<FilterRunner> filterCondition = filterConditionAlwaysTrue;
+        Predicate<FilterRunner> filterCondition = FILTER_CONDITION_ALWAYS_TRUE;
         boolean skipOnError = isResponseFilter;
 
         int passedOnContinuationArgIndex = -1;
@@ -476,7 +492,7 @@ public class FilterRunner {
         if (skipOnError) {
             filterCondition = filterCondition.and(r -> r.failure == null);
         }
-        if (filterCondition == filterConditionAlwaysTrue) {
+        if (filterCondition == FILTER_CONDITION_ALWAYS_TRUE) {
             filterCondition = null;
         }
         return new FilterMethod<>(
@@ -738,7 +754,7 @@ public class FilterRunner {
 
         @Override
         public FilterContinuation<R> request(HttpRequest<?> request) {
-            FilterRunner.this.request = request;
+            FilterRunner.this.request = Objects.requireNonNull(request, "request");
             return this;
         }
 
