@@ -345,7 +345,7 @@ public class GenericUtils {
             Map<String, TypeMirror> genericsInfo) {
         if (typeArguments.size() == typeParameters.size()) {
 
-            Map<String, TypeMirror> resolved = new HashMap<>(typeArguments.size());
+            Map<String, TypeMirror> resolved = CollectionUtils.newHashMap(typeArguments.size());
             Iterator<? extends TypeMirror> i = typeArguments.iterator();
             for (TypeParameterElement typeParameter : typeParameters) {
                 TypeMirror typeParameterMirror = i.next();
@@ -357,11 +357,10 @@ public class GenericUtils {
         return Collections.emptyMap();
     }
 
-    private void resolveVariableForMirror(
-            Map<String, TypeMirror> genericsInfo,
-            Map<String, TypeMirror> resolved,
-            String variableName,
-            TypeMirror mirror) {
+    private void resolveVariableForMirror(Map<String, TypeMirror> genericsInfo,
+                                          Map<String, TypeMirror> resolved,
+                                          String variableName,
+                                          TypeMirror mirror) {
         if (mirror instanceof TypeVariable) {
             TypeVariable tv = (TypeVariable) mirror;
             resolveTypeVariable(genericsInfo, resolved, variableName, tv);
@@ -395,7 +394,10 @@ public class GenericUtils {
                         }
                     }
                     TypeMirror[] typeMirrors = resolvedArguments.toArray(new TypeMirror[0]);
-                    resolved.put(variableName, mirror);
+                    TypeElement typeElement = (TypeElement) dt.asElement();
+
+                    DeclaredType declaredType =  typeUtils.getDeclaredType(typeElement, typeMirrors);
+                    resolved.put(variableName, new PreservedAnnotationsTypeMirror(typeElement, mirror, declaredType));
                 } else {
                     resolved.put(variableName, mirror);
                 }
@@ -413,18 +415,15 @@ public class GenericUtils {
         String name = variable.toString();
         TypeMirror element = genericsInfo.get(name);
         if (element != null) {
-            if (element instanceof DeclaredType) {
-                DeclaredType dt = (DeclaredType) element;
+            if (element instanceof DeclaredType dt) {
                 List<? extends TypeMirror> typeArguments = dt.getTypeArguments();
                 for (TypeMirror typeArgument : typeArguments) {
-                    if (typeArgument instanceof TypeVariable) {
-                        TypeVariable tv = (TypeVariable) typeArgument;
+                    if (typeArgument instanceof TypeVariable tv) {
                         TypeMirror upperBound = tv.getUpperBound();
                         if (upperBound instanceof DeclaredType) {
                             resolved.put(variableName, upperBound);
                             break;
                         }
-
                         TypeMirror lowerBound = tv.getLowerBound();
                         if (lowerBound instanceof DeclaredType) {
                             resolved.put(variableName, lowerBound);
@@ -432,7 +431,6 @@ public class GenericUtils {
                         }
                     }
                 }
-
                 if (!resolved.containsKey(variableName)) {
                     resolved.put(variableName, element);
                 }
@@ -441,22 +439,16 @@ public class GenericUtils {
             }
         } else {
             TypeMirror upperBound = variable.getUpperBound();
-            if (upperBound instanceof TypeVariable) {
-                resolveTypeVariable(genericsInfo, resolved, variableName, (TypeVariable) upperBound);
+            if (upperBound instanceof TypeVariable upperTypeVariable) {
+                resolveTypeVariable(genericsInfo, resolved, variableName, upperTypeVariable);
             } else if (upperBound instanceof DeclaredType) {
-                resolved.put(
-                        variableName,
-                        upperBound
-                );
+                resolved.put(variableName, upperBound);
             } else {
                 TypeMirror lowerBound = variable.getLowerBound();
-                if (lowerBound instanceof TypeVariable) {
-                    resolveTypeVariable(genericsInfo, resolved, variableName, (TypeVariable) lowerBound);
+                if (lowerBound instanceof TypeVariable lowerTypeVariable) {
+                    resolveTypeVariable(genericsInfo, resolved, variableName, lowerTypeVariable);
                 } else if (lowerBound instanceof DeclaredType) {
-                    resolved.put(
-                            variableName,
-                            lowerBound
-                    );
+                    resolved.put(variableName, lowerBound);
                 }
             }
         }

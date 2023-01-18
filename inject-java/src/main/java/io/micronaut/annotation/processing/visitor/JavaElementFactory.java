@@ -15,9 +15,7 @@
  */
 package io.micronaut.annotation.processing.visitor;
 
-import io.micronaut.annotation.processing.JavaElementAnnotationMetadataFactory;
 import io.micronaut.annotation.processing.PostponeToNextRoundException;
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.ast.ClassElement;
@@ -51,12 +49,6 @@ public class JavaElementFactory implements ElementFactory<Element, TypeElement, 
 
     public JavaElementFactory(JavaVisitorContext visitorContext) {
         this.visitorContext = Objects.requireNonNull(visitorContext, "Visitor context cannot be null");
-    }
-
-    private ElementAnnotationMetadataFactory defaultAnnotationMetadata(Object nativeType,
-                                                                       AnnotationMetadata annotationMetadata) {
-        JavaElementAnnotationMetadataFactory elementAnnotationMetadataFactory = visitorContext.getElementAnnotationMetadataFactory();
-        return elementAnnotationMetadataFactory.overrideForNativeType(nativeType, element -> elementAnnotationMetadataFactory.build(element, annotationMetadata));
     }
 
     @NonNull

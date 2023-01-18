@@ -335,9 +335,9 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
                 if (visitorContext.getModelUtils().resolveKind(typeElement, ElementKind.ENUM).isPresent()) {
                     return new JavaEnumElement(
                         typeElement,
-                        resolveElementAnnotationMetadataFactory(typeElement, dt, includeTypeAnnotations),
+                        elementAnnotationMetadataFactory,
                         visitorContext
-                    );
+                    ).withAnnotationMetadata(createAnnotationMetadata(typeElement, dt, includeTypeAnnotations));
                 }
                 genericsInfo = visitorContext.getGenericUtils().alignNewGenericsInfo(
                     typeElement,
@@ -346,12 +346,12 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
                 );
                 return new JavaClassElement(
                     typeElement,
-                    resolveElementAnnotationMetadataFactory(typeElement, dt, includeTypeAnnotations),
+                    elementAnnotationMetadataFactory,
                     visitorContext,
                     typeArguments,
                     genericsInfo,
                     isTypeVariable
-                );
+                ).withAnnotationMetadata(createAnnotationMetadata(typeElement, dt, includeTypeAnnotations));
             }
             return PrimitiveElement.VOID;
         }
@@ -403,20 +403,17 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
         return PrimitiveElement.VOID;
     }
 
-    @NonNull
-    private ElementAnnotationMetadataFactory resolveElementAnnotationMetadataFactory(TypeElement typeElement, DeclaredType dt, boolean includeTypeAnnotations) {
-        return elementAnnotationMetadataFactory.overrideForNativeType(typeElement, element -> {
-            AnnotationUtils annotationUtils = visitorContext
-                .getAnnotationUtils();
-            AnnotationMetadata newAnnotationMetadata;
-            List<? extends AnnotationMirror> annotationMirrors = dt.getAnnotationMirrors();
-            if (!annotationMirrors.isEmpty()) {
-                newAnnotationMetadata = annotationUtils.newAnnotationBuilder().buildDeclared(typeElement, annotationMirrors, includeTypeAnnotations);
-            } else {
-                newAnnotationMetadata = includeTypeAnnotations ? annotationUtils.newAnnotationBuilder().lookupOrBuildForType(typeElement).copyAnnotationMetadata() : AnnotationMetadata.EMPTY_METADATA;
-            }
-            return elementAnnotationMetadataFactory.build(element, newAnnotationMetadata);
-        });
+    private AnnotationMetadata createAnnotationMetadata(TypeElement typeElement, DeclaredType dt, boolean includeTypeAnnotations) {
+        AnnotationUtils annotationUtils = visitorContext
+            .getAnnotationUtils();
+        AnnotationMetadata newAnnotationMetadata;
+        List<? extends AnnotationMirror> annotationMirrors = dt.getAnnotationMirrors();
+        if (!annotationMirrors.isEmpty()) {
+            newAnnotationMetadata = annotationUtils.newAnnotationBuilder().buildDeclared(typeElement, annotationMirrors, includeTypeAnnotations);
+        } else {
+            newAnnotationMetadata = includeTypeAnnotations ? annotationUtils.newAnnotationBuilder().lookupOrBuildForType(typeElement).copyAnnotationMetadata() : AnnotationMetadata.EMPTY_METADATA;
+        }
+        return newAnnotationMetadata;
     }
 
     private ClassElement resolveTypeVariable(JavaVisitorContext visitorContext,
