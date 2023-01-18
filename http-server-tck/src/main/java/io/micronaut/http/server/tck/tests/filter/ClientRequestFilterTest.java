@@ -16,6 +16,7 @@
 package io.micronaut.http.server.tck.tests.filter;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
@@ -36,11 +37,13 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 
@@ -64,7 +67,7 @@ public class ClientRequestFilterTest {
                     .build());
                 Assertions.assertEquals(
                     List.of("requestFilterImmediateRequestParameter /request-filter/immediate-request-parameter"),
-                    server.getApplicationContext().getBean(MyServerFilter.class).events
+                    server.getApplicationContext().getBean(MyClientFilter.class).events
                 );
             })
             .run();
@@ -83,6 +86,124 @@ public class ClientRequestFilterTest {
     }
 
     @Test
+    @Disabled // updating the request is not supported by http client atm
+    public void requestFilterReplaceRequest() throws IOException {
+        TestScenario.builder()
+            .specName(SPEC_NAME)
+            .request(HttpRequest.GET("/request-filter/replace-request"))
+            .assertion((server, request) -> {
+                AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .body("/request-filter/replace-request-2")
+                    .build());
+            })
+            .run();
+    }
+
+    @Test
+    @Disabled // updating the request is not supported by http client atm
+    public void requestFilterReplaceMutableRequest() throws IOException {
+        TestScenario.builder()
+            .specName(SPEC_NAME)
+            .request(HttpRequest.GET("/request-filter/replace-mutable-request"))
+            .assertion((server, request) -> {
+                AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .body("/request-filter/replace-mutable-request-2")
+                    .build());
+            })
+            .run();
+    }
+
+    @Test
+    public void requestFilterReplaceRequestNull() throws IOException {
+        TestScenario.builder()
+            .specName(SPEC_NAME)
+            .request(HttpRequest.GET("/request-filter/replace-request-null"))
+            .assertion((server, request) -> {
+                AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .body("/request-filter/replace-request-null")
+                    .build());
+            })
+            .run();
+    }
+
+    @Test
+    public void requestFilterReplaceRequestEmpty() throws IOException {
+        TestScenario.builder()
+            .specName(SPEC_NAME)
+            .request(HttpRequest.GET("/request-filter/replace-request-empty"))
+            .assertion((server, request) -> {
+                AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .body("/request-filter/replace-request-empty")
+                    .build());
+            })
+            .run();
+    }
+
+    @Test
+    @Disabled // updating the request is not supported by http client atm
+    public void requestFilterReplaceRequestPublisher() throws IOException {
+        TestScenario.builder()
+            .specName(SPEC_NAME)
+            .request(HttpRequest.GET("/request-filter/replace-request-publisher"))
+            .assertion((server, request) -> {
+                AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .body("/request-filter/replace-request-publisher-2")
+                    .build());
+            })
+            .run();
+    }
+
+    @Test
+    @Disabled // updating the request is not supported by http client atm
+    public void requestFilterReplaceRequestMono() throws IOException {
+        TestScenario.builder()
+            .specName(SPEC_NAME)
+            .request(HttpRequest.GET("/request-filter/replace-request-mono"))
+            .assertion((server, request) -> {
+                AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .body("/request-filter/replace-request-mono-2")
+                    .build());
+            })
+            .run();
+    }
+
+    @Test
+    @Disabled // updating the request is not supported by http client atm
+    public void requestFilterReplaceRequestCompletable() throws IOException {
+        TestScenario.builder()
+            .specName(SPEC_NAME)
+            .request(HttpRequest.GET("/request-filter/replace-request-completable"))
+            .assertion((server, request) -> {
+                AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .body("/request-filter/replace-request-completable-2")
+                    .build());
+            })
+            .run();
+    }
+
+    @Test
+    @Disabled // updating the request is not supported by http client atm
+    public void requestFilterReplaceRequestCompletion() throws IOException {
+        TestScenario.builder()
+            .specName(SPEC_NAME)
+            .request(HttpRequest.GET("/request-filter/replace-request-completion"))
+            .assertion((server, request) -> {
+                AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .body("/request-filter/replace-request-completion-2")
+                    .build());
+            })
+            .run();
+    }
+
+    @Test
     public void requestFilterContinuationBlocking() throws IOException {
         TestScenario.builder()
             .specName(SPEC_NAME)
@@ -94,7 +215,7 @@ public class ClientRequestFilterTest {
                     .build());
                 Assertions.assertEquals(
                     List.of("requestFilterContinuationBlocking bar"),
-                    server.getApplicationContext().getBean(MyServerFilter.class).events
+                    server.getApplicationContext().getBean(MyClientFilter.class).events
                 );
             })
             .run();
@@ -112,7 +233,7 @@ public class ClientRequestFilterTest {
                     .build());
                 Assertions.assertEquals(
                     List.of("requestFilterContinuationReactivePublisher bar"),
-                    server.getApplicationContext().getBean(MyServerFilter.class).events
+                    server.getApplicationContext().getBean(MyClientFilter.class).events
                 );
             })
             .run();
@@ -143,6 +264,42 @@ public class ClientRequestFilterTest {
                     .status(HttpStatus.OK)
                     .body("requestFilterImmediateResponse")
                     .build());
+            })
+            .run();
+    }
+
+    @Test
+    public void requestFilterNullResponse() throws IOException {
+        TestScenario.builder()
+            .specName(SPEC_NAME)
+            .request(HttpRequest.GET("/request-filter/null-response"))
+            .assertion((server, request) -> {
+                AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .body("foo")
+                    .build());
+                Assertions.assertEquals(
+                    List.of("requestFilterNullResponse"),
+                    server.getApplicationContext().getBean(MyClientFilter.class).events
+                );
+            })
+            .run();
+    }
+
+    @Test
+    public void requestFilterEmptyOptionalResponse() throws IOException {
+        TestScenario.builder()
+            .specName(SPEC_NAME)
+            .request(HttpRequest.GET("/request-filter/empty-optional-response"))
+            .assertion((server, request) -> {
+                AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .body("foo")
+                    .build());
+                Assertions.assertEquals(
+                    List.of("requestFilterEmptyOptionalResponse"),
+                    server.getApplicationContext().getBean(MyClientFilter.class).events
+                );
             })
             .run();
     }
@@ -206,7 +363,7 @@ public class ClientRequestFilterTest {
     @ClientFilter
     @Singleton
     @Requires(property = "spec.name", value = SPEC_NAME)
-    public static class MyServerFilter {
+    public static class MyClientFilter {
         List<String> events = new ArrayList<>();
 
         @RequestFilter("/request-filter/immediate-request-parameter")
@@ -217,6 +374,46 @@ public class ClientRequestFilterTest {
         @RequestFilter("/request-filter/immediate-mutable-request-parameter")
         public void requestFilterImmediateMutableRequestParameter(MutableHttpRequest<?> request) {
             request.header("foo", "bar");
+        }
+
+        @RequestFilter("/request-filter/replace-request")
+        public HttpRequest<Object> requestFilterReplaceRequest() {
+            return HttpRequest.GET("/request-filter/replace-request-2");
+        }
+
+        @RequestFilter("/request-filter/replace-mutable-request")
+        public MutableHttpRequest<Object> requestFilterReplaceMutableRequest() {
+            return HttpRequest.GET("/request-filter/replace-mutable-request-2");
+        }
+
+        @RequestFilter("/request-filter/replace-request-null")
+        public HttpRequest<Object> requestFilterReplaceRequestNull() {
+            return null;
+        }
+
+        @RequestFilter("/request-filter/replace-request-empty")
+        public Optional<HttpRequest<Object>> requestFilterReplaceRequestEmpty() {
+            return Optional.empty();
+        }
+
+        @RequestFilter("/request-filter/replace-request-publisher")
+        public Publisher<HttpRequest<Object>> requestFilterReplaceRequestPublisher() {
+            return Flux.just(HttpRequest.GET("/request-filter/replace-request-publisher-2"));
+        }
+
+        @RequestFilter("/request-filter/replace-request-mono")
+        public Mono<HttpRequest<Object>> requestFilterReplaceRequestMono() {
+            return Mono.just(HttpRequest.GET("/request-filter/replace-request-mono-2"));
+        }
+
+        @RequestFilter("/request-filter/replace-request-completable")
+        public CompletableFuture<HttpRequest<Object>> requestFilterReplaceRequestCompletable() {
+            return CompletableFuture.completedFuture(HttpRequest.GET("/request-filter/replace-request-completable-2"));
+        }
+
+        @RequestFilter("/request-filter/replace-request-completion")
+        public CompletionStage<HttpRequest<Object>> requestFilterReplaceRequestCompletion() {
+            return CompletableFuture.completedStage(HttpRequest.GET("/request-filter/replace-request-completion-2"));
         }
 
         @RequestFilter("/request-filter/continuation-blocking")
@@ -244,6 +441,19 @@ public class ClientRequestFilterTest {
         @RequestFilter("/request-filter/immediate-response")
         public HttpResponse<?> requestFilterImmediateResponse() {
             return HttpResponse.ok("requestFilterImmediateResponse");
+        }
+
+        @RequestFilter("/request-filter/null-response")
+        @Nullable
+        public HttpResponse<?> requestFilterNullResponse() {
+            events.add("requestFilterNullResponse");
+            return null;
+        }
+
+        @RequestFilter("/request-filter/empty-optional-response")
+        public Optional<HttpResponse<?>> requestFilterEmptyOptionalResponse() {
+            events.add("requestFilterEmptyOptionalResponse");
+            return Optional.empty();
         }
 
         @RequestFilter("/request-filter/publisher-response")
@@ -280,6 +490,46 @@ public class ClientRequestFilterTest {
             return request.getHeaders().get("foo");
         }
 
+        @Get("/request-filter/replace-request-2")
+        public String requestFilterReplaceRequest(HttpRequest<?> request) {
+            return request.getPath();
+        }
+
+        @Get("/request-filter/replace-mutable-request-2")
+        public String requestFilterReplaceMutableRequest(HttpRequest<?> request) {
+            return request.getPath();
+        }
+
+        @Get("/request-filter/replace-request-null")
+        public String requestFilterReplaceRequestNull(HttpRequest<?> request) {
+            return request.getPath();
+        }
+
+        @Get("/request-filter/replace-request-empty")
+        public String requestFilterReplaceRequestEmpty(HttpRequest<?> request) {
+            return request.getPath();
+        }
+
+        @Get("/request-filter/replace-request-publisher-2")
+        public String requestFilterReplaceRequestPublisher(HttpRequest<?> request) {
+            return request.getPath();
+        }
+
+        @Get("/request-filter/replace-request-mono-2")
+        public String requestFilterReplaceRequestMono(HttpRequest<?> request) {
+            return request.getPath();
+        }
+
+        @Get("/request-filter/replace-request-completable-2")
+        public String requestFilterReplaceRequestCompletable(HttpRequest<?> request) {
+            return request.getPath();
+        }
+
+        @Get("/request-filter/replace-request-completion-2")
+        public String requestFilterReplaceRequestCompletion(HttpRequest<?> request) {
+            return request.getPath();
+        }
+
         @Get("/request-filter/continuation-blocking")
         public String requestFilterContinuationBlocking(HttpRequest<?> request) {
             return request.getHeaders().get("foo");
@@ -293,6 +543,16 @@ public class ClientRequestFilterTest {
         @Get("/request-filter/continuation-update-request")
         public String requestFilterContinuationUpdateRequest(HttpRequest<?> request) {
             return request.getPath();
+        }
+
+        @Get("/request-filter/null-response")
+        public String requestFilterNullResponse(HttpRequest<?> request) {
+            return "foo";
+        }
+
+        @Get("/request-filter/empty-optional-response")
+        public String requestFilterEmptyOptionalResponse(HttpRequest<?> request) {
+            return "foo";
         }
     }
 }

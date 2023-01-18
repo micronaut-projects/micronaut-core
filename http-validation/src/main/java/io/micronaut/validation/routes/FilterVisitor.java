@@ -37,6 +37,7 @@ import org.reactivestreams.Publisher;
 
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletionStage;
 
@@ -50,7 +51,8 @@ public final class FilterVisitor implements TypeElementVisitor<Object, Object> {
         MutableHttpRequest.class,
         HttpResponse.class,
         MutableHttpResponse.class,
-        FilterContinuation.class
+        FilterContinuation.class,
+        Optional.class
     );
 
     @Override

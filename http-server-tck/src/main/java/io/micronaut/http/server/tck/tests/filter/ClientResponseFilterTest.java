@@ -66,7 +66,7 @@ public class ClientResponseFilterTest {
                     .build());
                 Assertions.assertEquals(
                     List.of("responseFilterImmediateRequestParameter /response-filter/immediate-request-parameter"),
-                    server.getApplicationContext().getBean(MyServerFilter.class).events
+                    server.getApplicationContext().getBean(MyClientFilter.class).events
                 );
             })
             .run();
@@ -84,7 +84,7 @@ public class ClientResponseFilterTest {
                     .build());
                 Assertions.assertEquals(
                     List.of("responseFilterImmediateMutableRequestParameter /response-filter/immediate-mutable-request-parameter"),
-                    server.getApplicationContext().getBean(MyServerFilter.class).events
+                    server.getApplicationContext().getBean(MyClientFilter.class).events
                 );
             })
             .run();
@@ -102,7 +102,7 @@ public class ClientResponseFilterTest {
                     .build());
                 Assertions.assertEquals(
                     List.of("responseFilterResponseParameter foo"),
-                    server.getApplicationContext().getBean(MyServerFilter.class).events
+                    server.getApplicationContext().getBean(MyClientFilter.class).events
                 );
             })
             .run();
@@ -139,7 +139,7 @@ public class ClientResponseFilterTest {
                         "responseFilterThrowableParameter HCRE Internal Server Error",
                         "responseFilterThrowableParameter NAE null"
                     ),
-                    new HashSet<>(server.getApplicationContext().getBean(MyServerFilter.class).events)
+                    new HashSet<>(server.getApplicationContext().getBean(MyClientFilter.class).events)
                 );
             })
             .run();
@@ -232,7 +232,7 @@ public class ClientResponseFilterTest {
     @ClientFilter
     @Singleton
     @Requires(property = "spec.name", value = SPEC_NAME)
-    public static class MyServerFilter {
+    public static class MyClientFilter {
         List<String> events = new ArrayList<>();
 
         @ResponseFilter("/response-filter/immediate-request-parameter")
