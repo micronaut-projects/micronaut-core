@@ -302,14 +302,17 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
                                                 PropertyElement propertyElement,
                                                 MethodElement writeElement) {
         makeInterceptedForValidationIfNeeded(writeElement);
+        MethodElement readMethod = propertyElement.getReadMethod().orElse(null);
         if (visitInjectAndLifecycleMethod(visitor, propertyElement, writeElement)) {
             makeInterceptedForValidationIfNeeded(writeElement);
-            if (propertyElement.getReadMethod().isPresent() && writeElement.hasStereotype(ANN_REQUIRES_VALIDATION)) {
+            if (readMethod != null &&
+                readMethod.hasDeclaredStereotype(ANN_REQUIRES_VALIDATION)) {
                 visitor.setValidated(true);
             }
             return true;
         } else if (!writeElement.isStatic() && getElementAnnotationMetadata(writeElement).hasStereotype(AnnotationUtil.QUALIFIER)) {
-            if (propertyElement.getReadMethod().isPresent() && writeElement.hasStereotype(ANN_REQUIRES_VALIDATION)) {
+            if (readMethod != null &&
+                readMethod.hasDeclaredStereotype(ANN_REQUIRES_VALIDATION)) {
                 visitor.setValidated(true);
             }
             staticMethodCheck(writeElement);

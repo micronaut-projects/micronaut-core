@@ -4097,7 +4097,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
      * @since 4.0.0
      */
     @Internal
-    final static class BeanDefinitionProducer {
+    static final class BeanDefinitionProducer {
 
         @Nullable
         private volatile BeanDefinitionReference reference;
