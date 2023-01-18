@@ -31,10 +31,15 @@ import io.micronaut.http.server.tck.TestScenario;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
 @SuppressWarnings({
     "java:S5960", // We're allowed assertions, as these are used in tests only
@@ -130,6 +135,90 @@ public class ResponseFilterTest {
             .run();
     }
 
+    @Test
+    public void responseFilterReplaceResponse() throws IOException {
+        TestScenario.builder()
+            .specName(SPEC_NAME)
+            .request(HttpRequest.GET("/response-filter/replace-response"))
+            .assertion((server, request) -> {
+                AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .body("responseFilterReplaceResponse foo")
+                    .build());
+            })
+            .run();
+    }
+
+    @Test
+    public void responseFilterReplaceMutableResponse() throws IOException {
+        TestScenario.builder()
+            .specName(SPEC_NAME)
+            .request(HttpRequest.GET("/response-filter/replace-mutable-response"))
+            .assertion((server, request) -> {
+                AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .body("responseFilterReplaceMutableResponse foo")
+                    .build());
+            })
+            .run();
+    }
+
+    @Test
+    public void responseFilterReplacePublisherResponse() throws IOException {
+        TestScenario.builder()
+            .specName(SPEC_NAME)
+            .request(HttpRequest.GET("/response-filter/replace-publisher-response"))
+            .assertion((server, request) -> {
+                AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .body("responseFilterReplacePublisherResponse foo")
+                    .build());
+            })
+            .run();
+    }
+
+    @Test
+    public void responseFilterReplaceMonoResponse() throws IOException {
+        TestScenario.builder()
+            .specName(SPEC_NAME)
+            .request(HttpRequest.GET("/response-filter/replace-mono-response"))
+            .assertion((server, request) -> {
+                AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .body("responseFilterReplaceMonoResponse foo")
+                    .build());
+            })
+            .run();
+    }
+
+    @Test
+    public void responseFilterReplaceCompletableResponse() throws IOException {
+        TestScenario.builder()
+            .specName(SPEC_NAME)
+            .request(HttpRequest.GET("/response-filter/replace-completable-response"))
+            .assertion((server, request) -> {
+                AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .body("responseFilterReplaceCompletableResponse foo")
+                    .build());
+            })
+            .run();
+    }
+
+    @Test
+    public void responseFilterReplaceCompletionResponse() throws IOException {
+        TestScenario.builder()
+            .specName(SPEC_NAME)
+            .request(HttpRequest.GET("/response-filter/replace-completion-response"))
+            .assertion((server, request) -> {
+                AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .body("responseFilterReplaceCompletionResponse foo")
+                    .build());
+            })
+            .run();
+    }
+
     @ServerFilter
     @Singleton
     @Requires(property = "spec.name", value = SPEC_NAME)
@@ -160,6 +249,36 @@ public class ResponseFilterTest {
         public void responseFilterThrowableParameter(Throwable t) {
             events.add("responseFilterThrowableParameter " + t.getMessage());
         }
+
+        @ResponseFilter("/response-filter/replace-response")
+        public HttpResponse<?> responseFilterReplaceResponse(HttpResponse<?> response) {
+            return HttpResponse.ok("responseFilterReplaceResponse " + response.body());
+        }
+
+        @ResponseFilter("/response-filter/replace-mutable-response")
+        public MutableHttpResponse<?> responseFilterReplaceMutableResponse(HttpResponse<?> response) {
+            return HttpResponse.ok("responseFilterReplaceMutableResponse " + response.body());
+        }
+
+        @ResponseFilter("/response-filter/replace-publisher-response")
+        public Publisher<MutableHttpResponse<?>> responseFilterReplacePublisherResponse(HttpResponse<?> response) {
+            return Flux.just(HttpResponse.ok("responseFilterReplacePublisherResponse " + response.body()));
+        }
+
+        @ResponseFilter("/response-filter/replace-mono-response")
+        public Mono<MutableHttpResponse<?>> responseFilterReplaceMonoResponse(HttpResponse<?> response) {
+            return Mono.just(HttpResponse.ok("responseFilterReplaceMonoResponse " + response.body()));
+        }
+
+        @ResponseFilter("/response-filter/replace-completable-response")
+        public CompletableFuture<MutableHttpResponse<?>> responseFilterReplaceCompletableResponse(HttpResponse<?> response) {
+            return CompletableFuture.completedFuture(HttpResponse.ok("responseFilterReplaceCompletableResponse " + response.body()));
+        }
+
+        @ResponseFilter("/response-filter/replace-completion-response")
+        public CompletionStage<MutableHttpResponse<?>> responseFilterReplaceCompletionResponse(HttpResponse<?> response) {
+            return CompletableFuture.completedStage(HttpResponse.ok("responseFilterReplaceCompletionResponse " + response.body()));
+        }
     }
 
     @Controller
@@ -188,6 +307,36 @@ public class ResponseFilterTest {
         @Get("/response-filter/throwable-parameter")
         public String responseFilterThrowableParameter() {
             throw new RuntimeException("foo");
+        }
+
+        @Get("/response-filter/replace-response")
+        public String responseFilterReplaceResponse() {
+            return "foo";
+        }
+
+        @Get("/response-filter/replace-mutable-response")
+        public String responseFilterReplaceMutableResponse() {
+            return "foo";
+        }
+
+        @Get("/response-filter/replace-publisher-response")
+        public String responseFilterReplacePublisherResponse() {
+            return "foo";
+        }
+
+        @Get("/response-filter/replace-mono-response")
+        public String responseFilterReplaceMonoResponse() {
+            return "foo";
+        }
+
+        @Get("/response-filter/replace-completable-response")
+        public String responseFilterReplaceCompletableResponse() {
+            return "foo";
+        }
+
+        @Get("/response-filter/replace-completion-response")
+        public String responseFilterReplaceCompletionResponse() {
+            return "foo";
         }
     }
 }

@@ -20,6 +20,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpRequest;
+import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.RequestFilter;
@@ -39,6 +40,8 @@ import reactor.core.publisher.Mono;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
 @SuppressWarnings({
     "java:S5960", // We're allowed assertions, as these are used in tests only
@@ -170,6 +173,34 @@ public class RequestFilterTest {
             .run();
     }
 
+    @Test
+    public void requestFilterCompletableResponse() throws IOException {
+        TestScenario.builder()
+            .specName(SPEC_NAME)
+            .request(HttpRequest.GET("/request-filter/completable-response"))
+            .assertion((server, request) -> {
+                AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .body("requestFilterCompletableResponse")
+                    .build());
+            })
+            .run();
+    }
+
+    @Test
+    public void requestFilterCompletionResponse() throws IOException {
+        TestScenario.builder()
+            .specName(SPEC_NAME)
+            .request(HttpRequest.GET("/request-filter/completion-response"))
+            .assertion((server, request) -> {
+                AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .body("requestFilterCompletionResponse")
+                    .build());
+            })
+            .run();
+    }
+
     @ServerFilter
     @Singleton
     @Requires(property = "spec.name", value = SPEC_NAME)
@@ -221,6 +252,16 @@ public class RequestFilterTest {
         @RequestFilter("/request-filter/mono-response")
         public Mono<HttpResponse<?>> requestFilterMonoResponse() {
             return Mono.fromCallable(() -> HttpResponse.ok("requestFilterMonoResponse"));
+        }
+
+        @RequestFilter("/request-filter/completable-response")
+        public CompletableFuture<MutableHttpResponse<String>> requestFilterCompletableResponse() {
+            return CompletableFuture.completedFuture(HttpResponse.ok("requestFilterCompletableResponse"));
+        }
+
+        @RequestFilter("/request-filter/completion-response")
+        public CompletionStage<MutableHttpResponse<String>> requestFilterCompletionResponse() {
+            return CompletableFuture.completedStage(HttpResponse.ok("requestFilterCompletionResponse"));
         }
     }
 
