@@ -395,7 +395,7 @@ public class GenericUtils {
                         }
                     }
                     TypeMirror[] typeMirrors = resolvedArguments.toArray(new TypeMirror[0]);
-                    resolved.put(variableName, typeUtils.getDeclaredType((TypeElement) dt.asElement(), typeMirrors));
+                    resolved.put(variableName, mirror);
                 } else {
                     resolved.put(variableName, mirror);
                 }

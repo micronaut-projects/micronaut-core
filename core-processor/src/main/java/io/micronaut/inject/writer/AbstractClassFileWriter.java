@@ -237,19 +237,28 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
             return;
         }
         Set<String> visitedTypes = new HashSet<>(5);
-        pushTypeArgumentElements(owningType, owningTypeWriter, generatorAdapter, declaringElementName, types, visitedTypes, defaults, loadTypeMethods);
+        pushTypeArgumentElements(owningType, owningTypeWriter, generatorAdapter, null, declaringElementName, types, visitedTypes, defaults, loadTypeMethods, false);
     }
 
     private static void pushTypeArgumentElements(
             Type owningType,
             ClassWriter declaringClassWriter,
             GeneratorAdapter generatorAdapter,
+            @Nullable TypedElement declaringElement,
             String declaringElementName,
             Map<String, ClassElement> types,
             Set<String> visitedTypes,
             Map<String, Integer> defaults,
-            Map<String, GeneratorAdapter> loadTypeMethods) {
-        if (visitedTypes.contains(declaringElementName)) {
+            Map<String, GeneratorAdapter> loadTypeMethods,
+            boolean areTypeVariableArguments) {
+        boolean isTypeVariable = false;
+        if (declaringElement instanceof ClassElement classElement) {
+            if (classElement.isGenericPlaceholder() || classElement.isTypeVariable()) {
+                isTypeVariable = true;
+            }
+        }
+
+        if (areTypeVariableArguments) {
             generatorAdapter.getStatic(
                     TYPE_ARGUMENT,
                     ZERO_ARGUMENTS_CONSTANT,
@@ -280,7 +289,8 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
                             typeArguments,
                             visitedTypes,
                             defaults,
-                            loadTypeMethods
+                            loadTypeMethods,
+                            isTypeVariable
                     );
                 } else {
                     buildArgument(generatorAdapter, argumentName, classElement);
@@ -381,7 +391,8 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
             Map<String, ClassElement> typeArguments,
             Set<String> visitedTypes,
             Map<String, Integer> defaults,
-            Map<String, GeneratorAdapter> loadTypeMethods) {
+            Map<String, GeneratorAdapter> loadTypeMethods,
+            boolean isTypeVariable) {
         // 1st argument: the type
         generatorAdapter.push(typeReference);
         // 2nd argument: the name
@@ -418,11 +429,13 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
                 owningType,
                 owningClassWriter,
                 generatorAdapter,
+                classElement,
                 classElement.getName(),
                 typeArguments,
                 visitedTypes,
                 defaults,
-                loadTypeMethods
+                loadTypeMethods,
+                isTypeVariable
         );
 
         // Argument.create( .. )
