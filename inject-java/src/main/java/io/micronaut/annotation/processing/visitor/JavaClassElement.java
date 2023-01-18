@@ -764,11 +764,13 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     private Map<String, ClassElement> resolveTypeArguments() {
         List<? extends TypeParameterElement> typeParameters = classElement.getTypeParameters();
         Iterator<? extends TypeParameterElement> tpi = typeParameters.iterator();
+        Iterator<? extends TypeMirror> tai = typeArguments.iterator();
 
         Map<String, ClassElement> map = new LinkedHashMap<>();
         while (tpi.hasNext()) {
             TypeParameterElement tpe = tpi.next();
-            ClassElement classElement = mirrorToClassElement(tpe.asType(), visitorContext, this.genericTypeInfo, visitorContext.getConfiguration().includeTypeLevelAnnotationsInGenericArguments());
+            TypeMirror tme = tai.hasNext() ? tai.next() : null;
+            ClassElement classElement = mirrorToClassElement(tpe.asType(), visitorContext, this.genericTypeInfo, visitorContext.getConfiguration().includeTypeLevelAnnotationsInGenericArguments(), tme instanceof TypeVariable);
             map.put(tpe.toString(), classElement);
         }
 
