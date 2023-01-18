@@ -379,6 +379,7 @@ public class RequestFilterTest {
         }
 
         @RequestFilter("/request-filter/replace-request-null")
+        @Nullable
         public HttpRequest<Object> requestFilterReplaceRequestNull() {
             return null;
         }

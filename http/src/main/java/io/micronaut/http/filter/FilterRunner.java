@@ -503,7 +503,7 @@ public class FilterRunner {
             fulfilled,
             filterCondition,
             passedOnContinuationArgIndex,
-            prepareReturnHandler(returnType, isResponseFilter, passedOnContinuationArgIndex != -1)
+            prepareReturnHandler(returnType, isResponseFilter, passedOnContinuationArgIndex != -1, false)
         );
     }
 
@@ -512,9 +512,9 @@ public class FilterRunner {
         return continuationReturnType.isReactive() || continuationReturnType.getType() == Publisher.class;
     }
 
-    private static FilterReturnHandler prepareReturnHandler(Argument<?> type, boolean isResponseFilter, boolean hasContinuation) throws IllegalArgumentException {
+    private static FilterReturnHandler prepareReturnHandler(Argument<?> type, boolean isResponseFilter, boolean hasContinuation, boolean fromOptional) throws IllegalArgumentException {
         if (type.isOptional()) {
-            FilterReturnHandler next = prepareReturnHandler(type.getWrappedType(), isResponseFilter, hasContinuation);
+            FilterReturnHandler next = prepareReturnHandler(type.getWrappedType(), isResponseFilter, hasContinuation, true);
             return (r, o, c) -> next.handle(r, o == null ? null : ((Optional<?>) o).orElse(null), c);
         }
         if (type.isVoid()) {
@@ -528,15 +528,17 @@ public class FilterRunner {
                 return (r, o, c) -> true;
             }
         }
+        boolean nullable = type.isNullable() || fromOptional;
         if (!isResponseFilter) {
             if (type.getType() == HttpRequest.class || type.getType() == MutableHttpRequest.class) {
                 if (hasContinuation) {
                     throw new IllegalArgumentException("Filter method that accepts a continuation cannot return an HttpRequest");
                 }
                 return (r, o, c) -> {
-                    if (o != null) {
-                        r.request = (HttpRequest<?>) o;
+                    if (o == null && nullable) {
+                        return true;
                     }
+                    r.request = (HttpRequest<?>) Objects.requireNonNull(o, "Returned request must not be null, or mark the method as @Nullable");
                     return true;
                 };
             } else if (type.getType() == HttpResponse.class || type.getType() == MutableHttpResponse.class) {
@@ -552,12 +554,12 @@ public class FilterRunner {
                     };
                 } else {
                     return (r, o, c) -> {
-                        if (o == null) {
+                        if (o == null && nullable) {
                             return true;
                         }
 
                         // cancel request pipeline, move immediately to response handling
-                        r.response = (HttpResponse<?>) o;
+                        r.response = (HttpResponse<?>) Objects.requireNonNull(o, "Returned response must not be null, or mark the method as @Nullable");
                         r.failure = null;
                         r.responseNeedsProcessing = true;
                         r.workResponse();
@@ -571,12 +573,12 @@ public class FilterRunner {
             }
             if (type.getType() == HttpResponse.class || type.getType() == MutableHttpResponse.class) {
                 return (r, o, c) -> {
-                    if (o == null) {
+                    if (o == null && nullable) {
                         return true;
                     }
 
                     // cancel request pipeline, move immediately to response handling
-                    r.response = (HttpResponse<?>) o;
+                    r.response = (HttpResponse<?>) Objects.requireNonNull(o, "Returned response must not be null, or mark the method as @Nullable");
                     r.failure = null;
                     r.responseNeedsProcessing = true;
                     return true;
@@ -584,8 +586,8 @@ public class FilterRunner {
             }
         }
         if (isReactive(type)) {
-            var next = prepareReturnHandler(type.getWrappedType(), isResponseFilter, hasContinuation);
-            return new DelayedFilterReturnHandler(isResponseFilter, next) {
+            var next = prepareReturnHandler(type.getWrappedType(), isResponseFilter, hasContinuation, false);
+            return new DelayedFilterReturnHandler(isResponseFilter, next, nullable) {
                 @Override
                 protected ExecutionFlow<?> toFlow(FilterRunner runner, Object o) {
                     //noinspection unchecked
@@ -595,8 +597,8 @@ public class FilterRunner {
                 }
             };
         } else if (type.isAsync()) {
-            var next = prepareReturnHandler(type.getWrappedType(), isResponseFilter, hasContinuation);
-            return new DelayedFilterReturnHandler(isResponseFilter, next) {
+            var next = prepareReturnHandler(type.getWrappedType(), isResponseFilter, hasContinuation, false);
+            return new DelayedFilterReturnHandler(isResponseFilter, next, nullable) {
                 @Override
                 protected ExecutionFlow<?> toFlow(FilterRunner runner, Object o) {
                     //noinspection unchecked
@@ -637,21 +639,23 @@ public class FilterRunner {
     private abstract static class DelayedFilterReturnHandler implements FilterReturnHandler {
         final boolean isResponseFilter;
         final FilterReturnHandler next;
+        final boolean nullable;
 
-        private DelayedFilterReturnHandler(boolean isResponseFilter, FilterReturnHandler next) {
+        private DelayedFilterReturnHandler(boolean isResponseFilter, FilterReturnHandler next, boolean nullable) {
             this.isResponseFilter = isResponseFilter;
             this.next = next;
+            this.nullable = nullable;
         }
 
         protected abstract ExecutionFlow<?> toFlow(FilterRunner runner, Object o);
 
         @Override
         public boolean handle(FilterRunner runner, Object o, FilterContinuationImpl<?> passedOnContinuation) throws Throwable {
-            if (o == null) {
+            if (o == null && nullable) {
                 return next.handle(runner, null, passedOnContinuation);
             }
 
-            ExecutionFlow<?> delayedFlow = toFlow(runner, o);
+            ExecutionFlow<?> delayedFlow = toFlow(runner, Objects.requireNonNull(o, "Returned value must not be null, or mark the method as @Nullable"));
             ImperativeExecutionFlow<?> doneFlow = delayedFlow.tryComplete();
             if (doneFlow != null) {
                 if (doneFlow.getError() != null) {
