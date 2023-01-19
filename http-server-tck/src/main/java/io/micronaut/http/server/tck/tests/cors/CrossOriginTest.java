@@ -166,7 +166,7 @@ public class CrossOriginTest {
     @Test
     void httHeaderValueAccessControlExposeHeaderValueCanBeSetViaCrossOriginAnnotation() throws IOException {
         asserts(SPECNAME,
-            CollectionUtils.mapOf("micronaut.server.cors.single-header", StringUtils.FALSE),
+            CollectionUtils.mapOf("micronaut.server.cors.single-header", StringUtils.TRUE),
             preflight(UriBuilder.of("/exposedheaders").path("bar"), "https://foo.com", HttpMethod.GET)
                 .header(HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS, "foo"),
             (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
