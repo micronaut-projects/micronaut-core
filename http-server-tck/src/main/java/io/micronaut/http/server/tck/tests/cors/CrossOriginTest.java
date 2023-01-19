@@ -82,7 +82,7 @@ public class CrossOriginTest {
     }
 
     @Test
-    void corsSimpleRequestMethods() {
+    void verifyHttpMethodIsValidatedInACorsRequest() {
         assertAll(
             () -> asserts(SPECNAME,
                 preflight(UriBuilder.of("/methods").path("getit"), "https://www.google.com", HttpMethod.GET),
