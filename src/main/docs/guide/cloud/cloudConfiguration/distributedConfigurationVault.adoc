@@ -1,9 +1,9 @@
 Micronaut integrates with https://www.vaultproject.io/[HashiCorp Vault] as a distributed configuration source.
 
-To enable support for Vault Configuration, make sure https://docs.micronaut.io/latest/guide/#bootstrap[bootstrap] is enabled and create a `src/main/resources/bootstrap.yml` file with the following configuration:
+To enable distributed configuration make sure <<bootstrap>> is enabled and create a `src/main/resources/bootstrap.[yml/toml/properties]` file with the following configuration:
 
 .Integrating with HashiCorp Vault
-[source,yaml]
+[configuration]
 ----
 micronaut:
   application:

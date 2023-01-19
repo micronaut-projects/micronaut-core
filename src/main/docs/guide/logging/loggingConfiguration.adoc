@@ -1,6 +1,6 @@
-Log levels can be configured via properties defined in `application.yml` (and environment variables) with the `logger.levels` prefix:
+Log levels can be configured via properties defined in your configuration file (e.g `application.yml`) (and environment variables) with the `logger.levels` prefix:
 
-[source,yaml]
+[configuration]
 ----
 logger:
   levels:
@@ -23,7 +23,7 @@ You can also set a custom Logback XML configuration file to be used via `logger.
 
 To disable a logger, you need to set the logger level to `OFF`:
 
-[source,yaml]
+[configuration]
 ----
 logger:
   levels:

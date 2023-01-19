@@ -1,9 +1,9 @@
 The HTTP server features a number of configuration options. They are defined in the api:http.server.netty.configuration.NettyHttpServerConfiguration[] configuration class, which extends api:http.server.HttpServerConfiguration[].
 
-The following example shows how to tweak configuration options for the server via `application.yml`:
+The following example shows how to tweak configuration options for the server via your configuration file (e.g `application.yml`):
 
 .Configuring HTTP server settings
-[source,yaml]
+[configuration]
 ----
 micronaut:
   server:
@@ -48,7 +48,7 @@ dependency:netty-transport-native-epoll[groupId="io.netty",scope="runtimeOnly",c
 Then configure the default event loop group to prefer native transports:
 
 .Configuring The Default Event Loop to Prefer Native Transports
-[source,yaml]
+[configuration]
 ----
 micronaut:
   netty:

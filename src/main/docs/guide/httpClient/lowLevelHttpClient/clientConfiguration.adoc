@@ -1,9 +1,9 @@
 === Global Configuration for All Clients
 
-The default HTTP client configuration is a <<configurationProperties, Configuration Properties>> named api:http.client.DefaultHttpClientConfiguration[] that allows configuring the default behaviour for all HTTP clients. For example, in `application.yml`:
+The default HTTP client configuration is a <<configurationProperties, Configuration Properties>> named api:http.client.DefaultHttpClientConfiguration[] that allows configuring the default behaviour for all HTTP clients. For example, in your configuration file (e.g `application.yml`):
 
 .Altering default HTTP client configuration
-[source,yaml]
+[configuration]
 ----
 micronaut:
   http:
@@ -15,10 +15,10 @@ The above example sets the `readTimeout` property of the api:http.client.HttpCli
 
 === Client Specific Configuration
 
-To have separate configuration per-client, there are a couple of options. You can configure <<serviceDiscoveryManual, Service Discovery>> manually in `application.yml` and apply per-client configuration:
+To have separate configuration per-client, there are a couple of options. You can configure <<serviceDiscoveryManual, Service Discovery>> manually in your configuration file (e.g `application.yml`) and apply per-client configuration:
 
 .Manually configuring HTTP services
-[source,yaml]
+[configuration]
 ----
 micronaut:
   http:
@@ -88,7 +88,7 @@ Each HTTP/1.1 connection can only support one request at a time, but can be reus
 To remove the overhead of opening a new connection for each request, the Micronaut HTTP Client will reuse HTTP connections wherever possible. They are managed in a _connection pool_. HTTP/1.1 connections are kept around using keep-alive and are used for new requests, and for HTTP/2, a single connection is used for all requests.
 
 .Manually configuring HTTP services
-[source,yaml]
+[configuration]
 ----
 micronaut:
   http:
@@ -114,7 +114,7 @@ By default, Micronaut shares a common Netty `EventLoopGroup` for worker threads 
 This `EventLoopGroup` can be configured via the `micronaut.netty.event-loops.default` property:
 
 .Configuring The Default Event Loop
-[source,yaml]
+[configuration]
 ----
 micronaut:
   netty:
@@ -133,7 +133,7 @@ For example, if your interactions with an HTTP client involve CPU-intensive work
 The following example configures an additional event loop group called "other" with 10 threads:
 
 .Configuring Additional Event Loops
-[source,yaml]
+[configuration]
 ----
 micronaut:
   netty:
@@ -146,7 +146,7 @@ micronaut:
 Once an additional event loop has been configured you can alter the HTTP client configuration to use it:
 
 .Altering the Event Loop Group used by Clients
-[source,yaml]
+[configuration]
 ----
 micronaut:
   http:
