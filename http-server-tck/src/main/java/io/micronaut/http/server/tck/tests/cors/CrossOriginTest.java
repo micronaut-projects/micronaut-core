@@ -179,6 +179,77 @@ public class CrossOriginTest {
                 .build()));
     }
 
+    /**
+     * The Access-Control-Allow-Credentials response header tells browsers whether to expose the response to the frontend JavaScript code when the request's credentials mode (Request.credentials) is include.
+     * @see <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Access-Control-Allow-Credentials">Access-Control-Allow-Credentials</a>
+     */
+    @Test
+    void defaultAccessControlAllowCredentialsValueIsNotSet() throws IOException {
+        asserts(SPECNAME,
+            preflight(UriBuilder.of("/credentials").path("foo"), "https://foo.com", HttpMethod.GET),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .assertResponse(response -> {
+                    assertCorsHeaders(response, "https://foo.com", HttpMethod.GET, false);
+                    assertFalse(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS));
+                })
+                .build()));
+    }
+
+    /**
+     * The Access-Control-Allow-Credentials response header tells browsers whether to expose the response to the frontend JavaScript code when the request's credentials mode (Request.credentials) is include.
+     * @see <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Access-Control-Allow-Credentials">Access-Control-Allow-Credentials</a>
+     */
+    @Test
+    void defaultAccessControlAllowCredentialsValueIsSet() throws IOException {
+        asserts(SPECNAME,
+            preflight(UriBuilder.of("/credentials").path("bar"), "https://foo.com", HttpMethod.GET),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .assertResponse(response -> {
+                    assertCorsHeaders(response, "https://foo.com", HttpMethod.GET);
+                    assertTrue(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS));
+                    assertEquals("true", response.getHeaders().get(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS));
+                })
+                .build()));
+    }
+
+    /**
+     * The Access-Control-Max-Age response header indicates how long the results of a preflight request (that is the information contained in the Access-Control-Allow-Methods and Access-Control-Allow-Headers headers) can be cached.
+     * @see <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Access-Control-Max-Age">Access-Control-Max-Age</a>
+     */
+    @Test
+    void defaultAccessControlMaxAgeValueIsSet() throws IOException {
+        asserts(SPECNAME,
+            preflight(UriBuilder.of("/maxage").path("foo"), "https://foo.com", HttpMethod.GET),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .assertResponse(response -> {
+                    assertCorsHeaders(response, "https://foo.com", HttpMethod.GET);
+                    assertTrue(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_MAX_AGE));
+                    assertEquals("1800", response.getHeaders().get(HttpHeaders.ACCESS_CONTROL_MAX_AGE));
+                })
+                .build()));
+    }
+
+    /**
+     * The Access-Control-Max-Age response header indicates how long the results of a preflight request (that is the information contained in the Access-Control-Allow-Methods and Access-Control-Allow-Headers headers) can be cached.
+     * @see <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Access-Control-Max-Age">Access-Control-Max-Age</a>
+     */
+    @Test
+    void accessControlMaxAgeValueIsSet() throws IOException {
+        asserts(SPECNAME,
+            preflight(UriBuilder.of("/maxage").path("bar"), "https://foo.com", HttpMethod.GET),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .assertResponse(response -> {
+                    assertCorsHeaders(response, "https://foo.com", HttpMethod.GET, "1000");
+                    assertTrue(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_MAX_AGE));
+                    assertEquals("1000", response.getHeaders().get(HttpHeaders.ACCESS_CONTROL_MAX_AGE));
+                })
+                .build()));
+    }
+
     private static MutableHttpRequest<?> preflight(UriBuilder uriBuilder, String originValue, HttpMethod method) {
         return HttpRequest.OPTIONS(uriBuilder.build())
             .header(HttpHeaders.ACCEPT, MediaType.TEXT_PLAIN)
@@ -259,17 +330,48 @@ public class CrossOriginTest {
         }
     }
 
-    // TODO: tests for CrossOrigin.allowCredentials, CrossOrigin.maxAge
     @Requires(property = "spec.name", value = SPECNAME)
     @Controller("/credentials")
-    @CrossOrigin(
-        value = "https://foo.com",
-        allowCredentials = "false"
-    )
     static class Credentials {
+        @CrossOrigin(
+            value = "https://foo.com",
+            allowCredentials = "false"
+        )
+        @Produces(MediaType.TEXT_PLAIN)
+        @Get("/foo")
+        String foo() {
+            return "foo";
+        }
+
+        @CrossOrigin(
+            value = "https://foo.com"
+        )
         @Produces(MediaType.TEXT_PLAIN)
         @Get("/bar")
-        String index() {
+        String bar() {
+            return "bar";
+        }
+    }
+
+    @Requires(property = "spec.name", value = SPECNAME)
+    @Controller("/maxage")
+    static class MaxAge {
+        @CrossOrigin(
+            value = "https://foo.com"
+        )
+        @Produces(MediaType.TEXT_PLAIN)
+        @Get("/foo")
+        String foo() {
+            return "foo";
+        }
+
+        @CrossOrigin(
+            value = "https://foo.com",
+            maxAge = 1000L
+        )
+        @Produces(MediaType.TEXT_PLAIN)
+        @Get("/bar")
+        String bar() {
             return "bar";
         }
     }
