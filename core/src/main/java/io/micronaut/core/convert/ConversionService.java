@@ -31,6 +31,8 @@ public interface ConversionService {
 
     /**
      * The default shared conversion service.
+     *
+     * @Deprecated This will be removed in the next version. Use an injected {@link ConversionService} instead.
      */
     ConversionService SHARED = new DefaultMutableConversionService();
 
