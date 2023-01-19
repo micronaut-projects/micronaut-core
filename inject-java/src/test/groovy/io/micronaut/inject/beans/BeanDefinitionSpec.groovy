@@ -397,6 +397,29 @@ public class NumberThingManager extends AbstractThingManager<NumberThing<?>> {}
         definition.getTypeArguments("test.AbstractThingManager")[0].getTypeVariables().get("T").getType() == Number.class
     }
 
+    void "test building a bean with generics wildcard extending"() {
+        when:
+        def definition = buildBeanDefinition('test.NumberThingManager', '''
+package test;
+
+import jakarta.inject.Singleton;
+
+interface Thing<T> {}
+
+interface NumberThing<T extends Number & Comparable<T>> extends Thing<T> {}
+
+class AbstractThingManager<T extends Thing<?>> {}
+
+@Singleton
+public class NumberThingManager extends AbstractThingManager<NumberThing<? extends Double>> {}
+''')
+
+        then:
+        noExceptionThrown()
+        definition != null
+        definition.getTypeArguments("test.AbstractThingManager")[0].getTypeVariables().get("T").getType() == Double.class
+    }
+
     void "test a bean definition in a package with uppercase letters"() {
         when:
         def definition = buildBeanDefinition('test.A', 'TestBean', '''
