@@ -36,6 +36,7 @@ import javax.lang.model.type.TypeMirror;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Supplier;
 
 /**
  * An implementation of {@link ElementFactory} for Java.
@@ -217,7 +218,7 @@ public class JavaElementFactory implements ElementFactory<Element, TypeElement, 
     public JavaMethodElement newMethodElement(ClassElement owningType,
                                               @NonNull ExecutableElement method,
                                               @NonNull ElementAnnotationMetadataFactory annotationMetadataFactory,
-                                              @Nullable Map<String, Map<String, TypeMirror>> genericTypes) {
+                                              @Nullable Map<String, Map<String, Supplier<ClassElement>>> genericTypes) {
         validateOwningClass(owningType);
         failIfPostponeIsNeeded(owningType, method);
         final JavaClassElement javaDeclaringClass = (JavaClassElement) owningType;

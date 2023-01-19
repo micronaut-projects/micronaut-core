@@ -24,7 +24,6 @@ import io.micronaut.core.convert.TypeConverter
 import io.micronaut.core.reflect.InstantiationUtils
 import io.micronaut.core.reflect.exception.InstantiationException
 import io.micronaut.core.type.Argument
-import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.ExecutableMethod
 import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
 import io.micronaut.inject.visitor.TypeElementVisitor
@@ -832,7 +831,6 @@ public record Foo(int x, int y){
         obj.y() == 10
     }
 
-    @Requires({ jvm.isJava14Compatible() })
     void "test serializing records respects json annotations"() {
         given:
         BeanIntrospection introspection = buildBeanIntrospection('json.test.Foo', '''
@@ -1928,13 +1926,16 @@ package test;
 import io.micronaut.core.annotation.*;
 import javax.validation.constraints.*;
 import java.util.List;
+import java.util.Set;
 
 @Introspected
 public class Test {
     List<@Size(min=1, max=2) List<@NotEmpty List<@NotNull String>>> deepList;
+    List<List<List<List<List<List<String>>>>>> deepList2;
 
     Test(List<List<List<String>>> deepList) { this.deepList = deepList; }
     List<List<List<String>>> getDeepList() { return deepList; }
+    List<List<List<List<List<List<String>>>>>> getDeepList2() { return deepList2; }
 }
 ''')
         expect:
