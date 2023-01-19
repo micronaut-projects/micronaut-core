@@ -1,0 +1,15 @@
+To configure the headers that are sent in the response to a CORS request through the `Access-Control-Expose-Headers` header, include a list of strings for the `exposedHeaders` key in your configuration. None are exposed by default.
+
+.Example CORS Configuration
+[source,yaml]
+----
+micronaut:
+  server:
+    cors:
+      enabled: true
+      configurations:
+        web:
+          exposedHeaders:
+            - Content-Type
+            - Authorization
+----
