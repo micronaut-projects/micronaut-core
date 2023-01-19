@@ -50,15 +50,6 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
     public MutableAnnotationMetadata() {
     }
 
-    MutableAnnotationMetadata(DefaultAnnotationMetadata annotationMetadata) {
-        this(newMapOrNull(annotationMetadata.declaredAnnotations),
-                newMapOrNull(annotationMetadata.declaredStereotypes),
-                newMapOrNull(annotationMetadata.allStereotypes),
-                newMapOrNull(annotationMetadata.allAnnotations),
-                newMapOrNull(annotationMetadata.annotationsByStereotype),
-                annotationMetadata.hasPropertyExpressions());
-    }
-
     private MutableAnnotationMetadata(@Nullable Map<String, Map<CharSequence, Object>> declaredAnnotations,
                                      @Nullable Map<String, Map<CharSequence, Object>> declaredStereotypes,
                                      @Nullable Map<String, Map<CharSequence, Object>> allStereotypes,
@@ -127,14 +118,6 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
         }
         cloned.hasPropertyExpressions = hasPropertyExpressions;
         return cloned;
-    }
-
-    private static <K, V> Map<K, V> newMapOrNull(Map<K, V> map) {
-        if (map == null) {
-            return null;
-        } else {
-            return new HashMap<>(map);
-        }
     }
 
     @NonNull
