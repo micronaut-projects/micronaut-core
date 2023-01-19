@@ -453,10 +453,13 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
         Supplier<ClassElement> bound = boundGenerics.get(tv.toString());
         if (bound != null) {
             ClassElement classElement = bound.get();
-            if (!(classElement instanceof WildcardElement)) {
+            if (classElement instanceof WildcardElement wildcardElement) {
+                if (!wildcardElement.getType().getName().equals("java.lang.Object")) {
+                    return wildcardElement;
+                }
+            } else {
                 return classElement;
             }
-//            return mirrorToClassElement(bound., visitorContext, genericsInfo, includeTypeAnnotations, isTypeVariable);
         }
         // type variable is still free.
         List<? extends TypeMirror> boundsUnresolved = upperBound instanceof IntersectionType ?

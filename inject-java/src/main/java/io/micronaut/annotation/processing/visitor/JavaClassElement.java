@@ -24,6 +24,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.inject.ast.ArrayableClassElement;
@@ -243,7 +244,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             Map<String, Map<String, TypeMirror>> data = visitorContext.getGenericUtils().buildGenericTypeArgumentElementInfo(classElement, null, getBoundTypeMirrors());
             Map<String, TypeMirror> forType = data.get(type);
             if (forType != null) {
-                Map<String, ClassElement> typeArgs = new LinkedHashMap<>(forType.size());
+                Map<String, ClassElement> typeArgs = CollectionUtils.newLinkedHashMap(forType.size());
                 for (Map.Entry<String, TypeMirror> entry : forType.entrySet()) {
                     TypeMirror v = entry.getValue();
                     ClassElement ce = v != null ? mirrorToClassElement(v, visitorContext, Collections.emptyMap(), visitorContext.getConfiguration().includeTypeLevelAnnotationsInGenericArguments()) : null;
@@ -266,13 +267,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
 
     @Override
     public Collection<ClassElement> getInterfaces() {
-        final List<? extends TypeMirror> interfaces = classElement.getInterfaces();
-        if (!interfaces.isEmpty()) {
-            return Collections.unmodifiableList(interfaces.stream().map((mirror) ->
-                mirrorToClassElement(mirror, visitorContext, genericTypeInfo)).collect(Collectors.toList())
-            );
-        }
-        return Collections.emptyList();
+        return classElement.getInterfaces().stream().map(mirror -> mirrorToClassElement(mirror, visitorContext, genericTypeInfo)).toList();
     }
 
     @Override

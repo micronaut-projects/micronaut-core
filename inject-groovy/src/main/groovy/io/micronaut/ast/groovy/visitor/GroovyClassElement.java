@@ -437,7 +437,8 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                             cn,
                             elementAnnotationMetadataFactory,
                             Collections.singletonMap(cn.getName(), newInfo),
-                            cn.isArray() ? computeDimensions(cn) : 0
+                            cn.isArray() ? computeDimensions(cn) : 0,
+                                true
                         )));
                     }
                 }

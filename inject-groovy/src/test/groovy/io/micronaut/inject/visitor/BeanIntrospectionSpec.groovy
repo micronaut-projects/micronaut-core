@@ -2183,4 +2183,60 @@ class Test {
             introspection.beanProperties.size() == 2
     }
 
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/2059')
+    void "test annotation metadata doesn't cause stackoverflow"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test','''\
+package test;
+
+import io.micronaut.core.annotation.*;
+
+@Introspected
+public class Test {
+    int num;
+    String str;
+
+    @Creator
+    public <T extends Enum<T>> Test(int num, String str, Class<T> enumClass) {
+        this(num, str + enumClass.getName());
+    }
+
+    public <T extends Enum<T>> Test(int num, String str) {
+        this.num = num;
+        this.str = str;
+    }
+}
+
+
+''')
+        expect:
+            introspection != null
+    }
+
+    void "test annotation metadata doesn't cause stackoverflow 2"() {
+        def bd = buildBeanDefinition('test.SessionFactoryFactory','''\
+package test;
+
+import io.micronaut.aop.interceptors.Mutating
+
+import io.micronaut.context.annotation.Factory
+import io.micronaut.context.annotation.Prototype
+import org.hibernate.SessionFactory
+import org.hibernate.engine.spi.SessionFactoryDelegatingImpl
+
+@Factory
+class SessionFactoryFactory {
+
+    @Mutating("name")
+    @Prototype
+    SessionFactory sessionFactory() {
+        return new SessionFactoryDelegatingImpl(null)
+    }
+}
+
+
+''')
+        expect:
+            bd != null
+    }
+
 }
