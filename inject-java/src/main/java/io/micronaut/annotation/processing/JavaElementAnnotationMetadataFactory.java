@@ -15,7 +15,10 @@
  */
 package io.micronaut.annotation.processing;
 
+import io.micronaut.annotation.processing.visitor.AbstractJavaElement;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.ast.annotation.AbstractElementAnnotationMetadataFactory;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 
 import javax.lang.model.element.AnnotationMirror;
@@ -29,6 +32,9 @@ import javax.lang.model.element.Element;
  */
 public final class JavaElementAnnotationMetadataFactory extends AbstractElementAnnotationMetadataFactory<Element, AnnotationMirror> {
 
+    private static final ElementAnnotationMetadata EMPTY = new ElementAnnotationMetadata() {
+    };
+
     public JavaElementAnnotationMetadataFactory(boolean isReadOnly, JavaAnnotationMetadataBuilder metadataBuilder) {
         super(isReadOnly, metadataBuilder);
     }
@@ -38,4 +44,27 @@ public final class JavaElementAnnotationMetadataFactory extends AbstractElementA
         return new JavaElementAnnotationMetadataFactory(true, (JavaAnnotationMetadataBuilder) metadataBuilder);
     }
 
+    @Override
+    public ElementAnnotationMetadata build(io.micronaut.inject.ast.Element element) {
+        AbstractJavaElement javaElement = (AbstractJavaElement) element;
+        if (notAllowedAnnotations(javaElement)) {
+            return EMPTY;
+        }
+        return super.build(element);
+    }
+
+    private static boolean notAllowedAnnotations(AbstractJavaElement javaElement) {
+        return !(javaElement.getNativeType() instanceof Element);
+    }
+
+    @Override
+    public ElementAnnotationMetadata build(io.micronaut.inject.ast.Element element, AnnotationMetadata defaultAnnotationMetadata) {
+        if (defaultAnnotationMetadata == null) {
+            AbstractJavaElement javaElement = (AbstractJavaElement) element;
+            if (notAllowedAnnotations(javaElement)) {
+                return EMPTY;
+            }
+        }
+        return super.build(element, defaultAnnotationMetadata);
+    }
 }

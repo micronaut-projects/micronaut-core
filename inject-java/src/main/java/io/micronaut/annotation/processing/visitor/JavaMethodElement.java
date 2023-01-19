@@ -42,6 +42,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 /**
@@ -267,7 +268,7 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
      * @param info The info
      * @return The return type
      */
-    protected ClassElement returnType(Map<String, Map<String, TypeMirror>> info) {
+    protected ClassElement returnType(Map<String, Map<String, Supplier<ClassElement>>> info) {
         VariableElement varElement = CollectionUtils.last(executableElement.getParameters());
         if (isSuspend(varElement)) {
             DeclaredType dType = (DeclaredType) varElement.asType();
