@@ -1220,13 +1220,13 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     public void visitMethodInjectionPoint(TypedElement beanType,
                                           MethodElement methodElement,
                                           boolean requiresReflection,
-                                          PropertyElement propertyElement, VisitorContext visitorContext) {
+                                          VisitorContext visitorContext) {
         deferredInjectionPoints.add(() ->
                 proxyBeanDefinitionWriter.visitMethodInjectionPoint(
                         beanType,
                         methodElement,
                         requiresReflection,
-                    propertyElement, visitorContext)
+                        visitorContext)
         );
     }
 

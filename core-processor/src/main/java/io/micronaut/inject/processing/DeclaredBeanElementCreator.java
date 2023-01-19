@@ -302,22 +302,16 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
                                                 PropertyElement propertyElement,
                                                 MethodElement writeElement) {
         makeInterceptedForValidationIfNeeded(writeElement);
-        MethodElement readMethod = propertyElement.getReadMethod().orElse(null);
         if (visitInjectAndLifecycleMethod(visitor, propertyElement, writeElement)) {
             makeInterceptedForValidationIfNeeded(writeElement);
-            if (readMethod != null &&
-                readMethod.hasDeclaredStereotype(ANN_REQUIRES_VALIDATION)) {
-                visitor.setValidated(true);
-            }
             return true;
         } else if (!writeElement.isStatic() && getElementAnnotationMetadata(writeElement).hasStereotype(AnnotationUtil.QUALIFIER)) {
-            if (readMethod != null &&
-                readMethod.hasDeclaredStereotype(ANN_REQUIRES_VALIDATION)) {
+            if (propertyElement.getReadMethod().isPresent() && writeElement.hasStereotype(ANN_REQUIRES_VALIDATION)) {
                 visitor.setValidated(true);
             }
             staticMethodCheck(writeElement);
             // TODO: Require @ReflectiveAccess for private methods in Micronaut 4
-            visitMethodInjectionPoint(visitor, writeElement, propertyElement);
+            visitMethodInjectionPoint(visitor, writeElement);
             return true;
         }
         return visitAopAndExecutableMethod(visitor, writeElement);
@@ -368,14 +362,7 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
         if (!methodElement.isStatic() && isInjectPointMethod(propertyElement, methodElement)) {
             staticMethodCheck(methodElement);
             // TODO: Require @ReflectiveAccess for private methods in Micronaut 4
-            if (propertyElement != null) {
-                // use the properties metadata for property elements
-                FieldElement fieldElement = propertyElement.getField().orElse(null);
-                if (fieldElement != null) {
-                    methodElement = methodElement.withAnnotationMetadata(propertyElement.getTargetAnnotationMetadata());
-                }
-            }
-            visitMethodInjectionPoint(visitor, methodElement, propertyElement);
+            visitMethodInjectionPoint(visitor, methodElement);
             return true;
         }
         return false;
@@ -383,18 +370,16 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
 
     /**
      * Visit a method injection point.
-     *
-     * @param visitor         The visitor
-     * @param methodElement   The method element
-     * @param propertyElement The property element if it exists
+     * @param visitor The visitor
+     * @param methodElement The method element
      */
-    protected void visitMethodInjectionPoint(BeanDefinitionVisitor visitor, MethodElement methodElement, PropertyElement propertyElement) {
+    protected void visitMethodInjectionPoint(BeanDefinitionVisitor visitor, MethodElement methodElement) {
         applyConfigurationInjectionIfNecessary(visitor, methodElement);
         visitor.visitMethodInjectionPoint(
             methodElement.getDeclaringType(),
             methodElement,
             methodElement.isReflectionRequired(classElement),
-            propertyElement, visitorContext
+            visitorContext
         );
     }
 
@@ -478,17 +463,11 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
      * @return true if it is
      */
     protected boolean isInjectPointMethod(PropertyElement propertyElement, MemberElement memberElement) {
-        return memberElement.hasDeclaredStereotype(AnnotationUtil.INJECT) || isInjectableProperty(propertyElement);
-    }
-
-    private static boolean isInjectableProperty(@Nullable PropertyElement propertyElement) {
-        if (propertyElement == null) {
-            return false;
-        }
-        return propertyElement.hasDeclaredAnnotation(AnnotationUtil.INJECT) ||
-            propertyElement.hasDeclaredStereotype(AnnotationUtil.QUALIFIER) ||
-            propertyElement.hasDeclaredAnnotation(Property.class) ||
-            propertyElement.hasDeclaredAnnotation(Value.class);
+        return
+            memberElement.hasDeclaredStereotype(AnnotationUtil.INJECT) ||
+                (propertyElement != null && (propertyElement.hasDeclaredAnnotation(AnnotationUtil.INJECT) ||
+                    propertyElement.hasDeclaredStereotype(AnnotationUtil.QUALIFIER) ||
+                    propertyElement.hasDeclaredAnnotation(Property.class))) ;
     }
 
     private void staticMethodCheck(MethodElement methodElement) {

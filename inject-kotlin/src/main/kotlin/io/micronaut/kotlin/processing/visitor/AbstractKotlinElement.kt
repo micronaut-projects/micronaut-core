@@ -139,13 +139,18 @@ abstract class AbstractKotlinElement<T : KSNode>(val declaration: T,
             val javaModifiers = visitorContext.resolver.effectiveJavaModifiers(dec)
             return javaModifiers.mapNotNull {
                 when (it) {
-                    Modifier.FINAL -> ElementModifier.FINAL
-                    Modifier.PRIVATE, Modifier.INTERNAL -> ElementModifier.PRIVATE
-                    Modifier.PROTECTED -> ElementModifier.PROTECTED
                     Modifier.ABSTRACT -> ElementModifier.ABSTRACT
-                    Modifier.JAVA_STATIC -> ElementModifier.STATIC
+                    Modifier.FINAL -> ElementModifier.FINAL
+                    Modifier.PRIVATE -> ElementModifier.PRIVATE
+                    Modifier.PROTECTED -> ElementModifier.PROTECTED
                     Modifier.PUBLIC -> ElementModifier.PUBLIC
+                    Modifier.JAVA_STATIC -> ElementModifier.STATIC
                     Modifier.JAVA_TRANSIENT -> ElementModifier.TRANSIENT
+                    Modifier.JAVA_DEFAULT -> ElementModifier.DEFAULT
+                    Modifier.JAVA_SYNCHRONIZED -> ElementModifier.SYNCHRONIZED
+                    Modifier.JAVA_VOLATILE -> ElementModifier.VOLATILE
+                    Modifier.JAVA_NATIVE -> ElementModifier.NATIVE
+                    Modifier.JAVA_STRICT -> ElementModifier.STRICTFP
                     else -> null
                 }
             }.toMutableSet()

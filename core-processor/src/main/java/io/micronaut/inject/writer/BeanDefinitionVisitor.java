@@ -136,7 +136,7 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
 
     /**
      * Alter the super class of this bean definition. The passed class should be a subclass of
-     * {@link io.micronaut.context.AbstractBeanDefinition}.
+     * {@link io.micronaut.context.AbstractInitializableBeanDefinition}.
      *
      * @param name The super type
      */
@@ -260,13 +260,12 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
      * @param beanType           The bean type of the method
      * @param methodElement      The method element
      * @param requiresReflection Whether the method requires reflection
-     * @param propertyElement    Whether this method originates from a property
      * @param visitorContext     The visitor context
      */
     void visitMethodInjectionPoint(TypedElement beanType,
                                    MethodElement methodElement,
                                    boolean requiresReflection,
-                                   @Nullable PropertyElement propertyElement, VisitorContext visitorContext);
+                                   VisitorContext visitorContext);
 
     /**
      * Visit a method that is to be made executable allow invocation of said method without reflection.
