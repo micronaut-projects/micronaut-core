@@ -2154,6 +2154,28 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             final DefaultAnnotationMetadata defaultMetadata = isReferenceOrEmpty
                 ? new MutableAnnotationMetadata()
                 : (DefaultAnnotationMetadata) annotationMetadata;
+
+            List<AnnotationValue<Annotation>> repeatableAnnotations = annotationValue.getAnnotations(AnnotationMetadata.VALUE_MEMBER);
+            boolean isRepeatableAnnotationContainer = !repeatableAnnotations.isEmpty() && repeatableAnnotations.stream()
+                    .allMatch(value -> {
+                        T annotationMirror = getAnnotationMirror(value.getAnnotationName()).orElse(null);
+                        return annotationMirror != null && getRepeatableNameForType(annotationMirror) != null;
+                    });
+            if (isRepeatableAnnotationContainer) {
+                // Repeatable annotations container is being added with values
+                // We will add every repeatable annotation separately to properly detect its container and run transformations
+                Map<CharSequence, Object> containerValues = new LinkedHashMap<>(annotationValue.getValues());
+                containerValues.remove(AnnotationMetadata.VALUE_MEMBER);
+                if (!containerValues.isEmpty()) {
+                    // If repeatable container has some extra values add it stripped of the value
+                    annotationMetadata = annotate(annotationMetadata, new AnnotationValue<A2>(annotationValue.getAnnotationName(), containerValues));
+                }
+                for (AnnotationValue<?> av : repeatableAnnotations) {
+                    annotationMetadata = annotate(annotationMetadata, av);
+                }
+                return annotationMetadata;
+            }
+
             T annotationMirror = getAnnotationMirror(annotationName).orElse(null);
             if (annotationMirror != null) {
                 applyTransformationsForAnnotationType(
