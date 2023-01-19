@@ -18,10 +18,11 @@ package io.micronaut.http.server.tck.tests.cors;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpRequest;
@@ -126,6 +127,10 @@ public class CrossOriginTest {
                 .build()));
     }
 
+    /**
+     * <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Access-Control-Allow-Headers">Access-Control-Allow-Headers</a>
+     * The Access-Control-Allow-Headers response header is used in response to a preflight request which includes the Access-Control-Request-Headers to indicate which HTTP headers can be used during the actual request.
+     */
     @Test
     void allowedHeadersFailure() throws IOException {
         asserts(SPECNAME,
@@ -137,29 +142,48 @@ public class CrossOriginTest {
                 .build()));
     }
 
+    /**
+     * The Access-Control-Expose-Headers header adds the specified headers to the allowlist that JavaScript (such as getResponseHeader()) in browsers is allowed to access.
+     * @see <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Access-Control-Expose-Headers">Access-Control-Expose-Headers</a>
+     */
     @Test
-    void exposedHeadersHappyPath() throws IOException {
+    void defaultAccessControlExposeHeaderValueIsNotSet() throws IOException {
         asserts(SPECNAME,
+            preflight(UriBuilder.of("/exposedheaders").path("foo"), "https://foo.com", HttpMethod.GET),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .assertResponse(response -> {
+                    assertCorsHeaders(response, "https://foo.com", HttpMethod.GET);
+                    assertFalse(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS));
+                })
+                .build()));
+    }
+
+    /**
+     * The Access-Control-Expose-Headers header adds the specified headers to the allowlist that JavaScript (such as getResponseHeader()) in browsers is allowed to access.
+     * @see <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Access-Control-Expose-Headers">Access-Control-Expose-Headers</a>
+     */
+    @Test
+    void httHeaderValueAccessControlExposeHeaderValueCanBeSetViaCrossOriginAnnotation() throws IOException {
+        asserts(SPECNAME,
+            CollectionUtils.mapOf("micronaut.server.cors.single-header", StringUtils.FALSE),
             preflight(UriBuilder.of("/exposedheaders").path("bar"), "https://foo.com", HttpMethod.GET)
-                .header(HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS, HttpHeaders.AUTHORIZATION + "," + HttpHeaders.CONTENT_TYPE),
+                .header(HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS, "foo"),
             (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .assertResponse(response -> {
                     assertCorsHeaders(response, "https://foo.com", HttpMethod.GET);
                     assertTrue(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS));
+                    assertEquals("Content-Encoding,Kuma-Revision", response.getHeaders().get(HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS));
                 })
                 .build()));
     }
 
-    @Test
-    void exposedHeadersFailure() throws IOException {
-        asserts(SPECNAME,
-            preflight(UriBuilder.of("/exposedheaders").path("bar"), "https://foo.com", HttpMethod.GET)
-                .header(HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS, "foo"),
-            (server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
-                .status(HttpStatus.FORBIDDEN)
-                .assertResponse(this::assertCorsHeadersNotPresent)
-                .build()));
+    private static MutableHttpRequest<?> preflight(UriBuilder uriBuilder, String originValue, HttpMethod method) {
+        return HttpRequest.OPTIONS(uriBuilder.build())
+            .header(HttpHeaders.ACCEPT, MediaType.TEXT_PLAIN)
+            .header(HttpHeaders.ORIGIN, originValue)
+            .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, method);
     }
 
     @Requires(property = "spec.name", value = SPECNAME)
@@ -211,17 +235,27 @@ public class CrossOriginTest {
             return "bar";
         }
     }
+
     @Requires(property = "spec.name", value = SPECNAME)
     @Controller("/exposedheaders")
-    @CrossOrigin(
-        value = "https://foo.com",
-        exposedHeaders = { HttpHeaders.CONTENT_TYPE, HttpHeaders.AUTHORIZATION }
-    )
     static class ExposedHeaders {
+        @CrossOrigin(
+            value = "https://foo.com",
+            exposedHeaders = { "Content-Encoding", "Kuma-Revision" }
+        )
         @Produces(MediaType.TEXT_PLAIN)
         @Get("/bar")
-        String index() {
+        String bar() {
             return "bar";
+        }
+
+        @CrossOrigin(
+            value = "https://foo.com"
+        )
+        @Produces(MediaType.TEXT_PLAIN)
+        @Get("/foo")
+        String foo() {
+            return "foo";
         }
     }
 
@@ -249,12 +283,4 @@ public class CrossOriginTest {
             return "https://micronautexample.com";
         }
     }
-
-    private static MutableHttpRequest<?> preflight(UriBuilder uriBuilder, String originValue, HttpMethod method) {
-        return HttpRequest.OPTIONS(uriBuilder.build())
-            .header(HttpHeaders.ACCEPT, MediaType.TEXT_PLAIN)
-            .header(HttpHeaders.ORIGIN, originValue)
-            .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, method);
-    }
-
 }

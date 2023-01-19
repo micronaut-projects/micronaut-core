@@ -44,7 +44,7 @@ public class CorsOriginConfiguration {
     private List<String> allowedOrigins = ANY;
     private List<HttpMethod> allowedMethods = ANY_METHOD;
     private List<String> allowedHeaders = ANY;
-    private List<String> exposedHeaders = NONE;
+    private List<String> exposedHeaders = Collections.emptyList();
     private boolean allowCredentials = true;
     private Long maxAge = 1800L;
 
