@@ -130,6 +130,7 @@ httpServer:
     listener: Advanced Listener Configuration
     cors:
       title: Configuring CORS
+      annotationBasedCors: Annotation-based CORS Configuration
       corsConfiguration: CORS via Configuration
       corsAllowedOrigins: Allowed Origins
       corsAllowedMethods: Allowed Methods
