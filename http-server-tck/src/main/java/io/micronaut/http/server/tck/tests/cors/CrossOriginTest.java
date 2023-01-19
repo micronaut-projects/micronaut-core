@@ -33,6 +33,7 @@ import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.server.cors.CrossOrigin;
 import io.micronaut.http.server.tck.AssertionUtils;
+import io.micronaut.http.server.tck.CorsUtils;
 import io.micronaut.http.server.tck.HttpResponseAssertion;
 import io.micronaut.http.server.util.HttpHostResolver;
 import io.micronaut.http.uri.UriBuilder;
@@ -41,6 +42,7 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 
+import static io.micronaut.http.server.tck.CorsUtils.*;
 import static io.micronaut.http.server.tck.TestScenario.asserts;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -75,7 +77,7 @@ public class CrossOriginTest {
             preflight(UriBuilder.of("/foo").path("bar"), "https://bar.com", HttpMethod.GET),
             (server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.METHOD_NOT_ALLOWED)
-                .assertResponse(this::assertCorsHeadersNotPresent)
+                .assertResponse(CorsUtils::assertCorsHeadersNotPresent)
                 .build()));
     }
 
@@ -104,7 +106,7 @@ public class CrossOriginTest {
                 preflight(UriBuilder.of("/methods").path("deleteit").path("id"), "https://www.google.com", HttpMethod.DELETE),
                 (server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
                     .status(HttpStatus.FORBIDDEN)
-                    .assertResponse(this::assertCorsHeadersNotPresent)
+                    .assertResponse(CorsUtils::assertCorsHeadersNotPresent)
                     .build()))
         );
     }
@@ -130,7 +132,7 @@ public class CrossOriginTest {
                 .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, "foo"),
             (server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.FORBIDDEN)
-                .assertResponse(this::assertCorsHeadersNotPresent)
+                .assertResponse(CorsUtils::assertCorsHeadersNotPresent)
                 .build()));
     }
 
@@ -254,25 +256,4 @@ public class CrossOriginTest {
             .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, method);
     }
 
-    private void assertCorsHeadersNotPresent(HttpResponse<?> response) {
-        assertFalse(response.getHeaders().names().contains(HttpHeaders.VARY));
-        assertFalse(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS));
-        assertFalse(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_MAX_AGE));
-        assertFalse(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN));
-        assertFalse(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS));
-        assertFalse(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS));
-    }
-
-    private void assertCorsHeaders(HttpResponse<?> response, String origin, HttpMethod method) {
-        assertTrue(response.getHeaders().names().contains(HttpHeaders.VARY));
-        assertEquals("Origin", response.getHeaders().get(HttpHeaders.VARY));
-        assertTrue(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS));
-        assertEquals("true", response.getHeaders().get(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS));
-        assertTrue(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_MAX_AGE));
-        assertEquals("1800", response.getHeaders().get(HttpHeaders.ACCESS_CONTROL_MAX_AGE));
-        assertTrue(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN));
-        assertEquals(origin, response.getHeaders().get(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN));
-        assertTrue(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS));
-        assertEquals(method.toString(), response.getHeaders().get(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS));
-    }
 }
