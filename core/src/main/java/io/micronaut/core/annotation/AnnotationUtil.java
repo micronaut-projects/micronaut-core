@@ -613,7 +613,9 @@ public class AnnotationUtil {
     public static int calculateHashCode(Map<? extends CharSequence, Object> values) {
         int hashCode = 0;
 
-        for (Map.Entry<? extends CharSequence, Object> member : values.entrySet()) {
+        // Performance optimization to use the Object as the type otherwise
+        // the bytecode will produce the type-check introducing type-check pollution
+        for (Map.Entry<? extends Object, Object> member : values.entrySet()) {
             Object value = member.getValue();
 
             int nameHashCode = member.getKey().hashCode();

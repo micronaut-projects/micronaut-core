@@ -5,3 +5,5 @@ io.micronaut.visitors.AllClassesVisitor
 io.micronaut.visitors.InjectVisitor
 io.micronaut.inject.factory.BasicVisitor
 io.micronaut.aop.introduction.repeatable.MyRepoVisitor
+io.micronaut.annotation.mapping.AddsRepeatableAnnotationSpec$AddRepeatableTypeElementVisitor
+io.micronaut.annotation.mapping.ReplacesRepeatableAnnotationSpec$ReplacesRepeatableTypeElementVisitor

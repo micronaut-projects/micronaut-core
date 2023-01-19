@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.Function;
 
 /**
  * A mapping from environment variable names to Micronaut
@@ -100,7 +101,13 @@ public final class EnvironmentProperties {
                 return result;
             }
         }
-        return cache.computeIfAbsent(env, EnvironmentProperties::computePropertiesFor);
+        // Keep the anonymous class instead of Lambda to reduce the Lambda invocation overhead during the startup
+        return cache.computeIfAbsent(env, new Function<String, List<String>>() {
+            @Override
+            public List<String> apply(String env1) {
+                return computePropertiesFor(env1);
+            }
+        });
     }
 
     private static List<String> computePropertiesFor(String env) {

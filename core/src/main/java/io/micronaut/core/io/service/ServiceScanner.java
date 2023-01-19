@@ -39,6 +39,7 @@ import java.util.Set;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.RecursiveAction;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
@@ -79,14 +80,18 @@ final class ServiceScanner<S> {
     @SuppressWarnings("java:S3398")
     private static Set<String> computeMicronautServiceTypeNames(URI uri, String path) {
         Set<String> typeNames = new HashSet<>();
-        IOUtils.eachFile(
-                uri, path, currentPath -> {
-                    if (Files.isRegularFile(currentPath)) {
-                        final String typeName = currentPath.getFileName().toString();
-                        typeNames.add(typeName);
-                    }
+        // Keep the anonymous class instead of Lambda to reduce the Lambda invocation overhead during the startup
+        Consumer<Path> consumer = new Consumer<>() {
+
+            @Override
+            public void accept(Path currentPath) {
+                if (Files.isRegularFile(currentPath)) {
+                    final String typeName = currentPath.getFileName().toString();
+                    typeNames.add(typeName);
                 }
-        );
+            }
+        };
+        IOUtils.eachFile(uri, path, consumer);
         return typeNames;
     }
 
@@ -197,12 +202,18 @@ final class ServiceScanner<S> {
                     while (serviceConfigs.hasMoreElements()) {
                         URL url = serviceConfigs.nextElement();
                         for (String typeName : computeStandardServiceTypeNames(url)) {
-                            values.add(transformer.apply(typeName));
+                            S val = transformer.apply(typeName);
+                            if (val != null) {
+                                values.add(val);
+                            }
                         }
                     }
                     findMicronautMetaServiceConfigs((uri, path) -> {
                         for (String typeName : computeMicronautServiceTypeNames(uri, path)) {
-                            values.add(transformer.apply(typeName));
+                            S val = transformer.apply(typeName);
+                            if (val != null) {
+                                values.add(val);
+                            }
                         }
                     });
                 } catch (IOException | URISyntaxException e) {
