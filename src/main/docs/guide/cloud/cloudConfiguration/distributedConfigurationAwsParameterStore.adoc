@@ -2,7 +2,7 @@ Micronaut supports configuration sharing via AWS System Manager Parameter Store.
 
 dependency:io.micronaut.aws:micronaut-aws-parameter-store[]
 
-To enable distributed configuration, create a `src/main/resources/bootstrap.yml` configuration file and add Parameter Store configuration:
+To enable distributed configuration, make sure https://docs.micronaut.io/latest/guide/#bootstrap[bootstrap] is enabled and create a `src/main/resources/bootstrap.yml` file with the following configuration:
 
 .bootstrap.yml
 [source,yaml]
