@@ -1,6 +1,7 @@
 package io.micronaut.docs.http.server.cors;
 
 // tag::imports[]
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
@@ -8,6 +9,7 @@ import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.server.cors.CrossOrigin;
 // end::imports[]
 
+@Requires(property = "spec.name", value = "CorsControllerSpec")
 // tag::controller[]
 @Controller("/hello")
 public class CorsController {
