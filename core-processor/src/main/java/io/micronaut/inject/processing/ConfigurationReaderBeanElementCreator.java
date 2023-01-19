@@ -264,8 +264,8 @@ final class ConfigurationReaderBeanElementCreator extends DeclaredBeanElementCre
     }
 
     @Override
-    protected boolean isInjectPointMethod(PropertyElement propertyElement, MemberElement memberElement) {
-        return super.isInjectPointMethod(propertyElement, memberElement) || memberElement.hasDeclaredStereotype(ConfigurationInject.class);
+    protected boolean isInjectPointMethod(MemberElement memberElement) {
+        return memberElement.hasDeclaredStereotype(ConfigurationInject.class);
     }
 
     private void visitConfigurationBuilder(BeanDefinitionVisitor visitor,

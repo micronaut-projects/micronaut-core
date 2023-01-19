@@ -107,12 +107,7 @@ public abstract class BeanDefinitionCreatorFactory {
         ).isPresent();
     }
 
-    /**
-     * Does the given metadata define an injection point.
-     * @param annotationMetadata The annotation metadata
-     * @return True if it does
-     */
-    public static boolean containsInjectPoint(AnnotationMetadata annotationMetadata) {
+    private static boolean containsInjectPoint(AnnotationMetadata annotationMetadata) {
         return annotationMetadata.hasStereotype(AnnotationUtil.INJECT)
             || annotationMetadata.hasStereotype(Value.class)
             || annotationMetadata.hasStereotype(Property.class);
