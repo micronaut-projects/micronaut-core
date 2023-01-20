@@ -41,7 +41,6 @@ import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -161,7 +160,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @return The {@link AnnotationMetadata}
      */
     public AnnotationMetadata buildDeclared(T element) {
-        MutableAnnotationMetadata annotationMetadata = new MutableAnnotationMetadata();
+        DefaultAnnotationMetadata annotationMetadata = new MutableAnnotationMetadata();
         try {
             AnnotationMetadata metadata = buildInternalMulti(
                 Collections.emptyList(),
@@ -189,7 +188,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         if (CollectionUtils.isEmpty(annotations)) {
             return AnnotationMetadata.EMPTY_METADATA;
         }
-        MutableAnnotationMetadata annotationMetadata = new MutableAnnotationMetadata();
+        DefaultAnnotationMetadata annotationMetadata = new MutableAnnotationMetadata();
         if (includeTypeAnnotations) {
             buildInternalMulti(
                 Collections.emptyList(),
@@ -260,7 +259,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     }
 
     private AnnotationMetadata buildInternal(boolean inheritTypeAnnotations, boolean declaredOnly, T element) {
-        MutableAnnotationMetadata annotationMetadata = new MutableAnnotationMetadata();
+        DefaultAnnotationMetadata annotationMetadata = new MutableAnnotationMetadata();
         try {
             return buildInternalMulti(
                 Collections.emptyList(),
@@ -636,7 +635,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             processAnnotationDefaults(originatingElement,
                 metadata,
                 annotationName,
-                () -> readAnnotationDefaultValues(annotationMirror));
+                () ->  readAnnotationDefaultValues(annotationMirror));
         }
 
         List<String> parentAnnotations = new ArrayList<>();
@@ -808,13 +807,8 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         Optional<?> aliases = getAnnotationValues(originatingElement, member, Aliases.class).get("value");
         if (aliases.isPresent()) {
             Object value = aliases.get();
-            Collection<AnnotationValue> values = null;
             if (value instanceof AnnotationValue[]) {
-                values = Arrays.asList((AnnotationValue[]) value);
-            } else if (value instanceof Collection) {
-                values = (Collection<AnnotationValue>) value;
-            }
-            if (values != null) {
+                AnnotationValue[] values = (AnnotationValue[]) value;
                 for (AnnotationValue av : values) {
                     OptionalValues<Object> aliasForValues = OptionalValues.of(Object.class, av.getValues());
                     processAnnotationAlias(
@@ -1073,7 +1067,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     private AnnotationMetadata buildInternalMulti(
         List<T> parents,
         T element,
-        MutableAnnotationMetadata annotationMetadata,
+        DefaultAnnotationMetadata annotationMetadata,
         boolean inheritTypeAnnotations,
         boolean declaredOnly,
         boolean allowAliases) {
@@ -1112,7 +1106,9 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             Optional<String> value = annotationMetadata.stringValue(DefaultScope.class);
             value.ifPresent(name -> annotationMetadata.addDeclaredAnnotation(name, Collections.emptyMap()));
         }
-        postProcess(annotationMetadata, element);
+        if (annotationMetadata instanceof MutableAnnotationMetadata mutableAnnotationMetadata) {
+            postProcess(mutableAnnotationMetadata, element);
+        }
         return annotationMetadata;
     }
 
@@ -1451,11 +1447,6 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 final AnnotationClassValue[] values = (AnnotationClassValue[]) o;
                 if (values.length > 0) {
                     interceptorType = values[0];
-                }
-            } else if (o instanceof List) {
-                final List<AnnotationClassValue<?>> annotations = (List<AnnotationClassValue<?>>) o;
-                if (annotations.size() > 0) {
-                    interceptorType = annotations.get(0);
                 }
             }
             if (interceptorType != null) {
@@ -2384,13 +2375,6 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         @Override
         public int hashCode() {
             return hashCode;
-        }
-
-        @Override
-        public String toString() {
-            return "MetadataKey{" +
-                "elements=" + Arrays.toString(elements) +
-                '}';
         }
     }
 

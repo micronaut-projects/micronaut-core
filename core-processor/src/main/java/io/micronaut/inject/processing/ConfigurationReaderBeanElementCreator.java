@@ -265,7 +265,7 @@ final class ConfigurationReaderBeanElementCreator extends DeclaredBeanElementCre
 
     @Override
     protected boolean isInjectPointMethod(MemberElement memberElement) {
-        return memberElement.hasDeclaredStereotype(ConfigurationInject.class);
+        return super.isInjectPointMethod(memberElement) || memberElement.hasDeclaredStereotype(ConfigurationInject.class);
     }
 
     private void visitConfigurationBuilder(BeanDefinitionVisitor visitor,
@@ -284,7 +284,7 @@ final class ConfigurationReaderBeanElementCreator extends DeclaredBeanElementCre
                         return false;
                     }
                     MethodElement methodElement = writeMethod.get();
-                    if (propertyElement.hasStereotype(Deprecated.class) || !methodElement.isPublic()) {
+                    if (methodElement.hasStereotype(Deprecated.class) || !methodElement.isPublic()) {
                         return false;
                     }
                     return methodElement.getParameters().length <= 2;

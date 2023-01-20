@@ -25,6 +25,7 @@ import com.google.devtools.ksp.symbol.*
 import io.micronaut.core.annotation.AnnotationClassValue
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.reflect.ReflectionUtils
+import io.micronaut.core.util.ArrayUtils
 import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap
 import io.micronaut.core.value.OptionalValues
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
@@ -271,12 +272,30 @@ class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnvironment: Sy
         memberName: String,
         annotationValue: Any
     ): Any? {
-        if (annotationValue is Collection<*>) {
-            return annotationValue.map {
-                readAnnotationValue(originatingElement, it)
+        return when (annotationValue) {
+            is Collection<*> -> {
+                toArray(annotationValue, originatingElement)
             }
+            is Array<*> -> {
+                toArray(annotationValue.toList(), originatingElement)
+            }
+            else -> readAnnotationValue(originatingElement, annotationValue)
         }
-        return readAnnotationValue(originatingElement, annotationValue)
+    }
+
+    private fun toArray(
+        annotationValue: Collection<*>,
+        originatingElement: KSAnnotated
+    ): Array<out Any>? {
+        var valueType = Any::class.java
+        val collection = annotationValue.map {
+            val v = readAnnotationValue(originatingElement, it)
+            if (v != null) {
+                valueType = v.javaClass
+            }
+            v
+        }
+        return ArrayUtils.toArray(collection, valueType)
     }
 
     override fun readAnnotationDefaultValues(annotationMirror: KSAnnotation): MutableMap<out KSDeclaration, *> {
@@ -375,7 +394,8 @@ class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnvironment: Sy
         declaration.getAllProperties().forEach { prop ->
             val argument = annotationMirror.arguments.find { it.name == prop.simpleName }
             if (argument?.value != null && !argument.isDefault()) {
-                map[prop] = argument.value!!
+                val value = argument.value!!
+                map[prop] = value
             }
         }
         return map
@@ -537,7 +557,7 @@ class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnvironment: Sy
         if (value is KSAnnotation) {
             return readNestedAnnotationValue(originatingElement, value)
         }
-        return value
+         return value
     }
 
     override fun getAnnotationMembers(annotationType: String): MutableMap<String, out KSAnnotated> {

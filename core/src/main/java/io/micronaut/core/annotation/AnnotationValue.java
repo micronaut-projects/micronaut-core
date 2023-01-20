@@ -624,9 +624,6 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         if (o instanceof AnnotationClassValue<?>[] annotationClassValues) {
             return annotationClassValues;
         }
-        if (o instanceof Collection<?> collection) {
-            return collection.toArray(new AnnotationClassValue<?>[0]);
-        }
         return AnnotationClassValue.EMPTY_ARRAY;
     }
 
@@ -642,12 +639,6 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         if (o instanceof AnnotationClassValue<?>[] annotationClassValues) {
             if (annotationClassValues.length > 0) {
                 return Optional.of(annotationClassValues[0]);
-            }
-        }
-        if (o instanceof List<?> a && !a.isEmpty()) {
-            Object o1 = a.get(0);
-            if (o1 instanceof AnnotationClassValue<?> acv) {
-                return Optional.of(acv);
             }
         }
         return Optional.empty();
@@ -1416,14 +1407,6 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         }
         if (value instanceof CharSequence) {
             return new String[]{value.toString()};
-        } else if (value instanceof Iterable<?> iterable) {
-            List<String> list = new ArrayList<>();
-            for (Object entry: iterable) {
-                if (entry != null) {
-                    list.add(entry.toString());
-                }
-            }
-            return list.toArray(StringUtils.EMPTY_STRING_ARRAY);
         }
         if (value != null) {
             if (value.getClass().isArray()) {

@@ -153,7 +153,7 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
     }
 
     private void build(BeanDefinitionVisitor visitor) {
-        Set<MemberElement> processedFields = new HashSet<>();
+        Set<FieldElement> processedFields = new HashSet<>();
         ElementQuery<MemberElement> memberQuery = ElementQuery.ALL_FIELD_AND_METHODS.includeHiddenElements();
         if (processAsProperties()) {
             memberQuery = memberQuery.excludePropertyElements();
@@ -229,7 +229,7 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
         Optional<FieldElement> field = propertyElement.getField();
         if (!claimed && field.isPresent()) {
             FieldElement writeElement = field.get();
-            claimed |= visitField(visitor, writeElement);
+            claimed = visitField(visitor, writeElement);
         }
         return claimed;
     }
@@ -458,7 +458,7 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
     /**
      * Is inject point method?
      *
-     * @param memberElement   The method
+     * @param memberElement The method
      * @return true if it is
      */
     protected boolean isInjectPointMethod(MemberElement memberElement) {
