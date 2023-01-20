@@ -232,6 +232,7 @@ public class KotlinCompiler {
         return buildContext(clazz, includeAllBeans, Collections.emptyMap());
     }
 
+    @SuppressWarnings("java:S2095")
     public static ApplicationContext
     buildContext(@Language("kotlin") String clazz, boolean includeAllBeans, Map<String, Object> config) {
         Pair<Pair<KotlinCompilation, KotlinCompilation.Result>, Pair<KotlinCompilation, KotlinCompilation.Result>> pair = compile("temp", clazz, classElement -> {
