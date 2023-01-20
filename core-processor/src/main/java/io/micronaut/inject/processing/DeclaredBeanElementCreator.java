@@ -462,9 +462,7 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
      * @return true if it is
      */
     protected boolean isInjectPointMethod(MemberElement memberElement) {
-        return  memberElement.hasDeclaredStereotype(AnnotationUtil.INJECT) ||
-                memberElement.hasDeclaredStereotype(AnnotationUtil.QUALIFIER) ||
-                memberElement.hasDeclaredAnnotation(Property.class);
+        return memberElement.hasDeclaredStereotype(AnnotationUtil.INJECT);
     }
 
     private void staticMethodCheck(MethodElement methodElement) {

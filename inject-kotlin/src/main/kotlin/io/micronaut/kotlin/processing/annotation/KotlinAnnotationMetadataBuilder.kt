@@ -22,6 +22,7 @@ import com.google.devtools.ksp.isDefault
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.symbol.*
+import io.micronaut.context.annotation.Property
 import io.micronaut.core.annotation.AnnotationClassValue
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.reflect.ReflectionUtils
@@ -189,6 +190,11 @@ class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnvironment: Sy
             val markedNullable = element.type.resolve().isMarkedNullable
             if (markedNullable) {
                 annotationMetadata.addDeclaredAnnotation(AnnotationUtil.NULLABLE, emptyMap())
+            }
+        } else if (element is KSPropertySetter) {
+            if (!annotationMetadata.hasAnnotation(JvmField::class.java) && (annotationMetadata.hasStereotype(AnnotationUtil.QUALIFIER) || annotationMetadata.hasAnnotation(Property::class.java))) {
+                // implicitly inject
+                annotationMetadata.addDeclaredAnnotation(AnnotationUtil.INJECT, emptyMap())
             }
         }
     }

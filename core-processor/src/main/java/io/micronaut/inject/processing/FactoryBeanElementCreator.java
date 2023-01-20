@@ -83,16 +83,16 @@ final class FactoryBeanElementCreator extends DeclaredBeanElementCreator {
 
     @Override
     protected boolean visitPropertyReadElement(BeanDefinitionVisitor visitor, PropertyElement propertyElement, MemberElement readElement) {
-        if (propertyElement.hasDeclaredStereotype(Bean.class.getName())) {
+        if (readElement.hasDeclaredStereotype(Bean.class.getName())) {
             ClassElement beanType;
             if (readElement instanceof MethodElement methodElement) {
                 beanType = methodElement.getGenericReturnType();
             } else if (readElement instanceof FieldElement fieldElement) {
                 beanType = fieldElement.getGenericType();
             } else {
-                beanType = propertyElement.getGenericType();
+                throw new IllegalStateException();
             }
-            visitBeanFactoryElement(visitor, beanType, propertyElement);
+            visitBeanFactoryElement(visitor, beanType, readElement);
             return true;
         }
         return super.visitPropertyReadElement(visitor, propertyElement, readElement);
@@ -107,10 +107,7 @@ final class FactoryBeanElementCreator extends DeclaredBeanElementCreator {
         return super.visitPropertyWriteElement(visitor, propertyElement, writeElement);
     }
 
-    void visitBeanFactoryElement(
-        BeanDefinitionVisitor visitor,
-        ClassElement producedType,
-        MemberElement producingElement) {
+    void visitBeanFactoryElement(BeanDefinitionVisitor visitor, ClassElement producedType, MemberElement producingElement) {
         if (producedType.isPrimitive()) {
             BeanDefinitionWriter producedBeanDefinitionWriter = new BeanDefinitionWriter(producingElement,
                 OriginatingElements.of(producingElement),

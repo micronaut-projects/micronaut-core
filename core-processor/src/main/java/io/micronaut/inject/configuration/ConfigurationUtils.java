@@ -91,13 +91,16 @@ public final class ConfigurationUtils {
             if (prefixOptional.isEmpty()) {
                 prefix = basePrefixOptional.get();
             } else {
-                prefix = prefixOptional.map(p -> basePrefixOptional.get() + "." + p).orElse("");
+                prefix = prefixOptional.map(p -> basePrefixOptional.get() + "." + p).orElse(null);
             }
         } else {
-            prefix = prefixOptional.orElse("");
+            prefix = prefixOptional.orElse(null);
         }
         if (annotationMetadata.hasDeclaredAnnotation(EachProperty.class)) {
             return computeIterablePrefix(annotationMetadata, prefix);
+        }
+        if (prefix == null) {
+            return "";
         }
         return prefix;
     }
