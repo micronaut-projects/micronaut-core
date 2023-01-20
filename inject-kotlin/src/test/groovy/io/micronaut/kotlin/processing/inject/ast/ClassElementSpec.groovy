@@ -210,9 +210,16 @@ interface Three
         buildClassElement('ast.test.Test', '''
 package ast.test
 
+/**
+* Class docs
+*
+* @param constructorProp construct prop
+*/
 class Test(
     val constructorProp : String) : Parent<String>(constructorProp), One<String> {
-
+    /**
+     * Property doc
+     */
     val publicReadOnlyProp : Boolean = true
     override val size: Int = 10
     override fun get(index: Int): String {
@@ -223,6 +230,10 @@ class Test(
         return "ok"
     }
 
+    /**
+    * Method doc
+    * @param name Param name
+    */
     override fun publicFunc(name : String) : String {
         return "ok"
     }
@@ -277,6 +288,7 @@ interface Three
                 [it.name, it]
             }
 
+            assert classElement.documentation.isPresent()
             assert methodMap['add'].parameters[1].genericType.simpleName == 'String'
             assert methodMap['add'].parameters[1].type.simpleName == 'CharSequence'
             assert methodMap['iterator'].returnType.firstTypeArgument.get().simpleName == 'Object'
@@ -292,6 +304,7 @@ interface Three
             assert propMap['conventionProp'].writeMethod.get().parameters[0].genericType.simpleName == 'String'
             assert propMap['parentConstructorProp'].type.simpleName == 'CharSequence'
             assert propMap['parentConstructorProp'].genericType.simpleName == 'String'
+            assert methodMap['publicFunc'].documentation.isPresent()
             assert methodMap['parentFunc'].returnType.simpleName == 'CharSequence'
             assert methodMap['parentFunc'].genericReturnType.simpleName == 'String'
             assert methodMap['parentFunc'].parameters[0].type.simpleName == 'CharSequence'
