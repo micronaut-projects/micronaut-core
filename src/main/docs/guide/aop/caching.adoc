@@ -20,10 +20,9 @@ In addition, if the underlying Cache implementation supports non-blocking cache 
 
 == Configuring Caches
 
-By default, https://github.com/ben-manes/caffeine[Caffeine] is used to create caches from application configuration. For example with `application.yml`:
+By default, https://github.com/ben-manes/caffeine[Caffeine] is used to create caches from application configuration. For example:
 
-.Cache Configuration Example
-[source,yaml]
+[configuration,title="Cache Configuration Example"]
 ----
 micronaut:
   caches:

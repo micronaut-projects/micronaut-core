@@ -1,7 +1,7 @@
-Micronaut supports HTTPS out of the box. By default HTTPS is disabled and all requests are served using HTTP. To enable HTTPS support, modify your configuration. For example with `application.yml`:
+Micronaut supports HTTPS out of the box. By default HTTPS is disabled and all requests are served using HTTP. To enable HTTPS support, modify your configuration. For example:
 
 .HTTPS Configuration Example
-[source,yaml]
+[configuration]
 ----
 micronaut:
   server:
@@ -40,7 +40,7 @@ During the creation of the `server.p12` file it is necessary to define a passwor
 Now modify your configuration:
 
 .HTTPS Configuration Example
-[source,yaml]
+[configuration]
 ----
 micronaut:
   ssl:
@@ -95,7 +95,7 @@ WARNING: If either `srcstorepass` or `alias` are not the same as defined in the 
 Now modify your configuration:
 
 .HTTPS Configuration Example
-[source,yaml]
+[configuration]
 ----
 micronaut:
   ssl:

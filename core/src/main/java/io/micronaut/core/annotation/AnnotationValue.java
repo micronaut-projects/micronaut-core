@@ -1165,16 +1165,24 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
 
         ArgumentUtils.requireNonNull("member", member);
         Object v = values.get(member);
-        AnnotationValue<?>[] values = null;
+        Collection<AnnotationValue<?>> values = null;
         if (v instanceof AnnotationValue<?> annotationValue) {
-            values = new AnnotationValue<?>[]{annotationValue};
+            values = Collections.singletonList(annotationValue);
         } else if (v instanceof AnnotationValue<?>[] annotationValues) {
-            values = annotationValues;
+            values = Arrays.asList(annotationValues);
+        } else if (v instanceof Collection<?> collection) {
+            final Iterator<?> i = collection.iterator();
+            if (i.hasNext()) {
+                final Object o = i.next();
+                if (o instanceof AnnotationValue) {
+                    values = (Collection<AnnotationValue<?>>) collection;
+                }
+            }
         }
-        if (ArrayUtils.isEmpty(values)) {
+        if (CollectionUtils.isEmpty(values)) {
             return Collections.emptyList();
         }
-        List<AnnotationValue<T>> list = new ArrayList<>(values.length);
+        List<AnnotationValue<T>> list = new ArrayList<>(values.size());
         for (AnnotationValue<?> value : values) {
             if (value == null) {
                 continue;

@@ -5,7 +5,7 @@ The environment endpoint returns information about the api:context.env.Environme
 To enable and configure the environment endpoint, supply configuration through `endpoints.env`.
 
 .Environment Endpoint Configuration Example
-[source,yaml]
+[configuration]
 ----
 endpoints:
   env:

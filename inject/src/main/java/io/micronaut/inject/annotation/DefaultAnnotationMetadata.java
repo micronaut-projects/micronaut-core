@@ -1480,18 +1480,17 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @SuppressWarnings("WeakerAccess")
     protected void addAnnotation(String annotation, Map<CharSequence, Object> values, RetentionPolicy retentionPolicy) {
         if (annotation != null) {
-            String repeatedName = findRepeatableAnnotationContainerInternal(annotation);
-            Object v = values.get(AnnotationMetadata.VALUE_MEMBER);
-            if (v instanceof io.micronaut.core.annotation.AnnotationValue[]) {
-                io.micronaut.core.annotation.AnnotationValue[] avs = (io.micronaut.core.annotation.AnnotationValue[]) v;
-                for (io.micronaut.core.annotation.AnnotationValue av : avs) {
-                    addRepeatable(annotation, av);
-                }
-            } else if (v instanceof Iterable && repeatedName != null) {
-                Iterable i = (Iterable) v;
-                for (Object o : i) {
-                    if (o instanceof io.micronaut.core.annotation.AnnotationValue) {
-                        addRepeatable(annotation, ((io.micronaut.core.annotation.AnnotationValue) o));
+            if (isRepeatableAnnotationContainer(annotation)) {
+                Object v = values.get(AnnotationMetadata.VALUE_MEMBER);
+                if (v instanceof io.micronaut.core.annotation.AnnotationValue<?>[] annotationValues) {
+                    for (io.micronaut.core.annotation.AnnotationValue<?> annotationValue : annotationValues) {
+                        addRepeatable(annotation, annotationValue);
+                    }
+                } else if (v instanceof Iterable<?> iterable) {
+                    for (Object o : iterable) {
+                        if (o instanceof io.micronaut.core.annotation.AnnotationValue<?> annotationValue) {
+                            addRepeatable(annotation, annotationValue);
+                        }
                     }
                 }
             } else {
@@ -1687,19 +1686,16 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @SuppressWarnings("WeakerAccess")
     protected final void addStereotype(List<String> parentAnnotations, String stereotype, Map<CharSequence, Object> values, RetentionPolicy retentionPolicy) {
         if (stereotype != null) {
-            String repeatedName = findRepeatableAnnotationContainerInternal(stereotype);
-            if (repeatedName != null) {
+            if (isRepeatableAnnotationContainer(stereotype)) {
                 Object v = values.get(AnnotationMetadata.VALUE_MEMBER);
-                if (v instanceof io.micronaut.core.annotation.AnnotationValue[]) {
-                    io.micronaut.core.annotation.AnnotationValue[] avs = (io.micronaut.core.annotation.AnnotationValue[]) v;
-                    for (io.micronaut.core.annotation.AnnotationValue av : avs) {
-                        addRepeatableStereotype(parentAnnotations, stereotype, av);
+                if (v instanceof io.micronaut.core.annotation.AnnotationValue<?>[] annotationValues) {
+                    for (io.micronaut.core.annotation.AnnotationValue<?> annotationValue : annotationValues) {
+                        addRepeatableStereotype(parentAnnotations, stereotype, annotationValue);
                     }
-                } else if (v instanceof Iterable) {
-                    Iterable i = (Iterable) v;
-                    for (Object o : i) {
-                        if (o instanceof io.micronaut.core.annotation.AnnotationValue) {
-                            addRepeatableStereotype(parentAnnotations, stereotype, (io.micronaut.core.annotation.AnnotationValue) o);
+                } else if (v instanceof Iterable<?> iterable) {
+                    for (Object o : iterable) {
+                        if (o instanceof io.micronaut.core.annotation.AnnotationValue<?> annotationValue) {
+                            addRepeatableStereotype(parentAnnotations, stereotype, annotationValue);
                         }
                     }
                 }
@@ -1751,19 +1747,16 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @SuppressWarnings("WeakerAccess")
     protected void addDeclaredStereotype(List<String> parentAnnotations, String stereotype, Map<CharSequence, Object> values, RetentionPolicy retentionPolicy) {
         if (stereotype != null) {
-            String repeatedName = findRepeatableAnnotationContainerInternal(stereotype);
-            if (repeatedName != null) {
+            if (isRepeatableAnnotationContainer(stereotype)) {
                 Object v = values.get(AnnotationMetadata.VALUE_MEMBER);
-                if (v instanceof io.micronaut.core.annotation.AnnotationValue[]) {
-                    io.micronaut.core.annotation.AnnotationValue[] avs = (io.micronaut.core.annotation.AnnotationValue[]) v;
-                    for (io.micronaut.core.annotation.AnnotationValue av : avs) {
-                        addDeclaredRepeatableStereotype(parentAnnotations, stereotype, av);
+                if (v instanceof io.micronaut.core.annotation.AnnotationValue<?>[] annotationValues) {
+                    for (io.micronaut.core.annotation.AnnotationValue<?> annotationValue : annotationValues) {
+                        addDeclaredRepeatableStereotype(parentAnnotations, stereotype, annotationValue);
                     }
-                } else if (v instanceof Iterable) {
-                    Iterable i = (Iterable) v;
-                    for (Object o : i) {
-                        if (o instanceof io.micronaut.core.annotation.AnnotationValue) {
-                            addDeclaredRepeatableStereotype(parentAnnotations, stereotype, (io.micronaut.core.annotation.AnnotationValue) o);
+                } else if (v instanceof Iterable<?> iterable) {
+                    for (Object o : iterable) {
+                        if (o instanceof io.micronaut.core.annotation.AnnotationValue<?> annotationValue) {
+                            addDeclaredRepeatableStereotype(parentAnnotations, stereotype, annotationValue);
                         }
                     }
                 }
@@ -1813,21 +1806,19 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     protected void addDeclaredAnnotation(String annotation, Map<CharSequence, Object> values, RetentionPolicy retentionPolicy) {
         if (annotation != null) {
             boolean hasOtherMembers = false;
-            String repeatedName = findRepeatableAnnotationContainerInternal(annotation);
-            if (repeatedName != null) {
+            boolean repeatableAnnotationContainer = isRepeatableAnnotationContainer(annotation);
+            if (isRepeatableAnnotationContainer(annotation)) {
                 for (Map.Entry<CharSequence, Object> entry : values.entrySet()) {
                     if (entry.getKey().equals(AnnotationMetadata.VALUE_MEMBER)) {
                         Object v = entry.getValue();
-                        if (v instanceof io.micronaut.core.annotation.AnnotationValue[]) {
-                            io.micronaut.core.annotation.AnnotationValue[] avs = (io.micronaut.core.annotation.AnnotationValue[]) v;
-                            for (io.micronaut.core.annotation.AnnotationValue av : avs) {
-                                addDeclaredRepeatable(annotation, av);
+                        if (v instanceof io.micronaut.core.annotation.AnnotationValue<?>[] annotationValues) {
+                            for (io.micronaut.core.annotation.AnnotationValue<?> annotationValue : annotationValues) {
+                                addDeclaredRepeatable(annotation, annotationValue);
                             }
-                        } else if (v instanceof Iterable) {
-                            Iterable i = (Iterable) v;
-                            for (Object o : i) {
-                                if (o instanceof io.micronaut.core.annotation.AnnotationValue) {
-                                    addDeclaredRepeatable(annotation, ((io.micronaut.core.annotation.AnnotationValue) o));
+                        } else if (v instanceof Iterable<?> iterable) {
+                            for (Object o : iterable) {
+                                if (o instanceof io.micronaut.core.annotation.AnnotationValue<?> annotationValue) {
+                                    addDeclaredRepeatable(annotation, annotationValue);
                                 }
                             }
                         }
@@ -1837,7 +1828,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                 }
             }
 
-            if (repeatedName == null || hasOtherMembers) {
+            if (!repeatableAnnotationContainer || hasOtherMembers) {
                 Map<String, Map<CharSequence, Object>> declaredAnnotations = getDeclaredAnnotationsInternal();
                 Map<String, Map<CharSequence, Object>> allAnnotations = getAllAnnotations();
                 addAnnotation(annotation, values, declaredAnnotations, allAnnotations, true, retentionPolicy);
@@ -2412,6 +2403,11 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                 }
             }
         }
+    }
+
+    private boolean isRepeatableAnnotationContainer(String annotation) {
+        // This method is only used during the compilation time so we don't bother checking AnnotationMetadataSupport
+        return annotationRepeatableContainer != null && annotationRepeatableContainer.values().contains(annotation);
     }
 
     private String findRepeatableAnnotationContainerInternal(String annotation) {

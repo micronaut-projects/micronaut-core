@@ -15,7 +15,6 @@
  */
 package io.micronaut.context.env;
 
-import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -23,7 +22,6 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.format.MapFormat;
-import io.micronaut.core.io.socket.SocketUtils;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.conventions.StringConvention;
 import io.micronaut.core.optim.StaticOptimizations;
@@ -34,10 +32,8 @@ import io.micronaut.core.util.EnvironmentProperties;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.MapPropertyResolver;
 import io.micronaut.core.value.PropertyResolver;
-import io.micronaut.core.value.ValueException;
 import org.slf4j.Logger;
 
-import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -52,7 +48,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -72,11 +67,6 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     private static final EnvironmentProperties CURRENT_ENV = StaticOptimizations.get(EnvironmentProperties.class)
             .orElseGet(EnvironmentProperties::empty);
     private static final Pattern DOT_PATTERN = Pattern.compile("\\.");
-    private static final String RANDOM_PREFIX = "\\s?random\\.(\\S+?)";
-    private static final String RANDOM_UPPER_LIMIT = "(\\(-?\\d+(\\.\\d+)?\\))";
-    private static final String RANDOM_RANGE = "(\\[-?\\d+(\\.\\d+)?,\\s?-?\\d+(\\.\\d+)?])";
-
-    private static final Pattern RANDOM_PATTERN = Pattern.compile("\\$\\{" + RANDOM_PREFIX + "(" + RANDOM_UPPER_LIMIT + "|" + RANDOM_RANGE + ")?\\}");
 
     private static final Object NO_VALUE = new Object();
     private static final PropertyCatalog[] CONVENTIONS = {PropertyCatalog.GENERATED, PropertyCatalog.RAW};
@@ -90,7 +80,6 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     protected final Map<String, Object>[] catalog = new Map[58];
     protected final Map<String, Object>[] rawCatalog = new Map[58];
     protected final Map<String, Object>[] nonGenerated = new Map[58];
-    private final SecureRandom random = new SecureRandom();
     private final Map<String, Boolean> containsCache = new ConcurrentHashMap<>(20);
     private final Map<String, Object> resolvedValueCache = new ConcurrentHashMap<>(20);
     private final EnvironmentProperties environmentProperties = EnvironmentProperties.fork(CURRENT_ENV);
@@ -586,21 +575,6 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
 
                 Object value = properties.get(property);
 
-                if (value instanceof CharSequence) {
-                    value = processRandomExpressions(convention, property, (CharSequence) value);
-                } else if (value instanceof List) {
-                    final ListIterator i = ((List) value).listIterator();
-                    while (i.hasNext()) {
-                        final Object o = i.next();
-                        if (o instanceof CharSequence) {
-                            final CharSequence newValue = processRandomExpressions(convention, property, (CharSequence) o);
-                            if (newValue != o) {
-                                i.set(newValue);
-                            }
-                        }
-                    }
-                }
-
                 List<String> resolvedProperties = resolvePropertiesForConvention(property, convention);
                 boolean first = true;
                 for (String resolvedProperty : resolvedProperties) {
@@ -722,67 +696,6 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         }
     }
 
-    private CharSequence processRandomExpressions(PropertySource.PropertyConvention convention, String property, CharSequence str) {
-        if (convention != PropertySource.PropertyConvention.ENVIRONMENT_VARIABLE && str.toString().contains(propertyPlaceholderResolver.getPrefix())) {
-            StringBuffer newValue = new StringBuffer();
-            Matcher matcher = RANDOM_PATTERN.matcher(str);
-            boolean hasRandoms = false;
-            while (matcher.find()) {
-                hasRandoms = true;
-                String type = matcher.group(1).trim().toLowerCase();
-                String range = matcher.group(2);
-                if (range != null) {
-                    range = range.substring(1, range.length() - 1);
-                }
-                String randomValue;
-                switch (type) {
-                    case "port":
-                        randomValue = String.valueOf(SocketUtils.findAvailableTcpPort());
-                        break;
-                    case "int":
-                    case "integer":
-                        randomValue = String.valueOf(range == null ? random.nextInt() : getNextIntegerInRange(range, property));
-                        break;
-                    case "long":
-                        randomValue = String.valueOf(range == null ? random.nextLong() : getNextLongInRange(range, property));
-                        break;
-                    case "float":
-                        randomValue = String.valueOf(range == null ? random.nextFloat() : getNextFloatInRange(range, property));
-                        break;
-                    case "shortuuid":
-                        randomValue = UUID.randomUUID().toString().substring(25, 35);
-                        break;
-                    case "uuid":
-                        randomValue = UUID.randomUUID().toString();
-                        break;
-                    case "uuid2":
-                        randomValue = UUID.randomUUID().toString().replace("-", "");
-                        break;
-                    default:
-                        throw new ConfigurationException("Invalid random expression " + matcher.group(0) + " for property: " + property);
-                }
-                matcher.appendReplacement(newValue, randomValue);
-            }
-
-            if (hasRandoms) {
-                matcher.appendTail(newValue);
-                return newValue.toString();
-            }
-
-        }
-        return str;
-    }
-
-    /**
-     * @param name        The name
-     * @param allowCreate Whether allows creation
-     * @return The map with the resolved entries for the name
-     */
-    @SuppressWarnings("MagicNumber")
-    protected Map<String, Object> resolveEntriesForKey(String name, boolean allowCreate) {
-        return resolveEntriesForKey(name, allowCreate, null);
-    }
-
     /**
      * @param name        The name
      * @param allowCreate Whether allows creation
@@ -897,48 +810,6 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             for (int i = list.size(); i <= toIndex; i++) {
                 list.add(i, value);
             }
-        }
-    }
-
-    private int getNextIntegerInRange(String range, String property) {
-        try {
-            String[] tokens = range.split(",");
-            int lowerBound = Integer.parseInt(tokens[0]);
-            if (tokens.length == 1) {
-                return lowerBound >= 0 ? 1 : -1  * (random.nextInt(Math.abs(lowerBound)));
-            }
-            int upperBound = Integer.parseInt(tokens[1]);
-            return lowerBound + (int) (Math.random() * (upperBound - lowerBound));
-        } catch (NumberFormatException ex) {
-            throw new ValueException("Invalid range: `" + range + "` found for type Integer while parsing property: " + property, ex);
-        }
-    }
-
-    private long getNextLongInRange(String range, String property) {
-        try {
-            String[] tokens = range.split(",");
-            long lowerBound = Long.parseLong(tokens[0]);
-            if (tokens.length == 1) {
-                return (long) (Math.random() * (lowerBound));
-            }
-            long upperBound = Long.parseLong(tokens[1]);
-            return lowerBound + (long) (Math.random() * (upperBound - lowerBound));
-        } catch (NumberFormatException ex) {
-            throw new ValueException("Invalid range: `" + range + "` found for type Long while parsing property: " + property, ex);
-        }
-    }
-
-    private float getNextFloatInRange(String range, String property) {
-        try {
-            String[] tokens = range.split(",");
-            float lowerBound = Float.parseFloat(tokens[0]);
-            if (tokens.length == 1) {
-                return (float) (Math.random() * (lowerBound));
-            }
-            float upperBound = Float.parseFloat(tokens[1]);
-            return lowerBound + (float) (Math.random() * (upperBound - lowerBound));
-        } catch (NumberFormatException ex) {
-            throw new ValueException("Invalid range: `" + range + "` found for type Float while parsing property: " + property, ex);
         }
     }
 
