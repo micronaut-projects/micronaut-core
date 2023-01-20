@@ -100,6 +100,48 @@ public class CorsSimpleRequestTest {
     }
 
     /**
+     * A request to localhost with an origin of 127.0.0.1 should fail despite them both being local.
+     *
+     * @throws IOException
+     */
+    @Test
+    void corsSimpleRequestAllowedForLocalhostAnd127Origin() throws IOException {
+        asserts(SPECNAME,
+            Collections.singletonMap(PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE),
+            (server) -> createRequest(server.getPort().map(p -> "http://localhost:" + p + "/refresh").orElseThrow(() -> new RuntimeException("Unknown port for " + server)), "http://127.0.0.1:8000"),
+            (server, request) -> {
+                RefreshCounter refreshCounter = server.getApplicationContext().getBean(RefreshCounter.class);
+                assertEquals(0, refreshCounter.getRefreshCount());
+                AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
+                    .status(HttpStatus.FORBIDDEN)
+                    .assertResponse(response -> assertFalse(response.getHeaders().contains("Vary")))
+                    .build());
+                assertEquals(0, refreshCounter.getRefreshCount());
+            });
+    }
+
+    /**
+     * A request to 127.0.0.1 with an origin of localhost should fail despite them both being local.
+     *
+     * @throws IOException
+     */
+    @Test
+    void corsSimpleRequestAllowedFor127RequestAndLocalhostOrigin() throws IOException {
+        asserts(SPECNAME,
+            Collections.singletonMap(PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE),
+            (server) -> createRequest(server.getPort().map(p -> "http://127.0.0.1:" + p + "/refresh").orElseThrow(() -> new RuntimeException("Unknown port for " + server)), "http://localhost:8000"),
+            (server, request) -> {
+                RefreshCounter refreshCounter = server.getApplicationContext().getBean(RefreshCounter.class);
+                assertEquals(0, refreshCounter.getRefreshCount());
+                AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
+                    .status(HttpStatus.FORBIDDEN)
+                    .assertResponse(response -> assertFalse(response.getHeaders().contains("Vary")))
+                    .build());
+                assertEquals(0, refreshCounter.getRefreshCount());
+            });
+    }
+
+    /**
      * CORS Simple request for localhost can be allowed via configuration.
      * @throws IOException may throw the try for resources
      */
@@ -132,7 +174,11 @@ public class CorsSimpleRequestTest {
     }
 
     static HttpRequest<?> createRequest(String origin) {
-        return HttpRequest.POST("/refresh", MultipartBody.builder().addPart("force", StringUtils.TRUE).build())
+        return createRequest("/refresh", origin);
+    }
+
+    static HttpRequest<?> createRequest(String uri, String origin) {
+        return HttpRequest.POST(uri, MultipartBody.builder().addPart("force", StringUtils.TRUE).build())
             .header("Content-Type", "multipart/form-data; boundary=----WebKitFormBoundarywxiDZy8kMlSE59h1")
             .header("Origin", origin)
             .header("Accept-Encoding", "gzip, deflate")

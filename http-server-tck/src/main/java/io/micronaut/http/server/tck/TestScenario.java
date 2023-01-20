@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2022 original authors
+ * Copyright 2017-2023 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,12 +32,12 @@ public final class TestScenario {
     private final String specName;
     private final Map<String, Object> configuration;
 
-    private final HttpRequest<?> request;
+    private final RequestSupplier request;
     private final BiConsumer<ServerUnderTest, HttpRequest<?>> assertion;
 
     private TestScenario(String specName,
                          Map<String, Object> configuration,
-                         HttpRequest<?> request,
+                         RequestSupplier request,
                          BiConsumer<ServerUnderTest, HttpRequest<?>> assertion) {
         this.specName = specName;
         this.configuration = configuration;
@@ -56,6 +56,26 @@ public final class TestScenario {
     public static void asserts(String specName,
                                Map<String, Object> configuration,
                                HttpRequest<?> request,
+                               BiConsumer<ServerUnderTest, HttpRequest<?>> assertion) throws IOException {
+        TestScenario.builder()
+            .specName(specName)
+            .configuration(configuration)
+            .request(request)
+            .assertion(assertion)
+            .run();
+    }
+
+    /**
+     *
+     * @param specName Value for {@literal spec.name} property. Used to avoid bean pollution.
+     * @param configuration Test Scenario configuration
+     * @param request HTTP Request to be sent in the test scenario
+     * @param assertion Assertion for a request and server.
+     * @throws IOException Exception thrown while getting the server under test.
+     */
+    public static void asserts(String specName,
+                               Map<String, Object> configuration,
+                               RequestSupplier request,
                                BiConsumer<ServerUnderTest, HttpRequest<?>> assertion) throws IOException {
         TestScenario.builder()
             .specName(specName)
@@ -93,7 +113,7 @@ public final class TestScenario {
     private void run() throws IOException {
         try (ServerUnderTest server = ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer(specName, configuration)) {
             if (assertion != null) {
-                assertion.accept(server, request);
+                assertion.accept(server, request.apply(server));
             }
         }
     }
@@ -109,7 +129,7 @@ public final class TestScenario {
 
         private BiConsumer<ServerUnderTest, HttpRequest<?>> assertion;
 
-        private HttpRequest<?> request;
+        private RequestSupplier request;
 
         /**
          *
@@ -127,7 +147,17 @@ public final class TestScenario {
          * @return The Test Scneario Builder
          */
         public Builder request(HttpRequest<?> request) {
-            this.request =  request;
+            this.request = (server) -> request;
+            return this;
+        }
+
+        /**
+         *
+         * @param request HTTP Request supplier that given a server, provides the request to be sent in the test scenario
+         * @return The Test Scenario Builder
+         */
+        public Builder request(RequestSupplier request) {
+            this.request = request;
             return this;
         }
 
