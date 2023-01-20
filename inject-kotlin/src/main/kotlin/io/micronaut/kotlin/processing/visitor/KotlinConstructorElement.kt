@@ -15,7 +15,11 @@
  */
 package io.micronaut.kotlin.processing.visitor
 
+import com.google.devtools.ksp.closestClassDeclaration
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
+import com.google.devtools.ksp.symbol.Modifier
+import io.micronaut.context.annotation.ConfigurationInject
+import io.micronaut.context.annotation.ConfigurationReader
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.inject.ast.*
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
@@ -26,6 +30,14 @@ class KotlinConstructorElement(method: KSFunctionDeclaration,
                                visitorContext: KotlinVisitorContext,
                                returnType: ClassElement
 ): ConstructorElement, KotlinMethodElement(method, declaringType, returnType, elementAnnotationMetadataFactory, visitorContext) {
+
+    init {
+        if (method.closestClassDeclaration()?.modifiers?.contains(Modifier.DATA) == true &&
+            declaringType.hasDeclaredStereotype(ConfigurationReader::class.java)) {
+            annotate(ConfigurationInject::class.java)
+        }
+    }
+
     override fun overrides(overridden: MethodElement): Boolean {
         return false
     }

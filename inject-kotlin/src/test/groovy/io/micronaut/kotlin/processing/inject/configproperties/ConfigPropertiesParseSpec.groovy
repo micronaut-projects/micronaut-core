@@ -1,5 +1,6 @@
 package io.micronaut.kotlin.processing.inject.configproperties
 
+import io.micronaut.annotation.processing.test.KotlinCompiler
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
 import io.micronaut.context.annotation.ConfigurationReader
@@ -14,6 +15,32 @@ import spock.lang.Specification
 import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class ConfigPropertiesParseSpec extends Specification {
+
+    void "test data classes that are configuration properties inject values"() {
+        given:
+
+        def config = ['foo.bar.host': 'test', 'foo.bar.baz.stuff': "good"]
+        def context = buildContext('''
+package test
+
+import io.micronaut.context.annotation.*
+
+@ConfigurationProperties("foo.bar")
+data class DataConfigTest(val host : String, val child: ChildConfig ) {
+    @ConfigurationProperties("baz")
+    data class ChildConfig(var stuff: String)
+}
+''', false, config)
+
+        def bean = getBean(context, 'test.DataConfigTest')
+
+        expect:
+        bean.host == 'test'
+        bean.child.stuff == 'good'
+
+        cleanup:
+        context.close()
+    }
 
     void "test inner class paths - pojo inheritance"() {
         when:
