@@ -85,7 +85,7 @@ public class IOUtils {
             String scheme = uri.getScheme();
 
             try {
-                if ("jar".equals(scheme)) {
+                if ("jar".equals(scheme) || "zip".equals(scheme)) {
                     // try to match FileSystems.newFileSystem(URI) semantics for zipfs here.
                     // Basically ignores anything after the !/ if it exists, and uses the part
                     // before as the jar path to extract.
@@ -93,6 +93,10 @@ public class IOUtils {
                     int sep = jarUri.lastIndexOf("!/");
                     if (sep != -1) {
                         jarUri = jarUri.substring(0, sep);
+                    }
+                    if (!jarUri.startsWith("file:")) {
+                        // Special case WebLogic classloader
+                        jarUri = "file:" + jarUri;
                     }
                     // now, add the !/ at the end again so that loadNestedJarUri can handle it:
                     jarUri += "!/";
