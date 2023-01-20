@@ -64,7 +64,6 @@ import static io.micronaut.http.annotation.Filter.MATCH_ALL_PATTERN;
 public class CorsFilter implements HttpServerFilter {
     private static final Logger LOG = LoggerFactory.getLogger(CorsFilter.class);
     private static final ArgumentConversionContext<HttpMethod> CONVERSION_CONTEXT_HTTP_METHOD = ImmutableArgumentConversionContext.of(HttpMethod.class);
-    private static final String LOCALHOST = "http://localhost";
 
     protected final HttpServerConfiguration.CorsConfiguration corsConfiguration;
 
@@ -123,7 +122,7 @@ public class CorsFilter implements HttpServerFilter {
      *
      * @param corsOriginConfiguration CORS Origin configuration for request's HTTP Header origin.
      * @param request HTTP Request
-     * @return {@literal true} if the resolved host is localhost or a 127.0.0.1 address and the CORS configuration has any for allowed origins.
+     * @return {@literal true} if the resolved host is localhost or 127.0.0.1 address and the CORS configuration has any for allowed origins.
      */
     protected boolean shouldDenyToPreventDriveByLocalhostAttack(@NonNull CorsOriginConfiguration corsOriginConfiguration,
                                                                 @NonNull HttpRequest<?> request) {
@@ -151,7 +150,7 @@ public class CorsFilter implements HttpServerFilter {
      *
      * @param origin HTTP Header {@link HttpHeaders#ORIGIN} value.
      * @param request HTTP Request
-     * @return {@literal true} if the resolved host starts with {@literal http://localhost} and origin does not start with localhost deny it.
+     * @return {@literal true} if the resolved host is localhost or 127.0.0.1 and origin is not one of these then deny it.
      */
     protected boolean shouldDenyToPreventDriveByLocalhostAttack(@NonNull String origin,
                                                                 @NonNull HttpRequest<?> request) {
@@ -159,7 +158,7 @@ public class CorsFilter implements HttpServerFilter {
             return false;
         }
         String host = httpHostResolver.resolve(request);
-        return !origin.startsWith(LOCALHOST) && host.startsWith(LOCALHOST);
+        return !isLocal(origin) && isLocal(host);
     }
 
     @Override
