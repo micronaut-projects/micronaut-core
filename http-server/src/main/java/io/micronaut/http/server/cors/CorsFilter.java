@@ -40,6 +40,8 @@ import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.net.InetAddress;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -121,7 +123,7 @@ public class CorsFilter implements HttpServerFilter {
      *
      * @param corsOriginConfiguration CORS Origin configuration for request's HTTP Header origin.
      * @param request HTTP Request
-     * @return {@literal true} if the resolved host starts with {@literal http://localhost} and the CORS configuration has any for allowed origins.
+     * @return {@literal true} if the resolved host is localhost or a 127.0.0.1 address and the CORS configuration has any for allowed origins.
      */
     protected boolean shouldDenyToPreventDriveByLocalhostAttack(@NonNull CorsOriginConfiguration corsOriginConfiguration,
                                                                 @NonNull HttpRequest<?> request) {
@@ -132,12 +134,17 @@ public class CorsFilter implements HttpServerFilter {
         if (origin == null) {
             return false;
         }
-        if (origin.startsWith(LOCALHOST)) {
+        if (isLocal(origin)) {
             return false;
         }
         String host = httpHostResolver.resolve(request);
-        return isAny(corsOriginConfiguration.getAllowedOrigins()) && host.startsWith(LOCALHOST);
+        return isAny(corsOriginConfiguration.getAllowedOrigins()) && isLocal(host);
+    }
 
+    private boolean isLocal(@NonNull String hostString) {
+        URI uri = URI.create(hostString);
+        String host = uri.getHost();
+        return "localhost".equals(host) || "127.0.0.1".equals(host);
     }
 
     /**
