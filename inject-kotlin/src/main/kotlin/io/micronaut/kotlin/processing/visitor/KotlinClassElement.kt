@@ -78,6 +78,7 @@ open class KotlinClassElement(val kotlinType: KSType,
                 it,
                 elementAnnotationMetadataFactory, visitorContext
             ) }
+            .filter { !it.hasAnnotation(JvmField::class.java) }
             .toList()
     }
     private val internalGenerics : Map<String, Map<String, KSType>> by lazy {
@@ -358,8 +359,12 @@ open class KotlinClassElement(val kotlinType: KSType,
                     !it.contains(ElementModifier.PRIVATE)
                 }
             }.annotated { prop ->
-                val excludedAnnotations = propertyElementQuery.excludedAnnotations
-                excludedAnnotations.isEmpty() || !excludedAnnotations.any { prop.hasAnnotation(it) }
+                if(prop.hasAnnotation(JvmField::class.java)) {
+                    false
+                } else {
+                    val excludedAnnotations = propertyElementQuery.excludedAnnotations
+                    excludedAnnotations.isEmpty() || !excludedAnnotations.any { prop.hasAnnotation(it) }
+                }
             }
 
         val allProperties : MutableList<PropertyElement> = mutableListOf()
@@ -420,7 +425,8 @@ open class KotlinClassElement(val kotlinType: KSType,
     override fun getSimpleName(): String {
         var parentDeclaration = classDeclaration.parentDeclaration
         return if (parentDeclaration == null) {
-            classDeclaration.simpleName.asString()
+            val simpleName = classDeclaration.simpleName.asString()
+            if (simpleName == "Any") "Object" else simpleName
         } else {
             val builder = StringBuilder(classDeclaration.simpleName.asString())
             while (parentDeclaration != null) {
@@ -488,14 +494,13 @@ open class KotlinClassElement(val kotlinType: KSType,
                 visitorContext.resolver.getKSNameFromString(type))
             if (kotlinName != null) {
                 ksType = visitorContext.resolver.getKotlinClassByName(kotlinName)?.asStarProjectedType()
-                if (ksType != null) {
-                    if (kotlinType.starProjection().isAssignableFrom(ksType)) {
-                        return true
-                    }
+                if (ksType != null && kotlinType.starProjection().isAssignableFrom(ksType)) {
+                    return true
                 }
             }
+            return false
         }
-        return ksType?.isAssignableFrom(kotlinType) ?: false
+        return false
     }
 
     override fun isAssignable(type: ClassElement): Boolean {
@@ -819,7 +824,7 @@ open class KotlinClassElement(val kotlinType: KSType,
 
                 is KSPropertyDeclaration -> {
                     if (elementType == PropertyElement::class.java) {
-                        return KotlinPropertyElement(
+                        val prop = KotlinPropertyElement(
                             this@KotlinClassElement,
                             visitorContext.elementFactory.newClassElement(
                                 ee.type.resolve(),
@@ -828,6 +833,15 @@ open class KotlinClassElement(val kotlinType: KSType,
                             ee,
                             elementAnnotationMetadataFactory, visitorContext
                         )
+                        if (!prop.hasAnnotation(JvmField::class.java)) {
+                            return prop
+                        } else {
+                            return elementFactory.newFieldElement(
+                                this@KotlinClassElement,
+                                ee,
+                                elementAnnotationMetadataFactory
+                            )
+                        }
                     } else {
                         return elementFactory.newFieldElement(
                             this@KotlinClassElement,

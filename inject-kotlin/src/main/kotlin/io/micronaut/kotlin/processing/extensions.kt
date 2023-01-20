@@ -76,17 +76,6 @@ fun Element.kspNode() : Any {
     }
 }
 
-fun KSPropertyDeclaration.isTypeReference(): Boolean {
-    var property: KSPropertyDeclaration? = this
-    while (property != null) {
-        if (property.type.resolve().declaration is KSTypeParameter) {
-            return true
-        }
-        property = property.findOverridee()
-    }
-    return false
-}
-
 fun KSPropertySetter.getVisibility(): Visibility {
     val modifierSet = try {
         this.modifiers

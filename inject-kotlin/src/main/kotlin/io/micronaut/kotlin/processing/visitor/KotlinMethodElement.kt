@@ -27,6 +27,7 @@ import io.micronaut.kotlin.processing.kspNode
 import io.micronaut.kotlin.processing.unwrap
 import java.util.*
 import java.util.function.Supplier
+import kotlin.jvm.Throws
 
 @OptIn(KspExperimental::class)
 open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElement {
@@ -373,7 +374,15 @@ open class KotlinMethodElement: AbstractKotlinElement<KSAnnotated>, MethodElemen
     }
 
     override fun getThrownTypes(): Array<ClassElement> {
-        return emptyArray() // Kotlin doesn't support throws declarations
+        return stringValues(Throws::class.java, "exceptionClasses")
+            .flatMap {
+                val ce = visitorContext.getClassElement(it).orElse(null)
+                if (ce != null) {
+                    listOf(ce)
+                } else {
+                    emptyList()
+                }
+            }.toTypedArray()
     }
 
 }

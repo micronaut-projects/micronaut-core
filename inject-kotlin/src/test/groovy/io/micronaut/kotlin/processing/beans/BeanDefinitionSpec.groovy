@@ -19,6 +19,30 @@ import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class BeanDefinitionSpec extends Specification {
 
+    void "test jvm field"() {
+        given:
+        def definition = KotlinCompiler.buildBeanDefinition('test.JvmFieldTest', '''
+package test
+
+import jakarta.inject.Inject
+import jakarta.inject.Singleton
+
+@Singleton
+class JvmFieldTest {
+    @JvmField
+    @Inject
+    var f : F? = null
+}
+
+@Singleton
+class F
+''')
+
+        expect:
+        definition.injectedMethods.size() == 0
+        definition.injectedFields.size() == 1
+    }
+
     @PendingFeature(reason = "difficult to achieve with current design without a significant rewrite or how native properties are handled")
     void "test injection order for inheritance"() {
         given:

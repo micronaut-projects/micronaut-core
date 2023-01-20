@@ -108,15 +108,13 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
 
         // The instance AnnotationMetadata of each element can change after a modification
         // Set annotation metadata as actual elements so the changes are reflected
-        // The instance AnnotationMetadata of each element can change after a modification
-        // Set annotation metadata as actual elements so the changes are reflected
         val propertyAnnotationMetadata: AnnotationMetadata
         propertyAnnotationMetadata = if (elements.size == 1) {
             elements.iterator().next()
         } else {
             AnnotationMetadataHierarchy(
                 true,
-                *elements.stream().map { e: MemberElement ->
+                *elements.map { e: MemberElement ->
                     if (e is MethodElement) {
                         return@map object : AnnotationMetadataDelegate {
                             override fun getAnnotationMetadata(): AnnotationMetadata {
@@ -126,7 +124,7 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
                         }
                     }
                     e
-                }.toList().toTypedArray()
+                }.toTypedArray()
             )
         }
         this.annotationMetadata = object : MutableAnnotationMetadataDelegate<Any?> {
@@ -204,7 +202,7 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
         this.classElement = classElement
         this.setter = Optional.ofNullable(setter)
             .map { method ->
-                return@map visitorContext.elementFactory.newMethodElement(classElement, method, elementAnnotationMetadataFactory)
+                visitorContext.elementFactory.newMethodElement(classElement, method, elementAnnotationMetadataFactory)
             }
         this.getter = Optional.of(visitorContext.elementFactory.newMethodElement(classElement, getter, elementAnnotationMetadataFactory))
         this.abstract = getter.isAbstract || setter?.isAbstract == true
@@ -214,8 +212,6 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
         this.getter.ifPresent { elements.add(it) }
         field.ifPresent { elements.add(it) }
 
-        // The instance AnnotationMetadata of each element can change after a modification
-        // Set annotation metadata as actual elements so the changes are reflected
         // The instance AnnotationMetadata of each element can change after a modification
         // Set annotation metadata as actual elements so the changes are reflected
         val propertyAnnotationMetadata: AnnotationMetadata
@@ -321,8 +317,6 @@ class KotlinPropertyElement: AbstractKotlinElement<KSNode>, PropertyElement {
         this.field.ifPresent { elements.add(it) }
         this.exc = excluded
 
-        // The instance AnnotationMetadata of each element can change after a modification
-        // Set annotation metadata as actual elements so the changes are reflected
         // The instance AnnotationMetadata of each element can change after a modification
         // Set annotation metadata as actual elements so the changes are reflected
         val propertyAnnotationMetadata: AnnotationMetadata

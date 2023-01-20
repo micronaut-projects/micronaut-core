@@ -39,7 +39,6 @@ class Test<T> {
     }
 
     @Unroll("super type is #superType")
-    @PendingFeature(reason = "Not yet implemented")
     def 'super type'() {
         given:
         def element = buildClassElement("example.Test", """
@@ -68,7 +67,6 @@ abstract class Test<T> : $superType() {
     }
 
     @Unroll("super interface is #superType")
-    @PendingFeature(reason = "Not yet implemented")
     def 'super interface'() {
         given:
         def element = buildClassElement("example.Test", """
@@ -94,7 +92,7 @@ abstract class Test<T> : $superType {
                 'List<List<out Array<T>>>',
                 'List<Array<List<out Array<T>>>>',
 //                'List<List>',
-                'List<List<Any>>',
+                'List<List<Object>>',
         ]
     }
 

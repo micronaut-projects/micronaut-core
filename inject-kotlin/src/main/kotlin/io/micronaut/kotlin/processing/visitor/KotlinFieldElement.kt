@@ -50,7 +50,11 @@ class KotlinFieldElement(declaration: KSPropertyDeclaration,
     }
 
     override fun isPublic(): Boolean {
-        return false // all Kotlin fields are private
+        return if (hasDeclaredAnnotation(JvmField::class.java)) {
+            super.isPublic()
+        } else {
+            false // all Kotlin fields are private
+        }
     }
 
     override fun getType(): ClassElement {

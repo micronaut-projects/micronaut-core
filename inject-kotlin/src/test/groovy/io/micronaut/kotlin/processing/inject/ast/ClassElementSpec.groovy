@@ -16,6 +16,10 @@ class ClassElementSpec extends AbstractKotlinCompilerSpec {
         buildClassElement('ast.test.Test', '''
 package ast.test
 
+import java.lang.IllegalStateException
+import kotlin.jvm.Throws
+
+
 class Test(
     val publicConstructorReadOnly : String,
     private val privateConstructorReadOnly : String,
@@ -42,6 +46,7 @@ class Test(
         return "ok"
     }
 
+    @Throws(IllegalStateException::class)
     override fun publicFunc(name : String) : String {
         return "ok"
     }
@@ -189,6 +194,8 @@ interface Three
             assert !methodMap['publicFunc'].isStatic()
             assert !methodMap['publicFunc'].isReflectionRequired()
             assert methodMap['publicFunc'].hasParameters()
+            assert methodMap['publicFunc'].thrownTypes.size() == 1
+            assert methodMap['publicFunc'].thrownTypes[0].name == IllegalStateException.name
             assert methodMap['publicFunc'].isPublic()
             assert methodMap['publicFunc'].owningType.name == 'ast.test.Test'
             assert methodMap['publicFunc'].declaringType.name == 'ast.test.Test'

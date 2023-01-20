@@ -92,7 +92,7 @@ class KotlinElementFactory(
             val componentElement = newClassElement(component, elementAnnotationMetadataFactory, false)
             return componentElement.toArray()
         } else if (declaration is KSTypeParameter) {
-            KotlinGenericPlaceholderElement(declaration, elementAnnotationMetadataFactory, visitorContext)
+            return KotlinGenericPlaceholderElement(declaration, elementAnnotationMetadataFactory, visitorContext)
         }
         if (allowPrimitive && !type.isMarkedNullable) {
             element = primitives[qualifiedName]
