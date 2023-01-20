@@ -91,6 +91,18 @@ public class DefaultMutableConversionService implements MutableConversionService
     private static final int CACHE_MAX = 150;
     private static final TypeConverter UNCONVERTIBLE = (object, targetType, context) -> Optional.empty();
 
+    private static LinkedHashMap<Class<?>, Class<?>> PRIMITIVE_ARRAYS = new LinkedHashMap<>();
+    {
+        PRIMITIVE_ARRAYS.put(Boolean[].class, boolean[].class);
+        PRIMITIVE_ARRAYS.put(Byte[].class, byte[].class);
+        PRIMITIVE_ARRAYS.put(Character[].class, char[].class);
+        PRIMITIVE_ARRAYS.put(Double[].class, double[].class);
+        PRIMITIVE_ARRAYS.put(Float[].class, float[].class);
+        PRIMITIVE_ARRAYS.put(Integer[].class, int[].class);
+        PRIMITIVE_ARRAYS.put(Long[].class, long[].class);
+        PRIMITIVE_ARRAYS.put(Short[].class, short[].class);
+    }
+
     private final Map<ConvertiblePair, TypeConverter> typeConverters = new ConcurrentHashMap<>();
     private final Map<ConvertiblePair, TypeConverter> converterCache = new ConcurrentLinkedHashMap.Builder<ConvertiblePair, TypeConverter>()
             .maximumWeightedCapacity(CACHE_MAX)
@@ -202,20 +214,14 @@ public class DefaultMutableConversionService implements MutableConversionService
         // primitive array to wrapper array
         @SuppressWarnings("rawtypes")
         Function primitiveArrayToWrapperArray = ArrayUtils::toWrapperArray;
-        addConverter(double[].class, Double[].class, primitiveArrayToWrapperArray);
-        addConverter(byte[].class, Byte[].class, primitiveArrayToWrapperArray);
-        addConverter(short[].class, Short[].class, primitiveArrayToWrapperArray);
-        addConverter(boolean[].class, Boolean[].class, primitiveArrayToWrapperArray);
-        addConverter(int[].class, Integer[].class, primitiveArrayToWrapperArray);
-        addConverter(float[].class, Float[].class, primitiveArrayToWrapperArray);
-        addConverter(double[].class, Double[].class, primitiveArrayToWrapperArray);
-        addConverter(char[].class, Character[].class, primitiveArrayToWrapperArray);
         // wrapper to primitive array converters
         Function<Object[], Object> wrapperArrayToPrimitiveArray = ArrayUtils::toPrimitiveArray;
-        //noinspection rawtypes
-        addConverter(Double[].class, double[].class, (Function) wrapperArrayToPrimitiveArray);
-        //noinspection rawtypes
-        addConverter(Integer[].class, int[].class, (Function) wrapperArrayToPrimitiveArray);
+        for (Map.Entry<Class<?>, Class<?>> e : PRIMITIVE_ARRAYS.entrySet()) {
+            Class<?> wrapperArray = e.getKey();
+            Class<?> primitiveArray = e.getValue();
+            addConverter(primitiveArray, wrapperArray, primitiveArrayToWrapperArray);
+            addConverter(wrapperArray, primitiveArray, (Function) wrapperArrayToPrimitiveArray);
+        }
 
         // Object -> List
         addConverter(Object.class, List.class, (object, targetType, context) -> {

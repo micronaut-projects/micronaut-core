@@ -296,6 +296,25 @@ public class ReflectionUtils {
     }
 
     /**
+     * Finds field's value or return an empty if exception occurs or if the value is null.
+     *
+     * @param fieldOwnerClass The field owner class
+     * @param fieldName The field name
+     * @return An {@link Optional} contains the value or empty of the value is null or an error occurred
+     * @since 4.0.0
+     */
+    @Internal
+    public static Optional<Object> getFieldValue(Class<?> fieldOwnerClass, String fieldName, Object instance) {
+        try {
+            final Field f = getRequiredField(fieldOwnerClass, fieldName);
+            f.setAccessible(true);
+            return Optional.ofNullable(f.get(instance));
+        } catch (Throwable t) {
+            return Optional.empty();
+        }
+    }
+
+    /**
      * Finds a field in the type or super type.
      *
      * @param type The type

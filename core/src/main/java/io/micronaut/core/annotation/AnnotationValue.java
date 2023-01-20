@@ -1371,6 +1371,20 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     }
 
     /**
+     * Start building a new annotation existing value.
+     *
+     * @param annotation      The annotation name
+     * @param <T>             The annotation type
+     * @return The builder
+     * @since 4.0.0
+     */
+    public static <T extends Annotation> AnnotationValueBuilder<T> builder(@NonNull AnnotationValue<T> annotation) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+        return new AnnotationValueBuilder<>(annotation, annotation.getRetentionPolicy());
+    }
+
+
+    /**
      * Start building a new annotation existing value and retention policy.
      *
      * @param annotation      The annotation name
