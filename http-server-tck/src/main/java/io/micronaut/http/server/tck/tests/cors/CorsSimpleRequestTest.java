@@ -125,6 +125,20 @@ public class CorsSimpleRequestTest {
     }
 
     /**
+     * Spoof attempt with origin should fail
+     *
+     * @throws IOException
+     */
+    @Test
+    void corsSimpleRequestFailsForLocalhostAndSpoofed127Origin() throws IOException {
+        asserts(SPECNAME,
+            Collections.singletonMap(PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE),
+            createRequestFor("localhost", "http://127.0.0.1.hac0r.com:8000"),
+            CorsSimpleRequestTest::isForbidden
+        );
+    }
+
+    /**
      * A request to 127.0.0.1 with an origin of localhost should succeed as they're both local.
      *
      * @throws IOException

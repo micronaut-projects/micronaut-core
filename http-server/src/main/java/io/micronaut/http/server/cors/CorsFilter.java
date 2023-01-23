@@ -40,7 +40,6 @@ import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.net.InetAddress;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
@@ -133,17 +132,11 @@ public class CorsFilter implements HttpServerFilter {
         if (origin == null) {
             return false;
         }
-        if (isLocal(origin)) {
+        if (isOriginLocal(origin)) {
             return false;
         }
         String host = httpHostResolver.resolve(request);
-        return isAny(corsOriginConfiguration.getAllowedOrigins()) && isLocal(host);
-    }
-
-    private boolean isLocal(@NonNull String hostString) {
-        URI uri = URI.create(hostString);
-        String host = uri.getHost();
-        return "localhost".equals(host) || "127.0.0.1".equals(host);
+        return isAny(corsOriginConfiguration.getAllowedOrigins()) && isHostLocal(host);
     }
 
     /**
@@ -158,7 +151,28 @@ public class CorsFilter implements HttpServerFilter {
             return false;
         }
         String host = httpHostResolver.resolve(request);
-        return !isLocal(origin) && isLocal(host);
+        return !isOriginLocal(origin) && isHostLocal(host);
+    }
+
+    /*
+     * We only need to check host for starting with "localhost" "127." (as there are multiple loopback addresses on linux)
+     *
+     * This is fine for host, as the request had to get here.
+     */
+    private boolean isHostLocal(@NonNull String hostString) {
+        return hostString.startsWith("http://localhost")
+            || hostString.startsWith("https://localhost")
+            || hostString.startsWith("http://127.")
+            || hostString.startsWith("https://127.");
+    }
+
+    /*
+     * For Origin, we need to be more strict as otherwise an address like 127.malicious.com would be allowed.
+     */
+    private boolean isOriginLocal(@NonNull String hostString) {
+        URI uri = URI.create(hostString);
+        String host = uri.getHost();
+        return "localhost".equals(host) || "127.0.0.1".equals(host);
     }
 
     @Override
