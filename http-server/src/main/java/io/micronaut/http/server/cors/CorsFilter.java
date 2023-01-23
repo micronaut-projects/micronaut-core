@@ -163,7 +163,11 @@ public class CorsFilter implements HttpServerFilter {
         return hostString.startsWith("http://localhost")
             || hostString.startsWith("https://localhost")
             || hostString.startsWith("http://127.")
-            || hostString.startsWith("https://127.");
+            || hostString.startsWith("https://127.")
+            || hostString.startsWith("ws://localhost")
+            || hostString.startsWith("wss://localhost")
+            || hostString.startsWith("ws://127.")
+            || hostString.startsWith("wss://127.");
     }
 
     /*
