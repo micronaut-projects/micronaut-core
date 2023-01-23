@@ -150,7 +150,12 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
 
     @Override
     protected Optional<Element> getAnnotationMirror(String annotationName) {
-        return Optional.ofNullable(elementUtils.getTypeElement(annotationName));
+        TypeElement typeElement = elementUtils.getTypeElement(annotationName);
+        if (typeElement == null) {
+            // maybe inner class?
+            typeElement = elementUtils.getTypeElement(annotationName.replace('$', '.'));
+        }
+        return Optional.ofNullable(typeElement);
     }
 
     @Override
