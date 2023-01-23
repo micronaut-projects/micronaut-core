@@ -422,12 +422,15 @@ open class KotlinClassElement(val kotlinType: KSType,
         )
     }
 
+    @OptIn(KspExperimental::class)
     override fun getSimpleName(): String {
         var parentDeclaration = classDeclaration.parentDeclaration
         return if (parentDeclaration == null) {
-            if (classDeclaration.qualifiedName?.asString() == Any::class.java.name)
-                "Object"
-            else
+            val qualifiedName = classDeclaration.qualifiedName
+            if (qualifiedName != null) {
+                visitorContext.resolver.mapKotlinNameToJava(qualifiedName)?.getShortName()
+                    ?: classDeclaration.simpleName.asString()
+            } else
                 classDeclaration.simpleName.asString()
         } else {
             val builder = StringBuilder(classDeclaration.simpleName.asString())
