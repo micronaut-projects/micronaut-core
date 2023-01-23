@@ -21,6 +21,7 @@ import io.micronaut.aop.Introduction;
 import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil;
 import io.micronaut.aop.writer.AopProxyWriter;
 import io.micronaut.context.RequiresCondition;
+import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
@@ -90,7 +91,7 @@ abstract class AbstractBeanElementCreator implements BeanDefinitionCreator {
             annotation.stringValue(RequiresCondition.MEMBER_BEAN_PROPERTY)
                 .ifPresent(beanProperty -> {
                     annotation.stringValue(RequiresCondition.MEMBER_BEAN)
-                        .map(className -> visitorContext.getClassElement(className, visitorContext.getElementAnnotationMetadataFactory().readOnly()).get())
+                        .flatMap(className -> visitorContext.getClassElement(className, visitorContext.getElementAnnotationMetadataFactory().readOnly()))
                         .ifPresent(classElement -> {
                             String requiredValue = annotation.stringValue().orElse(null);
                             String notEqualsValue = annotation.stringValue(RequiresCondition.MEMBER_NOT_EQUALS).orElse(null);
@@ -121,6 +122,12 @@ abstract class AbstractBeanElementCreator implements BeanDefinitionCreator {
             || InterceptedMethodUtil.hasDeclaredAroundAdvice(methodElement.getAnnotationMetadata())) {
             addToIntroduction(aopProxyWriter, typeElement, methodElement, false);
             return true;
+        } else if (!methodElement.isAbstract() && methodElement.hasDeclaredStereotype(Executable.class)) {
+            aopProxyWriter.visitExecutableMethod(
+                typeElement,
+                methodElement,
+                visitorContext
+            );
         }
         return false;
     }

@@ -19,18 +19,20 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
+import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementModifier;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.PropertyElement;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -51,7 +53,7 @@ import java.util.function.Predicate;
 @Internal
 public abstract class EnclosedElementsQuery<C, N> {
 
-    private final Map<N, io.micronaut.inject.ast.Element> elementsCache = new HashMap<>();
+    private final Map<N, Element> elementsCache = new ConcurrentLinkedHashMap.Builder<N, Element>().maximumWeightedCapacity(200).build();
 
     /**
      * Return the elements that match the given query.
@@ -172,6 +174,8 @@ public abstract class EnclosedElementsQuery<C, N> {
         if (!result.isIncludeOverriddenMethods()) {
             if (newElement instanceof MethodElement && existingElement instanceof MethodElement) {
                 return ((MethodElement) newElement).overrides((MethodElement) existingElement);
+            } else if (newElement instanceof PropertyElement newPropertyElement && existingElement instanceof PropertyElement existingPropertyElement) {
+                return newPropertyElement.overrides(existingPropertyElement);
             }
         }
         return false;
@@ -188,7 +192,13 @@ public abstract class EnclosedElementsQuery<C, N> {
             Set<io.micronaut.inject.ast.Element> addedFromClassElements = new LinkedHashSet<>();
             classElements:
             for (N element : classElements) {
-                io.micronaut.inject.ast.Element newElement = elementsCache.computeIfAbsent(element, this::toAstElement);
+                N cacheKey = getCacheKey(element);
+                io.micronaut.inject.ast.Element newElement = elementsCache.computeIfAbsent(cacheKey, e -> this.toAstElement(e, result.getElementType()));
+                if (!result.getElementType().isInstance(newElement)) {
+                    // dirty cache
+                    elementsCache.remove(cacheKey);
+                    newElement = elementsCache.computeIfAbsent(cacheKey, e -> this.toAstElement(e, result.getElementType()));
+                }
                 for (Iterator<io.micronaut.inject.ast.Element> iterator = elements.iterator(); iterator.hasNext(); ) {
                     io.micronaut.inject.ast.Element existingElement = iterator.next();
                     if (newElement.equals(existingElement)) {
@@ -206,6 +216,15 @@ public abstract class EnclosedElementsQuery<C, N> {
             elements.addAll(addedFromClassElements);
         }
         return elements;
+    }
+
+    /**
+     * get the cache key.
+     * @param element The element
+     * @return The cache key
+     */
+    protected N getCacheKey(N element) {
+        return element;
     }
 
     private void collectHierarchy(C classNode,
@@ -279,9 +298,10 @@ public abstract class EnclosedElementsQuery<C, N> {
      * Converts the native element to the AST element.
      *
      * @param enclosedElement The native element.
+     * @param elementType     The result type
      * @return The AST element
      */
     @NonNull
-    protected abstract io.micronaut.inject.ast.Element toAstElement(N enclosedElement);
+    protected abstract io.micronaut.inject.ast.Element toAstElement(N enclosedElement, Class<?> elementType);
 
 }

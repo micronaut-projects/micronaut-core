@@ -1104,7 +1104,15 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             Optional<String> value = annotationMetadata.stringValue(DefaultScope.class);
             value.ifPresent(name -> annotationMetadata.addDeclaredAnnotation(name, Collections.emptyMap()));
         }
+        if (annotationMetadata instanceof MutableAnnotationMetadata mutableAnnotationMetadata) {
+            postProcess(mutableAnnotationMetadata, element);
+        }
         return annotationMetadata;
+    }
+
+    protected void postProcess(MutableAnnotationMetadata mutableAnnotationMetadata,
+                               T element) {
+        //no-op
     }
 
     private void includeAnnotations(DefaultAnnotationMetadata annotationMetadata,

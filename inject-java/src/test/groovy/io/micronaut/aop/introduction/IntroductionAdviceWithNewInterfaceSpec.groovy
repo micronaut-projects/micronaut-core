@@ -28,6 +28,30 @@ import io.micronaut.inject.writer.BeanDefinitionVisitor
  */
 class IntroductionAdviceWithNewInterfaceSpec extends AbstractTypeElementSpec {
 
+
+    void "test introduction advice with primitive generics"() {
+        when:
+        def context = buildContext( 'test.MyRepo', '''
+package test;
+
+import io.micronaut.aop.introduction.*;
+import javax.validation.constraints.NotNull;
+
+@RepoDef
+interface MyRepo extends DeleteByIdCrudRepo<Integer> {
+
+    @Override void deleteById(@NotNull Integer integer);
+}
+
+
+''', true)
+
+        def bean =
+                getBean(context, 'test.MyRepo')
+        then:
+        bean != null
+    }
+
     void "test that it is possible for @Introduction advice to implement additional interfaces on concrete classes"() {
         when:
         BeanDefinition beanDefinition = buildBeanDefinition('test.MyBean' + BeanDefinitionVisitor.PROXY_SUFFIX, '''
@@ -138,7 +162,7 @@ interface MyBean  {
         beanDefinition != null
         ApplicationEventListener.class.isAssignableFrom(beanDefinition.beanType)
         beanDefinition.injectedFields.size() == 0
-        beanDefinition.executableMethods.size() == 2
+        beanDefinition.executableMethods.size() == 3
         beanDefinition.findMethod("getBar").isPresent()
         beanDefinition.findMethod("onApplicationEvent", Object).isPresent()
 

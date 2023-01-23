@@ -158,6 +158,7 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
         if (processAsProperties()) {
             memberQuery = memberQuery.excludePropertyElements();
             for (PropertyElement propertyElement : classElement.getBeanProperties()) {
+                propertyElement.getField().ifPresent(processedFields::add);
                 visitPropertyInternal(visitor, propertyElement);
             }
         } else {
@@ -176,7 +177,7 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
                 visitFieldInternal(visitor, fieldElement);
             } else if (memberElement instanceof MethodElement methodElement) {
                 visitMethodInternal(visitor, methodElement);
-            } else {
+            } else if (!(memberElement instanceof PropertyElement)) {
                 throw new IllegalStateException("Unknown element");
             }
         }

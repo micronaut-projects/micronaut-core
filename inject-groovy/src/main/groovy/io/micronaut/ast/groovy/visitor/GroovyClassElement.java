@@ -905,7 +905,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
         }
 
         @Override
-        protected Element toAstElement(AnnotatedNode enclosedElement) {
+        protected Element toAstElement(AnnotatedNode enclosedElement, Class<?> elementType) {
             final GroovyElementFactory elementFactory = visitorContext.getElementFactory();
             if (isSource) {
                 if (!(enclosedElement instanceof ConstructorNode) && enclosedElement instanceof MethodNode methodNode) {

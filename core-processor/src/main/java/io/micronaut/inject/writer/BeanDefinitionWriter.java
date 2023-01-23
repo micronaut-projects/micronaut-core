@@ -637,6 +637,21 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             }
             final ClassElement declaringType = factoryMethodElement.getOwningType();
             this.beanDefinitionName = declaringType.getPackageName() + "." + prefixClassName(declaringType.getSimpleName()) + "$" + upperCaseMethodName + uniqueIdentifier + CLASS_SUFFIX;
+        } else if (beanProducingElement instanceof PropertyElement factoryPropertyElement) {
+            autoApplyNamedToBeanProducingElement(beanProducingElement);
+            final ClassElement producedElement = factoryPropertyElement.getGenericType();
+            this.beanTypeElement = producedElement;
+            this.packageName = producedElement.getPackageName();
+            this.isInterface = producedElement.isInterface();
+            this.isAbstract = beanProducingElement.isAbstract();
+            this.beanFullClassName = producedElement.getName();
+            this.beanSimpleClassName = producedElement.getSimpleName();
+            String upperCaseMethodName = NameUtils.capitalize(factoryPropertyElement.getName());
+            if (uniqueIdentifier == null) {
+                throw new IllegalArgumentException("Factory methods require passing a unique identifier");
+            }
+            final ClassElement declaringType = factoryPropertyElement.getOwningType();
+            this.beanDefinitionName = declaringType.getPackageName() + "." + prefixClassName(declaringType.getSimpleName()) + "$" + upperCaseMethodName + uniqueIdentifier + CLASS_SUFFIX;
         } else if (beanProducingElement instanceof FieldElement factoryMethodElement) {
             autoApplyNamedToBeanProducingElement(beanProducingElement);
             final ClassElement producedElement = factoryMethodElement.getGenericField();
@@ -663,11 +678,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 throw new IllegalArgumentException("Beans produced by addAssociatedBean(..) require passing a unique identifier");
             }
             final Element originatingElement = beanElementBuilder.getOriginatingElement();
-            if (originatingElement instanceof ClassElement) {
-                ClassElement originatingClass = (ClassElement) originatingElement;
+            if (originatingElement instanceof ClassElement originatingClass) {
                 this.beanDefinitionName = getAssociatedBeanName(uniqueIdentifier, originatingClass);
-            } else if (originatingElement instanceof MethodElement) {
-                ClassElement originatingClass = ((MethodElement) originatingElement).getDeclaringType();
+            } else if (originatingElement instanceof MethodElement methodElement) {
+                ClassElement originatingClass = methodElement.getDeclaringType();
                 this.beanDefinitionName = getAssociatedBeanName(uniqueIdentifier, originatingClass);
             } else {
                 throw new IllegalArgumentException("Unsupported originating element");

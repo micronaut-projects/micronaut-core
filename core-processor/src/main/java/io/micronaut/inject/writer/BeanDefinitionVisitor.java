@@ -18,7 +18,12 @@ package io.micronaut.inject.writer;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.util.Toggleable;
 import io.micronaut.inject.BeanDefinition;
-import io.micronaut.inject.ast.*;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.ast.FieldElement;
+import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.visitor.VisitorContext;
 import org.objectweb.asm.Type;
@@ -136,7 +141,7 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
 
     /**
      * Alter the super class of this bean definition. The passed class should be a subclass of
-     * {@link io.micronaut.context.AbstractBeanDefinition}.
+     * {@link io.micronaut.context.AbstractInitializableBeanDefinition}.
      *
      * @param name The super type
      */
