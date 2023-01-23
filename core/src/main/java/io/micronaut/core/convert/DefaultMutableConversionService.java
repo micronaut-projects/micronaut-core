@@ -92,7 +92,7 @@ public class DefaultMutableConversionService implements MutableConversionService
     private static final TypeConverter UNCONVERTIBLE = (object, targetType, context) -> Optional.empty();
 
     private static LinkedHashMap<Class<?>, Class<?>> PRIMITIVE_ARRAYS = new LinkedHashMap<>();
-    {
+    static {
         PRIMITIVE_ARRAYS.put(Boolean[].class, boolean[].class);
         PRIMITIVE_ARRAYS.put(Byte[].class, byte[].class);
         PRIMITIVE_ARRAYS.put(Character[].class, char[].class);
