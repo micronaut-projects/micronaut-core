@@ -96,7 +96,8 @@ class BeanDefinitionProcessor(private val environment: SymbolProcessorEnvironmen
                 for (writer in beanDefinitionCreator.build()) {
                     if (processed.add(writer.beanDefinitionName)) {
                         processBeanDefinitions(writer, outputVisitor, processed)
-                    }                 }
+                    }
+                }
             }
         } catch (e: ProcessingException) {
             environment.logger.error(e.message!!, e.originatingElement as KSNode)

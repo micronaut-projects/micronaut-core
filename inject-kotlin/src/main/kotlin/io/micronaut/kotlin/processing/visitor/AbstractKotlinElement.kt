@@ -143,7 +143,7 @@ abstract class AbstractKotlinElement<T : KSNode>(val declaration: T,
                     Modifier.FINAL -> ElementModifier.FINAL
                     Modifier.PRIVATE -> ElementModifier.PRIVATE
                     Modifier.PROTECTED -> ElementModifier.PROTECTED
-                    Modifier.PUBLIC -> ElementModifier.PUBLIC
+                    Modifier.PUBLIC, Modifier.INTERNAL -> ElementModifier.PUBLIC
                     Modifier.JAVA_STATIC -> ElementModifier.STATIC
                     Modifier.JAVA_TRANSIENT -> ElementModifier.TRANSIENT
                     Modifier.JAVA_DEFAULT -> ElementModifier.DEFAULT

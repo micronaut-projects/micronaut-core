@@ -425,8 +425,10 @@ open class KotlinClassElement(val kotlinType: KSType,
     override fun getSimpleName(): String {
         var parentDeclaration = classDeclaration.parentDeclaration
         return if (parentDeclaration == null) {
-            val simpleName = classDeclaration.simpleName.asString()
-            if (simpleName == "Any") "Object" else simpleName
+            if (classDeclaration.qualifiedName?.asString() == Any::class.java.name)
+                "Object"
+            else
+                classDeclaration.simpleName.asString()
         } else {
             val builder = StringBuilder(classDeclaration.simpleName.asString())
             while (parentDeclaration != null) {
