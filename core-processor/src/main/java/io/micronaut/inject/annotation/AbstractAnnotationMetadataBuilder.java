@@ -1009,34 +1009,21 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 .flatMap(this::flattenRepeatable);
     }
 
-    private Stream<ProcessedAnnotation> transform(ProcessedAnnotation processedAnnotationToTransform) {
+    private Stream<ProcessedAnnotation> transform(ProcessedAnnotation toTransform) {
         // Transform annotation using:
         // - io.micronaut.inject.annotation.AnnotationMapper
         // - io.micronaut.inject.annotation.AnnotationRemapper
         // - io.micronaut.inject.annotation.AnnotationTransformer
+        // Each result of the transformation will be also transformed
+        // To eliminate infinity loops "processedVisitors" will track and eliminate processed mappers/transformers
+        Set<Object> processedVisitors = new HashSet<>();
+        return transform(toTransform, processedVisitors);
+    }
 
-        List<ProcessedAnnotation> result = new ArrayList<>();
-        processAnnotationMappers(processedAnnotationToTransform, result);
-
-        return result.stream().flatMap(processedAnnotation -> {
-            AnnotationValue<?> annotationValue = processedAnnotation.getAnnotationValue();
-            String repeatableName = processedAnnotation.getAnnotationType() == null ? null : getRepeatableNameForType(processedAnnotation.getAnnotationType());
-            List<ProcessedAnnotation> transformedResult = new ArrayList<>();
-            ProcessedAnnotation toTransform;
-            if (repeatableName != null) {
-                // Repeatable annotations should be wrapped in the container when remapped / transformed
-                toTransform = toProcessedAnnotation(AnnotationValue.builder(repeatableName).values(annotationValue).build());
-            } else {
-                toTransform = processedAnnotation;
-            }
-            if (processAnnotationRemappers(toTransform, transformedResult)) {
-                return transformedResult.stream();
-            }
-            if (processAnnotationTransformers(toTransform, transformedResult)) {
-                return transformedResult.stream();
-            }
-            return Stream.of(processedAnnotation);
-        });
+    private Stream<AbstractAnnotationMetadataBuilder<T, A>.ProcessedAnnotation> transform(AbstractAnnotationMetadataBuilder<T, A>.ProcessedAnnotation toTransform, Set<Object> processedVisitors) {
+        return processAnnotationMappers(toTransform, processedVisitors)
+                .flatMap(annotation -> processAnnotationRemappers(annotation, processedVisitors))
+                .flatMap(annotation -> processAnnotationTransformers(annotation, processedVisitors));
     }
 
     private Stream<ProcessedAnnotation> flattenRepeatable(ProcessedAnnotation processedAnnotation) {
@@ -1429,81 +1416,84 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         }
     }
 
-    private boolean processAnnotationRemappers(ProcessedAnnotation processedAnnotation, List<ProcessedAnnotation> result) {
+    private <K> List<K> eliminateProcessed(List<K> visitors, Set<Object> processedVisitors) {
+        return visitors.stream().filter(v -> !processedVisitors.contains(v)).toList();
+    }
+
+    private Stream<ProcessedAnnotation> processAnnotationRemappers(ProcessedAnnotation processedAnnotation,
+                                                                   Set<Object> processedVisitors) {
         AnnotationValue<?> annotationValue = processedAnnotation.getAnnotationValue();
         String packageName = NameUtils.getPackageName(annotationValue.getAnnotationName());
         List<AnnotationRemapper> annotationRemappers = ANNOTATION_REMAPPERS.get(packageName);
+        annotationRemappers = eliminateProcessed(annotationRemappers, processedVisitors);
         if (CollectionUtils.isEmpty(annotationRemappers)) {
-            return false;
+            return Stream.of(processedAnnotation);
         }
-        boolean remaped = false;
         VisitorContext visitorContext = createVisitorContext();
+        List<ProcessedAnnotation> result = new ArrayList<>();
         for (AnnotationRemapper annotationRemapper : annotationRemappers) {
+            processedVisitors.add(annotationRemapper);
             for (AnnotationValue<?> newAnnotationValue : annotationRemapper.remap(annotationValue, visitorContext)) {
                 if (newAnnotationValue == annotationValue) {
                     result.add(processedAnnotation); // Retain the same value
                 } else {
-                    remaped = true;
                     result.add(toProcessedAnnotation(newAnnotationValue));
                 }
             }
         }
-        if (!remaped) {
-            result.clear();
-        }
-        return remaped;
+        // Transform new remapped annotations
+        return result.stream().flatMap(annotation -> transform(annotation, processedVisitors));
     }
 
-    private <K extends Annotation> boolean processAnnotationTransformers(ProcessedAnnotation processedAnnotation, List<ProcessedAnnotation> result) {
+    private <K extends Annotation> Stream<ProcessedAnnotation> processAnnotationTransformers(ProcessedAnnotation processedAnnotation,
+                                                                                             Set<Object> processedVisitors) {
         AnnotationValue<K> annotationValue = (AnnotationValue<K>) processedAnnotation.getAnnotationValue();
         List<AnnotationTransformer<K>> annotationTransformers = getAnnotationTransformers(annotationValue.getAnnotationName());
+        annotationTransformers = eliminateProcessed(annotationTransformers, processedVisitors);
         if (CollectionUtils.isEmpty(annotationTransformers)) {
-            return false;
+            return Stream.of(processedAnnotation);
         }
-        boolean transformed = false;
         VisitorContext visitorContext = createVisitorContext();
+        List<ProcessedAnnotation> result = new ArrayList<>();
         for (AnnotationTransformer<K> annotationTransformer : annotationTransformers) {
+            processedVisitors.add(annotationTransformer);
             for (AnnotationValue<?> newAnnotationValue : annotationTransformer.transform(annotationValue, visitorContext)) {
                 if (newAnnotationValue == annotationValue) {
                     result.add(processedAnnotation); // Retain the same value
                 } else {
-                    transformed = true;
                     result.add(toProcessedAnnotation(newAnnotationValue));
                 }
             }
         }
-        if (!transformed) {
-            result.clear();
-        }
-        return transformed;
+        // Transform new transformed annotations
+        return result.stream().flatMap(annotation -> transform(annotation, processedVisitors));
     }
 
-    private <K extends Annotation> boolean processAnnotationMappers(ProcessedAnnotation processedAnnotation,
-                                                                    List<ProcessedAnnotation> result) {
+    private <K extends Annotation> Stream<ProcessedAnnotation> processAnnotationMappers(ProcessedAnnotation processedAnnotation,
+                                                                                        Set<Object> processedVisitors) {
         AnnotationValue<K> annotationValue = (AnnotationValue<K>) processedAnnotation.getAnnotationValue();
         List<AnnotationMapper<K>> mappers = getAnnotationMappers(annotationValue.getAnnotationName());
-        result.add(processedAnnotation); // Mapper retains the original value
+        mappers = eliminateProcessed(mappers, processedVisitors);
         if (CollectionUtils.isEmpty(mappers)) {
-            return false;
+            return Stream.of(processedAnnotation);
         }
-        boolean mapped = false;
         VisitorContext visitorContext = createVisitorContext();
+        List<ProcessedAnnotation> result = new ArrayList<>();
+        result.add(processedAnnotation); // Mapper retains the original value
         for (AnnotationMapper<K> mapper : mappers) {
+            processedVisitors.add(mapper);
             List<AnnotationValue<?>> mappedToAnnotationValues = mapper.map(annotationValue, visitorContext);
             if (mappedToAnnotationValues != null) {
                 for (AnnotationValue<?> mappedToAnnotationValue : mappedToAnnotationValues) {
                     if (mappedToAnnotationValue != annotationValue) {
-                        mapped = true;
                         result.add(toProcessedAnnotation(mappedToAnnotationValue));
                     }
                     // else: Mapper returned the same value, but it's already included
                 }
             }
         }
-        if (!mapped) {
-            result.clear();
-        }
-        return mapped;
+        // Transform new mapped annotations
+        return result.stream().flatMap(annotation -> transform(annotation, processedVisitors));
     }
 
     private ProcessedAnnotation toProcessedAnnotation(AnnotationValue<?> av) {
