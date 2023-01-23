@@ -1417,6 +1417,9 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     }
 
     private <K> List<K> eliminateProcessed(List<K> visitors, Set<Object> processedVisitors) {
+        if (visitors == null) {
+            return null;
+        }
         return visitors.stream().filter(v -> !processedVisitors.contains(v)).toList();
     }
 
