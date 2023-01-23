@@ -46,7 +46,7 @@ public class AnnotationUtil {
             Inherited.class.getName(),
             SuppressWarnings.class.getName(),
             Override.class.getName(),
-//            Repeatable.class.getName(),
+            Repeatable.class.getName(),
             Documented.class.getName(),
             "kotlin.annotation.MustBeDocumented",
             Target.class.getName(),
