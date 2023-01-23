@@ -1383,7 +1383,6 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         return new AnnotationValueBuilder<>(annotation, annotation.getRetentionPolicy());
     }
 
-
     /**
      * Start building a new annotation existing value and retention policy.
      *
