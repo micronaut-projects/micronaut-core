@@ -26,6 +26,7 @@ import io.micronaut.context.annotation.ConfigurationReader
 import io.micronaut.context.annotation.Property
 import io.micronaut.core.annotation.AnnotationClassValue
 import io.micronaut.core.annotation.AnnotationUtil
+import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.core.reflect.ReflectionUtils
 import io.micronaut.core.util.ArrayUtils
 import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap
@@ -408,11 +409,11 @@ class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnvironment: Sy
         return map
     }
 
-    override fun getAnnotationValues(
+    override fun <K : Annotation> getAnnotationValues(
         originatingElement: KSAnnotated,
-        member: KSAnnotated,
-        annotationType: Class<*>
-    ): OptionalValues<*> {
+        member: KSAnnotated?,
+        annotationType: Class<K>
+    ): Optional<AnnotationValue<K>> {
         val annotationMirrors: MutableList<KSAnnotation> = (member as KSPropertyDeclaration).getter!!.annotations.toMutableList()
         annotationMirrors.addAll(member.annotations.toList())
         val annotationName = annotationType.name
@@ -425,16 +426,18 @@ class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnvironment: Sy
                     readAnnotationRawValues(
                         originatingElement,
                         annotationName,
-                        member,
+                        key,
                         key.simpleName.asString(),
                         value,
                         converted
                     )
                 }
-                return OptionalValues.of(Any::class.java, converted)
+                return Optional.of(
+                    AnnotationValue.builder(annotationType).members(converted).build()
+                )
             }
         }
-        return OptionalValues.empty<Any>()
+        return Optional.empty()
     }
 
     override fun getAnnotationMemberName(member: KSAnnotated): String {
