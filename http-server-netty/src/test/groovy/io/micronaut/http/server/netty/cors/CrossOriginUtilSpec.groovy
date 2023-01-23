@@ -116,7 +116,7 @@ class CrossOriginUtilSpec extends Specification {
                 allowedHeaders = [ HttpHeaders.CONTENT_TYPE, HttpHeaders.AUTHORIZATION ],
                 exposedHeaders = [ HttpHeaders.CONTENT_TYPE, HttpHeaders.AUTHORIZATION ],
                 allowedMethods = [ HttpMethod.GET, HttpMethod.POST ],
-                allowCredentials = "false",
+                allowCredentials = false,
                 maxAge = -1L
         )
         @Produces(MediaType.TEXT_PLAIN)
@@ -142,7 +142,7 @@ class CrossOriginUtilSpec extends Specification {
             allowedHeaders = [ HttpHeaders.CONTENT_TYPE, HttpHeaders.AUTHORIZATION ],
             exposedHeaders = [ HttpHeaders.CONTENT_TYPE, HttpHeaders.AUTHORIZATION ],
             allowedMethods = [ HttpMethod.GET, HttpMethod.POST, HttpMethod.DELETE ],
-            allowCredentials = "false",
+            allowCredentials = false,
             maxAge = 3600L
     )
     static class TestClassController{

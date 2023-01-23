@@ -74,7 +74,7 @@ public @interface CrossOrigin {
      *
      * @return whether the browser should send credentials
      */
-    String allowCredentials() default "true";
+    boolean allowCredentials() default true;
 
     /**
      *

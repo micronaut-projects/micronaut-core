@@ -335,7 +335,7 @@ public class CrossOriginTest {
     static class Credentials {
         @CrossOrigin(
             value = "https://foo.com",
-            allowCredentials = "false"
+            allowCredentials = false
         )
         @Produces(MediaType.TEXT_PLAIN)
         @Get("/foo")
