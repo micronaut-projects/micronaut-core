@@ -3,6 +3,7 @@ package io.micronaut.core.io
 import org.opentest4j.TestAbortedException
 import spock.lang.Issue
 import spock.lang.Specification
+import spock.lang.Unroll
 
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
@@ -125,5 +126,21 @@ class IOUtilsSpec extends Specification {
 
         cleanup:
         Files.deleteIfExists(zipPath)
+    }
+
+    @Unroll
+    void "resolvePath"(String path, String expected, String uriStr) {
+        given:
+        List<Closeable> toClose = new ArrayList<>();
+        URI uri = new URI(uriStr)
+
+        expect:
+        expected == IOUtils.resolvePath(uri, path, toClose, (closeables, s) -> Path.of("/")).toString()
+
+        where:
+        path                                                             | expected                                                          | uriStr
+        "META-INF/micronaut/io.micronaut.inject.BeanDefinitionReference" | "/META-INF/micronaut/io.micronaut.inject.BeanDefinitionReference" | "jar:file:/Users/sdelamo/.m2/repository/io/micronaut/micronaut-json-core/3.5.7/micronaut-json-core-3.5.7.jar!/META-INF/micronaut/io.micronaut.inject.BeanDefinitionReference"
+        "META-INF/micronaut/io.micronaut.inject.BeanConfiguration"       | "/META-INF/micronaut/io.micronaut.inject.BeanConfiguration"       | "jar:file:/Users/sdelamo/.m2/repository/io/micronaut/micronaut-jackson-databind/3.5.7/micronaut-jackson-databind-3.5.7.jar!/META-INF/micronaut/io.micronaut.inject.BeanConfiguration"
+        "META-INF/micronaut/io.micronaut.inject.BeanConfiguration"       | "/META-INF/micronaut/io.micronaut.inject.BeanConfiguration"        | "zip:/u01/oracle/user_projects/domains/base_domain/servers/AdminServer/tmp/_WL_user/issue8386-0.1/y2p3pa/war/WEB-INF/lib/micronaut-jackson-databind-3.5.7.jar!/META-INF/micronaut/io.micronaut.inject.BeanConfiguration/"
     }
 }
