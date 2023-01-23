@@ -760,7 +760,7 @@ package test;
         myEnumArray3Alias = {io.micronaut.inject.annotation.MyEnum2.FOO, io.micronaut.inject.annotation.MyEnum2.BAR},
         classesArray1Alias = {},
         classesArray2Alias = {String.class},
-        ann = @io.micronaut.inject.annotation.MyAnnotation3("foo"),
+        annAlias = @io.micronaut.inject.annotation.MyAnnotation3("foo"),
         annotationsArray1Alias = {},
         annotationsArray2Alias = {
                 @io.micronaut.inject.annotation.MyAnnotation3("foo"),
