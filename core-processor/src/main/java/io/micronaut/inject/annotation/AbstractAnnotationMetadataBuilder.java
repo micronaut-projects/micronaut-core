@@ -1016,11 +1016,11 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         // - io.micronaut.inject.annotation.AnnotationTransformer
         // Each result of the transformation will be also transformed
         // To eliminate infinity loops "processedVisitors" will track and eliminate processed mappers/transformers
-        Set<Object> processedVisitors = new HashSet<>();
+        Set<Class<?>> processedVisitors = new HashSet<>();
         return transform(toTransform, processedVisitors);
     }
 
-    private Stream<AbstractAnnotationMetadataBuilder<T, A>.ProcessedAnnotation> transform(AbstractAnnotationMetadataBuilder<T, A>.ProcessedAnnotation toTransform, Set<Object> processedVisitors) {
+    private Stream<ProcessedAnnotation> transform(ProcessedAnnotation toTransform, Set<Class<?>> processedVisitors) {
         return processAnnotationMappers(toTransform, processedVisitors)
                 .flatMap(annotation -> processAnnotationRemappers(annotation, processedVisitors))
                 .flatMap(annotation -> processAnnotationTransformers(annotation, processedVisitors));
@@ -1416,15 +1416,15 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         }
     }
 
-    private <K> List<K> eliminateProcessed(List<K> visitors, Set<Object> processedVisitors) {
+    private <K> List<K> eliminateProcessed(List<K> visitors, Set<Class<?>>  processedVisitors) {
         if (visitors == null) {
             return null;
         }
-        return visitors.stream().filter(v -> !processedVisitors.contains(v)).toList();
+        return visitors.stream().filter(v -> !processedVisitors.contains(v.getClass())).toList();
     }
 
     private Stream<ProcessedAnnotation> processAnnotationRemappers(ProcessedAnnotation processedAnnotation,
-                                                                   Set<Object> processedVisitors) {
+                                                                   Set<Class<?>>  processedVisitors) {
         AnnotationValue<?> annotationValue = processedAnnotation.getAnnotationValue();
         String packageName = NameUtils.getPackageName(annotationValue.getAnnotationName());
         List<AnnotationRemapper> annotationRemappers = ANNOTATION_REMAPPERS.get(packageName);
@@ -1435,7 +1435,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         VisitorContext visitorContext = createVisitorContext();
         List<ProcessedAnnotation> result = new ArrayList<>();
         for (AnnotationRemapper annotationRemapper : annotationRemappers) {
-            processedVisitors.add(annotationRemapper);
+            processedVisitors.add(annotationRemapper.getClass());
             for (AnnotationValue<?> newAnnotationValue : annotationRemapper.remap(annotationValue, visitorContext)) {
                 if (newAnnotationValue == annotationValue) {
                     result.add(processedAnnotation); // Retain the same value
@@ -1449,7 +1449,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     }
 
     private <K extends Annotation> Stream<ProcessedAnnotation> processAnnotationTransformers(ProcessedAnnotation processedAnnotation,
-                                                                                             Set<Object> processedVisitors) {
+                                                                                             Set<Class<?>>  processedVisitors) {
         AnnotationValue<K> annotationValue = (AnnotationValue<K>) processedAnnotation.getAnnotationValue();
         List<AnnotationTransformer<K>> annotationTransformers = getAnnotationTransformers(annotationValue.getAnnotationName());
         annotationTransformers = eliminateProcessed(annotationTransformers, processedVisitors);
@@ -1459,7 +1459,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         VisitorContext visitorContext = createVisitorContext();
         List<ProcessedAnnotation> result = new ArrayList<>();
         for (AnnotationTransformer<K> annotationTransformer : annotationTransformers) {
-            processedVisitors.add(annotationTransformer);
+            processedVisitors.add(annotationTransformer.getClass());
             for (AnnotationValue<?> newAnnotationValue : annotationTransformer.transform(annotationValue, visitorContext)) {
                 if (newAnnotationValue == annotationValue) {
                     result.add(processedAnnotation); // Retain the same value
@@ -1473,7 +1473,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     }
 
     private <K extends Annotation> Stream<ProcessedAnnotation> processAnnotationMappers(ProcessedAnnotation processedAnnotation,
-                                                                                        Set<Object> processedVisitors) {
+                                                                                        Set<Class<?>> processedVisitors) {
         AnnotationValue<K> annotationValue = (AnnotationValue<K>) processedAnnotation.getAnnotationValue();
         List<AnnotationMapper<K>> mappers = getAnnotationMappers(annotationValue.getAnnotationName());
         mappers = eliminateProcessed(mappers, processedVisitors);
@@ -1484,7 +1484,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         List<ProcessedAnnotation> result = new ArrayList<>();
         result.add(processedAnnotation); // Mapper retains the original value
         for (AnnotationMapper<K> mapper : mappers) {
-            processedVisitors.add(mapper);
+            processedVisitors.add(mapper.getClass());
             List<AnnotationValue<?>> mappedToAnnotationValues = mapper.map(annotationValue, visitorContext);
             if (mappedToAnnotationValues != null) {
                 for (AnnotationValue<?> mappedToAnnotationValue : mappedToAnnotationValues) {
