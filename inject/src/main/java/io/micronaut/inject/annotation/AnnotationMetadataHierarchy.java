@@ -23,6 +23,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.value.OptionalValues;
 
 import java.lang.annotation.Annotation;
@@ -32,7 +33,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -254,21 +254,27 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     @Nullable
     private <T extends Annotation> AnnotationValue<T> mergeValue(@NonNull String annotation,
                                                                  @Nullable AnnotationValue<T> existingValue,
-                                                                 @Nullable AnnotationValue<T> newValud) {
-        if (newValud == null) {
+                                                                 @Nullable AnnotationValue<T> newValue) {
+        if (newValue == null) {
             return existingValue;
         }
         if (existingValue == null) {
-            return newValud;
+            return newValue;
         }
-        final Map<CharSequence, Object> values = newValud.getValues();
+        final Map<CharSequence, Object> values = newValue.getValues();
         final Map<CharSequence, Object> existing = existingValue.getValues();
-        Map<CharSequence, Object> newValues = new LinkedHashMap<>(values.size() + existing.size());
+        Map<CharSequence, Object> newValues = CollectionUtils.newLinkedHashMap(values.size() + existing.size());
         newValues.putAll(existing);
         for (Map.Entry<CharSequence, Object> entry : values.entrySet()) {
             newValues.putIfAbsent(entry.getKey(), entry.getValue());
         }
-        return new AnnotationValue<>(annotation, newValues, AnnotationMetadataSupport.getDefaultValues(annotation));
+        Map<CharSequence, Object> newDefaults = newValue.getDefaultValues();
+        Map<CharSequence, Object> existingDefaults = existingValue.getDefaultValues();
+        return new AnnotationValue<>(
+                annotation,
+                newValues,
+                existingDefaults != null ? existingDefaults : newDefaults
+        );
     }
 
     @NonNull
@@ -603,9 +609,9 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
 
     @NonNull
     @Override
-    public Map<String, Object> getDefaultValues(@NonNull String annotation) {
+    public Map<CharSequence, Object> getDefaultValues(@NonNull String annotation) {
         for (AnnotationMetadata annotationMetadata : hierarchy) {
-            final Map<String, Object> defaultValues = annotationMetadata.getDefaultValues(annotation);
+            final Map<CharSequence, Object> defaultValues = annotationMetadata.getDefaultValues(annotation);
             if (!defaultValues.isEmpty()) {
                 return defaultValues;
             }
@@ -1064,6 +1070,11 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
             delegateDeclaredToAllElements,
             Arrays.stream(copy).map(AnnotationMetadata::copyAnnotationMetadata).toArray(AnnotationMetadata[]::new)
         );
+    }
+
+    @NonNull
+    private static <T extends Annotation> AnnotationValue<T> newAnnotationValue(String annotationType, Map<CharSequence, Object> values) {
+        return new AnnotationValue<>(annotationType, values, AnnotationMetadataSupport.getDefaultValuesOrNull(annotationType));
     }
 
     /**

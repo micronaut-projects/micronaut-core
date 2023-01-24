@@ -429,13 +429,6 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
     }
 
     @Override
-    protected Map<? extends AnnotatedNode, ?> readAnnotationDefaultValues(AnnotationNode annotationMirror) {
-        ClassNode classNode = annotationMirror.getClassNode();
-        String annotationName = classNode.getName();
-        return readAnnotationDefaultValues(annotationName, classNode);
-    }
-
-    @Override
     protected Object readAnnotationValue(AnnotatedNode originatingElement, AnnotatedNode member, String memberName, Object annotationValue) {
         if (annotationValue instanceof ConstantExpression constantExpression) {
             return readConstantExpression(originatingElement, member, constantExpression);

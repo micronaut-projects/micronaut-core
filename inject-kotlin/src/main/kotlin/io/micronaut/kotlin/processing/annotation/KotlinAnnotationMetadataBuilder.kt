@@ -304,24 +304,6 @@ class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnvironment: Sy
         return ArrayUtils.toArray(collection, valueType)
     }
 
-    override fun readAnnotationDefaultValues(annotationMirror: KSAnnotation): MutableMap<out KSDeclaration, *> {
-        val defaultArguments = annotationMirror.defaultArguments
-        val declaration = annotationMirror.annotationType.getClassDeclaration(visitorContext)
-        val allProperties = declaration.getAllProperties()
-        val map = mutableMapOf<KSDeclaration, Any>()
-        for (defaultArgument in defaultArguments) {
-            val name = defaultArgument.name
-            val value = defaultArgument.value
-            if (name != null && value != null) {
-                val dec = allProperties.find { it.simpleName.asString() == name.asString() }
-                if (dec != null) {
-                    map[dec] = value
-                }
-            }
-        }
-        return map
-    }
-
     override fun readAnnotationDefaultValues(
         annotationName: String,
         annotationType: KSAnnotated

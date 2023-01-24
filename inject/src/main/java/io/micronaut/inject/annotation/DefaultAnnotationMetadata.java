@@ -88,6 +88,8 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     Map<String, String> annotationRepeatableContainer;
     @Nullable
     Set<String> sourceRetentionAnnotations;
+    @Nullable
+    Map<String, Map<CharSequence, Object>> sourceAnnotationDefaultValues;
     private Map<String, List> annotationValuesByType = new ConcurrentHashMap<>(2);
 
     private final boolean hasPropertyExpressions;
@@ -206,7 +208,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
 
     @NonNull
     @Override
-    public Map<String, Object> getDefaultValues(@NonNull String annotation) {
+    public Map<CharSequence, Object> getDefaultValues(@NonNull String annotation) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         return AnnotationMetadataSupport.getDefaultValues(annotation);
     }
@@ -975,7 +977,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         ArgumentUtils.requireNonNull("member", member);
         ArgumentUtils.requireNonNull("requiredType", requiredType);
 
-        Map<String, Object> defaultValues = getDefaultValues(annotation);
+        Map<CharSequence, Object> defaultValues = getDefaultValues(annotation);
         if (defaultValues.containsKey(member)) {
             final Object v = defaultValues.get(member);
             if (requiredType.isInstance(v)) {
@@ -1001,7 +1003,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                 } else if (allAnnotations != null) {
                     final Map<CharSequence, Object> values = allAnnotations.get(annotationTypeName);
                     if (values != null) {
-                        results = Collections.singletonList(new AnnotationValue<>(annotationTypeName, values));
+                        results = Collections.singletonList(newAnnotationValue(annotationTypeName, values));
                     }
                 }
 
@@ -1031,7 +1033,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                 } else if (allAnnotations != null) {
                     final Map<CharSequence, Object> values = allAnnotations.get(annotationType);
                     if (values != null) {
-                        results = Collections.singletonList(new AnnotationValue<>(annotationType, values));
+                        results = Collections.singletonList(newAnnotationValue(annotationType, values));
                     }
                 }
 
@@ -1042,6 +1044,21 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
             }
         }
         return Collections.emptyList();
+    }
+
+    @NonNull
+    private <T extends Annotation> AnnotationValue<T> newAnnotationValue(String annotationType, Map<CharSequence, Object> values) {
+        Map<CharSequence, Object> defaultValues = null;
+        if (annotationDefaultValues != null) {
+            defaultValues = annotationDefaultValues.get(annotationType);
+        }
+        if (defaultValues == null && sourceAnnotationDefaultValues != null) {
+            defaultValues = sourceAnnotationDefaultValues.get(annotationType);
+        }
+        if (defaultValues == null) {
+            defaultValues = AnnotationMetadataSupport.getDefaultValuesOrNull(annotationType);
+        }
+        return new AnnotationValue<>(annotationType, values, defaultValues);
     }
 
     @Override
@@ -1303,11 +1320,11 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         if (allAnnotations != null && StringUtils.isNotEmpty(annotation)) {
             Map<CharSequence, Object> values = allAnnotations.get(annotation);
             if (values != null) {
-                return Optional.of(new AnnotationValue<>(annotation, values, getDefaultValues(annotation)));
+                return Optional.of(newAnnotationValue(annotation, values));
             } else if (allStereotypes != null) {
                 values = allStereotypes.get(annotation);
                 if (values != null) {
-                    return Optional.of(new AnnotationValue<>(annotation, values, getDefaultValues(annotation)));
+                    return Optional.of(newAnnotationValue(annotation, values));
                 }
             }
         }
@@ -1321,11 +1338,11 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         if (declaredAnnotations != null && StringUtils.isNotEmpty(annotation)) {
             Map<CharSequence, Object> values = declaredAnnotations.get(annotation);
             if (values != null) {
-                return Optional.of(new AnnotationValue<>(annotation, values, getDefaultValues(annotation)));
+                return Optional.of(newAnnotationValue(annotation, values));
             } else if (declaredStereotypes != null) {
                 values = declaredStereotypes.get(annotation);
                 if (values != null) {
-                    return Optional.of(new AnnotationValue<>(annotation, values, getDefaultValues(annotation)));
+                    return Optional.of(newAnnotationValue(annotation, values));
                 }
             }
         }
@@ -1374,7 +1391,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         ArgumentUtils.requireNonNull("member", member);
         ArgumentUtils.requireNonNull("requiredType", requiredType);
         // Note this method should never reference the "annotationDefaultValues" field, which is used only at compile time
-        Map<String, Object> defaultValues = getDefaultValues(annotation);
+        Map<CharSequence, Object> defaultValues = getDefaultValues(annotation);
         if (defaultValues.containsKey(member)) {
             return ConversionService.SHARED.convert(defaultValues.get(member), requiredType);
         }
@@ -1424,6 +1441,9 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         }
         if (annotationDefaultValues != null) {
             cloned.annotationDefaultValues = cloneMapOfMapValue(annotationDefaultValues);
+        }
+        if (sourceAnnotationDefaultValues != null) {
+            cloned.sourceAnnotationDefaultValues = cloneMapOfMapValue(sourceAnnotationDefaultValues);
         }
         return cloned;
     }
@@ -1508,15 +1528,36 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      * @param values     The values
      */
     protected final void addDefaultAnnotationValues(String annotation, Map<CharSequence, Object> values) {
-        if (annotation != null) {
-            Map<String, Map<CharSequence, Object>> annotationDefaults = this.annotationDefaultValues;
+        addDefaultAnnotationValues(annotation, values, RetentionPolicy.RUNTIME);
+    }
+
+    /**
+     * Adds an annotation directly declared on the element and its member values, if the annotation already exists the
+     * data will be merged with existing values replaced.
+     *
+     * @param annotation      The annotation
+     * @param values          The values
+     * @param retentionPolicy The retention policy
+     */
+    protected final void addDefaultAnnotationValues(String annotation, Map<CharSequence, Object> values, RetentionPolicy retentionPolicy) {
+        if (annotation == null) {
+            return;
+        }
+        Map<String, Map<CharSequence, Object>> annotationDefaults;
+        if (retentionPolicy == RetentionPolicy.RUNTIME) {
+            annotationDefaults = this.annotationDefaultValues;
             if (annotationDefaults == null) {
                 this.annotationDefaultValues = new LinkedHashMap<>();
                 annotationDefaults = this.annotationDefaultValues;
             }
-
-            putValues(annotation, values, annotationDefaults);
+        } else {
+            annotationDefaults = this.sourceAnnotationDefaultValues;
+            if (annotationDefaults == null) {
+                this.sourceAnnotationDefaultValues = new LinkedHashMap<>();
+                annotationDefaults = this.sourceAnnotationDefaultValues;
+            }
         }
+        putValues(annotation, values, annotationDefaults);
     }
 
     /**
@@ -1528,7 +1569,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @SuppressWarnings("unused")
     @Internal
     @UsedByGeneratedCode
-    public static void registerAnnotationDefaults(String annotation, Map<String, Object> defaultValues) {
+    public static void registerAnnotationDefaults(String annotation, Map<CharSequence, Object> defaultValues) {
         AnnotationMetadataSupport.registerDefaultValues(annotation, defaultValues);
     }
 
@@ -1541,7 +1582,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @SuppressWarnings("unused")
     @Internal
     @UsedByGeneratedCode
-    public static void registerAnnotationDefaults(AnnotationClassValue<?> annotation, Map<String, Object> defaultValues) {
+    public static void registerAnnotationDefaults(AnnotationClassValue<?> annotation, Map<CharSequence, Object> defaultValues) {
         AnnotationMetadataSupport.registerDefaultValues(annotation, defaultValues);
     }
 
@@ -2165,6 +2206,14 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                 annotationDefaultValues.putAll(annotationMetadata.annotationDefaultValues);
             }
         }
+        if (annotationMetadata.sourceAnnotationDefaultValues != null) {
+            if (sourceAnnotationDefaultValues == null) {
+                sourceAnnotationDefaultValues = new LinkedHashMap<>(annotationMetadata.sourceAnnotationDefaultValues);
+            } else {
+                // No need to merge values
+                sourceAnnotationDefaultValues.putAll(annotationMetadata.sourceAnnotationDefaultValues);
+            }
+        }
     }
 
     /**
@@ -2181,24 +2230,22 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         if (source instanceof AnnotationMetadataHierarchy) {
             source = ((AnnotationMetadataHierarchy) source).merge();
         }
-        if (target instanceof DefaultAnnotationMetadata && source instanceof DefaultAnnotationMetadata) {
-            DefaultAnnotationMetadata damTarget = (DefaultAnnotationMetadata) target;
-            DefaultAnnotationMetadata damSource = (DefaultAnnotationMetadata) source;
+        if (target instanceof DefaultAnnotationMetadata damTarget && source instanceof DefaultAnnotationMetadata damSource) {
             final Map<String, Map<CharSequence, Object>> existingDefaults = damTarget.annotationDefaultValues;
+            final Map<String, Map<CharSequence, Object>> additionalDefaults = damSource.annotationDefaultValues;
             if (existingDefaults != null) {
-                final Map<String, Map<CharSequence, Object>> additionalDefaults = damSource.annotationDefaultValues;
                 if (additionalDefaults != null) {
                     existingDefaults.putAll(
                         additionalDefaults
                     );
                 }
             } else {
-                final Map<String, Map<CharSequence, Object>> additionalDefaults = damSource.annotationDefaultValues;
                 if (additionalDefaults != null) {
                     additionalDefaults.forEach(damTarget::addDefaultAnnotationValues);
                 }
             }
         }
+        // We don't need to contribute the default source annotation
         contributeRepeatable(target, source);
     }
 
@@ -2290,7 +2337,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         if (annotations != null) {
             annotations.entrySet().removeIf(entry -> {
                 final String annotationName = entry.getKey();
-                if (predicate.test(new AnnotationValue<>(annotationName, entry.getValue()))) {
+                if (predicate.test(newAnnotationValue(annotationName, entry.getValue()))) {
                     removeFromStereotypes(annotationName, annotations);
                     return true;
                 }

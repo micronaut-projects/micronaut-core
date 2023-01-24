@@ -27,7 +27,6 @@ import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
-import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.InstantiatedMember;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
@@ -42,11 +41,7 @@ import jakarta.inject.Qualifier;
 import org.jetbrains.annotations.NotNull;
 
 import java.lang.annotation.Annotation;
-import java.lang.annotation.Documented;
-import java.lang.annotation.Inherited;
-import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -61,7 +56,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -75,16 +69,6 @@ import java.util.stream.Stream;
 @Internal
 public abstract class AbstractAnnotationMetadataBuilder<T, A> {
 
-    protected static final List<String> EXCLUDES = Arrays.asList(
-            AnnotationUtil.KOTLIN_METADATA,
-            "jdk.internal.ValueBased",
-            Experimental.class.getName(),
-            Documented.class.getName(),
-            Retention.class.getName(),
-            Target.class.getName(),
-            Inherited.class.getName()
-    );
-
     /**
      * Names of annotations that should produce deprecation warnings.
      * The key in the map is the deprecated annotation the value the replacement.
@@ -95,7 +79,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     private static final Map<String, List<AnnotationRemapper>> ANNOTATION_REMAPPERS = new HashMap<>(5);
     private static final Map<MetadataKey<?>, CachedAnnotationMetadata> MUTATED_ANNOTATION_METADATA = new HashMap<>(100);
     private static final Map<String, Set<String>> NON_BINDING_CACHE = new HashMap<>(50);
-    private static final Map<String, Map<String, Object>> ANNOTATION_DEFAULTS = new HashMap<>(20);
+    private static final Map<String, Map<CharSequence, Object>> ANNOTATION_DEFAULTS = new HashMap<>(20);
     private static final String MSG_UNRECOGNIZED_ANNOTATION_METADATA = "Unrecognized annotation metadata: ";
 
     static {
@@ -482,14 +466,6 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     /**
      * Read the raw default annotation values from the given annotation.
      *
-     * @param annotationMirror The annotation
-     * @return The values
-     */
-    protected abstract Map<? extends T, ?> readAnnotationDefaultValues(A annotationMirror);
-
-    /**
-     * Read the raw default annotation values from the given annotation.
-     *
      * @param annotationName annotation name
      * @param annotationType the type
      * @return The values
@@ -542,50 +518,46 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     protected abstract String getRepeatableNameForType(T annotationType);
 
     /**
-     * @param originatingElement The originating element
-     * @param annotationMirror   The annotation
+     * @param annotationElement The annotation element
+     * @param annotationType    The annotation type
      * @return The annotation value
      */
-    protected io.micronaut.core.annotation.AnnotationValue readNestedAnnotationValue(T originatingElement, A annotationMirror) {
-        io.micronaut.core.annotation.AnnotationValue av;
-        Map<? extends T, ?> annotationValues = readAnnotationRawValues(annotationMirror);
-        final String annotationTypeName = getAnnotationTypeName(annotationMirror);
+    protected AnnotationValue<?> readNestedAnnotationValue(T annotationElement, A annotationType) {
+        final String annotationTypeName = getAnnotationTypeName(annotationType);
+        Map<? extends T, ?> annotationValues = readAnnotationRawValues(annotationType);
         if (annotationValues.isEmpty()) {
-            av = new io.micronaut.core.annotation.AnnotationValue(annotationTypeName);
-        } else {
-
-            Map<CharSequence, Object> resolvedValues = new LinkedHashMap<>();
-            for (Map.Entry<? extends T, ?> entry : annotationValues.entrySet()) {
-                T member = entry.getKey();
-                Optional<AnnotationValue<AliasFor>> aliasForValues = getAnnotationValues(originatingElement, member, AliasFor.class);
-                Object annotationValue = entry.getValue();
-                if (aliasForValues.isPresent()) {
-                    AnnotationValue<AliasFor> aliasFor = aliasForValues.get();
-                    Optional<String> aliasMember = aliasFor.stringValue("member");
-                    Optional<String> aliasAnnotation = aliasFor.stringValue("annotation");
-                    Optional<String> aliasAnnotationName = aliasFor.stringValue("annotationName");
-                    if (aliasMember.isPresent() && !(aliasAnnotation.isPresent() || aliasAnnotationName.isPresent())) {
-                        String aliasedNamed = aliasMember.get();
-                        readAnnotationRawValues(originatingElement,
-                                annotationTypeName,
-                                member,
-                                aliasedNamed,
-                                annotationValue,
-                                resolvedValues);
-                    }
-                }
-                String memberName = getAnnotationMemberName(member);
-                readAnnotationRawValues(originatingElement,
-                        annotationTypeName,
-                        member,
-                        memberName,
-                        annotationValue,
-                        resolvedValues);
-            }
-            av = new io.micronaut.core.annotation.AnnotationValue(annotationTypeName, resolvedValues);
+            return new AnnotationValue<>(annotationTypeName, Collections.emptyMap());
         }
 
-        return av;
+        Map<CharSequence, Object> resolvedValues = new LinkedHashMap<>();
+        for (Map.Entry<? extends T, ?> entry : annotationValues.entrySet()) {
+            T member = entry.getKey();
+            Optional<AnnotationValue<AliasFor>> aliasForValues = getAnnotationValues(annotationElement, member, AliasFor.class);
+            Object annotationValue = entry.getValue();
+            if (aliasForValues.isPresent()) {
+                AnnotationValue<AliasFor> aliasFor = aliasForValues.get();
+                Optional<String> aliasMember = aliasFor.stringValue("member");
+                Optional<String> aliasAnnotation = aliasFor.stringValue("annotation");
+                Optional<String> aliasAnnotationName = aliasFor.stringValue("annotationName");
+                if (aliasMember.isPresent() && !(aliasAnnotation.isPresent() || aliasAnnotationName.isPresent())) {
+                    String aliasedNamed = aliasMember.get();
+                    readAnnotationRawValues(annotationElement,
+                            annotationTypeName,
+                            member,
+                            aliasedNamed,
+                            annotationValue,
+                            resolvedValues);
+                }
+            }
+            String memberName = getAnnotationMemberName(member);
+            readAnnotationRawValues(annotationElement,
+                    annotationTypeName,
+                    member,
+                    memberName,
+                    annotationValue,
+                    resolvedValues);
+        }
+        return new AnnotationValue<>(annotationTypeName, resolvedValues);
     }
 
     /**
@@ -635,28 +607,6 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @return The visitor context
      */
     protected abstract VisitorContext createVisitorContext();
-
-    private void addAnnotationDefaults(DefaultAnnotationMetadata metadata,
-                                       T annotationType,
-                                       String annotationName) {
-        Map<CharSequence, Object> defaultValues;
-        final Map<String, Object> defaults = ANNOTATION_DEFAULTS.get(annotationName);
-        if (defaults != null) {
-            defaultValues = new LinkedHashMap<>(defaults);
-        } else {
-            Map<? extends T, ?> annotationDefaultValues = readAnnotationDefaultValues(annotationName, annotationType);
-            defaultValues = getAnnotationDefaults(annotationType, annotationName, annotationDefaultValues);
-            if (defaultValues != null) {
-                ANNOTATION_DEFAULTS.put(annotationName, defaultValues.entrySet().stream()
-                        .collect(Collectors.toMap(
-                                (entry) -> entry.getKey().toString(),
-                                Map.Entry::getValue)));
-            } else {
-                defaultValues = Collections.emptyMap();
-            }
-        }
-        metadata.addDefaultAnnotationValues(annotationName, defaultValues);
-    }
 
     private Map<CharSequence, Object> getAnnotationDefaults(T originatingElement,
                                                             String annotationName,
@@ -880,10 +830,32 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 }
             }
         }
+
+        Map<CharSequence, Object> defaultValues = getCachedAnnotationDefaults(annotationName, annotationType);
+
         return new ProcessedAnnotation(
                 annotationType,
-                new AnnotationValue<>(annotationName, annotationValues, retentionPolicy)
+                new AnnotationValue<>(annotationName, annotationValues, defaultValues, retentionPolicy)
         );
+    }
+
+    @NotNull
+    private Map<CharSequence, Object> getCachedAnnotationDefaults(String annotationName, T annotationType) {
+        Map<CharSequence, Object> defaultValues;
+        final Map<CharSequence, Object> defaults = ANNOTATION_DEFAULTS.get(annotationName);
+        if (defaults != null) {
+            defaultValues = new LinkedHashMap<>(defaults);
+        } else {
+            Map<? extends T, ?> annotationDefaultValues = readAnnotationDefaultValues(annotationName, annotationType);
+            defaultValues = getAnnotationDefaults(annotationType, annotationName, annotationDefaultValues);
+            if (defaultValues != null) {
+                // Add the default for any retention type annotation
+                ANNOTATION_DEFAULTS.put(annotationName, new LinkedHashMap<>(defaultValues));
+            } else {
+                defaultValues = Collections.emptyMap();
+            }
+        }
+        return defaultValues;
     }
 
     private void handleAnnotationAlias(T originatingElement,
@@ -962,7 +934,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                     if (hasInterceptorBinding && AnnotationUtil.ANN_INTERCEPTOR_BINDING.equals(annotationName)) {
                         annotationValue = handleMemberBinding(annotationMetadata, lastParent, annotationValue);
                         interceptorBindings.getLast().members(annotationValue.getValues());
-                        return new ProcessedAnnotation(processedAnnotation.getAnnotationType(), annotationValue);
+                        return processedAnnotation.withAnnotationValue(annotationValue);
                     }
                     if (hasInterceptorBinding && Type.class.getName().equals(annotationName)) {
                         final Object o = annotationValue.getValues().get(AnnotationMetadata.VALUE_MEMBER);
@@ -1054,9 +1026,11 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         AnnotationValue<?> annotationValue = processedAnnotation.getAnnotationValue();
         String annotationName = annotationValue.getAnnotationName();
         T annotationType = processedAnnotation.getAnnotationType();
-        if (annotationType != null && annotationValue.getRetentionPolicy() == RetentionPolicy.RUNTIME) {
-            addAnnotationDefaults(annotationMetadata, annotationType, annotationName);
+        Map<CharSequence, Object> annotationDefaults = annotationValue.getDefaultValues();
+        if (annotationDefaults == null) {
+            annotationDefaults = getCachedAnnotationDefaults(annotationName, annotationType);
         }
+        annotationMetadata.addDefaultAnnotationValues(annotationName, annotationDefaults, annotationValue.getRetentionPolicy());
     }
 
     private ProcessedAnnotation processAliases(ProcessedAnnotation processedAnnotation, List<ProcessedAnnotation> introducedAnnotations) {
@@ -1086,8 +1060,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         if (newValues.equals(annotationValue.getValues())) {
             return processedAnnotation;
         } else {
-            return new ProcessedAnnotation(
-                    processedAnnotation.getAnnotationType(),
+            return processedAnnotation.withAnnotationValue(
                     AnnotationValue.builder(annotationValue).members(newValues).build()
             );
         }
@@ -1414,7 +1387,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         }
     }
 
-    private <K> List<K> eliminateProcessed(List<K> visitors, Set<Class<?>>  processedVisitors) {
+    private <K> List<K> eliminateProcessed(List<K> visitors, Set<Class<?>> processedVisitors) {
         if (visitors == null) {
             return null;
         }
@@ -1422,7 +1395,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     }
 
     private Stream<ProcessedAnnotation> processAnnotationRemappers(ProcessedAnnotation processedAnnotation,
-                                                                   Set<Class<?>>  processedVisitors) {
+                                                                   Set<Class<?>> processedVisitors) {
         AnnotationValue<?> annotationValue = processedAnnotation.getAnnotationValue();
         String packageName = NameUtils.getPackageName(annotationValue.getAnnotationName());
         List<AnnotationRemapper> annotationRemappers = ANNOTATION_REMAPPERS.get(packageName);
@@ -1447,7 +1420,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     }
 
     private <K extends Annotation> Stream<ProcessedAnnotation> processAnnotationTransformers(ProcessedAnnotation processedAnnotation,
-                                                                                             Set<Class<?>>  processedVisitors) {
+                                                                                             Set<Class<?>> processedVisitors) {
         AnnotationValue<K> annotationValue = (AnnotationValue<K>) processedAnnotation.getAnnotationValue();
         List<AnnotationTransformer<K>> annotationTransformers = getAnnotationTransformers(annotationValue.getAnnotationName());
         annotationTransformers = eliminateProcessed(annotationTransformers, processedVisitors);
@@ -1714,6 +1687,10 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         private ProcessedAnnotation(@Nullable T annotationType, AnnotationValue<?> annotationValue) {
             this.annotationType = annotationType;
             this.annotationValue = annotationValue;
+        }
+
+        public ProcessedAnnotation withAnnotationValue(AnnotationValue<?> annotationValue) {
+            return new ProcessedAnnotation(annotationType, annotationValue);
         }
 
         @Nullable

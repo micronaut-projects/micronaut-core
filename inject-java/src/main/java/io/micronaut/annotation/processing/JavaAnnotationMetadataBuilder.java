@@ -247,10 +247,8 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
 
     @Override
     protected List<? extends AnnotationMirror> getAnnotationsForType(Element element) {
-        List<? extends AnnotationMirror> annotationMirrors = new ArrayList<>(element.getAnnotationMirrors());
-        annotationMirrors.removeIf(mirror -> EXCLUDES.contains(getAnnotationTypeName(mirror)));
-        List<AnnotationMirror> expanded = new ArrayList<>(annotationMirrors.size());
-        for (AnnotationMirror annotation : annotationMirrors) {
+        List<AnnotationMirror> expanded = new ArrayList<>();
+        for (AnnotationMirror annotation : element.getAnnotationMirrors()) {
             boolean repeatable = false;
             boolean hasOtherMembers = false;
             for (Map.Entry<? extends ExecutableElement, ? extends AnnotationValue> entry : annotation.getElementValues().entrySet()) {
@@ -432,14 +430,6 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
             return annotationValue;
         }
         return null;
-    }
-
-    @Override
-    protected Map<? extends Element, ?> readAnnotationDefaultValues(AnnotationMirror annotationMirror) {
-
-        final String annotationTypeName = getAnnotationTypeName(annotationMirror);
-        Element element = annotationMirror.getAnnotationType().asElement();
-        return readAnnotationDefaultValues(annotationTypeName, element);
     }
 
     @Override

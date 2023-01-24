@@ -85,7 +85,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @Internal
 public final class AnnotationMetadataSupport {
 
-    private static final Map<String, Map<String, Object>> ANNOTATION_DEFAULTS = new ConcurrentHashMap<>(20);
+    private static final Map<String, Map<CharSequence, Object>> ANNOTATION_DEFAULTS = new ConcurrentHashMap<>(20);
     private static final Map<String, String> REPEATABLE_ANNOTATIONS_CONTAINERS = new ConcurrentHashMap<>(20);
 
     private static final Map<Class<? extends Annotation>, Optional<Constructor<InvocationHandler>>> ANNOTATION_PROXY_CACHE = new ConcurrentHashMap<>(20);
@@ -154,8 +154,18 @@ public final class AnnotationMetadataSupport {
      * @return The default values for the annotation
      */
     @UsedByGeneratedCode
-    public static Map<String, Object> getDefaultValues(String annotation) {
+    @NonNull
+    public static Map<CharSequence, Object> getDefaultValues(String annotation) {
         return ANNOTATION_DEFAULTS.getOrDefault(annotation, Collections.emptyMap());
+    }
+
+    /**
+     * @param annotation The annotation
+     * @return The default values for the annotation
+     */
+    @Nullable
+    public static Map<CharSequence, Object> getDefaultValuesOrNull(String annotation) {
+        return ANNOTATION_DEFAULTS.get(annotation);
     }
 
     /**
@@ -219,7 +229,7 @@ public final class AnnotationMetadataSupport {
      * @return The default values for the annotation
      */
     @SuppressWarnings("unchecked")
-    static Map<String, Object> getDefaultValues(Class<? extends Annotation> annotation) {
+    static Map<CharSequence, Object> getDefaultValues(Class<? extends Annotation> annotation) {
         return getDefaultValues(annotation.getName());
     }
 
@@ -239,7 +249,7 @@ public final class AnnotationMetadataSupport {
      * @param annotation    The annotation
      * @param defaultValues The default values
      */
-    static void registerDefaultValues(String annotation, Map<String, Object> defaultValues) {
+    static void registerDefaultValues(String annotation, Map<CharSequence, Object> defaultValues) {
         if (StringUtils.isNotEmpty(annotation)) {
             ANNOTATION_DEFAULTS.put(annotation, defaultValues);
         }
@@ -251,7 +261,7 @@ public final class AnnotationMetadataSupport {
      * @param annotation    The annotation
      * @param defaultValues The default values
      */
-    static void registerDefaultValues(AnnotationClassValue<?> annotation, Map<String, Object> defaultValues) {
+    static void registerDefaultValues(AnnotationClassValue<?> annotation, Map<CharSequence, Object> defaultValues) {
         if (defaultValues != null) {
             registerDefaultValues(annotation.getName(), defaultValues);
         }
@@ -306,7 +316,7 @@ public final class AnnotationMetadataSupport {
     static <T extends Annotation> T buildAnnotation(Class<T> annotationClass, @Nullable AnnotationValue<T> annotationValue) {
         Optional<Constructor<InvocationHandler>> proxyClass = getProxyClass(annotationClass);
         if (proxyClass.isPresent()) {
-            Map<String, Object> values = new HashMap<>(getDefaultValues(annotationClass));
+            Map<CharSequence, Object> values = new HashMap<>(getDefaultValues(annotationClass));
             if (annotationValue != null) {
                 final Map<CharSequence, Object> annotationValues = annotationValue.getValues();
                 annotationValues.forEach((key, o) -> values.put(key.toString(), o));
