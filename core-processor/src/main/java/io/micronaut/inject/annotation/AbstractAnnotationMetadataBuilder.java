@@ -599,12 +599,12 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     /**
      * Get the annotation member.
      *
-     * @param originatingElement The originatig element
-     * @param member             The member
-     * @return The annotation member
+     * @param annotationElement The annotation element
+     * @param member            The member
+     * @return The annotation member element
      */
     @Nullable
-    protected abstract T getAnnotationMember(T originatingElement, CharSequence member);
+    protected abstract T getAnnotationMember(T annotationElement, CharSequence member);
 
     /**
      * Obtain the annotation mappers for the given annotation name.

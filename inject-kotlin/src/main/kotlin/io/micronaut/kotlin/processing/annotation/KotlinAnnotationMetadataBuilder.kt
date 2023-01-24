@@ -22,7 +22,6 @@ import com.google.devtools.ksp.isDefault
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.symbol.*
-import io.micronaut.context.annotation.ConfigurationReader
 import io.micronaut.context.annotation.Property
 import io.micronaut.core.annotation.AnnotationClassValue
 import io.micronaut.core.annotation.AnnotationUtil
@@ -30,7 +29,6 @@ import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.core.reflect.ReflectionUtils
 import io.micronaut.core.util.ArrayUtils
 import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap
-import io.micronaut.core.value.OptionalValues
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
 import io.micronaut.inject.annotation.MutableAnnotationMetadata
 import io.micronaut.inject.visitor.VisitorContext
@@ -440,13 +438,6 @@ class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnvironment: Sy
         return Optional.empty()
     }
 
-    override fun getAnnotationMemberName(member: KSAnnotated): String {
-        if (member is KSDeclaration) {
-            return member.simpleName.asString()
-        }
-        TODO("Not yet implemented")
-    }
-
     override fun getRepeatableName(annotationMirror: KSAnnotation): String? {
         return getRepeatableNameForType(annotationMirror.annotationType)
     }
@@ -470,11 +461,18 @@ class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnvironment: Sy
         return Optional.ofNullable(resolver.getClassDeclarationByName(annotationName))
     }
 
-    override fun getAnnotationMember(originatingElement: KSAnnotated, member: CharSequence): KSAnnotated? {
-        if (originatingElement is KSAnnotation) {
-            return originatingElement.arguments.find { it.name == member }
+    override fun getAnnotationMember(annotationElement: KSAnnotated, member: CharSequence): KSAnnotated? {
+        if (annotationElement is KSClassDeclaration) {
+            return annotationElement.getAllProperties().find { it.simpleName.asString() == member }
         }
-        return null
+        throw IllegalStateException("Unknown annotation element: $annotationElement")
+    }
+
+    override fun getAnnotationMemberName(member: KSAnnotated): String {
+        if (member is KSPropertyDeclaration) {
+            return member.simpleName.asString()
+        }
+        throw IllegalStateException("Unknown annotation member element: $member")
     }
 
     override fun createVisitorContext(): VisitorContext {

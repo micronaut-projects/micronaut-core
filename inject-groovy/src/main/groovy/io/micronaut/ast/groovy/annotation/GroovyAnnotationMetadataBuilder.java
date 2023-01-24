@@ -136,8 +136,8 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
     }
 
     @Override
-    protected AnnotatedNode getAnnotationMember(AnnotatedNode originatingElement, CharSequence member) {
-        if (originatingElement instanceof ClassNode classNode) {
+    protected AnnotatedNode getAnnotationMember(AnnotatedNode annotationElement, CharSequence member) {
+        if (annotationElement instanceof ClassNode classNode) {
             final List<MethodNode> methods = classNode.getMethods(member.toString());
             if (CollectionUtils.isNotEmpty(methods)) {
                 return methods.iterator().next();

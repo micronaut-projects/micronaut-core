@@ -344,9 +344,9 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
 
     @Nullable
     @Override
-    protected Element getAnnotationMember(Element originatingElement, CharSequence member) {
-        if (originatingElement instanceof TypeElement) {
-            List<? extends Element> enclosedElements = originatingElement.getEnclosedElements();
+    protected Element getAnnotationMember(Element annotationElement, CharSequence member) {
+        if (annotationElement instanceof TypeElement) {
+            List<? extends Element> enclosedElements = annotationElement.getEnclosedElements();
             for (Element enclosedElement : enclosedElements) {
                 if (enclosedElement instanceof ExecutableElement && enclosedElement.getSimpleName().toString().equals(member.toString())) {
                     return enclosedElement;
